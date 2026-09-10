@@ -984,7 +984,11 @@ list is the heaviest page, and it repeatedly came near to the default limit of 3
   (`cross-tab-logout.spec.ts`). The observing tab stays on `/profile`. A list page continues to send
   cursor requests, and the jwt interceptor sends the first 401 to `/login` with or without the
   listener.
-- OAuth safety for the last provider (`oauth-unlink-last-provider.spec.ts`)
+- OAuth safety for the last provider (`oauth-unlink-last-provider.spec.ts`). The unlink demands a
+  step-up, so the account reaches that refusal on the load that follows a provider round trip
+- the step-up on a provider link (`oauth-link-step-up.spec.ts`) and on a provider unlink
+  (`oauth-unlink-step-up.spec.ts`): the password prompt, a refused password, the round trip an
+  account with no password takes, and the operation the proof is bound to
 - a wire-contract assertion that `auth_user.roles` is a `RoleResponse[]`
   (`post-login-admin-badge.spec.ts`)
 - an OAuth sign-in completes the session, thus a guarded return URL activates and does not go to

@@ -191,34 +191,38 @@
                   </div>
                 }
 
-                @if (linkPasswordProvider()) {
-                  <div class="oauth-link-confirm">
-                    <p class="oauth-link-note">
+                @let stepUp = stepUpPrompt();
+                @if (stepUp) {
+                  <div class="oauth-step-up-confirm">
+                    <p class="oauth-step-up-note">
                       {{
-                        t('auth.profile.confirmLinkHint', {
-                          provider: linkProviderLabel()
-                        })
+                        t(
+                          stepUp.mode === 'link'
+                            ? 'auth.profile.confirmLinkHint'
+                            : 'auth.profile.confirmUnlinkHint',
+                          { provider: stepUpPromptLabel() }
+                        )
                       }}
                     </p>
 
                     <nxs-form-field
-                      [field]="linkPasswordForm.currentPassword"
+                      [field]="stepUpPasswordForm.currentPassword"
                       label="auth.profile.currentPassword"
-                      [type]="linkPwdToggle.show() ? 'text' : 'password'"
+                      [type]="stepUpPwdToggle.show() ? 'text' : 'password'"
                       prefixIcon="lock"
                       autocomplete="current-password"
                     >
-                      <nxs-password-toggle formFieldSuffix #linkPwdToggle />
+                      <nxs-password-toggle formFieldSuffix #stepUpPwdToggle />
                     </nxs-form-field>
 
-                    <div class="oauth-link-actions">
+                    <div class="oauth-step-up-actions">
                       <button
                         matButton="filled"
                         type="button"
                         [disabled]="
-                          linkPasswordForm().invalid() || oauthLoading()
+                          stepUpPasswordForm().invalid() || oauthLoading()
                         "
-                        (click)="confirmLink()"
+                        (click)="confirmStepUp()"
                       >
                         @if (oauthLoading()) {
                           <span class="app-btn-loading">
@@ -226,13 +230,19 @@
                             {{ t('auth.profile.saving') }}
                           </span>
                         } @else {
-                          {{ t('auth.profile.confirmLinkButton') }}
+                          {{
+                            t(
+                              stepUp.mode === 'link'
+                                ? 'auth.profile.confirmLinkButton'
+                                : 'auth.profile.confirmUnlinkButton'
+                            )
+                          }}
                         }
                       </button>
                       <button
                         matButton="text"
                         type="button"
-                        (click)="cancelLink()"
+                        (click)="cancelStepUp()"
                       >
                         {{ t('common.cancel') }}
                       </button>

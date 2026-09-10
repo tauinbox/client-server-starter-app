@@ -136,18 +136,18 @@ form {
   align-items: center;
 }
 
-.oauth-link-confirm {
+.oauth-step-up-confirm {
   padding-top: vars.$spacing-md;
   border-top: func.rem(1) solid var(--mat-sys-outline-variant);
 }
 
-.oauth-link-note {
+.oauth-step-up-note {
   margin: 0 0 vars.$spacing-sm;
   font-size: vars.$font-size-sm;
   color: var(--mat-sys-on-surface-variant);
 }
 
-.oauth-link-actions {
+.oauth-step-up-actions {
   display: flex;
   flex-wrap: wrap;
   gap: vars.$spacing-sm;

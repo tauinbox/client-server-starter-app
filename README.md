@@ -185,6 +185,8 @@ management and theming.
 - `GET /api/v1/auth/permissions` returns the packed CASL rules. The client hydrates them into
   `AppAbility` at bootstrap, before the route activation.
 - The profile page manages the OAuth accounts. A user can link a provider and unlink a provider.
+  Each direction is a credential change, so each one asks for a fresh factor first: the current
+  password, or a provider round trip for an account that holds no password.
 - Cron jobs on the server clean up the tokens.
 - **Audit logging.** The server records a security-sensitive operation in the `audit_logs` table.
   Examples are a login, a registration, a password change, user and role management, and an OAuth
@@ -1758,11 +1760,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2325 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 369 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 367 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1271 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 259 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 718 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2331 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 376 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 374 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1275 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 264 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 726 tests pass |
 
 ## CI/CD
 

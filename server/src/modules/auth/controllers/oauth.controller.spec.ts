@@ -220,7 +220,8 @@ describe('OAuthController', () => {
     it('should notify the account owner that a provider was unlinked', async () => {
       await controller.unlinkOAuth(
         'google',
-        mockJwtRequest('user-1') as JwtAuthRequest
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        {}
       );
 
       expect(
@@ -236,7 +237,8 @@ describe('OAuthController', () => {
       await expect(
         controller.unlinkOAuth(
           'google',
-          mockJwtRequest('user-1') as JwtAuthRequest
+          mockJwtRequest('user-1') as JwtAuthRequest,
+          {}
         )
       ).rejects.toThrow('last provider');
 
@@ -255,7 +257,8 @@ describe('OAuthController', () => {
 
       const result = await controller.unlinkOAuth(
         'google',
-        mockJwtRequest('user-1') as JwtAuthRequest
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        {}
       );
       await new Promise((resolve) => setImmediate(resolve));
 
@@ -266,7 +269,8 @@ describe('OAuthController', () => {
     it('should delegate to the service and audit the unlink', async () => {
       const result = await controller.unlinkOAuth(
         'google',
-        mockJwtRequest('user-1') as JwtAuthRequest
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        {}
       );
 
       expect(oauthAccountServiceMock.unlinkProvider).toHaveBeenCalledWith(
@@ -296,17 +300,61 @@ describe('OAuthController', () => {
       await expect(
         controller.unlinkOAuth(
           'google',
-          mockJwtRequest('user-1') as JwtAuthRequest
+          mockJwtRequest('user-1') as JwtAuthRequest,
+          {}
         )
       ).rejects.toThrow('No linked google account found');
       expect(auditServiceMock.log).not.toHaveBeenCalled();
+    });
+
+    it('demands a step-up bound to the unlink operation', async () => {
+      const req = mockJwtRequest('user-1', { reauth_proof: 'proof-token' });
+
+      await controller.unlinkOAuth('google', req as JwtAuthRequest, {
+        currentPassword: 'CurrentPassword123'
+      });
+
+      expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
+        'user-1',
+        'CurrentPassword123',
+        'proof-token',
+        STEP_UP_OPERATION.OAUTH_UNLINK,
+        expect.anything()
+      );
+    });
+
+    it('removes nothing when the step-up refuses the caller', async () => {
+      authServiceMock.assertStepUpForUser.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Current password is incorrect',
+            errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+          },
+          HttpStatus.BAD_REQUEST
+        )
+      );
+
+      await expect(
+        controller.unlinkOAuth(
+          'google',
+          mockJwtRequest('user-1') as JwtAuthRequest,
+          {}
+        )
+      ).rejects.toBeInstanceOf(HttpException);
+
+      expect(oauthAccountServiceMock.unlinkProvider).not.toHaveBeenCalled();
+      expect(auditServiceMock.log).not.toHaveBeenCalled();
+      expect(
+        mailServiceMock.sendOAuthUnlinkedNotification
+      ).not.toHaveBeenCalled();
     });
 
     it('should throw when provider is invalid', async () => {
       await expect(
         controller.unlinkOAuth(
           'invalid-provider',
-          mockJwtRequest('user-1') as JwtAuthRequest
+          mockJwtRequest('user-1') as JwtAuthRequest,
+          {}
         )
       ).rejects.toThrow('Invalid OAuth provider');
       expect(oauthAccountServiceMock.unlinkProvider).not.toHaveBeenCalled();

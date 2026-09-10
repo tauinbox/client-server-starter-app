@@ -4,25 +4,27 @@ import { createMockUser } from '../fixtures/mock-data';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
 import type { Page } from '@playwright/test';
 
-// A linked provider signs the account in, and no recovery path removes it: a
-// password reset ends every session and leaves the row. So the link route
-// demands the same fresh proof of identity the other credential changes demand.
-test.describe('Linking a provider demands a step-up', () => {
-  const passwordUserId = '210';
-  const passwordEmail = 'link-step-up@example.com';
-  const providerUserId = '211';
-  const providerEmail = 'link-provider-only@example.com';
+// A linked provider signs the account in, and no recovery path removes it. The
+// link route already demands a fresh proof of identity for that reason, and
+// removing the row is the same credential change in the other direction: a
+// stolen session must not be able to strip the owner of a sign-in method.
+test.describe('Unlinking a provider demands a step-up', () => {
+  const passwordUserId = '220';
+  const passwordEmail = 'unlink-step-up@example.com';
+  const providerUserId = '221';
+  const providerEmail = 'unlink-provider-only@example.com';
 
-  /** The row for a provider that is offered but not linked yet. */
-  function connectButton(page: Page, provider: string) {
+  /** The row for a provider that is linked. */
+  function disconnectButton(page: Page, provider: string) {
     return page
       .locator('.oauth-provider-row')
       .filter({ hasText: provider })
-      .getByRole('button', { name: /^Connect$/i });
+      .getByRole('button', { name: /^Disconnect$/i });
   }
 
   async function seedProviderOnlyUser(
-    mockServer: MockServerApi
+    mockServer: MockServerApi,
+    providers: string[]
   ): Promise<void> {
     await mockServer.seedUsers([
       createMockUser({
@@ -43,13 +45,14 @@ test.describe('Linking a provider demands a step-up', () => {
       })
     ]);
 
-    await mockServer.seedOAuthAccounts(providerUserId, [
-      {
-        provider: 'google',
-        providerId: 'g-211',
+    await mockServer.seedOAuthAccounts(
+      providerUserId,
+      providers.map((provider) => ({
+        provider,
+        providerId: `${provider}-221`,
         createdAt: '2025-01-01T00:00:00.000Z'
-      }
-    ]);
+      }))
+    );
   }
 
   async function seedProof(page: Page, token: string): Promise<void> {
@@ -72,38 +75,45 @@ test.describe('Linking a provider demands a step-up', () => {
       email: passwordEmail,
       roles: ['user']
     });
+    await _mockServer.seedOAuthAccounts(passwordUserId, [
+      {
+        provider: 'google',
+        providerId: 'g-220',
+        createdAt: '2025-01-01T00:00:00.000Z'
+      }
+    ]);
 
     await page.goto('/profile');
 
-    const linkCalls: number[] = [];
+    const unlinkCalls: number[] = [];
     page.on('response', (res) => {
       if (
-        res.url().includes('/auth/oauth/link-init') &&
-        res.request().method() === 'POST'
+        res.url().includes('/auth/oauth/accounts/') &&
+        res.request().method() === 'DELETE'
       ) {
-        linkCalls.push(res.status());
+        unlinkCalls.push(res.status());
       }
     });
 
-    await connectButton(page, 'Google').click();
+    await disconnectButton(page, 'Google').click();
 
     const prompt = page.locator('.oauth-step-up-confirm');
     await expect(prompt).toBeVisible();
-    // The prompt is the whole point: nothing is minted before a factor lands.
-    expect(linkCalls).toEqual([]);
+    // The prompt is the whole point: nothing is removed before a factor lands.
+    expect(unlinkCalls).toEqual([]);
 
     await prompt.getByLabel('Current password').fill('WrongPassword1');
-    await prompt.getByRole('button', { name: 'Continue' }).click();
+    await prompt.getByRole('button', { name: 'Disconnect' }).click();
 
     await expect(
       page.getByText(/current password is incorrect/i).first()
     ).toBeVisible();
-    await expect(prompt).toBeVisible();
-    expect(page.url()).toContain('/profile');
-    expect(linkCalls).toEqual([400]);
+    expect(unlinkCalls).toEqual([400]);
+    // Refused, so the provider is still a sign-in method.
+    await expect(disconnectButton(page, 'Google')).toBeVisible();
   });
 
-  test('links after the password, at every width', async ({
+  test('unlinks after the password, at every width', async ({
     _mockServer,
     page
   }) => {
@@ -112,9 +122,16 @@ test.describe('Linking a provider demands a step-up', () => {
       email: passwordEmail,
       roles: ['user']
     });
+    await _mockServer.seedOAuthAccounts(passwordUserId, [
+      {
+        provider: 'google',
+        providerId: 'g-220',
+        createdAt: '2025-01-01T00:00:00.000Z'
+      }
+    ]);
 
     await page.goto('/profile');
-    await connectButton(page, 'Google').click();
+    await disconnectButton(page, 'Google').click();
 
     const prompt = page.locator('.oauth-step-up-confirm');
     await expect(prompt).toBeVisible();
@@ -139,30 +156,33 @@ test.describe('Linking a provider demands a step-up', () => {
 
     const accepted = page.waitForResponse(
       (res) =>
-        res.url().includes('/auth/oauth/link-init') &&
-        res.request().method() === 'POST',
+        res.url().includes('/auth/oauth/accounts/') &&
+        res.request().method() === 'DELETE',
       { timeout: 15_000 }
     );
 
     await prompt.getByLabel('Current password').fill('Password1');
-    await prompt.getByRole('button', { name: 'Continue' }).click();
+    await prompt.getByRole('button', { name: 'Disconnect' }).click();
 
     const response = await accepted;
     expect(response.status()).toBe(200);
+    // The password travels in the DELETE body, which is what the server reads.
     expect(response.request().postDataJSON()).toEqual({
       currentPassword: 'Password1'
     });
 
-    // The provider half answers 501 in the mock, so the address is the proof
-    // that the intent was minted and the browser left for the provider.
-    await page.waitForURL(/\/api\/v1\/auth\/oauth\/google/, {
-      timeout: 15_000
-    });
+    await expect(prompt).toHaveCount(0);
+    await expect(
+      page
+        .locator('.oauth-provider-row')
+        .filter({ hasText: 'Google' })
+        .getByRole('button', { name: /^Connect$/i })
+    ).toBeVisible();
   });
 
   // An account created through a provider holds no password, so it proves
-  // itself at the provider it already has. That is a round trip of its own,
-  // before the round trip that does the linking.
+  // itself at a provider it still holds. That is a round trip of its own,
+  // before the request that removes the row.
   test('sends an account with no password to its provider first', async ({
     _mockServer,
     page
@@ -172,7 +192,7 @@ test.describe('Linking a provider demands a step-up', () => {
       email: providerEmail,
       roles: ['user']
     });
-    await seedProviderOnlyUser(_mockServer);
+    await seedProviderOnlyUser(_mockServer, ['google', 'facebook']);
 
     await page.goto('/profile');
 
@@ -182,17 +202,17 @@ test.describe('Linking a provider demands a step-up', () => {
         res.request().method() === 'POST',
       { timeout: 15_000 }
     );
-    await connectButton(page, 'Facebook').click();
+    await disconnectButton(page, 'Facebook').click();
 
     const response = await initiated;
     expect(response.request().postDataJSON()).toEqual({
-      operation: STEP_UP_OPERATION.OAUTH_LINK
+      operation: STEP_UP_OPERATION.OAUTH_UNLINK
     });
     // No password prompt: this account could never answer it.
     await expect(page.locator('.oauth-step-up-confirm')).toHaveCount(0);
   });
 
-  test('links on the load that follows the round trip', async ({
+  test('unlinks on the load that follows the round trip', async ({
     _mockServer,
     page
   }) => {
@@ -201,24 +221,24 @@ test.describe('Linking a provider demands a step-up', () => {
       email: providerEmail,
       roles: ['user']
     });
-    await seedProviderOnlyUser(_mockServer);
+    await seedProviderOnlyUser(_mockServer, ['google', 'facebook']);
 
     const { token } = await _mockServer.issueReauthProof(
       providerUserId,
-      STEP_UP_OPERATION.OAUTH_LINK
+      STEP_UP_OPERATION.OAUTH_UNLINK
     );
     await seedProof(page, token);
 
     // Seed before the document runs: the page reads and clears the key during
     // bootstrap, which happens after `page.goto` resolves.
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_link', 'facebook')
+      sessionStorage.setItem('pending_oauth_unlink', 'facebook')
     );
 
     const accepted = page.waitForResponse(
       (res) =>
-        res.url().includes('/auth/oauth/link-init') &&
-        res.request().method() === 'POST',
+        res.url().includes('/auth/oauth/accounts/facebook') &&
+        res.request().method() === 'DELETE',
       { timeout: 15_000 }
     );
 
@@ -226,43 +246,13 @@ test.describe('Linking a provider demands a step-up', () => {
 
     const response = await accepted;
     expect(response.status()).toBe(200);
-    await page.waitForURL(/\/api\/v1\/auth\/oauth\/facebook/, {
-      timeout: 15_000
-    });
+    await expect(
+      page.getByText(/facebook account disconnected/i).first()
+    ).toBeVisible();
   });
 
-  // A step-up refused at the provider must come back to the page that started
-  // it. The mock answers 501 for both provider halves, so the redirect the
-  // guard produces is driven directly, exactly as the browser would receive it.
-  test('reports a step-up refused at the provider on the profile page', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url, {
-      id: providerUserId,
-      email: providerEmail,
-      roles: ['user']
-    });
-    await seedProviderOnlyUser(_mockServer);
-
-    await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_link', 'facebook')
-    );
-
-    await page.goto('/profile?oauth_error=reauth_failed');
-
-    const snackbar = page.locator('mat-snack-bar-container');
-    await expect(snackbar).toBeVisible({ timeout: 5000 });
-    await expect(snackbar).toContainText('We could not confirm it is you');
-
-    await expect(page).toHaveURL(/\/profile$/);
-    expect(
-      await page.evaluate(() => sessionStorage.getItem('pending_oauth_link'))
-    ).toBeNull();
-  });
-
-  // The proof names one operation, so a trip taken for the two-factor
-  // enrolment buys no provider link.
+  // The proof names one operation, so a trip taken for the link buys no
+  // unlink.
   test('refuses a proof taken for another operation', async ({
     _mockServer,
     page
@@ -272,21 +262,21 @@ test.describe('Linking a provider demands a step-up', () => {
       email: providerEmail,
       roles: ['user']
     });
-    await seedProviderOnlyUser(_mockServer);
+    await seedProviderOnlyUser(_mockServer, ['google', 'facebook']);
 
     const { token } = await _mockServer.issueReauthProof(
       providerUserId,
-      STEP_UP_OPERATION.MFA_SETUP
+      STEP_UP_OPERATION.OAUTH_LINK
     );
     await seedProof(page, token);
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_link', 'facebook')
+      sessionStorage.setItem('pending_oauth_unlink', 'facebook')
     );
 
     const refused = page.waitForResponse(
       (res) =>
-        res.url().includes('/auth/oauth/link-init') &&
-        res.request().method() === 'POST' &&
+        res.url().includes('/auth/oauth/accounts/facebook') &&
+        res.request().method() === 'DELETE' &&
         res.status() === 400,
       { timeout: 15_000 }
     );
@@ -294,6 +284,6 @@ test.describe('Linking a provider demands a step-up', () => {
     await page.goto('/profile?reauth=ok');
     await refused;
 
-    expect(page.url()).toContain('/profile');
+    await expect(disconnectButton(page, 'Facebook')).toBeVisible();
   });
 });

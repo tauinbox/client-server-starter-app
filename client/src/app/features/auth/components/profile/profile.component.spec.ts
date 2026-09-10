@@ -859,7 +859,7 @@ describe('ProfileComponent', () => {
       component.connectProvider('unknown-provider');
 
       expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
-      expect(component['linkPasswordProvider']()).toBeNull();
+      expect(component['stepUpPrompt']()).toBeNull();
     });
 
     it('asks an account that holds a password for it, and mints nothing yet', async () => {
@@ -868,7 +868,10 @@ describe('ProfileComponent', () => {
 
       component.connectProvider('google');
 
-      expect(component['linkPasswordProvider']()).toBe('google');
+      expect(component['stepUpPrompt']()).toEqual({
+        provider: 'google',
+        mode: 'link'
+      });
       expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
     });
 
@@ -877,9 +880,9 @@ describe('ProfileComponent', () => {
       await fixture.whenStable();
 
       component.connectProvider('google');
-      component.linkPasswordModel.set({ currentPassword: 'Password1' });
+      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
       await fixture.whenStable();
-      component['confirmLink']();
+      component['confirmStepUp']();
 
       expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith('Password1');
     });
@@ -905,7 +908,7 @@ describe('ProfileComponent', () => {
         );
         expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
         expect(sessionStorage.getItem('pending_oauth_link')).toBe('facebook');
-        expect(component['linkPasswordProvider']()).toBeNull();
+        expect(component['stepUpPrompt']()).toBeNull();
       });
 
       it('links on the load that follows the round trip', async () => {
@@ -931,6 +934,8 @@ describe('ProfileComponent', () => {
     });
   });
 
+  // The row an unlink deletes is a sign-in credential, so removing one costs
+  // the same factor that adding one costs.
   describe('disconnectProvider', () => {
     it('ignores a provider name it does not know', () => {
       fixture.detectChanges();
@@ -941,15 +946,91 @@ describe('ProfileComponent', () => {
       expect(component['oauthLoading']()).toBe(false);
     });
 
-    it('unlinks a known provider', () => {
+    it('asks an account that holds a password for it, and removes nothing yet', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.disconnectProvider('google');
+
+      expect(component['stepUpPrompt']()).toEqual({
+        provider: 'google',
+        mode: 'unlink'
+      });
+      expect(authServiceMock.unlinkOAuthAccount).not.toHaveBeenCalled();
+    });
+
+    it('sends the password with the unlink request', async () => {
       authServiceMock.unlinkOAuthAccount.mockReturnValue(
         of({ message: 'Unlinked' })
       );
       fixture.detectChanges();
+      await fixture.whenStable();
 
       component.disconnectProvider('google');
+      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
+      await fixture.whenStable();
+      component['confirmStepUp']();
 
-      expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith('google');
+      expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith(
+        'google',
+        'Password1'
+      );
+      expect(component['stepUpPrompt']()).toBeNull();
+    });
+
+    describe('on an account created through a provider', () => {
+      const oauthOnlyUser = { ...mockUser, hasPassword: false };
+
+      beforeEach(() => {
+        authServiceMock.getProfile.mockReturnValue(of(oauthOnlyUser));
+        authServiceMock.getOAuthAccounts.mockReturnValue(
+          of([
+            { provider: 'google', createdAt: '2025-01-01T00:00:00.000Z' },
+            { provider: 'facebook', createdAt: '2025-01-01T00:00:00.000Z' }
+          ])
+        );
+      });
+
+      it('takes a round trip bound to the unlink instead of asking', async () => {
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        component.disconnectProvider('facebook');
+
+        expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
+          STEP_UP_OPERATION.OAUTH_UNLINK
+        );
+        expect(authServiceMock.unlinkOAuthAccount).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem('pending_oauth_unlink')).toBe('facebook');
+        expect(component['stepUpPrompt']()).toBeNull();
+      });
+
+      it('unlinks on the load that follows the round trip', async () => {
+        authServiceMock.unlinkOAuthAccount.mockReturnValue(
+          of({ message: 'Unlinked' })
+        );
+        sessionStorage.setItem('pending_oauth_unlink', 'facebook');
+        activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith(
+          'facebook',
+          undefined
+        );
+        expect(sessionStorage.getItem('pending_oauth_unlink')).toBeNull();
+      });
+
+      it('does not unlink on a round trip taken for the link', async () => {
+        sessionStorage.setItem('pending_oauth_link', 'facebook');
+        activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(authServiceMock.unlinkOAuthAccount).not.toHaveBeenCalled();
+      });
     });
   });
 

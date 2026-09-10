@@ -35,6 +35,7 @@ import { NotifyService } from '@core/services/notify.service';
 import { TwoFactorComponent } from '../two-factor/two-factor.component';
 import type { UserResponse } from '@app/shared/types';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
+import type { StepUpOperation } from '@app/shared/constants';
 import type { UpdateProfile } from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -118,6 +119,16 @@ const PENDING_MFA_KEY = 'pending_mfa_setup';
  * the right provider without asking again.
  */
 const PENDING_LINK_KEY = 'pending_oauth_link';
+
+/**
+ * The fifth resume path. It holds the provider the user asked to remove, so
+ * the load that follows the step-up round trip can finish the unlink without
+ * asking again.
+ */
+const PENDING_UNLINK_KEY = 'pending_oauth_unlink';
+
+/** Which credential change the open password prompt authorises. */
+type StepUpPromptMode = 'link' | 'unlink';
 
 /** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
 const PROVIDER_KEYS: Record<OAuthProvider, string> = {
@@ -224,23 +235,27 @@ export class ProfileComponent implements OnInit {
   protected readonly savingLocale = signal(false);
 
   /**
-   * The provider whose link control is waiting for the password, or null when
-   * no prompt is open. One prompt at a time, because one link at a time.
+   * The provider whose step-up prompt is waiting for the password, and the
+   * change that prompt authorises. Null when no prompt is open: one prompt at
+   * a time, because one credential change at a time.
    */
-  protected readonly linkPasswordProvider = signal<OAuthProvider | null>(null);
+  protected readonly stepUpPrompt = signal<{
+    provider: OAuthProvider;
+    mode: StepUpPromptMode;
+  } | null>(null);
 
-  protected readonly linkProviderLabel = computed(() => {
-    const provider = this.linkPasswordProvider();
-    return provider ? this.#providerLabel(provider) : '';
+  protected readonly stepUpPromptLabel = computed(() => {
+    const prompt = this.stepUpPrompt();
+    return prompt ? this.#providerLabel(prompt.provider) : '';
   });
 
-  readonly linkPasswordModel = signal<{ currentPassword: string }>({
+  readonly stepUpPasswordModel = signal<{ currentPassword: string }>({
     currentPassword: ''
   });
 
-  readonly linkPasswordForm = form(this.linkPasswordModel, (path) => {
+  readonly stepUpPasswordForm = form(this.stepUpPasswordModel, (path) => {
     required(path.currentPassword, {
-      message: 'auth.profile.linkPasswordRequired'
+      message: 'auth.profile.stepUpPasswordRequired'
     });
   });
 
@@ -399,10 +414,13 @@ export class ProfileComponent implements OnInit {
       this.#sessionStorage.getItem<boolean>(PENDING_PASSWORD_KEY);
     const pendingMfa = this.#sessionStorage.getItem<boolean>(PENDING_MFA_KEY);
     const pendingLink = this.#sessionStorage.getItem<string>(PENDING_LINK_KEY);
+    const pendingUnlink =
+      this.#sessionStorage.getItem<string>(PENDING_UNLINK_KEY);
     this.#sessionStorage.removeItem(PENDING_EMAIL_KEY);
     this.#sessionStorage.removeItem(PENDING_PASSWORD_KEY);
     this.#sessionStorage.removeItem(PENDING_MFA_KEY);
     this.#sessionStorage.removeItem(PENDING_LINK_KEY);
+    this.#sessionStorage.removeItem(PENDING_UNLINK_KEY);
 
     if (reauth !== 'ok') return;
 
@@ -430,6 +448,13 @@ export class ProfileComponent implements OnInit {
     // the provider the user picked before leaving.
     if (pendingLink && isOAuthProvider(pendingLink)) {
       this.#startLink(pendingLink);
+      return;
+    }
+
+    // The proof this trip earned is what the unlink was refused for, so the
+    // request can go straight out: removing the row needs no second trip.
+    if (pendingUnlink && isOAuthProvider(pendingUnlink)) {
+      this.#unlink(pendingUnlink);
       return;
     }
 
@@ -627,27 +652,46 @@ export class ProfileComponent implements OnInit {
     if (!isOAuthProvider(provider)) return;
 
     if (this.accountHasPassword()) {
-      this.linkPasswordModel.set({ currentPassword: '' });
-      this.linkPasswordProvider.set(provider);
+      this.#openStepUpPrompt(provider, 'link');
       return;
     }
 
-    this.#startLinkReauth(provider);
+    this.#startProviderReauth(
+      provider,
+      STEP_UP_OPERATION.OAUTH_LINK,
+      PENDING_LINK_KEY
+    );
   }
 
-  /** The password prompt on the link control, answered. */
-  protected confirmLink(): void {
-    const provider = this.linkPasswordProvider();
-    if (!provider || this.linkPasswordForm().invalid() || this.oauthLoading()) {
+  /** The password prompt on the provider controls, answered. */
+  protected confirmStepUp(): void {
+    const prompt = this.stepUpPrompt();
+    if (!prompt || this.stepUpPasswordForm().invalid() || this.oauthLoading()) {
       return;
     }
 
-    this.#startLink(provider, this.linkPasswordModel().currentPassword);
+    const currentPassword = this.stepUpPasswordModel().currentPassword;
+
+    if (prompt.mode === 'link') {
+      this.#startLink(prompt.provider, currentPassword);
+      return;
+    }
+
+    this.#unlink(prompt.provider, currentPassword);
   }
 
-  protected cancelLink(): void {
-    this.linkPasswordProvider.set(null);
-    this.linkPasswordModel.set({ currentPassword: '' });
+  protected cancelStepUp(): void {
+    this.#closeStepUpPrompt();
+  }
+
+  #openStepUpPrompt(provider: OAuthProvider, mode: StepUpPromptMode): void {
+    this.stepUpPasswordModel.set({ currentPassword: '' });
+    this.stepUpPrompt.set({ provider, mode });
+  }
+
+  #closeStepUpPrompt(): void {
+    this.stepUpPrompt.set(null);
+    this.stepUpPasswordModel.set({ currentPassword: '' });
   }
 
   #startLink(provider: OAuthProvider, currentPassword?: string): void {
@@ -657,8 +701,7 @@ export class ProfileComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.linkPasswordProvider.set(null);
-          this.linkPasswordModel.set({ currentPassword: '' });
+          this.#closeStepUpPrompt();
           this.#sessionStorage.setItem('oauth_return_url', '/profile');
           if (this.#window) {
             this.#window.location.href = OAUTH_URLS[provider];
@@ -672,11 +715,15 @@ export class ProfileComponent implements OnInit {
   }
 
   /**
-   * An account with no password proves itself at the provider it already
-   * holds. The provider it asked to link waits in session storage, because the
+   * An account with no password proves itself at a provider it already holds.
+   * The provider the change applies to waits in session storage, because the
    * round trip comes back as a full page load.
    */
-  #startLinkReauth(provider: OAuthProvider): void {
+  #startProviderReauth(
+    provider: OAuthProvider,
+    operation: StepUpOperation,
+    pendingKey: string
+  ): void {
     const reauthProvider = this.reauthProvider();
     if (!reauthProvider) {
       this.#notify.error('auth.profile.errorReauthNoProvider');
@@ -685,11 +732,11 @@ export class ProfileComponent implements OnInit {
 
     this.oauthLoading.set(true);
     this.#authService
-      .initOAuthReauth(STEP_UP_OPERATION.OAUTH_LINK)
+      .initOAuthReauth(operation)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#sessionStorage.setItem(PENDING_LINK_KEY, provider);
+          this.#sessionStorage.setItem(pendingKey, provider);
           this.#notify.info('auth.profile.reauthRedirecting', {
             provider: this.reauthProviderLabel()
           });
@@ -704,16 +751,36 @@ export class ProfileComponent implements OnInit {
       });
   }
 
+  /**
+   * The row an unlink deletes is a sign-in credential that a password change
+   * does not revoke, so removing one costs the factor that adding one costs.
+   * An account that holds a password types it here; an account created through
+   * a provider proves itself at a provider it still holds.
+   */
   disconnectProvider(provider: string): void {
     if (!isOAuthProvider(provider)) return;
 
+    if (this.accountHasPassword()) {
+      this.#openStepUpPrompt(provider, 'unlink');
+      return;
+    }
+
+    this.#startProviderReauth(
+      provider,
+      STEP_UP_OPERATION.OAUTH_UNLINK,
+      PENDING_UNLINK_KEY
+    );
+  }
+
+  #unlink(provider: OAuthProvider, currentPassword?: string): void {
     this.oauthLoading.set(true);
     this.#authService
-      .unlinkOAuthAccount(provider)
+      .unlinkOAuthAccount(provider, currentPassword)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
           this.oauthLoading.set(false);
+          this.#closeStepUpPrompt();
           this.oauthAccounts.update((accounts) =>
             accounts.filter((a) => a.provider !== provider)
           );

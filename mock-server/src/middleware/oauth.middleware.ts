@@ -33,6 +33,9 @@ router.get('/accounts', authGuard, (req, res) => {
 });
 
 // DELETE /api/v1/auth/oauth/accounts/:provider
+// Removing a provider is a credential change in the same way that adding one
+// is, so the route demands the same fresh proof of identity the link route
+// demands. The provider name is validated first, so a typo costs no step-up.
 router.delete('/accounts/:provider', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const provider = req.params['provider'] as string;
@@ -42,6 +45,25 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
       statusCode: 400,
       errorKey: ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER
     });
+    return;
+  }
+
+  const { currentPassword } = (req.body ?? {}) as { currentPassword?: unknown };
+
+  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
+    res.status(400).json(validationError('currentPassword is required'));
+    return;
+  }
+
+  const stepUp = stepUpError(
+    req,
+    user,
+    currentPassword,
+    undefined,
+    STEP_UP_OPERATION.OAUTH_UNLINK
+  );
+  if (stepUp) {
+    sendWithRetryAfter(res, stepUp);
     return;
   }
 
