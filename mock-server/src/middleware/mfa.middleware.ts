@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import {
   ErrorKeys,
+  LOCKOUT_DURATION_MS,
   MAX_CONCURRENT_SESSIONS,
+  MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE,
   TOTP_DIGITS,
@@ -48,6 +50,56 @@ const invalidPendingTokenEnvelope = {
   statusCode: 401,
   errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN
 };
+
+/**
+ * The route throttles are keyed by client address, so they bound one caller and
+ * not one account. This is the brake the source address cannot move: it mirrors
+ * the server `FailedAttemptCounter` on the challenge route only. The recovery
+ * route stays open on purpose, so a caller who holds only the password can
+ * never deny the owner every way in.
+ */
+function readChallengeFailures(userId: string): {
+  count: number;
+  remainingMs: number;
+} {
+  const open = getState().mfaChallengeFailures.get(userId);
+  const now = Date.now();
+  if (!open || open.expiresAt <= now) return { count: 0, remainingMs: 0 };
+  return { count: open.count, remainingMs: open.expiresAt - now };
+}
+
+function recordChallengeFailure(userId: string): {
+  count: number;
+  remainingMs: number;
+} {
+  const windows = getState().mfaChallengeFailures;
+  const now = Date.now();
+  const open = windows.get(userId);
+  // The window is set when it opens and never extended, so a caller who keeps
+  // trying cannot be barred past the duration.
+  const entry =
+    open && open.expiresAt > now
+      ? open
+      : { count: 0, expiresAt: now + LOCKOUT_DURATION_MS };
+  entry.count += 1;
+  windows.set(userId, entry);
+  return { count: entry.count, remainingMs: entry.expiresAt - now };
+}
+
+function clearChallengeFailures(userId: string): void {
+  getState().mfaChallengeFailures.delete(userId);
+}
+
+function challengeLockedEnvelope(remainingMs: number): Record<string, unknown> {
+  return {
+    message:
+      'Too many incorrect verification codes. Use a recovery code or try again later',
+    statusCode: 423,
+    errorKey: ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
+    lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
+    retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
+  };
+}
 
 function isValidCodeShape(value: unknown): value is string {
   return typeof value === 'string' && value.length === TOTP_DIGITS;
@@ -361,19 +413,31 @@ router.post('/verify', (req, res) => {
     return;
   }
 
+  const open = readChallengeFailures(user.id);
+  if (open.count >= MAX_FAILED_ATTEMPTS) {
+    res.status(423).json(challengeLockedEnvelope(open.remainingMs));
+    return;
+  }
+
   if (!consumeTotpCode(user, code)) {
+    const { count, remainingMs } = recordChallengeFailure(user.id);
     logAudit('MFA_CHALLENGE_FAILURE', {
       actorId: user.id,
       actorEmail: user.email,
       targetId: user.id,
       targetType: 'User',
-      details: { stage: 'challenge' },
+      details: { stage: 'challenge', attempt: count },
       ip: req.ip
     });
+    if (count >= MAX_FAILED_ATTEMPTS) {
+      res.status(423).json(challengeLockedEnvelope(remainingMs));
+      return;
+    }
     res.status(401).json(invalidCodeEnvelope);
     return;
   }
 
+  clearChallengeFailures(user.id);
   issueSession(req, res, user);
 });
 
@@ -438,6 +502,7 @@ router.post('/recovery', (req, res) => {
     ip: req.ip
   });
 
+  clearChallengeFailures(user.id);
   issueSession(req, res, user);
 });
 

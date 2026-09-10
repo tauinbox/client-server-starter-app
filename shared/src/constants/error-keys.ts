@@ -46,7 +46,8 @@ export const ErrorKeys = {
     MFA_INVALID_CODE: 'errors.auth.mfaInvalidCode',
     MFA_INVALID_RECOVERY_CODE: 'errors.auth.mfaInvalidRecoveryCode',
     MFA_INVALID_PENDING_TOKEN: 'errors.auth.mfaInvalidPendingToken',
-    MFA_ENROLMENT_REQUIRED: 'errors.auth.mfaEnrolmentRequired'
+    MFA_ENROLMENT_REQUIRED: 'errors.auth.mfaEnrolmentRequired',
+    MFA_CHALLENGE_LOCKED: 'errors.auth.mfaChallengeLocked'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

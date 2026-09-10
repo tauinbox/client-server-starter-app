@@ -1,12 +1,13 @@
 import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { findUserByEmail, resetState } from '../state';
+import { findUserByEmail, getState, resetState } from '../state';
 import {
   MOCK_RECOVERY_CODES,
   MOCK_REGENERATED_RECOVERY_CODES,
   MOCK_TOTP_CODE
 } from '../constants';
+import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 
 let server: Server;
 let baseUrl: string;
@@ -299,6 +300,113 @@ describe('two-factor sign-in', () => {
 
     expect(res.status).toBe(401);
     expect(body['errorKey']).toBe('errors.auth.mfaInvalidPendingToken');
+  });
+});
+
+/**
+ * The route throttles bound one caller, so they cannot bound one account. These
+ * cover the per-account brake, which is the same shape the server carries.
+ */
+describe('the brake on the authenticator challenge', () => {
+  async function guessWrong(mfaToken: string, times: number): Promise<void> {
+    for (let i = 0; i < times; i += 1) {
+      await post('/auth/mfa/verify', { mfaToken, code: '000000' });
+    }
+  }
+
+  it('bars the account after the same number of tries the password gets', async () => {
+    await enrol();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+
+    await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS - 1);
+    const res = await post('/auth/mfa/verify', { mfaToken, code: '000000' });
+    const body = (await res.json()) as Record<string, string>;
+
+    expect(res.status).toBe(423);
+    expect(body['errorKey']).toBe('errors.auth.mfaChallengeLocked');
+    expect(body['retryAfter']).toEqual(expect.any(Number));
+  });
+
+  // A fresh pending token costs one sign-in with the password the caller
+  // already holds, so the counter must not be bound to the token.
+  it('carries the window across a new pending token', async () => {
+    await enrol();
+    const first = (await login()) as { mfaToken: string };
+    await guessWrong(first.mfaToken, MAX_FAILED_ATTEMPTS);
+
+    const second = (await login()) as { mfaToken: string };
+    const res = await post('/auth/mfa/verify', {
+      mfaToken: second.mfaToken,
+      code: '000000'
+    });
+
+    expect(res.status).toBe(423);
+  });
+
+  it('refuses a correct code while the account is barred', async () => {
+    await enrol();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+    await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS);
+    await clearTotpLedger();
+
+    const res = await post('/auth/mfa/verify', {
+      mfaToken,
+      code: MOCK_TOTP_CODE
+    });
+
+    expect(res.status).toBe(423);
+  });
+
+  // A brake that shuts every door lets a caller who holds only the password
+  // deny the owner their own account.
+  it('leaves the recovery route open while the account is barred', async () => {
+    await enrol();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+    await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS);
+
+    const res = await post('/auth/mfa/recovery', {
+      mfaToken,
+      recoveryCode: MOCK_RECOVERY_CODES[0]
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('closes the window on a correct code', async () => {
+    await enrol();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+    await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS - 1);
+    await clearTotpLedger();
+
+    const accepted = await post('/auth/mfa/verify', {
+      mfaToken,
+      code: MOCK_TOTP_CODE
+    });
+    expect(accepted.status).toBe(200);
+
+    const next = (await login()) as { mfaToken: string };
+    const res = await post('/auth/mfa/verify', {
+      mfaToken: next.mfaToken,
+      code: '000000'
+    });
+
+    expect(res.status).toBe(401);
+  });
+
+  it('counts the attempt into the audit trail', async () => {
+    await enrol();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+
+    await post('/auth/mfa/verify', { mfaToken, code: '000000' });
+    await post('/auth/mfa/verify', { mfaToken, code: '000000' });
+
+    const failures = getState().auditLogs.filter(
+      (entry) => entry.action === 'MFA_CHALLENGE_FAILURE'
+    );
+    expect(failures.map((entry) => entry.details)).toEqual([
+      { stage: 'challenge', attempt: 1 },
+      { stage: 'challenge', attempt: 2 }
+    ]);
   });
 });
 

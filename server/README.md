@@ -1023,6 +1023,29 @@ usable for its whole window and an observed code buys a second session, or turns
 The lock is what makes it hold under load: a plain read-then-write lets two requests carrying one
 code both see it unspent. Starting a new enrolment and turning the factor off clear the floor.
 
+**The challenge carries a per-account brake as well.** The route throttles are keyed by client
+address, so they bound one caller and not one account: a caller who already holds the password buys
+a fresh budget of guesses with every address they add. `POST /auth/mfa/verify` therefore counts
+refused codes against the account itself, `MAX_FAILED_ATTEMPTS` inside `LOCKOUT_DURATION_MS`, that is
+the same budget the password gets. The answer after that is HTTP 423 `errors.auth.mfaChallengeLocked`
+with `lockedUntil` and `retryAfter`, and a correct code is refused for the rest of the window too.
+The window opens on the first refused code and is never extended. A correct code closes it, and so
+does a spent recovery code.
+
+`POST /auth/mfa/recovery` is outside the brake on purpose. A recovery code is 80 bits of base32, so
+brute force is not the threat there, and it is the owner's way back in while the authenticator is
+shut: a brake that closes every door lets a caller who holds only the password deny the owner the
+account. The enrolment stage is not counted either, because that caller is an authenticated owner
+setting up their own device.
+
+The state is `FailedAttemptCounter` (`common/utils/failed-attempt-counter.ts`), not a column. With
+Redis it is a raw `INCR` behind a `SET NX PX` that creates the key and carries the expiry, in that
+order: an `INCR` that landed before a separate `PEXPIRE` failed would leave a counter with no expiry,
+that is an account barred for ever. Without Redis one process map holds the window. It **fails open**
+on a cache outage, which returns the route to the throttle-only behaviour and never to a worse one.
+The counter is deliberately not bound to the `mfa_pending` token: a fresh token costs one
+`POST /auth/login` with the password the caller already holds.
+
 **Token purpose.** The service signs three token types: access, OAuth link and OAuth data. The three
 use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
 its own purpose.
@@ -1338,6 +1361,11 @@ that are revoked and expired.
 password comparison, thus a wrong password answers the generic 401 whatever the state of the account,
 and a locked account collects no more strikes. A password reset clears the lock. The end of the
 window clears it. An administrator can also unlock the account with a user update.
+
+The lock covers the password path only, and `failed_login_attempts` and `locked_until` count password
+guesses alone. The second factor is a gate on both ways in, so a brake that reused those columns
+would shut every door at once. The counter on a refused code is therefore separate, and it stays off
+the recovery route. See the two-factor section above.
 
 **Email verification.** It is necessary before a login. The token expires in 24 hours, and the user
 can request the email again.
@@ -1669,7 +1697,7 @@ These routes currently replace the default limit:
 | `POST /auth/forgot-password` | 5 min | 2 | The cost of an email, and enumeration mitigation. The CAPTCHA soft trigger starts near the limit |
 | `POST /auth/reset-password` | 1 min | 10 | Defense in depth against a token brute force |
 | `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token, and the payload id it carries is spendable once. The limit bounds the attempts around both |
-| `POST /auth/mfa/verify` | 1 min | 5 plus `login-long-window` | Six digits is a million guesses, and an unthrottled route walks that in minutes |
+| `POST /auth/mfa/verify` | 1 min | 5 plus `login-long-window` | Six digits is a million guesses, and an unthrottled route walks that in minutes. Both keys are per address, so this route also carries a per-account counter of refused codes |
 | `POST /auth/mfa/recovery` | 1 min | 5 plus `login-long-window` | The same, against the recovery codes |
 | `POST /auth/mfa/setup` | 1 min | 5 plus `login-long-window` | It verifies the step-up secret of an authenticated caller. A stolen access token must not buy unlimited guesses |
 | `POST /auth/mfa/enable` | 1 min | 5 plus `login-long-window` | It verifies a code from the pending secret |

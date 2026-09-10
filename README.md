@@ -38,7 +38,10 @@ management and theming.
   as well: the account records the time step of the code it spent, and any code at or below
   that step is refused, so an observed code cannot be replayed inside its window. After that a correct password no longer signs the
   account in: it returns a 300 second `mfa_pending` token, which the bearer strategy refuses, and
-  only a code or a recovery code turns it into a session. The shared secret is encrypted at rest
+  only a code or a recovery code turns it into a session. Wrong codes are counted against the
+  account, not against the caller: five of them shut the code step for 15 minutes, which is the same
+  budget the password gets, while the recovery code stays accepted so the owner always keeps a way
+  back in. The shared secret is encrypted at rest
   with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 503 and every other
   path is unchanged. An account created through a provider holds no password, so the card takes it
   through a round trip at that provider and picks the enrolment up on the return, and it turns the
@@ -1749,11 +1752,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2287 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2307 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 369 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 367 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1270 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 257 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 707 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 258 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 713 tests pass |
 
 ## CI/CD
 
@@ -1821,7 +1824,11 @@ a second request to the registry for a verdict that gates nothing.
 - **Two-factor authentication** is available to every account. A password on an enrolled account
   buys only an `mfa_pending` token, which `JwtStrategy` refuses as a bearer credential, so one
   factor alone reaches nothing. The two challenge routes carry the login throttle, including the
-  long window that counts failures only, and each refused code is audited. A recovery code is spent
+  long window that counts failures only, and each refused code is audited. That throttle is keyed by
+  client address, so `POST /auth/mfa/verify` also counts refused codes against the account itself:
+  five inside 15 minutes answer HTTP 423 `errors.auth.mfaChallengeLocked`, and a correct code is
+  refused for the rest of that window as well. `POST /auth/mfa/recovery` stays outside the brake, so
+  a caller who holds only the password can never deny the owner every way in. A recovery code is spent
   by deleting its hash, so it works once, and the whole set is replaced on request behind a
   step-up of its own, so a spent set does not force the account to turn the factor off. A TOTP
   code is single use too: an acceptance

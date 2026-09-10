@@ -1,5 +1,13 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger
+} from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
+import type { Cache } from 'cache-manager';
 import { DataSource } from 'typeorm';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
@@ -11,6 +19,8 @@ import {
 } from 'otplib';
 import {
   ErrorKeys,
+  LOCKOUT_DURATION_MS,
+  MAX_FAILED_ATTEMPTS,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   MFA_RECOVERY_CODE_BYTES,
   MFA_RECOVERY_CODE_COUNT,
@@ -33,6 +43,7 @@ import {
   digestsMatch
 } from '../../../common/crypto/secret-encryption.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 
 const base32 = new ScureBase32Plugin();
@@ -40,17 +51,35 @@ const base32 = new ScureBase32Plugin();
 /** Both halves of a recovery code, as the user reads it: ABCDEFGH-IJKLMNOP. */
 const RECOVERY_CODE_GROUP = 8;
 
+/** Namespace of the per-account counter of refused authenticator codes. */
+const CHALLENGE_FAILURE_KEY_PREFIX = 'mfa:challenge-failures:';
+
 @Injectable()
 export class MfaService {
   private readonly logger = new Logger(MfaService.name);
+
+  /**
+   * Bars the account, not the caller. The route throttles are keyed by client
+   * address, so an attacker who already holds the password buys a fresh budget
+   * of guesses with every address they add. The second factor needs one brake
+   * that the source address cannot move.
+   */
+  readonly #challengeFailures: FailedAttemptCounter;
 
   constructor(
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
-    private readonly encryption: SecretEncryptionService
-  ) {}
+    private readonly encryption: SecretEncryptionService,
+    @Inject(CACHE_MANAGER) cache: Cache
+  ) {
+    this.#challengeFailures = new FailedAttemptCounter(
+      cache,
+      CHALLENGE_FAILURE_KEY_PREFIX,
+      this.logger
+    );
+  }
 
   /**
    * Starts an enrolment. The secret is stored encrypted straight away but the
@@ -239,11 +268,25 @@ export class MfaService {
   ): Promise<User> {
     const user = await this.userFromPendingToken(mfaToken);
 
+    const open = await this.#challengeFailures.read(user.id);
+    if (open.count >= MAX_FAILED_ATTEMPTS) {
+      throw this.challengeLockedException(open.remainingMs);
+    }
+
     if (!(await this.consumeTotp(user, code))) {
-      await this.recordChallengeFailure(user, 'challenge', context);
+      const { count, remainingMs } = await this.#challengeFailures.record(
+        user.id,
+        LOCKOUT_DURATION_MS
+      );
+      await this.recordChallengeFailure(user, 'challenge', context, count);
+
+      if (count >= MAX_FAILED_ATTEMPTS) {
+        throw this.challengeLockedException(remainingMs);
+      }
       throw this.invalidCodeException();
     }
 
+    await this.#challengeFailures.clear(user.id);
     return user;
   }
 
@@ -299,6 +342,10 @@ export class MfaService {
       details: { remaining: remaining.length },
       context
     });
+
+    // The owner proved possession, so the brake on the authenticator has done
+    // its job and must not keep them out of it for the rest of the window.
+    await this.#challengeFailures.clear(user.id);
 
     return user;
   }
@@ -487,7 +534,8 @@ export class MfaService {
   private async recordChallengeFailure(
     user: User,
     stage: 'enrolment' | 'challenge' | 'recovery_code',
-    context?: AuditContext
+    context?: AuditContext,
+    attempt?: number
   ): Promise<void> {
     await this.auditService.log({
       action: AuditAction.MFA_CHALLENGE_FAILURE,
@@ -495,9 +543,28 @@ export class MfaService {
       actorEmail: user.email,
       targetId: user.id,
       targetType: 'User',
-      details: { stage },
+      details: attempt === undefined ? { stage } : { stage, attempt },
       context
     });
+  }
+
+  /**
+   * The authenticator is shut for the rest of the window. The recovery route
+   * stays open on purpose: a brake that closes every door lets a caller who
+   * holds only the password deny the owner their own account.
+   */
+  private challengeLockedException(remainingMs: number): HttpException {
+    const retryAfter = Math.max(1, Math.ceil(remainingMs / 1000));
+    return new HttpException(
+      {
+        message:
+          'Too many incorrect verification codes. Use a recovery code or try again later',
+        errorKey: ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
+        lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
+        retryAfter
+      },
+      HttpStatus.LOCKED
+    );
   }
 
   private invalidCodeException(): HttpException {

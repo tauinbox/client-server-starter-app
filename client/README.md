@@ -1000,7 +1000,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 257 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 258 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1270 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
@@ -1021,7 +1021,11 @@ calls `POST /__control/totp-ledger` to clear the recorded step. It stands in for
 authenticator imposes, without a 30-second sleep in the run. The card also replaces the recovery
 set on request: it asks for the same step-up the disable path asks for, then shows the new codes in
 the panel the enrolment ends on. The mock answers that route with a second fixed set, so one test
-can watch a code of the first set stop working and a code of the second set sign the account in. The unit tests also cover session restore, cross-tab logout, lockout, email
+can watch a code of the first set stop working and a code of the second set sign the account in. One
+more test drives the per-account brake on the code step: it presents five wrong codes, reads the
+locked message off the screen, which also proves the server key resolves to text and not to a raw dot
+path, and then signs in with a recovery code, because that route stays open while the brake holds.
+The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit
 and search. This includes the email-change confirmation dialog of the administrator and the
 soft-delete and restore flow. They also cover the administration of roles, resources and feature
