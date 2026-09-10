@@ -104,6 +104,9 @@ management and theming.
 
   The client reads the public site key from `GET /api/v1/auth/captcha-config`. It loads the Turnstile
   script only when the script is necessary.
+
+  The server bounds each `siteverify` call at 2.5 s, and it fails closed. Thus a Cloudflare endpoint
+  that does not answer refuses the caller quickly, and it does not hold a request handler open.
 - **OAuth2 login with Google, Facebook and VK.** The server never links a provider to an existing
   local account automatically, because that prevents an account takeover. The user must log in with
   their password and then link the provider from their profile.
@@ -1755,10 +1758,10 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2307 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2319 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 369 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 367 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1270 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 258 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 259 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 713 tests pass |
 
 ## CI/CD

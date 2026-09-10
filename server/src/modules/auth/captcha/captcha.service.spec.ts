@@ -136,5 +136,22 @@ describe('CaptchaService', () => {
       mockFetch.mockRejectedValueOnce(new Error('ECONNRESET'));
       await expect(service.verify('token')).resolves.toBe(false);
     });
+
+    it('bounds the request and fails closed when it is abandoned', async () => {
+      const service = await buildService({
+        TURNSTILE_SITE_KEY: 'site',
+        TURNSTILE_SECRET_KEY: 'secret'
+      });
+      // The signal is read after the call, not inside the stub: an assertion
+      // that throws inside `fetch` is swallowed by the fail-closed catch.
+      let init: RequestInit | undefined;
+      mockFetch.mockImplementation((_url: string, options: RequestInit) => {
+        init = options;
+        return Promise.reject(new DOMException('timed out', 'TimeoutError'));
+      });
+
+      await expect(service.verify('token')).resolves.toBe(false);
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    });
   });
 });

@@ -1780,6 +1780,10 @@ when an IP comes near the rate limit.
 5. **Disable the CAPTCHA for a short time.** Do this, for example, when Cloudflare has an outage and
    the `Turnstile siteverify request failed` message fills the log.
 
+   Each verification attempt is abandoned after 2.5 s, thus an unresponsive Cloudflare costs a fast
+   400 and does not hold a request handler open. The gate stays fail closed through an outage: the
+   two routes refuse every caller whose rate-limit budget is nearly spent, until you do this step.
+
    Clear the two `TURNSTILE_*` GitHub secrets, that is set an empty value, and start a deploy. The
    sync script skips an empty value. Thus this step alone does **not** clear `server/.env`. For an
    immediate correction, also comment the keys out on the VPS:

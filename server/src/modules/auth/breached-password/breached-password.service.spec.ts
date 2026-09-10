@@ -133,8 +133,11 @@ describe('BreachedPasswordService', () => {
     });
 
     it('abandons a lookup that does not answer', async () => {
-      fetchMock.mockImplementation((_url: string, init: RequestInit) => {
-        expect(init.signal).toBeInstanceOf(AbortSignal);
+      // The signal is read after the call, not inside the stub: an assertion
+      // that throws inside `fetch` is swallowed by the fail-open catch.
+      let init: RequestInit | undefined;
+      fetchMock.mockImplementation((_url: string, options: RequestInit) => {
+        init = options;
         return Promise.reject(new DOMException('timed out', 'TimeoutError'));
       });
 
@@ -142,6 +145,7 @@ describe('BreachedPasswordService', () => {
         service.assertNotBreached('Sunrise-Kettle-19')
       ).resolves.toBeUndefined();
       expect(recordBreachLookup).toHaveBeenCalledWith('unavailable');
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
     });
   });
 
