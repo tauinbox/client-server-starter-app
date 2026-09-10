@@ -39,10 +39,16 @@ async function loginAsAdmin(): Promise<{ token: string; userId: string }> {
   return { token: body.tokens.access_token, userId: body.user.id };
 }
 
+// The route demands a step-up, and the seeded admin holds a password, so the
+// factor rides in the body of the DELETE.
 function unlink(token: string, provider: string): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/auth/oauth/accounts/${provider}`, {
     method: 'DELETE',
-    headers: { authorization: `Bearer ${token}` }
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ currentPassword: 'Password1' })
   });
 }
 

@@ -1,5 +1,6 @@
 import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 
 // Regression for the OAuth-only-account safety check. Server: /oauth/accounts
 // /:provider DELETE rejects with `auth.unlinkLastProvider` when the user has
@@ -7,8 +8,11 @@ import { createMockUser } from '../fixtures/mock-data';
 // strand themselves with no way to authenticate. The mock-server mirrors
 // this. Both paths must keep behaving so the user is never locked out.
 //
+// The route now demands a step-up first, so this account reaches the check
+// only on the page load that follows a provider round trip.
+//
 // Given an OAuth-only account (no password) with exactly one linked provider,
-// when the user clicks Disconnect on that provider,
+// when the unlink resumes after that round trip,
 // then the request must fail with the unlink-last-provider error and the
 // provider must remain linked.
 test.describe('OAuth — unlink last provider safety', () => {
@@ -59,7 +63,25 @@ test.describe('OAuth — unlink last provider safety', () => {
       }
     ]);
 
-    await page.goto('/profile');
+    // The proof this account earned at its provider. Without it the unlink is
+    // refused for the step-up rather than for the last-provider rule.
+    const { token } = await _mockServer.issueReauthProof(
+      userId,
+      STEP_UP_OPERATION.OAUTH_UNLINK
+    );
+    await page.context().addCookies([
+      {
+        name: 'reauth_proof',
+        value: token,
+        domain: 'localhost',
+        path: '/api/v1/auth'
+      }
+    ]);
+    await page.addInitScript(() =>
+      sessionStorage.setItem('pending_oauth_unlink', 'google')
+    );
+
+    await page.goto('/profile?reauth=ok');
 
     const googleRow = page
       .locator('.oauth-provider-row')
@@ -67,11 +89,6 @@ test.describe('OAuth — unlink last provider safety', () => {
     const disconnectButton = googleRow.getByRole('button', {
       name: /^Disconnect$/i
     });
-
-    // Wait for OAuth accounts to load before clicking — the row exists with
-    // a Connect button until /oauth/accounts resolves and re-renders.
-    await expect(disconnectButton).toBeVisible();
-    await disconnectButton.click();
 
     // The server returns 400 with errorKey auth.unlinkLastProvider. Profile's
     // disconnect handler renders `err.error.message` in a snackbar. Use

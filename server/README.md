@@ -1269,7 +1269,14 @@ must not log the user out everywhere.
 A token that is revoked and expired falls through to the standard 401. That is the natural cleanup
 window.
 
-**OAuth accounts.** The user manages the linked providers. An unlink has a safety check.
+**OAuth accounts.** The user manages the linked providers. A link and an unlink both demand a
+step-up first, and an unlink also has a safety check.
+
+The row an unlink deletes is a sign-in credential that no password reset removes, so the route
+runs `AuthService.assertStepUpForUser` with the operation `oauth_unlink` before it deletes
+anything. The password rides in the body of the `DELETE`; an account created through a provider
+sends none and presents a `reauth_proof` minted for that operation instead. The provider name is
+validated first, so a typo costs no factor.
 
 The check and the delete run in one transaction that holds a `FOR UPDATE` lock on the user row
 (`OAuthAccountService.unlinkProvider`). Thus two concurrent unlink requests cannot both see "one

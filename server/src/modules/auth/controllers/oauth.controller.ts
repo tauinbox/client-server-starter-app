@@ -65,6 +65,7 @@ import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
 import { OAuthLinkInitDto } from '../dtos/oauth-link-init.dto';
+import { OAuthUnlinkDto } from '../dtos/oauth-unlink.dto';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { AuthService } from '../services/auth.service';
@@ -272,6 +273,14 @@ export class OAuthController {
     }));
   }
 
+  /**
+   * Removing a provider is a credential change in the same way that adding one
+   * is: the row it deletes is a sign-in method, and a stolen session must not
+   * be able to strip the owner of one. So the route demands the same fresh
+   * proof of identity the link route demands.
+   */
+  @Throttle(CHALLENGE_THROTTLE)
+  @CountFailuresOnlyWhenBody('currentPassword')
   @Delete('/accounts/:provider')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Unlink an OAuth provider from current user' })
@@ -280,9 +289,11 @@ export class OAuthController {
     enum: OAuthProvider,
     description: 'OAuth provider to unlink'
   })
+  @ApiBody({ type: OAuthUnlinkDto, required: false })
   async unlinkOAuth(
     @Param('provider') provider: string,
-    @Request() req: JwtAuthRequest
+    @Request() req: JwtAuthRequest,
+    @Body() dto: OAuthUnlinkDto
   ) {
     if (!Object.values(OAuthProvider).includes(provider as OAuthProvider)) {
       throw new HttpException(
@@ -295,6 +306,19 @@ export class OAuthController {
     }
 
     const userId = req.user.userId;
+
+    const reauthProof = (req.cookies as Record<string, string> | undefined)?.[
+      REAUTH_PROOF_COOKIE
+    ];
+
+    await this.authService.assertStepUpForUser(
+      userId,
+      dto.currentPassword,
+      reauthProof,
+      STEP_UP_OPERATION.OAUTH_UNLINK,
+      extractAuditContext(req)
+    );
+
     const { email, locale } = await this.oauthAccountService.unlinkProvider(
       userId,
       provider

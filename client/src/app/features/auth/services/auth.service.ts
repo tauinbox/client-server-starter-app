@@ -394,9 +394,23 @@ export class AuthService {
     });
   }
 
-  unlinkOAuthAccount(provider: string): Observable<{ message: string }> {
+  /**
+   * Removes a linked provider. The row it deletes is a sign-in credential, so
+   * the server demands the same fresh proof of identity the link route
+   * demands: a password, or the proof an account with none earned at its own
+   * provider. A `DELETE` carries the password in its body, which Express
+   * parses and Nest validates like any other body.
+   */
+  unlinkOAuthAccount(
+    provider: string,
+    currentPassword?: string
+  ): Observable<{ message: string }> {
     return this.#http.delete<{ message: string }>(
-      `${AuthApiEnum.OAuthAccounts}/${encodeURIComponent(provider)}`
+      `${AuthApiEnum.OAuthAccounts}/${encodeURIComponent(provider)}`,
+      {
+        body: currentPassword ? { currentPassword } : {},
+        context: silentContext()
+      }
     );
   }
 

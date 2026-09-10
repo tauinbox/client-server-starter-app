@@ -6,6 +6,7 @@ import {
 import { FAILURE_COUNTER_BODY_FIELDS } from '../../core/failure-counter.decorator';
 import { AuthController } from './auth.controller';
 import { MfaController } from './mfa.controller';
+import { OAuthController } from './oauth.controller';
 
 // The package keeps these metadata keys out of its public entry point.
 const THROTTLER_LIMIT = 'THROTTLER:LIMIT';
@@ -30,6 +31,26 @@ describe('step-up routes', () => {
       expect(limitOf(handler, 'default')).toBe(5);
       expect(limitOf(handler, LONG_WINDOW)).toBe(MAX_FAILED_ATTEMPTS - 1);
       expect(ttlOf(handler, LONG_WINDOW)).toBe(LOCKOUT_DURATION_MS);
+    });
+  });
+
+  describe.each([
+    ['POST /auth/oauth/link-init', OAuthController.prototype.initOAuthLink],
+    [
+      'DELETE /auth/oauth/accounts/:provider',
+      OAuthController.prototype.unlinkOAuth
+    ]
+  ])('%s', (_name, handler) => {
+    it('costs the caller a budget on every refused attempt', () => {
+      expect(limitOf(handler, 'default')).toBe(5);
+      expect(limitOf(handler, LONG_WINDOW)).toBe(MAX_FAILED_ATTEMPTS - 1);
+      expect(ttlOf(handler, LONG_WINDOW)).toBe(LOCKOUT_DURATION_MS);
+    });
+
+    it('counts only the requests that carry a password', () => {
+      expect(reflector.get(FAILURE_COUNTER_BODY_FIELDS, handler)).toEqual([
+        'currentPassword'
+      ]);
     });
   });
 
