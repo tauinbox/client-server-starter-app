@@ -4,6 +4,13 @@ import { ConfigService } from '@nestjs/config';
 const TURNSTILE_VERIFY_URL =
   'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
+/**
+ * Siteverify is one round trip to Cloudflare. The cap exists so an endpoint
+ * that accepts the connection and never answers cannot hold a request handler
+ * open: the attempt is abandoned and refused by the fail-closed branch below.
+ */
+const TURNSTILE_TIMEOUT_MS = 2500;
+
 interface TurnstileVerifyResponse {
   success: boolean;
   'error-codes'?: string[];
@@ -45,7 +52,8 @@ export class CaptchaService {
       const response = await fetch(TURNSTILE_VERIFY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString()
+        body: params.toString(),
+        signal: AbortSignal.timeout(TURNSTILE_TIMEOUT_MS)
       });
 
       if (!response.ok) {

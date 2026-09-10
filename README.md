@@ -104,6 +104,9 @@ management and theming.
 
   The client reads the public site key from `GET /api/v1/auth/captcha-config`. It loads the Turnstile
   script only when the script is necessary.
+
+  The server bounds each `siteverify` call at 2.5 s, and it fails closed. Thus a Cloudflare endpoint
+  that does not answer refuses the caller quickly, and it does not hold a request handler open.
 - **OAuth2 login with Google, Facebook and VK.** The server never links a provider to an existing
   local account automatically, because that prevents an account takeover. The user must log in with
   their password and then link the provider from their profile.
