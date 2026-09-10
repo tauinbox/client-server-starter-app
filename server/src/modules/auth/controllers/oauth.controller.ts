@@ -53,6 +53,7 @@ import {
 } from '@app/shared/constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
+import { OAUTH_ERROR_REAUTH_FAILED } from '../exceptions/oauth-authentication-failed.exception';
 import {
   OAUTH_INTENT_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
@@ -560,7 +561,9 @@ export class OAuthController {
       res.redirect(`${this.clientUrl}/profile?reauth=ok`);
     } catch (error) {
       this.logger.error('OAuth re-authentication error', error);
-      res.redirect(`${this.clientUrl}/profile?oauth_error=reauth_failed`);
+      res.redirect(
+        `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR_REAUTH_FAILED}`
+      );
     }
   }
 

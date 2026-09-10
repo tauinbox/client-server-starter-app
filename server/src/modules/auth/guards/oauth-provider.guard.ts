@@ -8,9 +8,13 @@ import type { OAuthFailureRedirect } from '../exceptions/oauth-authentication-fa
 import {
   OAUTH_ERROR_AUTH_FAILED,
   OAUTH_ERROR_CANCELLED,
+  OAUTH_ERROR_REAUTH_FAILED,
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
-import { OAUTH_LINK_COOKIE } from '../constants/oauth.constants';
+import {
+  OAUTH_LINK_COOKIE,
+  OAUTH_REAUTH_COOKIE
+} from '../constants/oauth.constants';
 
 // Passport rejects with this message only when the provider's credentials
 // are absent and conditionalProvider skipped registering the strategy.
@@ -77,13 +81,30 @@ export function createOAuthProviderGuard(
   return OAuthProviderGuard;
 }
 
+function intentCookies(request: ExpressRequest): {
+  link: boolean;
+  reauth: boolean;
+} {
+  const cookies = request.cookies as Record<string, string> | undefined;
+  return {
+    link: Boolean(cookies?.[OAUTH_LINK_COOKIE]),
+    reauth: Boolean(cookies?.[OAUTH_REAUTH_COOKIE])
+  };
+}
+
 function resolveErrorKey(request: ExpressRequest): string {
+  // A step-up that ends at the provider changed nothing, and the profile page
+  // has a message written for exactly that. The callback reads the reauth
+  // intent first too, so a request holding both cookies is a step-up here.
+  if (intentCookies(request).reauth) {
+    return OAUTH_ERROR_REAUTH_FAILED;
+  }
   return request.query?.['error'] === PROVIDER_CANCELLED_ERROR
     ? OAUTH_ERROR_CANCELLED
     : OAUTH_ERROR_AUTH_FAILED;
 }
 
 function resolveRedirectPath(request: ExpressRequest): OAuthFailureRedirect {
-  const cookies = request.cookies as Record<string, string> | undefined;
-  return cookies?.[OAUTH_LINK_COOKIE] ? '/profile' : '/login';
+  const { link, reauth } = intentCookies(request);
+  return link || reauth ? '/profile' : '/login';
 }

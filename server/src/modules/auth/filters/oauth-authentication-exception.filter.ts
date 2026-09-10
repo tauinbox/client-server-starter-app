@@ -5,6 +5,7 @@ import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import {
   OAUTH_LINK_COOKIE,
+  OAUTH_REAUTH_COOKIE,
   OAUTH_INTENT_COOKIE_PATH
 } from '../constants/oauth.constants';
 
@@ -25,11 +26,15 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
 
     const response = host.switchToHttp().getResponse<Response>();
 
-    // The link attempt is over, so the cookie must not survive to turn the
-    // user's next plain OAuth login into another link attempt. The success and
-    // in-handler failure paths clear it in OAuthController the same way.
+    // The attempt is over, so neither intent cookie must survive to turn the
+    // user's next plain OAuth login into another link or step-up attempt. The
+    // success and in-handler failure paths clear them in OAuthController the
+    // same way. Only one of the two is normally present.
     if (exception.redirectPath === '/profile') {
       response.clearCookie(OAUTH_LINK_COOKIE, {
+        path: OAUTH_INTENT_COOKIE_PATH
+      });
+      response.clearCookie(OAUTH_REAUTH_COOKIE, {
         path: OAUTH_INTENT_COOKIE_PATH
       });
     }

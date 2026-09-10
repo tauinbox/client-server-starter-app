@@ -1307,6 +1307,12 @@ query `?error=access_denied`, which is how each provider reports a declined cons
 instead of `/login`. Thus a link attempt that started on the profile page ends there. The filter also
 clears that cookie, because the attempt is over.
 
+The `oauth_reauth` cookie of a step-up selects the same target, and the key `reauth_failed`, which is
+the message the profile page holds for a change that did not happen. The guard reads that cookie
+first, as the callback does, so a browser that holds both intents is a step-up. The filter clears
+both cookies on that branch. Without this the browser went to `/login`, where the client guest guard
+sends an authenticated user to `/profile` and drops the query string, so the user saw no message.
+
 **The link intent belongs to one authorization flow.** `CookieStateStore.store` ties an unclaimed
 intent to the one-time state it mints, and rewrites the cookie as `b:<state>:<token>`. The callback
 takes the link branch only when that bound state equals the state the callback presents, compared

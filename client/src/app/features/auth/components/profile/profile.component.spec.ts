@@ -176,6 +176,19 @@ describe('ProfileComponent', () => {
       expect(notifyMock.error).not.toHaveBeenCalled();
     });
 
+    it('reports a refused step-up with its own message', () => {
+      activatedRouteMock.snapshot.queryParamMap.set(
+        'oauth_error',
+        'reauth_failed'
+      );
+      fixture.detectChanges();
+
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        'auth.profile.errorReauthFailed'
+      );
+      expect(notifyMock.info).not.toHaveBeenCalled();
+    });
+
     it('still reports a genuine link failure as an error', () => {
       activatedRouteMock.snapshot.queryParamMap.set(
         'oauth_error',
