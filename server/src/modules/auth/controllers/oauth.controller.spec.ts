@@ -221,7 +221,8 @@ describe('OAuthController', () => {
       await controller.unlinkOAuth(
         'google',
         mockJwtRequest('user-1') as JwtAuthRequest,
-        {}
+        {},
+        mockResponse()
       );
 
       expect(
@@ -238,7 +239,8 @@ describe('OAuthController', () => {
         controller.unlinkOAuth(
           'google',
           mockJwtRequest('user-1') as JwtAuthRequest,
-          {}
+          {},
+          mockResponse()
         )
       ).rejects.toThrow('last provider');
 
@@ -258,7 +260,8 @@ describe('OAuthController', () => {
       const result = await controller.unlinkOAuth(
         'google',
         mockJwtRequest('user-1') as JwtAuthRequest,
-        {}
+        {},
+        mockResponse()
       );
       await new Promise((resolve) => setImmediate(resolve));
 
@@ -270,7 +273,8 @@ describe('OAuthController', () => {
       const result = await controller.unlinkOAuth(
         'google',
         mockJwtRequest('user-1') as JwtAuthRequest,
-        {}
+        {},
+        mockResponse()
       );
 
       expect(oauthAccountServiceMock.unlinkProvider).toHaveBeenCalledWith(
@@ -301,7 +305,8 @@ describe('OAuthController', () => {
         controller.unlinkOAuth(
           'google',
           mockJwtRequest('user-1') as JwtAuthRequest,
-          {}
+          {},
+          mockResponse()
         )
       ).rejects.toThrow('No linked google account found');
       expect(auditServiceMock.log).not.toHaveBeenCalled();
@@ -310,9 +315,12 @@ describe('OAuthController', () => {
     it('demands a step-up bound to the unlink operation', async () => {
       const req = mockJwtRequest('user-1', { reauth_proof: 'proof-token' });
 
-      await controller.unlinkOAuth('google', req as JwtAuthRequest, {
-        currentPassword: 'CurrentPassword123'
-      });
+      await controller.unlinkOAuth(
+        'google',
+        req as JwtAuthRequest,
+        { currentPassword: 'CurrentPassword123' },
+        mockResponse()
+      );
 
       expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
         'user-1',
@@ -321,6 +329,41 @@ describe('OAuthController', () => {
         STEP_UP_OPERATION.OAUTH_UNLINK,
         expect.anything()
       );
+    });
+
+    it('clears the provider proof once the provider is removed', async () => {
+      const res = mockResponse();
+
+      await controller.unlinkOAuth(
+        'google',
+        mockJwtRequest('user-1', {
+          reauth_proof: 'proof-token'
+        }) as JwtAuthRequest,
+        {},
+        res
+      );
+
+      expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
+        path: '/api/v1/auth'
+      });
+    });
+
+    it('keeps the provider proof when the unlink is rejected', async () => {
+      oauthAccountServiceMock.unlinkProvider.mockRejectedValueOnce(
+        new Error('last provider')
+      );
+      const res = mockResponse();
+
+      await expect(
+        controller.unlinkOAuth(
+          'google',
+          mockJwtRequest('user-1') as JwtAuthRequest,
+          {},
+          res
+        )
+      ).rejects.toThrow('last provider');
+
+      expect(res.clearCookie).not.toHaveBeenCalled();
     });
 
     it('removes nothing when the step-up refuses the caller', async () => {
@@ -338,7 +381,8 @@ describe('OAuthController', () => {
         controller.unlinkOAuth(
           'google',
           mockJwtRequest('user-1') as JwtAuthRequest,
-          {}
+          {},
+          mockResponse()
         )
       ).rejects.toBeInstanceOf(HttpException);
 
@@ -354,7 +398,8 @@ describe('OAuthController', () => {
         controller.unlinkOAuth(
           'invalid-provider',
           mockJwtRequest('user-1') as JwtAuthRequest,
-          {}
+          {},
+          mockResponse()
         )
       ).rejects.toThrow('Invalid OAuth provider');
       expect(oauthAccountServiceMock.unlinkProvider).not.toHaveBeenCalled();
@@ -428,6 +473,18 @@ describe('OAuthController', () => {
 
       expect(jwtServiceMock.sign).not.toHaveBeenCalled();
       expect(res.cookie).not.toHaveBeenCalled();
+      expect(res.clearCookie).not.toHaveBeenCalled();
+    });
+
+    it('clears the provider proof once the intent is minted', async () => {
+      const res = mockResponse();
+      const req = mockJwtRequest('user-1', { reauth_proof: 'proof-token' });
+
+      await controller.initOAuthLink(req as JwtAuthRequest, {}, res);
+
+      expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
+        path: '/api/v1/auth'
+      });
     });
   });
 

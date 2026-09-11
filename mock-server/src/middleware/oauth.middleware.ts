@@ -4,6 +4,7 @@ import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { findUserById, getState, logAudit, toUserResponse } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import {
+  clearReauthProofCookie,
   isValidPasswordShape,
   sendWithRetryAfter,
   stepUpError
@@ -95,6 +96,8 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
     user.id,
     accounts.filter((a) => a.provider !== provider)
   );
+
+  clearReauthProofCookie(res);
 
   logAudit('OAUTH_UNLINK', {
     actorId: user.id,
@@ -199,6 +202,8 @@ router.post('/link-init', authGuard, (req, res) => {
     sendWithRetryAfter(res, stepUp);
     return;
   }
+
+  clearReauthProofCookie(res);
 
   res.json({ message: 'Link initiated' });
 });

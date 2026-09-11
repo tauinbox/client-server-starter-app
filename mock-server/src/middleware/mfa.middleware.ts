@@ -11,6 +11,7 @@ import {
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
 import {
   clearFailures,
+  clearReauthProofCookie,
   consumeTotpCode,
   isValidPasswordShape,
   normalize,
@@ -190,6 +191,8 @@ router.post('/setup', authGuard, (req, res) => {
     return;
   }
 
+  clearReauthProofCookie(res);
+
   user.totpSecret = MOCK_TOTP_SECRET;
   user.totpEnabledAt = null;
   user.totpRecoveryCodes = null;
@@ -309,6 +312,8 @@ router.post('/disable', authGuard, (req, res) => {
     return;
   }
 
+  clearReauthProofCookie(res);
+
   user.totpSecret = null;
   user.totpEnabledAt = null;
   user.totpRecoveryCodes = null;
@@ -367,6 +372,8 @@ router.post('/recovery-codes', authGuard, (req, res) => {
     });
     return;
   }
+
+  clearReauthProofCookie(res);
 
   user.totpRecoveryCodes = [...MOCK_REGENERATED_RECOVERY_CODES];
 

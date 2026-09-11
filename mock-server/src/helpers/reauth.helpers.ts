@@ -6,7 +6,11 @@ import {
   TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
 import { getState, logAudit } from '../state';
-import { MOCK_TOTP_CODE, REAUTH_PROOF_COOKIE } from '../constants';
+import {
+  MOCK_TOTP_CODE,
+  REAUTH_PROOF_COOKIE,
+  REAUTH_PROOF_COOKIE_PATH
+} from '../constants';
 import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
 import type { FailedAttemptWindow, MockUser } from '../types';
@@ -69,6 +73,11 @@ export function sendWithRetryAfter(
  * this account and this operation, it has not expired, and it was not minted
  * before the last session revocation. The mock has no provider round trip to
  * produce one, so `POST /__control/reauth-proof` seeds it instead.
+ *
+ * The proof is single use. The server records the token id in a ledger; an
+ * in-memory map is single use by construction once the record is deleted, and
+ * the record is deleted last, so a proof offered for the wrong operation does
+ * not burn the one the user still holds.
  */
 export function isValidReauthProof(
   proof: string | undefined,
@@ -95,7 +104,17 @@ export function isValidReauthProof(
     return false;
   }
 
+  getState().reauthProofs.delete(proof);
   return true;
+}
+
+/**
+ * Called only after the change is accepted, so a rejected attempt keeps its
+ * remaining proof window. The record is spent already; this stops the browser
+ * from holding a credential that no longer works.
+ */
+export function clearReauthProofCookie(res: Response): void {
+  res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
 }
 
 /**

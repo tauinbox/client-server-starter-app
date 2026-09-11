@@ -42,7 +42,10 @@ import {
   MfaVerifyDto
 } from '../dtos/mfa.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { REAUTH_PROOF_COOKIE } from '../constants/oauth.constants';
+import {
+  REAUTH_PROOF_COOKIE,
+  REAUTH_PROOF_COOKIE_PATH
+} from '../constants/oauth.constants';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
@@ -82,6 +85,15 @@ export class MfaController {
     ];
   }
 
+  /**
+   * Called only after the change is accepted, so a rejected attempt keeps its
+   * remaining proof window. The ledger already refuses a second use of the
+   * value; this stops the browser from holding a credential that is spent.
+   */
+  private clearReauthProofCookie(res: Response): void {
+    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+  }
+
   @Throttle(CHALLENGE_THROTTLE)
   @Post('setup')
   @HttpCode(HttpStatus.OK)
@@ -95,7 +107,8 @@ export class MfaController {
   @ApiConflictResponse({ description: 'Two-factor is already enabled' })
   async setup(
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaSetupDto
+    @Body() dto: MfaSetupDto,
+    @Res({ passthrough: true }) res: Response
   ): Promise<MfaSetupResponseDto> {
     const user = await this.userService.findOne(req.user.userId);
     // A stolen session must not be able to enrol a device of its own, which
@@ -109,7 +122,9 @@ export class MfaController {
       extractAuditContext(req)
     );
 
-    return await this.mfaService.beginEnrolment(user);
+    const enrolment = await this.mfaService.beginEnrolment(user);
+    this.clearReauthProofCookie(res);
+    return enrolment;
   }
 
   @Throttle(CHALLENGE_THROTTLE)
@@ -144,7 +159,8 @@ export class MfaController {
   @ApiOkResponse({ description: 'Two-factor has been turned off' })
   async disable(
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaStepUpDto
+    @Body() dto: MfaStepUpDto,
+    @Res({ passthrough: true }) res: Response
   ): Promise<{ message: string }> {
     const user = await this.userService.findOne(req.user.userId);
     await this.authService.assertStepUp(
@@ -157,6 +173,7 @@ export class MfaController {
     );
 
     await this.mfaService.disable(user, extractAuditContext(req));
+    this.clearReauthProofCookie(res);
     return { message: 'Two-factor authentication has been turned off' };
   }
 
@@ -172,7 +189,8 @@ export class MfaController {
   })
   async regenerateRecoveryCodes(
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaStepUpDto
+    @Body() dto: MfaStepUpDto,
+    @Res({ passthrough: true }) res: Response
   ): Promise<MfaRecoveryCodesResponseDto> {
     const user = await this.userService.findOne(req.user.userId);
     await this.authService.assertStepUp(
@@ -184,10 +202,12 @@ export class MfaController {
       extractAuditContext(req)
     );
 
-    return await this.mfaService.regenerateRecoveryCodes(
+    const codes = await this.mfaService.regenerateRecoveryCodes(
       user,
       extractAuditContext(req)
     );
+    this.clearReauthProofCookie(res);
+    return codes;
   }
 
   @Public()

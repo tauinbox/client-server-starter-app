@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
@@ -28,6 +29,7 @@ import { MfaService } from './mfa.service';
 import { SessionIssuerService } from './session-issuer.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
+import { createMockCache } from '../../../common/testing/cache.mock';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -306,7 +308,8 @@ describe('AuthService', () => {
           provide: BreachedPasswordService,
           useValue: mockBreachedPasswordService
         },
-        { provide: MfaService, useValue: mockMfaService }
+        { provide: MfaService, useValue: mockMfaService },
+        { provide: CACHE_MANAGER, useValue: createMockCache() }
       ]
     }).compile();
 
@@ -1635,7 +1638,97 @@ describe('AuthService', () => {
         sub: oauthOnlyUser.id,
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.PASSWORD_SET,
+        iat: Math.floor(Date.now() / 1000),
+        jti: 'proof-1'
+      });
+
+      await expect(
+        service.assertStepUpForUser(
+          oauthOnlyUser.id,
+          undefined,
+          'proof',
+          STEP_UP_OPERATION.PASSWORD_SET
+        )
+      ).resolves.toBeUndefined();
+    });
+
+    it('refuses the same proof a second time', async () => {
+      const oauthOnlyUser = { ...mockUser, password: null };
+      mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
+      mockJwtService.verify.mockReturnValue({
+        sub: oauthOnlyUser.id,
+        purpose: TOKEN_PURPOSE.REAUTH_PROOF,
+        operation: STEP_UP_OPERATION.PASSWORD_SET,
+        iat: Math.floor(Date.now() / 1000),
+        jti: 'proof-replayed'
+      });
+
+      await expect(
+        service.assertStepUpForUser(
+          oauthOnlyUser.id,
+          undefined,
+          'proof',
+          STEP_UP_OPERATION.PASSWORD_SET
+        )
+      ).resolves.toBeUndefined();
+
+      // The account holds no password, so a refused proof must not fall
+      // through to the password branch.
+      await expect(
+        service.assertStepUpForUser(
+          oauthOnlyUser.id,
+          undefined,
+          'proof',
+          STEP_UP_OPERATION.PASSWORD_SET
+        )
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+      });
+    });
+
+    it('refuses a proof that carries no token id', async () => {
+      const oauthOnlyUser = { ...mockUser, password: null };
+      mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
+      mockJwtService.verify.mockReturnValue({
+        sub: oauthOnlyUser.id,
+        purpose: TOKEN_PURPOSE.REAUTH_PROOF,
+        operation: STEP_UP_OPERATION.PASSWORD_SET,
         iat: Math.floor(Date.now() / 1000)
+      });
+
+      await expect(
+        service.assertStepUpForUser(
+          oauthOnlyUser.id,
+          undefined,
+          'proof',
+          STEP_UP_OPERATION.PASSWORD_SET
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+      });
+    });
+
+    it('does not spend the proof when the operation does not match', async () => {
+      const oauthOnlyUser = { ...mockUser, password: null };
+      mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
+      mockJwtService.verify.mockReturnValue({
+        sub: oauthOnlyUser.id,
+        purpose: TOKEN_PURPOSE.REAUTH_PROOF,
+        operation: STEP_UP_OPERATION.PASSWORD_SET,
+        iat: Math.floor(Date.now() / 1000),
+        jti: 'proof-unspent'
+      });
+
+      await expect(
+        service.assertStepUpForUser(
+          oauthOnlyUser.id,
+          undefined,
+          'proof',
+          STEP_UP_OPERATION.EMAIL_CHANGE
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
 
       await expect(
@@ -1923,11 +2016,15 @@ describe('AuthService', () => {
         hasPassword: false
       });
 
+      // The proof is single use, so every case in this block needs its own id.
+      let proofCounter = 0;
+
       const validProof = () => ({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.EMAIL_CHANGE,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        jti: `proof-${(proofCounter += 1)}`
       });
 
       beforeEach(() => {

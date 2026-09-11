@@ -31,6 +31,13 @@ const OWNER_ID = 'user-a';
 const SIGNED_PROOF = 'signed-reauth-proof';
 const PROVIDER_ID = 'google-id-of-the-signer';
 
+const signProof = jest.fn(
+  (payload: { purpose?: string; operation?: string; jti?: string }) => {
+    void payload;
+    return SIGNED_PROOF;
+  }
+);
+
 /**
  * Answers the token exchange, so the real passport-oauth2 pipeline can complete
  * a round trip without a provider.
@@ -166,7 +173,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
         {
           provide: JwtService,
           useValue: {
-            sign: jest.fn(() => SIGNED_PROOF),
+            sign: signProof,
             verify: jest.fn((token: string) => {
               if (token === UNBOUND_REAUTH_TOKEN) {
                 return {
@@ -207,6 +214,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
   });
 
   beforeEach(() => {
+    signProof.mockClear();
     assertReauthenticated.mockClear().mockResolvedValue(undefined);
     loginWithOAuth.mockClear();
     linkOAuthToUser.mockClear();
@@ -264,6 +272,22 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     expect(jar.get('reauth_proof')).toBe(SIGNED_PROOF);
     expect(jar.get('oauth_reauth')).toBeUndefined();
     expect(loginWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it('gives the proof a token id, so the ledger can record it as spent', async () => {
+    const jar = new CookieJar();
+    jar.set('oauth_reauth', REAUTH_TOKEN);
+
+    const state = await authorize(jar);
+    await callback(jar, state);
+
+    const [payload] = signProof.mock.calls[0] ?? [];
+
+    expect(payload).toMatchObject({
+      purpose: TOKEN_PURPOSE.REAUTH_PROOF,
+      operation: STEP_UP_OPERATION.EMAIL_CHANGE
+    });
+    expect(typeof payload?.jti).toBe('string');
   });
 
   it('mints nothing when a second flow presents its own state', async () => {

@@ -114,7 +114,11 @@ describe('MfaController', () => {
     it('demands a fresh proof of identity before it enrols a device', async () => {
       // A stolen session that could enrol its own authenticator would lock the
       // owner out of their own account.
-      await controller.setup(jwtRequest(), { currentPassword: 'Password1' });
+      await controller.setup(
+        jwtRequest(),
+        { currentPassword: 'Password1' },
+        res
+      );
 
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
@@ -128,7 +132,7 @@ describe('MfaController', () => {
     });
 
     it('passes the re-authentication proof cookie through', async () => {
-      await controller.setup(jwtRequest({ reauth_proof: 'proof' }), {});
+      await controller.setup(jwtRequest({ reauth_proof: 'proof' }), {}, res);
 
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
@@ -148,7 +152,9 @@ describe('MfaController', () => {
         )
       );
 
-      await expect(controller.setup(jwtRequest(), {})).rejects.toMatchObject({
+      await expect(
+        controller.setup(jwtRequest(), {}, res)
+      ).rejects.toMatchObject({
         status: 400
       });
       expect(mfaService.beginEnrolment).not.toHaveBeenCalled();
@@ -170,7 +176,7 @@ describe('MfaController', () => {
 
   describe('disable', () => {
     it('accepts an authenticator code in place of the password', async () => {
-      await controller.disable(jwtRequest(), { code: '123456' });
+      await controller.disable(jwtRequest(), { code: '123456' }, res);
 
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
@@ -188,16 +194,20 @@ describe('MfaController', () => {
         new HttpException({}, HttpStatus.BAD_REQUEST)
       );
 
-      await expect(controller.disable(jwtRequest(), {})).rejects.toBeDefined();
+      await expect(
+        controller.disable(jwtRequest(), {}, res)
+      ).rejects.toBeDefined();
       expect(mfaService.disable).not.toHaveBeenCalled();
     });
   });
 
   describe('regenerateRecoveryCodes', () => {
     it('demands its own step-up operation, not the one disable uses', async () => {
-      const result = await controller.regenerateRecoveryCodes(jwtRequest(), {
-        currentPassword: 'Password1'
-      });
+      const result = await controller.regenerateRecoveryCodes(
+        jwtRequest(),
+        { currentPassword: 'Password1' },
+        res
+      );
 
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
@@ -211,9 +221,11 @@ describe('MfaController', () => {
     });
 
     it('accepts an authenticator code in place of the password', async () => {
-      await controller.regenerateRecoveryCodes(jwtRequest(), {
-        code: '123456'
-      });
+      await controller.regenerateRecoveryCodes(
+        jwtRequest(),
+        { code: '123456' },
+        res
+      );
 
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
@@ -231,9 +243,54 @@ describe('MfaController', () => {
       );
 
       await expect(
-        controller.regenerateRecoveryCodes(jwtRequest(), {})
+        controller.regenerateRecoveryCodes(jwtRequest(), {}, res)
       ).rejects.toBeDefined();
       expect(mfaService.regenerateRecoveryCodes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the provider proof is cleared once the change is accepted', () => {
+    const clearedProof: [string, { path: string }] = [
+      'reauth_proof',
+      { path: '/api/v1/auth' }
+    ];
+
+    it('clears it after an enrolment starts', async () => {
+      await controller.setup(jwtRequest({ reauth_proof: 'proof' }), {}, res);
+
+      expect(res.clearCookie).toHaveBeenCalledWith(...clearedProof);
+    });
+
+    it('clears it after two-factor is turned off', async () => {
+      await controller.disable(
+        jwtRequest({ reauth_proof: 'proof' }),
+        { code: '123456' },
+        res
+      );
+
+      expect(res.clearCookie).toHaveBeenCalledWith(...clearedProof);
+    });
+
+    it('clears it after the recovery codes are replaced', async () => {
+      await controller.regenerateRecoveryCodes(
+        jwtRequest({ reauth_proof: 'proof' }),
+        { code: '123456' },
+        res
+      );
+
+      expect(res.clearCookie).toHaveBeenCalledWith(...clearedProof);
+    });
+
+    it('keeps it when the step-up refuses the caller', async () => {
+      authService.assertStepUp.mockRejectedValue(
+        new HttpException({}, HttpStatus.BAD_REQUEST)
+      );
+
+      await expect(
+        controller.disable(jwtRequest({ reauth_proof: 'proof' }), {}, res)
+      ).rejects.toBeDefined();
+
+      expect(res.clearCookie).not.toHaveBeenCalled();
     });
   });
 
