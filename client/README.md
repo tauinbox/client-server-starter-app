@@ -675,7 +675,12 @@ has exactly one meaning.
    relative URL resolves against the origin of the app. An absolute cross-origin URL never gets the
    token, and its 401 does not start the refresh path. The interceptor handles a 401 with a token
    refresh and a retry of the request. It uses `shareReplay(1)`, thus two refreshes cannot run
-   together.
+   together. `TOKEN_REFRESH_EXCLUDED_URLS` holds the session-guarded routes whose 401 reports on the
+   request body and not on the session: `POST /auth/logout` and `POST /auth/mfa/enable`. A wrong
+   two-factor enrolment code answers 401. A refresh there sends the same wrong code again. It spends
+   a second attempt of the account budget and it replaces the refresh cookie for no result. Both
+   routes need the `Authorization` header. Thus neither route can move to `AUTH_EXCLUDED_URLS`, which
+   also removes that header.
 
 ### Path Aliases
 
@@ -1004,8 +1009,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 264 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1271 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 265 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1278 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

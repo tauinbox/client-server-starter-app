@@ -27,6 +27,16 @@ describe('isTokenRefreshExcludedUrl', () => {
     expect(isTokenRefreshExcludedUrl(request)).toBe(true);
   });
 
+  it('should return true for the two-factor enrolment URL', () => {
+    const request = new HttpRequest('POST', '/api/v1/auth/mfa/enable', {});
+    expect(isTokenRefreshExcludedUrl(request)).toBe(true);
+  });
+
+  it('should return false for the two-factor sign-in challenge URL', () => {
+    const request = new HttpRequest('POST', '/api/v1/auth/mfa/verify', {});
+    expect(isTokenRefreshExcludedUrl(request)).toBe(false);
+  });
+
   it('should return false for partial path match like logout-all', () => {
     const request = new HttpRequest('POST', '/api/v1/auth/logout-all', {});
     expect(isTokenRefreshExcludedUrl(request)).toBe(false);
