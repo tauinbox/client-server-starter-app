@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { AuditService } from './audit.service';
+import { AUDIT_FIELD_MAX_LENGTH, AuditService } from './audit.service';
 import { AuditLog } from './entities/audit-log.entity';
 
 describe('AuditService', () => {
@@ -77,6 +77,54 @@ describe('AuditService', () => {
         requestId: null
       });
       expect(mockRepository.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('log - field caps', () => {
+    it('truncates an over-long actorEmail to the stated cap', async () => {
+      const actorEmail = `${'a'.repeat(400)}@example.com`;
+
+      await service.log({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        actorEmail
+      });
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorEmail: actorEmail.slice(0, AUDIT_FIELD_MAX_LENGTH)
+        })
+      );
+    });
+
+    it('truncates requestId, targetId, targetType and ip as well', async () => {
+      await service.log({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        targetId: 'i'.repeat(5000),
+        targetType: 't'.repeat(5000),
+        context: { ip: 'p'.repeat(5000), requestId: 'r'.repeat(5000) }
+      });
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetId: 'i'.repeat(AUDIT_FIELD_MAX_LENGTH),
+          targetType: 't'.repeat(AUDIT_FIELD_MAX_LENGTH),
+          ipAddress: 'p'.repeat(AUDIT_FIELD_MAX_LENGTH),
+          requestId: 'r'.repeat(AUDIT_FIELD_MAX_LENGTH)
+        })
+      );
+    });
+
+    it('leaves a value at the cap untouched', async () => {
+      const actorEmail = 'a'.repeat(AUDIT_FIELD_MAX_LENGTH);
+
+      await service.log({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        actorEmail
+      });
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ actorEmail })
+      );
     });
   });
 
