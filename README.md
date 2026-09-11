@@ -1651,7 +1651,8 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
   optional jsonb `conditions` column.
 - **user_roles** is a join table of `user_id` and `role_id`, with a composite primary key.
 - **audit_logs** holds the security-sensitive operations. Each row has the actor, the target, the IP
-  address and the request id.
+  address and the request id. Each string value is truncated to 255 characters on write, because the
+  columns are unbounded `varchar`.
 - **feature_flags** has a UUID primary key, a unique key, a description, the `enabled` flag, the
   `environments text[]` column with a GIN index, the `public` flag, an integer `version`, an
   `updated_by_user_id` and the timestamps.
@@ -1917,8 +1918,9 @@ a second request to the registry for a verdict that gates nothing.
   a webhook-event replay and a usage ingest.
 - **`X-Request-Id` shape validation.** An incoming `x-request-id` header must match
   `^[A-Za-z0-9_-]{1,64}$`. The server replaces a value that does not match with a new UUID before the
-  value reaches an audit row, a log line or a Prometheus label. Thus a person cannot inject data into
-  a log or make a label with high cardinality.
+  value reaches an audit row, a log line or a Prometheus label. The middleware writes the accepted
+  value to `req.requestId`, and each reader takes it from there, never from the header. Thus a person
+  cannot inject data into a log or make a label with high cardinality.
 - `class-validator` runs on the server DTOs with `whitelist: true` and `forbidNonWhitelisted: true`.
   The pipe removes an unknown property and rejects a request with an undeclared field. Thus a
   mass-assignment attack fails. On the client, the Angular `Validators` do the same work.

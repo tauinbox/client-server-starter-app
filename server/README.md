@@ -324,7 +324,14 @@ and the permission-cache invalidation after a role change.
 #### audit
 
 `audit.service.ts` holds `AuditService`. It records 47 security-sensitive actions in the `audit_logs`
-table.
+table. `log()` truncates `actorEmail`, `targetId`, `targetType`, `ipAddress` and `requestId` to
+`AUDIT_FIELD_MAX_LENGTH` (255) before the insert. The columns are unbounded `varchar`, and some of
+the values reach the row without a DTO: `POST /auth/login` takes no body DTO, and `req.ip` is
+resolved from a proxy header.
+
+`../../common/utils/audit-context.util.ts` holds `extractAuditContext(req)`. It reads `req.ip` and
+`req.requestId`, which is the value `RequestIdMiddleware` validated. It never reads the raw
+`x-request-id` header, so the audit row, the response header and the log line always agree.
 
 `audit-cleanup.service.ts` holds `AuditCleanupService`. A nightly cron job deletes an entry that is
 older than `AUDIT_LOG_RETENTION_DAYS` days.

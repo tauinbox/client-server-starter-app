@@ -53,7 +53,10 @@ describe('AuditLogInterceptor', () => {
     const ctx = makeContext({
       user: { userId: 'admin-1', email: 'a@e.com' },
       params: { id: 'role-42' },
-      headers: { 'x-request-id': 'req-1' },
+      // RequestIdMiddleware writes the sanitised id here; the raw header is
+      // present to prove the interceptor does not read it.
+      requestId: 'req-1',
+      headers: { 'x-request-id': 'x'.repeat(5000) },
       ip: '10.0.0.1'
     });
     const next: CallHandler = { handle: () => of(undefined) };
