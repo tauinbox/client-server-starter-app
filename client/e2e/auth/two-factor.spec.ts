@@ -5,6 +5,7 @@ import {
   MOCK_TOTP_CODE
 } from '../../../mock-server/src/constants';
 import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
+import type { MockAuditLog } from '../../../mock-server/src/types';
 import type { Page } from '@playwright/test';
 
 const EMAIL = 'testlogin@example.com';
@@ -222,6 +223,50 @@ test.describe('two-factor authentication', () => {
     await page.getByLabel('Recovery code').fill(MOCK_RECOVERY_CODES[0]);
     await page.getByRole('button', { name: 'Verify' }).click();
     await page.waitForURL((url) => !url.pathname.endsWith('/login'));
+  });
+
+  // A wrong enrolment code is answered with 401, the same status an expired
+  // session carries. The interceptor must read it as a verdict on the code:
+  // a refresh here replays the same wrong code, so one mistyped code costs two
+  // attempts of the account budget and rotates the refresh cookie for nothing.
+  test('spends one attempt and no refresh on a wrong enrolment code', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await page.getByLabel('Current password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.locator('.two-factor-qr')).toBeVisible();
+
+    const calls: string[] = [];
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url());
+      if (
+        pathname.endsWith('/auth/mfa/enable') ||
+        pathname.endsWith('/auth/refresh-token')
+      ) {
+        calls.push(`${request.method()} ${pathname}`);
+      }
+    });
+
+    await page.getByLabel('Authentication code').fill('000000');
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await expect(page.locator('mat-snack-bar-container')).toBeVisible();
+
+    expect(calls).toEqual(['POST /api/v1/auth/mfa/enable']);
+
+    const state = await _mockServer.getState();
+    const failures = (state.auditLogs as MockAuditLog[]).filter(
+      (row) => row.action === 'MFA_CHALLENGE_FAILURE'
+    );
+    expect(failures).toHaveLength(1);
+
+    // The card stays on the code step, so the correct code still enrols.
+    await _mockServer.clearTotpLedger(USER_ID);
+    await page.getByLabel('Authentication code').fill(MOCK_TOTP_CODE);
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await expect(page.getByText(MOCK_RECOVERY_CODES[0])).toBeVisible();
   });
 
   test('renders every panel without overflow at every width', async ({

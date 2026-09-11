@@ -194,6 +194,31 @@ describe('jwtInterceptor', () => {
     expect(tokenServiceMock.refreshTokens).not.toHaveBeenCalled();
   });
 
+  // A wrong enrolment code answers 401. A refresh there replays the same wrong
+  // code, which costs the user a second attempt of the account budget.
+  it('should pass 401 through for the two-factor enrolment URL', () => {
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
+    let caughtError: HttpErrorResponse | null = null;
+
+    http.post('/api/v1/auth/mfa/enable', { code: '000000' }).subscribe({
+      error: (err) => (caughtError = err)
+    });
+
+    const req = httpMock.expectOne('/api/v1/auth/mfa/enable');
+    // The route sits behind the session guard, so the header must survive.
+    expect(req.request.headers.get('Authorization')).toBe(
+      'Bearer my-access-token'
+    );
+    req.flush(
+      { message: 'Verification code is incorrect' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+
+    expect(caughtError!.status).toBe(401);
+    expect(tokenServiceMock.refreshTokens).not.toHaveBeenCalled();
+    expect(tokenServiceMock.forceLogout).not.toHaveBeenCalled();
+  });
+
   it('should force-logout and rethrow when refresh fails', () => {
     authStoreMock.getAccessToken.mockReturnValue('expired-token');
     tokenServiceMock.refreshTokens.mockReturnValue(
