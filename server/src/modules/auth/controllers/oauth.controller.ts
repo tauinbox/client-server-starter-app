@@ -150,6 +150,10 @@ export class OAuthController {
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
 
+    // Cleared only now, so a rejected attempt keeps its remaining proof
+    // window. The ledger already refuses a second use of the value.
+    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+
     return { message: 'Link initiated' };
   }
 
@@ -293,7 +297,8 @@ export class OAuthController {
   async unlinkOAuth(
     @Param('provider') provider: string,
     @Request() req: JwtAuthRequest,
-    @Body() dto: OAuthUnlinkDto
+    @Body() dto: OAuthUnlinkDto,
+    @Res({ passthrough: true }) res: Response
   ) {
     if (!Object.values(OAuthProvider).includes(provider as OAuthProvider)) {
       throw new HttpException(
@@ -323,6 +328,10 @@ export class OAuthController {
       userId,
       provider
     );
+
+    // Cleared only now, so a rejected attempt keeps its remaining proof
+    // window. The ledger already refuses a second use of the value.
+    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
 
     await this.auditService.log({
       action: AuditAction.OAUTH_UNLINK,
@@ -565,11 +574,14 @@ export class OAuthController {
         payload.iat
       );
 
+      // The id is what the single-use ledger records, so a value captured
+      // before the change is refused once the owner has spent it.
       const proof = this.jwtService.sign(
         {
           sub: payload.sub,
           purpose: TOKEN_PURPOSE.REAUTH_PROOF,
-          operation: payload.operation
+          operation: payload.operation,
+          jti: randomUUID()
         },
         { expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS }
       );

@@ -200,7 +200,11 @@ cannot both proceed. The raw Redis client is used for the same reason the versio
 Keyv gives no conditional write. Without Redis one process owns the ledger, and the claims in flight
 are also reserved synchronously, because the read and the write are two awaits. A ledger that cannot
 be reached fails open, because it hardens a credential that is already signed and short-lived.
-`POST /auth/oauth/exchange` is the one consumer today.
+There are two consumers. `POST /auth/oauth/exchange` claims the `jti` of the `oauth_data` cookie.
+`AuthService.isValidReauthProof` claims the `jti` of a `reauth_proof` under the prefix
+`reauth-proof:spent:`, so one provider round trip authorises one sensitive change. That claim runs
+after every other check on the proof, thus a proof offered for the wrong operation is refused and
+stays unspent. A proof that carries no `jti` cannot be recorded, thus it is refused.
 
 `common/validators/` holds `is-safe-mongo-query` and `permission-condition-shape`. It also holds
 `property-is-defined.ts`.
@@ -1276,7 +1280,8 @@ The row an unlink deletes is a sign-in credential that no password reset removes
 runs `AuthService.assertStepUpForUser` with the operation `oauth_unlink` before it deletes
 anything. The password rides in the body of the `DELETE`; an account created through a provider
 sends none and presents a `reauth_proof` minted for that operation instead. The provider name is
-validated first, so a typo costs no factor.
+validated first, so a typo costs no factor. The route clears the proof cookie once the provider is
+removed, as every consumer of a proof does.
 
 The check and the delete run in one transaction that holds a `FOR UPDATE` lock on the user row
 (`OAuthAccountService.unlinkProvider`). Thus two concurrent unlink requests cannot both see "one

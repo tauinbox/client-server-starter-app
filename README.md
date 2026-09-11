@@ -1760,11 +1760,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2331 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2342 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 376 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 374 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1275 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 264 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 726 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 731 tests pass |
 
 ## CI/CD
 
@@ -1865,12 +1865,13 @@ a second request to the registry for a verdict that gates nothing.
   (`POST /auth/mfa/setup`) takes the same trip, under its own operation. Turning the factor off does
   not, and neither does replacing the recovery codes: an enrolled account presents a code from its
   authenticator, which the step-up accepts before it looks for a password. Each of those two actions
-  still names its own operation, because a proof is not single use and one trip must not authorize
-  both. Before the password path was gated, a stolen
+  still names its own operation, because a trip taken for one change must not authorize the other. Before the password path was gated, a stolen
   access token alone could bind a password that survived the logout and the token rotation.
-  The proof lasts 300 seconds, is HttpOnly, and dies with an account-wide session revocation. It is not single use,
-  so it also carries the operation it was minted for, and each sensitive action accepts only its own:
-  a proof taken to change an address cannot bind a password. The callback mints nothing unless the
+  The proof lasts 300 seconds, is HttpOnly, and dies with an account-wide session revocation. It is
+  single use: it carries a token id that the server records as spent on the first presentation that
+  passes every other check, so one round trip authorizes one change. It also carries the operation it
+  was minted for, and each sensitive action accepts only its own, so a proof taken to change an
+  address cannot bind a password and is not spent by the attempt. The callback mints nothing unless the
   provider identity that just authenticated already belongs to the caller, so a second account at the
   same provider proves nothing.
 - The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an

@@ -1,4 +1,12 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger
+} from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -19,6 +27,7 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { MfaService } from './mfa.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
@@ -28,6 +37,7 @@ import {
   ErrorKeys,
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
+  REAUTH_PROOF_MAX_AGE_SECONDS,
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
   SYSTEM_ROLES,
@@ -95,6 +105,8 @@ const ENUMERATION_SAFE_FORGOT_RESPONSE = {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
+  private readonly reauthProofLedger: SingleUseTokenLedger;
+
   constructor(
     private dataSource: DataSource,
     private usersService: UsersService,
@@ -108,8 +120,15 @@ export class AuthService {
     private sessionIssuer: SessionIssuerService,
     private jwtService: JwtService,
     private breachedPasswordService: BreachedPasswordService,
-    private mfaService: MfaService
-  ) {}
+    private mfaService: MfaService,
+    @Inject(CACHE_MANAGER) cache: Cache
+  ) {
+    this.reauthProofLedger = new SingleUseTokenLedger(
+      cache,
+      'reauth-proof:spent:',
+      this.logger
+    );
+  }
 
   // Dummy hash for constant-time rejection (prevents timing attacks).
   // Derived from BCRYPT_SALT_ROUNDS so its cost can never drift from real
@@ -918,9 +937,9 @@ export class AuthService {
    * `reauth_proof` token this reads.
    *
    * The proof is bounded by its own 300 second expiry, by the last session
-   * revocation, and by the operation it was minted for. It is still not single
-   * use inside that window, so `operation` is what stops one round trip from
-   * authorising a different sensitive change than the one the user asked for.
+   * revocation, by the operation it was minted for, and it is single use: the
+   * first presentation that passes every other check records the token id as
+   * spent, so one round trip authorises one change.
    *
    * An account that carries a second factor may present a code instead of
    * either of the two. That is the only factor an OAuth-only holder of an
@@ -995,7 +1014,7 @@ export class AuthService {
     }
 
     if (user.password === null) {
-      return this.isValidReauthProof(user, reauthProof, operation)
+      return (await this.isValidReauthProof(user, reauthProof, operation))
         ? null
         : 'reauth_proof';
     }
@@ -1008,11 +1027,21 @@ export class AuthService {
     return isMatch ? null : 'password';
   }
 
-  private isValidReauthProof(
+  /**
+   * The proof is spent on the first presentation that passes every other
+   * check. Clearing the cookie only ends the credential in the caller's own
+   * browser, so a script on the origin can otherwise send the same value again
+   * for the rest of the 300 second window and repeat the operation it opens.
+   *
+   * The claim runs last on purpose: a proof offered for the wrong operation,
+   * or after a session revocation, must be refused without burning the one the
+   * user still holds.
+   */
+  private async isValidReauthProof(
     user: User,
     proof: string | undefined,
     operation: StepUpOperation
-  ): boolean {
+  ): Promise<boolean> {
     if (!proof) {
       return false;
     }
@@ -1023,18 +1052,29 @@ export class AuthService {
         purpose?: string;
         operation?: string;
         iat?: number;
+        jti?: string;
       }>(proof);
 
       const revokedAtSeconds = user.tokenRevokedAt
         ? user.tokenRevokedAt.getTime() / 1000
         : null;
 
-      return (
+      const isIntact =
         payload.purpose === TOKEN_PURPOSE.REAUTH_PROOF &&
         payload.sub === user.id &&
         payload.operation === operation &&
         typeof payload.iat === 'number' &&
-        (revokedAtSeconds === null || payload.iat >= revokedAtSeconds)
+        (revokedAtSeconds === null || payload.iat >= revokedAtSeconds);
+
+      // A proof minted before the ledger existed carries no id and cannot be
+      // recorded as spent, so it is refused rather than trusted.
+      if (!isIntact || !payload.jti) {
+        return false;
+      }
+
+      return await this.reauthProofLedger.claim(
+        payload.jti,
+        REAUTH_PROOF_MAX_AGE_SECONDS * 1000
       );
     } catch {
       return false;

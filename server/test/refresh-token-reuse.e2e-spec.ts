@@ -5,6 +5,7 @@
 // hashing, transactional revoke + rotate, full session purge on reuse).
 
 import { Test } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus } from '@nestjs/common';
@@ -24,6 +25,7 @@ import { MailService } from '../src/modules/mail/mail.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
+import { createMockCache } from '../src/common/testing/cache.mock';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
@@ -190,6 +192,7 @@ describe('Refresh token reuse detection (e2e)', () => {
           provide: BreachedPasswordService,
           useValue: { assertNotBreached: jest.fn() }
         },
+        { provide: CACHE_MANAGER, useValue: createMockCache() },
         AuthService,
         {
           // These suites never present a second factor. The mock answers the two
