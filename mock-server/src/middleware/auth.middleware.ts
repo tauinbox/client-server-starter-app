@@ -1003,6 +1003,20 @@ router.post('/profile/email/confirm', (req, res) => {
   }
 
   const user = findUserById(userId);
+  // Deactivation must also void an email-change token issued while the account
+  // was still active, matching the isActive gate in reset-password. The
+  // response stays identical to the not-found case so it reveals no account
+  // state, and the token is left in place exactly as the server leaves the
+  // column, so a later re-activation behaves the same in both.
+  if (user && !user.isActive) {
+    res.status(400).json({
+      message: 'Invalid or expired email-change token',
+      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      statusCode: 400
+    });
+    return;
+  }
+
   if (!user || !user.pendingEmail) {
     state.pendingEmailTokens.delete(token);
     res.status(400).json({

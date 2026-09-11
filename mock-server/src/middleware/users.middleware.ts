@@ -427,8 +427,19 @@ router.patch(
       revokeUserSessions(user);
     }
     if (isActive !== undefined) {
-      if (isActive === false && user.isActive !== false) {
+      // Keyed on the submitted value and not on a transition, because the
+      // server writes both effects whenever the request carries `false`.
+      if (isActive === false) {
         user.tokenRevokedAt = new Date().toISOString();
+        // Cancel any in-flight self-service email change so a mailed link
+        // cannot confirm against a disabled row, the same reason the soft
+        // delete clears these three fields.
+        if (user.pendingEmailToken) {
+          getState().pendingEmailTokens.delete(user.pendingEmailToken);
+        }
+        user.pendingEmail = null;
+        user.pendingEmailToken = null;
+        user.pendingEmailExpiresAt = null;
       }
       user.isActive = isActive;
     }

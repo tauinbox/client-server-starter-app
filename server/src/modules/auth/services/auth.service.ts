@@ -825,7 +825,11 @@ export class AuthService {
           const user = await manager.findOne(User, {
             where: { pendingEmailToken: hashedToken }
           });
-          if (!user || !user.pendingEmail) {
+          // Deactivation must also void an email-change token issued while the
+          // account was still active, matching the isActive gate in
+          // resetPassword. The response stays identical to the not-found case
+          // so it reveals no account state.
+          if (!user || !user.pendingEmail || !user.isActive) {
             throw new HttpException(
               {
                 message: 'Invalid or expired email-change token',

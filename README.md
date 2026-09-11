@@ -69,7 +69,8 @@ management and theming.
 
   `POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction. It checks the
   uniqueness again for the race window. It revokes each refresh token, and it notifies the old
-  address.
+  address. It refuses an account that is not active, with the same body as an unknown token. A
+  deactivation also cancels a change that is in progress.
 
   A partial unique index on `LOWER(pending_email)` keeps the set of `{email}` and `{pendingEmail}`
   globally unique. The dual-email checks in `register`, `users.update` and `users.create` do the

@@ -1427,6 +1427,8 @@ alert with no link to the old address.
 
 `POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction. It checks the
 uniqueness again for the race window. It revokes each refresh token, and it notifies the old address.
+It refuses an account that is not active, with the same body as an unknown token, thus the answer
+reports no account state. This matches the `isActive` gate on `forgotPassword` and `resetPassword`.
 
 The server rejects an account with OAuth only, because it has no password. Such a user must set a
 password first.
@@ -1435,7 +1437,8 @@ The endpoint has a throttle of 3 calls each hour. It is enumeration-safe, becaus
 taken address gives the same response shape.
 
 The server clears the `pendingEmail*` fields that are in progress on a `resetPassword` call, on an
-administrator email change, on a soft delete, and on `UserDeletedEvent`.
+administrator email change, on a deactivation (`isActive` set to false), on a soft delete, and on
+`UserDeletedEvent`. A re-activation does not restore a cancelled change. The user starts a new one.
 
 A partial unique index on `LOWER(pending_email)`, plus the dual-email checks in `register`,
 `users.create` and `users.update`, keep the set of `{email}` and `{pendingEmail}` globally unique

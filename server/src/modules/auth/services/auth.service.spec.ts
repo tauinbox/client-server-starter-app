@@ -2294,6 +2294,33 @@ describe('AuthService', () => {
       expect(mockManager.update).not.toHaveBeenCalled();
     });
 
+    it('refuses a deactivated account with the not-found envelope', async () => {
+      const pendingUser = {
+        ...mockUser,
+        isActive: false,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      };
+      mockManager.findOne.mockResolvedValue(pendingUser);
+
+      const rejection = await service.confirmEmailChange('raw-token').then(
+        () => null,
+        (err: unknown) => err
+      );
+
+      expect(rejection).toBeInstanceOf(HttpException);
+      const httpError = rejection as HttpException;
+      expect(httpError.getStatus()).toBe(HttpStatus.BAD_REQUEST);
+      expect(httpError.getResponse()).toEqual({
+        message: 'Invalid or expired email-change token',
+        errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
+      });
+      expect(mockManager.update).not.toHaveBeenCalled();
+      expect(mockManager.delete).not.toHaveBeenCalled();
+      expect(mockUsersService.clearPendingEmailChange).not.toHaveBeenCalled();
+    });
+
     it('clears state and throws 400 when token is expired', async () => {
       const pendingUser = {
         ...mockUser,
