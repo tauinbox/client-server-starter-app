@@ -69,7 +69,8 @@ management and theming.
 
   `POST /api/v1/auth/profile/email/confirm` applies the change inside a transaction. It checks the
   uniqueness again for the race window. It revokes each refresh token, and it notifies the old
-  address.
+  address. It refuses an account that is not active, with the same body as an unknown token. A
+  deactivation also cancels a change that is in progress.
 
   A partial unique index on `LOWER(pending_email)` keeps the set of `{email}` and `{pendingEmail}`
   globally unique. The dual-email checks in `register`, `users.update` and `users.create` do the
@@ -1760,11 +1761,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2342 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2345 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 376 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 374 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1278 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 265 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 731 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 734 tests pass |
 
 ## CI/CD
 

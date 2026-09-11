@@ -532,6 +532,44 @@ describe('UsersService', () => {
       );
     });
 
+    it('cancels an in-flight email change when deactivating a user', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      });
+      mockRepository.save.mockResolvedValue({ ...mockUser, isActive: false });
+
+      await service.update('user-1', { isActive: false }, SYSTEM_ABILITY);
+
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null
+        })
+      );
+    });
+
+    it('keeps an in-flight email change when activating a user', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token'
+      });
+      mockRepository.save.mockResolvedValue({ ...mockUser, isActive: true });
+
+      await service.update('user-1', { isActive: true }, SYSTEM_ABILITY);
+
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.not.objectContaining({ pendingEmailToken: null })
+      );
+    });
+
     it('translates a unique violation on save into the same 409', async () => {
       mockRepository.findOne
         .mockResolvedValueOnce(mockUser) // target user

@@ -263,6 +263,12 @@ export class UsersService {
 
     if (rest.isActive === false) {
       changes.tokenRevokedAt = new Date();
+      // Cancel any in-flight self-service email change so a mailed link cannot
+      // confirm against a disabled row, the same reason the soft delete clears
+      // these three columns.
+      changes.pendingEmail = null;
+      changes.pendingEmailToken = null;
+      changes.pendingEmailExpiresAt = null;
     }
 
     let pendingVerificationRawToken: string | null = null;
