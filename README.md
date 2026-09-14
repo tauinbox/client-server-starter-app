@@ -58,7 +58,12 @@ management and theming.
   An administrator email change through `PATCH /api/v1/users/:id` sets `isEmailVerified` to false. It
   makes a new hashed verification token and sends a new verification email. The server enforces the
   uniqueness of the address. A conflict answers HTTP 409 with
-  `errorKey: errors.users.emailExists`.
+  `errorKey: errors.users.emailExists`. A real move also writes a
+  `USER_EMAIL_CHANGE_COMPLETE` audit row with
+  `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row of the same
+  request records field names only. The server does not mail the previous address on this path. The
+  path recovers an account whose address an attacker holds, thus a notice would warn that attacker,
+  and the audit row is the only record of the move.
 - **Self-service email change.** A user can change their own email address from `/profile`. The flow
   has two steps and confirms at the new address.
 
@@ -1492,7 +1497,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
-| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change or an email change revokes the sessions of the target |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change or an email change revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'` |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/roles` | `roles:create` | Create a role |

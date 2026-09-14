@@ -390,6 +390,7 @@ router.patch(
       return;
     }
 
+    let previousEmail: string | undefined;
     if (email !== undefined) {
       const existing = findUserByEmail(email);
       const pendingConflict = Array.from(getState().users.values()).find(
@@ -404,6 +405,7 @@ router.patch(
         return;
       }
       if (email !== user.email) {
+        previousEmail = user.email;
         user.isEmailVerified = false;
         // Admin-set email overrides any self-service change in flight.
         if (user.pendingEmailToken) {
@@ -461,6 +463,23 @@ router.patch(
       details: { changedFields },
       ip: req.ip
     });
+
+    // The USER_UPDATE row carries field names only, so without this row the
+    // address the account moved to is unrecoverable. Mirrors the server.
+    if (previousEmail !== undefined) {
+      logAudit('USER_EMAIL_CHANGE_COMPLETE', {
+        actorId: actor.id,
+        actorEmail: actor.email,
+        targetId: id,
+        targetType: 'User',
+        details: {
+          oldEmail: previousEmail,
+          newEmail: user.email,
+          source: 'admin'
+        },
+        ip: req.ip
+      });
+    }
 
     if (password !== undefined) {
       logAudit('PASSWORD_CHANGE', {
