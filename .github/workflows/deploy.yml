@@ -285,6 +285,18 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans
 
+            # Grafana reads the provisioning directory at startup only, and the
+            # directory is a bind mount, so `up -d` above does not recreate the
+            # container when one of those files changes. Without this an edited
+            # alert rule, datasource or contact point lands on the host and is
+            # never applied, while the deploy reports success. Restart Grafana
+            # only when those files actually changed, so an ordinary code deploy
+            # does not churn the container.
+            if [ -z "$PREV_SHA" ] || ! git diff --quiet "$PREV_SHA" "$DEPLOY_SHA" -- monitoring/grafana/provisioning; then
+              echo "Grafana provisioning changed - restarting grafana to reload it"
+              docker compose restart grafana
+            fi
+
             # Health check with timeout — require ALL services with healthcheck to be healthy
             echo "Waiting for services to become healthy..."
             EXPECTED=$(docker compose config 2>/dev/null | grep -c 'healthcheck:' || true)

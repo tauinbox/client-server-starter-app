@@ -16,27 +16,38 @@ groups:
         for: 10m
         annotations:
           summary: 'Dependency {{ $labels.dependency }} has been degraded for 10 minutes'
-          description: 'The readiness probe reports {{ $labels.dependency }} as degraded or down. Transactional mail (smtp) or rate limiting and cache invalidation (redis) are not working, while /health/ready keeps returning ok.'
+          description: 'The readiness probe reports {{ $labels.dependency }} as degraded or down in the last 15 minutes. Transactional mail (smtp) or rate limiting and cache invalidation (redis) are not working, while /health/ready keeps returning ok. The alert clears after 15 minutes of healthy samples.'
         labels:
           severity: warning
-        # Server-down is covered by nexus-server-down, so an absent series here
-        # must stay silent instead of duplicating that alert.
-        noDataState: OK
+        # A scrape gap is not a recovery. Prometheus marks the series stale on a
+        # failed scrape and a restart drops it until the first readiness probe,
+        # and with noDataState: OK each gap sent a RESOLVED message and re-fired
+        # 10 min later. Keeping the last state leaves a dead server to
+        # nexus-server-down, which is still the only rule that reports it.
+        noDataState: KeepLast
         execErrState: Error
         isPaused: false
         data:
           - refId: A
             relativeTimeRange:
-              from: 600
+              from: 900
               to: 0
             datasourceUid: prometheus
             model:
               refId: A
-              expr: dependency_up
+              # min_over_time, not the raw gauge: the mail provider accepts about
+              # one login in eighty, and the indicator's 5 min verify cache turns
+              # a single success into a 5 min plateau of 1. On the raw gauge that
+              # plateau resolved the alert, and the next failed check re-fired it
+              # 11 min later - measured 2026-09-14, two plateaus in 12 hours and
+              # 144 rejected logins out of about 156 checks. One healthy sample
+              # can no longer clear the condition; the cost is a real recovery
+              # that needs 15 min of healthy samples to report.
+              expr: min_over_time(dependency_up[15m])
               instant: true
           - refId: B
             relativeTimeRange:
-              from: 600
+              from: 900
               to: 0
             datasourceUid: __expr__
             model:
@@ -52,8 +63,8 @@ groups:
                     params:
                       - 1
 
-      # Without this the dependency rule's noDataState: OK would make a dead
-      # server look identical to a healthy one.
+      # Without this a dead server reports nothing: the dependency rule keeps
+      # the state it last evaluated, which for a healthy stack is Normal.
       - uid: nexus-server-down
         title: Server unreachable
         condition: B

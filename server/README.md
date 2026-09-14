@@ -250,6 +250,11 @@ not authenticate against the provider again at each request.
 Each result also goes to the `dependency_up` gauge. That gauge is what makes a degraded dependency
 alertable while readiness reports it as up.
 
+The cache also holds a single successful verify for 5 minutes. A provider that rejects almost all
+logins can accept one, thus the gauge shows a 5-minute plateau of `1` that is not a recovery. The
+alert rule reads the minimum of a 15-minute window for that reason. Refer to
+[Alerting](../README.md#alerting).
+
 `metrics/` holds `MetricsModule`, which is `@Global`. It supplies the Prometheus metrics through
 `@willsoto/nestjs-prometheus`.
 
