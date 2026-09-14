@@ -47,7 +47,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
 
   constructor(
     provider: OAuthProvider,
-    private readonly isProduction: boolean
+    private readonly secureCookies: boolean
   ) {
     this.cookieName = `${COOKIE_NAME_PREFIX}${provider}`;
   }
@@ -168,7 +168,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
       res.cookie(name, bindIntent(intent, state), {
         httpOnly: true,
         sameSite: 'lax',
-        secure: this.isProduction,
+        secure: this.secureCookies,
         path: OAUTH_INTENT_COOKIE_PATH,
         maxAge: COOKIE_MAX_AGE_MS
       });
@@ -203,7 +203,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     return {
       httpOnly: true,
       sameSite: 'lax',
-      secure: this.isProduction,
+      secure: this.secureCookies,
       path: COOKIE_PATH,
       maxAge: COOKIE_MAX_AGE_MS
     };

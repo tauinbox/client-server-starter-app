@@ -4,6 +4,7 @@ import type { StrategyOptions } from 'passport-vkontakte';
 import { Strategy } from 'passport-vkontakte';
 import type OAuth2Strategy from 'passport-oauth2';
 import { ConfigService } from '@nestjs/config';
+import { requiresSecureCookies } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
@@ -32,7 +33,7 @@ export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
       state: true,
       store: new CookieStateStore(
         OAuthProvider.VK,
-        configService.get('ENVIRONMENT') === 'production'
+        requiresSecureCookies(configService.get<string>('ENVIRONMENT'))
       )
     };
 

@@ -47,8 +47,8 @@ describe('AnonIdMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('sets Secure flag in production', () => {
-    configService.get.mockReturnValue('production');
+  function secureFlagFor(environment: string): boolean | undefined {
+    configService.get.mockReturnValue(environment);
     const req = createMockRequest({ cookies: {} });
     const cookieSpy = jest.fn();
     const res = createMockResponse({ cookie: cookieSpy });
@@ -56,6 +56,21 @@ describe('AnonIdMiddleware', () => {
     const calls = cookieSpy.mock.calls as Array<
       [string, string, { secure?: boolean }]
     >;
-    expect(calls[0][2]).toMatchObject({ secure: true });
+    return calls[0][2].secure;
+  }
+
+  it('sets Secure flag in production', () => {
+    expect(secureFlagFor('production')).toBe(true);
+  });
+
+  // Regression: the flag came from an === 'production' comparison, so the two
+  // middle environments issued the cookie over plain HTTP.
+  it('sets Secure flag in development and staging too', () => {
+    expect(secureFlagFor('development')).toBe(true);
+    expect(secureFlagFor('staging')).toBe(true);
+  });
+
+  it('leaves Secure off in local, which the dev proxy serves over HTTP', () => {
+    expect(secureFlagFor('local')).toBe(false);
   });
 });

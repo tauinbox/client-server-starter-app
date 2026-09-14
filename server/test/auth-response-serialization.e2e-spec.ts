@@ -155,7 +155,11 @@ describe('Auth response serialization (e2e)', () => {
 
   const configValues: Record<string, string> = {
     CLIENT_URL: 'http://localhost:4200',
-    JWT_REFRESH_EXPIRATION: '604800'
+    JWT_REFRESH_EXPIRATION: '604800',
+    // The agent below replays cookies over plain HTTP, which is what a local
+    // server serves. Each other environment sets Secure and the agent drops
+    // the cookie.
+    ENVIRONMENT: 'local'
   };
 
   beforeEach(async () => {

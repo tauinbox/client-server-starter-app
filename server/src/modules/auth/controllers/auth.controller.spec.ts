@@ -364,6 +364,30 @@ describe('AuthController', () => {
       );
     });
 
+    // Regression: the attribute came from an === 'production' comparison, so
+    // a staging deployment put the refresh token on the wire without Secure.
+    it.each<[string, boolean]>([
+      ['staging', true],
+      ['development', true],
+      ['production', true],
+      ['local', false]
+    ])(
+      'sets Secure on the refresh cookie in %s',
+      async (environment, secure) => {
+        configValues['ENVIRONMENT'] = environment;
+        const req = mockLocalAuthRequest() as LocalAuthRequest;
+        const res = mockResponse();
+
+        await controller.login(req, res);
+
+        expect(res.cookie).toHaveBeenCalledWith(
+          'refresh_token',
+          'refresh-token',
+          expect.objectContaining({ secure })
+        );
+      }
+    );
+
     // Regression: a missing JWT_REFRESH_EXPIRATION must fail loudly. The
     // pre-fix code computed a NaN maxAge and silently set a session cookie.
     it('should fail loudly and set no cookie when JWT_REFRESH_EXPIRATION is missing', async () => {

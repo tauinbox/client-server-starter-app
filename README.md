@@ -1020,7 +1020,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APPLICATION_PORT` | `3000` | HTTP listen port |
-| `ENVIRONMENT` | `local` | Environment name |
+| `ENVIRONMENT` | `local` | Environment name. Each value other than `local` makes the session cookies `Secure` and thus needs HTTPS |
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `my-db` | Database name |
@@ -1785,7 +1785,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2360 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2369 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 379 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 377 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1278 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 265 tests pass |

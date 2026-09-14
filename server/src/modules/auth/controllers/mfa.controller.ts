@@ -21,7 +21,10 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { Request as ExpressRequest, Response } from 'express';
-import { STEP_UP_OPERATION } from '@app/shared/constants';
+import {
+  requiresSecureCookies,
+  STEP_UP_OPERATION
+} from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuthService } from '../services/auth.service';
 import { MfaService } from '../services/mfa.service';
@@ -72,7 +75,9 @@ export class MfaController {
       1000;
     res.cookie(REFRESH_TOKEN_COOKIE, token, {
       httpOnly: true,
-      secure: this.configService.get('ENVIRONMENT') === 'production',
+      secure: requiresSecureCookies(
+        this.configService.get<string>('ENVIRONMENT')
+      ),
       sameSite: 'strict',
       path: '/api/v1/auth',
       maxAge

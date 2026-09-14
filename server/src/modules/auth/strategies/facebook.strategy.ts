@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import type { StrategyOptions } from 'passport-facebook';
 import { Strategy } from 'passport-facebook';
 import { ConfigService } from '@nestjs/config';
+import { requiresSecureCookies } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
@@ -20,7 +21,7 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       state: true,
       store: new CookieStateStore(
         OAuthProvider.FACEBOOK,
-        configService.get('ENVIRONMENT') === 'production'
+        requiresSecureCookies(configService.get<string>('ENVIRONMENT'))
       )
     };
 
