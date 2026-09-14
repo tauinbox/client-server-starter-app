@@ -8,6 +8,7 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserRoleChangedEvent } from '../events/user-role-changed.event';
 import type { AppAbility } from '../casl/app-ability';
 import {
   LOG_AUDIT_KEY,
@@ -65,6 +66,7 @@ describe('RolesController', () => {
     assignRoleToUser: jest.Mock;
     removeRoleFromUser: jest.Mock;
   };
+  let eventEmitterMock: { emit: jest.Mock; emitAsync: jest.Mock };
   let auditServiceMock: { log: jest.Mock; logFireAndForget: jest.Mock };
   let metricsServiceMock: { recordPermissionDenied: jest.Mock };
 
@@ -84,6 +86,11 @@ describe('RolesController', () => {
       removeRoleFromUser: jest.fn().mockResolvedValue(undefined)
     };
 
+    eventEmitterMock = {
+      emit: jest.fn(),
+      emitAsync: jest.fn().mockResolvedValue([])
+    };
+
     auditServiceMock = {
       log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn()
@@ -94,7 +101,7 @@ describe('RolesController', () => {
       controllers: [RolesController],
       providers: [
         { provide: RoleService, useValue: roleServiceMock },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MetricsService, useValue: metricsServiceMock }
       ]
@@ -437,6 +444,34 @@ describe('RolesController', () => {
         'actor-1'
       );
     });
+
+    it('should await the session revocation event', async () => {
+      await controller.assignRole(
+        'user-99',
+        { roleId: 'role-1' },
+        mockAbility,
+        mockReq
+      );
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserRoleChangedEvent.name,
+        new UserRoleChangedEvent('user-99')
+      );
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+    });
+
+    it('should fail the request when the revocation listener rejects', async () => {
+      eventEmitterMock.emitAsync.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        controller.assignRole(
+          'user-99',
+          { roleId: 'role-1' },
+          mockAbility,
+          mockReq
+        )
+      ).rejects.toThrow('db down');
+    });
   });
 
   describe('removeRole', () => {
@@ -460,6 +495,24 @@ describe('RolesController', () => {
       );
 
       expect(result).toBeUndefined();
+    });
+
+    it('should await the session revocation event', async () => {
+      await controller.removeRole('user-99', 'role-1', mockAbility, mockReq);
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserRoleChangedEvent.name,
+        new UserRoleChangedEvent('user-99')
+      );
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+    });
+
+    it('should fail the request when the revocation listener rejects', async () => {
+      eventEmitterMock.emitAsync.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        controller.removeRole('user-99', 'role-1', mockAbility, mockReq)
+      ).rejects.toThrow('db down');
     });
   });
 
