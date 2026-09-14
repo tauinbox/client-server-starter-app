@@ -57,6 +57,7 @@ export {
 export {
   APP_ENVIRONMENTS,
   normalizeEnvironmentList,
+  requiresSecureCookies,
   type AppEnvironment
 } from './environment.constants';
 

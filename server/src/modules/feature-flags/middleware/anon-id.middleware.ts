@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, type NestMiddleware } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { requiresSecureCookies } from '@app/shared/constants';
 import type { NextFunction, Request, Response } from 'express';
 
 export const ANON_ID_COOKIE = 'nxs_anon_id';
@@ -18,14 +19,15 @@ export class AnonIdMiddleware implements NestMiddleware {
       return;
     }
     const value = randomUUID();
-    const isProduction =
-      this.configService.get<string>('ENVIRONMENT') === 'production';
+    const secure = requiresSecureCookies(
+      this.configService.get<string>('ENVIRONMENT')
+    );
     res.cookie(ANON_ID_COOKIE, value, {
       // Bucketing is resolved server-side from the cookie, so no browser script
       // needs to read it.
       httpOnly: true,
       sameSite: 'lax',
-      secure: isProduction,
+      secure,
       maxAge: COOKIE_MAX_AGE_MS,
       path: '/'
     });

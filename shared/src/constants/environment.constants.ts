@@ -32,3 +32,16 @@ export function normalizeEnvironmentList(
   }
   return normalized;
 }
+
+/**
+ * Decides the `Secure` attribute of the cookies the server sets. Only `local`
+ * is served over plain HTTP - the dev proxy on localhost, where a Secure cookie
+ * is dropped and every sign-in fails. Each other value is a deployment that
+ * must not put a session cookie on the wire unprotected, so an unknown or a
+ * missing value is secure too.
+ */
+export function requiresSecureCookies(
+  environment: string | undefined
+): boolean {
+  return environment !== 'local';
+}

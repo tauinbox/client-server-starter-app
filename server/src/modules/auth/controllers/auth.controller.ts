@@ -18,6 +18,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
+  requiresSecureCookies,
   STEP_UP_OPERATION
 } from '@app/shared/constants';
 import {
@@ -113,7 +114,9 @@ export class AuthController {
       1000;
     res.cookie(REFRESH_TOKEN_COOKIE, token, {
       httpOnly: true,
-      secure: this.configService.get('ENVIRONMENT') === 'production',
+      secure: requiresSecureCookies(
+        this.configService.get<string>('ENVIRONMENT')
+      ),
       sameSite: 'strict',
       path: '/api/v1/auth',
       maxAge

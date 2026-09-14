@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import type { StrategyOptions } from 'passport-google-oauth20';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
+import { requiresSecureCookies } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
@@ -19,7 +20,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       state: true,
       store: new CookieStateStore(
         OAuthProvider.GOOGLE,
-        configService.get('ENVIRONMENT') === 'production'
+        requiresSecureCookies(configService.get<string>('ENVIRONMENT'))
       )
     };
 

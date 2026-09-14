@@ -89,7 +89,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APPLICATION_PORT` | `3000` | HTTP listen port |
-| `ENVIRONMENT` | `local` | Environment name. The value `local` enables the automatic schema sync and a permissive CORS policy |
+| `ENVIRONMENT` | `local` | Environment name. The value `local` enables the automatic schema sync and a permissive CORS policy. Each other value makes the session cookies `Secure`, thus the deployment must use HTTPS |
 | `SWAGGER_ENABLED` | - | Set it to `true` to enable the Swagger UI in staging or in production. It is always on in `local` and `development` |
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
@@ -434,7 +434,8 @@ RBAC stays the true gate.
 the caller.
 
 `middleware/anon-id.middleware.ts` issues the `nxs_anon_id` cookie at the first request. The cookie
-uses `SameSite=Lax`, `Secure` in production, a life of 1 year and `httpOnly=false`.
+uses `SameSite=Lax`, `Secure` in each environment other than `local`, a life of 1 year and
+`httpOnly=true`.
 
 `events/feature-flag-changed.event.ts` holds
 `{ flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }`.
@@ -2184,8 +2185,8 @@ change. One save in a dialog is such a burst, because it emits an update and a r
 cross-module communication uses `EventEmitter2` and never `forwardRef`.
 
 **Anonymous bucketing.** `AnonIdMiddleware` issues the `nxs_anon_id` cookie at the first request to
-any route. The cookie uses `SameSite=Lax`, `Secure` in production, a `maxAge` of 1 year, and
-`httpOnly: false`.
+any route. The cookie uses `SameSite=Lax`, `Secure` in each environment other than `local`, a
+`maxAge` of 1 year, and `httpOnly: true`.
 
 The value of the cookie seeds the hash of the percentage bucket. Thus a 10 % rollout of a public flag
 converges on the same 10 % of anonymous browsers across reloads.

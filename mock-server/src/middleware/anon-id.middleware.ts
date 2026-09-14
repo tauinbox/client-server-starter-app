@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
+import { requiresSecureCookies } from '@app/shared/constants';
 
 export const ANON_ID_COOKIE = 'nxs_anon_id';
 const COOKIE_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
@@ -19,12 +20,15 @@ export function anonIdMiddleware(
     return;
   }
   const value = randomUUID();
-  const isProduction = process.env['ENVIRONMENT'] === 'production';
+  // The mock only ever serves http://localhost, so an unset ENVIRONMENT is
+  // local: a Secure cookie would be dropped and bucketing would restart on
+  // every request.
+  const secure = requiresSecureCookies(process.env['ENVIRONMENT'] ?? 'local');
   res.cookie(ANON_ID_COOKIE, value, {
     // Matches the real server: bucketing is resolved server-side from the cookie
     httpOnly: true,
     sameSite: 'lax',
-    secure: isProduction,
+    secure,
     maxAge: COOKIE_MAX_AGE_MS,
     path: '/'
   });

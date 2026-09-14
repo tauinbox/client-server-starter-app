@@ -48,6 +48,7 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import {
   ErrorKeys,
   REAUTH_PROOF_MAX_AGE_SECONDS,
+  requiresSecureCookies,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
@@ -145,7 +146,9 @@ export class OAuthController {
     res.cookie(OAUTH_LINK_COOKIE, linkToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: this.configService.get('ENVIRONMENT') === 'production',
+      secure: requiresSecureCookies(
+        this.configService.get<string>('ENVIRONMENT')
+      ),
       path: OAUTH_INTENT_COOKIE_PATH,
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
@@ -190,7 +193,9 @@ export class OAuthController {
     res.cookie(OAUTH_REAUTH_COOKIE, reauthToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: this.configService.get('ENVIRONMENT') === 'production',
+      secure: requiresSecureCookies(
+        this.configService.get<string>('ENVIRONMENT')
+      ),
       path: OAUTH_INTENT_COOKIE_PATH,
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
@@ -431,7 +436,9 @@ export class OAuthController {
       const { refresh_token, ...publicTokens } = payload.data.tokens;
       res.cookie('refresh_token', refresh_token, {
         httpOnly: true,
-        secure: this.configService.get('ENVIRONMENT') === 'production',
+        secure: requiresSecureCookies(
+          this.configService.get<string>('ENVIRONMENT')
+        ),
         sameSite: 'strict',
         path: '/api/v1/auth',
         maxAge
@@ -508,7 +515,9 @@ export class OAuthController {
       res.cookie(OAuthController.OAUTH_DATA_COOKIE, signedData, {
         httpOnly: true,
         sameSite: 'lax',
-        secure: this.configService.get('ENVIRONMENT') === 'production',
+        secure: requiresSecureCookies(
+          this.configService.get<string>('ENVIRONMENT')
+        ),
         path: '/api/v1/auth/oauth',
         maxAge: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS * 1000
       });
@@ -589,7 +598,9 @@ export class OAuthController {
       res.cookie(REAUTH_PROOF_COOKIE, proof, {
         httpOnly: true,
         sameSite: 'lax',
-        secure: this.configService.get('ENVIRONMENT') === 'production',
+        secure: requiresSecureCookies(
+          this.configService.get<string>('ENVIRONMENT')
+        ),
         path: REAUTH_PROOF_COOKIE_PATH,
         maxAge: REAUTH_PROOF_MAX_AGE_SECONDS * 1000
       });
