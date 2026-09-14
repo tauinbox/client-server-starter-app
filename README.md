@@ -1175,13 +1175,26 @@ with `provenance: file`:
 
 | Rule | Expression | `for` | No-data behaviour |
 |---|---|---|---|
-| Dependency degraded | `dependency_up < 1` | 10m | `OK`. A missing series means that the server is down, and the rule below owns that condition |
+| Dependency degraded | `min_over_time(dependency_up[15m]) < 1` | 10m | `KeepLast`. A missing series is a scrape gap, and the rule below owns a dead server |
 | Server unreachable | `up{job="nestjs-server"} < 1` | 5m | `Alerting` |
 
 The window of 10 minutes is intentional. `SmtpHealthIndicator` keeps its verify result for 5 minutes.
 Thus a sample can be one TTL old, and a shorter window alerts on a dependency that already recovered.
 The worst-case detection latency is therefore approximately 15 minutes. Before this rule existed, a
 dead SMTP server stayed unknown for five and a half weeks.
+
+**The rule reads the minimum of the window, and not the sample, because one healthy sample is not a
+recovery.** A mail provider that rejects almost all logins can accept one, and the 5-minute verify
+cache then holds that success as a 5-minute plateau of `1`. On the raw gauge the plateau cleared the
+condition, Grafana delivered `RESOLVED`, and the next failed check delivered `FIRING` again 11 minutes
+later. A `min_over_time` window of 15 minutes ignores one plateau, because the window is longer than
+the cache. The cost is the recovery message: a dependency that is healthy again must supply 15 minutes
+of healthy samples before the alert clears.
+
+**`KeepLast` for missing data, and not `OK`, because a scrape gap is not a recovery either.** A restart
+removes the series until the first readiness probe, and Prometheus marks the series stale after a
+failed scrape. With `OK` each gap delivered a `RESOLVED` message, and the alert fired again 10 minutes
+later. `Server unreachable` still owns a dead server, and it keeps `for: 5m`.
 
 The delivery goes to one webhook contact point, `ops-webhook`. It reads `$ALERT_WEBHOOK_URL`.
 
@@ -1268,6 +1281,11 @@ the deploy loudly, and it does not ship `admin`/`admin` silently.
 builds the Docker images locally and scans them with Trivy for HIGH and CRITICAL findings. It pushes
 to GHCR only after the two scans pass. Then it deploys to the VPS with health checks and an automatic
 rollback.
+
+Grafana reads `monitoring/grafana/provisioning/` at startup only, and that directory is a bind mount.
+Thus `docker compose up -d` does not apply a changed alert rule, datasource or contact point. The
+deploy compares the directory against the commit of the last successful deploy, and it restarts the
+Grafana container only when a file in it changed.
 
 `.github/workflows/rebuild.yml` is a weekly rebuild on Sunday at 03:00 UTC. It collects the OS
 security patches. It rebuilds the images with `no-cache`, scans them and deploys them. It also
