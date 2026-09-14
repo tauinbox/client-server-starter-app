@@ -640,6 +640,77 @@ describe('UsersController', () => {
         })
       );
     });
+
+    it('should log USER_EMAIL_CHANGE_COMPLETE with both addresses when the admin changes the email', async () => {
+      const dto: UpdateUserDto = { email: 'new@example.com' };
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'old@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'new@example.com'
+      });
+      const req = mockJwtRequest(
+        'actor-2',
+        'admin@example.com'
+      ) as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
+          actorId: 'actor-2',
+          actorEmail: 'admin@example.com',
+          targetId: 'user-5',
+          targetType: 'User',
+          details: {
+            oldEmail: 'old@example.com',
+            newEmail: 'new@example.com',
+            source: 'admin'
+          }
+        })
+      );
+    });
+
+    it('should NOT log USER_EMAIL_CHANGE_COMPLETE when the submitted email is unchanged', async () => {
+      const dto: UpdateUserDto = {
+        email: 'same@example.com',
+        firstName: 'Updated'
+      };
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(auditServiceMock.log).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_EMAIL_CHANGE_COMPLETE
+        })
+      );
+    });
+
+    it('should NOT log USER_EMAIL_CHANGE_COMPLETE when the dto carries no email', async () => {
+      const dto: UpdateUserDto = { firstName: 'Updated' };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(auditServiceMock.log).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_EMAIL_CHANGE_COMPLETE
+        })
+      );
+    });
   });
 
   // ── remove ────────────────────────────────────────────────────────

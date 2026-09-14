@@ -308,6 +308,26 @@ export class UsersController {
         );
     }
 
+    // The USER_UPDATE row above carries field names only, on purpose, so the
+    // address the account moved to would otherwise be unrecoverable. This is
+    // the administrator counterpart of the self-service confirm row, and
+    // `source` is what separates the two.
+    if (emailChanged) {
+      await this.auditService.log({
+        action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
+        actorId: req.user.userId,
+        actorEmail: req.user.email,
+        targetId: id,
+        targetType: 'User',
+        details: {
+          oldEmail: previousEmail,
+          newEmail: updatedUser.email,
+          source: 'admin'
+        },
+        context: extractAuditContext(req)
+      });
+    }
+
     // An admin email change exists to recover an account whose address is
     // attacker-controlled; leaving the holder's issued tokens alive would
     // defeat it. Mirrors the self-service confirm path, which revokes too.

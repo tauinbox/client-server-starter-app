@@ -3,6 +3,7 @@
 // session of the target.
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { HttpStatus, HttpException } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
@@ -252,6 +253,7 @@ describe('Admin email change - session revocation through the real event bus', (
   let controller: UsersController;
   let store: UserStore;
   let refreshTokenService: { deleteByUserId: jest.Mock };
+  let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
   let userUpdate: jest.Mock;
 
   // @ts-expect-error partial mock - the update path reads only user/ip/headers
@@ -270,6 +272,10 @@ describe('Admin email change - session revocation through the real event bus', (
 
     refreshTokenService = {
       deleteByUserId: jest.fn().mockResolvedValue(undefined)
+    };
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
     };
     userUpdate = jest.fn((id: string, patch: Partial<User>) => {
       const row = store.rows.get(id);
@@ -296,13 +302,7 @@ describe('Admin email change - session revocation through the real event bus', (
         },
         { provide: DataSource, useValue: dataSource },
         { provide: RefreshTokenService, useValue: refreshTokenService },
-        {
-          provide: AuditService,
-          useValue: {
-            log: jest.fn().mockResolvedValue(undefined),
-            logFireAndForget: jest.fn()
-          }
-        },
+        { provide: AuditService, useValue: auditService },
         {
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
@@ -343,6 +343,53 @@ describe('Admin email change - session revocation through the real event bus', (
       tokenRevokedAt: expect.any(Date) as Date
     });
     expect(store.rows.get('user-1')?.tokenRevokedAt).toBeInstanceOf(Date);
+  });
+
+  it('audits the move with both addresses, beside the value-free USER_UPDATE row', async () => {
+    await controller.update(
+      'user-1',
+      { email: 'after@example.com' },
+      adminRequest,
+      ability
+    );
+
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
+        actorId: 'admin-1',
+        actorEmail: 'admin@example.com',
+        targetId: 'user-1',
+        targetType: 'User',
+        details: {
+          oldEmail: 'before@example.com',
+          newEmail: 'after@example.com',
+          source: 'admin'
+        }
+      })
+    );
+
+    // The request record stays value-free; the credential change is the new row.
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.USER_UPDATE,
+        details: { changedFields: ['email'] }
+      })
+    );
+  });
+
+  it('writes no email-change row when the submitted email is unchanged', async () => {
+    await controller.update(
+      'user-1',
+      { email: 'before@example.com', firstName: 'Updated' },
+      adminRequest,
+      ability
+    );
+
+    expect(auditService.log).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.USER_EMAIL_CHANGE_COMPLETE
+      })
+    );
   });
 
   it('leaves sessions alone when the submitted email is unchanged', async () => {

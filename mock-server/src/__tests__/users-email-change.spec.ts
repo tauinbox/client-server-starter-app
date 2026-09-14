@@ -1,7 +1,8 @@
 import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
+import type { MockAuditLog } from '../types';
 import { mockId } from '../utils/mock-id';
 
 let server: Server;
@@ -50,6 +51,10 @@ async function loginAsUser(
   const refreshToken = /refresh_token=([^;]+)/.exec(setCookie)?.[1] ?? '';
   expect(refreshToken).not.toBe('');
   return { accessToken: body.tokens.access_token, refreshToken };
+}
+
+function auditRows(action: string): MockAuditLog[] {
+  return getState().auditLogs.filter((row) => row.action === action);
 }
 
 describe('PATCH /api/v1/users/:id email-change parity with server', () => {
@@ -159,5 +164,51 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { isEmailVerified: boolean };
     expect(body.isEmailVerified).toBe(true);
+  });
+
+  it('audits the move with both addresses and source admin', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ email: 'moved@example.com' })
+    });
+    expect(res.status).toBe(200);
+
+    const rows = auditRows('USER_EMAIL_CHANGE_COMPLETE');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].actorEmail).toBe('admin@example.com');
+    expect(rows[0].targetId).toBe(mockId('user-3'));
+    expect(rows[0].targetType).toBe('User');
+    expect(rows[0].details).toEqual({
+      oldEmail: 'john@example.com',
+      newEmail: 'moved@example.com',
+      source: 'admin'
+    });
+
+    // The request record stays value-free; the credential change is the new row.
+    expect(auditRows('USER_UPDATE')[0].details).toEqual({
+      changedFields: ['email']
+    });
+  });
+
+  it('writes no email-change audit row when the email is unchanged', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ email: 'john@example.com', firstName: 'Johnny' })
+    });
+    expect(res.status).toBe(200);
+
+    expect(auditRows('USER_EMAIL_CHANGE_COMPLETE')).toHaveLength(0);
   });
 });

@@ -58,7 +58,12 @@ management and theming.
   An administrator email change through `PATCH /api/v1/users/:id` sets `isEmailVerified` to false. It
   makes a new hashed verification token and sends a new verification email. The server enforces the
   uniqueness of the address. A conflict answers HTTP 409 with
-  `errorKey: errors.users.emailExists`.
+  `errorKey: errors.users.emailExists`. A real move also writes a
+  `USER_EMAIL_CHANGE_COMPLETE` audit row with
+  `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row of the same
+  request records field names only. The server does not mail the previous address on this path. The
+  path recovers an account whose address an attacker holds, thus a notice would warn that attacker,
+  and the audit row is the only record of the move.
 - **Self-service email change.** A user can change their own email address from `/profile`. The flow
   has two steps and confirms at the new address.
 
@@ -1492,7 +1497,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
-| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change or an email change revokes the sessions of the target |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change or an email change revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'` |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/roles` | `roles:create` | Create a role |
@@ -1780,11 +1785,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2350 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 377 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 375 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2353 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 379 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 377 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1278 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 265 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 734 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 736 tests pass |
 
 ## CI/CD
 
