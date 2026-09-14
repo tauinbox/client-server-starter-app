@@ -360,7 +360,7 @@ export class RolesController {
       ability,
       req.user?.userId
     );
-    this.eventEmitter.emit(
+    await this.eventEmitter.emitAsync(
       UserRoleChangedEvent.name,
       new UserRoleChangedEvent(userId)
     );
@@ -392,7 +392,7 @@ export class RolesController {
       ability,
       req.user?.userId
     );
-    this.eventEmitter.emit(
+    await this.eventEmitter.emitAsync(
       UserRoleChangedEvent.name,
       new UserRoleChangedEvent(userId)
     );

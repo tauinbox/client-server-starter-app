@@ -317,7 +317,10 @@ registers with `suppressErrors:false`, and the caller emits it with `emitAsync`.
 revocation fails the request of the caller.
 
 `UserDeletedListener` cleans up a pending email change. `UserRoleChangedListener` does the revocation
-and the permission-cache invalidation after a role change.
+and the permission-cache invalidation after a role change. It uses the same two halves as
+`SessionRevocationListener`: it registers with `suppressErrors:false`, and `RolesController` emits
+`UserRoleChangedEvent` with `emitAsync` and awaits it. Thus a failed revocation fails the role
+change. The other handlers of that event keep the default suppression.
 
 `entities/` holds `RefreshToken`, `OAuthAccount`, `Resource` and `Action`.
 
