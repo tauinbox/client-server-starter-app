@@ -136,6 +136,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify({ userId })
         });
       },
+      async ageSession(userId, ageMs) {
+        await fetch(`${baseUrl}/__control/age-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, ageMs })
+        });
+      },
       async clearTotpLedger(userId) {
         await fetch(`${baseUrl}/__control/totp-ledger`, {
           method: 'POST',

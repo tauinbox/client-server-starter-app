@@ -29,6 +29,14 @@ export class RefreshToken {
   @Column({ name: 'session_id', type: 'uuid' })
   sessionId: string;
 
+  /**
+   * When the session started. Rotation carries this value over unchanged, so it
+   * bounds the whole chain: a derived anchor would not survive, because the
+   * cleanup job deletes every revoked ancestor once it is past its own expiry.
+   */
+  @Column({ name: 'session_started_at', type: 'timestamptz' })
+  sessionStartedAt: Date;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

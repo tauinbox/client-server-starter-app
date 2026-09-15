@@ -20,6 +20,7 @@ export class RefreshTokenService {
     const refreshToken = this.repository.create({
       userId,
       sessionId,
+      sessionStartedAt: new Date(),
       token: hashToken(token),
       expiresAt: new Date(Date.now() + expiresIn * 1000)
     });

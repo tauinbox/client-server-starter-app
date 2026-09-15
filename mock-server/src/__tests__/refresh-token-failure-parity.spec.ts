@@ -1,5 +1,8 @@
 import type { Server } from 'http';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
+  ErrorKeys
+} from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -57,6 +60,15 @@ function setActive(userId: string, isActive: boolean): void {
   const user = getState().users.get(userId);
   expect(user).toBeDefined();
   user!.isActive = isActive;
+}
+
+async function ageSession(userId: string, ageMs: number): Promise<void> {
+  const res = await fetch(`${baseUrl}/__control/age-session`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ userId, ageMs })
+  });
+  expect(res.status).toBe(200);
 }
 
 function auditRows(action: string): MockAuditLog[] {
@@ -151,6 +163,64 @@ describe('refresh-token failure parity', () => {
 
     setActive(phone.userId, true);
     expect((await refresh(desktop)).status).toBe(200);
+  });
+
+  it('refuses a refresh past the absolute session lifetime', async () => {
+    const session = await signIn();
+    await ageSession(session.userId, DEFAULT_SESSION_ABSOLUTE_MAX_MS);
+
+    const res = await refresh(session);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      message: 'Session has reached its maximum duration. Please log in again.',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
+    });
+
+    const rows = auditRows('TOKEN_REFRESH_FAILURE');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].details).toEqual({
+      reason: 'session_absolute_lifetime_exceeded'
+    });
+  });
+
+  it('ends the whole session at the cap, so a replay is not read as reuse', async () => {
+    const session = await signIn();
+    await ageSession(session.userId, DEFAULT_SESSION_ABSOLUTE_MAX_MS);
+
+    expect((await refresh(session)).status).toBe(401);
+
+    const replay = await refresh(session);
+    expect(replay.status).toBe(401);
+    expect(await replay.json()).toEqual({
+      message: 'Invalid refresh token',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    });
+    expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
+  });
+
+  it('carries the session start over a rotation', async () => {
+    const session = await signIn();
+    const half = DEFAULT_SESSION_ABSOLUTE_MAX_MS / 2;
+
+    await ageSession(session.userId, half);
+    const rotated = await refresh(session);
+    expect(rotated.status).toBe(200);
+
+    const next: Session = {
+      userId: session.userId,
+      refreshCookie: refreshCookieOf(rotated)
+    };
+
+    // The second half tips the session past the cap only if the rotation kept
+    // the original start. A re-stamped start would answer 200 here.
+    await ageSession(session.userId, half);
+    const res = await refresh(next);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
+    });
   });
 
   it('does not clear the refresh cookie on the reuse path', async () => {

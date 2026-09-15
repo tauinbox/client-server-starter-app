@@ -125,11 +125,33 @@ describe('RefreshTokenService', () => {
       expect(mockRepository.create).toHaveBeenCalledWith({
         userId: 'user-1',
         sessionId: 'session-1',
+        sessionStartedAt: expect.any(Date) as Date,
         token: hashToken('raw-token'),
         expiresAt: expect.any(Date) as Date
       });
       expect(mockRepository.save).toHaveBeenCalledWith(mockToken);
       expect(result).toEqual(mockToken);
+    });
+
+    it('anchors the session start at the moment of issue', async () => {
+      mockRepository.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data
+      );
+      mockRepository.save.mockImplementation((data: Partial<RefreshToken>) =>
+        Promise.resolve(data)
+      );
+
+      const before = Date.now();
+      await service.createRefreshToken('user-1', 'token', 3600, 'session-1');
+      const after = Date.now();
+
+      const createArg = mockRepository.create.mock.calls[0] as [
+        Partial<RefreshToken>
+      ];
+      const sessionStartedAt = createArg[0].sessionStartedAt as Date;
+
+      expect(sessionStartedAt.getTime()).toBeGreaterThanOrEqual(before);
+      expect(sessionStartedAt.getTime()).toBeLessThanOrEqual(after);
     });
 
     it('should set expiration based on expiresIn seconds', async () => {

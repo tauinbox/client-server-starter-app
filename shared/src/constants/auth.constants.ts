@@ -73,6 +73,14 @@ export const TOKEN_REFRESH_WINDOW_SECONDS = 60;
 export const MIN_JWT_EXPIRATION_SECONDS = 2 * TOKEN_REFRESH_WINDOW_SECONDS;
 
 /**
+ * Default absolute lifetime of one session, in milliseconds. Rotation keeps the
+ * session id and restarts the refresh window, so this anchor is the only bound
+ * on how long a device that refreshes on schedule stays signed in. A value of 0
+ * disables the cap.
+ */
+export const DEFAULT_SESSION_ABSOLUTE_MAX_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
  * How long a step-up re-authentication proof stays usable. A sensitive change
  * must follow the proof closely, so this is much shorter than a session.
  */

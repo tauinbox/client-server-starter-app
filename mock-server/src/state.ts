@@ -87,6 +87,7 @@ export function resetState(): void {
     reauthProofs: new Map(),
     refreshTokens: new Map(),
     refreshSessions: new Map(),
+    sessionStarts: new Map(),
     revokedRefreshTokens: new Map(),
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
@@ -131,6 +132,27 @@ export function getState(): State {
  */
 export function registerSession(refreshToken: string, sessionId: string): void {
   state.refreshSessions.set(refreshToken, sessionId);
+  // Only a session that is new gets a start. Rotation calls this with the id it
+  // replaces a token inside, and re-stamping there would restore the sliding
+  // expiry the absolute cap ends.
+  if (!state.sessionStarts.has(sessionId)) {
+    state.sessionStarts.set(sessionId, Date.now());
+  }
+}
+
+/**
+ * How long the session of one refresh token has run, in milliseconds. An
+ * unknown session reads as 0, so a token the mock does not track is never
+ * refused for age.
+ */
+export function sessionAgeMs(refreshToken: string): number {
+  const sessionId = state.refreshSessions.get(refreshToken);
+  if (sessionId === undefined) return 0;
+
+  const startedAt = state.sessionStarts.get(sessionId);
+  if (startedAt === undefined) return 0;
+
+  return Date.now() - startedAt;
 }
 
 /**
@@ -160,6 +182,7 @@ export function endSessionOfToken(refreshToken: string): boolean {
     state.revokedRefreshTokens.delete(token);
     state.refreshSessions.delete(token);
   }
+  state.sessionStarts.delete(sessionId);
   return ended;
 }
 

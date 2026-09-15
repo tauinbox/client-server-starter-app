@@ -45,6 +45,11 @@ export type ControlApi = {
   // Sets user.tokenRevokedAt = now so existing access tokens fail authentication
   // on the next call. Refresh tokens stay valid — interceptor can recover.
   invalidateAccessTokens(userId: string): Promise<void>;
+  // Moves the start of every live session of the user back by `ageMs`
+  // (default: the absolute session cap). The next refresh of an aged session
+  // answers 401, because the cap measures the session start and no test can
+  // wait 30 days out.
+  ageSession(userId: string, ageMs?: number): Promise<void>;
   // Clears the TOTP replay floor, so the one fixed mock code is accepted
   // again. Stands in for the wait a real authenticator imposes between two
   // codes; a test that presents the code twice needs it.

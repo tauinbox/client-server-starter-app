@@ -365,6 +365,10 @@ export interface State {
   // session ends when no live refresh token points at it any more. Mirrors the
   // `session_id` column the real server keeps on `refresh_tokens`.
   refreshSessions: Map<string, string>;
+  // Session id -> the epoch milliseconds the session started. Rotation keeps
+  // the entry, so it bounds the whole chain. Mirrors the `session_started_at`
+  // column the real server keeps on `refresh_tokens`.
+  sessionStarts: Map<string, number>;
   // Revoked refresh tokens — kept around to detect token reuse (OAuth 2.0 BCP).
   // If a token was rotated (moved to this map) and is presented again before
   // it would naturally expire, treat as a possible compromise: revoke all
