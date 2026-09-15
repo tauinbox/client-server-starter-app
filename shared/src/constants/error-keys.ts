@@ -49,7 +49,8 @@ export const ErrorKeys = {
     MFA_INVALID_PENDING_TOKEN: 'errors.auth.mfaInvalidPendingToken',
     MFA_ENROLMENT_REQUIRED: 'errors.auth.mfaEnrolmentRequired',
     MFA_CHALLENGE_LOCKED: 'errors.auth.mfaChallengeLocked',
-    MFA_STEP_UP_LOCKED: 'errors.auth.mfaStepUpLocked'
+    MFA_STEP_UP_LOCKED: 'errors.auth.mfaStepUpLocked',
+    STEP_UP_LOCKED: 'errors.auth.stepUpLocked'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

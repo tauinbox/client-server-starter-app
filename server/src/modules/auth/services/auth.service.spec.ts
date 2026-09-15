@@ -18,6 +18,7 @@ import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   ErrorKeys,
   MAX_CONCURRENT_SESSIONS,
+  MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
@@ -2032,6 +2033,198 @@ describe('AuthService', () => {
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.STEP_UP_FAILURE })
       );
+    });
+
+    describe('per-account password brake', () => {
+      const passwordUser = {
+        id: 'user-1',
+        email: 'user@example.com',
+        password: '$2b$12$hash'
+      } as User;
+
+      async function guessWrong(times: number): Promise<void> {
+        jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+        for (let i = 0; i < times; i += 1) {
+          await expect(
+            service.assertStepUp(
+              passwordUser,
+              'WrongPass1',
+              undefined,
+              STEP_UP_OPERATION.PASSWORD_SET
+            )
+          ).rejects.toMatchObject({
+            response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
+          });
+        }
+      }
+
+      async function exhaustBudget(): Promise<void> {
+        await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'WrongPass1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).rejects.toMatchObject({ status: HttpStatus.LOCKED });
+      }
+
+      beforeEach(() => {
+        mockMfaService.isValidStepUpCode.mockResolvedValue(false);
+      });
+
+      it('bars the account after the same number of tries the sign-in gets', async () => {
+        await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+
+        // The route throttle is keyed by client address, so an attacker who
+        // holds a session buys a fresh budget with every address it adds.
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'WrongPass1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).rejects.toMatchObject({
+          status: HttpStatus.LOCKED,
+          response: {
+            errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED,
+            retryAfter: expect.any(Number) as unknown,
+            lockedUntil: expect.any(String) as unknown
+          }
+        });
+      });
+
+      it('audits the attempt that bars the account', async () => {
+        await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+        mockAuditService.logFireAndForget.mockClear();
+
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'WrongPass1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).rejects.toMatchObject({ status: HttpStatus.LOCKED });
+
+        // The attempt that spends the last of the budget is the one a reader
+        // of the trail most needs, so the row is written before the refusal.
+        expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.STEP_UP_FAILURE,
+            details: expect.objectContaining({
+              factor: 'password'
+            }) as unknown
+          })
+        );
+      });
+
+      it('refuses a correct password while the account is barred', async () => {
+        await exhaustBudget();
+
+        jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'CorrectPassword1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).rejects.toMatchObject({
+          status: HttpStatus.LOCKED,
+          response: { errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED }
+        });
+      });
+
+      it('leaves the sign-in lockout counter alone', async () => {
+        await exhaustBudget();
+
+        // The two counters hold separate namespaces on purpose: a caller who
+        // holds a stolen session must not be able to shut the owner out of the
+        // way back in.
+        expect(
+          mockUsersService.incrementFailedAttemptsAndLockIfNeeded
+        ).not.toHaveBeenCalled();
+      });
+
+      it('does not count a step-up that offers no password', async () => {
+        for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
+          await expect(
+            service.assertStepUp(
+              passwordUser,
+              undefined,
+              undefined,
+              STEP_UP_OPERATION.PASSWORD_SET
+            )
+          ).rejects.toMatchObject({
+            response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
+          });
+        }
+
+        jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'CorrectPassword1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).resolves.toBeUndefined();
+      });
+
+      it('leaves the counter untouched for an account that holds no password', async () => {
+        const oauthOnly = { ...passwordUser, password: null } as User;
+
+        for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
+          await expect(
+            service.assertStepUp(
+              oauthOnly,
+              undefined,
+              undefined,
+              STEP_UP_OPERATION.PASSWORD_SET
+            )
+          ).rejects.toMatchObject({
+            response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+          });
+        }
+
+        jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'CorrectPassword1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).resolves.toBeUndefined();
+      });
+
+      it('closes the window on a correct password', async () => {
+        await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+
+        jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'CorrectPassword1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).resolves.toBeUndefined();
+
+        await guessWrong(MAX_FAILED_ATTEMPTS - 1);
+        jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+        await expect(
+          service.assertStepUp(
+            passwordUser,
+            'CorrectPassword1',
+            undefined,
+            STEP_UP_OPERATION.PASSWORD_SET
+          )
+        ).resolves.toBeUndefined();
+      });
     });
   });
 

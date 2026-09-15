@@ -62,7 +62,9 @@ import {
 } from '../constants';
 import {
   isValidReauthProof,
-  logStepUpFailure
+  logStepUpFailure,
+  sendWithRetryAfter,
+  stepUpPasswordError
 } from '../helpers/reauth.helpers';
 
 /**
@@ -803,20 +805,15 @@ router.patch('/profile', authGuard, (req, res) => {
         return;
       }
     } else {
-      // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-      if (!currentPassword || user.password !== currentPassword) {
-        logStepUpFailure(
-          req,
-          user,
-          STEP_UP_OPERATION.PASSWORD_SET,
-          'password',
-          false
-        );
-        res.status(400).json({
-          message: 'Current password is incorrect',
-          statusCode: 400,
-          errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-        });
+      const stepUp = stepUpPasswordError(
+        req,
+        user,
+        currentPassword,
+        STEP_UP_OPERATION.PASSWORD_SET,
+        false
+      );
+      if (stepUp) {
+        sendWithRetryAfter(res, stepUp);
         return;
       }
     }
@@ -916,21 +913,18 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
       });
       return;
     }
-  } else if (user.password !== currentPassword) {
-    // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-    logStepUpFailure(
+  } else {
+    const stepUp = stepUpPasswordError(
       req,
       user,
+      currentPassword,
       STEP_UP_OPERATION.EMAIL_CHANGE,
-      'password',
       false
     );
-    res.status(400).json({
-      message: 'Current password is incorrect',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-    });
-    return;
+    if (stepUp) {
+      sendWithRetryAfter(res, stepUp);
+      return;
+    }
   }
 
   if (newEmail === user.email) {

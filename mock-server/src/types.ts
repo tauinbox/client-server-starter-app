@@ -420,6 +420,10 @@ export interface State {
   // holds a stolen session must not be able to bar the owner out of the
   // sign-in code step by firing wrong codes at a step-up route.
   mfaStepUpFailures: Map<string, FailedAttemptWindow>;
+  // The same brake for the step-up password, in a third namespace. A caller
+  // who holds a stolen session must not be able to guess the password at the
+  // route throttle rate, one fresh budget per source address.
+  stepUpPasswordFailures: Map<string, FailedAttemptWindow>;
   // Sample of the public breach corpus the server checks a new password
   // against. Seeded from `seedBreachedPasswords`; a test adds more through
   // `POST /__control/breached-passwords`.

@@ -1903,6 +1903,14 @@ a second request to the registry for a verdict that gates nothing.
   address cannot bind a password and is not spent by the attempt. The callback mints nothing unless the
   provider identity that just authenticated already belongs to the caller, so a second account at the
   same provider proves nothing.
+
+  The **password factor of every step-up carries a per-account brake** as well. Five refused
+  passwords inside 15 minutes answer HTTP 423 `errors.auth.stepUpLocked`, and a correct password is
+  refused for the rest of that window. The route throttles are keyed by client address, so without
+  it a caller that holds a stolen access token bought four guesses per address per route, on each of
+  the seven routes that take a step-up, and the account never locked. The counter has a namespace of
+  its own, so a spent budget never shuts `POST /auth/login`: a fresh sign-in and the password reset
+  are the owner's way back. A request that offers no password spends nothing.
 - The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an
   expiry of 7 days. JavaScript can neither read nor steal the token, thus XSS cannot take it.
 

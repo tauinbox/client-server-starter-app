@@ -26,6 +26,7 @@ import { AuditService, AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { MfaService } from './mfa.service';
+import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { hashToken } from '../../../common/utils/hash-token';
 import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
@@ -101,11 +102,29 @@ const ENUMERATION_SAFE_FORGOT_RESPONSE = {
     'If an account with that email exists, a password reset link has been sent.'
 };
 
+/**
+ * Bars the account, not the caller. The step-up routes are throttled by client
+ * address, so a caller who already holds a session buys a fresh budget of
+ * password guesses with every address it adds. The namespace is its own: a
+ * spent budget here never shuts the owner out of `POST /auth/login`.
+ */
+const STEP_UP_PASSWORD_FAILURE_KEY_PREFIX = 'step-up:password-failures:';
+
+/** The outcome of one step-up, and the brake that attempt may have tripped. */
+interface StepUpVerdict {
+  /** The factor that refused the caller, or null when the caller proved itself. */
+  factor: 'password' | 'reauth_proof' | null;
+  /** How long the account stays barred, set only when this attempt barred it. */
+  lockedMs?: number;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   private readonly reauthProofLedger: SingleUseTokenLedger;
+
+  private readonly stepUpPasswordFailures: FailedAttemptCounter;
 
   constructor(
     private dataSource: DataSource,
@@ -126,6 +145,11 @@ export class AuthService {
     this.reauthProofLedger = new SingleUseTokenLedger(
       cache,
       'reauth-proof:spent:',
+      this.logger
+    );
+    this.stepUpPasswordFailures = new FailedAttemptCounter(
+      cache,
+      STEP_UP_PASSWORD_FAILURE_KEY_PREFIX,
       this.logger
     );
   }
@@ -990,7 +1014,7 @@ export class AuthService {
     totpCode?: string,
     auditContext?: AuditContext
   ): Promise<void> {
-    const factor = await this.stepUpFailure(
+    const { factor, lockedMs } = await this.stepUpFailure(
       user,
       currentPassword,
       reauthProof,
@@ -1015,6 +1039,10 @@ export class AuthService {
       context: auditContext
     });
 
+    if (lockedMs !== undefined) {
+      throw this.stepUpPasswordLockedException(lockedMs);
+    }
+
     throw factor === 'reauth_proof'
       ? new HttpException(
           {
@@ -1036,7 +1064,8 @@ export class AuthService {
   /**
    * The factor that refused the caller, or null when the caller proved itself.
    * Returning the verdict instead of throwing keeps the audit row and the
-   * response in one place.
+   * response in one place, including the attempt that spends the last of the
+   * per-account budget.
    */
   private async stepUpFailure(
     user: User,
@@ -1045,23 +1074,58 @@ export class AuthService {
     operation: StepUpOperation,
     totpCode?: string,
     auditContext?: AuditContext
-  ): Promise<'password' | 'reauth_proof' | null> {
+  ): Promise<StepUpVerdict> {
     if (await this.mfaService.isValidStepUpCode(user, totpCode, auditContext)) {
-      return null;
+      return { factor: null };
     }
 
     if (user.password === null) {
       return (await this.isValidReauthProof(user, reauthProof, operation))
-        ? null
-        : 'reauth_proof';
+        ? { factor: null }
+        : { factor: 'reauth_proof' };
     }
 
+    // Every step-up runs through here, including the ones that carry no
+    // password at all. Counting those would let a route that presents another
+    // factor burn the budget of an account that never offered a password.
     if (!currentPassword) {
-      return 'password';
+      return { factor: 'password' };
     }
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    return isMatch ? null : 'password';
+    const open = await this.stepUpPasswordFailures.read(user.id);
+    if (open.count >= MAX_FAILED_ATTEMPTS) {
+      throw this.stepUpPasswordLockedException(open.remainingMs);
+    }
+
+    if (!(await bcrypt.compare(currentPassword, user.password))) {
+      const { count, remainingMs } = await this.stepUpPasswordFailures.record(
+        user.id,
+        LOCKOUT_DURATION_MS
+      );
+      return count >= MAX_FAILED_ATTEMPTS
+        ? { factor: 'password', lockedMs: remainingMs }
+        : { factor: 'password' };
+    }
+
+    await this.stepUpPasswordFailures.clear(user.id);
+    return { factor: null };
+  }
+
+  /**
+   * The password factor of the step-up is shut for the rest of the window. The
+   * key is not `ACCOUNT_LOCKED`: the sign-in card keys its countdown off that
+   * one, and no step-up route has a sign-in to count down to.
+   */
+  private stepUpPasswordLockedException(remainingMs: number): HttpException {
+    return new HttpException(
+      {
+        message: 'Too many incorrect passwords. Try again later',
+        errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED,
+        lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
+        retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
+      },
+      HttpStatus.LOCKED
+    );
   }
 
   /**
