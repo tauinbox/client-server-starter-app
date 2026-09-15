@@ -15,6 +15,7 @@ import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
 import {
   BCRYPT_SALT_ROUNDS,
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   ErrorKeys,
   MAX_CONCURRENT_SESSIONS,
   STEP_UP_OPERATION,
@@ -217,14 +218,16 @@ describe('AuthService', () => {
       get: jest.fn().mockImplementation((key: string) => {
         const config: Record<string, string> = {
           JWT_EXPIRATION: '3600',
-          JWT_REFRESH_EXPIRATION: '604800'
+          JWT_REFRESH_EXPIRATION: '604800',
+          SESSION_ABSOLUTE_MAX_MS: String(DEFAULT_SESSION_ABSOLUTE_MAX_MS)
         };
         return config[key];
       }),
       getOrThrow: jest.fn().mockImplementation((key: string) => {
         const config: Record<string, string> = {
           JWT_EXPIRATION: '3600',
-          JWT_REFRESH_EXPIRATION: '604800'
+          JWT_REFRESH_EXPIRATION: '604800',
+          SESSION_ABSOLUTE_MAX_MS: String(DEFAULT_SESSION_ABSOLUTE_MAX_MS)
         };
         const value = config[key];
         if (value === undefined) {
@@ -1309,6 +1312,7 @@ describe('AuthService', () => {
       token: 'hashed-token',
       userId: 'user-1',
       sessionId: 'session-1',
+      sessionStartedAt: new Date(Date.now() - 3600000),
       revoked: false,
       expiresAt: new Date(Date.now() + 86400000),
       isExpired: () => false
@@ -1540,6 +1544,76 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
         'token-1'
       );
+    });
+
+    it('refuses a refresh past the absolute session lifetime and ends the session', async () => {
+      const agedToken = {
+        ...mockTokenDoc,
+        sessionStartedAt: new Date(
+          Date.now() - DEFAULT_SESSION_ABSOLUTE_MAX_MS - 1000
+        )
+      };
+      mockRefreshTokenService.findByToken.mockResolvedValue(agedToken);
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+
+      await expect(
+        service.refreshTokens('aged-session-token')
+      ).rejects.toMatchObject({
+        status: HttpStatus.UNAUTHORIZED,
+        response: { errorKey: ErrorKeys.AUTH.SESSION_EXPIRED }
+      });
+
+      expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+        'session-1'
+      );
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('carries the session start over a rotation inside the cap', async () => {
+      const startedAt = new Date(
+        Date.now() - DEFAULT_SESSION_ABSOLUTE_MAX_MS / 2
+      );
+      mockRefreshTokenService.findByToken.mockResolvedValue({
+        ...mockTokenDoc,
+        sessionStartedAt: startedAt
+      });
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+
+      await service.refreshTokens('valid-refresh-token');
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        RefreshToken,
+        expect.objectContaining({
+          sessionId: 'session-1',
+          sessionStartedAt: startedAt
+        })
+      );
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
+    });
+
+    it('rotates an aged session when SESSION_ABSOLUTE_MAX_MS is 0', async () => {
+      mockConfigService.getOrThrow.mockImplementation((key: string) => {
+        const config: Record<string, string> = {
+          JWT_EXPIRATION: '3600',
+          JWT_REFRESH_EXPIRATION: '604800',
+          SESSION_ABSOLUTE_MAX_MS: '0'
+        };
+        const value = config[key];
+        if (value === undefined) {
+          throw new Error(`Configuration key "${key}" does not exist`);
+        }
+        return value;
+      });
+      mockRefreshTokenService.findByToken.mockResolvedValue({
+        ...mockTokenDoc,
+        sessionStartedAt: new Date(2020, 0, 1)
+      });
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.refreshTokens('valid-refresh-token');
+
+      expect(result.tokens.access_token).toBe('mock-access-token');
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
     });
 
     it('should allow refresh when JWT_MIN_IAT is set and token was created after it', async () => {

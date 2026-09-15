@@ -28,6 +28,7 @@ import type {
   State
 } from './types';
 import {
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   ENTITLED_SUBSCRIPTION_STATUSES,
   MAX_CONCURRENT_SESSIONS,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS
@@ -64,6 +65,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     reauthProofs: state.reauthProofs.size,
     refreshTokens: state.refreshTokens.size,
     refreshSessions: state.refreshSessions.size,
+    sessionStarts: state.sessionStarts.size,
     revokedRefreshTokens: state.revokedRefreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
     passwordResetTokens: state.passwordResetTokens.size,
@@ -360,6 +362,41 @@ router.post('/invalidate-access-tokens', (req, res) => {
   }
   user.tokenRevokedAt = new Date().toISOString();
   res.json({ message: `tokens invalidated for user ${userId}` });
+});
+
+// POST /__control/age-session — move the start of a user's sessions back.
+// The absolute session cap is 30 days, so an E2E cannot wait one out. This
+// ages the session instead of shifting the clock, the way expire-token ages a
+// mailed token.
+router.post('/age-session', (req, res) => {
+  const { userId, ageMs } = req.body as { userId?: string; ageMs?: number };
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required' });
+    return;
+  }
+
+  const state = getState();
+  if (!state.users.has(userId)) {
+    res.status(404).json({ message: 'user not found' });
+    return;
+  }
+
+  const offset = ageMs ?? DEFAULT_SESSION_ABSOLUTE_MAX_MS;
+  let aged = 0;
+  for (const [token, tokenUserId] of state.refreshTokens.entries()) {
+    if (tokenUserId !== userId) continue;
+
+    const sessionId = state.refreshSessions.get(token);
+    if (sessionId === undefined) continue;
+
+    const startedAt = state.sessionStarts.get(sessionId);
+    if (startedAt === undefined) continue;
+
+    state.sessionStarts.set(sessionId, startedAt - offset);
+    aged++;
+  }
+
+  res.json({ message: `Aged ${aged} session(s) of user ${userId}` });
 });
 
 // POST /__control/totp-ledger — clear the replay floor for a user.

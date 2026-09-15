@@ -23,6 +23,7 @@ export const ErrorKeys = {
     RESET_TOKEN_EXPIRED: 'errors.auth.resetTokenExpired',
     INVALID_REFRESH_TOKEN: 'errors.auth.invalidRefreshToken',
     SESSION_INVALIDATED: 'errors.auth.sessionInvalidated',
+    SESSION_EXPIRED: 'errors.auth.sessionExpired',
     TOKEN_REVOKED: 'errors.auth.tokenRevoked',
     TOKEN_INVALIDATED_ROTATION: 'errors.auth.tokenInvalidatedRotation',
     INVALID_TOKEN: 'errors.auth.invalidToken',

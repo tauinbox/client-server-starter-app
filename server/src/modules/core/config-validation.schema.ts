@@ -1,6 +1,7 @@
 import * as Joi from 'joi';
 import {
   APP_ENVIRONMENTS,
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   MIN_JWT_EXPIRATION_SECONDS
 } from '@app/shared/constants';
 import { DEFAULT_BILLING_PROVIDER_TIMEOUT_MS } from '../billing/providers/provider-deadline';
@@ -56,6 +57,31 @@ export const configValidationSchema = Joi.object({
   // every open tab would refresh once per round trip.
   JWT_EXPIRATION: Joi.number().min(MIN_JWT_EXPIRATION_SECONDS).required(),
   JWT_REFRESH_EXPIRATION: Joi.number().required(),
+  // The floor and the rising default both keep an abort about a value the
+  // operator chose: under the refresh window a cap ends a session sooner than
+  // JWT_REFRESH_EXPIRATION promises, and the constant must not refuse a longer
+  // window. 0 disables the cap.
+  SESSION_ABSOLUTE_MAX_MS: Joi.alternatives()
+    .try(
+      Joi.number().valid(0),
+      Joi.number()
+        .integer()
+        .min(
+          Joi.ref('JWT_REFRESH_EXPIRATION', {
+            adjust: (seconds: number) => Number(seconds) * 1000
+          })
+        )
+        .messages({
+          'number.min':
+            'SESSION_ABSOLUTE_MAX_MS must be 0 or at least JWT_REFRESH_EXPIRATION * 1000'
+        })
+    )
+    .default((parent: Record<string, unknown>) => {
+      const refreshWindowMs = Number(parent['JWT_REFRESH_EXPIRATION']) * 1000;
+      return Number.isFinite(refreshWindowMs)
+        ? Math.max(DEFAULT_SESSION_ABSOLUTE_MAX_MS, refreshWindowMs)
+        : DEFAULT_SESSION_ABSOLUTE_MAX_MS;
+    }),
   AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90),
   DB_POOL_MAX: Joi.number().min(1).default(10),
   DB_POOL_IDLE_TIMEOUT: Joi.number().min(0).default(30000),

@@ -1,4 +1,7 @@
-import { MIN_JWT_EXPIRATION_SECONDS } from '@app/shared/constants';
+import {
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
+  MIN_JWT_EXPIRATION_SECONDS
+} from '@app/shared/constants';
 import { configValidationSchema } from './config-validation.schema';
 
 // Mirrors the validationOptions ConfigModule uses in core.module.ts.
@@ -73,6 +76,63 @@ describe('configValidationSchema', () => {
     );
 
     expect(error).toBeUndefined();
+  });
+
+  it('defaults SESSION_ABSOLUTE_MAX_MS to the shared constant', () => {
+    const { error, value } = configValidationSchema.validate(
+      validEnv,
+      options
+    ) as { error?: Error; value: Record<string, unknown> };
+
+    expect(error).toBeUndefined();
+    expect(value['SESSION_ABSOLUTE_MAX_MS']).toBe(
+      DEFAULT_SESSION_ABSOLUTE_MAX_MS
+    );
+  });
+
+  it('accepts SESSION_ABSOLUTE_MAX_MS=0, which disables the cap', () => {
+    const { error, value } = configValidationSchema.validate(
+      { ...validEnv, SESSION_ABSOLUTE_MAX_MS: '0' },
+      options
+    ) as { error?: Error; value: Record<string, unknown> };
+
+    expect(error).toBeUndefined();
+    expect(value['SESSION_ABSOLUTE_MAX_MS']).toBe(0);
+  });
+
+  it('raises the default SESSION_ABSOLUTE_MAX_MS to a longer refresh window', () => {
+    const longWindowSeconds = 90 * 24 * 60 * 60;
+
+    const { error, value } = configValidationSchema.validate(
+      { ...validEnv, JWT_REFRESH_EXPIRATION: String(longWindowSeconds) },
+      options
+    ) as { error?: Error; value: Record<string, unknown> };
+
+    // A refresh token that outlives the constant must not abort the boot on a
+    // value nobody set.
+    expect(error).toBeUndefined();
+    expect(value['SESSION_ABSOLUTE_MAX_MS']).toBe(longWindowSeconds * 1000);
+  });
+
+  it('rejects a SESSION_ABSOLUTE_MAX_MS below the refresh window', () => {
+    const { error } = configValidationSchema.validate(
+      { ...validEnv, SESSION_ABSOLUTE_MAX_MS: String(604800 * 1000 - 1) },
+      options
+    );
+
+    expect(error?.message).toContain(
+      'SESSION_ABSOLUTE_MAX_MS must be 0 or at least JWT_REFRESH_EXPIRATION * 1000'
+    );
+  });
+
+  it('accepts a SESSION_ABSOLUTE_MAX_MS exactly at the refresh window', () => {
+    const { error, value } = configValidationSchema.validate(
+      { ...validEnv, SESSION_ABSOLUTE_MAX_MS: String(604800 * 1000) },
+      options
+    ) as { error?: Error; value: Record<string, unknown> };
+
+    expect(error).toBeUndefined();
+    expect(value['SESSION_ABSOLUTE_MAX_MS']).toBe(604800 * 1000);
   });
 
   it('rejects a missing JWT_SECRET when the algorithm is HS256', () => {

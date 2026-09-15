@@ -28,6 +28,7 @@ import { BreachedPasswordService } from '../src/modules/auth/breached-password/b
 import { createMockCache } from '../src/common/testing/cache.mock';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
 
 interface InMemoryStore {
   tokens: Map<string, RefreshToken>;
@@ -48,7 +49,13 @@ function makeRefreshTokenRepoMock(
       Object.assign(t, data);
       return t;
     },
-    save: jest.fn((entity: RefreshToken) => {
+    save: jest.fn((data: RefreshToken) => {
+      // The real repository answers with an entity, and the rotation hands it a
+      // plain object. Without this the successor row carries no isExpired().
+      const entity =
+        data instanceof RefreshToken
+          ? data
+          : Object.assign(new RefreshToken(), data);
       if (!entity.id) entity.id = `rt-${++idSeq}`;
       if (!entity.createdAt) entity.createdAt = new Date();
       if (entity.revoked === undefined) entity.revoked = false;
@@ -66,10 +73,15 @@ function makeRefreshTokenRepoMock(
       if (existing) Object.assign(existing, partial);
       return Promise.resolve({ affected: existing ? 1 : 0 });
     }),
-    delete: jest.fn((criteria: { userId: string }) => {
+    delete: jest.fn((criteria: { userId?: string; sessionId?: string }) => {
       let n = 0;
       for (const [id, t] of store.tokens.entries()) {
-        if (t.userId === criteria.userId) {
+        const matchesUser =
+          criteria.userId !== undefined && t.userId === criteria.userId;
+        const matchesSession =
+          criteria.sessionId !== undefined &&
+          t.sessionId === criteria.sessionId;
+        if (matchesUser || matchesSession) {
           store.tokens.delete(id);
           n++;
         }
@@ -177,11 +189,13 @@ describe('Refresh token reuse detection (e2e)', () => {
   let store: InMemoryStore;
   let auditLog: jest.Mock;
   let recordAuthEvent: jest.Mock;
+  let absoluteMaxMs: number;
 
   beforeEach(async () => {
     store = createStore();
     auditLog = jest.fn();
     recordAuthEvent = jest.fn();
+    absoluteMaxMs = DEFAULT_SESSION_ABSOLUTE_MAX_MS;
 
     const rtRepo = makeRefreshTokenRepoMock(store);
     const ds = makeDataSourceMock(store, rtRepo);
@@ -223,6 +237,7 @@ describe('Refresh token reuse detection (e2e)', () => {
             get: jest.fn(),
             getOrThrow: jest.fn((k: string) => {
               if (k === 'JWT_REFRESH_EXPIRATION') return '604800';
+              if (k === 'SESSION_ABSOLUTE_MAX_MS') return String(absoluteMaxMs);
               throw new Error(`unexpected config key ${k}`);
             })
           }
@@ -334,5 +349,88 @@ describe('Refresh token reuse detection (e2e)', () => {
     );
     expect(recordAuthEvent).not.toHaveBeenCalledWith('token_reuse_detected');
     expect(store.userRevokedAt.has('user-1')).toBe(false);
+  });
+
+  describe('absolute session lifetime', () => {
+    function ageSession(offsetMs: number): void {
+      for (const row of store.tokens.values()) {
+        row.sessionStartedAt = new Date(
+          row.sessionStartedAt.getTime() - offsetMs
+        );
+      }
+    }
+
+    it('stamps the session start at login and carries it over a rotation', async () => {
+      const loginResult = await auth.login(userRecord);
+      const startedAt = Array.from(store.tokens.values())[0].sessionStartedAt;
+
+      expect(startedAt).toBeInstanceOf(Date);
+
+      ageSession(absoluteMaxMs / 2);
+      const aged = Array.from(store.tokens.values())[0].sessionStartedAt;
+
+      const refreshed = await auth.refreshTokens(
+        loginResult.tokens.refresh_token
+      );
+      expect(refreshed.tokens.access_token).toBeDefined();
+
+      const live = Array.from(store.tokens.values()).filter((r) => !r.revoked);
+      expect(live).toHaveLength(1);
+      // Re-stamping here would restore the sliding expiry the cap ends.
+      expect(live[0].sessionStartedAt.getTime()).toBe(aged.getTime());
+    });
+
+    it('refuses a refresh past the cap and deletes the whole session', async () => {
+      const loginResult = await auth.login(userRecord);
+      const sessionId = Array.from(store.tokens.values())[0].sessionId;
+
+      const firstRefresh = await auth.refreshTokens(
+        loginResult.tokens.refresh_token
+      );
+      expect(store.tokens.size).toBe(2);
+
+      ageSession(absoluteMaxMs);
+
+      await expect(
+        auth.refreshTokens(firstRefresh.tokens.refresh_token)
+      ).rejects.toMatchObject({
+        status: HttpStatus.UNAUTHORIZED,
+        response: { errorKey: 'errors.auth.sessionExpired' }
+      });
+
+      // The revoked ancestor goes too: it would otherwise keep answering the
+      // reuse detector for a session that no longer exists.
+      const remaining = Array.from(store.tokens.values()).filter(
+        (r) => r.sessionId === sessionId
+      );
+      expect(remaining).toHaveLength(0);
+
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.TOKEN_REFRESH_FAILURE,
+          actorId: 'user-1',
+          details: { reason: 'session_absolute_lifetime_exceeded' }
+        })
+      );
+      expect(recordAuthEvent).toHaveBeenCalledWith('token_refresh_failure');
+      // Age is not a compromise signal, so no panic revoke of the account.
+      expect(store.userRevokedAt.has('user-1')).toBe(false);
+    });
+
+    it('rotates an aged session when the cap is disabled with 0', async () => {
+      absoluteMaxMs = 0;
+
+      const loginResult = await auth.login(userRecord);
+      ageSession(DEFAULT_SESSION_ABSOLUTE_MAX_MS * 4);
+
+      const refreshed = await auth.refreshTokens(
+        loginResult.tokens.refresh_token
+      );
+
+      expect(refreshed.tokens.access_token).toBeDefined();
+      expect(
+        Array.from(store.tokens.values()).filter((r) => !r.revoked)
+      ).toHaveLength(1);
+    });
   });
 });

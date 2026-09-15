@@ -29,6 +29,13 @@ export class RefreshToken {
   @Column({ name: 'session_id', type: 'uuid' })
   sessionId: string;
 
+  /**
+   * When the session started. Rotation carries it over unchanged, so it bounds
+   * the whole chain of rows rather than the row that holds it.
+   */
+  @Column({ name: 'session_started_at', type: 'timestamptz' })
+  sessionStartedAt: Date;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

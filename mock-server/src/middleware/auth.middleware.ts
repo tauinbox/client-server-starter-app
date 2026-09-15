@@ -1,6 +1,7 @@
 import { Router, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   EMAIL_CHANGE_TOKEN_EXPIRY_MS,
   ErrorKeys,
   LOCKOUT_DURATION_MS,
@@ -37,6 +38,7 @@ import {
   isMfaMandatoryFor,
   logAudit,
   registerSession,
+  sessionAgeMs,
   toUserResponse
 } from '../state';
 import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
@@ -621,6 +623,24 @@ router.post('/refresh-token', (req, res) => {
       message: 'Invalid refresh token',
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    });
+    return;
+  }
+
+  // Absolute session timeout. The server reads SESSION_ABSOLUTE_MAX_MS against
+  // the `session_started_at` column; the mock carries the same default and the
+  // same order, after the reuse detector.
+  if (sessionAgeMs(cookieToken) >= DEFAULT_SESSION_ABSOLUTE_MAX_MS) {
+    endSessionOfToken(cookieToken);
+    logAudit('TOKEN_REFRESH_FAILURE', {
+      actorId: userId,
+      details: { reason: 'session_absolute_lifetime_exceeded' },
+      ip: req.ip
+    });
+    res.status(401).json({
+      message: 'Session has reached its maximum duration. Please log in again.',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
     });
     return;
   }

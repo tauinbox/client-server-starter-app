@@ -147,6 +147,9 @@ management and theming.
   linked. An administrator changes the flags at `/admin/feature-flags`.
 - A JWT access token lives 1 h and stays in memory only. An opaque refresh token lives 7 days. The
   browser keeps it as an HttpOnly cookie with `SameSite=Strict`, thus JavaScript can never read it.
+- One session lives 30 days at most. A refresh keeps the session and writes a new 7-day expiry, thus
+  the refresh window alone never ends a device that refreshes on schedule. `SESSION_ABSOLUTE_MAX_MS`
+  is that upper bound, and the person signs in again when a session reaches it.
 - The app restores the session after a page reload. `provideAppInitializer` does a cookie refresh
   before the route guards run.
 - The client refreshes the token automatically 60 seconds before the expiry. It discards a response
@@ -1033,6 +1036,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it for key rotation |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds. The minimum is `120` |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds |
+| `SESSION_ABSOLUTE_MAX_MS` | `2592000000` | Absolute lifetime of one session in milliseconds, that is 30 days. A refresh does not extend it. Use `0` to disable the cap. The default rises to `JWT_REFRESH_EXPIRATION * 1000` when that window is longer |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
 | `FACEBOOK_CLIENT_ID` | - | Facebook OAuth client ID |
@@ -1785,11 +1789,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2369 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 379 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 377 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2377 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 382 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 380 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1278 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 265 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 736 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 266 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 739 tests pass |
 
 ## CI/CD
 
@@ -1901,6 +1905,10 @@ a second request to the registry for a verdict that gates nothing.
   same provider proves nothing.
 - The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an
   expiry of 7 days. JavaScript can neither read nor steal the token, thus XSS cannot take it.
+
+  One session still ends at `SESSION_ABSOLUTE_MAX_MS`, which is 30 days by default. The session
+  start is a column of its own, and the rotation carries it over unchanged, thus a refresh cannot
+  move that bound. Past it the refresh answers 401 and the server deletes every row of the session.
 
   The server rotates the token at each use. The rotation revokes the presented row conditionally.
   Thus two requests that race with the same token make exactly one live successor. The loser gets a

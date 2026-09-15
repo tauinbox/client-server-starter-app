@@ -490,6 +490,14 @@ with a stale token answers 401. The refresh token then stays live on the server 
 UI. If the refresh fails, the session is already invalid, and the code continues to the local
 teardown.
 
+A refresh can also be refused for the age of the session. The server caps the absolute lifetime of
+one session at `SESSION_ABSOLUTE_MAX_MS`, which is 30 days by default, and a rotation does not extend
+it. Past that bound `POST /auth/refresh-token` answers 401 `errors.auth.sessionExpired`. That route is
+in `AUTH_EXCLUDED_URLS`, thus the interceptor does not retry it, and the failed refresh runs
+`TokenService.forceLogout`. The person lands on the login page, and no client branch is specific to
+this refusal. `session-absolute-lifetime.spec.ts` drives the flow against the mock through
+`POST /__control/age-session`, because no test can wait 30 days out.
+
 The session teardown is one routine. `logout()` runs it on both branches.
 `TokenService.forceLogout()` reaches it through the `sessionCleared$` subject, because `TokenService`
 cannot import `AuthService`. Such an import closes a dependency cycle. Thus each exit path
@@ -1009,7 +1017,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 265 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 266 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1278 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
@@ -1026,6 +1034,10 @@ Seventeen Playwright tests cover the four paths, with the proof seeded through
 covers the refusal: a step-up that ends at the provider returns to `/profile?oauth_error=reauth_failed`,
 and the page reports that nothing was changed.
 An account that holds a password answers a prompt on the "Connect" control instead of leaving.
+The session tests carry a control route of their own. `POST /__control/age-session` moves the start
+of each live session of a user back, thus the next refresh of that session reads as past the absolute
+cap. It stands in for a 30-day wait, the same way `POST /__control/expire-token` stands in for the
+deadline of a mailed token.
 The two-factor tests carry one more control route. A code is single use on the server and on the
 mock, and the mock answers one fixed code, so a test that must present that code a second time
 calls `POST /__control/totp-ledger` to clear the recorded step. It stands in for the wait a real

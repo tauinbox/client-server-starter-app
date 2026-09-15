@@ -41,6 +41,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { CLIENT_URL } from '../src/modules/auth/providers/client-url.provider';
+import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
 
 const PUBLIC_USER_FIELDS = [
   'id',
@@ -156,6 +157,7 @@ describe('Auth response serialization (e2e)', () => {
   const configValues: Record<string, string> = {
     CLIENT_URL: 'http://localhost:4200',
     JWT_REFRESH_EXPIRATION: '604800',
+    SESSION_ABSOLUTE_MAX_MS: String(DEFAULT_SESSION_ABSOLUTE_MAX_MS),
     // The agent below replays cookies over plain HTTP, which is what a local
     // server serves. Each other environment sets Secure and the agent drops
     // the cookie.
@@ -217,6 +219,7 @@ describe('Auth response serialization (e2e)', () => {
               userId: 'user-1',
               revoked: false,
               createdAt: new Date('2025-01-01T00:00:00.000Z'),
+              sessionStartedAt: new Date(),
               expiresAt: new Date('2099-01-01T00:00:00.000Z'),
               isExpired: () => false
             }),

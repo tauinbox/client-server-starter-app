@@ -582,6 +582,34 @@ export class AuthService {
       );
     }
 
+    // Absolute session timeout (OWASP ASVS 5.0 V7). Rotation restarts the
+    // refresh window, so the session start is the only value that bounds the
+    // chain. Ordered after the reuse detector on purpose: a replayed token must
+    // still be reported as a possible compromise rather than refused for age.
+    const absoluteMaxMs = Number(
+      this.configService.getOrThrow<string>('SESSION_ABSOLUTE_MAX_MS')
+    );
+    if (
+      absoluteMaxMs > 0 &&
+      Date.now() - tokenDoc.sessionStartedAt.getTime() >= absoluteMaxMs
+    ) {
+      await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
+      this.auditService.logFireAndForget({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        actorId: tokenDoc.userId,
+        details: { reason: 'session_absolute_lifetime_exceeded' }
+      });
+      this.metricsService.recordAuthEvent('token_refresh_failure');
+      throw new HttpException(
+        {
+          message:
+            'Session has reached its maximum duration. Please log in again.',
+          errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
     const rawMinIat = this.configService.get<number>('JWT_MIN_IAT');
     if (rawMinIat !== undefined) {
       const minIat = Number(rawMinIat);
@@ -683,6 +711,9 @@ export class AuthService {
       await manager.save(RefreshToken, {
         userId: user.id,
         sessionId: tokenDoc.sessionId,
+        // Carried over, never re-stamped: re-stamping here restores the sliding
+        // expiry the absolute cap above exists to end.
+        sessionStartedAt: tokenDoc.sessionStartedAt,
         token: hashToken(tokens.refresh_token),
         expiresAt
       });

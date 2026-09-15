@@ -98,6 +98,7 @@
       "resetTokenExpired": "Password reset token has expired. Please request a new one.",
       "invalidRefreshToken": "Invalid refresh token",
       "sessionInvalidated": "Session invalidated due to key rotation. Please log in again.",
+      "sessionExpired": "Your session reached its maximum duration. Please log in again.",
       "tokenRevoked": "Token has been revoked",
       "tokenInvalidatedRotation": "Token invalidated due to key rotation. Please log in again.",
       "invalidToken": "Invalid authentication token",
