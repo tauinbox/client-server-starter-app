@@ -1051,7 +1051,10 @@ path, and then signs in with a recovery code, because that route stays open whil
 step-up code carries its own brake on the server, under a separate namespace and a separate key,
 `errors.auth.mfaStepUpLocked`. The card needs no branch for it: the panel reports the 423 through
 `NotifyService.error`, which is the shared `parseHttpErrorMessage` funnel every server error takes,
-and both language files carry the key.
+and both language files carry the key. The step-up password carries a third brake, under the key
+`errors.auth.stepUpLocked`, and it reaches the screen the same way: every screen that asks for
+`currentPassword` already sends the whole `HttpErrorResponse` through that funnel, so the new 423
+needs no client branch and only the two translations.
 The unit tests also cover session restore, cross-tab logout, lockout, email
 verification, and password reset with a password confirmation. They cover the users list, detail, edit
 and search. This includes the email-change confirmation dialog of the administrator and the

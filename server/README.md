@@ -1083,6 +1083,21 @@ never touches the counter: every step-up reaches that method, `PATCH /auth/profi
 `POST /auth/oauth/link-init` included, and counting those would let an ordinary password step-up
 burn the budget of an account that never offered a code.
 
+**The step-up password carries the third brake.** `AuthService.stepUpFailure` counts refused
+passwords against the account on a `FailedAttemptCounter` keyed `step-up:password-failures:`, with
+the same threshold, the same window and the same 423 envelope, under the key
+`errors.auth.stepUpLocked`. The route throttles are keyed by client address, so before this the
+whole ceiling was four guesses per address per route, repeated on each of the seven routes that take
+a step-up, and the account never locked however many were wrong. The counter reports the bar to
+`assertStepUp` through the `lockedMs` field of the verdict rather than throwing past it, so the
+attempt that spends the last of the budget still writes its `STEP_UP_FAILURE` row.
+
+This namespace is separate from `users.failed_login_attempts` as well. A caller that holds only a
+stolen session can spend this budget and bar the owner's step-up for the window, and the sign-in
+must stay open under it, because a fresh sign-in and the password reset are the owner's way back. A
+step-up that offers no password never touches the counter, and neither does the `reauth_proof`
+branch of an account that holds no password.
+
 **Token purpose.** The service signs three token types: access, OAuth link and OAuth data. The three
 use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
 its own purpose.

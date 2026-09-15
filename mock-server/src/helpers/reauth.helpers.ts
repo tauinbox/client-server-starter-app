@@ -242,6 +242,31 @@ function stepUpLockedEnvelope(remainingMs: number): StepUpErrorEnvelope {
 }
 
 /**
+ * The password factor of the step-up is shut for the rest of the window. The
+ * key is not `ACCOUNT_LOCKED`: the sign-in card keys its countdown off that
+ * one, and no step-up route has a sign-in to count down to.
+ */
+function stepUpPasswordLockedEnvelope(
+  remainingMs: number
+): StepUpErrorEnvelope {
+  return {
+    message: 'Too many incorrect passwords. Try again later',
+    statusCode: 423,
+    errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED,
+    lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
+    retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
+  };
+}
+
+function invalidCurrentPasswordEnvelope(): StepUpErrorEnvelope {
+  return {
+    message: 'Current password is incorrect',
+    statusCode: 400,
+    errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+  };
+}
+
+/**
  * Mirrors AuthService.assertStepUp: a code from the enrolled authenticator, a
  * password, or a provider proof, in that order. Returns an error envelope, or
  * null when the caller proved itself. A refusal writes the audit row the
@@ -275,15 +300,51 @@ export function stepUpError(
     };
   }
 
+  return stepUpPasswordError(
+    req,
+    user,
+    currentPassword,
+    operation,
+    code !== undefined
+  );
+}
+
+/**
+ * The per-account brake on the step-up password, mirroring the counter in
+ * `AuthService.stepUpFailure`. The profile routes compare the password
+ * themselves rather than through `stepUpError`, so the brake lives here where
+ * every one of them can reach it.
+ *
+ * A step-up that offers no password never touches the counter, so a route that
+ * presents another factor cannot burn the budget of the account.
+ */
+export function stepUpPasswordError(
+  req: Request,
+  user: MockUser,
+  currentPassword: unknown,
+  operation: StepUpOperation,
+  codeOffered: boolean
+): StepUpErrorEnvelope | null {
+  if (!currentPassword) {
+    logStepUpFailure(req, user, operation, 'password', codeOffered);
+    return invalidCurrentPasswordEnvelope();
+  }
+
+  const windows = getState().stepUpPasswordFailures;
+  const open = readFailures(windows, user.id);
+  if (open.count >= MAX_FAILED_ATTEMPTS) {
+    return stepUpPasswordLockedEnvelope(open.remainingMs);
+  }
+
   // Plaintext comparison - mock only. Real server uses bcrypt.compare().
   if (user.password === currentPassword) {
+    clearFailures(windows, user.id);
     return null;
   }
 
-  logStepUpFailure(req, user, operation, 'password', code !== undefined);
-  return {
-    message: 'Current password is incorrect',
-    statusCode: 400,
-    errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-  };
+  const { count, remainingMs } = recordFailure(windows, user.id);
+  logStepUpFailure(req, user, operation, 'password', codeOffered);
+  return count >= MAX_FAILED_ATTEMPTS
+    ? stepUpPasswordLockedEnvelope(remainingMs)
+    : invalidCurrentPasswordEnvelope();
 }

@@ -80,6 +80,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     captchaAttempts: state.captchaAttempts.size,
     mfaChallengeFailures: state.mfaChallengeFailures.size,
     mfaStepUpFailures: state.mfaStepUpFailures.size,
+    stepUpPasswordFailures: state.stepUpPasswordFailures.size,
     breachedPasswords: Array.from(state.breachedPasswords),
     featureFlags: Array.from(state.featureFlags.values()),
     featureFlagRules: state.featureFlagRules,

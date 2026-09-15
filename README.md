@@ -1789,11 +1789,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2380 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2387 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 382 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 380 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1278 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 266 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 742 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 750 tests pass |
 
 ## CI/CD
 
@@ -1903,6 +1903,14 @@ a second request to the registry for a verdict that gates nothing.
   address cannot bind a password and is not spent by the attempt. The callback mints nothing unless the
   provider identity that just authenticated already belongs to the caller, so a second account at the
   same provider proves nothing.
+
+  The **password factor of every step-up carries a per-account brake** as well. Five refused
+  passwords inside 15 minutes answer HTTP 423 `errors.auth.stepUpLocked`, and a correct password is
+  refused for the rest of that window. The route throttles are keyed by client address, so without
+  it a caller that holds a stolen access token bought four guesses per address per route, on each of
+  the seven routes that take a step-up, and the account never locked. The counter has a namespace of
+  its own, so a spent budget never shuts `POST /auth/login`: a fresh sign-in and the password reset
+  are the owner's way back. A request that offers no password spends nothing.
 - The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an
   expiry of 7 days. JavaScript can neither read nor steal the token, thus XSS cannot take it.
 
