@@ -390,8 +390,10 @@ export class AuthService {
   async resendVerificationEmail(email: string): Promise<{ message: string }> {
     const user = await this.usersService.findByEmail(email);
 
-    // Always return success to prevent email enumeration
-    if (!user || user.isEmailVerified) {
+    // Always return success to prevent email enumeration. A deactivated account
+    // gets no new token either, matching the isActive gate in forgotPassword:
+    // the address it would verify still cannot sign in.
+    if (!user || !user.isActive || user.isEmailVerified) {
       return ENUMERATION_SAFE_RESEND_RESPONSE;
     }
 

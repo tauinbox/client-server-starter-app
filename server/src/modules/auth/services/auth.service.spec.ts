@@ -996,6 +996,38 @@ describe('AuthService', () => {
       expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
       expect(result.message).toBeDefined();
     });
+
+    it('should issue no token and send no mail for a deactivated account', async () => {
+      const deactivatedUser = {
+        ...mockUser,
+        isEmailVerified: false,
+        isActive: false
+      };
+      mockUsersService.findByEmail.mockResolvedValue(deactivatedUser);
+
+      const result = await service.resendVerificationEmail('test@example.com');
+
+      expect(mockUsersService.setEmailVerificationToken).not.toHaveBeenCalled();
+      expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
+      expect(result.message).toBeDefined();
+    });
+
+    it('should answer a deactivated account exactly like an unknown address', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false,
+        isActive: false
+      });
+      const deactivated =
+        await service.resendVerificationEmail('test@example.com');
+
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      const unknown = await service.resendVerificationEmail(
+        'nonexistent@example.com'
+      );
+
+      expect(deactivated).toEqual(unknown);
+    });
   });
 
   describe('forgotPassword', () => {

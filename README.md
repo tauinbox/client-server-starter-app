@@ -1486,7 +1486,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
 | GET | `/auth/oauth/:provider/callback` | None | Callback of the OAuth provider |
 | POST | `/auth/verify-email` | None | Verify an email address with a token |
-| POST | `/auth/resend-verification` | None | Send the verification email again |
+| POST | `/auth/resend-verification` | None | Send the verification email again. A deactivated account gets no token and no mail |
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
 | POST | `/auth/reset-password` | None | Reset the password with a token |
@@ -1789,11 +1789,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2377 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2380 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 382 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 380 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1278 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 266 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 739 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 742 tests pass |
 
 ## CI/CD
 

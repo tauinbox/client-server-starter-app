@@ -359,8 +359,10 @@ router.post('/resend-verification', (req, res) => {
   const email = normalizeEmail(req.body.email) ?? '';
   const user = findUserByEmail(email);
 
-  // Always return success to prevent email enumeration
-  if (!user || user.isEmailVerified) {
+  // Always return success to prevent email enumeration. A deactivated account
+  // gets no new token either, matching the isActive gate in forgot-password:
+  // the address it would verify still cannot sign in.
+  if (!user || !user.isActive || user.isEmailVerified) {
     res.json({ message: successMessage });
     return;
   }
