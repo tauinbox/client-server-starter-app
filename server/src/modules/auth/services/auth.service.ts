@@ -582,11 +582,10 @@ export class AuthService {
       );
     }
 
-    // Absolute session timeout (OWASP ASVS 5.0 V7). Rotation keeps the session
-    // id and restarts the refresh window, so the session start is the only value
-    // that bounds the chain. The check sits after the reuse detector on purpose:
-    // a replayed token must still be reported as a possible compromise rather
-    // than refused for age.
+    // Absolute session timeout (OWASP ASVS 5.0 V7). Rotation restarts the
+    // refresh window, so the session start is the only value that bounds the
+    // chain. Ordered after the reuse detector on purpose: a replayed token must
+    // still be reported as a possible compromise rather than refused for age.
     const absoluteMaxMs = Number(
       this.configService.getOrThrow<string>('SESSION_ABSOLUTE_MAX_MS')
     );

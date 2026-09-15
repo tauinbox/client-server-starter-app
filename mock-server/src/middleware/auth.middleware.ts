@@ -627,10 +627,9 @@ router.post('/refresh-token', (req, res) => {
     return;
   }
 
-  // Absolute session timeout. The real server reads SESSION_ABSOLUTE_MAX_MS and
-  // compares it against the `session_started_at` column; the mock carries the
-  // same default and the same order, after the reuse detector so a replayed
-  // token is still reported as a possible compromise.
+  // Absolute session timeout. The server reads SESSION_ABSOLUTE_MAX_MS against
+  // the `session_started_at` column; the mock carries the same default and the
+  // same order, after the reuse detector.
   if (sessionAgeMs(cookieToken) >= DEFAULT_SESSION_ABSOLUTE_MAX_MS) {
     endSessionOfToken(cookieToken);
     logAudit('TOKEN_REFRESH_FAILURE', {

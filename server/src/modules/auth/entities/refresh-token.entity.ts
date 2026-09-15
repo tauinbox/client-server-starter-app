@@ -30,9 +30,8 @@ export class RefreshToken {
   sessionId: string;
 
   /**
-   * When the session started. Rotation carries this value over unchanged, so it
-   * bounds the whole chain: a derived anchor would not survive, because the
-   * cleanup job deletes every revoked ancestor once it is past its own expiry.
+   * When the session started. Rotation carries it over unchanged, so it bounds
+   * the whole chain of rows rather than the row that holds it.
    */
   @Column({ name: 'session_started_at', type: 'timestamptz' })
   sessionStartedAt: Date;

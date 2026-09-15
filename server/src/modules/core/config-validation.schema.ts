@@ -57,13 +57,10 @@ export const configValidationSchema = Joi.object({
   // every open tab would refresh once per round trip.
   JWT_EXPIRATION: Joi.number().min(MIN_JWT_EXPIRATION_SECONDS).required(),
   JWT_REFRESH_EXPIRATION: Joi.number().required(),
-  // Absolute lifetime of one session, in milliseconds. 0 disables the cap.
-  // A non-zero value below the refresh window would end a session sooner than
-  // JWT_REFRESH_EXPIRATION promises, so that pair aborts the boot instead of
-  // signing people out at a moment no configuration explains.
-  // The default rises with the refresh window for the same reason: a
-  // deployment whose refresh token outlives 30 days must not fail to boot on a
-  // value nobody chose.
+  // The floor and the rising default both keep an abort about a value the
+  // operator chose: under the refresh window a cap ends a session sooner than
+  // JWT_REFRESH_EXPIRATION promises, and the constant must not refuse a longer
+  // window. 0 disables the cap.
   SESSION_ABSOLUTE_MAX_MS: Joi.alternatives()
     .try(
       Joi.number().valid(0),
