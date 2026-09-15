@@ -1486,7 +1486,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
 | GET | `/auth/oauth/:provider/callback` | None | Callback of the OAuth provider |
 | POST | `/auth/verify-email` | None | Verify an email address with a token |
-| POST | `/auth/resend-verification` | None | Send the verification email again |
+| POST | `/auth/resend-verification` | None | Send the verification email again. A deactivated account gets no token and no mail |
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
 | POST | `/auth/reset-password` | None | Reset the password with a token |

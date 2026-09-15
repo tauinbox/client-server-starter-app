@@ -2121,7 +2121,7 @@ The base URL is `/api/v1`.
 | POST | `/profile/email/confirm` | None | Step 2. It confirms the new address with the token, applies the change atomically, revokes each refresh token, and notifies the old address |
 | GET | `/permissions` | Bearer | Get the resolved permissions of the current user |
 | POST | `/verify-email` | None | Verify an email address with a token |
-| POST | `/resend-verification` | None | Send the verification email again, with a limit of 3 calls each minute |
+| POST | `/resend-verification` | None | Send the verification email again, with a limit of 3 calls each minute. A deactivated account gets no token and no mail, and reads the same enumeration-safe answer |
 | POST | `/forgot-password` | None | Request a password reset email, with a limit of 2 calls each 5 minutes. A CAPTCHA token is necessary near the rate limit |
 | POST | `/reset-password` | None | Reset the password with a token |
 | GET | `/captcha-config` | None | The public CAPTCHA configuration: the provider, the site key and the enabled flag |
