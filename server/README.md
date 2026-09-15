@@ -108,6 +108,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it during key rotation |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds, that is 1 h. The minimum is `120`, because the client refreshes 60 s before the expiry |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds, that is 7 days |
+| `SESSION_ABSOLUTE_MAX_MS` | `2592000000` | Absolute lifetime of one session in milliseconds, that is 30 days. A refresh keeps the session id and does not extend this bound, thus it is the only limit on a device that refreshes on schedule. A refresh at or past it answers 401 `errors.auth.sessionExpired` and deletes every row of the session. Use `0` to disable the cap. A non-zero value below `JWT_REFRESH_EXPIRATION * 1000` aborts the boot, and the default rises to that window when the window is longer |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
 | `FACEBOOK_CLIENT_ID` | - | Facebook OAuth client ID |
@@ -1279,6 +1280,27 @@ committed a live successor.
 
 The loser gets a plain 401 and not a session purge, because a benign double refresh from two tabs
 must not log the user out everywhere.
+
+**Absolute session lifetime.** A rotation keeps the `session_id` of the row it replaces and writes a
+new `expires_at`, thus `JWT_REFRESH_EXPIRATION` alone never ends a device that refreshes ahead of
+expiry. Each row therefore carries `session_started_at`, the moment the session began, and the
+rotation copies that value over unchanged.
+
+`refreshTokens()` refuses a session whose age is at or past `SESSION_ABSOLUTE_MAX_MS`, which is
+2592000000 ms (30 days) by default. The answer is 401 with `errors.auth.sessionExpired`, and the
+audit row carries `reason: 'session_absolute_lifetime_exceeded'`. `deleteBySessionId` then removes
+every row of that session, the revoked ancestors included, thus a later replay of the same cookie is
+an unknown token and not a reuse signal.
+
+The check sits **after** the reuse detector, so a replayed token is still reported as a possible
+compromise, and **before** the `JWT_MIN_IAT` branch. The value `0` disables the cap. A non-zero value
+below `JWT_REFRESH_EXPIRATION * 1000` aborts the boot, because it would end a session sooner than the
+refresh window promises.
+
+The column is real and not derived. `MIN(created_at)` of a session looks sufficient, because a
+rotation revokes an ancestor instead of deleting it, but `removeRevokedAndExpiredTokens` deletes each
+revoked row once it is past its own expiry. The oldest row of a long session is therefore gone well
+before a 30-day cap would read it.
 
 **Reuse detection** follows the OAuth 2.0 BCP and RFC 6819. When `refreshTokens()` sees a token where
 `revoked === true && !isExpired()`, the server deletes each refresh token of the user and stamps
