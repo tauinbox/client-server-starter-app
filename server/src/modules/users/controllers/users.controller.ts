@@ -331,7 +331,12 @@ export class UsersController {
     // An admin email change exists to recover an account whose address is
     // attacker-controlled; leaving the holder's issued tokens alive would
     // defeat it. Mirrors the self-service confirm path, which revokes too.
-    if (updateUserDto.password || emailChanged) {
+    // Deactivation too: a surviving refresh row mints tokens on re-activation.
+    if (
+      updateUserDto.password ||
+      emailChanged ||
+      updateUserDto.isActive === false
+    ) {
       await this.eventEmitter.emitAsync(
         UserSessionRevocationRequiredEvent.name,
         new UserSessionRevocationRequiredEvent(id)

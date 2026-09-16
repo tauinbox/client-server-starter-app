@@ -434,7 +434,7 @@ router.patch(
       // Keyed on the submitted value and not on a transition, because the
       // server writes both effects whenever the request carries `false`.
       if (isActive === false) {
-        user.tokenRevokedAt = new Date().toISOString();
+        revokeUserSessions(user);
         // Cancel any in-flight self-service email change so a mailed link
         // cannot confirm against a disabled row, the same reason the soft
         // delete clears these three fields.
