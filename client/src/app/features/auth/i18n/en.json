@@ -11,6 +11,7 @@
     "verificationSent": "Verification email sent! Check your inbox.",
     "sending": "Sending...",
     "resendVerificationEmail": "Resend verification email",
+    "resendVerificationFailed": "The verification email could not be sent. Please try again.",
     "loggingIn": "Logging in...",
     "forgotPassword": "Forgot password?",
     "oauthDivider": "or sign in with",

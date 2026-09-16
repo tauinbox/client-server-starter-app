@@ -11,6 +11,7 @@
     "verificationSent": "Письмо с подтверждением отправлено! Проверьте входящие.",
     "sending": "Отправка...",
     "resendVerificationEmail": "Отправить письмо повторно",
+    "resendVerificationFailed": "Не удалось отправить письмо с подтверждением. Попробуйте снова.",
     "loggingIn": "Вход...",
     "forgotPassword": "Забыли пароль?",
     "oauthDivider": "или войдите через",

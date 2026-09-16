@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures/base.fixture';
+import { createMockUser } from '../fixtures/mock-data';
+import { mockId } from '../fixtures/ids';
 
 const TURNSTILE_SCRIPT_URL =
   'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
@@ -69,6 +71,64 @@ test.describe('CAPTCHA soft-trigger', () => {
 
     await submit.click();
     await expect(page.getByText(/check your email/i)).toBeVisible();
+  });
+
+  test('resend-verification: shows widget once the budget is spent', async ({
+    _mockServer,
+    page
+  }) => {
+    await stubTurnstile(page);
+    await _mockServer.setCaptcha(true);
+    await _mockServer.seedUsers([
+      createMockUser({
+        id: mockId('user-401'),
+        email: 'resend-captcha@example.com',
+        firstName: 'Resend',
+        lastName: 'Captcha',
+        password: 'Password1',
+        isActive: true,
+        roles: ['user'],
+        isEmailVerified: false
+      })
+    ]);
+
+    const main = page.getByRole('main');
+    const resend = page.getByRole('button', { name: /resend verification/i });
+
+    async function reachResendButton(): Promise<void> {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill('resend-captcha@example.com');
+      await page.getByLabel('Email').blur();
+      await page.getByLabel('Password', { exact: true }).fill('Password1');
+      await page.getByLabel('Password', { exact: true }).blur();
+      await main.getByRole('button', { name: 'Login' }).click();
+      await expect(resend).toBeVisible();
+    }
+
+    // The route allows 3 calls a minute and the gate asks for a token once
+    // the remaining count drops to 1, so the first resend is still free.
+    await reachResendButton();
+    await resend.click();
+    await expect(page.getByText(/verification email sent/i)).toBeVisible();
+
+    // The second resend reaches the threshold: the widget appears and the
+    // button stays disabled until the callback fires.
+    await reachResendButton();
+    await resend.click();
+
+    const fake = page.getByTestId('fake-turnstile');
+    await expect(fake).toBeVisible();
+    await expect(resend).toBeDisabled();
+    await expect(
+      page.getByText(/complete the CAPTCHA challenge/i)
+    ).toBeVisible();
+    await expect(page.getByText(/verification email sent/i)).toHaveCount(0);
+
+    await fake.click();
+    await expect(resend).toBeEnabled();
+
+    await resend.click();
+    await expect(page.getByText(/verification email sent/i)).toBeVisible();
   });
 
   test('does not render widget when captcha is disabled', async ({

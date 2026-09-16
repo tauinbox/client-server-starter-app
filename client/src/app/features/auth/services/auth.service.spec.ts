@@ -487,6 +487,32 @@ describe('AuthService', () => {
     });
   });
 
+  describe('resendVerificationEmail', () => {
+    it('POSTs without captchaToken when none is held', async () => {
+      const promise = firstValueFrom(
+        service.resendVerificationEmail('a@b.com')
+      );
+      const req = httpMock.expectOne(AuthApiEnum.ResendVerification);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ email: 'a@b.com' });
+      req.flush({ message: 'OK' });
+      await promise;
+    });
+
+    it('POSTs with captchaToken when the gate asked for one', async () => {
+      const promise = firstValueFrom(
+        service.resendVerificationEmail('a@b.com', 'tok-1')
+      );
+      const req = httpMock.expectOne(AuthApiEnum.ResendVerification);
+      expect(req.request.body).toEqual({
+        email: 'a@b.com',
+        captchaToken: 'tok-1'
+      });
+      req.flush({ message: 'OK' });
+      await promise;
+    });
+  });
+
   describe('getProfile', () => {
     it('should GET profile and update current user', async () => {
       const mockUser = createMockAuthResponse().user;

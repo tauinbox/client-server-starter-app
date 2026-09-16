@@ -347,6 +347,17 @@ router.post('/verify-email', (req, res) => {
 
 // POST /api/v1/auth/resend-verification
 router.post('/resend-verification', (req, res) => {
+  const remaining = trackAttemptAndSetHeader(
+    CAPTCHA_ROUTE_LIMITS['resend-verification'],
+    req.ip ?? '',
+    res
+  );
+  const captchaCheck = evaluateCaptcha(remaining, req.body?.captchaToken);
+  if (!captchaCheck.ok) {
+    res.status(captchaCheck.status).json(captchaCheck.body);
+    return;
+  }
+
   const successMessage =
     'If an account with that email exists and is not yet verified, a verification email has been sent.';
 

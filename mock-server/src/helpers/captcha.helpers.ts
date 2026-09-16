@@ -17,6 +17,11 @@ export const CAPTCHA_ROUTE_LIMITS: Record<string, ThrottleConfig> = {
     name: 'forgot-password',
     ttlMs: 5 * 60 * 1000,
     limit: 2
+  },
+  'resend-verification': {
+    name: 'resend-verification',
+    ttlMs: 60 * 1000,
+    limit: 3
   }
 };
 

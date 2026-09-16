@@ -61,10 +61,22 @@
                   t('auth.login.verificationSent')
                 }}</span>
               } @else {
+                @if (resendCaptchaRequired()) {
+                  <nxs-captcha-widget
+                    (tokenChange)="onResendCaptchaToken($event)"
+                  />
+                }
+
+                @if (resendError()) {
+                  <div class="error-message" role="alert">
+                    {{ resendError() }}
+                  </div>
+                }
+
                 <button
                   matButton="text"
                   type="button"
-                  [disabled]="resendingVerification()"
+                  [disabled]="!canResend()"
                   (click)="resendVerification()"
                 >
                   @if (resendingVerification()) {

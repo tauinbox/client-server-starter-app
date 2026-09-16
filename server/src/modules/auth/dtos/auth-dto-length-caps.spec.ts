@@ -117,6 +117,25 @@ describe('Auth DTO length caps', () => {
         'email must be shorter than or equal to 255 characters'
       );
     });
+
+    // The captcha gate reads the token off the body, so forbidNonWhitelisted
+    // must not reject the field before the guard runs.
+    it('accepts a captcha token beside the address', async () => {
+      await expect(
+        validate(ResendVerificationDto, {
+          email: 'user@example.com',
+          captchaToken: 'x'.repeat(2048)
+        })
+      ).resolves.toBeDefined();
+    });
+
+    it('rejects a captcha token longer than 2048 characters', async () => {
+      await expectRejected(
+        ResendVerificationDto,
+        { email: 'user@example.com', captchaToken: 'x'.repeat(2049) },
+        'captchaToken must be shorter than or equal to 2048 characters'
+      );
+    });
   });
 
   describe('ForgotPasswordDto', () => {
