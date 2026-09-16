@@ -11,7 +11,7 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import isEmail from 'validator/lib/isEmail';
 
 /** Every address field on the server carries the same `@MaxLength`. */
-const EMAIL_MAX_LENGTH = 255;
+export const EMAIL_MAX_LENGTH = 255;
 
 /**
  * Mirrors `@IsEmail()`, which is `typeof value === 'string' && isEmail(value)`

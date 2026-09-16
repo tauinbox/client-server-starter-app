@@ -13,8 +13,10 @@ import {
   STEP_UP_OPERATION,
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
+import isLength from 'validator/lib/isLength';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
+  EMAIL_MAX_LENGTH,
   emailErrors,
   passwordLengthError,
   validateLocale,
@@ -165,9 +167,16 @@ router.post('/register', (req, res) => {
 router.post('/login', (req, res) => {
   // No DTO validation here: the real login route has no `@Body()` parameter
   // (guards run before pipes), so a malformed address or an over-long password
-  // is just another failed credential - 401, never 400.
-  const email = normalizeEmail(req.body.email) ?? '';
-  const { password } = req.body;
+  // is just another failed credential - 401, never 400. Values over the
+  // `LoginDto` caps collapse to '' exactly like the server's LocalStrategy, so
+  // the audit row never carries an oversized address.
+  const rawEmail = normalizeEmail(req.body.email) ?? '';
+  const email = isLength(rawEmail, { max: EMAIL_MAX_LENGTH }) ? rawEmail : '';
+  const password =
+    typeof req.body.password === 'string' &&
+    isLength(req.body.password, { max: MAX_PASSWORD_LENGTH })
+      ? req.body.password
+      : '';
 
   const user = findUserByEmail(email);
 

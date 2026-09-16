@@ -15,6 +15,9 @@ import { UpdateResourceDto } from './update-resource.dto';
 // options as main.ts. Every field that reaches bcrypt, an indexed DB lookup,
 // or a per-element validation loop must carry an upper length bound so a
 // crafted oversized body is rejected with 400 before doing expensive work.
+// `LoginDto` is not listed: the login route has no `@Body()`, so the pipe
+// never runs there. `LocalStrategy` applies its caps and answers 401 instead
+// (see local.strategy.spec.ts).
 describe('Auth DTO length caps', () => {
   const pipe = new ValidationPipe({
     transform: true,

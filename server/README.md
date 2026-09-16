@@ -335,8 +335,9 @@ change. The other handlers of that event keep the default suppression.
 `audit.service.ts` holds `AuditService`. It records 47 security-sensitive actions in the `audit_logs`
 table. `log()` truncates `actorEmail`, `targetId`, `targetType`, `ipAddress` and `requestId` to
 `AUDIT_FIELD_MAX_LENGTH` (255) before the insert. The columns are unbounded `varchar`, and some of
-the values reach the row without a DTO: `POST /auth/login` takes no body DTO, and `req.ip` is
-resolved from a proxy header.
+the values reach the row without a DTO: `POST /auth/login` takes no body DTO (`LocalStrategy`
+applies the address cap first, and this truncation is the second layer), and `req.ip` is resolved
+from a proxy header. The mock `logAudit` applies the same truncation.
 
 `../../common/utils/audit-context.util.ts` holds `extractAuditContext(req)`. It reads `req.ip` and
 `req.requestId`, which is the value `RequestIdMiddleware` validated. It never reads the raw
@@ -1012,7 +1013,10 @@ An unknown error becomes a generic 500.
 `POST /auth/login` has no `@Body()` DTO. A guard runs before a pipe, thus a DTO never executes there.
 For that reason the strategy is the single place that canonicalizes the raw credentials. The address
 goes through the shared `normalizeEmail` function (`shared/src/utils/email.ts`). A credential that is
-not a string becomes an empty string. Thus a login answers 401 and never 400.
+not a string becomes an empty string. The strategy also applies the two caps that `LoginDto` declares:
+an address over 255 characters and a password over `MAX_PASSWORD_LENGTH` (128) become an empty string
+too. It counts length with the `maxLength` function of `class-validator`, which `@MaxLength` uses.
+Thus a login answers 401 and never 400, and the lookup and the audit row never get an over-long value.
 
 **Email canonicalization.** `normalizeEmail` trims the address and makes it lowercase. The DTO
 `@Transform` decorators apply it. `LocalStrategy` applies it. The three OAuth strategies apply it. It
