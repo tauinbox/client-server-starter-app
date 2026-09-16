@@ -444,10 +444,13 @@ export class AuthService {
     );
   }
 
-  resendVerificationEmail(email: string): Observable<{ message: string }> {
+  resendVerificationEmail(
+    email: string,
+    captchaToken?: string | null
+  ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.ResendVerification,
-      { email },
+      captchaToken ? { email, captchaToken } : { email },
       { context: silentContext() }
     );
   }

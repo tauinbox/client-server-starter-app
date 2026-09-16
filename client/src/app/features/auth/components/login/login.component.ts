@@ -39,6 +39,7 @@ import type {
   MfaRequiredResponse
 } from '../../models/auth.types';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
 import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
@@ -72,6 +73,7 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
     RouterLink,
     NxsFormFieldComponent,
     PasswordToggleComponent,
+    CaptchaWidgetComponent,
     MfaChallengeComponent,
     TranslocoDirective
   ],
@@ -115,6 +117,13 @@ export class LoginComponent implements OnInit, OnDestroy {
   protected readonly emailNotVerified = signal(false);
   protected readonly resendingVerification = signal(false);
   protected readonly verificationResent = signal(false);
+
+  // The resend route carries the same soft captcha gate as register and
+  // forgot-password: the server asks for a token only once the per-address
+  // budget is nearly spent, so the widget stays hidden on the ordinary path.
+  protected readonly resendCaptchaRequired = signal(false);
+  protected readonly resendCaptchaToken = signal<string | null>(null);
+  protected readonly resendError = signal<string | null>(null);
 
   // Post-registration banner
   protected readonly pendingVerification = signal(false);
@@ -179,6 +188,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.error.set(null);
     this.emailNotVerified.set(false);
     this.verificationResent.set(false);
+    this.resendError.set(null);
     this.pendingVerification.set(false);
 
     this.#authService
@@ -217,23 +227,58 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.error.set(null);
   }
 
+  protected onResendCaptchaToken(token: string | null): void {
+    this.resendCaptchaToken.set(token);
+    if (token) {
+      this.resendError.set(null);
+    }
+  }
+
+  protected canResend(): boolean {
+    if (this.resendingVerification()) return false;
+    if (this.resendCaptchaRequired() && !this.resendCaptchaToken())
+      return false;
+    return true;
+  }
+
   resendVerification(): void {
     const email = this.loginModel().email;
-    if (!email) return;
+    if (!email || !this.canResend()) return;
 
     this.resendingVerification.set(true);
+    this.resendError.set(null);
     this.#authService
-      .resendVerificationEmail(email)
+      .resendVerificationEmail(email, this.resendCaptchaToken())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
           this.resendingVerification.set(false);
           this.verificationResent.set(true);
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
           this.resendingVerification.set(false);
+          this.#handleResendError(err);
         }
       });
+  }
+
+  // A token is spent by the attempt that carried it, so the gate always drops
+  // it and asks the widget for a fresh one.
+  #handleResendError(err: HttpErrorResponse): void {
+    const errorKey = err.error?.errorKey as string | undefined;
+    if (
+      errorKey === ErrorKeys.AUTH.CAPTCHA_REQUIRED ||
+      errorKey === ErrorKeys.AUTH.CAPTCHA_INVALID
+    ) {
+      this.resendCaptchaRequired.set(true);
+      this.resendCaptchaToken.set(null);
+      this.resendError.set(parseHttpErrorMessage(err, this.#translocoService));
+      return;
+    }
+
+    this.resendError.set(
+      this.#resolveErrorMessage(err, 'auth.login.resendVerificationFailed')
+    );
   }
 
   /** Attacker-supplied `?returnUrl=` is only followed when same-origin. */

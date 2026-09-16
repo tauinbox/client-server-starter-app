@@ -336,10 +336,10 @@ src/app/
     │   ├── password-toggle/           # PasswordToggleComponent is the reusable toggle for
     │   │                              # password visibility.
     │   └── captcha-widget/            # CaptchaWidgetComponent is the soft-trigger widget for
-    │                                  # Cloudflare Turnstile. It renders only when the register
-    │                                  # or forgot-password endpoint returns CAPTCHA_REQUIRED. It
-    │                                  # uses the CaptchaService configuration and the lazy script
-    │                                  # loader.
+    │                                  # Cloudflare Turnstile. It renders only when the register,
+    │                                  # forgot-password or resend-verification endpoint returns
+    │                                  # CAPTCHA_REQUIRED. It uses the CaptchaService configuration
+    │                                  # and the lazy script loader.
     ├── forms/              # NxsFormFieldComponent (<nxs-form-field>) is the Signal Forms
     │                       # wrapper. NxsChipsAutocompleteComponent
     │                       # (<nxs-chips-autocomplete>) is a mat-chip-grid with a

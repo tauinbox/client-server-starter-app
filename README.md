@@ -99,7 +99,8 @@ management and theming.
   address, and it tells the reader what to do if the change was not theirs. It has no action link,
   because the mailbox can be under the control of the attacker. Delivery is best effort: a mail
   failure is logged and the operation stays successful.
-- **A CAPTCHA soft trigger on register and forgot-password.** The server activates the Cloudflare
+- **A CAPTCHA soft trigger on register, forgot-password and resend-verification.** These are the
+  three unauthenticated routes that mail an address that the caller names. The server activates the Cloudflare
   Turnstile challenge only when `X-RateLimit-Remaining` is 1 or less for the IP of the caller. Thus a
   legitimate user usually does not see it.
 
@@ -1062,7 +1063,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
 | `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |
 | `ADMIN_LAST_NAME` | `User` | Last name of the initial administrator |
-| `TURNSTILE_SITE_KEY` | - | Public site key of Cloudflare Turnstile. The CAPTCHA on `/register` and `/forgot-password` stays disabled while one of the two keys is empty. Get a true pair at `dash.cloudflare.com`, then Turnstile, then Add site. It is free. The test keys (`1x00000000000000000000AA` and `1x0000000000000000000000000000000AA`) operate for local development and for CI. They are public and give no protection in production. Refer to [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
+| `TURNSTILE_SITE_KEY` | - | Public site key of Cloudflare Turnstile. The CAPTCHA on `/register`, `/forgot-password` and `/resend-verification` stays disabled while one of the two keys is empty. Get a true pair at `dash.cloudflare.com`, then Turnstile, then Add site. It is free. The test keys (`1x00000000000000000000AA` and `1x0000000000000000000000000000000AA`) operate for local development and for CI. They are public and give no protection in production. Refer to [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
 | `TURNSTILE_SECRET_KEY` | - | Secret key of Cloudflare Turnstile for the `siteverify` calls on the server. Use it with `TURNSTILE_SITE_KEY` |
 | `PADDLE_API_KEY` | - | Paddle server API key. Use it with `PADDLE_WEBHOOK_SECRET`. The two values are necessary before Paddle counts as configured |
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
@@ -1433,7 +1434,7 @@ the script is the authoritative reference for the key list.
 | `MFA_ENCRYPTION_KEY` | deploy, rebuild | `server/.env` | The AES-256-GCM key of the two-factor secret column. It is not stored with the data it protects. While the secret is empty, two-factor enrolment answers HTTP 503 and nothing else changes |
 | `MFA_REQUIRED_FOR_ADMINS` | deploy, rebuild | `server/.env` | Not a credential, but carried the same way because this is the only channel that survives a from-scratch rebuild of the host. Set it to `true` to make two-factor authentication mandatory for every account with a super role. It has no effect while `MFA_ENCRYPTION_KEY` is empty |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
-| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register` and `/forgot-password`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register`, `/forgot-password` and `/resend-verification`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
 | `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. Keep them empty until a person connects a provider |
 | `CI_JWT_SECRET` | ci.yml | - (CI tests only) | Production does not use it |
 
@@ -1486,7 +1487,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
 | GET | `/auth/oauth/:provider/callback` | None | Callback of the OAuth provider |
 | POST | `/auth/verify-email` | None | Verify an email address with a token |
-| POST | `/auth/resend-verification` | None | Send the verification email again. A deactivated account gets no token and no mail |
+| POST | `/auth/resend-verification` | None | Send the verification email again. A deactivated account gets no token and no mail. A CAPTCHA token is necessary near the rate limit |
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
 | POST | `/auth/reset-password` | None | Reset the password with a token |
@@ -1789,11 +1790,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2387 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2390 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 382 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 380 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1278 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 266 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 750 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1285 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 267 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 755 tests pass |
 
 ## CI/CD
 

@@ -1502,9 +1502,10 @@ minutes. The reset invalidates each session, clears the lockout, and sets `isEma
 The server mails the token only to `user.email`. The same transaction clears the `pendingEmail*`
 fields, thus a reset cannot confirm a change to another address that is in progress.
 
-**CAPTCHA soft trigger.** `CaptchaRequiredGuard` gates `/register` and `/forgot-password` with a
-Cloudflare Turnstile challenge. The challenge activates only when `X-RateLimit-Remaining` is 1 or
-less for the IP of the caller.
+**CAPTCHA soft trigger.** `CaptchaRequiredGuard` gates `/register`, `/forgot-password` and
+`/resend-verification` with a Cloudflare Turnstile challenge. These are the three unauthenticated
+routes that mail an address that the caller names. The challenge activates only when
+`X-RateLimit-Remaining` is 1 or less for the IP of the caller.
 
 The CAPTCHA is **disabled by default**, because the two environment variables are empty. To activate
 it in production you need a free Cloudflare account. The full steps are in
@@ -1783,7 +1784,7 @@ These routes currently replace the default limit:
 | `POST /auth/profile/email/initiate` | 1 h | 3 | The cost of a confirmation email, and enumeration mitigation |
 | `POST /auth/profile/email/confirm` | 1 min | 10 | Defense in depth against a token brute force. The token entropy already makes that infeasible |
 | `POST /auth/verify-email` | 1 min | 10 | The same |
-| `POST /auth/resend-verification` | 1 min | 3 | The cost of an email |
+| `POST /auth/resend-verification` | 1 min | 3 | The cost of an email, and the stored token is replaced on each accepted call. The CAPTCHA soft trigger starts near the limit |
 | `POST /auth/forgot-password` | 5 min | 2 | The cost of an email, and enumeration mitigation. The CAPTCHA soft trigger starts near the limit |
 | `POST /auth/reset-password` | 1 min | 10 | Defense in depth against a token brute force |
 | `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token, and the payload id it carries is spendable once. The limit bounds the attempts around both |
@@ -1802,9 +1803,10 @@ A rejected request gets the standard `429` answer with
 
 ## Enabling CAPTCHA in production
 
-The CAPTCHA on `/register` and `/forgot-password` is **disabled by default**. After a deploy, only
-the rate limiter protects the two endpoints. The limits are 5 requests each hour for the register
-route, and 2 requests each 5 minutes for the forgot-password route, for each IP.
+The CAPTCHA on `/register`, `/forgot-password` and `/resend-verification` is **disabled by default**.
+After a deploy, only the rate limiter protects the three endpoints. The limits are 5 requests each
+hour for the register route, 2 requests each 5 minutes for the forgot-password route, and 3 requests
+each minute for the resend-verification route, for each IP.
 
 Do these steps to enable a Cloudflare Turnstile soft-trigger challenge. The challenge then activates
 when an IP comes near the rate limit.

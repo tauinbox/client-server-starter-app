@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { HttpException, Logger, UnauthorizedException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Request as ExpressRequest, Response } from 'express';
 import { AuthController } from './auth.controller';
 import { MfaService } from '../services/mfa.service';
@@ -870,6 +871,23 @@ describe('AuthController', () => {
         'resend@example.com'
       );
       expect(result).toEqual({ message: 'sent' });
+    });
+
+    // The route mails a caller-named address and rotates the stored token on
+    // every call, so it carries the same soft captcha gate as its two mailing
+    // siblings. Descriptor lookup instead of a direct method reference: the
+    // handler is only a Reflect metadata target here, never invoked.
+    it('carries the captcha gate, like register and forgot-password', () => {
+      const guardsOf = (method: string): unknown[] =>
+        (Reflect.getMetadata(
+          GUARDS_METADATA,
+          Object.getOwnPropertyDescriptor(AuthController.prototype, method)!
+            .value as object
+        ) as unknown[]) ?? [];
+
+      expect(guardsOf('resendVerification')).toContain(CaptchaRequiredGuard);
+      expect(guardsOf('register')).toContain(CaptchaRequiredGuard);
+      expect(guardsOf('forgotPassword')).toContain(CaptchaRequiredGuard);
     });
   });
 

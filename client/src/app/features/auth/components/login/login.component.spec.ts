@@ -58,6 +58,7 @@ describe('LoginComponent', () => {
     login: ReturnType<typeof vi.fn>;
     verifyMfa: ReturnType<typeof vi.fn>;
     verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
+    resendVerificationEmail: ReturnType<typeof vi.fn>;
   };
   let featureFlagServiceMock: {
     getEvaluatedFlags: ReturnType<typeof vi.fn>;
@@ -72,7 +73,8 @@ describe('LoginComponent', () => {
     authServiceMock = {
       login: vi.fn(),
       verifyMfa: vi.fn(),
-      verifyMfaRecoveryCode: vi.fn()
+      verifyMfaRecoveryCode: vi.fn(),
+      resendVerificationEmail: vi.fn()
     };
     featureFlagServiceMock = {
       getEvaluatedFlags: vi
@@ -108,6 +110,115 @@ describe('LoginComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('resend verification captcha gate', () => {
+    const captchaError = new HttpErrorResponse({
+      error: {
+        message: 'Captcha verification is required',
+        errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+      },
+      status: 400
+    });
+
+    async function reachResend(): Promise<void> {
+      component.loginModel.set({
+        email: 'unverified@example.com',
+        password: 'Password1'
+      });
+      await fixture.whenStable();
+    }
+
+    it('shows the widget and blocks the button on CAPTCHA_REQUIRED', async () => {
+      authServiceMock.resendVerificationEmail.mockReturnValueOnce(
+        throwError(() => captchaError)
+      );
+      await reachResend();
+
+      component.resendVerification();
+
+      expect(component['resendCaptchaRequired']()).toBe(true);
+      expect(component['canResend']()).toBe(false);
+      expect(component['resendError']()).toBe(
+        'Please complete the CAPTCHA challenge to continue.'
+      );
+      expect(component['verificationResent']()).toBe(false);
+    });
+
+    it('carries the token on the retry and confirms the send', async () => {
+      authServiceMock.resendVerificationEmail
+        .mockReturnValueOnce(throwError(() => captchaError))
+        .mockReturnValueOnce(of({ message: 'sent' }));
+      await reachResend();
+
+      component.resendVerification();
+      component['onResendCaptchaToken']('turnstile-token');
+
+      expect(component['resendError']()).toBeNull();
+      expect(component['canResend']()).toBe(true);
+
+      component.resendVerification();
+
+      expect(authServiceMock.resendVerificationEmail).toHaveBeenLastCalledWith(
+        'unverified@example.com',
+        'turnstile-token'
+      );
+      expect(component['verificationResent']()).toBe(true);
+    });
+
+    it('sends no request while the gate waits for a token', async () => {
+      authServiceMock.resendVerificationEmail.mockReturnValueOnce(
+        throwError(() => captchaError)
+      );
+      await reachResend();
+
+      component.resendVerification();
+      component.resendVerification();
+
+      expect(authServiceMock.resendVerificationEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the spent token when the gate refuses it', async () => {
+      authServiceMock.resendVerificationEmail
+        .mockReturnValueOnce(throwError(() => captchaError))
+        .mockReturnValueOnce(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                error: {
+                  message: 'Captcha verification failed',
+                  errorKey: ErrorKeys.AUTH.CAPTCHA_INVALID
+                },
+                status: 400
+              })
+          )
+        );
+      await reachResend();
+
+      component.resendVerification();
+      component['onResendCaptchaToken']('stale-token');
+      component.resendVerification();
+
+      expect(component['resendCaptchaToken']()).toBeNull();
+      expect(component['canResend']()).toBe(false);
+      expect(component['resendError']()).toBe(
+        'CAPTCHA verification failed. Please try again.'
+      );
+    });
+
+    it('reports an ordinary failure with the client fallback', async () => {
+      authServiceMock.resendVerificationEmail.mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({ error: null, status: 500 }))
+      );
+      await reachResend();
+
+      component.resendVerification();
+
+      expect(component['resendCaptchaRequired']()).toBe(false);
+      expect(component['resendError']()).toBe(
+        'The verification email could not be sent. Please try again.'
+      );
+    });
   });
 
   describe('second factor', () => {

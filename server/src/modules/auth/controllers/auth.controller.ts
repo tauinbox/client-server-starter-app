@@ -460,6 +460,7 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @UseGuards(CaptchaRequiredGuard)
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resend email verification link' })
