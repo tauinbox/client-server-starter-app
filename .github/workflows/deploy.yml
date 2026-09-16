@@ -283,7 +283,17 @@ jobs:
             bash scripts/sync-prod-env.sh
 
             docker compose pull
-            docker compose up -d --remove-orphans
+            # Bound `up -d` so this script, not the SSH client, decides what
+            # happens when a start goes slow. compose blocks indefinitely on a
+            # depends_on target stuck in `health: starting`, and on 2026-09-16
+            # that ate the whole 10 m `command_timeout` twice: the health loop,
+            # the rollback branch and the `.deployed-sha` write below never ran,
+            # so production served an unrecorded release. 300 s clears a healthy
+            # start by a wide margin and still leaves the health loop and the
+            # rollback room inside the budget. `set -euo pipefail` is in force,
+            # so the `|| echo` is required: without it a `timeout` exit of 124
+            # aborts the script exactly as the SSH timeout did.
+            timeout 300 docker compose up -d --remove-orphans || echo "up -d did not return in 300s - continuing to the health check"
 
             # Grafana reads the provisioning directory at startup only, and the
             # directory is a bind mount, so `up -d` above does not recreate the
@@ -347,7 +357,9 @@ jobs:
             git checkout "${PREV_SHA}" -- docker-compose.yml
 
             docker compose down
-            docker compose up -d
+            # Bounded for the same reason as the deploy path above: the
+            # rollback must reach its own health check even if a start hangs.
+            timeout 300 docker compose up -d || echo "up -d did not return in 300s - continuing to the health check"
 
             # Verify rollback health
             ELAPSED=0

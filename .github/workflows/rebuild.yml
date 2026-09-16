@@ -274,7 +274,14 @@ jobs:
             bash scripts/sync-prod-env.sh
 
             docker compose pull
-            docker compose up -d --remove-orphans
+            # Bound `up -d` so this script, not the SSH client, decides what
+            # happens when a start goes slow. compose blocks indefinitely on a
+            # depends_on target stuck in `health: starting`, which on 2026-09-16
+            # consumed the whole 10 m `command_timeout` on the deploy path and
+            # left the health loop, the rollback and the `.deployed-sha` write
+            # unreachable. `set -euo pipefail` is in force, so the `|| echo` is
+            # required: without it a `timeout` exit of 124 aborts the script.
+            timeout 300 docker compose up -d --remove-orphans || echo "up -d did not return in 300s - continuing to the health check"
 
             # Require ALL services with healthcheck to be healthy
             EXPECTED=$(docker compose config 2>/dev/null | grep -c 'healthcheck:' || true)
@@ -316,7 +323,9 @@ jobs:
               docker tag "ghcr.io/${OWNER}/nexus-server:pre-rebuild" "ghcr.io/${OWNER}/nexus-server:latest"
               docker tag "ghcr.io/${OWNER}/nexus-client:pre-rebuild" "ghcr.io/${OWNER}/nexus-client:latest"
               docker compose down
-              docker compose up -d
+              # Bounded for the same reason as the rebuild path above: the
+              # rollback must reach its own health check even if a start hangs.
+              timeout 300 docker compose up -d || echo "up -d did not return in 300s - continuing to the health check"
 
               ELAPSED=0
               ROLLBACK_HEALTHY=0

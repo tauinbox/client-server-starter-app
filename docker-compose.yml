@@ -179,7 +179,15 @@ services:
       start_period: 20s
     depends_on:
       server:
-        condition: service_healthy
+        # Prometheus scrapes on its own schedule and retries a target that
+        # does not answer, so it depends on start ordering only, and not on
+        # backend health. A service_healthy gate made `docker compose up -d`
+        # wait until the server became healthy, which did not occur on a
+        # starved host: the deploy script lost its whole SSH budget before its
+        # health check, its rollback and its bookkeeping, and production ran a
+        # release that no file on the host recorded. The gate also held back
+        # monitoring in the window where monitoring is most necessary.
+        condition: service_started
     # Memory grows with active series and 30d TSDB retention (peak ~93 MiB).
     mem_limit: 192m
     cap_drop:
