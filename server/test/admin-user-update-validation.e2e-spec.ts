@@ -46,7 +46,10 @@ describe('Admin user update DTO validation (e2e)', () => {
           useValue: { sendPasswordChangedNotification: jest.fn() }
         },
         { provide: MetricsService, useValue: {} },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } }
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn(), emitAsync: jest.fn() }
+        }
       ]
     })
       .overrideGuard(PermissionsGuard)

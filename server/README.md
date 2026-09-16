@@ -1467,7 +1467,9 @@ issues a new hashed token and sends a verification email. It also revokes each s
 through `UserSessionRevocationRequiredEvent`, which the code awaits as it awaits an administrator
 password change. A person moves an address to recover an account, thus the access token and the
 refresh tokens of the previous holder must die with it. A resubmitted address that does not change
-revokes nothing.
+revokes nothing. A deactivation (`isActive` set to false) revokes each session through the same
+event. The refresh flow does not read `tokenRevokedAt`, thus the refresh tokens must go, or a later
+re-activation makes them valid again.
 
 The server enforces the uniqueness of the address. A conflict answers HTTP 409 with
 `errorKey: errors.users.emailExists`.
@@ -2313,7 +2315,7 @@ name as the gate. Thus a later reader can go from the code to the configuration 
 | GET | `/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. `isActive` and `includeDeleted` accept `true` or `false` only, and each other value is a 400 |
 | GET | `/:id` | `users:read` | Get a user by ID |
 | GET | `/:id/permissions` | `users:read` | Get the effective permissions of a user: the roles, the resolved permissions and the packed CASL rules |
-| PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A real email move revokes each session of the target and writes a second audit row, `USER_EMAIL_CHANGE_COMPLETE` with `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row records field names only. The server does not mail the previous address, because this path recovers an account whose address an attacker holds. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target |
+| PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, a real email move and a deactivation each revoke each session of the target. A real email move also writes a second audit row, `USER_EMAIL_CHANGE_COMPLETE` with `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row records field names only. The server does not mail the previous address, because this path recovers an account whose address an attacker holds. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target |
 | DELETE | `/:id` | `users:delete` | Soft-delete a user. It sets `deleted_at` and revokes each active session |
 | POST | `/:id/restore` | `users:delete` | Restore a soft-deleted user. It clears `deleted_at` and sets `isActive=true` |
 

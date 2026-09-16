@@ -505,6 +505,30 @@ describe('UsersController', () => {
       expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
     });
 
+    it('should await session revocation when the admin deactivates the account', async () => {
+      const dto: UpdateUserDto = { isActive: false };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledTimes(1);
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserSessionRevocationRequiredEvent.name,
+        expect.objectContaining({ userId: 'user-5' })
+      );
+    });
+
+    it('should NOT request session revocation when the admin activates the account', async () => {
+      const dto: UpdateUserDto = { isActive: true };
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+    });
+
     it('should fail the request when session revocation fails', async () => {
       const dto: UpdateUserDto = { firstName: 'Updated', password: 'NewPass1' };
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
