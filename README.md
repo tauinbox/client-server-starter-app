@@ -1031,7 +1031,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
-| `JWT_SECRET` | - | HS256 secret, a minimum of 16 characters. It is necessary when `JWT_ALGORITHM=HS256` |
+| `JWT_SECRET` | - | HS256 secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
 | `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
 | `JWT_PUBLIC_KEY` | - | RSA public key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
 | `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it for key rotation |
@@ -1436,7 +1436,7 @@ the script is the authoritative reference for the key list.
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register`, `/forgot-password` and `/resend-verification`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
 | `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. Keep them empty until a person connects a provider |
-| `CI_JWT_SECRET` | ci.yml | - (CI tests only) | Production does not use it |
+| `CI_JWT_SECRET` | ci.yml | - (CI tests only) | Production does not use it. The `Server E2E` job runs on HS256, thus the value must hold a minimum of 32 characters |
 
 > **Caution about `DB_PASSWORD`.** Postgres writes the password into its data volume at the first
 > initialization. A change of the `DB_PASSWORD` secret does **not** change the key of an existing
@@ -1790,7 +1790,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2390 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2392 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 382 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 380 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1285 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 267 tests pass |

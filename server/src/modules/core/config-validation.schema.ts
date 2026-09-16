@@ -25,10 +25,13 @@ export const configValidationSchema = Joi.object({
   DB_USER: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
   JWT_ALGORITHM: Joi.string().valid('HS256', 'RS256').default('HS256'),
-  JWT_SECRET: Joi.string().min(16).when('JWT_ALGORITHM', {
+  JWT_SECRET: Joi.string().when('JWT_ALGORITHM', {
     is: 'RS256',
     then: Joi.optional(),
-    otherwise: Joi.required()
+    // RFC 7518 section 3.2: an HS256 key must be at least the hash output size,
+    // that is 256 bits. The floor stays off the RS256 branch, where the value is
+    // unused, so a legacy secret in the file cannot refuse the boot.
+    otherwise: Joi.string().min(32).required()
   }),
   JWT_PRIVATE_KEY: Joi.string().when('JWT_ALGORITHM', {
     is: 'RS256',
