@@ -1292,6 +1292,12 @@ builds the Docker images locally and scans them with Trivy for HIGH and CRITICAL
 to GHCR only after the two scans pass. Then it deploys to the VPS with health checks and an automatic
 rollback.
 
+Each `docker compose up -d` on the host has a bound of `timeout 300`. Compose waits without a limit
+for a `depends_on` target that stays in `health: starting`, and such a wait consumed the whole SSH
+budget of two deploys on 2026-09-16. The health check, the rollback and the write of `.deployed-sha`
+all come after that command, thus an unbounded wait left production with a release that no file on
+the host recorded. The bound gives the decision back to the deploy script.
+
 Grafana reads `monitoring/grafana/provisioning/` at startup only, and that directory is a bind mount.
 Thus `docker compose up -d` does not apply a changed alert rule, datasource or contact point. The
 deploy compares the directory against the commit of the last successful deploy, and it restarts the

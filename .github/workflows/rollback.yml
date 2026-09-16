@@ -222,8 +222,15 @@ jobs:
             # :latest in the registry now points to the target SHA (retagged above)
             docker compose pull
 
-            # force-recreate ensures containers restart even if compose detects no tag change
-            docker compose up -d --force-recreate --remove-orphans
+            # force-recreate ensures containers restart even if compose detects no tag change.
+            # Bounded so this script, not the SSH client, decides what happens
+            # when a start goes slow: compose blocks indefinitely on a
+            # depends_on target stuck in `health: starting`, and an unbounded
+            # wait here would leave the health check and the `.deployed-sha`
+            # write below unreachable. `set -euo pipefail` is in force, so the
+            # `|| echo` is required: without it a `timeout` exit of 124 aborts
+            # the script.
+            timeout 300 docker compose up -d --force-recreate --remove-orphans || echo "up -d did not return in 300s - continuing to the health check"
 
             # Health check with timeout — require ALL services with healthcheck to be healthy
             EXPECTED=$(docker compose config 2>/dev/null | grep -c 'healthcheck:' || true)
