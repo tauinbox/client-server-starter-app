@@ -102,7 +102,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `DB_LOGGER` | - | TypeORM logger type, for example `advanced-console` or `file`. A value replaces the default logger |
 | `REQUEST_LOG_LEVEL` | `all` | Request logging level. `all` logs each request. `warn` logs a 4xx and a 5xx. `error` logs a 5xx |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
-| `JWT_SECRET` | - | Symmetric secret, a minimum of 16 characters. It is necessary when `JWT_ALGORITHM=HS256` |
+| `JWT_SECRET` | - | Symmetric secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
 | `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
 | `JWT_PUBLIC_KEY` | - | RSA public key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
 | `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it during key rotation |

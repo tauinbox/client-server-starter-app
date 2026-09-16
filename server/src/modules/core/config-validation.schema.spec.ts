@@ -12,7 +12,7 @@ const validEnv = {
   DB_NAME: 'db',
   DB_USER: 'user',
   DB_PASSWORD: 'pass',
-  JWT_SECRET: 'a-secret-of-sufficient-length',
+  JWT_SECRET: 'a-jwt-secret-of-thirty-two-chars',
   JWT_EXPIRATION: '3600',
   JWT_REFRESH_EXPIRATION: '604800'
 };
@@ -142,6 +142,40 @@ describe('configValidationSchema', () => {
     const { error } = configValidationSchema.validate(env, options);
 
     expect(error?.message).toContain('JWT_SECRET');
+  });
+
+  it('refuses an HS256 JWT_SECRET below 32 characters', () => {
+    const tooShort = 'a-jwt-secret-of-thirty-two-char';
+    expect(tooShort).toHaveLength(31);
+
+    const { error } = configValidationSchema.validate(
+      { ...validEnv, JWT_SECRET: tooShort },
+      options
+    );
+
+    expect(error?.message).toContain('JWT_SECRET');
+
+    const atTheFloor = configValidationSchema.validate(
+      { ...validEnv, JWT_SECRET: `${tooShort}s` },
+      options
+    );
+
+    expect(atTheFloor.error).toBeUndefined();
+  });
+
+  it('does not apply the HS256 length floor to an unused RS256 JWT_SECRET', () => {
+    const { error } = configValidationSchema.validate(
+      {
+        ...validEnv,
+        JWT_ALGORITHM: 'RS256',
+        JWT_SECRET: 'short',
+        JWT_PRIVATE_KEY: 'private-key',
+        JWT_PUBLIC_KEY: 'public-key'
+      },
+      options
+    );
+
+    expect(error).toBeUndefined();
   });
 
   it('requires key material instead of JWT_SECRET when the algorithm is RS256', () => {
