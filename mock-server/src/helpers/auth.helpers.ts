@@ -5,6 +5,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import {
   buildAbilityForUser,
   findUserById,
+  getState,
   isSessionLive,
   logAudit,
   mustEnrolMfa
@@ -192,4 +193,22 @@ export function pruneOldestUserTokens(
       refreshTokens.delete(userTokens[i]);
     }
   }
+}
+
+// Mirrors the server: a password change nulls the reset columns and the
+// pending-email trio in the same write, so a link mailed before the change
+// cannot take the account after it.
+export function clearMailedProofs(user: MockUser): void {
+  const state = getState();
+  for (const [token, issued] of state.passwordResetTokens.entries()) {
+    if (issued.userId === user.id) {
+      state.passwordResetTokens.delete(token);
+    }
+  }
+  if (user.pendingEmailToken) {
+    state.pendingEmailTokens.delete(user.pendingEmailToken);
+  }
+  user.pendingEmail = null;
+  user.pendingEmailToken = null;
+  user.pendingEmailExpiresAt = null;
 }

@@ -254,6 +254,14 @@ export class UsersService {
       // the record at all, and before the hash.
       await this.breachedPasswordService.assertNotBreached(rest.password);
       changes.password = await bcrypt.hash(rest.password, BCRYPT_SALT_ROUNDS);
+      // A password change voids every mailed proof of ownership, the same rule
+      // resetPassword states: a link kept from before the change must not still
+      // take the account, and neither must an email change in flight.
+      changes.passwordResetToken = null;
+      changes.passwordResetExpiresAt = null;
+      changes.pendingEmail = null;
+      changes.pendingEmailToken = null;
+      changes.pendingEmailExpiresAt = null;
     }
 
     if (unlockAccount) {

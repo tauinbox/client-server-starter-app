@@ -41,7 +41,11 @@ import {
   sessionAgeMs,
   toUserResponse
 } from '../state';
-import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
+import {
+  authGuard,
+  clearMailedProofs,
+  pruneOldestUserTokens
+} from '../helpers/auth.helpers';
 import {
   buildMockUser,
   validateCreateUserBody
@@ -844,6 +848,7 @@ router.patch('/profile', authGuard, (req, res) => {
   if (password !== undefined) {
     user.password = password;
     user.tokenRevokedAt = new Date().toISOString();
+    clearMailedProofs(user);
 
     logAudit('PASSWORD_CHANGE', {
       actorId: user.id,

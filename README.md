@@ -1487,7 +1487,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
 | POST | `/auth/logout` | Bearer | Log out this device. It ends the session the `refresh_token` cookie belongs to, leaves the other devices signed in, and cancels a started OAuth link. It answers `Clear-Site-Data` |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
-| PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only |
+| PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
 | POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires the current password. Rejects an account with OAuth only |
 | POST | `/auth/profile/email/confirm` | None | Confirm an email change with the token from the new address. Applies the change in a transaction and revokes each session |
 | GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
@@ -1508,7 +1508,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
-| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change or an email change revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'` |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change or an email change revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/roles` | `roles:create` | Create a role |
@@ -1796,11 +1796,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2392 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 382 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 380 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2394 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 385 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 383 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1285 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 267 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 755 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 758 tests pass |
 
 ## CI/CD
 
@@ -1889,6 +1889,11 @@ a second request to the registry for a verdict that gates nothing.
   enrols.
 - A **password reset token** is single-use and expires in 30 minutes. The reset revokes each session.
 - An **administrator password change** immediately revokes each session of the target user.
+- **Each password change voids the mailed proofs of ownership.** The self-service change and the
+  administrator change both clear `passwordResetToken`, `passwordResetExpiresAt` and the
+  `pendingEmail` trio in the same write. Thus a reset link kept from before the change, and a
+  confirmation link for an email change in progress, are both dead after the change. The reset path
+  has cleared the same five columns since it was written.
 - An **administrator email change** does the same. The endpoint exists to recover an account whose
   address an attacker controls. Thus the previous holder must not continue to authenticate with the
   tokens from before the change. A resubmitted address that does not change revokes nothing.

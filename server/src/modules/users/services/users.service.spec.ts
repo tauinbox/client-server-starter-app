@@ -452,9 +452,61 @@ describe('UsersService', () => {
         'NewPassword1',
         BCRYPT_SALT_ROUNDS
       );
-      expect(mockRepository.merge).toHaveBeenCalledWith(mockUser, {
-        password: 'new-hashed'
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        mockUser,
+        expect.objectContaining({ password: 'new-hashed' })
+      );
+    });
+
+    it('voids the mailed reset token and the pending email change on a password change', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordResetToken: 'hashed-reset-token',
+        passwordResetExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        pendingEmail: 'attacker@example.com',
+        pendingEmailToken: 'hashed-pending-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
       });
+      mockRepository.save.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
+
+      await service.update(
+        'user-1',
+        { password: 'NewPassword1' },
+        SYSTEM_ABILITY
+      );
+
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null
+        })
+      );
+    });
+
+    it('leaves the mailed proofs alone on an update that carries no password', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordResetToken: 'hashed-reset-token',
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-pending-token'
+      });
+      mockRepository.save.mockResolvedValue(mockUser);
+
+      await service.update('user-1', { firstName: 'Updated' }, SYSTEM_ABILITY);
+
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.not.objectContaining({ passwordResetToken: null })
+      );
+      expect(mockRepository.merge).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.not.objectContaining({ pendingEmailToken: null })
+      );
     });
 
     it('refuses a breached password before it hashes anything', async () => {
