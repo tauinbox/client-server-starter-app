@@ -365,6 +365,15 @@ export function addOAuthAccounts(
   state.oauthAccounts.set(userId, [...existing, ...accounts]);
 }
 
+// Mirrors AUDIT_FIELD_MAX_LENGTH in the server AuditService: the audit columns
+// are unbounded, so every string field is capped at write time.
+const AUDIT_FIELD_MAX_LENGTH = 255;
+
+function capAuditField(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  return value.slice(0, AUDIT_FIELD_MAX_LENGTH);
+}
+
 export function logAudit(
   action: string,
   opts: {
@@ -381,12 +390,12 @@ export function logAudit(
     id: crypto.randomUUID(),
     action,
     actorId: opts.actorId ?? null,
-    actorEmail: opts.actorEmail ?? null,
-    targetId: opts.targetId ?? null,
-    targetType: opts.targetType ?? null,
+    actorEmail: capAuditField(opts.actorEmail),
+    targetId: capAuditField(opts.targetId),
+    targetType: capAuditField(opts.targetType),
     details: opts.details ?? null,
-    ipAddress: opts.ip ?? null,
-    requestId: opts.requestId ?? null,
+    ipAddress: capAuditField(opts.ip),
+    requestId: capAuditField(opts.requestId),
     createdAt: new Date().toISOString()
   };
   state.auditLogs.push(entry);

@@ -7,7 +7,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
+import { AuditService } from '../src/modules/audit/audit.service';
+import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
@@ -76,5 +79,30 @@ runWithInfra('Login email normalization (e2e)', () => {
       .post('/api/v1/auth/login')
       .send({ email: { $ne: null }, password })
       .expect(401);
+  }, 30000);
+
+  // `LoginDto` caps the address at 255, but the pipe never runs on this route.
+  // The strategy applies the cap, so the refusal stays a 401 and neither the
+  // lookup nor the audit row receives the oversized value.
+  it('rejects an over-long address as invalid credentials without passing it on', async () => {
+    const lookup = jest.spyOn(app.get(UsersService), 'findByEmail');
+    const audit = jest.spyOn(app.get(AuditService), 'logFireAndForget');
+    try {
+      await request(http())
+        .post('/api/v1/auth/login')
+        .send({ email: `${'a'.repeat(10_000)}@example.com`, password })
+        .expect(401);
+
+      expect(lookup).toHaveBeenCalledWith('');
+      expect(audit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGIN_FAILURE,
+          actorEmail: ''
+        })
+      );
+    } finally {
+      lookup.mockRestore();
+      audit.mockRestore();
+    }
   }, 30000);
 });

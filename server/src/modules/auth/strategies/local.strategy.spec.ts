@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { LocalStrategy } from './local.strategy';
+import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 import { AuthService } from '../services/auth.service';
 import type { UserResponseDto } from '../../users/dtos/user-response.dto';
 
@@ -71,6 +72,55 @@ describe('LocalStrategy', () => {
       expect(authServiceMock.validateUser).toHaveBeenCalledWith(
         'test@example.com',
         ''
+      );
+    });
+
+    it('collapses an address over 255 characters to an ordinary failed credential', async () => {
+      const address = `${'a'.repeat(250)}@x.com`;
+      expect(address).toHaveLength(256);
+
+      await strategy.validate(address, 'Password1');
+
+      expect(authServiceMock.validateUser).toHaveBeenCalledWith(
+        '',
+        'Password1'
+      );
+    });
+
+    it('keeps an address of exactly 255 characters', async () => {
+      const address = `${'a'.repeat(249)}@x.com`;
+
+      await strategy.validate(address, 'Password1');
+
+      expect(authServiceMock.validateUser).toHaveBeenCalledWith(
+        address,
+        'Password1'
+      );
+    });
+
+    it(`collapses a password over ${MAX_PASSWORD_LENGTH} characters to an ordinary failed credential`, async () => {
+      await strategy.validate(
+        'test@example.com',
+        'a'.repeat(MAX_PASSWORD_LENGTH + 1)
+      );
+
+      expect(authServiceMock.validateUser).toHaveBeenCalledWith(
+        'test@example.com',
+        ''
+      );
+    });
+
+    // The anti-lockout case: `@MaxLength` counts a surrogate pair as one
+    // character, so a password of 128 emoji passed the DTO when it was set.
+    it(`keeps a password of ${MAX_PASSWORD_LENGTH} astral characters`, async () => {
+      const password = '\u{1F600}'.repeat(MAX_PASSWORD_LENGTH);
+      expect(password.length).toBeGreaterThan(MAX_PASSWORD_LENGTH);
+
+      await strategy.validate('test@example.com', password);
+
+      expect(authServiceMock.validateUser).toHaveBeenCalledWith(
+        'test@example.com',
+        password
       );
     });
 
