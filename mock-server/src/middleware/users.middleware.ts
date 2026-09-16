@@ -32,6 +32,7 @@ import {
 } from '../state';
 import {
   assertInstancePermission,
+  clearMailedProofs,
   permissionGuard
 } from '../helpers/auth.helpers';
 import {
@@ -427,6 +428,7 @@ router.patch(
       user.password = password;
       // Invalidate target user's sessions so attacker cannot keep access after admin password reset
       revokeUserSessions(user);
+      clearMailedProofs(user);
     }
     if (isActive !== undefined) {
       // Keyed on the submitted value and not on a transition, because the
