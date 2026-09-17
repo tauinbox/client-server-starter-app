@@ -7,6 +7,8 @@
     "password": "Password",
     "passwordRequired": "Password is required",
     "registrationPendingVerification": "Registration successful! Please check your email to verify your account before logging in.",
+    "passwordChanged": "Your password was changed and every session was ended. Sign in with the new password.",
+    "passwordChangedEmailPending": "Your password was changed and every session was ended. Sign in with the new password. A confirmation link was sent to your new email address.",
     "lockoutCountdown": "Try again in {{ seconds }} seconds",
     "verificationSent": "Verification email sent! Check your inbox.",
     "sending": "Sending...",

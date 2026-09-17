@@ -80,6 +80,11 @@ import {
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { passwordByteLimit } from '@shared/forms/password-byte-limit';
+import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import {
+  PASSWORD_CHANGED,
+  PASSWORD_CHANGED_PARAM
+} from '../../constants/password-changed.const';
 
 type ProfileData = {
   email: string;
@@ -887,6 +892,10 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         complete: () => {
           this.saving.set(false);
+          if (savedUser && updateData?.password) {
+            this.#endSessionAfterPasswordChange(emailInitiated);
+            return;
+          }
           this.#applySavedProfile(savedUser);
           this.#notify.success(
             this.#successKey(newEmail !== null, !!savedUser)
@@ -1090,6 +1099,24 @@ export class ProfileComponent implements OnInit {
     }
 
     return updateData;
+  }
+
+  /**
+   * The server has already revoked every session, including this one, so the
+   * token in memory is dead: `logout()` would post it and get a 401. Clearing
+   * the persisted user also signs out the other tabs.
+   */
+  #endSessionAfterPasswordChange(emailInitiated: boolean): void {
+    this.#authService.cancelRefresh();
+    this.#authService.clearSession();
+    void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
+      queryParams: {
+        [PASSWORD_CHANGED_PARAM]: emailInitiated
+          ? PASSWORD_CHANGED.EmailPending
+          : PASSWORD_CHANGED.Done
+      },
+      replaceUrl: true
+    });
   }
 
   #successKey(emailChanging: boolean, profileSaved: boolean): string {

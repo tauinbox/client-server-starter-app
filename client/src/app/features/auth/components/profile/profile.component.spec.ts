@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
@@ -58,6 +58,8 @@ describe('ProfileComponent', () => {
     initOAuthLink: ReturnType<typeof vi.fn>;
     initOAuthReauth: ReturnType<typeof vi.fn>;
     startMfaSetup: ReturnType<typeof vi.fn>;
+    cancelRefresh: ReturnType<typeof vi.fn>;
+    clearSession: ReturnType<typeof vi.fn>;
   };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
@@ -89,7 +91,9 @@ describe('ProfileComponent', () => {
             'otpauth://totp/Nexus:test@example.com?secret=JBSWY3DPEHPK3PXP',
           qrDataUrl: 'data:image/png;base64,AAAA'
         })
-      )
+      ),
+      cancelRefresh: vi.fn(),
+      clearSession: vi.fn()
     };
     featureFlagServiceMock = {
       getEvaluatedFlags: vi
@@ -686,7 +690,7 @@ describe('ProfileComponent', () => {
       expect(component['saving']()).toBe(false);
     });
 
-    it('should reset password and currentPassword fields after successful update', async () => {
+    it('clears the password fields after a save without a password', async () => {
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
@@ -694,16 +698,67 @@ describe('ProfileComponent', () => {
         email: 'test@example.com',
         firstName: 'Updated',
         lastName: 'User',
-        currentPassword: 'CurrentPass1',
-        password: 'NewPassword1',
-        confirmPassword: 'NewPassword1'
+        currentPassword: 'typed-but-unused',
+        password: '',
+        confirmPassword: ''
       });
       await fixture.whenStable();
       component.onSubmit();
 
-      expect(component.profileModel().password).toBe('');
-      expect(component.profileModel().confirmPassword).toBe('');
       expect(component.profileModel().currentPassword).toBe('');
+      expect(authServiceMock.clearSession).not.toHaveBeenCalled();
+    });
+
+    describe('after a password change', () => {
+      async function submitPasswordChange(): Promise<void> {
+        component.profileModel.set({
+          email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User',
+          currentPassword: 'CurrentPass1',
+          password: 'NewPassword1',
+          confirmPassword: 'NewPassword1'
+        });
+        await fixture.whenStable();
+        component.onSubmit();
+      }
+
+      it('ends the local session and opens the login page with a marker', async () => {
+        authServiceMock.updateProfile.mockReturnValue(of(mockUser));
+        const navigate = vi
+          .spyOn(TestBed.inject(Router), 'navigate')
+          .mockResolvedValue(true);
+
+        await submitPasswordChange();
+
+        expect(authServiceMock.cancelRefresh).toHaveBeenCalledOnce();
+        expect(authServiceMock.clearSession).toHaveBeenCalledOnce();
+        expect(navigate).toHaveBeenCalledWith(['/login'], {
+          queryParams: { password_changed: '1' },
+          replaceUrl: true
+        });
+        // The snackbar would vanish with the page; the login page says it.
+        expect(notifyMock.success).not.toHaveBeenCalled();
+        expect(component['saving']()).toBe(false);
+      });
+
+      it('keeps the session when the server refuses the change', async () => {
+        authServiceMock.updateProfile.mockReturnValue(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                error: { message: 'Wrong password' },
+                status: 400
+              })
+          )
+        );
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+
+        await submitPasswordChange();
+
+        expect(authServiceMock.clearSession).not.toHaveBeenCalled();
+        expect(navigate).not.toHaveBeenCalled();
+      });
     });
 
     it('should set error on update failure', async () => {
@@ -1065,6 +1120,31 @@ describe('ProfileComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
     }
+
+    it('tells the login page that a link was sent when the password changed too', async () => {
+      const navigate = vi
+        .spyOn(TestBed.inject(Router), 'navigate')
+        .mockResolvedValue(true);
+      component.profileModel.set({
+        email: 'new@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        currentPassword: 'Password1',
+        password: 'NewPassword1',
+        confirmPassword: 'NewPassword1'
+      });
+      await fixture.whenStable();
+
+      component.onSubmit();
+      await fixture.whenStable();
+
+      expect(authServiceMock.initiateEmailChange).toHaveBeenCalled();
+      expect(authServiceMock.clearSession).toHaveBeenCalledOnce();
+      expect(navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { password_changed: 'email-pending' },
+        replaceUrl: true
+      });
+    });
 
     it('persists the name typed alongside the new email', async () => {
       component.profileModel.set({

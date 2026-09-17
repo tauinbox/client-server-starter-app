@@ -12,6 +12,17 @@
         </div>
       }
 
+      @if (passwordChanged(); as changed) {
+        <div class="info-message">
+          <mat-icon>lock_reset</mat-icon>
+          <span>{{
+            changed === passwordChangedValues.EmailPending
+              ? t('auth.login.passwordChangedEmailPending')
+              : t('auth.login.passwordChanged')
+          }}</span>
+        </div>
+      }
+
       @if (mfaChallenge(); as challenge) {
         <nxs-mfa-challenge
           [challenge]="challenge"
