@@ -371,6 +371,33 @@ describe('LoginComponent', () => {
     });
   });
 
+  describe('password_changed query parameter', () => {
+    const renderWith = (value?: string): HTMLElement => {
+      if (value !== undefined) queryParams['password_changed'] = value;
+      const bannerFixture = TestBed.createComponent(LoginComponent);
+      bannerFixture.detectChanges();
+      return bannerFixture.nativeElement as HTMLElement;
+    };
+
+    it('says the password changed and every session ended', () => {
+      expect(renderWith('1').textContent).toContain(
+        'Your password was changed and every session was ended.'
+      );
+    });
+
+    it('also mentions the confirmation link when an email change is pending', () => {
+      expect(renderWith('email-pending').textContent).toContain(
+        'A confirmation link was sent to your new email address.'
+      );
+    });
+
+    it('shows no banner for an unknown value', () => {
+      expect(renderWith('yes').textContent).not.toContain(
+        'Your password was changed'
+      );
+    });
+  });
+
   describe('form validation', () => {
     it('should be invalid when empty', () => {
       expect(component.loginForm().valid()).toBe(false);

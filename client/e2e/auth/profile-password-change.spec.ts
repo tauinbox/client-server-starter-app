@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  loginViaUi,
+  routeApiToMockServer,
+  test
+} from '../fixtures/base.fixture';
 
 // Changing password from /auth/profile must require the user's current
 // password. Without it (or with a wrong one) the request must fail with a
@@ -42,11 +47,18 @@ test.describe('Profile password change', () => {
     );
   });
 
-  test('should accept password change with correct current password', async ({
+  // The server revokes every session on a password change, so the page must
+  // not stay on a dead token until the next request drops the user silently.
+  test('ends the session in every tab and says why on the login page', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url);
+
+    const otherTab = await page.context().newPage();
+    await routeApiToMockServer(otherTab, _mockServer.url);
+    await otherTab.goto('/profile');
+    await expect(otherTab.getByLabel('First Name')).toBeVisible();
 
     // Current Password field only appears once the user starts typing a new password.
     await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
@@ -54,7 +66,19 @@ test.describe('Profile password change', () => {
     await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-    await expect(page.getByText('Profile updated successfully')).toBeVisible();
+    await expect(page).toHaveURL(/\/login\?password_changed=1$/);
+    await expect(
+      page.getByText(
+        'Your password was changed and every session was ended. Sign in with the new password.'
+      )
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => localStorage.getItem('auth_user'))
+    ).toBeNull();
+
+    // The other tab stays quiet on /profile, so only the storage event can move it.
+    await expect(otherTab).toHaveURL(/\/login\b/);
+    await otherTab.close();
   });
 
   test('should hide currentPassword field when new password is blank', async ({

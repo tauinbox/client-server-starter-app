@@ -33,6 +33,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
+import {
+  PASSWORD_CHANGED,
+  PASSWORD_CHANGED_PARAM
+} from '../../constants/password-changed.const';
+import type { PasswordChangedValue } from '../../constants/password-changed.const';
 import { safeReturnUrl } from '../../utils/safe-return-url';
 import type {
   LockoutErrorData,
@@ -128,6 +133,12 @@ export class LoginComponent implements OnInit, OnDestroy {
   // Post-registration banner
   protected readonly pendingVerification = signal(false);
 
+  // Post-password-change banner: the profile page ends the session and lands here.
+  protected readonly passwordChanged = signal<PasswordChangedValue | null>(
+    null
+  );
+  protected readonly passwordChangedValues = PASSWORD_CHANGED;
+
   // The challenge a correct password buys on an account with a second factor.
   // Holding it here, rather than in storage, keeps it out of every other tab
   // and drops it the moment the user leaves the page.
@@ -166,6 +177,14 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (registered === 'pending-verification') {
       this.pendingVerification.set(true);
     }
+
+    const passwordChanged =
+      this.#route.snapshot.queryParams[PASSWORD_CHANGED_PARAM];
+    if (passwordChanged === PASSWORD_CHANGED.Done) {
+      this.passwordChanged.set(PASSWORD_CHANGED.Done);
+    } else if (passwordChanged === PASSWORD_CHANGED.EmailPending) {
+      this.passwordChanged.set(PASSWORD_CHANGED.EmailPending);
+    }
   }
 
   ngOnDestroy(): void {
@@ -190,6 +209,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.verificationResent.set(false);
     this.resendError.set(null);
     this.pendingVerification.set(false);
+    this.passwordChanged.set(null);
 
     this.#authService
       .login(this.loginModel())

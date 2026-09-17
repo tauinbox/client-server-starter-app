@@ -123,6 +123,7 @@ test.describe('OAuth-only account sets its first password', () => {
     );
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await saved;
+    await expect(page).toHaveURL(/\/login\?password_changed=1$/);
   });
 
   test('refuses a proof taken for the email change', async ({
