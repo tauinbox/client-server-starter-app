@@ -129,6 +129,26 @@ function grantIsContained(
   );
 }
 
+export function isDenyCondition(
+  conditions: PermissionCondition | null | undefined
+): boolean {
+  return conditions?.effect === 'deny';
+}
+
+/**
+ * Compares two stored or submitted conditions by value. A submitted condition
+ * is a DTO instance that can carry keys set to `undefined`, which the jsonb
+ * column never holds, so both sides are normalised through JSON first.
+ */
+export function sameConditions(
+  a: PermissionCondition | null | undefined,
+  b: PermissionCondition | null | undefined
+): boolean {
+  const normalise = (value: PermissionCondition | null | undefined): unknown =>
+    JSON.parse(JSON.stringify(value ?? null)) as unknown;
+  return deepEquals(normalise(a), normalise(b));
+}
+
 function grantDenied(
   item: ResolvedGrantItem,
   message: string,
@@ -186,9 +206,24 @@ export function assertCanGrantPermissions(
       );
     }
 
-    const rules = ability
-      .rulesFor(item.actionName, subject)
-      .filter((r) => !r.inverted);
+    const allRules = ability.rulesFor(item.actionName, subject);
+
+    // A caller under a deny can still act on the rows it leaves open, but an
+    // allow they hand out carries no copy of that deny, so the grantee would
+    // reach exactly the rows the caller is barred from.
+    if (
+      !isDenyCondition(item.bodyConditions) &&
+      allRules.some((r) => r.inverted)
+    ) {
+      throw grantDenied(
+        item,
+        `Cannot grant ${item.actionName}:${item.subject} - caller holds it under a restriction`,
+        ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION,
+        'caller-restricted'
+      );
+    }
+
+    const rules = allRules.filter((r) => !r.inverted);
 
     if (rules.some((r) => !r.conditions)) {
       continue;
@@ -240,6 +275,45 @@ export function assertCanGrantPermissions(
         `Cannot grant ${permissionLabel} - the supplied condition is broader than the caller's own`,
         ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER,
         'condition-broader-than-caller'
+      );
+    }
+  }
+}
+
+/**
+ * Enforces "only an unrestricted holder may lift a restriction": removing a
+ * deny row - directly, by omitting it from a full replace, by deleting its
+ * role, or by taking its role away from a user - widens every holder's reach
+ * to the rows the deny covered. A caller may do that only for an
+ * (action, subject) pair they hold with an unconditional allow and no deny of
+ * their own; anything narrower could lift a restriction that also binds them,
+ * or one wider than their own reach. Items without a deny effect are ignored.
+ *
+ * Callers with `manage:all` (super) bypass all checks.
+ */
+export function assertCanLiftDenies(
+  ability: AppAbility,
+  items: ResolvedGrantItem[]
+): void {
+  if (ability.can('manage', 'all')) {
+    return;
+  }
+
+  for (const item of items) {
+    if (!isDenyCondition(item.bodyConditions)) continue;
+
+    const subject = item.subject as Extract<Subjects, string>;
+    const rules = ability.rulesFor(item.actionName, subject);
+    const unrestricted =
+      rules.some((r) => !r.inverted && !r.conditions) &&
+      !rules.some((r) => r.inverted);
+
+    if (!unrestricted) {
+      throw grantDenied(
+        item,
+        `Cannot lift the ${item.actionName}:${item.subject} restriction - caller does not hold it without restriction`,
+        ErrorKeys.ROLES.CANNOT_LIFT_DENY,
+        'deny-lift'
       );
     }
   }

@@ -11,6 +11,8 @@ import {
 import { resolveConditions } from '../casl/resolve-conditions';
 import {
   assertCanGrantPermissions,
+  assertCanLiftDenies,
+  sameConditions,
   type ResolvedGrantItem
 } from './can-grant.util';
 
@@ -301,6 +303,33 @@ describe('assertCanGrantPermissions', () => {
     });
   });
 
+  describe('caller holds the permission under a deny', () => {
+    const ability = (): AppAbility => restrictedAbility();
+
+    it('rejects a plain allow, which would carry no copy of the deny', () => {
+      try {
+        grant(ability(), null);
+        throw new Error('expected a 403');
+      } catch (err) {
+        expect((err as HttpException).getStatus()).toBe(403);
+        expect((err as HttpException).getResponse()).toMatchObject({
+          errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION,
+          details: { reason: 'caller-restricted' }
+        });
+      }
+    });
+
+    it('rejects a conditional allow as well', () => {
+      expect(() =>
+        grant(ability(), { fieldMatch: { isActive: [true] } })
+      ).toThrow(HttpException);
+    });
+
+    it('still lets the caller hand out a deny', () => {
+      expect(() => grant(ability(), DENY_CEO)).not.toThrow();
+    });
+  });
+
   it('still rejects an action the caller does not hold at all', () => {
     const ability = abilityFor([{ action: 'read', subject: 'User' }]);
 
@@ -312,5 +341,129 @@ describe('assertCanGrantPermissions', () => {
         errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION
       });
     }
+  });
+});
+
+const DENY_CEO: PermissionCondition = {
+  effect: 'deny',
+  fieldMatch: { email: ['ceo@example.com'] }
+};
+
+function restrictedAbility(): AppAbility {
+  const { can, cannot, build } = new AbilityBuilder<AppAbility>(
+    createMongoAbility
+  );
+  const subject = 'User' as Extract<Subjects, string>;
+  can('update', subject);
+  cannot('update', subject, { email: { $in: ['ceo@example.com'] } });
+  return build();
+}
+
+function denyItem(
+  bodyConditions: PermissionCondition | null = DENY_CEO
+): ResolvedGrantItem {
+  return {
+    permissionId: 'perm-1',
+    actionName: 'update',
+    subject: 'User',
+    bodyConditions
+  };
+}
+
+describe('assertCanLiftDenies', () => {
+  function abilityWith(
+    define: (
+      can: AbilityBuilder<AppAbility>['can'],
+      subject: Extract<Subjects, string>
+    ) => void
+  ): AppAbility {
+    const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+    define(can, 'User');
+    return build();
+  }
+
+  function liftError(ability: AppAbility): unknown {
+    try {
+      assertCanLiftDenies(ability, [denyItem()]);
+      return null;
+    } catch (err) {
+      return err;
+    }
+  }
+
+  it('lets an unconditional holder with no deny lift it', () => {
+    const ability = abilityWith((can, subject) => can('update', subject));
+
+    expect(liftError(ability)).toBeNull();
+  });
+
+  it('lets a super caller lift it', () => {
+    const ability = abilityWith((can) => can('manage', 'all'));
+
+    expect(liftError(ability)).toBeNull();
+  });
+
+  it('refuses a caller under a deny on the same pair', () => {
+    const err = liftError(restrictedAbility()) as HttpException;
+
+    expect(err).toBeInstanceOf(HttpException);
+    expect(err.getStatus()).toBe(403);
+    expect(err.getResponse()).toMatchObject({
+      errorKey: ErrorKeys.ROLES.CANNOT_LIFT_DENY,
+      details: {
+        action: 'update',
+        subject: 'User',
+        permissionId: 'perm-1',
+        reason: 'deny-lift'
+      }
+    });
+  });
+
+  it('refuses a caller who holds the pair only under a condition', () => {
+    const ability = abilityWith((can, subject) =>
+      can('update', subject, { isActive: true })
+    );
+
+    expect(liftError(ability)).toBeInstanceOf(HttpException);
+  });
+
+  it('refuses a caller who does not hold the pair at all', () => {
+    const ability = abilityWith((can, subject) => can('read', subject));
+
+    expect(liftError(ability)).toBeInstanceOf(HttpException);
+  });
+
+  it('ignores rows that carry no deny', () => {
+    expect(() =>
+      assertCanLiftDenies(restrictedAbility(), [
+        denyItem(null),
+        denyItem({ fieldMatch: { isActive: [true] } })
+      ])
+    ).not.toThrow();
+  });
+});
+
+describe('sameConditions', () => {
+  it('ignores keys set to undefined and key order', () => {
+    expect(
+      sameConditions(
+        { fieldMatch: { email: ['a'] }, effect: 'deny', ownership: undefined },
+        { effect: 'deny', fieldMatch: { email: ['a'] } }
+      )
+    ).toBe(true);
+  });
+
+  it('treats null and undefined as the same empty condition', () => {
+    expect(sameConditions(null, undefined)).toBe(true);
+  });
+
+  it('tells apart conditions with different values', () => {
+    expect(
+      sameConditions(
+        { effect: 'deny', fieldMatch: { email: ['a'] } },
+        { effect: 'deny', fieldMatch: { email: ['b'] } }
+      )
+    ).toBe(false);
+    expect(sameConditions(DENY_CEO, null)).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ import {
   parseCursorQuery
 } from '../helpers/pagination.helpers';
 
+import type { PermissionCondition } from '@app/shared/types';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
   findConditionActionError,
@@ -26,6 +27,11 @@ import {
   permissionGuard
 } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
+import {
+  assertDenyScope,
+  denyRowsOf,
+  sameConditions
+} from '../helpers/grant-scope.helpers';
 import { pushToUser } from '../sse-hub';
 import {
   requireUuid,
@@ -463,6 +469,10 @@ router.delete(
       return;
     }
 
+    if (!assertDenyScope(req, res, 'lift', id, denyRowsOf(id))) {
+      return;
+    }
+
     // Capture holders before unassigning — the loop below clears user.roles.
     const holderIds = Array.from(state.users.values())
       .filter((u) => u.roles.includes(role.name))
@@ -583,6 +593,27 @@ router.put(
         statusCode: 400,
         errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
       });
+      return;
+    }
+
+    const grantItems = items.map((item) => ({
+      permissionId: item.permissionId,
+      conditions: (item.conditions as PermissionCondition | null) ?? null
+    }));
+    if (!assertDenyScope(req, res, 'grant', id, grantItems)) {
+      return;
+    }
+
+    // A deny row survives a replace only when it is sent back unchanged.
+    const liftedRows = denyRowsOf(id).filter(
+      (row) =>
+        !grantItems.some(
+          (item) =>
+            item.permissionId === row.permissionId &&
+            sameConditions(item.conditions, row.conditions)
+        )
+    );
+    if (!assertDenyScope(req, res, 'lift', id, liftedRows)) {
       return;
     }
 
@@ -712,6 +743,14 @@ router.post(
       return;
     }
 
+    const grantItems = (permissionIds as string[]).map((permissionId) => ({
+      permissionId,
+      conditions: (conditions as PermissionCondition | undefined) ?? null
+    }));
+    if (!assertDenyScope(req, res, 'grant', id, grantItems)) {
+      return;
+    }
+
     const duplicateId = (permissionIds as string[]).find((permissionId) =>
       state.rolePermissions.some(
         (rp) => rp.roleId === id && rp.permissionId === permissionId
@@ -786,6 +825,13 @@ router.delete(
       return;
     }
 
+    const removedRows = denyRowsOf(id).filter(
+      (row) => row.permissionId === permissionId
+    );
+    if (!assertDenyScope(req, res, 'lift', id, removedRows)) {
+      return;
+    }
+
     state.rolePermissions = state.rolePermissions.filter(
       (rp) => !(rp.roleId === id && rp.permissionId === permissionId)
     );
@@ -855,6 +901,13 @@ router.post(
     // `RoleService.assignRoleToUser` re-checks `update` on the target user,
     // below the super-role test and above the duplicate 409.
     if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+      return;
+    }
+
+    // `RoleService.assignRoleToUser` checks the rows of the role before the
+    // insert that raises the duplicate 409.
+    const roleRows = state.rolePermissions.filter((rp) => rp.roleId === roleId);
+    if (!assertDenyScope(req, res, 'grant', roleId, roleRows)) {
       return;
     }
 
@@ -936,6 +989,10 @@ router.delete(
     }
 
     if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+      return;
+    }
+
+    if (!assertDenyScope(req, res, 'lift', roleId, denyRowsOf(roleId))) {
       return;
     }
 

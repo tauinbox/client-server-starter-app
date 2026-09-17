@@ -323,7 +323,11 @@ describe('RolesController', () => {
       const result = await controller.remove('role-1', mockReq, mockAbility);
 
       expect(roleServiceMock.findOne).toHaveBeenCalledWith('role-1');
-      expect(roleServiceMock.delete).toHaveBeenCalledWith('role-1');
+      expect(roleServiceMock.delete).toHaveBeenCalledWith(
+        'role-1',
+        mockAbility,
+        mockReq.user?.userId
+      );
       expect(result).toBeUndefined();
     });
 

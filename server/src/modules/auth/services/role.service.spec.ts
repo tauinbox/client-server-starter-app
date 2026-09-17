@@ -32,6 +32,7 @@ describe('RoleService', () => {
   let mockPermissionRepo: { find: jest.Mock };
   let mockRolePermissionRepo: {
     find: jest.Mock;
+    findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
@@ -133,7 +134,8 @@ describe('RoleService', () => {
     };
 
     mockRolePermissionRepo = {
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
       create: jest
         .fn()
         .mockImplementation((data: Record<string, unknown>) => data),
@@ -1267,6 +1269,208 @@ describe('RoleService', () => {
       await expect(
         service.removePermissionFromRole('role-1', 'perm-1')
       ).rejects.toMatchObject({ status: 400 });
+    });
+  });
+
+  describe('lifting a deny restriction', () => {
+    const permUpdateUser = {
+      id: 'perm-update-user',
+      action: { name: 'update' },
+      resource: { subject: 'User' }
+    };
+    const denyCeo = {
+      effect: 'deny' as const,
+      fieldMatch: { email: ['ceo@example.com'] }
+    };
+    const denyRow = {
+      roleId: 'role-2',
+      permissionId: 'perm-update-user',
+      conditions: denyCeo
+    };
+
+    function abilityOf(
+      define: (b: AbilityBuilder<AppAbility>) => void
+    ): AppAbility {
+      const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+      builder.can('update', 'Role');
+      define(builder);
+      return builder.build();
+    }
+
+    // The caller holds the pair, but under the same restriction it would lift.
+    const restricted = (): AppAbility =>
+      abilityOf((b) => {
+        b.can('update', 'User');
+        b.cannot('update', 'User', { email: { $in: ['ceo@example.com'] } });
+      });
+    // The caller holds the pair only for some rows.
+    const conditional = (): AppAbility =>
+      abilityOf((b) => b.can('update', 'User', { isActive: true }));
+    const unrestricted = (): AppAbility =>
+      abilityOf((b) => b.can('update', 'User'));
+
+    function expectLiftRefusal(): void {
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_GRANT_DENIED',
+          targetId: 'role-2',
+          details: expect.objectContaining({
+            action: 'update',
+            subject: 'User',
+            reason: 'deny-lift'
+          }) as Record<string, unknown>
+        })
+      );
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'update',
+        'User'
+      );
+    }
+
+    beforeEach(() => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([permUpdateUser]);
+      mockRolePermissionRepo.find.mockResolvedValue([denyRow]);
+      mockRolePermissionRepo.findOne.mockResolvedValue(denyRow);
+      // Lets the conditional caller pass the update:User check on the target,
+      // so the refusal under test is the lift, not the membership write.
+      mockRoleRepo.manager.findOne.mockResolvedValue({
+        id: 'user-1',
+        isActive: true
+      });
+    });
+
+    describe.each([
+      ['restricted', restricted],
+      ['conditional', conditional]
+    ])('a %s caller', (_label, ability) => {
+      it('cannot take the restriction role away from a user', async () => {
+        await expect(
+          service.removeRoleFromUser('user-1', 'role-2', ability(), 'actor-1')
+        ).rejects.toMatchObject({
+          status: 403,
+          response: { errorKey: 'errors.roles.cannotLiftDeny' }
+        });
+        expect(mockRelationQueryBuilder.remove).not.toHaveBeenCalled();
+        expectLiftRefusal();
+      });
+
+      it('cannot remove the deny row', async () => {
+        await expect(
+          service.removePermissionFromRole(
+            'role-2',
+            'perm-update-user',
+            ability(),
+            'actor-1'
+          )
+        ).rejects.toMatchObject({ status: 403 });
+        expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
+        expectLiftRefusal();
+      });
+
+      it('cannot omit the deny row from a full replace', async () => {
+        await expect(
+          service.setPermissionsForRole('role-2', [], ability(), 'actor-1')
+        ).rejects.toMatchObject({ status: 403 });
+        expect(
+          mockRolePermissionRepo.manager.transaction
+        ).not.toHaveBeenCalled();
+        expectLiftRefusal();
+      });
+
+      it('cannot delete the role that holds the deny row', async () => {
+        await expect(
+          service.delete('role-2', ability(), 'actor-1')
+        ).rejects.toMatchObject({ status: 403 });
+        expect(mockRoleRepo.remove).not.toHaveBeenCalled();
+        expectLiftRefusal();
+      });
+    });
+
+    it('a restricted caller keeps a deny row that a replace sends back unchanged', async () => {
+      // A DTO instance can carry keys set to undefined; the stored row cannot.
+      const resent = { ...denyCeo, ownership: undefined };
+
+      await service.setPermissionsForRole(
+        'role-2',
+        [{ permissionId: 'perm-update-user', conditions: resent }],
+        restricted(),
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+    });
+
+    it('a restricted caller cannot edit a deny row, because the stored one is lifted', async () => {
+      await expect(
+        service.setPermissionsForRole(
+          'role-2',
+          [
+            {
+              permissionId: 'perm-update-user',
+              conditions: {
+                effect: 'deny',
+                fieldMatch: { email: ['someone-else@example.com'] }
+              }
+            }
+          ],
+          restricted(),
+          'actor-1'
+        )
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('an unrestricted caller lifts the restriction on every path', async () => {
+      await service.removeRoleFromUser(
+        'user-1',
+        'role-2',
+        unrestricted(),
+        'actor-1'
+      );
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-update-user',
+        unrestricted(),
+        'actor-1'
+      );
+      await service.setPermissionsForRole(
+        'role-2',
+        [],
+        unrestricted(),
+        'actor-1'
+      );
+      await service.delete('role-2', unrestricted(), 'actor-1');
+
+      expect(mockRelationQueryBuilder.remove).toHaveBeenCalled();
+      expect(mockRolePermissionRepo.delete).toHaveBeenCalled();
+      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+      expect(mockRoleRepo.remove).toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('a restricted caller removes a role that carries no deny row', async () => {
+      mockRolePermissionRepo.find.mockResolvedValue([
+        { ...denyRow, conditions: null }
+      ]);
+
+      await service.removeRoleFromUser(
+        'user-1',
+        'role-2',
+        restricted(),
+        'actor-1'
+      );
+
+      expect(mockRelationQueryBuilder.remove).toHaveBeenCalled();
+    });
+
+    it('a super caller skips the check without reading the role rows', async () => {
+      const superAbility = abilityOf((b) => b.can('manage', 'all'));
+
+      await service.delete('role-2', superAbility, 'actor-1');
+
+      expect(mockRolePermissionRepo.find).not.toHaveBeenCalled();
+      expect(mockRoleRepo.remove).toHaveBeenCalled();
     });
   });
 
