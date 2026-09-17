@@ -630,20 +630,22 @@ block of each permission in `RolePermissionsDialogComponent`.
 
 #### More than one role, and condition precedence
 
-When a user has more than one role, the system deduplicates the permissions by the key
-`effect:resource:action`. Thus an allow rule and a deny rule for the same pair of resource and action,
-from two different roles, stay two separate entries.
+When a user has more than one role, the system removes a permission entry only when an earlier entry
+has the same effect, resource, action and conditions. Thus every rule with different conditions stays a
+separate entry: an allow and a deny for the same pair of resource and action, and also two allows or
+two denies from two different roles.
 
-Inside the same effect bucket, a later role overrides an earlier role. The system does **not** merge
-the conditions across two roles.
+Allow entries add up: the user gets the union of their scopes. The system does **not** intersect the
+conditions across two roles.
 
 Example: Role A grants `update:User` with `{ ownership: { userField: "id" } }`. Role B grants
 `update:User` with no conditions. The user then gets **unrestricted** `update:User`, because Role B
-overrides Role A on the allow side.
+already allows every record.
 
-To apply more than one restriction at the same time, use one of two methods. Use `$and` in one
-`custom` condition on one role. Or move the additional restrictions to a separate role with
-`effect: 'deny'`.
+Deny entries also add up: each deny removes its own records from the grant. To apply more than one
+restriction at the same time, use one of two methods. Use `$and` in one `custom` condition on one
+role. Or put each additional restriction on a separate role with `effect: 'deny'`. Two such roles on
+the same permission both apply.
 
 ### User Management (Admin)
 
@@ -1796,11 +1798,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2400 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2402 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 388 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 386 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1285 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1286 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 267 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 764 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 768 tests pass |
 
 ## CI/CD
 

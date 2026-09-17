@@ -218,6 +218,80 @@ describe('PermissionService', () => {
         conditions: { effect: 'deny', fieldMatch: { status: ['locked'] } }
       });
     });
+
+    // Regression: the key ignored conditions, so the second restriction role
+    // on one permission was silently dropped and its deny never applied.
+    it('should keep two deny rules with different conditions from two roles', async () => {
+      const denyA = {
+        effect: 'deny',
+        custom: '{"email":"a@victim.test"}'
+      };
+      const denyB = {
+        effect: 'deny',
+        custom: '{"email":"b@victim.test"}'
+      };
+      mockUserRepository.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: [
+          {
+            id: 'role-deny-a',
+            name: 'limiter-a',
+            isSuper: false,
+            rolePermissions: [
+              { ...mockRolePermission, id: 'rp-a', conditions: denyA }
+            ]
+          },
+          {
+            id: 'role-deny-b',
+            name: 'limiter-b',
+            isSuper: false,
+            rolePermissions: [
+              { ...mockRolePermission, id: 'rp-b', conditions: denyB }
+            ]
+          }
+        ]
+      });
+
+      const result = await service.getPermissionsForUser('user-1');
+
+      expect(result.map((p) => p.conditions)).toEqual([denyA, denyB]);
+    });
+
+    it('should deduplicate rows whose conditions are equal', async () => {
+      const deny = { effect: 'deny', fieldMatch: { status: ['locked'] } };
+      mockUserRepository.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: [
+          {
+            id: 'role-1',
+            name: 'limiter-a',
+            isSuper: false,
+            rolePermissions: [
+              { ...mockRolePermission, id: 'rp-1', conditions: deny }
+            ]
+          },
+          {
+            id: 'role-2',
+            name: 'limiter-b',
+            isSuper: false,
+            rolePermissions: [
+              { ...mockRolePermission, id: 'rp-2', conditions: { ...deny } }
+            ]
+          }
+        ]
+      });
+
+      const result = await service.getPermissionsForUser('user-1');
+
+      expect(result).toEqual([
+        {
+          resource: 'users',
+          action: 'read',
+          permission: 'users:read',
+          conditions: deny
+        }
+      ]);
+    });
   });
 
   describe('getRolesForUser', () => {

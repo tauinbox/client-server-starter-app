@@ -202,6 +202,40 @@ describe('UserPermissionsComponent', () => {
       ]);
     });
 
+    // The server keeps one row per distinct condition set, so one permission
+    // can arrive several times: an allow plus one deny per restriction role.
+    it('should render every row of a repeated permission without a duplicate track key', () => {
+      const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined);
+      const response = (): UserEffectivePermissionsResponse => ({
+        roles: [mockRole],
+        permissions: [
+          buildPermission('User', 'update'),
+          buildPermission('User', 'update', {
+            effect: 'deny',
+            custom: '{"email":"a@victim.test"}'
+          }),
+          buildPermission('User', 'update', {
+            effect: 'deny',
+            custom: '{"email":"b@victim.test"}'
+          })
+        ],
+        rules: []
+      });
+      createComponent(response());
+      // Angular checks track keys only when it reconciles a rendered list, so
+      // a second load is what exposes a duplicate key.
+      userServiceMock.getPermissions.mockReturnValue(of(response()));
+      component.ngOnInit();
+      fixture.detectChanges();
+
+      const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '.permission-row'
+      );
+      expect(rows).toHaveLength(3);
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('NG0955'));
+      warn.mockRestore();
+    });
+
     it('should set hasDeny when any permission has effect=deny', () => {
       createComponent({
         roles: [mockRole],
