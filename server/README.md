@@ -1213,7 +1213,8 @@ set of a role apply the same check in the service layer. The permission-set muta
 `DELETE /roles/:id/permissions/:permId`. `RoleService` checks them before the system-role lock and
 before the grant check.
 
-The server blocks the assignment and the removal of a super role for an actor that is not a super.
+The server blocks the assignment and the removal of a super role for every actor, a super actor
+included. No API path grants or removes a super role.
 
 Each denial writes a `PERMISSION_CHECK_FAILURE` audit row. The row has `details.instanceCheck === true`
 and `actorId` set to the refused caller. Each service method that takes an `ability` parameter also

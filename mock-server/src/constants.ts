@@ -36,6 +36,14 @@ export const REAUTH_PROOF_COOKIE_PATH = '/api/v1/auth';
 export const REAUTH_PROOF_MAX_AGE_MS = 300 * 1000;
 
 /**
+ * The server sets these on a provider link or step-up redirect. The mock never
+ * sets them, but it clears them where the server does.
+ */
+export const OAUTH_LINK_COOKIE = 'oauth_link';
+export const OAUTH_REAUTH_COOKIE = 'oauth_reauth';
+export const OAUTH_INTENT_COOKIE_PATH = '/api/v1/auth/oauth';
+
+/**
  * The mock accepts one fixed code and hands out one fixed secret. A real
  * time-based code would make every end-to-end run depend on the clock, which
  * is a flake by construction rather than a test of anything.

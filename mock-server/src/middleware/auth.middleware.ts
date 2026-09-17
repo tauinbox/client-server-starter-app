@@ -46,6 +46,7 @@ import {
 import {
   authGuard,
   clearMailedProofs,
+  permissionGuard,
   pruneOldestUserTokens
 } from '../helpers/auth.helpers';
 import {
@@ -61,6 +62,9 @@ import {
 import type { AuthenticatedRequest } from '../types';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
+  OAUTH_INTENT_COOKIE_PATH,
+  OAUTH_LINK_COOKIE,
+  OAUTH_REAUTH_COOKIE,
   REAUTH_PROOF_COOKIE,
   REAUTH_PROOF_COOKIE_PATH,
   REFRESH_COOKIE_OPTIONS,
@@ -728,6 +732,14 @@ router.post('/refresh-token', (req, res) => {
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
+// Mirrors `clearOAuthLinkCookie` on the server: an abandoned provider link or
+// step-up must not outlive the session that started it.
+function clearOAuthIntentCookies(res: Response): void {
+  res.clearCookie(OAUTH_LINK_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
+  res.clearCookie(OAUTH_REAUTH_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
+  res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+}
+
 // POST /api/v1/auth/logout
 router.post('/logout', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
@@ -750,6 +762,7 @@ router.post('/logout', authGuard, (req, res) => {
   });
 
   res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+  clearOAuthIntentCookies(res);
   res.setHeader('Clear-Site-Data', '"cache", "cookies"');
   res.json({ message: 'Successfully logged out' });
 });
@@ -771,127 +784,143 @@ router.get('/permissions', authGuard, (req, res) => {
   });
 });
 
+/**
+ * Mirrors `@ValidateIf(propertyIsDefined) @IsNotEmpty() @MaxLength(255)` on
+ * `UpdateProfileDto`. An omitted field is skipped, an explicit null is not.
+ * Decorators apply bottom-up, so MaxLength is reported before IsNotEmpty.
+ */
+function profileNameErrors(field: string, value: unknown): string[] {
+  if (value === undefined) return [];
+  const errors: string[] = [];
+  const tooLong = validateMaxLength(value, 255, field);
+  if (tooLong) errors.push(tooLong);
+  if (value === '' || value === null) {
+    errors.push(`${field} should not be empty`);
+  }
+  return errors;
+}
+
 // PATCH /api/v1/auth/profile
-router.patch('/profile', authGuard, (req, res) => {
-  const { firstName, lastName, password, currentPassword, locale } = req.body;
-  const { user } = req as AuthenticatedRequest;
+// The server route carries `@SkipMfaEnrolmentGate()`: an account that owes an
+// enrolment may still set the password that the enrolment step-up needs.
+router.patch(
+  '/profile',
+  permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
+  (req, res) => {
+    const { firstName, lastName, password, currentPassword, locale } = req.body;
+    const { user } = req as AuthenticatedRequest;
 
-  const localeErr = validateLocale(locale);
-  if (localeErr) {
-    res.status(400).json(validationError(localeErr));
-    return;
-  }
-
-  if (firstName !== undefined) {
-    const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
-    if (fnMaxErr) {
-      res.status(400).json(validationError(fnMaxErr));
-      return;
-    }
-  }
-
-  if (lastName !== undefined) {
-    const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
-    if (lnMaxErr) {
-      res.status(400).json(validationError(lnMaxErr));
-      return;
-    }
-  }
-
-  if (password !== undefined) {
-    const pwLenErr = passwordLengthError(password);
-    if (pwLenErr) {
-      res.status(400).json(validationError(pwLenErr));
+    const localeErr = validateLocale(locale);
+    if (localeErr) {
+      res.status(400).json(validationError(localeErr));
       return;
     }
 
-    // A first password binds a credential that outlives the session, so an
-    // account that holds no password proves itself with a provider proof, and
-    // an account that holds one supplies it.
-    if (user.password === null) {
-      const proof = (req.cookies as Record<string, string> | undefined)?.[
-        REAUTH_PROOF_COOKIE
-      ];
-      if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.PASSWORD_SET)) {
-        logStepUpFailure(
+    const nameErrors = [
+      ...profileNameErrors('firstName', firstName),
+      ...profileNameErrors('lastName', lastName)
+    ];
+    if (nameErrors.length > 0) {
+      res.status(400).json(validationError(nameErrors));
+      return;
+    }
+
+    if (password !== undefined) {
+      const pwLenErr = passwordLengthError(password);
+      if (pwLenErr) {
+        res.status(400).json(validationError(pwLenErr));
+        return;
+      }
+
+      // A first password binds a credential that outlives the session, so an
+      // account that holds no password proves itself with a provider proof, and
+      // an account that holds one supplies it.
+      if (user.password === null) {
+        const proof = (req.cookies as Record<string, string> | undefined)?.[
+          REAUTH_PROOF_COOKIE
+        ];
+        if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.PASSWORD_SET)) {
+          logStepUpFailure(
+            req,
+            user,
+            STEP_UP_OPERATION.PASSWORD_SET,
+            'reauth_proof',
+            false
+          );
+          res.status(400).json({
+            message:
+              'Confirm it is you with your sign-in provider, then try again',
+            statusCode: 400,
+            errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+          });
+          return;
+        }
+      } else {
+        const stepUp = stepUpPasswordError(
           req,
           user,
+          currentPassword,
           STEP_UP_OPERATION.PASSWORD_SET,
-          'reauth_proof',
           false
         );
-        res.status(400).json({
-          message:
-            'Confirm it is you with your sign-in provider, then try again',
-          statusCode: 400,
-          errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-        });
+        if (stepUp) {
+          sendWithRetryAfter(res, stepUp);
+          return;
+        }
+      }
+
+      // The blocklist verdict comes from UsersService.update on the real server,
+      // after the step up and before any field assignment, so a 400 must leave
+      // the profile unchanged.
+      if (isBreachedPassword(password)) {
+        res.status(400).json(breachedPasswordEnvelope());
         return;
       }
-    } else {
-      const stepUp = stepUpPasswordError(
-        req,
-        user,
-        currentPassword,
-        STEP_UP_OPERATION.PASSWORD_SET,
-        false
+    }
+
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+    if (locale !== undefined) user.locale = locale as string;
+    if (password !== undefined) {
+      user.password = password;
+      user.tokenRevokedAt = new Date().toISOString();
+      clearMailedProofs(user);
+
+      logAudit('PASSWORD_CHANGE', {
+        actorId: user.id,
+        actorEmail: user.email,
+        targetId: user.id,
+        targetType: 'User',
+        details: { source: 'self' },
+        ip: req.ip
+      });
+
+      console.log(
+        `[PASSWORD CHANGED] To: ${user.email}\n  Source: profile page | IP: ${req.ip}`
       );
-      if (stepUp) {
-        sendWithRetryAfter(res, stepUp);
-        return;
-      }
-    }
 
-    // The blocklist verdict comes from UsersService.update on the real server,
-    // after the step up and before any field assignment, so a 400 must leave
-    // the profile unchanged.
-    if (isBreachedPassword(password)) {
-      res.status(400).json(breachedPasswordEnvelope());
-      return;
+      // Invalidate all refresh tokens on password change (matches real server)
+      const state = getState();
+      for (const [rt, uid] of state.refreshTokens.entries()) {
+        if (uid === user.id) {
+          state.refreshTokens.delete(rt);
+        }
+      }
+      for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
+        if (uid === user.id) {
+          state.revokedRefreshTokens.delete(rt);
+        }
+      }
+      res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+      clearOAuthIntentCookies(res);
+      // Cleared only now, so a rejected attempt keeps its remaining proof window.
+      res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
     }
+    user.updatedAt = new Date().toISOString();
+
+    res.json(toUserResponse(user));
   }
-
-  if (firstName !== undefined) user.firstName = firstName;
-  if (lastName !== undefined) user.lastName = lastName;
-  if (locale !== undefined) user.locale = locale as string;
-  if (password !== undefined) {
-    user.password = password;
-    user.tokenRevokedAt = new Date().toISOString();
-    clearMailedProofs(user);
-
-    logAudit('PASSWORD_CHANGE', {
-      actorId: user.id,
-      actorEmail: user.email,
-      targetId: user.id,
-      targetType: 'User',
-      details: { source: 'self' },
-      ip: req.ip
-    });
-
-    console.log(
-      `[PASSWORD CHANGED] To: ${user.email}\n  Source: profile page | IP: ${req.ip}`
-    );
-
-    // Invalidate all refresh tokens on password change (matches real server)
-    const state = getState();
-    for (const [rt, uid] of state.refreshTokens.entries()) {
-      if (uid === user.id) {
-        state.refreshTokens.delete(rt);
-      }
-    }
-    for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
-      if (uid === user.id) {
-        state.revokedRefreshTokens.delete(rt);
-      }
-    }
-    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
-    // Cleared only now, so a rejected attempt keeps its remaining proof window.
-    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
-  }
-  user.updatedAt = new Date().toISOString();
-
-  res.json(toUserResponse(user));
-});
+);
 
 // POST /api/v1/auth/profile/email/initiate
 router.post('/profile/email/initiate', authGuard, (req, res) => {

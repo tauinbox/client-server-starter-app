@@ -66,16 +66,22 @@ export type GuardError = {
  * a type-level CASL check, so a route that also needs the record itself runs a
  * second check inside the handler, exactly as the server controllers do.
  */
+export interface PermissionGuardOptions {
+  /** Mirrors `@SkipMfaEnrolmentGate()` on the server route. */
+  skipMfaEnrolmentGate?: boolean;
+}
+
 export function requirePermission(
   action: Actions,
-  subject: SubjectNames
+  subject: SubjectNames,
+  options: PermissionGuardOptions = {}
 ): (req: Request) => { user: MockUser; decoded: DecodedToken } | GuardError {
   return (req) => {
     const result = requireAuth(req);
     if ('error' in result) return result;
 
     // Mirrors MfaRequiredGuard, which travels with @Authorize on the server.
-    if (mustEnrolMfa(result.user)) {
+    if (!options.skipMfaEnrolmentGate && mustEnrolMfa(result.user)) {
       return {
         error: 403,
         message:
@@ -114,8 +120,12 @@ export function authGuard(req: Request, res: Response, next: NextFunction) {
 }
 
 /** Express middleware - requires one CASL permission, attaches req.user */
-export function permissionGuard(action: Actions, subject: SubjectNames) {
-  const check = requirePermission(action, subject);
+export function permissionGuard(
+  action: Actions,
+  subject: SubjectNames,
+  options: PermissionGuardOptions = {}
+) {
+  const check = requirePermission(action, subject, options);
   return (req: Request, res: Response, next: NextFunction) => {
     const result = check(req);
     if ('error' in result) {
