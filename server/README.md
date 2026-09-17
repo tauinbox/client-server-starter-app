@@ -1241,9 +1241,17 @@ The check compares the two sides as resolved MongoQuery objects. It runs the req
 same `resolveConditions` function that the ability factory uses, with the id of the caller. Thus it
 compares two resolved queries and not two authored shapes.
 
-A super role bypasses the check. `DELETE /roles/:id/permissions/:permId` has no grant check, because
-a removal is a de-escalation. The server does not validate a grant that a person wrote before this
+A super role bypasses the check. The server does not validate a grant that a person wrote before this
 rule again.
+
+**A deny row is lifted only by an unrestricted holder.** A deny row is always in its own role, so
+its removal widens the reach of every holder. A non-super caller can remove a deny row
+(`DELETE /roles/:id/permissions/:permId`), omit it from `PUT /roles/:id/permissions`, delete its
+role (`DELETE /roles/:id`) or remove its role from a user (`DELETE /roles/assign/:userId/:roleId`)
+only when they hold the pair with an unconditional allow and no deny. Otherwise the server answers
+403 with `errors.roles.cannotLiftDeny`. A `PUT` that sends a deny row back unchanged keeps it. A
+caller under a deny on a pair also cannot grant an allow on it: the answer is 403 with
+`errors.roles.cannotGrantPermission`. The mock server applies both rules.
 
 **The server rejects an unsatisfiable grant on a write.** `ownership` and `userAttr` resolve to the
 id of the acting user. A record that does not exist yet can never carry that id. Thus either branch

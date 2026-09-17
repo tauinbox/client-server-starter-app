@@ -23,6 +23,9 @@ import { ErrorKeys } from '@app/shared/constants';
 import type { AppAbility } from '../casl/app-ability';
 import {
   assertCanGrantPermissions,
+  assertCanLiftDenies,
+  isDenyCondition,
+  sameConditions,
   type ResolvedGrantItem
 } from '../utils/can-grant.util';
 import {
@@ -97,41 +100,81 @@ export class RoleService {
         logger: this.logger
       });
     } catch (err) {
-      if (err instanceof HttpException && err.getStatus() === 403) {
-        const body = err.getResponse();
-        const details =
-          typeof body === 'object' && body !== null
-            ? ((body as { details?: Record<string, unknown> }).details ?? {
-                body
-              })
-            : { message: String(body) };
-        this.auditService.logFireAndForget({
-          action: AuditAction.PERMISSION_GRANT_DENIED,
-          actorId: context.actorId ?? null,
-          targetId: context.roleId,
-          targetType: 'Role',
-          details
-        });
-        const rawAction =
-          typeof details === 'object' && 'action' in details
-            ? (details as { action?: unknown }).action
-            : undefined;
-        const rawSubject =
-          typeof details === 'object' && 'subject' in details
-            ? (details as { subject?: unknown }).subject
-            : undefined;
-        const deniedAction =
-          typeof rawAction === 'string' ? rawAction : 'grant';
-        const deniedSubject =
-          typeof rawSubject === 'string' ? rawSubject : 'Permission';
-        this.metricsService.recordPermissionDenied(
-          'instance',
-          deniedAction,
-          deniedSubject
-        );
-      }
+      this.recordGrantRefusal(err, context);
       throw err;
     }
+  }
+
+  /**
+   * Refuse to remove deny rows unless the caller holds each restricted pair
+   * without restriction. `rows` are the stored rows about to disappear; rows
+   * without a deny effect are ignored.
+   */
+  private async assertDenyLiftAllowed(
+    ability: AppAbility | undefined,
+    rows: { permissionId: string; conditions: PermissionCondition | null }[],
+    context: { actorId?: string; roleId: string }
+  ): Promise<void> {
+    if (!this.isScopeChecked(ability)) return;
+    const denies = rows.filter((row) => isDenyCondition(row.conditions));
+    if (denies.length === 0) return;
+    const resolved = await this.resolveGrantItems(denies);
+    try {
+      assertCanLiftDenies(ability, resolved);
+    } catch (err) {
+      this.recordGrantRefusal(err, context);
+      throw err;
+    }
+  }
+
+  private isScopeChecked(
+    ability: AppAbility | undefined
+  ): ability is AppAbility {
+    return ability !== undefined && !ability.can('manage', 'all');
+  }
+
+  private async findDenyRows(roleId: string): Promise<RolePermission[]> {
+    const rows = await this.rolePermissionRepository.find({
+      where: { roleId }
+    });
+    return rows.filter((row) => isDenyCondition(row.conditions));
+  }
+
+  private recordGrantRefusal(
+    err: unknown,
+    context: { actorId?: string; roleId: string }
+  ): void {
+    if (!(err instanceof HttpException) || err.getStatus() !== 403) return;
+    const body = err.getResponse();
+    const details =
+      typeof body === 'object' && body !== null
+        ? ((body as { details?: Record<string, unknown> }).details ?? {
+            body
+          })
+        : { message: String(body) };
+    this.auditService.logFireAndForget({
+      action: AuditAction.PERMISSION_GRANT_DENIED,
+      actorId: context.actorId ?? null,
+      targetId: context.roleId,
+      targetType: 'Role',
+      details
+    });
+    const rawAction =
+      typeof details === 'object' && 'action' in details
+        ? (details as { action?: unknown }).action
+        : undefined;
+    const rawSubject =
+      typeof details === 'object' && 'subject' in details
+        ? (details as { subject?: unknown }).subject
+        : undefined;
+    const deniedAction = typeof rawAction === 'string' ? rawAction : 'grant';
+    const deniedSubject =
+      typeof rawSubject === 'string' ? rawSubject : 'Permission';
+    this.metricsService.recordPermissionDenied(
+      'instance',
+      deniedAction,
+      deniedSubject
+    );
   }
 
   /**
@@ -318,7 +361,11 @@ export class RoleService {
     return this.roleRepository.save(role);
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(
+    id: string,
+    ability?: AppAbility,
+    actorId?: string
+  ): Promise<void> {
     const role = await this.findOne(id);
     if (role.isSystem) {
       throw new HttpException(
@@ -328,6 +375,12 @@ export class RoleService {
         },
         HttpStatus.BAD_REQUEST
       );
+    }
+    if (this.isScopeChecked(ability)) {
+      await this.assertDenyLiftAllowed(ability, await this.findDenyRows(id), {
+        actorId,
+        roleId: id
+      });
     }
     await this.invalidateUsersWithRole(id);
     await this.roleRepository.remove(role);
@@ -430,6 +483,13 @@ export class RoleService {
         { actorId, targetId: userId, targetType: 'User' },
         this.metricsService
       );
+      if (this.isScopeChecked(ability)) {
+        await this.assertDenyLiftAllowed(
+          ability,
+          await this.findDenyRows(roleId),
+          { actorId, roleId }
+        );
+      }
     }
 
     await this.roleRepository.manager
@@ -467,6 +527,19 @@ export class RoleService {
     this.assertNotSystem(role, ability);
     await this.assertConditionsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
+    if (this.isScopeChecked(ability)) {
+      // A deny row survives a replace only when it is sent back unchanged;
+      // an edited deny is a lift of the stored one plus a new grant.
+      const lifted = (await this.findDenyRows(roleId)).filter(
+        (row) =>
+          !items.some(
+            (item) =>
+              item.permissionId === row.permissionId &&
+              sameConditions(item.conditions, row.conditions)
+          )
+      );
+      await this.assertDenyLiftAllowed(ability, lifted, { actorId, roleId });
+    }
     await this.rolePermissionRepository.manager.transaction(async (em) => {
       await em.delete(RolePermission, { roleId });
       if (items.length > 0) {
@@ -519,6 +592,14 @@ export class RoleService {
     const role = await this.findOne(roleId);
     this.assertCanUpdateRole(role, ability, actorId);
     this.assertNotSystem(role, ability);
+    if (this.isScopeChecked(ability)) {
+      const row = await this.rolePermissionRepository.findOne({
+        where: { roleId, permissionId }
+      });
+      if (row) {
+        await this.assertDenyLiftAllowed(ability, [row], { actorId, roleId });
+      }
+    }
     await this.rolePermissionRepository.delete({ roleId, permissionId });
     await this.invalidateUsersWithRole(roleId);
   }

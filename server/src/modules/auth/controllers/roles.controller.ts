@@ -233,7 +233,7 @@ export class RolesController {
       { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
       this.metricsService
     );
-    await this.roleService.delete(id);
+    await this.roleService.delete(id, ability, req.user?.userId);
     // The row is gone after the delete, so the name is recorded here: a bare
     // targetId resolves to nothing once the role no longer exists.
     await this.auditService.log({
