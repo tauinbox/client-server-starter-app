@@ -504,9 +504,12 @@ cannot import `AuthService`. Such an import closes a dependency cycle. Thus each
 disconnects the SSE stream. It also clears the session, the cached RBAC metadata, the feature flags
 and the entitlements.
 
-Three exit paths never reach `logout()`: `ensureAuthenticated` and `guestGuard` after a failed
-refresh, and the `catch` block in `provideAppInitializer`. They run the same routine through the
-public `clearSession()` delegate. A call to `AuthStore.clearSession()` clears only the token and the
+Four exit paths never reach `logout()`: `ensureAuthenticated` and `guestGuard` after a failed
+refresh, the `catch` block in `provideAppInitializer`, and `ProfileComponent` after a successful
+password change. They run the same routine through the public `clearSession()` delegate. The
+profile path cannot call `logout()`: the server already revoked every session, so
+`POST /auth/logout` would get a 401. It opens `/login?password_changed=1` (or `=email-pending`
+when the same submit started an email change), and the login page shows a banner that says why. A call to `AuthStore.clearSession()` clears only the token and the
 persisted user.
 
 **The server sign-out is per device.** `POST /auth/logout` ends the session that the
