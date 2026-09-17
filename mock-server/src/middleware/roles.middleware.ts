@@ -882,20 +882,14 @@ router.post(
       return;
     }
 
-    // Prevent assigning super roles via API. A delegated role that holds
-    // assign:Role now reaches this handler, so the super test is load-bearing.
+    // `RoleService.assignRoleToUser` refuses a super role to every caller of
+    // this route, a super caller included: no API path grants one.
     if (role.isSuper) {
-      const actor = (req as AuthenticatedRequest).user;
-      const actorRoles = Array.from(state.roles.values()).filter((r) =>
-        actor.roles.includes(r.name)
-      );
-      if (!actorRoles.some((r) => r.isSuper)) {
-        res.status(403).json({
-          message: 'Cannot assign super roles',
-          statusCode: 403
-        });
-        return;
-      }
+      res.status(403).json({
+        message: 'Cannot assign super roles',
+        statusCode: 403
+      });
+      return;
     }
 
     // `RoleService.assignRoleToUser` re-checks `update` on the target user,
@@ -973,19 +967,14 @@ router.delete(
       return;
     }
 
-    // Prevent removing super roles via API unless actor is also super
+    // `RoleService.removeRoleFromUser` refuses a super role to every caller of
+    // this route, a super caller included: no API path removes one.
     if (role.isSuper) {
-      const actor = (req as AuthenticatedRequest).user;
-      const actorRoles = Array.from(state.roles.values()).filter((r) =>
-        actor.roles.includes(r.name)
-      );
-      if (!actorRoles.some((r) => r.isSuper)) {
-        res.status(403).json({
-          message: 'Cannot remove super roles',
-          statusCode: 403
-        });
-        return;
-      }
+      res.status(403).json({
+        message: 'Cannot remove super roles',
+        statusCode: 403
+      });
+      return;
     }
 
     if (!assertInstancePermission(req, res, 'update', 'User', user)) {
