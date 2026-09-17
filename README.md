@@ -630,20 +630,22 @@ block of each permission in `RolePermissionsDialogComponent`.
 
 #### More than one role, and condition precedence
 
-When a user has more than one role, the system deduplicates the permissions by the key
-`effect:resource:action`. Thus an allow rule and a deny rule for the same pair of resource and action,
-from two different roles, stay two separate entries.
+When a user has more than one role, the system removes a permission entry only when an earlier entry
+has the same effect, resource, action and conditions. Thus every rule with different conditions stays a
+separate entry: an allow and a deny for the same pair of resource and action, and also two allows or
+two denies from two different roles.
 
-Inside the same effect bucket, a later role overrides an earlier role. The system does **not** merge
-the conditions across two roles.
+Allow entries add up: the user gets the union of their scopes. The system does **not** intersect the
+conditions across two roles.
 
 Example: Role A grants `update:User` with `{ ownership: { userField: "id" } }`. Role B grants
 `update:User` with no conditions. The user then gets **unrestricted** `update:User`, because Role B
-overrides Role A on the allow side.
+already allows every record.
 
-To apply more than one restriction at the same time, use one of two methods. Use `$and` in one
-`custom` condition on one role. Or move the additional restrictions to a separate role with
-`effect: 'deny'`.
+Deny entries also add up: each deny removes its own records from the grant. To apply more than one
+restriction at the same time, use one of two methods. Use `$and` in one `custom` condition on one
+role. Or put each additional restriction on a separate role with `effect: 'deny'`. Two such roles on
+the same permission both apply.
 
 ### User Management (Admin)
 

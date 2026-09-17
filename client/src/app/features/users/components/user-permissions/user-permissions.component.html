@@ -118,10 +118,7 @@
                     </mat-expansion-panel-header>
 
                     <ul class="permission-list">
-                      @for (
-                        permission of group.permissions;
-                        track permission.permission
-                      ) {
+                      @for (permission of group.permissions; track $index) {
                         <li class="permission-row">
                           <div class="permission-head">
                             <span class="action-name">{{

@@ -434,7 +434,7 @@ export function getResolvedPermissionsForUser(
     }
   }
 
-  // Dedup keyed by effect:resource:action, first wins — mirrors
+  // Dedup keyed by effect:resource:action:conditions, first wins - mirrors
   // PermissionService.getPermissionsForUser on the server.
   const permissionMap = new Map<string, ResolvedPermission>();
 
@@ -448,7 +448,7 @@ export function getResolvedPermissionsForUser(
       const action = currentState.actions.get(permission.actionId);
       if (!resource || !action) continue;
       const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
-      const key = `${effect}:${resource.name}:${action.name}`;
+      const key = `${effect}:${resource.name}:${action.name}:${JSON.stringify(rp.conditions ?? null)}`;
       if (!permissionMap.has(key)) {
         permissionMap.set(key, {
           resource: resource.name,

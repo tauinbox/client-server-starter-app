@@ -51,11 +51,9 @@ export class PermissionService {
       return [];
     }
 
-    // Dedup by effect + resource + action so allow and deny rules for the
-    // same (resource, action) coexist. The CASL factory registers them in
-    // allow-first / deny-last order, letting deny rules override broader
-    // allow rules (e.g. allow update:Article + deny update:Article when
-    // published=true).
+    // Conditions are part of the key: two restriction roles on one permission
+    // are two denies, and dropping either widens the grant. jsonb key order is
+    // stable, so equal conditions still dedup.
     const permissionMap = new Map<string, ResolvedPermission>();
 
     for (const role of user.roles) {
@@ -63,7 +61,7 @@ export class PermissionService {
         const resourceName = rp.permission.resource.name;
         const actionName = rp.permission.action.name;
         const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
-        const key = `${effect}:${resourceName}:${actionName}`;
+        const key = `${effect}:${resourceName}:${actionName}:${JSON.stringify(rp.conditions ?? null)}`;
         if (!permissionMap.has(key)) {
           permissionMap.set(key, {
             resource: resourceName,
