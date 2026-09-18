@@ -13,6 +13,7 @@ import {
   type MailQueueRef
 } from '../core/metrics/metrics.module';
 import { MetricsService } from '../core/metrics/metrics.service';
+import { maskEmail } from '../../common/utils/escape-html';
 
 /**
  * Delivers queued emails. Errors propagate so BullMQ applies the configured
@@ -54,7 +55,7 @@ export class MailProcessor extends WorkerHost {
   onFailed(job: Job<MailJobData>, err: Error): void {
     this.metrics.recordMailJob('failed');
     this.logger.error(
-      `Mail job ${job.id} to ${job.data.to} failed (attempt ${job.attemptsMade})`,
+      `Mail job ${job.id} to ${maskEmail(job.data.to)} failed (attempt ${job.attemptsMade})`,
       err
     );
   }

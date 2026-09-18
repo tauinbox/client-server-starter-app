@@ -14,6 +14,7 @@ import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MailService } from '../../mail/mail.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import { maskEmail } from '../../../common/utils/escape-html';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import {
@@ -186,7 +187,7 @@ export class OAuthService {
           .sendEmailVerification(email, rawVerificationToken)
           .catch((err) =>
             this.logger.error(
-              `Failed to send OAuth verification email to ${email}`,
+              `Failed to send OAuth verification email to ${maskEmail(email)}`,
               err
             )
           );

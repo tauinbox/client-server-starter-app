@@ -284,7 +284,7 @@ export class MailService {
         });
       } catch (error) {
         this.logger.error(
-          `Failed to enqueue "${message.subject}" to ${to}`,
+          `Failed to enqueue "${message.subject}" to ${maskEmail(to)}`,
           error
         );
       }
@@ -294,7 +294,10 @@ export class MailService {
     try {
       await this.deliver(data);
     } catch (error) {
-      this.logger.error(`Failed to send "${message.subject}" to ${to}`, error);
+      this.logger.error(
+        `Failed to send "${message.subject}" to ${maskEmail(to)}`,
+        error
+      );
     }
   }
 }

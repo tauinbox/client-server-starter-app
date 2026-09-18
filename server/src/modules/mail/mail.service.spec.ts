@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -37,6 +38,26 @@ describe('MailService', () => {
   it('should use json transport when SMTP_HOST is not set', () => {
     expect(service).toBeDefined();
     // Service was created without SMTP_HOST, so it uses jsonTransport
+  });
+
+  it('logs a masked recipient when direct delivery fails', async () => {
+    const loggerError = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation();
+    jest
+      .spyOn(service, 'deliver')
+      .mockRejectedValueOnce(new Error('smtp down'));
+
+    await service.sendPasswordReset('alice.private@example.com', 'tok', 'en');
+
+    expect(loggerError).toHaveBeenCalledWith(
+      expect.stringContaining('to a***e@example.com'),
+      expect.any(Error)
+    );
+    expect(JSON.stringify(loggerError.mock.calls)).not.toContain(
+      'alice.private@example.com'
+    );
+    loggerError.mockRestore();
   });
 
   describe('isSmtpConfigured', () => {
@@ -240,6 +261,28 @@ describe('MailService', () => {
         queuedService.sendPasswordReset('user@example.com', 'tok-123', 'en')
       ).resolves.toBeUndefined();
       expect(add).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs a masked recipient when the enqueue fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      add.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+      await queuedService.sendPasswordReset(
+        'alice.private@example.com',
+        'tok-123',
+        'en'
+      );
+
+      expect(loggerError).toHaveBeenCalledWith(
+        expect.stringContaining('to a***e@example.com'),
+        expect.any(Error)
+      );
+      expect(JSON.stringify(loggerError.mock.calls)).not.toContain(
+        'alice.private@example.com'
+      );
+      loggerError.mockRestore();
     });
 
     it('renders a credential-change notice with the UTC stamp and the IP', async () => {

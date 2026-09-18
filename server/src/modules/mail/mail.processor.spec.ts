@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
@@ -106,5 +107,29 @@ describe('MailProcessor', () => {
     processor.onFailed(job, new Error('smtp down'));
 
     expect(recordMailJob).toHaveBeenCalledWith('failed');
+  });
+
+  it('logs a masked recipient on the failed worker event', async () => {
+    const { processor } = await createProcessor();
+    const loggerError = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation();
+
+    // @ts-expect-error minimal Job stub — onFailed only reads logging fields
+    const job: Job<MailJobData> = {
+      id: 'j1',
+      attemptsMade: 1,
+      data: { to: 'alice.private@example.com', subject: 'Hi', html: '<p>x</p>' }
+    };
+    processor.onFailed(job, new Error('smtp down'));
+
+    expect(loggerError).toHaveBeenCalledWith(
+      'Mail job j1 to a***e@example.com failed (attempt 1)',
+      expect.any(Error)
+    );
+    expect(JSON.stringify(loggerError.mock.calls)).not.toContain(
+      'alice.private@example.com'
+    );
+    loggerError.mockRestore();
   });
 });

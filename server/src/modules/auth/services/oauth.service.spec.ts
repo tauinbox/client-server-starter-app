@@ -727,6 +727,42 @@ describe('OAuthService', () => {
       expect(typeof callArgs[1]).toBe('string');
       expect(callArgs[1]).toHaveLength(64); // 32 bytes hex
     });
+
+    it('should mask the address when the verification email fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+      mockManager.save
+        .mockResolvedValueOnce({ ...oauthUser, isEmailVerified: false })
+        .mockResolvedValueOnce({
+          id: 'oauth-account-1',
+          userId: 'oauth-user-1',
+          provider: 'google',
+          providerId: 'google-123'
+        });
+      mockUsersService.findOne.mockResolvedValue({
+        ...oauthUser,
+        isEmailVerified: false
+      });
+      mockMailService.sendEmailVerification.mockRejectedValueOnce(
+        new Error('smtp down')
+      );
+
+      await service.loginWithOAuth({ ...oauthProfile, emailVerified: false });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(loggerError).toHaveBeenCalledWith(
+        'Failed to send OAuth verification email to o***h@example.com',
+        expect.any(Error)
+      );
+      expect(JSON.stringify(loggerError.mock.calls)).not.toContain(
+        'oauth@example.com'
+      );
+      loggerError.mockRestore();
+    });
   });
 
   describe('linkOAuthToUser', () => {
