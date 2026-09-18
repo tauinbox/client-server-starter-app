@@ -35,7 +35,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     } catch (error) {
       this.logger.warn(
         'Resource sync skipped — tables may not exist yet. Run migrations first.',
-        error instanceof Error ? error.message : String(error)
+        error
       );
     }
   }

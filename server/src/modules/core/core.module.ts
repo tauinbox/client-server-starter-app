@@ -7,6 +7,7 @@ import { configValidationSchema } from './config-validation.schema';
 import { CacheModule } from '@nestjs/cache-manager';
 import { buildCacheOptions } from './redis-cache.store';
 import { buildThrottlerOptions } from './throttler-options';
+import { buildLoggerOptions } from './logger-options';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { postgresConfig } from '../../postgres.config';
 import { UsersModule } from '../users/users.module';
@@ -54,21 +55,8 @@ export class CoreModule implements NestModule {
         }),
         LoggerModule.forRootAsync({
           inject: [ConfigService],
-          useFactory: (config: ConfigService) => ({
-            pinoHttp: {
-              // HTTP request logging is handled by RequestLoggingMiddleware
-              autoLogging: false,
-              level:
-                config.get('ENVIRONMENT') === 'production' ? 'info' : 'debug',
-              transport:
-                config.get('ENVIRONMENT') !== 'production'
-                  ? {
-                      target: 'pino-pretty',
-                      options: { colorize: true, singleLine: true }
-                    }
-                  : undefined
-            }
-          })
+          useFactory: (config: ConfigService) =>
+            buildLoggerOptions(config.get<string>('ENVIRONMENT'))
         }),
         EventEmitterModule.forRoot(),
         CacheModule.registerAsync({

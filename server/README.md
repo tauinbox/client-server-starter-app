@@ -237,6 +237,19 @@ unreachable Redis from holding a request, and the server then serves the data wi
 
 `filters/` holds `GlobalExceptionFilter`. It gives a standard error response and maps a DB error.
 
+`logger-options.ts` holds `buildLoggerOptions(ENVIRONMENT)`, the `nestjs-pino` configuration. The
+Nest `Logger` gives each argument after the message to pino as a printf value, and pino drops a
+value with no placeholder. Thus `logger.error('msg', err)` wrote no cause and no stack. A
+`hooks.logMethod` hook moves the first `Error` after the message into the `err` field.
+
+The `err` serializer writes an allowlist only: `type`, `message`, `stack` and `code`. It masks each
+email address in `message` and `stack` with `maskEmail`. The default serializer copies each
+enumerable field of the error, and these fields carry secrets and PII: `QueryFailedError.parameters`,
+the axios request `config` (the YooKassa SDK puts the shop secret key in `config.auth`), and an SMTP
+reply that quotes the recipient. Add a field to the allowlist only after you make sure that it
+cannot carry PII or a secret. The allowlist keeps `message`, thus a third-party error message can
+still carry PII that is not an email address.
+
 `health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
 readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
 environment is production.
