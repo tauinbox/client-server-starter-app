@@ -19,6 +19,7 @@ import { CookieStateStore } from '../utils/cookie-state-store';
 export interface VkStrategyOptions extends StrategyOptions {
   scope: string[];
   state: boolean;
+  pkce: boolean;
   store: OAuth2Strategy.StateStore;
 }
 
@@ -31,6 +32,7 @@ export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
       callbackURL: '/api/v1/auth/oauth/vk/callback',
       scope: ['email'],
       state: true,
+      pkce: true,
       store: new CookieStateStore(
         OAuthProvider.VK,
         requiresSecureCookies(configService.get<string>('ENVIRONMENT'))

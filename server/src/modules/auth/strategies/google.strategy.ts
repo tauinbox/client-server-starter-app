@@ -18,6 +18,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       callbackURL: '/api/v1/auth/oauth/google/callback',
       scope: ['email', 'profile'],
       state: true,
+      pkce: true,
       store: new CookieStateStore(
         OAuthProvider.GOOGLE,
         requiresSecureCookies(configService.get<string>('ENVIRONMENT'))
