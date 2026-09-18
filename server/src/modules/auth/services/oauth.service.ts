@@ -24,6 +24,17 @@ import {
 import { normalizeEmail } from '@app/shared/utils/email';
 import type { MfaRequiredResponse } from '@app/shared/types';
 
+function emailAlreadyRegisteredConflict(): HttpException {
+  return new HttpException(
+    {
+      message:
+        'This email is already registered. Log in with your password first, then link the provider from your profile.',
+      errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
+    },
+    HttpStatus.CONFLICT
+  );
+}
+
 @Injectable()
 export class OAuthService {
   private readonly logger = new Logger(OAuthService.name);
@@ -97,28 +108,12 @@ export class OAuthService {
         user.isEmailVerified = true;
       }
     } else {
-      // 2. Check if user exists by email.
       // Canonicalized again here rather than trusted from the strategy: this is
       // the only writer of OAuth-created users, and a provider-cased address
       // would create a duplicate the conflict check below can never see.
       const email = normalizeEmail(profile.email) ?? '';
-      const existingUser = await this.usersService.findByEmail(email);
 
-      if (existingUser) {
-        // Do NOT auto-link OAuth to a pre-existing local account.
-        // A provider asserting an email address is not sufficient consent
-        // to take over the linked user's session. The user must explicitly
-        // initiate linking from their profile page.
-        throw new HttpException(
-          {
-            message:
-              'This email is already registered. Log in with your password first, then link the provider from your profile.',
-            errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-          },
-          HttpStatus.CONFLICT
-        );
-      }
-      // 3. Create new user + OAuth account atomically.
+      // 2. Create new user + OAuth account atomically.
       // Without a transaction, a failure after user creation would leave an
       // orphaned user with no OAuth account — they would be unable to log in.
       // Email verification: trust the provider's `emailVerified` flag.
@@ -138,15 +133,34 @@ export class OAuthService {
       const createdUserId = await withTransaction(
         this.dataSource,
         async (manager) => {
-          const newUser = await manager.save(User, {
-            email,
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            password: null,
-            isEmailVerified,
-            emailVerificationToken: hashedVerificationToken,
-            emailVerificationExpiresAt: verificationExpiresAt
+          // Do NOT auto-link OAuth to a pre-existing local account: a provider
+          // asserting an address is not consent to take over that account.
+          // An address another account is changing to is reserved as well,
+          // matching register; otherwise that owner's confirmation fails.
+          const existing = await manager.findOne(User, {
+            where: [{ email }, { pendingEmail: email }]
           });
+          if (existing) {
+            throw emailAlreadyRegisteredConflict();
+          }
+
+          let newUser: User;
+          try {
+            newUser = await manager.save(User, {
+              email,
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              password: null,
+              isEmailVerified,
+              emailVerificationToken: hashedVerificationToken,
+              emailVerificationExpiresAt: verificationExpiresAt
+            });
+          } catch (error: unknown) {
+            if (isUniqueViolation(error)) {
+              throw emailAlreadyRegisteredConflict();
+            }
+            throw error;
+          }
           await manager.save(OAuthAccount, {
             userId: newUser.id,
             provider: profile.provider,

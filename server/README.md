@@ -1378,7 +1378,8 @@ review the connected accounts. OWASP ASVS 5.0 requirement 6.3.7 asks for this no
 The mock has no link path to mirror, because both provider halves answer 501.
 
 **Automatic linking is disabled.** When a local account already exists for the email address that
-OAuth asserts, the callback throws `OAUTH_EMAIL_ALREADY_REGISTERED` (409). It redirects to
+OAuth asserts, or another account has that address as its `pendingEmail`, the callback throws
+`OAUTH_EMAIL_ALREADY_REGISTERED` (409). A unique violation on the user insert gives the same 409. It redirects to
 `/login?oauth_error=email_already_registered`. The user must log in with their password and then link
 the provider with `POST /auth/oauth/link-init`, which asks for their password first: a linked
 provider signs the account in and no recovery path removes it.
@@ -1509,7 +1510,7 @@ administrator email change, on a deactivation (`isActive` set to false), on a so
 `UserDeletedEvent`. A re-activation does not restore a cancelled change. The user starts a new one.
 
 A partial unique index on `LOWER(pending_email)`, plus the dual-email checks in `register`,
-`users.create` and `users.update`, keep the set of `{email}` and `{pendingEmail}` globally unique
+`users.create`, `users.update` and the OAuth sign-up, keep the set of `{email}` and `{pendingEmail}` globally unique
 under a concurrent write.
 
 **Password reset.** The forgot-password and reset-password flow uses a token that expires in 30
