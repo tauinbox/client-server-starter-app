@@ -121,7 +121,7 @@ describe('ResourceSyncService', () => {
       await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Resource sync skipped'),
-        expect.any(String)
+        expect.any(Error)
       );
     });
 
