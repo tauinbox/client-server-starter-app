@@ -78,8 +78,8 @@ management and theming.
   deactivation also cancels a change that is in progress.
 
   A partial unique index on `LOWER(pending_email)` keeps the set of `{email}` and `{pendingEmail}`
-  globally unique. The dual-email checks in `register`, `users.update` and `users.create` do the
-  same.
+  globally unique. The dual-email checks in `register`, `users.update`, `users.create` and the
+  OAuth sign-up do the same.
 
   On the client, one Save action carries the whole form. If the user confirms an address change, the
   client sends the initiate request and the `PATCH /api/v1/auth/profile` request in sequence. The
@@ -1799,8 +1799,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2427 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 388 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. Thus a local `npm run test:e2e` reports 393 passed and 2 skipped. The mail suite is the skipped one, until `SMTP_HOST` points at a sink. CI runs with no Redis and skips 10 |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2430 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 397 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis, as CI runs, 387 pass and 10 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1292 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 267 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 784 tests pass |
