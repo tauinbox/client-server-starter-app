@@ -244,7 +244,10 @@ describe('Refresh token reuse detection (e2e)', () => {
         },
         {
           provide: UsersService,
-          useValue: { findOne: jest.fn().mockResolvedValue(userRecord) }
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(userRecord),
+            findById: jest.fn().mockResolvedValue(userRecord)
+          }
         },
         { provide: RoleService, useValue: {} },
         {

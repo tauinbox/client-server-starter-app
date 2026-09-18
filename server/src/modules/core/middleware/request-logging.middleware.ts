@@ -1,6 +1,7 @@
 import type { NestMiddleware } from '@nestjs/common';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
+import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 
 // Health probes (docker healthcheck, every 30s) and Prometheus scrapes
 // (every 15s) would dominate the request log; keep them out of it.
@@ -30,7 +31,9 @@ export class RequestLoggingMiddleware implements NestMiddleware {
 
       const duration = Date.now() - start;
       const requestId = res.getHeader('X-Request-Id') as string | undefined;
-      const message = `${req.method} ${req.originalUrl} ${statusCode} ${duration}ms${requestId ? ` [req-id: ${requestId}]` : ''}`;
+      // The OAuth callback carries its authorization code in the query string.
+      const url = redactSensitiveQuery(req.originalUrl);
+      const message = `${req.method} ${url} ${statusCode} ${duration}ms${requestId ? ` [req-id: ${requestId}]` : ''}`;
 
       if (statusCode >= 500) {
         this.logger.error(message);

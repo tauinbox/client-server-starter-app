@@ -240,7 +240,10 @@ describe('Auth response serialization (e2e)', () => {
         },
         {
           provide: UsersService,
-          useValue: { findOne: jest.fn(() => Promise.resolve(userEntity)) }
+          useValue: {
+            findOne: jest.fn(() => Promise.resolve(userEntity)),
+            findById: jest.fn(() => Promise.resolve(userEntity))
+          }
         },
         { provide: RoleService, useValue: {} },
         {

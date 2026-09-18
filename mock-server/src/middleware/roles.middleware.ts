@@ -20,6 +20,7 @@ import {
   findUserById,
   getState,
   logAudit,
+  revokeUserSessions,
   toPermissionResponse
 } from '../state';
 import {
@@ -920,7 +921,7 @@ router.post(
     user.roles.push(role.name);
 
     // Revoke tokens on any role change (mirrors UserRoleChangedListener)
-    user.tokenRevokedAt = new Date().toISOString();
+    revokeUserSessions(user.id);
 
     const actor = (req as AuthenticatedRequest).user;
     logAudit('ROLE_ASSIGN', {
@@ -988,7 +989,7 @@ router.delete(
     user.roles = user.roles.filter((r) => r !== role.name);
 
     // Revoke tokens on any role change (mirrors UserRoleChangedListener)
-    user.tokenRevokedAt = new Date().toISOString();
+    revokeUserSessions(user.id);
 
     const actor = (req as AuthenticatedRequest).user;
     logAudit('ROLE_UNASSIGN', {
