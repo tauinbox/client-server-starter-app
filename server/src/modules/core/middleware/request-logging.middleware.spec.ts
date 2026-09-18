@@ -67,6 +67,24 @@ describe('RequestLoggingMiddleware', () => {
     );
   });
 
+  it('does not write the OAuth authorization code or state to the log', () => {
+    req = {
+      method: 'GET',
+      originalUrl:
+        '/api/v1/auth/oauth/google/callback?state=s3cr3t-state&code=s3cr3t-code'
+    };
+    res.statusCode = 302;
+
+    middleware.use(req as Request, res, next);
+    res.emit('finish');
+
+    const [[line]] = logSpy.mock.calls as string[][];
+    expect(line).toContain(
+      '/api/v1/auth/oauth/google/callback?state=REDACTED&code=REDACTED 302'
+    );
+    expect(line).not.toContain('s3cr3t');
+  });
+
   it('should log 3xx responses with Logger.log', () => {
     res.statusCode = 301;
 

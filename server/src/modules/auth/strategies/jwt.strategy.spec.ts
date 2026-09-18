@@ -141,6 +141,31 @@ describe('JwtStrategy', () => {
       });
     });
 
+    // Minted 600 ms after the revocation, but `iat` reads the whole second.
+    it('passes a token minted later in the same second as the revocation', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        id: 'user-1',
+        tokenRevokedAt: new Date(basePayload.iat! * 1000 + 400)
+      });
+
+      await expect(strategy.validate(basePayload)).resolves.toEqual({
+        userId: 'user-1',
+        email: 'test@example.com',
+        roles: ['user']
+      });
+    });
+
+    it('refuses a token minted in the second before the revocation', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        id: 'user-1',
+        tokenRevokedAt: new Date((basePayload.iat! + 1) * 1000 + 400)
+      });
+
+      await expect(strategy.validate(basePayload)).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
+      });
+    });
+
     it('should default roles to empty array when payload has no roles', async () => {
       mockRepository.findOne.mockResolvedValue({
         id: 'user-1',

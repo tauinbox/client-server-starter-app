@@ -10,6 +10,7 @@ import {
   CASL_RESERVED_ACTION_NAMES,
   CASL_RESERVED_SUBJECT_NAMES
 } from './constants';
+import { generateSessionId } from './jwt.utils';
 import type {
   AdminUserResponse,
   MockAuditLog,
@@ -185,6 +186,47 @@ export function endSessionOfToken(refreshToken: string): boolean {
   }
   state.sessionStarts.delete(sessionId);
   return ended;
+}
+
+/**
+ * Ends every session of the account and stamps the revocation. Mirrors the
+ * server's revocation listeners, which do both: the stamp alone leaves the
+ * refresh token working, and the delete alone leaves issued access tokens.
+ */
+export function revokeUserSessions(userId: string): void {
+  for (const [token, uid] of state.refreshTokens.entries()) {
+    if (uid === userId) state.refreshTokens.delete(token);
+  }
+  for (const [token, uid] of state.revokedRefreshTokens.entries()) {
+    if (uid === userId) state.revokedRefreshTokens.delete(token);
+  }
+  const user = state.users.get(userId);
+  if (user) user.tokenRevokedAt = new Date().toISOString();
+}
+
+/**
+ * Gives each live session of the account a new id, so every access token
+ * issued so far fails the session check while the refresh token still works.
+ * Unlike a revocation stamp, this does not depend on which second a token was
+ * issued in.
+ */
+export function rekeyUserSessions(userId: string): void {
+  const renamed = new Map<string, string>();
+  for (const [token, sid] of state.refreshSessions.entries()) {
+    const owner =
+      state.refreshTokens.get(token) ?? state.revokedRefreshTokens.get(token);
+    if (owner !== userId) continue;
+
+    let next = renamed.get(sid);
+    if (next === undefined) {
+      next = generateSessionId();
+      renamed.set(sid, next);
+      const startedAt = state.sessionStarts.get(sid);
+      state.sessionStarts.delete(sid);
+      if (startedAt !== undefined) state.sessionStarts.set(next, startedAt);
+    }
+    state.refreshSessions.set(token, next);
+  }
 }
 
 export function findUserByEmail(email: string): MockUser | undefined {

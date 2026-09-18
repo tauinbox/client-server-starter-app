@@ -220,6 +220,20 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * The lookup for a caller that must answer a missing account itself.
+   * `findOne` throws a 404, which is the wrong status on a token path. A
+   * soft-deleted account is missing here too.
+   */
+  async findById(id: string): Promise<User | null> {
+    if (!id) return null;
+
+    return this.userRepository.findOne({
+      where: { id },
+      relations: ['roles']
+    });
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { email },

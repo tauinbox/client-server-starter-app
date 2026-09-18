@@ -109,7 +109,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         HttpStatus.UNAUTHORIZED
       );
     }
-    if (user.tokenRevokedAt && iat < user.tokenRevokedAt.getTime() / 1000) {
+    // `iat` is whole seconds. A token minted earlier in the revocation's second
+    // passes here and dies at the session check: every revocation deletes rows.
+    if (
+      user.tokenRevokedAt &&
+      iat < Math.floor(user.tokenRevokedAt.getTime() / 1000)
+    ) {
       throw new HttpException(
         {
           message: 'Token has been revoked',

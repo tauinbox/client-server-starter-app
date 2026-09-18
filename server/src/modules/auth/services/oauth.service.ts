@@ -242,15 +242,6 @@ export class OAuthService {
   }
 
   /**
-   * A linked provider is an authentication factor, never an email assertion:
-   * the provider's address is deliberately not passed in, because linking a
-   * provider whose profile carries a different mailbox is legitimate - the
-   * session already proves identity.
-   *
-   * `linkTokenIssuedAt` is the `iat` of the link token, in seconds. It is
-   * required, not optional: the caller must state when the intent was proved.
-   */
-  /**
    * Confirms that a completed provider round trip re-authenticated the account
    * the intent names. Two things have to hold, and neither is implied by the
    * other: the account must still be usable, and the identity the provider just
@@ -263,8 +254,10 @@ export class OAuthService {
     providerId: string,
     reauthTokenIssuedAt: number
   ): Promise<void> {
+    // A missing account throws 404 inside `findOne`; the callback turns either
+    // refusal into the same redirect.
     const user = await this.usersService.findOne(userId);
-    if (!user || !user.isActive) {
+    if (!user.isActive) {
       throw new HttpException(
         {
           message: 'User account not found or deactivated',
@@ -304,6 +297,15 @@ export class OAuthService {
     }
   }
 
+  /**
+   * A linked provider is an authentication factor, never an email assertion:
+   * the provider's address is deliberately not passed in, because linking a
+   * provider whose profile carries a different mailbox is legitimate - the
+   * session already proves identity.
+   *
+   * `linkTokenIssuedAt` is the `iat` of the link token, in seconds. It is
+   * required, not optional: the caller must state when the intent was proved.
+   */
   async linkOAuthToUser(
     userId: string,
     provider: string,
@@ -311,8 +313,10 @@ export class OAuthService {
     linkTokenIssuedAt: number,
     auditContext?: AuditContext
   ): Promise<void> {
+    // A missing account throws 404 inside `findOne`; the callback turns either
+    // refusal into the same redirect.
     const user = await this.usersService.findOne(userId);
-    if (!user || !user.isActive) {
+    if (!user.isActive) {
       throw new HttpException(
         {
           message: 'User account not found or deactivated',
