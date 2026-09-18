@@ -2,6 +2,7 @@ import { CookieStateStore } from './cookie-state-store';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { bindIntent, readIntentForFlow } from './oauth-flow-intent';
 import type { Request, Response } from 'express';
+import type OAuth2Strategy from 'passport-oauth2';
 
 /**
  * The jar is shared between requests on purpose: a browser replays every
@@ -50,8 +51,8 @@ function verifySync(
   store: CookieStateStore,
   req: Request,
   providedState: string
-): boolean {
-  let captured: boolean | undefined;
+): boolean | string {
+  let captured: boolean | string | undefined;
   store.verify(req, providedState, (err, ok) => {
     expect(err).toBeNull();
     captured = ok;
@@ -67,7 +68,7 @@ describe('CookieStateStore', () => {
     it('should keep the arities passport dispatches on', () => {
       const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
 
-      expect(store.store.length).toBe(3);
+      expect(store.store.length).toBe(5);
       expect(store.verify.length).toBe(4);
     });
   });
@@ -306,6 +307,61 @@ describe('CookieStateStore', () => {
         false
       );
       expect(verifySync(store, mockReqRes(jar).req, state)).toBe(true);
+    });
+  });
+
+  describe('PKCE verifier', () => {
+    const META: OAuth2Strategy.Metadata = {
+      authorizationURL: 'https://provider.example/authorize',
+      tokenURL: 'https://provider.example/token',
+      clientID: 'client-id'
+    };
+
+    /** How passport-oauth2 calls a store whose `store` has five parameters. */
+    function storeWithVerifier(req: Request, verifier: string): string {
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
+      let captured: string | undefined;
+      store.store(req, verifier, undefined, META, (err, state) => {
+        expect(err).toBeNull();
+        captured = state as string;
+      });
+      return captured!;
+    }
+
+    // base64url, so it contains the field separator.
+    const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+
+    it('should report the verifier of the matched state', () => {
+      const jar: Record<string, string> = {};
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
+      const state = storeWithVerifier(mockReqRes(jar).req, VERIFIER);
+
+      expect(verifySync(store, mockReqRes(jar).req, state)).toBe(VERIFIER);
+    });
+
+    it('should keep each flow with its own verifier', () => {
+      const jar: Record<string, string> = {};
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
+      const first = storeWithVerifier(mockReqRes(jar).req, `${VERIFIER}-1`);
+      const second = storeWithVerifier(mockReqRes(jar).req, `${VERIFIER}-2`);
+
+      expect(verifySync(store, mockReqRes(jar).req, second)).toBe(
+        `${VERIFIER}-2`
+      );
+      expect(verifySync(store, mockReqRes(jar).req, first)).toBe(
+        `${VERIFIER}-1`
+      );
+    });
+
+    // Such an entry predates PKCE, so its flow sent no challenge and the
+    // token exchange must not carry a verifier either.
+    it('should report true for an entry that holds no verifier', () => {
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
+      const { req } = mockReqRes({
+        oauth_state_google: pendingCookie('abc123')
+      });
+
+      expect(verifySync(store, req, 'abc123')).toBe(true);
     });
   });
 

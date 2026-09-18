@@ -1432,7 +1432,8 @@ mismatched intent is left in place rather than cleared, because its own flow may
 The marker and the separator are both `:`, which appears neither in a hex state nor in a JWT. The
 intent is not carried inside the `oauth_state_<provider>` cookie, whose separators are `.` and `-`,
 and a JWT holds both. The binding runs inside `store` and adds no parameter, because
-`passport-oauth2` dispatches on `store.length` and `verify.length`.
+`passport-oauth2` dispatches on `store.length` and `verify.length`: `store` takes the five
+arguments of the PKCE form, and `verify` takes four.
 
 **The link intent also ends with the session.** `POST /auth/logout` clears the `oauth_link` cookie,
 and so does a self-service password change, which revokes the sessions for the same reason. The
@@ -1453,7 +1454,17 @@ provider (`auth/providers/client-url.provider.ts`), which the controller and the
 
 **The OAuth state is scoped for each provider and for each flow in progress.** `CookieStateStore`
 writes an `oauth_state_<provider>` cookie. The cookie is `httpOnly`, uses `sameSite: 'lax'` and the
-path `/api/v1/auth/oauth`. Its value is a list of a maximum of 5 `<state>-<expiresAt>` entries.
+path `/api/v1/auth/oauth`. Its value is a list of a maximum of 5 `<state>-<expiresAt>-<verifier>`
+entries. The verifier is base64url and can contain `-`, so it is the last field and is read as the
+remainder of the entry.
+
+**All three strategies use PKCE (`pkce: true`, method `S256`).** `passport-oauth2` makes a verifier
+for each flow and hands it to `store`, which keeps it beside the state. `verify` reports the verifier
+of the matched entry in place of `true`, and `passport-oauth2` sends it as `code_verifier`. Thus a
+code that was stolen from one flow cannot be exchanged through the flow of another browser: the state
+check passes there, and the verifier does not match the challenge. An entry with no verifier makes
+the exchange send none, because the flow that wrote it sent no challenge. The published typings of
+`passport-oauth2` allow a boolean only for that report, so `verify` casts its callback once.
 
 Thus two flows can run together. Two providers use two different cookies, and two tabs of one
 provider each hold their own entry.
