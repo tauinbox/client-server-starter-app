@@ -11,8 +11,9 @@ export function createApp() {
   const app = express();
   app.use(cors({ origin: true, credentials: true }));
   app.use(cookieParser());
+  // JSON only, as the server: a cross-site form can post a urlencoded body with
+  // no preflight, and a login sent that way plants the sender's session.
   app.use(express.json({ limit: '100kb' }));
-  app.use(express.urlencoded({ extended: true, limit: '100kb' }));
   // Anonymous ID cookie (mirrors server's AnonIdMiddleware) — must run after
   // cookieParser so req.cookies is populated, and before route handlers so
   // /feature-flags can read it for percentage bucketing.
