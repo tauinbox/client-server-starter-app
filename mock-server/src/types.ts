@@ -369,6 +369,12 @@ export interface State {
   // the entry, so it bounds the whole chain. Mirrors the `session_started_at`
   // column the real server keeps on `refresh_tokens`.
   sessionStarts: Map<string, number>;
+  // Session id -> the User-Agent the device sent when it signed in. Mirrors the
+  // `user_agent` column the real server keeps on `refresh_tokens`.
+  sessionUserAgents: Map<string, string | null>;
+  // Session id -> the epoch milliseconds of its latest refresh token. Mirrors
+  // the `created_at` of the live row, which the server reports as last active.
+  sessionLastActive: Map<string, number>;
   // Revoked refresh tokens — kept around to detect token reuse (OAuth 2.0 BCP).
   // If a token was rotated (moved to this map) and is presented again before
   // it would naturally expire, treat as a possible compromise: revoke all
@@ -432,4 +438,5 @@ export interface State {
 
 export interface AuthenticatedRequest extends Request {
   user: MockUser;
+  sessionId: string;
 }

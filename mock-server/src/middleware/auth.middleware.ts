@@ -43,6 +43,7 @@ import {
   sessionAgeMs,
   toUserResponse
 } from '../state';
+import { normalizeUserAgent } from '../utils/user-agent';
 import {
   authGuard,
   clearMailedProofs,
@@ -291,7 +292,11 @@ router.post('/login', (req, res) => {
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
-  registerSession(tokens.refresh_token, sessionId);
+  registerSession(
+    tokens.refresh_token,
+    sessionId,
+    normalizeUserAgent(req.headers['user-agent'])
+  );
   // Concurrent-session allowance is plan-driven; a plan carrying no `sessions`
   // limit (Free, usage) keeps the constant, exactly as the server resolves it.
   pruneOldestUserTokens(

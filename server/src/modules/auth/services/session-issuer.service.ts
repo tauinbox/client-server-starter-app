@@ -40,7 +40,8 @@ export class SessionIssuerService {
    * carry the same value.
    */
   async issueSession(
-    user: User
+    user: User,
+    userAgent: string | null
   ): Promise<{ tokens: TokensResponseDto; user: User }> {
     const roleNames = user.roles.map((r) => r.name);
     const sessionId = randomUUID();
@@ -59,7 +60,8 @@ export class SessionIssuerService {
       user.id,
       tokens.refresh_token,
       expiresIn,
-      sessionId
+      sessionId,
+      userAgent
     );
     await this.refreshTokenService.pruneOldestTokens(
       user.id,

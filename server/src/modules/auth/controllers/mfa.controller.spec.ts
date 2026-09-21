@@ -28,7 +28,12 @@ const auditContext = { ip: '127.0.0.1', requestId: undefined };
 
 function jwtRequest(cookies: Record<string, string> = {}): JwtAuthRequest {
   return createMockRequest({
-    user: { userId: 'user-1', email: 'user@example.com', roles: ['user'] },
+    user: {
+      userId: 'user-1',
+      email: 'user@example.com',
+      roles: ['user'],
+      sessionId: 'session-1'
+    },
     ip: '127.0.0.1',
     headers: {},
     cookies

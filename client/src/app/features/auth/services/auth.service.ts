@@ -7,7 +7,10 @@ import type { Observable } from 'rxjs';
 import { EMPTY, finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
-import type { UserPermissionsResponse } from '@app/shared/types';
+import type {
+  ActiveSessionResponse,
+  UserPermissionsResponse
+} from '@app/shared/types';
 import type { StepUpOperation } from '@app/shared/constants';
 import type {
   AuthResponse,
@@ -198,6 +201,32 @@ export class AuthService {
       AuthApiEnum.MfaDisable,
       request,
       { context: silentContext() }
+    );
+  }
+
+  getSessions(): Observable<ActiveSessionResponse[]> {
+    return this.#http.get<ActiveSessionResponse[]>(AuthApiEnum.Sessions, {
+      context: silentContext()
+    });
+  }
+
+  /** An empty request relies on the provider proof cookie the page cannot read. */
+  revokeSession(
+    sessionId: string,
+    request: MfaStepUpRequest
+  ): Observable<{ message: string }> {
+    return this.#http.delete<{ message: string }>(
+      `${AuthApiEnum.Sessions}/${encodeURIComponent(sessionId)}`,
+      { body: request, context: silentContext() }
+    );
+  }
+
+  revokeOtherSessions(
+    request: MfaStepUpRequest
+  ): Observable<{ message: string; count: number }> {
+    return this.#http.delete<{ message: string; count: number }>(
+      AuthApiEnum.Sessions,
+      { body: request, context: silentContext() }
     );
   }
 

@@ -212,7 +212,7 @@ describe('OAuthService', () => {
    * failure and not a shape to handle.
    */
   const loginExpectingSession = async (profile: OAuthUserProfile) => {
-    const result = await service.loginWithOAuth(profile);
+    const result = await service.loginWithOAuth(profile, null);
     if ('mfaRequired' in result) {
       throw new Error('Expected a session, received a two-factor challenge');
     }
@@ -283,7 +283,7 @@ describe('OAuthService', () => {
         totpEnabledAt: new Date()
       });
 
-      const result = await service.loginWithOAuth(oauthProfile);
+      const result = await service.loginWithOAuth(oauthProfile, null);
 
       expect(result).toEqual({
         mfaRequired: true,
@@ -305,7 +305,7 @@ describe('OAuthService', () => {
       mockUsersService.findOne.mockResolvedValue(oauthUser);
       mockEntitlementService.limitFor.mockResolvedValue(10);
 
-      await service.loginWithOAuth(oauthProfile);
+      await service.loginWithOAuth(oauthProfile, null);
 
       // A paid allowance must survive the provider path too: trimming to the
       // constant here would evict devices the user paid for the moment they
@@ -444,10 +444,13 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      await service.loginWithOAuth({
-        ...oauthProfile,
-        email: 'OAuth@Example.com'
-      });
+      await service.loginWithOAuth(
+        {
+          ...oauthProfile,
+          email: 'OAuth@Example.com'
+        },
+        null
+      );
 
       expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
         'oauth-user-1'
@@ -469,7 +472,7 @@ describe('OAuthService', () => {
         isActive: false
       });
 
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
+      await expect(service.loginWithOAuth(oauthProfile, null)).rejects.toThrow(
         HttpException
       );
     });
@@ -486,7 +489,9 @@ describe('OAuthService', () => {
         email: 'oauth@example.com'
       });
 
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
+      await expect(
+        service.loginWithOAuth(oauthProfile, null)
+      ).rejects.toMatchObject({
         constructor: HttpException,
         status: HttpStatus.CONFLICT,
         response: {
@@ -511,7 +516,9 @@ describe('OAuthService', () => {
         isActive: false
       });
 
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
+      await expect(
+        service.loginWithOAuth(oauthProfile, null)
+      ).rejects.toMatchObject({
         response: {
           errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
         }
@@ -534,10 +541,13 @@ describe('OAuthService', () => {
       );
 
       await expect(
-        service.loginWithOAuth({
-          ...oauthProfile,
-          email: ' OAuth@Example.COM '
-        })
+        service.loginWithOAuth(
+          {
+            ...oauthProfile,
+            email: ' OAuth@Example.COM '
+          },
+          null
+        )
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
         response: {
@@ -572,7 +582,9 @@ describe('OAuthService', () => {
           )
       );
 
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
+      await expect(
+        service.loginWithOAuth(oauthProfile, null)
+      ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
         response: {
           errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
@@ -591,7 +603,9 @@ describe('OAuthService', () => {
         Object.assign(new Error('duplicate key'), { code: '23505' })
       );
 
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
+      await expect(
+        service.loginWithOAuth(oauthProfile, null)
+      ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
         response: {
           errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
@@ -607,7 +621,9 @@ describe('OAuthService', () => {
       const failure = new Error('connection lost');
       mockManager.save.mockRejectedValueOnce(failure);
 
-      await expect(service.loginWithOAuth(oauthProfile)).rejects.toBe(failure);
+      await expect(service.loginWithOAuth(oauthProfile, null)).rejects.toBe(
+        failure
+      );
     });
 
     it('stores a canonical address when creating the user', async () => {
@@ -622,10 +638,13 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      await service.loginWithOAuth({
-        ...oauthProfile,
-        email: ' OAuth@Example.COM '
-      });
+      await service.loginWithOAuth(
+        {
+          ...oauthProfile,
+          email: ' OAuth@Example.COM '
+        },
+        null
+      );
 
       expect(mockManager.save).toHaveBeenCalledWith(
         User,
@@ -704,7 +723,7 @@ describe('OAuthService', () => {
         isEmailVerified: false
       });
 
-      await service.loginWithOAuth(unverifiedProfile);
+      await service.loginWithOAuth(unverifiedProfile, null);
 
       expect(mockManager.save).toHaveBeenCalledWith(
         expect.anything(),
@@ -751,7 +770,10 @@ describe('OAuthService', () => {
         new Error('smtp down')
       );
 
-      await service.loginWithOAuth({ ...oauthProfile, emailVerified: false });
+      await service.loginWithOAuth(
+        { ...oauthProfile, emailVerified: false },
+        null
+      );
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(loggerError).toHaveBeenCalledWith(

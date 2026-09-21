@@ -89,6 +89,8 @@ export function resetState(): void {
     refreshTokens: new Map(),
     refreshSessions: new Map(),
     sessionStarts: new Map(),
+    sessionUserAgents: new Map(),
+    sessionLastActive: new Map(),
     revokedRefreshTokens: new Map(),
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
@@ -132,13 +134,19 @@ export function getState(): State {
  * `session_id` column of the real server, which the access token carries as the
  * `sid` claim.
  */
-export function registerSession(refreshToken: string, sessionId: string): void {
+export function registerSession(
+  refreshToken: string,
+  sessionId: string,
+  userAgent: string | null = null
+): void {
   state.refreshSessions.set(refreshToken, sessionId);
-  // Only a session that is new gets a start. Rotation calls this with the id it
-  // replaces a token inside, and re-stamping there would restore the sliding
-  // expiry the absolute cap ends.
+  state.sessionLastActive.set(sessionId, Date.now());
+  // Only a session that is new gets a start and a device. Rotation calls this
+  // with the id it replaces a token inside, and re-stamping there would restore
+  // the sliding expiry the absolute cap ends.
   if (!state.sessionStarts.has(sessionId)) {
     state.sessionStarts.set(sessionId, Date.now());
+    state.sessionUserAgents.set(sessionId, userAgent);
   }
 }
 
@@ -176,7 +184,10 @@ export function isSessionLive(sessionId: string): boolean {
 export function endSessionOfToken(refreshToken: string): boolean {
   const sessionId = state.refreshSessions.get(refreshToken);
   if (sessionId === undefined) return false;
+  return endSession(sessionId);
+}
 
+function endSession(sessionId: string): boolean {
   let ended = false;
   for (const [token, sid] of state.refreshSessions.entries()) {
     if (sid !== sessionId) continue;
@@ -185,6 +196,44 @@ export function endSessionOfToken(refreshToken: string): boolean {
     state.refreshSessions.delete(token);
   }
   state.sessionStarts.delete(sessionId);
+  state.sessionUserAgents.delete(sessionId);
+  state.sessionLastActive.delete(sessionId);
+  return ended;
+}
+
+/** The live sessions of one account. Mirrors `findLiveSessions`. */
+export function liveSessionIdsOf(userId: string): string[] {
+  const ids = new Set<string>();
+  for (const [token, uid] of state.refreshTokens.entries()) {
+    if (uid !== userId) continue;
+    const sid = state.refreshSessions.get(token);
+    if (sid !== undefined) ids.add(sid);
+  }
+  return [...ids].sort(
+    (a, b) =>
+      (state.sessionLastActive.get(b) ?? 0) -
+      (state.sessionLastActive.get(a) ?? 0)
+  );
+}
+
+/**
+ * Ends one live session of this account. Mirrors `deleteUserSession`: a session
+ * of another account reads the same as one that does not exist.
+ */
+export function endUserSession(userId: string, sessionId: string): boolean {
+  if (!liveSessionIdsOf(userId).includes(sessionId)) return false;
+  return endSession(sessionId);
+}
+
+/** Mirrors `deleteOtherSessions`, and stamps no revocation either. */
+export function endOtherUserSessions(
+  userId: string,
+  keepSessionId: string
+): number {
+  let ended = 0;
+  for (const sid of liveSessionIdsOf(userId)) {
+    if (sid !== keepSessionId && endSession(sid)) ended += 1;
+  }
   return ended;
 }
 
@@ -204,6 +253,13 @@ export function revokeUserSessions(userId: string): void {
   if (user) user.tokenRevokedAt = new Date().toISOString();
 }
 
+function moveKey<V>(map: Map<string, V>, from: string, to: string): void {
+  const value = map.get(from);
+  if (value === undefined) return;
+  map.set(to, value);
+  map.delete(from);
+}
+
 /**
  * Gives each live session of the account a new id, so every access token
  * issued so far fails the session check while the refresh token still works.
@@ -221,9 +277,9 @@ export function rekeyUserSessions(userId: string): void {
     if (next === undefined) {
       next = generateSessionId();
       renamed.set(sid, next);
-      const startedAt = state.sessionStarts.get(sid);
-      state.sessionStarts.delete(sid);
-      if (startedAt !== undefined) state.sessionStarts.set(next, startedAt);
+      moveKey(state.sessionStarts, sid, next);
+      moveKey(state.sessionUserAgents, sid, next);
+      moveKey(state.sessionLastActive, sid, next);
     }
     state.refreshSessions.set(token, next);
   }

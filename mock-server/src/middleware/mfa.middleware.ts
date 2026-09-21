@@ -13,6 +13,7 @@ import {
   clearFailures,
   clearReauthProofCookie,
   consumeTotpCode,
+  isValidCodeShape,
   isValidPasswordShape,
   normalize,
   readFailures,
@@ -29,6 +30,7 @@ import {
   registerSession,
   toUserResponse
 } from '../state';
+import { normalizeUserAgent } from '../utils/user-agent';
 import { resolveEntitlementLimit } from './billing.middleware';
 import {
   MOCK_RECOVERY_CODES,
@@ -97,10 +99,6 @@ function challengeLockedEnvelope(remainingMs: number): {
   };
 }
 
-function isValidCodeShape(value: unknown): value is string {
-  return typeof value === 'string' && value.length === TOTP_DIGITS;
-}
-
 /** Resolves the account behind an mfa-pending token, or null. */
 function userFromPendingToken(mfaToken: unknown): MockUser | null {
   if (typeof mfaToken !== 'string') return null;
@@ -139,7 +137,11 @@ function issueSession(req: Request, res: Response, user: MockUser): void {
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
-  registerSession(tokens.refresh_token, sessionId);
+  registerSession(
+    tokens.refresh_token,
+    sessionId,
+    normalizeUserAgent(req.headers['user-agent'])
+  );
   pruneOldestUserTokens(
     state.refreshTokens,
     user.id,

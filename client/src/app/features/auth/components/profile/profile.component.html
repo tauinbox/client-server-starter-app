@@ -258,8 +258,16 @@
           [user]="u"
           [reauthProviderLabel]="reauthProviderLabel()"
           [resumeSetup]="resumeMfaSetup()"
-          (changed)="loadProfile()"
+          (changed)="onTwoFactorChanged()"
           (reauthRequested)="startMfaReauth()"
+        />
+
+        <nxs-active-sessions
+          [user]="u"
+          [reauthProviderLabel]="reauthProviderLabel()"
+          [resumeRevoke]="resumeSessionRevoke()"
+          [offerSignOutOthers]="offerSignOutOthers()"
+          (reauthRequested)="startSessionsReauth($event)"
         />
 
         <mat-card>

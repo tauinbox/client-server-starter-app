@@ -92,7 +92,8 @@ describe('JwtStrategy', () => {
       expect(result).toEqual({
         userId: 'user-1',
         email: 'test@example.com',
-        roles: ['user']
+        roles: ['user'],
+        sessionId: 'session-1'
       });
       expect(mockDataSource.getRepository).toHaveBeenCalled();
       expect(mockRepository.findOne).toHaveBeenCalledWith({
@@ -137,7 +138,8 @@ describe('JwtStrategy', () => {
       expect(result).toEqual({
         userId: 'user-1',
         email: 'test@example.com',
-        roles: ['user']
+        roles: ['user'],
+        sessionId: 'session-1'
       });
     });
 
@@ -151,7 +153,8 @@ describe('JwtStrategy', () => {
       await expect(strategy.validate(basePayload)).resolves.toEqual({
         userId: 'user-1',
         email: 'test@example.com',
-        roles: ['user']
+        roles: ['user'],
+        sessionId: 'session-1'
       });
     });
 

@@ -33,10 +33,14 @@ import { AuthStore } from '../../store/auth.store';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { NotifyService } from '@core/services/notify.service';
 import { TwoFactorComponent } from '../two-factor/two-factor.component';
+import { ActiveSessionsComponent } from '../active-sessions/active-sessions.component';
 import type { UserResponse } from '@app/shared/types';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import type { StepUpOperation } from '@app/shared/constants';
-import type { UpdateProfile } from '../../models/auth.types';
+import type {
+  SessionRevokeTarget,
+  UpdateProfile
+} from '../../models/auth.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Observable } from 'rxjs';
@@ -132,6 +136,23 @@ const PENDING_LINK_KEY = 'pending_oauth_link';
  */
 const PENDING_UNLINK_KEY = 'pending_oauth_unlink';
 
+/**
+ * The sixth resume path. It holds the session change the user asked for, so
+ * the load that follows the step-up round trip can send it without asking
+ * again.
+ */
+const PENDING_SESSION_REVOKE_KEY = 'pending_session_revoke';
+
+/** The stored value is read back from session storage, so its shape is checked. */
+function isSessionRevokeTarget(value: unknown): value is SessionRevokeTarget {
+  if (typeof value !== 'object' || value === null) return false;
+  const target = value as Record<string, unknown>;
+  return (
+    target['scope'] === 'others' ||
+    (target['scope'] === 'one' && typeof target['sessionId'] === 'string')
+  );
+}
+
 /** Which credential change the open password prompt authorises. */
 type StepUpPromptMode = 'link' | 'unlink';
 
@@ -181,7 +202,8 @@ function canonicalEmail(value: string | undefined): string {
     MatButtonToggleGroup,
     MatSlider,
     MatSliderThumb,
-    TwoFactorComponent
+    TwoFactorComponent,
+    ActiveSessionsComponent
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -371,6 +393,18 @@ export class ProfileComponent implements OnInit {
   /** The same signal for the two-factor card, which resumes on its own. */
   protected readonly resumeMfaSetup = signal(false);
 
+  /** The same signal for the sessions card. */
+  protected readonly resumeSessionRevoke = signal<SessionRevokeTarget | null>(
+    null
+  );
+
+  /**
+   * True once a sign-in method changed on this page. A device that signed in
+   * with the old method keeps its session, so the sessions card offers to end
+   * the others. It is an offer, never an automatic sign-out.
+   */
+  protected readonly offerSignOutOthers = signal(false);
+
   protected readonly passwordSetNeedsReauth = computed(
     () =>
       !this.accountHasPassword() &&
@@ -421,11 +455,16 @@ export class ProfileComponent implements OnInit {
     const pendingLink = this.#sessionStorage.getItem<string>(PENDING_LINK_KEY);
     const pendingUnlink =
       this.#sessionStorage.getItem<string>(PENDING_UNLINK_KEY);
+    const pendingSessionRevoke = this.#sessionStorage.getItem(
+      PENDING_SESSION_REVOKE_KEY,
+      isSessionRevokeTarget
+    );
     this.#sessionStorage.removeItem(PENDING_EMAIL_KEY);
     this.#sessionStorage.removeItem(PENDING_PASSWORD_KEY);
     this.#sessionStorage.removeItem(PENDING_MFA_KEY);
     this.#sessionStorage.removeItem(PENDING_LINK_KEY);
     this.#sessionStorage.removeItem(PENDING_UNLINK_KEY);
+    this.#sessionStorage.removeItem(PENDING_SESSION_REVOKE_KEY);
 
     if (reauth !== 'ok') return;
 
@@ -463,6 +502,11 @@ export class ProfileComponent implements OnInit {
       return;
     }
 
+    if (pendingSessionRevoke) {
+      this.resumeSessionRevoke.set(pendingSessionRevoke);
+      return;
+    }
+
     // The card holds the enrolment, so all it needs is the signal that the
     // proof its request will carry is now there.
     if (pendingMfa) {
@@ -475,7 +519,34 @@ export class ProfileComponent implements OnInit {
    * label and the return address all belong to this page, exactly as they do
    * for an email change and for a first password.
    */
+  /** Every event of the two-factor card changes a sign-in factor. */
+  protected onTwoFactorChanged(): void {
+    this.offerSignOutOthers.set(true);
+    this.loadProfile();
+  }
+
   protected startMfaReauth(): void {
+    this.#leaveForCardReauth(
+      STEP_UP_OPERATION.MFA_SETUP,
+      PENDING_MFA_KEY,
+      true
+    );
+  }
+
+  /** The sessions card asks for the round trip the same way. */
+  protected startSessionsReauth(target: SessionRevokeTarget): void {
+    this.#leaveForCardReauth(
+      STEP_UP_OPERATION.SESSION_REVOKE,
+      PENDING_SESSION_REVOKE_KEY,
+      target
+    );
+  }
+
+  #leaveForCardReauth(
+    operation: StepUpOperation,
+    pendingKey: string,
+    pendingValue: unknown
+  ): void {
     const provider = this.reauthProvider();
     if (!provider) {
       this.#notify.error('auth.profile.errorReauthNoProvider');
@@ -483,11 +554,11 @@ export class ProfileComponent implements OnInit {
     }
 
     this.#authService
-      .initOAuthReauth(STEP_UP_OPERATION.MFA_SETUP)
+      .initOAuthReauth(operation)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
-          this.#sessionStorage.setItem(PENDING_MFA_KEY, true);
+          this.#sessionStorage.setItem(pendingKey, pendingValue);
           this.#notify.info('auth.profile.reauthRedirecting', {
             provider: this.reauthProviderLabel()
           });
@@ -534,6 +605,7 @@ export class ProfileComponent implements OnInit {
         this.#notify.success('auth.profile.oauthConnected', {
           provider: this.#providerLabel(provider)
         });
+        this.offerSignOutOthers.set(true);
       }
       void this.#router.navigate([], {
         queryParams: { oauth_linked: null },
@@ -565,8 +637,10 @@ export class ProfileComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     // A reload takes the two-factor card down and builds a new one, which
-    // would read a stale resume signal and ask for a second secret.
+    // would read a stale resume signal and ask for a second secret. The same
+    // holds for the sessions card and its spent proof.
     this.resumeMfaSetup.set(false);
+    this.resumeSessionRevoke.set(null);
 
     this.#authService
       .getProfile()
@@ -792,6 +866,7 @@ export class ProfileComponent implements OnInit {
           this.#notify.success('auth.profile.oauthDisconnected', {
             provider: this.#providerLabel(provider)
           });
+          this.offerSignOutOthers.set(true);
         },
         error: (err: HttpErrorResponse) => {
           this.oauthLoading.set(false);

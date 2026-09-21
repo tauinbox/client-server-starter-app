@@ -58,6 +58,10 @@ export type MfaStepUpRequest = {
   code?: string;
 };
 
+/** What a session step-up authorises: one other device, or all of them. */
+export type SessionRevokeTarget =
+  { scope: 'one'; sessionId: string } | { scope: 'others' };
+
 export type LockoutErrorData = {
   message: string;
   lockedUntil: string;

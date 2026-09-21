@@ -96,7 +96,8 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
       userId,
       raw,
       3600,
-      randomUUID()
+      randomUUID(),
+      null
     );
     return raw;
   }

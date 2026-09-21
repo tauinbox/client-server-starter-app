@@ -121,7 +121,7 @@ describe('SessionIssuerService', () => {
   });
 
   it('persists the refresh token before pruning, so the new session counts against the allowance', async () => {
-    await service.issueSession(mockUser);
+    await service.issueSession(mockUser, null);
 
     expect(
       mockRefreshTokenService.createRefreshToken.mock.invocationCallOrder[0]
@@ -134,7 +134,7 @@ describe('SessionIssuerService', () => {
   it('prunes to the resolved allowance, never to the pending promise', async () => {
     mockEntitlementService.limitFor.mockResolvedValue(10);
 
-    await service.issueSession(mockUser);
+    await service.issueSession(mockUser, null);
 
     // A dropped `await` on the limit lookup would hand the prune a pending
     // promise here, which no numeric expectation can match.
@@ -149,7 +149,7 @@ describe('SessionIssuerService', () => {
       new Error('billing unavailable')
     );
 
-    const result = await service.issueSession(mockUser);
+    const result = await service.issueSession(mockUser, null);
 
     expect(result.tokens.access_token).toBe('mock-access-token');
     expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
@@ -159,7 +159,7 @@ describe('SessionIssuerService', () => {
   });
 
   it('signs the JWT with role names and returns the User entity unchanged', async () => {
-    const result = await service.issueSession(mockUser);
+    const result = await service.issueSession(mockUser, 'Mozilla/5.0 Test');
 
     expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
       'user-1',
@@ -171,13 +171,14 @@ describe('SessionIssuerService', () => {
       'user-1',
       'mock-refresh-token',
       604800,
-      expect.any(String)
+      expect.any(String),
+      'Mozilla/5.0 Test'
     );
     expect(result.user).toBe(mockUser);
   });
 
   it('gives the access token and the refresh row the same session id', async () => {
-    await service.issueSession(mockUser);
+    await service.issueSession(mockUser, null);
 
     const signedCall = mockTokenGenerator.generateTokens.mock.calls[0] as [
       string,
@@ -194,8 +195,8 @@ describe('SessionIssuerService', () => {
   });
 
   it('mints a distinct session id per sign-in, so one sign-out cannot end another device', async () => {
-    await service.issueSession(mockUser);
-    await service.issueSession(mockUser);
+    await service.issueSession(mockUser, null);
+    await service.issueSession(mockUser, null);
 
     const calls = mockTokenGenerator.generateTokens.mock.calls as [
       string,

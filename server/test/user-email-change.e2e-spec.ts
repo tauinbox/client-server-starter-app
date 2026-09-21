@@ -258,7 +258,12 @@ describe('Admin email change - session revocation through the real event bus', (
 
   // @ts-expect-error partial mock - the update path reads only user/ip/headers
   const adminRequest: JwtAuthRequest = {
-    user: { userId: 'admin-1', email: 'admin@example.com', roles: [] },
+    user: {
+      userId: 'admin-1',
+      email: 'admin@example.com',
+      roles: [],
+      sessionId: 'session-1'
+    },
     ip: '127.0.0.1',
     headers: {}
   };

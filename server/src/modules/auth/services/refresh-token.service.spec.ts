@@ -119,13 +119,15 @@ describe('RefreshTokenService', () => {
         'user-1',
         'raw-token',
         3600,
-        'session-1'
+        'session-1',
+        null
       );
 
       expect(mockRepository.create).toHaveBeenCalledWith({
         userId: 'user-1',
         sessionId: 'session-1',
         sessionStartedAt: expect.any(Date) as Date,
+        userAgent: null,
         token: hashToken('raw-token'),
         expiresAt: expect.any(Date) as Date
       });
@@ -142,7 +144,13 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken('user-1', 'token', 3600, 'session-1');
+      await service.createRefreshToken(
+        'user-1',
+        'token',
+        3600,
+        'session-1',
+        null
+      );
       const after = Date.now();
 
       const createArg = mockRepository.create.mock.calls[0] as [
@@ -163,7 +171,13 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken('user-1', 'token', 7200, 'session-1');
+      await service.createRefreshToken(
+        'user-1',
+        'token',
+        7200,
+        'session-1',
+        null
+      );
       const after = Date.now();
 
       const createArg = mockRepository.create.mock.calls[0] as [
@@ -347,6 +361,77 @@ describe('RefreshTokenService', () => {
           revoked: false
         }
       });
+    });
+  });
+
+  describe('findLiveSessions', () => {
+    it('keeps the newest live row of each session', async () => {
+      mockRepository.find.mockResolvedValue([
+        { id: 'r3', sessionId: 's-1' },
+        { id: 'r2', sessionId: 's-2' },
+        { id: 'r1', sessionId: 's-1' }
+      ]);
+
+      const rows = await service.findLiveSessions('user-1');
+
+      expect(rows.map((r) => r.id)).toEqual(['r3', 'r2']);
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          revoked: false,
+          expiresAt: expect.anything() as unknown
+        },
+        order: { createdAt: 'DESC' }
+      });
+    });
+  });
+
+  describe('deleteUserSession', () => {
+    it('scopes both the lookup and the delete by the user id', async () => {
+      mockRepository.exists.mockResolvedValue(true);
+
+      await expect(service.deleteUserSession('user-1', 's-1')).resolves.toBe(
+        true
+      );
+
+      expect(mockRepository.exists).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          userId: 'user-1',
+          sessionId: 's-1',
+          revoked: false
+        }) as unknown
+      });
+      expect(mockRepository.delete).toHaveBeenCalledWith({
+        userId: 'user-1',
+        sessionId: 's-1'
+      });
+    });
+
+    it('deletes nothing when the user holds no such live session', async () => {
+      mockRepository.exists.mockResolvedValue(false);
+
+      await expect(
+        service.deleteUserSession('user-1', 'foreign')
+      ).resolves.toBe(false);
+      expect(mockRepository.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteOtherSessions', () => {
+    it('keeps the named session and counts the live sessions it ends', async () => {
+      mockRepository.find.mockResolvedValue([
+        { id: 'r1', sessionId: 'keep' },
+        { id: 'r2', sessionId: 's-2' },
+        { id: 'r3', sessionId: 's-3' }
+      ]);
+
+      await expect(service.deleteOtherSessions('user-1', 'keep')).resolves.toBe(
+        2
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'user_id = :userId AND session_id <> :keepSessionId',
+        { userId: 'user-1', keepSessionId: 'keep' }
+      );
     });
   });
 });

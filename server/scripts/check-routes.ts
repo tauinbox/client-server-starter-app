@@ -40,6 +40,7 @@ const DEFAULT_PARAMS: Record<string, string> = {
   ':userId': '1',
   ':roleId': 'role-admin',
   ':permissionId': 'perm-1',
+  ':sessionId': '1',
   ':provider': 'google'
 };
 

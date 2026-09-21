@@ -45,6 +45,7 @@ import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
 import {
   ErrorKeys,
   REAUTH_PROOF_MAX_AGE_SECONDS,
@@ -495,7 +496,10 @@ export class OAuthController {
         return;
       }
 
-      const result = await this.oauthService.loginWithOAuth(profile);
+      const result = await this.oauthService.loginWithOAuth(
+        profile,
+        normalizeUserAgent(req.headers['user-agent'])
+      );
 
       // Serialize here, not at /exchange: the cookie payload is plain JSON, so
       // an entity signed as-is would be echoed verbatim past any interceptor.

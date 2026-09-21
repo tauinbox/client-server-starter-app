@@ -1,0 +1,100 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+:host {
+  display: block;
+
+  .sessions-note {
+    margin-block: 0 vars.$spacing-md;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .sessions-loading {
+    display: flex;
+    justify-content: center;
+    padding-block: vars.$spacing-md;
+  }
+
+  .sessions-offer {
+    display: flex;
+    gap: vars.$spacing-xs;
+    align-items: flex-start;
+    padding: vars.$spacing-sm;
+    margin-bottom: vars.$spacing-md;
+    color: var(--mat-sys-on-secondary-container);
+    background-color: var(--mat-sys-secondary-container);
+    border-radius: func.rem(8);
+
+    p {
+      margin: 0;
+      font-size: vars.$font-size-sm;
+    }
+  }
+
+  .sessions-list {
+    padding: 0;
+    margin-block: 0 vars.$spacing-md;
+    list-style: none;
+  }
+
+  .sessions-item {
+    display: flex;
+    gap: vars.$spacing-sm;
+    align-items: flex-start;
+    padding-block: vars.$spacing-sm;
+    border-bottom: func.rem(1) solid var(--mat-sys-outline-variant);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .sessions-icon {
+    flex-shrink: 0;
+    margin-top: func.rem(2);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .sessions-details {
+    flex: 1;
+    min-width: 0;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .sessions-device {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  .sessions-badge {
+    display: inline-block;
+    padding: func.rem(2) func.rem(8);
+    margin-inline-start: vars.$spacing-xs;
+    font-size: func.rem(12);
+    font-weight: 500;
+    vertical-align: middle;
+    color: var(--mat-sys-on-primary-container);
+    background-color: var(--mat-sys-primary-container);
+    border-radius: func.rem(12);
+  }
+
+  .sessions-meta {
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .sessions-step-up {
+    margin-top: vars.$spacing-sm;
+  }
+
+  .sessions-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-xs;
+    align-items: center;
+  }
+}

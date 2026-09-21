@@ -1489,6 +1489,9 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/login` | None | Log in. Sets the `refresh_token` HttpOnly cookie and returns an access token |
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
 | POST | `/auth/logout` | Bearer | Log out this device. It ends the session the `refresh_token` cookie belongs to, leaves the other devices signed in, and cancels a started OAuth link. It answers `Clear-Site-Data` |
+| GET | `/auth/sessions` | Bearer | List the signed-in devices of the caller: session id, `current`, the User-Agent sent at sign-in, start time and last refresh |
+| DELETE | `/auth/sessions/:sessionId` | Bearer + step-up | End one other device. An unknown id and an id of another account both answer 404; the own session answers 400 |
+| DELETE | `/auth/sessions` | Bearer + step-up | End every device of the account except the caller |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
 | PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
 | POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires the current password. Rejects an account with OAuth only |
@@ -1641,7 +1644,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - A **modular NestJS architecture** with a dynamic root `CoreModule`.
 - **Passport strategies.** `LocalStrategy` uses the email and the password. `JwtStrategy` uses the
   Bearer token. It verifies the signature, `tokenRevokedAt` and the `sid` claim, which must name a
-  session that still holds a live refresh row, and it extracts `{ userId, email, roles }`. `GoogleStrategy`, `FacebookStrategy` and `VkStrategy` do the OAuth
+  session that still holds a live refresh row, and it extracts `{ userId, email, roles, sessionId }`. `GoogleStrategy`, `FacebookStrategy` and `VkStrategy` do the OAuth
   logins, and the module registers them conditionally.
 - **Routing is secure by default.** `APP_GUARD` registers `JwtAuthGuard` globally. Each endpoint
   requires a valid Bearer token, and `@Public()` is the only exception. The `check-auth-coverage` e2e
@@ -1927,7 +1930,7 @@ a second request to the registry for a verdict that gates nothing.
   passwords inside 15 minutes answer HTTP 423 `errors.auth.stepUpLocked`, and a correct password is
   refused for the rest of that window. The route throttles are keyed by client address, so without
   it a caller that holds a stolen access token bought four guesses per address per route, on each of
-  the seven routes that take a step-up, and the account never locked. The counter has a namespace of
+  the nine routes that take a step-up, and the account never locked. The counter has a namespace of
   its own, so a spent budget never shuts `POST /auth/login`: a fresh sign-in and the password reset
   are the owner's way back. A request that offers no password spends nothing.
 - The **refresh token cookie is HttpOnly**, with `SameSite=Strict`, the path `/api/v1/auth` and an

@@ -45,6 +45,7 @@ import {
   MfaVerifyDto
 } from '../dtos/mfa.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
 import {
   REAUTH_PROOF_COOKIE,
   REAUTH_PROOF_COOKIE_PATH
@@ -271,7 +272,10 @@ export class MfaController {
    * password check that preceded it.
    */
   private async issueSession(user: User, req: ExpressRequest, res: Response) {
-    const result = await this.authService.login(user);
+    const result = await this.authService.login(
+      user,
+      normalizeUserAgent(req.headers['user-agent'])
+    );
 
     await this.auditService.log({
       action: AuditAction.USER_LOGIN_SUCCESS,

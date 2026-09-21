@@ -19,9 +19,9 @@ export function extractBearerToken(req: Request): string | null {
   return authHeader.slice(7);
 }
 
-export function authenticateRequest(
-  req: Request
-): { user: MockUser; decoded: DecodedToken } | null {
+type AuthResult = { user: MockUser; decoded: DecodedToken; sessionId: string };
+
+export function authenticateRequest(req: Request): AuthResult | null {
   const token = extractBearerToken(req);
   if (!token) return null;
 
@@ -45,12 +45,10 @@ export function authenticateRequest(
   if (typeof decoded.sid !== 'string' || decoded.sid === '') return null;
   if (!isSessionLive(decoded.sid)) return null;
 
-  return { user, decoded };
+  return { user, decoded, sessionId: decoded.sid };
 }
 
-export function requireAuth(
-  req: Request
-): { user: MockUser; decoded: DecodedToken } | { error: number } {
+export function requireAuth(req: Request): AuthResult | { error: number } {
   const result = authenticateRequest(req);
   if (!result) return { error: 401 };
   return result;
@@ -77,7 +75,7 @@ export function requirePermission(
   action: Actions,
   subject: SubjectNames,
   options: PermissionGuardOptions = {}
-): (req: Request) => { user: MockUser; decoded: DecodedToken } | GuardError {
+): (req: Request) => AuthResult | GuardError {
   return (req) => {
     const result = requireAuth(req);
     if ('error' in result) return result;
@@ -118,6 +116,7 @@ export function authGuard(req: Request, res: Response, next: NextFunction) {
     return;
   }
   (req as AuthenticatedRequest).user = result.user;
+  (req as AuthenticatedRequest).sessionId = result.sessionId;
   next();
 }
 
@@ -141,6 +140,7 @@ export function permissionGuard(
       return;
     }
     (req as AuthenticatedRequest).user = result.user;
+    (req as AuthenticatedRequest).sessionId = result.sessionId;
     next();
   };
 }

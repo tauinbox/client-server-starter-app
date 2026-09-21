@@ -3,6 +3,7 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
+  TOTP_DIGITS,
   TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
 import { getState, logAudit } from '../state';
@@ -142,6 +143,11 @@ export function logStepUpFailure(
 /** Normalises a code the way the server does before it compares anything. */
 export function normalize(value: string): string {
   return value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase();
+}
+
+/** Mirrors `@Length(TOTP_DIGITS, TOTP_DIGITS)` on the step-up `code`. */
+export function isValidCodeShape(value: unknown): value is string {
+  return typeof value === 'string' && value.length === TOTP_DIGITS;
 }
 
 export function isValidPasswordShape(value: unknown): boolean {

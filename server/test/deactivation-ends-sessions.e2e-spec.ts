@@ -37,7 +37,12 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     ip: string;
     headers: Record<string, string>;
   } => ({
-    user: { userId: randomUUID(), email: 'admin@example.com', roles: [] },
+    user: {
+      userId: randomUUID(),
+      email: 'admin@example.com',
+      roles: [],
+      sessionId: randomUUID()
+    },
     ip: '127.0.0.1',
     headers: {}
   });
@@ -62,7 +67,8 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
       userId,
       raw,
       3600,
-      randomUUID()
+      randomUUID(),
+      null
     );
     return raw;
   };

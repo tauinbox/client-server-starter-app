@@ -278,7 +278,7 @@ describe('Refresh token reuse detection (e2e)', () => {
 
   it('rotates and revokes ALL sessions when the original token is presented twice', async () => {
     // Login — issues an initial refresh token.
-    const loginResult = await auth.login(userRecord);
+    const loginResult = await auth.login(userRecord, null);
     const originalToken = loginResult.tokens.refresh_token;
 
     expect(store.tokens.size).toBe(1);
@@ -323,7 +323,7 @@ describe('Refresh token reuse detection (e2e)', () => {
   });
 
   it('returns plain 401 (no panic-revoke) for revoked-AND-expired tokens', async () => {
-    await auth.login(userRecord);
+    await auth.login(userRecord, null);
     const allRows = Array.from(store.tokens.values());
     const row = allRows[0];
     row.revoked = true;
@@ -364,7 +364,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     }
 
     it('stamps the session start at login and carries it over a rotation', async () => {
-      const loginResult = await auth.login(userRecord);
+      const loginResult = await auth.login(userRecord, null);
       const startedAt = Array.from(store.tokens.values())[0].sessionStartedAt;
 
       expect(startedAt).toBeInstanceOf(Date);
@@ -384,7 +384,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     });
 
     it('refuses a refresh past the cap and deletes the whole session', async () => {
-      const loginResult = await auth.login(userRecord);
+      const loginResult = await auth.login(userRecord, null);
       const sessionId = Array.from(store.tokens.values())[0].sessionId;
 
       const firstRefresh = await auth.refreshTokens(
@@ -423,7 +423,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     it('rotates an aged session when the cap is disabled with 0', async () => {
       absoluteMaxMs = 0;
 
-      const loginResult = await auth.login(userRecord);
+      const loginResult = await auth.login(userRecord, null);
       ageSession(DEFAULT_SESSION_ABSOLUTE_MAX_MS * 4);
 
       const refreshed = await auth.refreshTokens(

@@ -679,14 +679,15 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should create a new session token and prune oldest beyond limit', async () => {
-      const result = await service.login(mockUser);
+      const result = await service.login(mockUser, 'Mozilla/5.0 Test');
 
       expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
         'user-1',
         expect.any(String),
         604800,
-        expect.any(String)
+        expect.any(String),
+        'Mozilla/5.0 Test'
       );
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
         'user-1',
@@ -708,7 +709,7 @@ describe('AuthService', () => {
     it('prunes to the plan allowance when the plan carries a sessions limit', async () => {
       mockEntitlementService.limitFor.mockResolvedValue(10);
 
-      await service.login(mockUser);
+      await service.login(mockUser, null);
 
       expect(mockEntitlementService.limitFor).toHaveBeenCalledWith(
         'user-1',
@@ -726,7 +727,7 @@ describe('AuthService', () => {
       );
 
       // A billing outage must never become a login outage.
-      const result = await service.login(mockUser);
+      const result = await service.login(mockUser, null);
 
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
@@ -740,13 +741,13 @@ describe('AuthService', () => {
         throw new Error(`Configuration key "${key}" does not exist`);
       });
 
-      await expect(service.login(mockUser)).rejects.toThrow(
+      await expect(service.login(mockUser, null)).rejects.toThrow(
         'Configuration key "JWT_REFRESH_EXPIRATION" does not exist'
       );
     });
 
     it('should generate tokens with correct payload', async () => {
-      await service.login(mockUser);
+      await service.login(mockUser, null);
 
       // JWT payload keeps role names as string[] (CASL / storage contract),
       // even though the response body carries RoleResponse[] objects.
@@ -1611,13 +1612,14 @@ describe('AuthService', () => {
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('carries the session start over a rotation inside the cap', async () => {
+    it('carries the session start and the device over a rotation inside the cap', async () => {
       const startedAt = new Date(
         Date.now() - DEFAULT_SESSION_ABSOLUTE_MAX_MS / 2
       );
       mockRefreshTokenService.findByToken.mockResolvedValue({
         ...mockTokenDoc,
-        sessionStartedAt: startedAt
+        sessionStartedAt: startedAt,
+        userAgent: 'Mozilla/5.0 Test'
       });
       mockUsersService.findById.mockResolvedValue(mockUser);
 
@@ -1627,7 +1629,8 @@ describe('AuthService', () => {
         RefreshToken,
         expect.objectContaining({
           sessionId: 'session-1',
-          sessionStartedAt: startedAt
+          sessionStartedAt: startedAt,
+          userAgent: 'Mozilla/5.0 Test'
         })
       );
       expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();

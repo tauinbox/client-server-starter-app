@@ -144,7 +144,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
   }
 
   async function signIn(times: number): Promise<void> {
-    for (let i = 0; i < times; i++) await auth.login(userRecord);
+    for (let i = 0; i < times; i++) await auth.login(userRecord, null);
   }
 
   beforeEach(async () => {
@@ -272,7 +272,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
       (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
     )[0];
 
-    const result = await auth.login(userRecord);
+    const result = await auth.login(userRecord, null);
 
     expect(typeof result.tokens.refresh_token).toBe('string');
     expect(activeTokenCount()).toBe(10);
@@ -301,7 +301,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
     customers.findOne.mockRejectedValue(new Error('billing database is down'));
 
     // A billing outage must never become a login outage.
-    const result = await auth.login(userRecord);
+    const result = await auth.login(userRecord, null);
     expect(typeof result.tokens.access_token).toBe('string');
 
     await signIn(MAX_CONCURRENT_SESSIONS + 2);
