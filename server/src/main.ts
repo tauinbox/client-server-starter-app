@@ -12,6 +12,10 @@ import * as cookieParser from 'cookie-parser';
 import { ConfigService } from '@nestjs/config';
 import { corsOptions } from './cors-options';
 import { applyTrustProxy } from './modules/core/trust-proxy.util';
+import {
+  applyBodyParsers,
+  HTTP_BODY_APP_OPTIONS
+} from './modules/core/http-body.config';
 
 async function bootstrap() {
   // Load .env eagerly so REDIS_URL is visible while the module graph is built
@@ -20,11 +24,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(
     CoreModule.forRoot(),
-    // rawBody: true makes the body parsers also retain the unparsed bytes on
-    // req.rawBody — required for billing webhook signature verification. The
-    // explicit useBodyParser('json'|'urlencoded', { limit }) calls below keep
-    // their limits and gain raw-body capture (Nest forwards the rawBody flag).
-    { bufferLogs: true, rawBody: true }
+    { bufferLogs: true, ...HTTP_BODY_APP_OPTIONS }
   );
   app.useLogger(app.get(Logger));
 
@@ -99,8 +99,7 @@ async function bootstrap() {
   app.enableVersioning({ type: VersioningType.URI });
   app.use(compression());
   app.use(cookieParser()); // this wil allow to get parsed cookie from req.cookies instead of req.get('Cookie')
-  app.useBodyParser('json', { limit: '100kb' });
-  app.useBodyParser('urlencoded', { extended: true, limit: '100kb' });
+  applyBodyParsers(app);
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Swagger')
