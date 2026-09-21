@@ -279,8 +279,8 @@ export class AuthService {
    * factors were checked: the password path and the second-factor path both
    * arrive here only once every gate the account carries has been passed.
    */
-  async login(user: LocalAuthRequest['user']) {
-    return this.sessionIssuer.issueSession(user);
+  async login(user: LocalAuthRequest['user'], userAgent: string | null) {
+    return this.sessionIssuer.issueSession(user, userAgent);
   }
 
   async register(
@@ -742,6 +742,7 @@ export class AuthService {
         // Carried over, never re-stamped: re-stamping here restores the sliding
         // expiry the absolute cap above exists to end.
         sessionStartedAt: tokenDoc.sessionStartedAt,
+        userAgent: tokenDoc.userAgent,
         token: hashToken(tokens.refresh_token),
         expiresAt
       });

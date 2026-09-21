@@ -58,6 +58,8 @@ describe('ProfileComponent', () => {
     initOAuthLink: ReturnType<typeof vi.fn>;
     initOAuthReauth: ReturnType<typeof vi.fn>;
     startMfaSetup: ReturnType<typeof vi.fn>;
+    getSessions: ReturnType<typeof vi.fn>;
+    revokeSession: ReturnType<typeof vi.fn>;
     cancelRefresh: ReturnType<typeof vi.fn>;
     clearSession: ReturnType<typeof vi.fn>;
   };
@@ -92,6 +94,8 @@ describe('ProfileComponent', () => {
           qrDataUrl: 'data:image/png;base64,AAAA'
         })
       ),
+      getSessions: vi.fn().mockReturnValue(of([])),
+      revokeSession: vi.fn().mockReturnValue(of({ message: 'ok' })),
       cancelRefresh: vi.fn(),
       clearSession: vi.fn()
     };
@@ -596,6 +600,93 @@ describe('ProfileComponent', () => {
 
       expect(component['resumeMfaSetup']()).toBe(false);
       expect(authServiceMock.startMfaSetup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signed-in devices on an account created through a provider', () => {
+    const oauthOnlyUser = { ...mockUser, hasPassword: false };
+
+    beforeEach(() => {
+      authServiceMock.getProfile.mockReturnValue(of(oauthOnlyUser));
+      authServiceMock.getOAuthAccounts.mockReturnValue(
+        of([{ provider: 'google', createdAt: '2025-01-01T00:00:00.000Z' }])
+      );
+    });
+
+    it('starts a round trip bound to the session change the card asks for', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component['startSessionsReauth']({ scope: 'others' });
+
+      expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
+        STEP_UP_OPERATION.SESSION_REVOKE
+      );
+      expect(sessionStorage.getItem('pending_session_revoke')).not.toBeNull();
+    });
+
+    it('sends the stored change on the load that follows the round trip', async () => {
+      sessionStorage.setItem(
+        'pending_session_revoke',
+        JSON.stringify({ scope: 'one', sessionId: 'other-id' })
+      );
+      activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(authServiceMock.revokeSession).toHaveBeenCalledTimes(1);
+      expect(authServiceMock.revokeSession).toHaveBeenCalledWith(
+        'other-id',
+        {}
+      );
+      expect(sessionStorage.getItem('pending_session_revoke')).toBeNull();
+    });
+
+    it('ignores a stored value of the wrong shape', async () => {
+      sessionStorage.setItem(
+        'pending_session_revoke',
+        JSON.stringify({ scope: 'one' })
+      );
+      activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component['resumeSessionRevoke']()).toBeNull();
+      expect(authServiceMock.revokeSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the offer to sign out other devices', () => {
+    it('opens after the two-factor card reports a change', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(component['offerSignOutOthers']()).toBe(false);
+
+      component['onTwoFactorChanged']();
+
+      expect(component['offerSignOutOthers']()).toBe(true);
+    });
+
+    it('opens after a provider link lands', async () => {
+      activatedRouteMock.snapshot.queryParamMap.set('oauth_linked', 'google');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component['offerSignOutOthers']()).toBe(true);
+    });
+
+    it('stays closed for a forged provider value', async () => {
+      activatedRouteMock.snapshot.queryParamMap.set('oauth_linked', 'evil');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component['offerSignOutOthers']()).toBe(false);
     });
   });
 

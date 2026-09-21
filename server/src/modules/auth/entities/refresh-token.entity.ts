@@ -36,6 +36,14 @@ export class RefreshToken {
   @Column({ name: 'session_started_at', type: 'timestamptz' })
   sessionStartedAt: Date;
 
+  /**
+   * The User-Agent the device sent when the session started, so the owner can
+   * tell one device from another. Rotation carries it over. Null for a session
+   * that started before the column existed, or for a client that sent none.
+   */
+  @Column({ name: 'user_agent', type: 'varchar', length: 512, nullable: true })
+  userAgent: string | null;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

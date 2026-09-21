@@ -13,4 +13,6 @@ export type PayloadFromJwt = {
   userId: UserResponseDto['id'];
   email: string;
   roles: string[];
+  /** The session of the caller's device, from the `sid` claim. */
+  sessionId: string;
 };

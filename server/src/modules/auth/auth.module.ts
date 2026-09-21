@@ -10,6 +10,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './controllers/auth.controller';
 import { MfaController } from './controllers/mfa.controller';
 import { OAuthController } from './controllers/oauth.controller';
+import { SessionsController } from './controllers/sessions.controller';
 import { AuthService } from './services/auth.service';
 import { MfaService } from './services/mfa.service';
 import { CryptoModule } from '../../common/crypto/crypto.module';
@@ -92,6 +93,7 @@ function conditionalProvider(
     AuthController,
     MfaController,
     OAuthController,
+    SessionsController,
     RolesController,
     RbacController
   ],

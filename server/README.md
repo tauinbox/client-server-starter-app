@@ -298,7 +298,7 @@ succeeding and no error rate moves. That counter is the only place the gap shows
 `SessionIssuerService`, `SessionLimitService`, `OAuthAccountService`, `TokenCleanupService`,
 `ResourceService`, `ActionService` and `ResourceSyncService`.
 
-`SessionIssuerService.issueSession(user)` is the single place where a sign-in becomes a session. It
+`SessionIssuerService.issueSession(user, userAgent)` is the single place where a sign-in becomes a session. It
 generates the tokens, persists the refresh token, and then prunes the sessions to the resolved
 allowance. `AuthService.login` and `OAuthService.loginWithOAuth` both delegate to it and hold no
 session logic. Thus the two paths cannot diverge.
@@ -1043,7 +1043,7 @@ applies the `JWT_MIN_IAT` cutoff and the per-user `tokenRevokedAt` cutoff, which
 seconds because `iat` has no finer unit. It then requires a `sid`
 claim and asks `RefreshTokenService.hasLiveSession`, which looks for a row of that session which is
 not revoked and not expired, so a sign-out on one device refuses that device on its next request
-while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, roles }`.
+while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, roles, sessionId }`.
 There is no `isAdmin` flag.
 
 **Sessions.** A sign-in mints a session id in `SessionIssuerService`. The access token carries it as
@@ -1052,6 +1052,15 @@ under the **same** session id, so a refresh in one tab does not strand the acces
 of the same device holds. `AuthService.logoutSession` deletes every row of one session, which is what
 `POST /auth/logout` calls. `AuthService.logout` deletes every row of the account and stamps
 `tokenRevokedAt`; it belongs to the password change and to the other account-wide paths.
+
+**Active sessions.** Each sign-in stores the `User-Agent` header of the device on the refresh row
+(`user_agent`, cut to 512 characters with control characters removed by `normalizeUserAgent`), and
+rotation copies it. `SessionsController` (`/auth/sessions`) lists the live session of each device
+and ends one other session or every other session. Both deletes demand a step-up with the
+operation `session_revoke` and name the user id beside the session id
+(`RefreshTokenService.deleteUserSession` and `deleteOtherSessions`), so an id of another account
+answers 404 exactly as an unknown id does. Neither writes `tokenRevokedAt`, which would also end
+the caller. The list is bounded by the plan session allowance, so it is not cursor paginated.
 
 **Two-factor codes are single use.** `MfaService.consumeTotp` is the one funnel for every path
 that reads a code: the enrolment, the sign-in challenge and the step-up. It reads the account row
@@ -1105,7 +1114,7 @@ burn the budget of an account that never offered a code.
 passwords against the account on a `FailedAttemptCounter` keyed `step-up:password-failures:`, with
 the same threshold, the same window and the same 423 envelope, under the key
 `errors.auth.stepUpLocked`. The route throttles are keyed by client address, so before this the
-whole ceiling was four guesses per address per route, repeated on each of the seven routes that take
+whole ceiling was four guesses per address per route, repeated on each of the nine routes that take
 a step-up, and the account never locked however many were wrong. The counter reports the bar to
 `assertStepUp` through the `lockedMs` field of the verdict rather than throwing past it, so the
 attempt that spends the last of the budget still writes its `STEP_UP_FAILURE` row.

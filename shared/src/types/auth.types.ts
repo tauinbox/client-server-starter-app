@@ -35,6 +35,19 @@ export type MfaRecoveryCodesResponse = {
   recoveryCodes: string[];
 };
 
+/**
+ * One signed-in device of the caller. `id` is the session id, which survives
+ * token rotation. `userAgent` is the header the device sent when it signed in,
+ * or null for a session that started before the server recorded it.
+ */
+export type ActiveSessionResponse = {
+  id: string;
+  current: boolean;
+  userAgent: string | null;
+  startedAt: string;
+  lastActiveAt: string;
+};
+
 export type CaptchaProvider = 'turnstile';
 
 export type CaptchaConfigResponse = {

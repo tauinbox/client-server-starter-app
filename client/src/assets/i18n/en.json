@@ -125,7 +125,9 @@
       "mfaInvalidPendingToken": "The two-factor sign-in expired. Please sign in again.",
       "mfaChallengeLocked": "Too many incorrect verification codes. Use a recovery code, or try again later.",
       "mfaStepUpLocked": "Too many incorrect verification codes. Try again later.",
-      "stepUpLocked": "Too many incorrect passwords. Try again later."
+      "stepUpLocked": "Too many incorrect passwords. Try again later.",
+      "sessionNotFound": "That session has already ended.",
+      "sessionIsCurrent": "Use Sign out to end the session of this device."
     },
     "users": {
       "notFound": "User not found",

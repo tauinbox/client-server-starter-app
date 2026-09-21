@@ -1,0 +1,181 @@
+<mat-card *transloco="let t; scope: 'auth'">
+  <mat-card-header>
+    <mat-card-title>{{ t('auth.sessions.title') }}</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p class="sessions-note">{{ t('auth.sessions.hint') }}</p>
+
+    @if (loading()) {
+      <div class="sessions-loading">
+        <mat-spinner diameter="32"></mat-spinner>
+      </div>
+    } @else if (loadFailed()) {
+      <p class="sessions-note" role="alert">
+        {{ t('auth.sessions.errorLoadFailed') }}
+      </p>
+      <button matButton="text" type="button" (click)="load()">
+        {{ t('auth.sessions.retry') }}
+      </button>
+    } @else {
+      @if (offerSignOutOthers() && otherSessions().length > 0 && !pending()) {
+        <div class="sessions-offer" role="status">
+          <mat-icon>info</mat-icon>
+          <p>{{ t('auth.sessions.offerAfterChange') }}</p>
+        </div>
+      }
+
+      <ul class="sessions-list">
+        @for (session of sessions(); track session.id) {
+          <li class="sessions-item" [class.is-current]="session.current">
+            <mat-icon class="sessions-icon">{{
+              session.os === 'Android' || session.os === 'iOS'
+                ? 'smartphone'
+                : 'computer'
+            }}</mat-icon>
+
+            <div class="sessions-details">
+              <p class="sessions-device" [attr.title]="session.userAgent">
+                @if (session.browser && session.os) {
+                  {{
+                    t('auth.sessions.browserOnOs', {
+                      browser: session.browser,
+                      os: session.os
+                    })
+                  }}
+                } @else if (session.browser || session.os) {
+                  {{ session.browser || session.os }}
+                } @else if (session.userAgent) {
+                  {{ session.userAgent }}
+                } @else {
+                  {{ t('auth.sessions.unknownDevice') }}
+                }
+                @if (session.current) {
+                  <span class="sessions-badge">{{
+                    t('auth.sessions.thisDevice')
+                  }}</span>
+                }
+              </p>
+              <p class="sessions-meta">
+                {{
+                  t('auth.sessions.startedAt', {
+                    date: session.startedAt | date: 'medium'
+                  })
+                }}
+              </p>
+              <p class="sessions-meta">
+                {{
+                  t('auth.sessions.lastActiveAt', {
+                    date: session.lastActiveAt | date: 'medium'
+                  })
+                }}
+              </p>
+            </div>
+
+            @if (!session.current) {
+              <button
+                matButton="text"
+                type="button"
+                [disabled]="busy() || cannotStepUp()"
+                (click)="startRevoke({ scope: 'one', sessionId: session.id })"
+              >
+                {{ t('auth.sessions.end') }}
+              </button>
+            }
+          </li>
+        }
+      </ul>
+
+      @if (cannotStepUp()) {
+        <p class="sessions-note" role="note">
+          {{ t('auth.sessions.needsFactor') }}
+        </p>
+      } @else if (factor() === 'provider' && otherSessions().length > 0) {
+        <p class="sessions-note">
+          {{
+            t('auth.sessions.reauthNotice', {
+              provider: reauthProviderLabel()
+            })
+          }}
+        </p>
+      }
+
+      @let target = pending();
+      @if (target) {
+        <div class="sessions-step-up">
+          <p class="sessions-note">
+            {{
+              target.scope === 'one'
+                ? t(
+                    factor() === 'password'
+                      ? 'auth.sessions.confirmOne'
+                      : 'auth.sessions.confirmOneCode'
+                  )
+                : t(
+                    factor() === 'password'
+                      ? 'auth.sessions.confirmOthers'
+                      : 'auth.sessions.confirmOthersCode'
+                  )
+            }}
+          </p>
+
+          @if (factor() === 'password') {
+            <nxs-form-field
+              [field]="passwordForm.currentPassword"
+              label="auth.sessions.currentPassword"
+              [type]="pwdToggle.show() ? 'text' : 'password'"
+              prefixIcon="lock"
+              autocomplete="current-password"
+            >
+              <nxs-password-toggle formFieldSuffix #pwdToggle />
+            </nxs-form-field>
+          } @else {
+            <nxs-form-field
+              [field]="codeForm.code"
+              label="auth.sessions.code"
+              type="text"
+              prefixIcon="password"
+              autocomplete="one-time-code"
+            />
+          }
+
+          <div class="sessions-actions">
+            <button
+              matButton="filled"
+              type="button"
+              [disabled]="stepUpBlocked()"
+              (click)="confirm()"
+            >
+              @if (busy()) {
+                <span class="app-btn-loading">
+                  <mat-spinner diameter="20"></mat-spinner>
+                  {{ t('auth.sessions.working') }}
+                </span>
+              } @else {
+                {{
+                  target.scope === 'one'
+                    ? t('auth.sessions.end')
+                    : t('auth.sessions.endOthers')
+                }}
+              }
+            </button>
+            <button matButton="text" type="button" (click)="cancel()">
+              {{ t('auth.sessions.cancel') }}
+            </button>
+          </div>
+        </div>
+      } @else if (otherSessions().length > 0) {
+        <div class="sessions-actions">
+          <button
+            matButton="outlined"
+            type="button"
+            [disabled]="busy() || cannotStepUp()"
+            (click)="startRevoke({ scope: 'others' })"
+          >
+            {{ t('auth.sessions.endOthers') }}
+          </button>
+        </div>
+      }
+    }
+  </mat-card-content>
+</mat-card>

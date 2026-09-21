@@ -12,6 +12,7 @@ import {
   toUsageResponse,
   toUserResponse
 } from './state';
+import { normalizeUserAgent } from './utils/user-agent';
 import type { StateSnapshot } from './control.types';
 import type {
   MockCustomer,
@@ -67,6 +68,8 @@ function buildStateSnapshot(state: State): StateSnapshot {
     refreshTokens: state.refreshTokens.size,
     refreshSessions: state.refreshSessions.size,
     sessionStarts: state.sessionStarts.size,
+    sessionUserAgents: state.sessionUserAgents.size,
+    sessionLastActive: state.sessionLastActive.size,
     revokedRefreshTokens: state.revokedRefreshTokens.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
     passwordResetTokens: state.passwordResetTokens.size,
@@ -230,7 +233,11 @@ router.post('/oauth-data', (req, res) => {
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
-  registerSession(tokens.refresh_token, sessionId);
+  registerSession(
+    tokens.refresh_token,
+    sessionId,
+    normalizeUserAgent(req.headers['user-agent'])
+  );
   pruneOldestUserTokens(
     state.refreshTokens,
     user.id,

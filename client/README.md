@@ -517,6 +517,14 @@ persisted user.
 cross-tab teardown below is what covers the other tabs of **this** browser. It is a client-side
 mechanism and does not depend on the server revoking anything.
 
+**Signed-in devices.** `ActiveSessionsComponent` (`nxs-active-sessions`) on the profile page lists
+the sessions from `GET /auth/sessions`, names each device with `describeUserAgent` (the major
+browsers and systems, with the raw header as the fallback, rendered as text only) and ends one
+other device or all of them. It asks for the factor the account holds: the password, else a code
+from the authenticator, else a provider round trip that the page starts and resumes through the
+`pending_session_revoke` session-storage key. After a sign-in method changes on the page, the card
+offers "Sign out all other devices"; it never signs anything out on its own.
+
 A logout in one tab also ends the session in the other tabs. The constructor listens for the
 `storage` event. That event fires in each other tab of the same origin, and never in the tab that
 made the change. When `auth_user` goes away, the listener calls
@@ -996,6 +1004,8 @@ list is the heaviest page, and it repeatedly came near to the default limit of 3
 - a reactive 401 causes a refresh and a retry (`reactive-token-refresh.spec.ts`)
 - logout and then the browser Back button (`logout-back-button.spec.ts`)
 - a sign-out on one device leaves a second device signed in (`per-device-logout.spec.ts`)
+- a device ended from the sessions card is signed out on its next load, and the card offers to end
+  the other devices after two-factor is turned on (`active-sessions.spec.ts`)
 - a logout in one tab ends the session in a second tab of the same context
   (`cross-tab-logout.spec.ts`). The observing tab stays on `/profile`. A list page continues to send
   cursor requests, and the jwt interceptor sends the first 401 to `/login` with or without the

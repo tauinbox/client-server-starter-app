@@ -38,7 +38,12 @@ function mockJwtRequest(
   ip: string;
 } {
   return {
-    user: { userId, email: 'test@example.com', roles: [] },
+    user: {
+      userId,
+      email: 'test@example.com',
+      roles: [],
+      sessionId: 'session-1'
+    },
     headers: {},
     cookies,
     ip: '127.0.0.1'
@@ -73,7 +78,7 @@ function mockExpressRequest(
     user,
     cookies,
     query: { state },
-    headers: {},
+    headers: { 'user-agent': 'Mozilla/5.0 Test' },
     ip: '127.0.0.1'
   };
   return req;
@@ -791,7 +796,10 @@ describe('OAuthController', () => {
 
       await controller.googleCallback(mockExpressRequest(profile), res);
 
-      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
+        profile,
+        'Mozilla/5.0 Test'
+      );
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
     });
 
@@ -824,7 +832,10 @@ describe('OAuthController', () => {
       );
 
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
-      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
+        profile,
+        'Mozilla/5.0 Test'
+      );
       // The abandoned flow may still finish, so its intent is left in place.
       expect(res.clearCookie).not.toHaveBeenCalled();
     });
@@ -853,7 +864,10 @@ describe('OAuthController', () => {
       );
 
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
-      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile);
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
+        profile,
+        'Mozilla/5.0 Test'
+      );
     });
   });
 

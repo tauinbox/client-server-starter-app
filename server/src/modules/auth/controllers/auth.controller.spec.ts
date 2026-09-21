@@ -39,7 +39,7 @@ function mockJwtRequest(
   cookies: Record<string, string>;
 } {
   return {
-    user: { userId, email, roles: [] },
+    user: { userId, email, roles: [], sessionId: 'session-1' },
     ip: '127.0.0.1',
     headers: {},
     cookies

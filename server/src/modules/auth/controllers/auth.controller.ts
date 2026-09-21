@@ -64,6 +64,7 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { UserPermissionsResponse } from '@app/shared/types';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
@@ -195,7 +196,10 @@ export class AuthController {
       return { mfaRequired: true, mfaToken, expiresIn };
     }
 
-    const result = await this.authService.login(req.user);
+    const result = await this.authService.login(
+      req.user,
+      normalizeUserAgent(req.headers['user-agent'])
+    );
     await this.auditService.log({
       action: AuditAction.USER_LOGIN_SUCCESS,
       actorId: req.user.id,

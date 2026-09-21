@@ -50,7 +50,9 @@ export const ErrorKeys = {
     MFA_ENROLMENT_REQUIRED: 'errors.auth.mfaEnrolmentRequired',
     MFA_CHALLENGE_LOCKED: 'errors.auth.mfaChallengeLocked',
     MFA_STEP_UP_LOCKED: 'errors.auth.mfaStepUpLocked',
-    STEP_UP_LOCKED: 'errors.auth.stepUpLocked'
+    STEP_UP_LOCKED: 'errors.auth.stepUpLocked',
+    SESSION_NOT_FOUND: 'errors.auth.sessionNotFound',
+    SESSION_IS_CURRENT: 'errors.auth.sessionIsCurrent'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

@@ -55,7 +55,8 @@ class TestJwtAuthGuard implements CanActivate {
     req.user = {
       userId: 'test-actor',
       email: 'actor@example.com',
-      roles: ['user']
+      roles: ['user'],
+      sessionId: 'session-1'
     };
     return true;
   }

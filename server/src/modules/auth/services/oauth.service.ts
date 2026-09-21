@@ -62,7 +62,8 @@ export class OAuthService {
    * writes is the shape this split exists to avoid.
    */
   async loginWithOAuth(
-    profile: OAuthUserProfile
+    profile: OAuthUserProfile,
+    userAgent: string | null
   ): Promise<{ tokens: TokensResponseDto; user: User } | MfaRequiredResponse> {
     const user = await this.resolveUserForOAuth(profile);
 
@@ -70,7 +71,7 @@ export class OAuthService {
       return { mfaRequired: true, ...this.mfaService.issuePendingToken(user) };
     }
 
-    return this.sessionIssuer.issueSession(user);
+    return this.sessionIssuer.issueSession(user, userAgent);
   }
 
   /** Finds, or creates, the account the provider profile names. */
