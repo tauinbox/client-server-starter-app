@@ -31,9 +31,11 @@ export function authenticateRequest(
   const user = findUserById(decoded.sub);
   if (!user) return null;
 
+  // Floored like JwtStrategy: `iat` is whole seconds, and every revocation
+  // also ends the sessions, so the session check below refuses the rest.
   if (
     user.tokenRevokedAt &&
-    decoded.iat < new Date(user.tokenRevokedAt).getTime() / 1000
+    decoded.iat < Math.floor(new Date(user.tokenRevokedAt).getTime() / 1000)
   ) {
     return null;
   }

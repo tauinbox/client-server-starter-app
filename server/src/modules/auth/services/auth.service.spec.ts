@@ -58,6 +58,7 @@ describe('AuthService', () => {
   let mockUsersService: {
     findByEmail: jest.Mock;
     findOne: jest.Mock;
+    findById: jest.Mock;
     create: jest.Mock;
     incrementFailedAttemptsAndLockIfNeeded: jest.Mock;
     resetLoginAttempts: jest.Mock;
@@ -192,6 +193,7 @@ describe('AuthService', () => {
     mockUsersService = {
       findByEmail: jest.fn(),
       findOne: jest.fn(),
+      findById: jest.fn(),
       create: jest.fn(),
       incrementFailedAttemptsAndLockIfNeeded: jest.fn().mockResolvedValue({
         failedLoginAttempts: 1,
@@ -1353,7 +1355,7 @@ describe('AuthService', () => {
 
     it('should issue new tokens and revoke old token atomically', async () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
 
       const result = await service.refreshTokens('valid-refresh-token');
 
@@ -1401,7 +1403,7 @@ describe('AuthService', () => {
         passwordResetToken: 'hashed-reset-token'
       });
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
-      mockUsersService.findOne.mockResolvedValue(entity);
+      mockUsersService.findById.mockResolvedValue(entity);
 
       const result = await service.refreshTokens('valid-refresh-token');
 
@@ -1492,7 +1494,7 @@ describe('AuthService', () => {
       it('should kill all sessions when the SAME original token is presented twice', async () => {
         // First refresh — happy path, rotates the token.
         mockRefreshTokenService.findByToken.mockResolvedValueOnce(mockTokenDoc);
-        mockUsersService.findOne.mockResolvedValue(mockUser);
+        mockUsersService.findById.mockResolvedValue(mockUser);
 
         const first = await service.refreshTokens('original-token');
         expect(first.tokens.access_token).toBe('mock-access-token');
@@ -1530,21 +1532,28 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw HttpException when user not found', async () => {
+    // A token path answers 401, never the 404 of the users API: the account
+    // behind a live refresh row can be soft-deleted before its session is.
+    it('answers 401 USER_NOT_FOUND when the account behind the token is gone', async () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
-      mockUsersService.findOne.mockRejectedValue(
-        new HttpException('User not found', 404)
-      );
+      mockUsersService.findById.mockResolvedValue(null);
 
-      await expect(
-        service.refreshTokens('valid-refresh-token')
-      ).rejects.toThrow(HttpException);
+      const error = await service
+        .refreshTokens('valid-refresh-token')
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(401);
+      expect((error as HttpException).getResponse()).toEqual(
+        expect.objectContaining({ errorKey: ErrorKeys.AUTH.USER_NOT_FOUND })
+      );
+      expect(mockUsersService.findById).toHaveBeenCalledWith('user-1');
     });
 
     it('should revoke token and throw when user is deactivated', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
-      mockUsersService.findOne.mockResolvedValue(inactiveUser);
+      mockUsersService.findById.mockResolvedValue(inactiveUser);
 
       await expect(
         service.refreshTokens('valid-refresh-token')
@@ -1587,7 +1596,7 @@ describe('AuthService', () => {
         )
       };
       mockRefreshTokenService.findByToken.mockResolvedValue(agedToken);
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
 
       await expect(
         service.refreshTokens('aged-session-token')
@@ -1610,7 +1619,7 @@ describe('AuthService', () => {
         ...mockTokenDoc,
         sessionStartedAt: startedAt
       });
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
 
       await service.refreshTokens('valid-refresh-token');
 
@@ -1641,7 +1650,7 @@ describe('AuthService', () => {
         ...mockTokenDoc,
         sessionStartedAt: new Date(2020, 0, 1)
       });
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
 
       const result = await service.refreshTokens('valid-refresh-token');
 
@@ -1655,7 +1664,7 @@ describe('AuthService', () => {
         createdAt: new Date('2030-01-01T00:00:00Z')
       };
       mockRefreshTokenService.findByToken.mockResolvedValue(recentToken);
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'JWT_MIN_IAT') return 1800000000; // 2027, before recentToken.createdAt
         const config: Record<string, string> = {

@@ -100,7 +100,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `DB_LOGGING` | `["warn","error","slow"]` | TypeORM logging levels. The value `"slow"` logs a query that takes more than `DB_SLOW_QUERY_THRESHOLD` |
 | `DB_SLOW_QUERY_THRESHOLD` | `200` | Slow query threshold in milliseconds |
 | `DB_LOGGER` | - | TypeORM logger type, for example `advanced-console` or `file`. A value replaces the default logger |
-| `REQUEST_LOG_LEVEL` | `all` | Request logging level. `all` logs each request. `warn` logs a 4xx and a 5xx. `error` logs a 5xx |
+| `REQUEST_LOG_LEVEL` | `all` | Request logging level. `all` logs each request. `warn` logs a 4xx and a 5xx. `error` logs a 5xx. The logged URL never carries the value of a `code`, `state` or `token` query parameter |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
 | `JWT_SECRET` | - | Symmetric secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
 | `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
@@ -1039,7 +1039,8 @@ that OAuth makes. The
 
 **JwtStrategy** verifies the signature of the Bearer token. It pins the issuer, the audience and the
 signing algorithm. It requires the `access` token purpose and a `sub` claim that is not empty. It
-applies the `JWT_MIN_IAT` cutoff and the per-user `tokenRevokedAt` cutoff. It then requires a `sid`
+applies the `JWT_MIN_IAT` cutoff and the per-user `tokenRevokedAt` cutoff, which it floors to whole
+seconds because `iat` has no finer unit. It then requires a `sid`
 claim and asks `RefreshTokenService.hasLiveSession`, which looks for a row of that session which is
 not revoked and not expired, so a sign-out on one device refuses that device on its next request
 while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, roles }`.

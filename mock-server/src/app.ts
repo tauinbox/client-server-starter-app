@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { registerRoutes } from './middleware';
 import { anonIdMiddleware } from './middleware/anon-id.middleware';
 import controlRouter from './control.routes';
@@ -51,7 +52,7 @@ export function createApp() {
         statusCode >= 500 ? 'ERROR' : statusCode >= 400 ? 'WARN' : 'LOG';
       const reqIdSuffix = reqId ? ` [req-id: ${reqId}]` : '';
       console.log(
-        `[HTTP] [${level}] ${req.method} ${req.originalUrl} ${statusCode} ${duration}ms${reqIdSuffix}`
+        `[HTTP] [${level}] ${req.method} ${redactSensitiveQuery(req.originalUrl)} ${statusCode} ${duration}ms${reqIdSuffix}`
       );
     });
     next();

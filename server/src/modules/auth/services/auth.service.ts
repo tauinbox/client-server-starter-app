@@ -658,7 +658,9 @@ export class AuthService {
       }
     }
 
-    const user = await this.usersService.findOne(tokenDoc.userId);
+    // Not `findOne`: its 404 would replace the 401 below, and a soft-deleted
+    // account whose session is not yet revoked arrives here.
+    const user = await this.usersService.findById(tokenDoc.userId);
     if (!user) {
       this.auditService.logFireAndForget({
         action: AuditAction.TOKEN_REFRESH_FAILURE,

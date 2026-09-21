@@ -4,6 +4,7 @@ import {
   addOAuthAccounts,
   findUserById,
   getState,
+  rekeyUserSessions,
   registerSession,
   resetState,
   toInvoiceResponse,
@@ -345,9 +346,9 @@ router.post('/role-permissions', (req, res) => {
   res.json({ message: `Set ${rolePermissions.length} role-permission(s)` });
 });
 
-// POST /__control/invalidate-access-tokens — set tokenRevokedAt for a user.
-// Existing access tokens issued before this call become invalid (the auth
-// helper compares decoded.iat to user.tokenRevokedAt). Refresh tokens are
+// POST /__control/invalidate-access-tokens — end every access token a user
+// holds. The live sessions get new ids, so the session check refuses each
+// token issued so far whatever second it was issued in. Refresh tokens are
 // LEFT INTACT so the client's 401 interceptor can refresh-and-retry.
 router.post('/invalidate-access-tokens', (req, res) => {
   const { userId } = req.body as { userId?: string };
@@ -362,6 +363,7 @@ router.post('/invalidate-access-tokens', (req, res) => {
     return;
   }
   user.tokenRevokedAt = new Date().toISOString();
+  rekeyUserSessions(userId);
   res.json({ message: `tokens invalidated for user ${userId}` });
 });
 
