@@ -23,6 +23,10 @@ import {
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
+import {
+  OAUTH_ERROR_NO_EMAIL,
+  OAuthAuthenticationFailedException
+} from '../exceptions/oauth-authentication-failed.exception';
 import type { MfaRequiredResponse } from '@app/shared/types';
 
 function emailAlreadyRegisteredConflict(): HttpException {
@@ -113,7 +117,11 @@ export class OAuthService {
       // Canonicalized again here rather than trusted from the strategy: this is
       // the only writer of OAuth-created users, and a provider-cased address
       // would create a duplicate the conflict check below can never see.
-      const email = normalizeEmail(profile.email) ?? '';
+      const email = normalizeEmail(profile.email);
+      // Only creation needs an address; a linked account signs in without one.
+      if (!email) {
+        throw new OAuthAuthenticationFailedException(OAUTH_ERROR_NO_EMAIL);
+      }
 
       // 2. Create new user + OAuth account atomically.
       // Without a transaction, a failure after user creation would leave an

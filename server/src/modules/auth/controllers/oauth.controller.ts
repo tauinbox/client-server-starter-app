@@ -55,7 +55,10 @@ import {
 } from '@app/shared/constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
-import { OAUTH_ERROR_REAUTH_FAILED } from '../exceptions/oauth-authentication-failed.exception';
+import {
+  OAUTH_ERROR_REAUTH_FAILED,
+  OAuthAuthenticationFailedException
+} from '../exceptions/oauth-authentication-failed.exception';
 import {
   OAUTH_INTENT_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
@@ -488,14 +491,6 @@ export class OAuthController {
         return this.handleOAuthLink(linkToken, profile, req, res);
       }
 
-      if (!profile.email) {
-        this.logger.warn(
-          `OAuth login failed: no email provided by ${profile.provider}`
-        );
-        res.redirect(`${this.clientUrl}/login?oauth_error=no_email`);
-        return;
-      }
-
       const result = await this.oauthService.loginWithOAuth(
         profile,
         normalizeUserAgent(req.headers['user-agent'])
@@ -528,6 +523,11 @@ export class OAuthController {
 
       res.redirect(`${this.clientUrl}/oauth/callback`);
     } catch (error) {
+      if (error instanceof OAuthAuthenticationFailedException) {
+        this.logger.warn(`${error.message} via ${profile.provider}`);
+        res.redirect(`${this.clientUrl}/login?oauth_error=${error.oauthError}`);
+        return;
+      }
       if (
         error instanceof HttpException &&
         (error.getResponse() as { errorKey?: string })?.errorKey ===

@@ -5,6 +5,7 @@
 export const OAUTH_ERROR_AUTH_FAILED = 'auth_failed';
 export const OAUTH_ERROR_CANCELLED = 'oauth_cancelled';
 export const OAUTH_ERROR_REAUTH_FAILED = 'reauth_failed';
+export const OAUTH_ERROR_NO_EMAIL = 'no_email';
 
 /**
  * Where the browser is sent after a failure. A cancelled or failed link flow

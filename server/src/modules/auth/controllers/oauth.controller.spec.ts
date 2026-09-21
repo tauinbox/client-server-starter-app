@@ -22,6 +22,10 @@ import {
 } from '@app/shared/constants';
 import { bindIntent } from '../utils/oauth-flow-intent';
 import { createMockCache } from '../../../common/testing/cache.mock';
+import {
+  OAUTH_ERROR_NO_EMAIL,
+  OAuthAuthenticationFailedException
+} from '../exceptions/oauth-authentication-failed.exception';
 
 // Seconds, as a JWT `iat` is.
 const LINK_TOKEN_IAT = Math.floor(
@@ -586,7 +590,36 @@ describe('OAuthController', () => {
       );
     });
 
-    it('should redirect to login with error when no email', async () => {
+    it('should leave a missing email to the service, which signs a linked account in', async () => {
+      oauthServiceMock.loginWithOAuth.mockResolvedValue({
+        tokens: { access_token: 'access', expires_in: 3600 },
+        user: { id: '1', email: 'linked@example.com' }
+      });
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.VK,
+        providerId: '123',
+        email: '',
+        firstName: 'Test',
+        lastName: 'User',
+        emailVerified: false
+      };
+
+      await controller.vkCallback(mockExpressRequest(profile), res);
+
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
+        profile,
+        expect.anything()
+      );
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/oauth/callback'
+      );
+    });
+
+    it('should redirect to login with error when the service refuses a missing email', async () => {
+      oauthServiceMock.loginWithOAuth.mockRejectedValue(
+        new OAuthAuthenticationFailedException(OAUTH_ERROR_NO_EMAIL)
+      );
       const res = mockResponse();
       const profile: OAuthUserProfile = {
         provider: OAuthProvider.VK,
