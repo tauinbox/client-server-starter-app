@@ -17,6 +17,10 @@ import { MailService } from '../../mail/mail.service';
 import { MfaService } from './mfa.service';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
+import {
+  OAUTH_ERROR_NO_EMAIL,
+  OAuthAuthenticationFailedException
+} from '../exceptions/oauth-authentication-failed.exception';
 import { ErrorKeys, MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 
 describe('OAuthService', () => {
@@ -480,6 +484,47 @@ describe('OAuthService', () => {
     // Auto-link is disabled. When a local account already exists for the
     // OAuth-asserted email but no OAuth row matches, we MUST throw and
     // refuse to create the link silently.
+    it('signs in a linked account whose provider sends no email', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'facebook',
+        providerId: 'fb-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
+
+      const result = await loginExpectingSession({
+        ...oauthProfile,
+        provider: 'facebook',
+        providerId: 'fb-123',
+        email: '',
+        emailVerified: false
+      });
+
+      expect(result.user.id).toBe('oauth-user-1');
+      expect(result.tokens).toBeDefined();
+    });
+
+    it('refuses to create an account when the provider sends no email', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+
+      await expect(
+        service.loginWithOAuth(
+          { ...oauthProfile, email: '', emailVerified: false },
+          null
+        )
+      ).rejects.toMatchObject({
+        constructor: OAuthAuthenticationFailedException,
+        oauthError: OAUTH_ERROR_NO_EMAIL
+      });
+
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(mockManager.save).not.toHaveBeenCalled();
+      expect(mockTokenGenerator.generateTokens).not.toHaveBeenCalled();
+    });
+
     it('should throw OAUTH_EMAIL_ALREADY_REGISTERED when local account exists for the email', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
