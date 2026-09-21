@@ -1407,6 +1407,12 @@ OAuth asserts, or another account has that address as its `pendingEmail`, the ca
 the provider with `POST /auth/oauth/link-init`, which asks for their password first: a linked
 provider signs the account in and no recovery path removes it.
 
+**A linked account signs in without an email.** `resolveUserForOAuth` finds a returning user by the
+provider and the `providerId`, and it does not read the address there. Facebook and VK send no address
+when the person declines the email permission. Only the creation of an account needs the address: without
+one, the service throws `OAuthAuthenticationFailedException(no_email)` before any write, and the callback
+redirects to `/login?oauth_error=no_email`.
+
 A new user that OAuth makes takes the `email_verified` flag of the provider. Google gives
 `profile.emails[0].verified`. Facebook gives `profile._json.verified`. VK always gives `false`.
 
