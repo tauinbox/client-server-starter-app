@@ -7,7 +7,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { Server } from 'http';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -20,11 +20,16 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
+import { Permission } from '../src/modules/auth/entities/permission.entity';
+import { Role } from '../src/modules/auth/entities/role.entity';
+import { RoleService } from '../src/modules/auth/services/role.service';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The seeded `user` role may update its own record, so a bare access token
 // reached the password and the address of the account. The whole pipeline is
 // real: the ownership grant, the global guards, the step-up and the write.
+// CI runs the migrations and not the seeders, so the suite grants the same
+// ownership condition through a role of its own instead of relying on it.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
@@ -33,6 +38,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
+  const selfEditRoleName = `step-up-self-edit-${stamp}`;
   const ownerEmail = `step-up-owner-${stamp}@example.com`;
   const otherEmail = `step-up-other-${stamp}@example.com`;
   const movedEmail = `step-up-moved-${stamp}@example.com`;
@@ -70,9 +76,29 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
         .send({ email, password, firstName: 'Step', lastName: 'Up' })
         .expect(201);
     }
+
+    // The seeded grant of the `user` role: update, on the own record only.
+    const roleService = app.get(RoleService);
+    const updateUser = (await dataSource.getRepository(Permission).find()).find(
+      (p) => p.action.name === 'update' && p.resource.subject === 'User'
+    );
+    if (!updateUser) throw new Error('Permission update:User missing');
+    const selfEdit = await roleService.create({ name: selfEditRoleName });
+    await roleService.setPermissionsForRole(selfEdit.id, [
+      {
+        permissionId: updateUser.id,
+        conditions: { ownership: { userField: 'id' } }
+      }
+    ]);
+    for (const email of [ownerEmail, otherEmail]) {
+      await roleService.assignRoleToUser(await userId(email), selfEdit.id);
+    }
   }, 60000);
 
   afterAll(async () => {
+    await dataSource
+      ?.getRepository(Role)
+      .delete({ name: In([selfEditRoleName]) });
     await dataSource
       ?.getRepository(User)
       .delete([
