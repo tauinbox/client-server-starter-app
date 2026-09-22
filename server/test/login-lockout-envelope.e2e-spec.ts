@@ -93,17 +93,19 @@ runWithInfra('Login lockout envelope (e2e)', () => {
     expect(response.headers['retry-after']).toBe(String(body.retryAfter));
   }, 30000);
 
-  it('answers the generic 401 when the password is wrong on a locked account', async () => {
-    await lockAccount();
+  // A 401 here and a 423 for the right password would tell the caller which
+  // guess was right, so the lock would keep taking guesses while it is open
+  it('answers the same 423 when the password is wrong on a locked account', async () => {
+    const lockedUntil = await lockAccount();
 
     const response = await request(http())
       .post('/api/v1/auth/login')
       .send({ email, password: 'Wrong-Password-42' })
-      .expect(401);
+      .expect(423);
 
-    const body = response.body as { retryAfter?: number };
-    expect(body.retryAfter).toBeUndefined();
-    expect(response.headers['retry-after']).toBeUndefined();
+    const body = response.body as { errorKey: string; lockedUntil: string };
+    expect(body.errorKey).toBe('errors.auth.accountLocked');
+    expect(body.lockedUntil).toBe(lockedUntil.toISOString());
 
     // The retry must not extend the window it was rejected by
     const after = await dataSource

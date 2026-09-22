@@ -464,24 +464,72 @@ describe('AuthService', () => {
       expect(mockUsersService.resetLoginAttempts).not.toHaveBeenCalled();
     });
 
-    // A 423 in front of the credential check separates a real account from an
-    // unknown address, so a wrong password answers the generic 401 instead
-    it('should answer 401, not 423, when the password is wrong on a locked account', async () => {
+    // A lock that checks the password answers 423 for the right guess and 401
+    // for a wrong one, so it keeps taking guesses while it is open
+    it('should answer 423 without checking the password on a locked account', async () => {
       mockUsersService.findByEmail.mockResolvedValue({
         ...mockUser,
         failedLoginAttempts: 5,
         lockedUntil: new Date(Date.now() + 600000)
       });
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+      const compareSpy = jest
+        .spyOn(bcrypt, 'compare')
+        .mockClear()
+        .mockResolvedValue(false as never);
 
       try {
         await service.validateUser('test@example.com', 'wrong-password');
         fail('Expected HttpException');
       } catch (error) {
-        expect((error as HttpException).getStatus()).toBe(
-          HttpStatus.UNAUTHORIZED
-        );
+        expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
       }
+      expect(compareSpy).not.toHaveBeenCalled();
+    });
+
+    it('should answer 423 without checking the password once the budget is spent', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
+        {
+          failedLoginAttempts: MAX_FAILED_ATTEMPTS + 1,
+          lockedUntil: new Date(Date.now() + 900000)
+        }
+      );
+      const compareSpy = jest
+        .spyOn(bcrypt, 'compare')
+        .mockClear()
+        .mockResolvedValue(true as never);
+
+      try {
+        await service.validateUser('test@example.com', 'password');
+        fail('Expected HttpException');
+      } catch (error) {
+        expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
+      }
+      expect(compareSpy).not.toHaveBeenCalled();
+      expect(mockUsersService.resetLoginAttempts).not.toHaveBeenCalled();
+    });
+
+    // A read-then-check lets every request of a concurrent burst be checked
+    it('should take the attempt slot before checking the password', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
+        {
+          failedLoginAttempts: 1,
+          lockedUntil: null
+        }
+      );
+      const compareSpy = jest
+        .spyOn(bcrypt, 'compare')
+        .mockClear()
+        .mockResolvedValue(true as never);
+
+      await service.validateUser('test@example.com', 'password');
+
+      const [reservedAt] =
+        mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mock
+          .invocationCallOrder;
+      const [comparedAt] = compareSpy.mock.invocationCallOrder;
+      expect(reservedAt).toBeLessThan(comparedAt);
     });
 
     // Otherwise a locked-out user extends their own window on every retry
@@ -542,8 +590,8 @@ describe('AuthService', () => {
         service.validateUser('test@example.com', 'password')
       ).resolves.toMatchObject({ id: 'user-1' });
 
-      // Once by the expiry branch; the success branch sees a cleared counter
-      expect(mockUsersService.resetLoginAttempts).toHaveBeenCalledTimes(1);
+      // Once by the expiry branch, once to release the slot the attempt took
+      expect(mockUsersService.resetLoginAttempts).toHaveBeenCalledTimes(2);
     });
 
     it('should lock account after 5 failed attempts', async () => {
@@ -667,13 +715,21 @@ describe('AuthService', () => {
       );
     });
 
-    it('should not reset attempts when count is zero', async () => {
-      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+    // Otherwise five correct passwords lock an account that is not verified
+    it('should release the slot on a correct password before the verification check', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false
+      });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
-      await service.validateUser('test@example.com', 'password');
+      await expect(
+        service.validateUser('test@example.com', 'password')
+      ).rejects.toThrow(HttpException);
 
-      expect(mockUsersService.resetLoginAttempts).not.toHaveBeenCalled();
+      expect(mockUsersService.resetLoginAttempts).toHaveBeenCalledWith(
+        'user-1'
+      );
     });
   });
 

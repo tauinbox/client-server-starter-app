@@ -165,91 +165,53 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<User> {
     const user = await this.usersService.findByEmail(email);
 
-    // Detect a lock here, but do not answer with one yet. A 423 in front of
-    // the credential check tells a caller that the address exists, which is
-    // the generic-failure rule that OWASP states for a wrong password
-    // whatever the account state. The lock is disclosed below, to a caller
-    // that proved it holds the password.
-    let openLockUntil: Date | null = null;
+    // The dummy comparison keeps an unusable address as slow as a wrong password.
+    if (!user || !user.isActive || !user.password) {
+      await bcrypt.compare(password, AuthService.DUMMY_HASH);
+      throw this.invalidCredentials(email, null);
+    }
 
-    if (user?.lockedUntil) {
+    if (user.lockedUntil) {
       if (user.lockedUntil.getTime() > Date.now()) {
-        this.auditService.logFireAndForget({
-          action: AuditAction.USER_LOGIN_FAILURE,
-          actorEmail: email,
-          targetId: user.id,
-          targetType: 'User',
-          details: { reason: 'account_locked' }
+        // Answer before the password is checked: 423 for a right guess and 401
+        // for a wrong one would let a locked account keep taking guesses.
+        throw this.lockedLogin(email, user.id, user.lockedUntil, {
+          reason: 'account_locked'
         });
-        openLockUntil = user.lockedUntil;
-      } else {
-        // The window elapsed. Restart the counter here: it is only ever
-        // cleared on a successful login, so leaving it at the threshold means
-        // the next wrong password re-locks the account on a single strike -
-        // one request per window keeps any known account locked indefinitely.
-        await this.usersService.resetLoginAttempts(user.id);
-        user.failedLoginAttempts = 0;
-        user.lockedUntil = null;
       }
+      // The window elapsed. Left at the threshold, one wrong password per window
+      // would keep any known account locked indefinitely.
+      await this.usersService.resetLoginAttempts(user.id);
     }
 
-    const hashToCompare =
-      user?.isActive && user.password ? user.password : AuthService.DUMMY_HASH;
-
-    const isMatch = await bcrypt.compare(password, hashToCompare);
-
-    if (!user || !user.isActive || !user.password || !isMatch) {
-      let attemptsAfterIncrement: number | null = null;
-      // Handle failed login attempt atomically to prevent race conditions. A
-      // locked account must not accrue further strikes, or a locked-out user
-      // extends the window every time they retry.
-      if (user && user.isActive && user.password && !openLockUntil) {
-        const { failedLoginAttempts, lockedUntil } =
-          await this.usersService.incrementFailedAttemptsAndLockIfNeeded(
-            user.id,
-            MAX_FAILED_ATTEMPTS,
-            LOCKOUT_DURATION_MS
-          );
-        attemptsAfterIncrement = failedLoginAttempts;
-
-        if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
-          this.auditService.logFireAndForget({
-            action: AuditAction.USER_LOGIN_FAILURE,
-            actorEmail: email,
-            targetId: user.id,
-            targetType: 'User',
-            details: {
-              reason: 'account_locked_after_max_attempts',
-              failedLoginAttempts
-            }
-          });
-          throw this.lockedAccountException(lockedUntil);
-        }
-      }
-      this.auditService.logFireAndForget({
-        action: AuditAction.USER_LOGIN_FAILURE,
-        actorEmail: email,
-        details: {
-          reason: 'invalid_credentials',
-          ...(attemptsAfterIncrement !== null
-            ? { failedLoginAttempts: attemptsAfterIncrement }
-            : {})
-        }
-      });
-      this.metricsService.recordAuthEvent('login_failure');
-      throw new HttpException(
-        {
-          message: 'Invalid credentials',
-          errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
-        },
-        HttpStatus.UNAUTHORIZED
+    // Take the slot before checking the password: a read-then-check lets a
+    // concurrent burst all see the same open budget and all be checked.
+    const { failedLoginAttempts, lockedUntil } =
+      await this.usersService.incrementFailedAttemptsAndLockIfNeeded(
+        user.id,
+        MAX_FAILED_ATTEMPTS,
+        LOCKOUT_DURATION_MS
       );
+
+    if (failedLoginAttempts > MAX_FAILED_ATTEMPTS && lockedUntil) {
+      throw this.lockedLogin(email, user.id, lockedUntil, {
+        reason: 'account_locked'
+      });
     }
 
-    // The caller holds the password, so the lock window can be disclosed.
-    if (openLockUntil) {
-      throw this.lockedAccountException(openLockUntil);
+    if (!(await bcrypt.compare(password, user.password))) {
+      if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
+        throw this.lockedLogin(email, user.id, lockedUntil, {
+          reason: 'account_locked_after_max_attempts',
+          failedLoginAttempts
+        });
+      }
+      throw this.invalidCredentials(email, failedLoginAttempts);
     }
+
+    // Before the verification check: five correct passwords must not lock an
+    // unverified account.
+    await this.usersService.resetLoginAttempts(user.id);
 
     // Check email verification
     if (!user.isEmailVerified) {
@@ -260,11 +222,6 @@ export class AuthService {
         },
         HttpStatus.FORBIDDEN
       );
-    }
-
-    // Success — reset failed attempts
-    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-      await this.usersService.resetLoginAttempts(user.id);
     }
 
     // Return the User entity itself so ClassSerializerInterceptor can apply
@@ -1095,16 +1052,17 @@ export class AuthService {
       return { factor: 'password' };
     }
 
-    const open = await this.stepUpPasswordFailures.read(user.id);
-    if (open.count >= MAX_FAILED_ATTEMPTS) {
-      throw this.stepUpPasswordLockedException(open.remainingMs);
+    // The attempt takes its slot before the password is checked, so a
+    // concurrent burst cannot all read the same open budget and all be checked.
+    const { count, remainingMs } = await this.stepUpPasswordFailures.record(
+      user.id,
+      LOCKOUT_DURATION_MS
+    );
+    if (count > MAX_FAILED_ATTEMPTS) {
+      throw this.stepUpPasswordLockedException(remainingMs);
     }
 
     if (!(await bcrypt.compare(currentPassword, user.password))) {
-      const { count, remainingMs } = await this.stepUpPasswordFailures.record(
-        user.id,
-        LOCKOUT_DURATION_MS
-      );
       return count >= MAX_FAILED_ATTEMPTS
         ? { factor: 'password', lockedMs: remainingMs }
         : { factor: 'password' };
@@ -1247,7 +1205,41 @@ export class AuthService {
     await this.invalidateAllSessions(userId);
   }
 
-  private lockedAccountException(lockedUntil: Date): HttpException {
+  private invalidCredentials(
+    email: string,
+    failedLoginAttempts: number | null
+  ): HttpException {
+    this.auditService.logFireAndForget({
+      action: AuditAction.USER_LOGIN_FAILURE,
+      actorEmail: email,
+      details: {
+        reason: 'invalid_credentials',
+        ...(failedLoginAttempts !== null ? { failedLoginAttempts } : {})
+      }
+    });
+    this.metricsService.recordAuthEvent('login_failure');
+    return new HttpException(
+      {
+        message: 'Invalid credentials',
+        errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
+      },
+      HttpStatus.UNAUTHORIZED
+    );
+  }
+
+  private lockedLogin(
+    email: string,
+    userId: string,
+    lockedUntil: Date,
+    details: Record<string, unknown>
+  ): HttpException {
+    this.auditService.logFireAndForget({
+      action: AuditAction.USER_LOGIN_FAILURE,
+      actorEmail: email,
+      targetId: userId,
+      targetType: 'User',
+      details
+    });
     const retryAfter = Math.ceil((lockedUntil.getTime() - Date.now()) / 1000);
     return new HttpException(
       {
