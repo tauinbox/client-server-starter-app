@@ -1091,6 +1091,9 @@ Redis it is a raw `INCR` behind a `SET NX PX` that creates the key and carries t
 order: an `INCR` that landed before a separate `PEXPIRE` failed would leave a counter with no expiry,
 that is an account barred for ever. Without Redis one process map holds the window. It **fails open**
 on a cache outage, which returns the route to the throttle-only behaviour and never to a worse one.
+Each of the three counters takes the slot of an attempt before the secret is checked, and checks the
+secret only when that slot is inside the budget. A read of the count before the check let every
+request of a concurrent burst see the same open budget, so all of them were checked.
 The counter is deliberately not bound to the `mfa_pending` token: a fresh token costs one
 `POST /auth/login` with the password the caller already holds.
 
@@ -1507,10 +1510,14 @@ nothing persisted.
 that are revoked and expired.
 
 **Account lockout.** 5 failed logins lock the account for 15 minutes, and the answer is HTTP 423 with
-`lockedUntil`, `retryAfter` and the standard `Retry-After` header. The lock is tested after the
-password comparison, thus a wrong password answers the generic 401 whatever the state of the account,
-and a locked account collects no more strikes. A password reset clears the lock. The end of the
-window clears it. An administrator can also unlock the account with a user update.
+`lockedUntil`, `retryAfter` and the standard `Retry-After` header. An open lock answers 423 before
+the password is compared, for a correct and a wrong password alike. If the answer depended on the
+password, a locked account would still tell a caller which guess was correct. The cost is that a
+locked address shows as an account, which the project accepts (see the account enumeration row of
+the spec). An attempt takes its slot in the counter before the comparison, so a concurrent burst gets
+at most 5 comparisons: an attempt whose slot is above the threshold answers 423 without one. A
+correct password clears the counter. A burst that lands after the lock opened does not extend the
+window. A password reset clears the lock. The end of the window clears it. An administrator can also unlock the account with a user update.
 
 The lock covers the password path only, and `failed_login_attempts` and `locked_until` count password
 guesses alone. The second factor is a gate on both ways in, so a brake that reused those columns

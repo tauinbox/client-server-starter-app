@@ -1872,10 +1872,10 @@ a second request to the registry for a verdict that gates nothing.
   input, thus each path that sets a password caps there, in characters and in bytes. A path that
   verifies a password keeps the 128-character cap, because a stored hash covers the same truncated
   prefix and a lower cap would lock out the owner of a long legacy password.
-- **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. The lock is tested
-  after the password, thus a wrong password answers the generic 401 and the 423 countdown reaches
-  only a caller that holds the password. A password reset clears it, and the end of the window also
-  clears it.
+- **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. An open lock answers
+  the 423 countdown before the password is checked, so a locked account takes no more guesses. Each
+  attempt takes its slot before the check, so a concurrent burst gets at most 5 checks. A password
+  reset clears the lock, and the end of the window also clears it.
 - **Email verification** is necessary before the first login.
 - **Two-factor authentication** is available to every account. A password on an enrolled account
   buys only an `mfa_pending` token, which `JwtStrategy` refuses as a bearer credential, so one
