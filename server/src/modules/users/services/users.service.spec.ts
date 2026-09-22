@@ -1378,6 +1378,18 @@ describe('UsersService', () => {
       expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });
 
+    it('refuses a delegated actor a target loaded without its roles', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        roles: undefined
+      });
+
+      await expect(
+        service.update('user-1', { firstName: 'Kept' }, delegated, 'actor-1')
+      ).rejects.toThrow('assertNotSuperTarget needs the roles of the target');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
     it('lets a delegated actor write to an ordinary target', async () => {
       mockRepository.findOne.mockResolvedValue({
         ...mockUser,

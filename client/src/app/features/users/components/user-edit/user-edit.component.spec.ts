@@ -399,6 +399,21 @@ describe('UserEditComponent', () => {
     });
   });
 
+  describe('a target the editor may not update', () => {
+    it('returns to the detail page with a notice instead of the form', () => {
+      permittedSignal.set(false);
+      const navigateSpy = vi.spyOn(router, 'navigate');
+
+      fixture.detectChanges();
+
+      expect(notifyMock.info).toHaveBeenCalledWith(
+        'users.edit.superTargetReadOnly'
+      );
+      expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users', 'user-1']);
+      expect(component.user()).toBeNull();
+    });
+  });
+
   describe('canManageUser (instance-level)', () => {
     it('should return false when user is not loaded', () => {
       expect(component['canManageUser']()).toBe(false);

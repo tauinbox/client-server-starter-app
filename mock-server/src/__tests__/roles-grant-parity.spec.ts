@@ -300,7 +300,7 @@ describe('role grant error parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(201);
       const user = getState().users.get(mockId('user-2'));
       expect(user?.roles).toEqual(['user', 'editor']);
       expect(user?.tokenRevokedAt).not.toBeNull();

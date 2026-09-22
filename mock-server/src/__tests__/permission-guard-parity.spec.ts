@@ -583,7 +583,7 @@ describe('permission-based route authorization', () => {
             roleId: SUPPORT_ROLE_ID
           })
         ).status
-      ).toBe(200);
+      ).toBe(201);
       await expectRefused(
         await send(token, 'POST', `/api/v1/roles/assign/${REGULAR_ID}`, {
           roleId: SUPPORT_ROLE_ID

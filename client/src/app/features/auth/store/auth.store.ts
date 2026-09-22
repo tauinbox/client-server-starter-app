@@ -23,6 +23,13 @@ import { isPersistedUser } from './storage-guards';
 
 export const AUTH_USER_KEY = 'auth_user';
 
+const SUPER_TARGET_DENY: RawRuleOf<AppAbility> = {
+  action: ['update', 'delete'],
+  subject: 'User',
+  conditions: { roles: { $elemMatch: { isSuper: true } } },
+  inverted: true
+};
+
 type AuthState = {
   accessToken: string | null; // in-memory ONLY — lost on page reload
   user: UserResponse | null; // persisted to localStorage (for reload detection)
@@ -119,9 +126,13 @@ export const AuthStore = signalStore(
       }
       // Safe cast: validation above guarantees rules is unknown[][]
       // which matches PackRule<RawRuleOf<AppAbility>>[] structure
-      const ability = createMongoAbility<AppAbility>(
-        unpackRules(rules as PackRule<RawRuleOf<AppAbility>>[])
-      );
+      const unpacked = unpackRules(rules as PackRule<RawRuleOf<AppAbility>>[]);
+      const ability = createMongoAbility<AppAbility>(unpacked);
+      // The server refuses a non-super actor every write on an account that
+      // holds a super role (assertNotSuperTarget), whatever the grants say.
+      if (!ability.can('manage', 'all')) {
+        ability.update([...unpacked, SUPER_TARGET_DENY]);
+      }
       patchState(store, { ability });
     }
 

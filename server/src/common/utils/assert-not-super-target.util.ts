@@ -21,7 +21,14 @@ export function assertNotSuperTarget(
   actorId: string | undefined,
   metricsService: MetricsService
 ): void {
-  if (ability.can('manage', 'all') || !target.roles?.some((r) => r.isSuper)) {
+  if (ability.can('manage', 'all')) {
+    return;
+  }
+  // Fail closed: a target loaded without its roles would pass as ordinary.
+  if (!target.roles) {
+    throw new Error('assertNotSuperTarget needs the roles of the target');
+  }
+  if (!target.roles.some((r) => r.isSuper)) {
     return;
   }
 

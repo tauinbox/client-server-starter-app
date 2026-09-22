@@ -928,7 +928,8 @@ router.post(
     });
 
     pushToUser(userId, { type: 'permissions_updated', userId });
-    res.send();
+    // The server route is a @Post with no @HttpCode, so Nest answers 201.
+    res.status(201).send();
   }
 );
 

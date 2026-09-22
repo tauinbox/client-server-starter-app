@@ -62,6 +62,7 @@
     "confirmEmailChangeMessage": "Changing the email for {{ firstName }} {{ lastName }} will mark their address as unverified, send a fresh verification email to {{ newEmail }}, and sign them out of every session. Continue?",
     "confirmEmailChangeButton": "Change email",
     "errorLoadFailed": "Failed to load user details. Please try again.",
+    "superTargetReadOnly": "Only a super administrator can change this account.",
     "successUnlocked": "Account unlocked successfully",
     "errorUnlockFailed": "Failed to unlock account",
     "successUpdated": "User updated successfully",

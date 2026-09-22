@@ -1057,7 +1057,10 @@ describe('RoleService', () => {
 
     it('assignRoleToUser blocks indirect escalation via role permissions', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      mockRoleRepo.manager.findOne.mockResolvedValue({ id: 'user-1' });
+      mockRoleRepo.manager.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: []
+      });
       mockRolePermissionRepo.find.mockResolvedValue([
         { permissionId: 'perm-create-role', conditions: null }
       ]);
@@ -1340,7 +1343,8 @@ describe('RoleService', () => {
       // so the refusal under test is the lift, not the membership write.
       mockRoleRepo.manager.findOne.mockResolvedValue({
         id: 'user-1',
-        isActive: true
+        isActive: true,
+        roles: []
       });
     });
 
