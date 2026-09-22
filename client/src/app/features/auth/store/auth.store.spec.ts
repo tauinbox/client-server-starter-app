@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { packRules } from '@casl/ability/extra';
 import { createMongoAbility } from '@casl/ability';
+import type { RawRuleOf } from '@casl/ability';
 import { AUTH_USER_KEY, AuthStore } from './auth.store';
 import type { AppAbility } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
@@ -351,6 +352,62 @@ describe('AuthStore', () => {
       expect(
         store.hasPermissions({ action: 'update', subject: 'Profile' })
       ).toBe(true);
+    });
+
+    describe('a super target', () => {
+      const superTarget = {
+        id: 'super-1',
+        roles: [{ name: 'admin', isSuper: true }]
+      };
+      const plainTarget = {
+        id: 'user-1',
+        roles: [{ name: 'user', isSuper: false }]
+      };
+
+      function packedOf(rules: RawRuleOf<AppAbility>[]): unknown[][] {
+        return packRules(createMongoAbility<AppAbility>(rules).rules);
+      }
+
+      it('denies a delegated actor update and delete on a super account', () => {
+        const store = createStore(null);
+        store.setRules(
+          packedOf([
+            { action: 'update', subject: 'User' },
+            { action: 'delete', subject: 'User' }
+          ])
+        );
+
+        for (const action of ['update', 'delete'] as const) {
+          expect(
+            store.hasPermissions({
+              action,
+              subject: 'User',
+              instance: superTarget
+            })
+          ).toBe(false);
+          expect(
+            store.hasPermissions({
+              action,
+              subject: 'User',
+              instance: plainTarget
+            })
+          ).toBe(true);
+          expect(store.hasPermissions({ action, subject: 'User' })).toBe(true);
+        }
+      });
+
+      it('leaves a super actor free to change a super account', () => {
+        const store = createStore(null);
+        store.setRules(packedOf([{ action: 'manage', subject: 'all' }]));
+
+        expect(
+          store.hasPermissions({
+            action: 'update',
+            subject: 'User',
+            instance: superTarget
+          })
+        ).toBe(true);
+      });
     });
 
     it('should silently skip when rules is not an array', () => {

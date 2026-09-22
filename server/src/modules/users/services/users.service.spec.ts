@@ -15,6 +15,7 @@ import type { AppAbility } from '../../auth/casl/app-ability';
 
 describe('UsersService', () => {
   let service: UsersService;
+  let mockMetricsService: { recordPermissionDenied: jest.Mock };
   let mockRepository: {
     findOne: jest.Mock;
     find: jest.Mock;
@@ -91,6 +92,7 @@ describe('UsersService', () => {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined)
     };
     mockAuditService = { logFireAndForget: jest.fn() };
+    mockMetricsService = { recordPermissionDenied: jest.fn() };
     mockBreachedPasswordService = {
       assertNotBreached: jest.fn().mockResolvedValue(undefined)
     };
@@ -112,7 +114,7 @@ describe('UsersService', () => {
         },
         {
           provide: MetricsService,
-          useValue: { recordPermissionDenied: jest.fn() }
+          useValue: mockMetricsService
         },
         {
           provide: MailService,
@@ -1269,6 +1271,136 @@ describe('UsersService', () => {
     it('rejects undefined in place of an ability', () => {
       // @ts-expect-error undefined is not an ability nor the system sentinel
       void (() => service.remove('user-1', undefined));
+    });
+  });
+
+  describe('a super target', () => {
+    const superUser = {
+      ...mockUser,
+      id: 'super-1',
+      roles: [{ name: 'admin', isSuper: true }]
+    } as User;
+    // A delegated role: every User action, and not `manage all`.
+    // @ts-expect-error partial mock - only `can` is needed for instance-level tests
+    const delegated: AppAbility = {
+      can: jest.fn((action: string) => action !== 'manage')
+    };
+    // @ts-expect-error partial mock - only `can` is needed for instance-level tests
+    const superActor: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+    async function expectSuperTargetRefusal(
+      write: Promise<unknown>,
+      action: string
+    ): Promise<void> {
+      const error: unknown = await write.catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(HttpException);
+      const http = error as HttpException;
+      expect(http.getStatus()).toBe(HttpStatus.FORBIDDEN);
+      expect(http.getResponse()).toMatchObject({
+        errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
+      });
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PERMISSION_CHECK_FAILURE',
+          actorId: 'actor-1',
+          targetId: 'super-1',
+          details: expect.objectContaining({
+            deniedAction: action,
+            superTarget: true
+          }) as unknown
+        })
+      );
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        action,
+        'User'
+      );
+    }
+
+    it('refuses an update by a delegated actor and writes nothing', async () => {
+      mockRepository.findOne.mockResolvedValue(superUser);
+
+      await expectSuperTargetRefusal(
+        service.update(
+          'super-1',
+          { password: 'Copper-Meadow-83' },
+          delegated,
+          'actor-1'
+        ),
+        'update'
+      );
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a deactivation by a delegated actor', async () => {
+      mockRepository.findOne.mockResolvedValue(superUser);
+
+      await expectSuperTargetRefusal(
+        service.update('super-1', { isActive: false }, delegated, 'actor-1'),
+        'update'
+      );
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a delete by a delegated actor', async () => {
+      mockRepository.findOne.mockResolvedValue(superUser);
+
+      await expectSuperTargetRefusal(
+        service.remove('super-1', delegated, 'actor-1'),
+        'delete'
+      );
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses a restore by a delegated actor', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...superUser,
+        deletedAt: new Date('2025-06-01')
+      });
+
+      await expectSuperTargetRefusal(
+        service.restore('super-1', delegated, 'actor-1'),
+        'delete'
+      );
+      expect(mockRepository.restore).not.toHaveBeenCalled();
+    });
+
+    it('lets a super actor write to a super target', async () => {
+      mockRepository.findOne.mockResolvedValue(superUser);
+      mockRepository.save.mockResolvedValue(superUser);
+
+      await expect(
+        service.update('super-1', { firstName: 'Kept' }, superActor, 'actor-1')
+      ).resolves.toBeDefined();
+      expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
+    });
+
+    it('refuses a delegated actor a target loaded without its roles', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        roles: undefined
+      });
+
+      await expect(
+        service.update('user-1', { firstName: 'Kept' }, delegated, 'actor-1')
+      ).rejects.toThrow('assertNotSuperTarget needs the roles of the target');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('lets a delegated actor write to an ordinary target', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        roles: [{ name: 'user', isSuper: false }]
+      });
+      mockRepository.save.mockResolvedValue(mockUser);
+
+      await expect(
+        service.update('user-1', { firstName: 'Kept' }, delegated, 'actor-1')
+      ).resolves.toBeDefined();
+      expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });
   });
 });

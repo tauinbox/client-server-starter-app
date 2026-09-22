@@ -131,7 +131,8 @@
     },
     "users": {
       "notFound": "User not found",
-      "emailExists": "User with this email already exists"
+      "emailExists": "User with this email already exists",
+      "superTargetForbidden": "Only a super administrator can change or delete a super administrator account"
     },
     "roles": {
       "notFound": "Role not found",

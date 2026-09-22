@@ -35,6 +35,7 @@ import {
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-target.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
@@ -396,7 +397,8 @@ export class RoleService {
    */
   private async loadRoleAssignmentTarget(userId: string): Promise<User> {
     const targetUser = await this.roleRepository.manager.findOne(User, {
-      where: { id: userId }
+      where: { id: userId },
+      relations: ['roles']
     });
     if (!targetUser) {
       throw new HttpException(
@@ -434,6 +436,16 @@ export class RoleService {
         subject('User', targetUser),
         this.auditService,
         { actorId, targetId: userId, targetType: 'User' },
+        this.metricsService
+      );
+      // Any role change ends every session of the target, so a delegated
+      // actor could keep a super account signed out with it.
+      assertNotSuperTarget(
+        ability,
+        'update',
+        targetUser,
+        this.auditService,
+        actorId,
         this.metricsService
       );
 
@@ -481,6 +493,16 @@ export class RoleService {
         subject('User', targetUser),
         this.auditService,
         { actorId, targetId: userId, targetType: 'User' },
+        this.metricsService
+      );
+      // Any role change ends every session of the target, so a delegated
+      // actor could keep a super account signed out with it.
+      assertNotSuperTarget(
+        ability,
+        'update',
+        targetUser,
+        this.auditService,
+        actorId,
         this.metricsService
       );
       if (this.isScopeChecked(ability)) {

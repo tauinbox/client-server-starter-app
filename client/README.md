@@ -445,6 +445,12 @@ Methods: `hasPermissions(check)`, `setRules(rules)`, `setMfaMandatory(flag)`, `h
 Without this rule, `[].every()` gives access to all callers. The method reads the ability signal
 before that exit, thus a caller that reacts to the signal keeps its subscription.
 
+For an actor without `manage all`, `setRules` adds one deny rule after the server rules: `update`
+and `delete` on a `User` whose `roles` hold one with `isSuper`. It mirrors the server rule
+`assertNotSuperTarget`. Thus the Edit, Delete and Restore controls of a super account are hidden or
+disabled for such an actor, and `UserEditComponent` sends a direct visit back to the detail page with
+a notice. A type-level check such as `{ action: 'update', subject: 'User' }` is not affected.
+
 Each RBAC check must use `hasPermissions`. Never compare a role name with the `'admin'` literal. For
 a rare display-only label, use `SYSTEM_ROLES.ADMIN` from `@app/shared/constants`.
 

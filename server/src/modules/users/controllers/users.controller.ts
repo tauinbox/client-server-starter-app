@@ -385,13 +385,11 @@ export class UsersController {
     currentPassword: string | undefined,
     code: string | undefined
   ): Promise<void> {
-    assertCan(
+    this.usersService.assertCanWrite(
       ability,
       'update',
-      subject('User', target),
-      this.auditService,
-      { actorId: req.user.userId, targetId: target.id, targetType: 'User' },
-      this.metricsService
+      target,
+      req.user.userId
     );
     await this.authService.assertStepUp(
       await this.usersService.findOne(req.user.userId),

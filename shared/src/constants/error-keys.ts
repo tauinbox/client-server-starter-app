@@ -56,7 +56,8 @@ export const ErrorKeys = {
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',
-    EMAIL_EXISTS: 'errors.users.emailExists'
+    EMAIL_EXISTS: 'errors.users.emailExists',
+    SUPER_TARGET_FORBIDDEN: 'errors.users.superTargetForbidden'
   },
   ROLES: {
     NOT_FOUND: 'errors.roles.notFound',

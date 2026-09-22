@@ -274,6 +274,21 @@ export class UserEditComponent implements OnInit, OnDestroy {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: ({ user, roles }) => {
+          if (
+            !this.#authStore.hasPermissions({
+              action: 'update',
+              subject: 'User',
+              instance: user
+            })
+          ) {
+            this.#notify.info('users.edit.superTargetReadOnly');
+            void this.#router.navigate([
+              `/${AppRouteSegmentEnum.Admin}`,
+              AppRouteSegmentEnum.Users,
+              user.id
+            ]);
+            return;
+          }
           this.availableRoles.set(roles);
           this.user.set(user);
 

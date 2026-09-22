@@ -602,6 +602,12 @@ A role with `isSuper: true` gets `can('manage', 'all')`. That is a CASL wildcard
 condition check. Each button is visible, each route is available, and each API call is permitted,
 with one exception: no caller can assign or remove a super role through the API.
 
+In the other direction, an account that holds a super role is out of reach of every actor that is not
+super. `PATCH /users/:id`, `DELETE /users/:id`, `POST /users/:id/restore` and the two role-assignment
+routes answer 403 with `errors.users.superTargetForbidden` for such an actor. Without that rule, a
+delegated role with `update:User` could set the password of the super account and sign in as it, or
+keep it signed out, because each role change ends every session of the target.
+
 This is the only path to a wildcard rule. The system rejects `manage` and `all` as an action name, and
 `all` as a resource subject, when a person writes them. It rejects them again when it builds the
 rules. A stored permission that carries one of the two keywords is skipped when it is an allow, and
@@ -1802,11 +1808,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2486 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 416 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and no mail sink, 398 pass and 18 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1320 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2497 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 426 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and no mail sink, 408 pass and 18 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1323 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 271 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 810 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 819 tests pass |
 
 ## CI/CD
 

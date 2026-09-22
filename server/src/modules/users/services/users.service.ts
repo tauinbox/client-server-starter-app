@@ -7,9 +7,10 @@ import { isUniqueViolation } from '../../../common/utils/is-unique-violation.uti
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS, ErrorKeys } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
-import type { AbilityOrSystem } from '../../auth/casl/app-ability';
+import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-target.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
 import { MailService } from '../../mail/mail.service';
@@ -241,6 +242,34 @@ export class UsersService {
     });
   }
 
+  /**
+   * The instance check of a write on `target`: `assertCan`, then the rule that
+   * an account holding a super role is out of reach of a non-super actor.
+   */
+  assertCanWrite(
+    ability: AppAbility,
+    action: 'update' | 'delete',
+    target: User,
+    actorId?: string
+  ): void {
+    assertCan(
+      ability,
+      action,
+      subject('User', target),
+      this.auditService,
+      { actorId, targetId: target.id, targetType: 'User' },
+      this.metricsService
+    );
+    assertNotSuperTarget(
+      ability,
+      action,
+      target,
+      this.auditService,
+      actorId,
+      this.metricsService
+    );
+  }
+
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
@@ -250,14 +279,7 @@ export class UsersService {
     const user = await this.findOne(id);
 
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'update',
-        subject('User', user),
-        this.auditService,
-        { actorId, targetId: id, targetType: 'User' },
-        this.metricsService
-      );
+      this.assertCanWrite(ability, 'update', user, actorId);
     }
 
     const { unlockAccount, ...rest } = updateUserDto;
@@ -455,14 +477,7 @@ export class UsersService {
     const user = await this.findOne(id);
 
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'delete',
-        subject('User', user),
-        this.auditService,
-        { actorId, targetId: id, targetType: 'User' },
-        this.metricsService
-      );
+      this.assertCanWrite(ability, 'delete', user, actorId);
     }
 
     // Clear pending email-change fields BEFORE soft-delete so a stale token
@@ -500,14 +515,7 @@ export class UsersService {
     }
 
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'delete',
-        subject('User', user),
-        this.auditService,
-        { actorId, targetId: id, targetType: 'User' },
-        this.metricsService
-      );
+      this.assertCanWrite(ability, 'delete', user, actorId);
     }
 
     // Lift the soft-delete only. `isActive` is an independent administrative

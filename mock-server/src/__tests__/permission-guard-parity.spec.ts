@@ -10,6 +10,7 @@ let baseUrl: string;
 
 const ADMIN_ID = mockId('user-1');
 const REGULAR_ID = mockId('user-2');
+const OTHER_ID = mockId('user-other');
 const EDITOR_ROLE_ID = mockId('role-editor');
 const MODERATOR_ROLE_ID = mockId('role-moderator');
 const SUPPORT_ROLE_ID = mockId('role-support');
@@ -252,6 +253,21 @@ describe('permission-based route authorization', () => {
       expect(await readMessage(res)).toBe('Insufficient permissions');
     }
 
+    // The permitted target of a conditional grant on a User write. It is an
+    // ordinary account: a super account is out of reach of a delegated role
+    // whatever the grant says.
+    function seedOrdinaryTarget(): void {
+      const state = getState();
+      const template = state.users.get(REGULAR_ID);
+      if (!template) throw new Error('Seed user user@example.com is missing');
+      state.users.set(OTHER_ID, {
+        ...template,
+        id: OTHER_ID,
+        email: 'other@example.com',
+        roles: ['user']
+      });
+    }
+
     async function delegate(
       grants: {
         permissionId: string;
@@ -390,22 +406,23 @@ describe('permission-based route authorization', () => {
     });
 
     it('applies a conditional delete:User grant to DELETE /users/:id and its restore', async () => {
+      seedOrdinaryTarget();
       const token = await delegate([
         {
           permissionId: permissionId('res-users', 'act-delete'),
-          conditions: { fieldMatch: { id: [ADMIN_ID] } }
+          conditions: { fieldMatch: { id: [OTHER_ID] } }
         }
       ]);
 
       expect(
-        (await send(token, 'DELETE', `/api/v1/users/${ADMIN_ID}`)).status
+        (await send(token, 'DELETE', `/api/v1/users/${OTHER_ID}`)).status
       ).toBe(200);
       await expectRefused(
         await send(token, 'DELETE', `/api/v1/users/${REGULAR_ID}`)
       );
 
       expect(
-        (await send(token, 'POST', `/api/v1/users/${ADMIN_ID}/restore`)).status
+        (await send(token, 'POST', `/api/v1/users/${OTHER_ID}/restore`)).status
       ).toBe(200);
       await expectRefused(
         await send(token, 'POST', `/api/v1/users/${REGULAR_ID}/restore`)
@@ -551,21 +568,22 @@ describe('permission-based route authorization', () => {
     });
 
     it('applies a conditional update:User grant to the two role-assignment routes', async () => {
+      seedOrdinaryTarget();
       const token = await delegate([
         { permissionId: permissionId('res-roles', 'act-assign') },
         {
           permissionId: permissionId('res-users', 'act-update'),
-          conditions: { fieldMatch: { id: [ADMIN_ID] } }
+          conditions: { fieldMatch: { id: [OTHER_ID] } }
         }
       ]);
 
       expect(
         (
-          await send(token, 'POST', `/api/v1/roles/assign/${ADMIN_ID}`, {
+          await send(token, 'POST', `/api/v1/roles/assign/${OTHER_ID}`, {
             roleId: SUPPORT_ROLE_ID
           })
         ).status
-      ).toBe(200);
+      ).toBe(201);
       await expectRefused(
         await send(token, 'POST', `/api/v1/roles/assign/${REGULAR_ID}`, {
           roleId: SUPPORT_ROLE_ID
@@ -577,7 +595,7 @@ describe('permission-based route authorization', () => {
           await send(
             token,
             'DELETE',
-            `/api/v1/roles/assign/${ADMIN_ID}/${SUPPORT_ROLE_ID}`
+            `/api/v1/roles/assign/${OTHER_ID}/${SUPPORT_ROLE_ID}`
           )
         ).status
       ).toBe(200);

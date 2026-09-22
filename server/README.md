@@ -1239,6 +1239,15 @@ before the grant check.
 The server blocks the assignment and the removal of a super role for every actor, a super actor
 included. No API path grants or removes a super role.
 
+`assertNotSuperTarget` (`common/utils/assert-not-super-target.util.ts`) runs after `assertCan` in
+`UsersService.update`, `remove` and `restore` (through `UsersService.assertCanWrite`) and in
+`RoleService.assignRoleToUser` and `removeRoleFromUser`. It refuses an actor without `manage all`
+when the target holds a super role: 403 with `errors.users.superTargetForbidden`, a
+`PERMISSION_CHECK_FAILURE` row with `details.superTarget === true`, and the `instance` denial
+metric. A role change adds nothing to a super account, but `UserRoleChangedListener` ends every
+session of the target, so the role routes need the rule too. `UsersController.update` calls it
+before the credential step-up, so a refused request spends no code of the caller.
+
 Each denial writes a `PERMISSION_CHECK_FAILURE` audit row. The row has `details.instanceCheck === true`
 and `actorId` set to the refused caller. Each service method that takes an `ability` parameter also
 takes the actor for this purpose. Each denial also increases

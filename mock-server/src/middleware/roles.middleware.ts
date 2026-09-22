@@ -24,7 +24,9 @@ import {
   toPermissionResponse
 } from '../state';
 import {
+  assertCanWriteUser,
   assertInstancePermission,
+  isActorSuper,
   permissionGuard
 } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
@@ -160,15 +162,6 @@ export function notifyRoleHolders(roleName: string): void {
       pushToUser(user.id, { type: 'permissions_updated', userId: user.id });
     }
   }
-}
-
-function isActorSuper(req: unknown): boolean {
-  const actor = (req as AuthenticatedRequest).user;
-  if (!actor) return false;
-  const state = getState();
-  return Array.from(state.roles.values()).some(
-    (r) => r.isSuper && actor.roles.includes(r.name)
-  );
 }
 
 // GET /api/v1/roles
@@ -894,8 +887,9 @@ router.post(
     }
 
     // `RoleService.assignRoleToUser` re-checks `update` on the target user,
-    // below the super-role test and above the duplicate 409.
-    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+    // and refuses a super target to a non-super caller, below the super-role
+    // test and above the duplicate 409.
+    if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
 
@@ -934,7 +928,8 @@ router.post(
     });
 
     pushToUser(userId, { type: 'permissions_updated', userId });
-    res.send();
+    // The server route is a @Post with no @HttpCode, so Nest answers 201.
+    res.status(201).send();
   }
 );
 
@@ -978,7 +973,7 @@ router.delete(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+    if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
 
