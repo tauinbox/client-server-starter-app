@@ -24,10 +24,8 @@ import { RoleService } from '../src/modules/auth/services/role.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
-// A delegated role that holds `update:User` and `delete:User` without
-// conditions must not reach an account that holds the super role: it could set
-// the password of that account and sign in as it. The super role comes from
-// the migrations, so the suite needs no seeders.
+// A delegated role must not reach a super account: it could set its password,
+// or end its sessions with a role change. The migrations create the super role.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 runWithInfra('User writes on a super target (e2e)', () => {
@@ -43,6 +41,8 @@ runWithInfra('User writes on a super target (e2e)', () => {
   const plainEmail = `super-target-plain-${stamp}@example.com`;
   const password = 'Lantern-Orchard-47';
   const newPassword = 'Copper-Meadow-83';
+  let supportRoleId: string;
+  let userRoleId: string;
 
   beforeAll(async () => {
     const moduleRef: TestingModule = await withPrivateThrottlerStorage(
@@ -83,18 +83,24 @@ runWithInfra('User writes on a super target (e2e)', () => {
 
     const roleService = app.get(RoleService);
     const permissions = await dataSource.getRepository(Permission).find();
-    const grant = (action: string) => {
+    const grant = (action: string, subjectName = 'User') => {
       const found = permissions.find(
-        (p) => p.action.name === action && p.resource.subject === 'User'
+        (p) => p.action.name === action && p.resource.subject === subjectName
       );
-      if (!found) throw new Error(`Permission ${action}:User missing`);
+      if (!found)
+        throw new Error(`Permission ${action}:${subjectName} missing`);
       return { permissionId: found.id, conditions: null };
     };
     const support = await roleService.create({ name: supportRoleName });
+    supportRoleId = support.id;
     await roleService.setPermissionsForRole(support.id, [
       grant('update'),
-      grant('delete')
+      grant('delete'),
+      grant('assign', 'Role')
     ]);
+    userRoleId = (
+      await dataSource.getRepository(Role).findOneByOrFail({ name: 'user' })
+    ).id;
     await roleService.assignRoleToUser(await userId(supportEmail), support.id);
 
     const superRole = await dataSource
@@ -236,5 +242,41 @@ runWithInfra('User writes on a super target (e2e)', () => {
       .send({ firstName: 'Renamed' })
       .expect(200);
     expect((await row(plainEmail)).firstName).toBe('Renamed');
+  }, 30000);
+  it('refuses a role assignment on a super account by a delegated role', async () => {
+    const token = await tokenFor(supportEmail);
+
+    const res = await request(http())
+      .post(`/api/v1/roles/assign/${await userId(superEmail)}`)
+      .auth(token, { type: 'bearer' })
+      .send({ roleId: supportRoleId });
+
+    expectSuperTargetRefusal(res);
+    const target = await usersService.findOne(await userId(superEmail));
+    expect(target.roles.map((r) => r.name)).not.toContain(supportRoleName);
+    expect(target.tokenRevokedAt).toBeNull();
+  }, 30000);
+
+  it('refuses a role removal on a super account by a delegated role', async () => {
+    const token = await tokenFor(supportEmail);
+
+    const res = await request(http())
+      .delete(`/api/v1/roles/assign/${await userId(superEmail)}/${userRoleId}`)
+      .auth(token, { type: 'bearer' });
+
+    expectSuperTargetRefusal(res);
+    const target = await usersService.findOne(await userId(superEmail));
+    expect(target.roles.map((r) => r.name)).toContain('user');
+    expect(target.tokenRevokedAt).toBeNull();
+  }, 30000);
+
+  it('lets the delegated role assign a role to an ordinary account', async () => {
+    const token = await tokenFor(supportEmail);
+
+    await request(http())
+      .post(`/api/v1/roles/assign/${await userId(plainEmail)}`)
+      .auth(token, { type: 'bearer' })
+      .send({ roleId: supportRoleId })
+      .expect(201);
   }, 30000);
 });

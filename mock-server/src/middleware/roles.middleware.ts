@@ -24,6 +24,7 @@ import {
   toPermissionResponse
 } from '../state';
 import {
+  assertCanWriteUser,
   assertInstancePermission,
   isActorSuper,
   permissionGuard
@@ -886,8 +887,9 @@ router.post(
     }
 
     // `RoleService.assignRoleToUser` re-checks `update` on the target user,
-    // below the super-role test and above the duplicate 409.
-    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+    // and refuses a super target to a non-super caller, below the super-role
+    // test and above the duplicate 409.
+    if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
 
@@ -970,7 +972,7 @@ router.delete(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+    if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
 

@@ -6,8 +6,9 @@ import { findUserByEmail, getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
 
 // Mirrors server/test/super-target-guard.e2e-spec.ts: a delegated role that
-// holds `update:User` and `delete:User` without conditions cannot change,
-// delete or restore an account that holds the super role.
+// holds `update:User`, `delete:User` and `assign:Role` without conditions
+// cannot change, delete or restore an account that holds the super role, or
+// change its roles.
 
 const SEED_PASSWORD = 'Password1';
 const NEW_PASSWORD = 'Copper-Meadow-83';
@@ -31,27 +32,31 @@ beforeEach(() => {
   delegateUserWrites();
 });
 
-function permissionId(actionSlug: string): string {
+function permissionId(actionSlug: string, resourceSlug = 'res-users'): string {
   const permission = [...getState().permissions.values()].find(
     (p) =>
-      p.resourceId === mockId('res-users') && p.actionId === mockId(actionSlug)
+      p.resourceId === mockId(resourceSlug) && p.actionId === mockId(actionSlug)
   );
   if (!permission) {
-    throw new Error(`Seed permission users/${actionSlug} missing`);
+    throw new Error(`Seed permission ${resourceSlug}/${actionSlug} missing`);
   }
   return permission.id;
 }
 
 // Puts user@example.com on the non-super `editor` role with unconditional
-// `update:User` and `delete:User`.
+// `update:User`, `delete:User` and `assign:Role`.
 function delegateUserWrites(): void {
   const state = getState();
   state.rolePermissions = [
     ...state.rolePermissions.filter((rp) => rp.roleId !== EDITOR_ROLE_ID),
-    ...['act-update', 'act-delete'].map((action, index) => ({
+    ...[
+      permissionId('act-update'),
+      permissionId('act-delete'),
+      permissionId('act-assign', 'res-roles')
+    ].map((id, index) => ({
       id: `rp-super-target-${index}`,
       roleId: EDITOR_ROLE_ID,
-      permissionId: permissionId(action),
+      permissionId: id,
       conditions: null
     }))
   ];
@@ -162,5 +167,37 @@ describe('user writes on a super target parity', () => {
 
     expect(res.status).toBe(200);
     expect(target.firstName).toBe('Renamed');
+  });
+
+  it('refuses a role assignment on a super account by a delegated role', async () => {
+    const token = await login('user@example.com');
+    const target = findUserByEmail('admin@example.com')!;
+    const rolesBefore = [...target.roles];
+
+    await expectSuperTargetRefusal(
+      await fetch(`${baseUrl}/api/v1/roles/assign/${target.id}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ roleId: EDITOR_ROLE_ID })
+      })
+    );
+    expect(target.roles).toEqual(rolesBefore);
+  });
+
+  it('refuses a role removal on a super account by a delegated role', async () => {
+    const token = await login('user@example.com');
+    const target = findUserByEmail('admin@example.com')!;
+    target.roles = [...target.roles, 'editor'];
+
+    await expectSuperTargetRefusal(
+      await fetch(
+        `${baseUrl}/api/v1/roles/assign/${target.id}/${EDITOR_ROLE_ID}`,
+        { method: 'DELETE', headers: { authorization: `Bearer ${token}` } }
+      )
+    );
+    expect(target.roles).toContain('editor');
   });
 });

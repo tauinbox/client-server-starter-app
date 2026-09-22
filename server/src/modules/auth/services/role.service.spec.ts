@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ForbiddenException, HttpException } from '@nestjs/common';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
+import { ErrorKeys } from '@app/shared/constants';
 import { RoleService } from './role.service';
 import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
@@ -441,7 +442,8 @@ describe('RoleService', () => {
       // The lookup must stay scoped to live rows so a soft-deleted account
       // cannot be modified without being restored first.
       expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
-        where: { id: 'user-99' }
+        where: { id: 'user-99' },
+        relations: ['roles']
       });
       expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
@@ -534,7 +536,8 @@ describe('RoleService', () => {
       });
 
       expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
-        where: { id: 'user-99' }
+        where: { id: 'user-99' },
+        relations: ['roles']
       });
       expect(mockRelationQueryBuilder.remove).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
@@ -1551,6 +1554,72 @@ describe('RoleService', () => {
         'UserRoleChangedEvent',
         expect.anything()
       );
+    });
+  });
+
+  describe('a super target', () => {
+    const superTarget = {
+      id: 'super-1',
+      roles: [{ name: 'admin', isSuper: true }]
+    } as User;
+    // A delegated role: every action, and not `manage all`.
+    // @ts-expect-error partial mock - only `can` is needed for instance-level tests
+    const delegated: AppAbility = {
+      can: jest.fn((action: string) => action !== 'manage')
+    };
+
+    async function expectSuperTargetRefusal(
+      write: Promise<unknown>
+    ): Promise<void> {
+      const error: unknown = await write.catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(HttpException);
+      const http = error as HttpException;
+      expect(http.getStatus()).toBe(403);
+      expect(http.getResponse()).toMatchObject({
+        errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
+      });
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'update',
+        'User'
+      );
+      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(mockRelationQueryBuilder.remove).not.toHaveBeenCalled();
+    }
+
+    it('refuses a role assignment on a super account by a delegated actor', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue(superTarget);
+
+      await expectSuperTargetRefusal(
+        service.assignRoleToUser('super-1', 'role-2', delegated, 'actor-1')
+      );
+    });
+
+    it('refuses a role removal on a super account by a delegated actor', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue(superTarget);
+
+      await expectSuperTargetRefusal(
+        service.removeRoleFromUser('super-1', 'role-2', delegated, 'actor-1')
+      );
+    });
+
+    it('lets a super actor assign a role to a super account', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue(superTarget);
+      mockRolePermissionRepo.find.mockResolvedValue([]);
+      // @ts-expect-error partial mock - only `can` is needed for instance-level tests
+      const superActor: AppAbility = { can: jest.fn().mockReturnValue(true) };
+
+      await service.assignRoleToUser(
+        'super-1',
+        'role-2',
+        superActor,
+        'actor-1'
+      );
+
+      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
     });
   });
 });
