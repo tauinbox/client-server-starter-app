@@ -33,6 +33,7 @@ import {
   toAdminUserResponse
 } from '../state';
 import {
+  assertCanWriteUser,
   assertInstancePermission,
   clearMailedProofs,
   permissionGuard
@@ -408,7 +409,7 @@ router.patch(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'update', 'User', user)) {
+    if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
 
@@ -573,7 +574,7 @@ router.delete(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'delete', 'User', targetUser)) {
+    if (!assertCanWriteUser(req, res, 'delete', targetUser)) {
       return;
     }
 
@@ -639,7 +640,7 @@ router.post(
     }
 
     // `UsersService.restore` gates on `delete`, not `update`.
-    if (!assertInstancePermission(req, res, 'delete', 'User', targetUser)) {
+    if (!assertCanWriteUser(req, res, 'delete', targetUser)) {
       return;
     }
 

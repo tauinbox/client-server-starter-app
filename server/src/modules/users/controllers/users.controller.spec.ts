@@ -56,6 +56,7 @@ describe('UsersController', () => {
     update: jest.Mock;
     remove: jest.Mock;
     restore: jest.Mock;
+    assertCanWrite: jest.Mock;
   };
   let eventEmitterMock: { emit: jest.Mock; emitAsync: jest.Mock };
   let auditServiceMock: { log: jest.Mock; logFireAndForget: jest.Mock };
@@ -75,7 +76,12 @@ describe('UsersController', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
-      restore: jest.fn()
+      restore: jest.fn(),
+      // The real instance check reduced to the ability: the super-target rule
+      // it adds is covered by the service spec.
+      assertCanWrite: jest.fn((ability: AppAbility, action: string) => {
+        if (!ability.can(action, 'User')) throw new ForbiddenException();
+      })
     };
 
     eventEmitterMock = {
@@ -450,6 +456,30 @@ describe('UsersController', () => {
           )
         ).rejects.toThrow(ForbiddenException);
 
+        expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+        expect(usersServiceMock.update).not.toHaveBeenCalled();
+      });
+
+      it('refuses a super target before it reads a factor', async () => {
+        usersServiceMock.assertCanWrite.mockImplementation(() => {
+          throw new ForbiddenException();
+        });
+
+        await expect(
+          controller.update(
+            'user-5',
+            { password: 'NewPassword1', currentPassword: 'ActorPassword1' },
+            mockJwtRequest() as JwtAuthRequest,
+            mockAbility
+          )
+        ).rejects.toThrow(ForbiddenException);
+
+        expect(usersServiceMock.assertCanWrite).toHaveBeenCalledWith(
+          mockAbility,
+          'update',
+          expect.objectContaining({ id: 'user-5' }),
+          'user-1'
+        );
         expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
         expect(usersServiceMock.update).not.toHaveBeenCalled();
       });

@@ -186,6 +186,54 @@ export function assertInstancePermission(
   return false;
 }
 
+export function isActorSuper(req: unknown): boolean {
+  const actor = (req as AuthenticatedRequest).user;
+  if (!actor) return false;
+  return roleNamesAreSuper(actor.roles);
+}
+
+function roleNamesAreSuper(roleNames: string[]): boolean {
+  return Array.from(getState().roles.values()).some(
+    (r) => r.isSuper && roleNames.includes(r.name)
+  );
+}
+
+/**
+ * Mirrors `UsersService.assertCanWrite`: the instance check, then the rule
+ * that an account holding a super role is out of reach of every actor that is
+ * not super itself. Answers 403 and returns false on a refusal.
+ */
+export function assertCanWriteUser(
+  req: Request,
+  res: Response,
+  action: 'update' | 'delete',
+  target: MockUser
+): boolean {
+  if (!assertInstancePermission(req, res, action, 'User', target)) {
+    return false;
+  }
+  if (isActorSuper(req) || !roleNamesAreSuper(target.roles)) {
+    return true;
+  }
+  logAudit('PERMISSION_CHECK_FAILURE', {
+    actorId: (req as AuthenticatedRequest).user.id,
+    targetId: target.id,
+    targetType: 'User',
+    details: {
+      instanceCheck: true,
+      deniedAction: action,
+      subject: 'User',
+      superTarget: true
+    }
+  });
+  res.status(403).json({
+    message: 'Only a super actor can modify a super account',
+    statusCode: 403,
+    errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
+  });
+  return false;
+}
+
 /**
  * Concurrent-session cap, applied wherever a session is created. The oldest
  * refresh tokens go first, matching the real server's SessionLimitService.

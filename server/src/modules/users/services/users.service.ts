@@ -7,8 +7,9 @@ import { isUniqueViolation } from '../../../common/utils/is-unique-violation.uti
 import * as bcrypt from 'bcrypt';
 import { BCRYPT_SALT_ROUNDS, ErrorKeys } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
-import type { AbilityOrSystem } from '../../auth/casl/app-ability';
+import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
@@ -241,6 +242,53 @@ export class UsersService {
     });
   }
 
+  /**
+   * The instance check of a write on `target`. An account that holds a super
+   * role is out of reach of every actor that is not super itself: a delegated
+   * `update` would otherwise set its password and `delete` would remove it,
+   * which is the super power the role routes already refuse to hand out.
+   */
+  assertCanWrite(
+    ability: AppAbility,
+    action: 'update' | 'delete',
+    target: User,
+    actorId?: string
+  ): void {
+    assertCan(
+      ability,
+      action,
+      subject('User', target),
+      this.auditService,
+      { actorId, targetId: target.id, targetType: 'User' },
+      this.metricsService
+    );
+
+    if (ability.can('manage', 'all') || !target.roles?.some((r) => r.isSuper)) {
+      return;
+    }
+
+    this.auditService.logFireAndForget({
+      action: AuditAction.PERMISSION_CHECK_FAILURE,
+      actorId: actorId ?? null,
+      targetId: target.id,
+      targetType: 'User',
+      details: {
+        instanceCheck: true,
+        deniedAction: action,
+        subject: 'User',
+        superTarget: true
+      }
+    });
+    this.metricsService.recordPermissionDenied('instance', action, 'User');
+    throw new HttpException(
+      {
+        message: 'Only a super actor can modify a super account',
+        errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
+      },
+      HttpStatus.FORBIDDEN
+    );
+  }
+
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
@@ -250,14 +298,7 @@ export class UsersService {
     const user = await this.findOne(id);
 
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'update',
-        subject('User', user),
-        this.auditService,
-        { actorId, targetId: id, targetType: 'User' },
-        this.metricsService
-      );
+      this.assertCanWrite(ability, 'update', user, actorId);
     }
 
     const { unlockAccount, ...rest } = updateUserDto;
@@ -455,14 +496,7 @@ export class UsersService {
     const user = await this.findOne(id);
 
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'delete',
-        subject('User', user),
-        this.auditService,
-        { actorId, targetId: id, targetType: 'User' },
-        this.metricsService
-      );
+      this.assertCanWrite(ability, 'delete', user, actorId);
     }
 
     // Clear pending email-change fields BEFORE soft-delete so a stale token
@@ -500,14 +534,7 @@ export class UsersService {
     }
 
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'delete',
-        subject('User', user),
-        this.auditService,
-        { actorId, targetId: id, targetType: 'User' },
-        this.metricsService
-      );
+      this.assertCanWrite(ability, 'delete', user, actorId);
     }
 
     // Lift the soft-delete only. `isActive` is an independent administrative

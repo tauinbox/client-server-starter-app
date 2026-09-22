@@ -25,6 +25,7 @@ import {
 } from '../state';
 import {
   assertInstancePermission,
+  isActorSuper,
   permissionGuard
 } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
@@ -160,15 +161,6 @@ export function notifyRoleHolders(roleName: string): void {
       pushToUser(user.id, { type: 'permissions_updated', userId: user.id });
     }
   }
-}
-
-function isActorSuper(req: unknown): boolean {
-  const actor = (req as AuthenticatedRequest).user;
-  if (!actor) return false;
-  const state = getState();
-  return Array.from(state.roles.values()).some(
-    (r) => r.isSuper && actor.roles.includes(r.name)
-  );
 }
 
 // GET /api/v1/roles

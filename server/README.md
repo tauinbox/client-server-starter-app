@@ -1239,6 +1239,12 @@ before the grant check.
 The server blocks the assignment and the removal of a super role for every actor, a super actor
 included. No API path grants or removes a super role.
 
+`UsersService.assertCanWrite` is the instance check of `update`, `remove` and `restore`. After
+`assertCan`, it refuses an actor without `manage all` when the target holds a super role: 403 with
+`errors.users.superTargetForbidden`, a `PERMISSION_CHECK_FAILURE` row with
+`details.superTarget === true`, and the `instance` denial metric. `UsersController.update` calls it
+before the credential step-up, so a refused request spends no code of the caller.
+
 Each denial writes a `PERMISSION_CHECK_FAILURE` audit row. The row has `details.instanceCheck === true`
 and `actorId` set to the refused caller. Each service method that takes an `ability` parameter also
 takes the actor for this purpose. Each denial also increases

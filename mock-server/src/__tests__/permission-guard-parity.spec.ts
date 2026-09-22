@@ -10,6 +10,7 @@ let baseUrl: string;
 
 const ADMIN_ID = mockId('user-1');
 const REGULAR_ID = mockId('user-2');
+const OTHER_ID = mockId('user-other');
 const EDITOR_ROLE_ID = mockId('role-editor');
 const MODERATOR_ROLE_ID = mockId('role-moderator');
 const SUPPORT_ROLE_ID = mockId('role-support');
@@ -390,22 +391,33 @@ describe('permission-based route authorization', () => {
     });
 
     it('applies a conditional delete:User grant to DELETE /users/:id and its restore', async () => {
+      // An ordinary account: a super account is out of reach of this role
+      // whatever the grant says.
+      const state = getState();
+      const template = state.users.get(REGULAR_ID);
+      if (!template) throw new Error('Seed user user@example.com is missing');
+      state.users.set(OTHER_ID, {
+        ...template,
+        id: OTHER_ID,
+        email: 'other@example.com',
+        roles: ['user']
+      });
       const token = await delegate([
         {
           permissionId: permissionId('res-users', 'act-delete'),
-          conditions: { fieldMatch: { id: [ADMIN_ID] } }
+          conditions: { fieldMatch: { id: [OTHER_ID] } }
         }
       ]);
 
       expect(
-        (await send(token, 'DELETE', `/api/v1/users/${ADMIN_ID}`)).status
+        (await send(token, 'DELETE', `/api/v1/users/${OTHER_ID}`)).status
       ).toBe(200);
       await expectRefused(
         await send(token, 'DELETE', `/api/v1/users/${REGULAR_ID}`)
       );
 
       expect(
-        (await send(token, 'POST', `/api/v1/users/${ADMIN_ID}/restore`)).status
+        (await send(token, 'POST', `/api/v1/users/${OTHER_ID}/restore`)).status
       ).toBe(200);
       await expectRefused(
         await send(token, 'POST', `/api/v1/users/${REGULAR_ID}/restore`)
