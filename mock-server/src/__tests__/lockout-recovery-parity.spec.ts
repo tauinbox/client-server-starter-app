@@ -84,6 +84,16 @@ describe('lockout recovery', () => {
     expect(user?.lockedUntil).toBeNull();
   });
 
+  it('clears the strikes on a correct password before the verification check', async () => {
+    await postJson('login', { email, password: 'wrong-password' });
+    const user = findUserByEmail(email);
+    user!.isEmailVerified = false;
+
+    const res = await postJson('login', { email, password });
+    expect(res.status).toBe(403);
+    expect(findUserByEmail(email)?.failedLoginAttempts).toBe(0);
+  });
+
   it('keeps rejecting with 423 while the lock window is open', async () => {
     await lockAccount();
 
@@ -105,14 +115,13 @@ describe('lockout recovery', () => {
     expect(res.headers.get('retry-after')).toBe(String(body.retryAfter));
   });
 
-  // A 423 in front of the credential check separates a real account from an
-  // unknown address, so a wrong password answers the generic 401 instead
-  it('answers 401 and adds no strike for a wrong password while locked', async () => {
+  // A 401 here and a 423 for the right password would tell the caller which
+  // guess was right, so the lock would keep taking guesses while it is open
+  it('answers the same 423 and adds no strike for a wrong password while locked', async () => {
     await lockAccount();
 
     const res = await postJson('login', { email, password: 'wrong-again' });
-    expect(res.status).toBe(401);
-    expect(res.headers.get('retry-after')).toBeNull();
+    expect(res.status).toBe(423);
     expect(findUserByEmail(email)?.failedLoginAttempts).toBe(
       MAX_FAILED_ATTEMPTS
     );
