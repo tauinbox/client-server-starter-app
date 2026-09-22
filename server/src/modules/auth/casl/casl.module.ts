@@ -18,9 +18,9 @@ import { CryptoModule } from '../../../common/crypto/crypto.module';
 /**
  * Shared CASL module — provides PermissionService, CaslAbilityFactory,
  * ResourceService, ActionService, and ResourceSyncService.
- * Imported by both AuthModule and UsersModule so that PermissionsGuard
- * (applied via @Authorize in UsersController) can resolve its deps without
- * creating a circular dependency between AuthModule and UsersModule.
+ * Its own module so that PermissionsGuard (applied via @Authorize) resolves
+ * its deps in every module that carries a controller, without a circular
+ * dependency between AuthModule and UsersModule.
  * MfaPolicyService lives here for the same reason: MfaRequiredGuard travels
  * with the same decorator and must resolve in every module that carries it.
  */

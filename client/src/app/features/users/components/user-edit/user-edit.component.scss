@@ -30,6 +30,16 @@
     width: 100%;
   }
 
+  .step-up-note {
+    margin-block: 0 vars.$spacing-sm;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .step-up-unavailable {
+    color: var(--mat-sys-error);
+  }
+
   .checkbox-group {
     margin: vars.$spacing-xs 0;
   }

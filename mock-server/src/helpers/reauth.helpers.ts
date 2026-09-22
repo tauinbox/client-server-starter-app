@@ -283,7 +283,10 @@ export function stepUpError(
   user: MockUser,
   currentPassword: unknown,
   code: unknown,
-  operation: StepUpOperation
+  operation: StepUpOperation,
+  // False on a route outside the path the proof cookie is scoped to, which a
+  // browser never sends it to. The server passes no proof there.
+  acceptsReauthProof = true
 ): StepUpErrorEnvelope | null {
   const lock = stepUpCodeError(req, user, code);
   if (lock !== undefined) {
@@ -291,9 +294,11 @@ export function stepUpError(
   }
 
   if (user.password === null) {
-    const proof = (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
+    const proof = acceptsReauthProof
+      ? (req.cookies as Record<string, string> | undefined)?.[
+          REAUTH_PROOF_COOKIE
+        ]
+      : undefined;
     if (isValidReauthProof(proof, user, operation)) {
       return null;
     }

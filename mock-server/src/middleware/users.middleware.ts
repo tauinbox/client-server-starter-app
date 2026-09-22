@@ -2,7 +2,9 @@ import { Router } from 'express';
 import {
   ALLOWED_USER_SORT_COLUMNS,
   ErrorKeys,
-  MAX_USER_FILTER_LENGTH
+  MAX_USER_FILTER_LENGTH,
+  STEP_UP_OPERATION,
+  TOTP_DIGITS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
@@ -40,6 +42,12 @@ import {
   findCreateUserConflict,
   validateCreateUserDto
 } from '../helpers/user-create.helpers';
+import {
+  isValidCodeShape,
+  isValidPasswordShape,
+  sendWithRetryAfter,
+  stepUpError
+} from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
@@ -357,6 +365,27 @@ router.patch(
       return;
     }
 
+    // The step-up factors of the caller, validated with the rest of the body
+    // as UpdateUserDto does.
+    const { currentPassword, code } = req.body;
+    if (
+      currentPassword !== undefined &&
+      !isValidPasswordShape(currentPassword)
+    ) {
+      res.status(400).json(validationError('currentPassword is required'));
+      return;
+    }
+    if (code !== undefined && !isValidCodeShape(code)) {
+      res
+        .status(400)
+        .json(
+          validationError(
+            `code must be longer than or equal to ${TOTP_DIGITS} characters`
+          )
+        );
+      return;
+    }
+
     if (isActive !== undefined && typeof isActive !== 'boolean') {
       res.status(400).json(validationError('isActive must be a boolean value'));
       return;
@@ -381,6 +410,27 @@ router.patch(
 
     if (!assertInstancePermission(req, res, 'update', 'User', user)) {
       return;
+    }
+
+    // Mirrors UsersController.assertCredentialStepUp: the factor is the
+    // CALLER's, whatever the target, and the provider proof never reaches
+    // this route.
+    if (
+      password !== undefined ||
+      (email !== undefined && email !== user.email)
+    ) {
+      const refusal = stepUpError(
+        req,
+        (req as AuthenticatedRequest).user,
+        currentPassword,
+        code,
+        STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+        false
+      );
+      if (refusal) {
+        sendWithRetryAfter(res, refusal);
+        return;
+      }
     }
 
     // The blocklist verdict comes from UsersService.update on the real server,
@@ -454,8 +504,9 @@ router.patch(
     user.updatedAt = new Date().toISOString();
 
     const actor = (req as AuthenticatedRequest).user;
+    // The step-up factors are stripped before the write, as on the server.
     const changedFields = Object.keys(req.body).filter(
-      (k: string) => k !== 'password'
+      (k: string) => !['password', 'currentPassword', 'code'].includes(k)
     );
     logAudit('USER_UPDATE', {
       actorId: actor.id,

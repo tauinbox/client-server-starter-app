@@ -1769,7 +1769,7 @@ parallel:
 | Throttler | Window | Limit | Notes |
 |-----------|--------|-------|-------|
 | `default` (unnamed) | 60 s | 120 requests for each IP | A soft ceiling for the whole SPA. A `@Throttle({ default: { ttl, limit } })` decorator on a route replaces it on a sensitive endpoint |
-| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | It does nothing at the global level. `/auth/login`, the two two-factor challenge routes, the four step-up routes and the password branch of `PATCH /auth/profile` tighten it to `MAX_FAILED_ATTEMPTS - 1`. Thus one IP cannot collect enough failed attempts to trip the account-lockout protection (SEC-6). It counts a **failed** attempt only: `LoginThrottlerGuard` refunds the increment when the response finishes below 400. Thus a shared NAT egress cannot lock out its own users with a successful login |
+| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | It does nothing at the global level. `/auth/login`, the two two-factor challenge routes, the four step-up routes, the password branch of `PATCH /auth/profile` and the credential branch of `PATCH /users/:id` tighten it to `MAX_FAILED_ATTEMPTS - 1`. Thus one IP cannot collect enough failed attempts to trip the account-lockout protection (SEC-6). It counts a **failed** attempt only: `LoginThrottlerGuard` refunds the increment when the response finishes below 400. Thus a shared NAT egress cannot lock out its own users with a successful login |
 
 A route that verifies a secret beside fields that verify none marks the secret with
 `@CountFailuresOnlyWhenBody('<field>')` (`modules/core/failure-counter.decorator.ts`). A request
@@ -1852,6 +1852,7 @@ These routes currently replace the default limit:
 | `POST /auth/mfa/recovery-codes` | 1 min | 5 plus `login-long-window` | It verifies a password or a code, and it replaces the recovery set |
 | `POST /auth/oauth/link-init` | 1 min | 5 plus `login-long-window`, on a body that carries `currentPassword` | It verifies the step-up secret before it mints the link intent. An account with no password takes a provider round trip instead, and spends none of that budget |
 | `PATCH /auth/profile` | 15 min | `login-long-window` only, on a body that carries `password` | The step-up on the password branch verifies a secret. A name or locale edit keeps the application-wide ceiling |
+| `PATCH /users/:id` | 15 min | `login-long-window` only, on a body that carries `currentPassword` or `code` | A password or email change verifies a step-up secret of the caller. An edit that presents no secret keeps the application-wide ceiling, so an administrator is not limited to five edits a minute |
 | `GET /rbac/metadata` | 1 min | 30 | The limit is higher, because each administrator route guard reads it |
 
 A rejected request gets the standard `429` answer with

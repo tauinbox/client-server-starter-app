@@ -124,7 +124,11 @@ describe('a password change voids the mailed proofs', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${adminToken}`
       },
-      body: JSON.stringify({ password: NEW_PASSWORD })
+      // The admin's own factor, not the target's.
+      body: JSON.stringify({
+        password: NEW_PASSWORD,
+        currentPassword: SEED_PASSWORD
+      })
     });
     expect(res.status).toBe(200);
 

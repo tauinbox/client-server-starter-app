@@ -54,6 +54,41 @@
             <nxs-password-toggle formFieldSuffix #pwdToggle />
           </nxs-form-field>
 
+          @if (credentialChanged()) {
+            @switch (stepUpFactor()) {
+              @case ('password') {
+                <p class="step-up-note">
+                  {{ t('users.edit.stepUpPasswordNote') }}
+                </p>
+                <nxs-form-field
+                  [field]="stepUpPasswordForm.currentPassword"
+                  label="users.edit.currentPassword"
+                  [type]="stepUpToggle.show() ? 'text' : 'password'"
+                  prefixIcon="verified_user"
+                  autocomplete="current-password"
+                >
+                  <nxs-password-toggle formFieldSuffix #stepUpToggle />
+                </nxs-form-field>
+              }
+              @case ('code') {
+                <p class="step-up-note">
+                  {{ t('users.edit.stepUpCodeNote') }}
+                </p>
+                <nxs-form-field
+                  [field]="stepUpCodeForm.code"
+                  label="users.edit.stepUpCode"
+                  prefixIcon="password"
+                  autocomplete="one-time-code"
+                />
+              }
+              @default {
+                <p class="step-up-note step-up-unavailable" role="status">
+                  {{ t('users.edit.stepUpUnavailable') }}
+                </p>
+              }
+            }
+          }
+
           @if (canAssignRoles() && availableRoles().length > 0) {
             <!--
               subscriptSizing="dynamic" — match the NxsFormFieldComponent

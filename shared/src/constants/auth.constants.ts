@@ -48,7 +48,8 @@ export const STEP_UP_OPERATION = {
   MFA_RECOVERY_CODES: 'mfa_recovery_codes',
   OAUTH_LINK: 'oauth_link',
   OAUTH_UNLINK: 'oauth_unlink',
-  SESSION_REVOKE: 'session_revoke'
+  SESSION_REVOKE: 'session_revoke',
+  USER_CREDENTIAL_CHANGE: 'user_credential_change'
 } as const;
 
 export type StepUpOperation =

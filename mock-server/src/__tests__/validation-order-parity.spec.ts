@@ -147,7 +147,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
       headers: authHeaders(token),
       body: JSON.stringify({
         firstName: 'Changed',
-        password: BREACHED_PASSWORD
+        password: BREACHED_PASSWORD,
+        currentPassword: 'Password1'
       })
     });
 
