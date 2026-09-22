@@ -97,6 +97,27 @@ function respondLocked(res: Response, lockedUntil: string): void {
   });
 }
 
+function respondInvalidCredentials(
+  res: Response,
+  email: string,
+  failedLoginAttempts: number | null,
+  ip: string | undefined
+): void {
+  logAudit('USER_LOGIN_FAILURE', {
+    actorEmail: email,
+    details: {
+      reason: 'invalid_credentials',
+      ...(failedLoginAttempts !== null ? { failedLoginAttempts } : {})
+    },
+    ip
+  });
+  res.status(401).json({
+    message: 'Invalid credentials',
+    statusCode: 401,
+    errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
+  });
+}
+
 const router = Router();
 
 // GET /api/v1/auth/captcha-config — public configuration consumed by the client
@@ -185,14 +206,16 @@ router.post('/login', (req, res) => {
 
   const user = findUserByEmail(email);
 
-  // Detect a lock here, but do not answer with one yet. Same order as the
-  // server: a 423 in front of the credential check tells a caller that the
-  // address exists.
-  let openLockUntil: string | null = null;
+  // Plaintext comparison - mock only. Real server uses bcrypt.compare().
+  if (!user || !user.isActive || !user.password) {
+    respondInvalidCredentials(res, email, null, req.ip);
+    return;
+  }
 
-  if (user && user.lockedUntil) {
-    const lockedUntilTime = new Date(user.lockedUntil).getTime();
-    if (lockedUntilTime > Date.now()) {
+  if (user.lockedUntil) {
+    if (new Date(user.lockedUntil).getTime() > Date.now()) {
+      // Same order as the server: the lock answers before the password is
+      // checked, so it cannot tell a caller which guess was right.
       logAudit('USER_LOGIN_FAILURE', {
         actorEmail: email,
         targetId: user.id,
@@ -200,65 +223,41 @@ router.post('/login', (req, res) => {
         details: { reason: 'account_locked' },
         ip: req.ip
       });
-      openLockUntil = user.lockedUntil;
-    } else {
-      // Lock expired - clear it
-      user.lockedUntil = null;
-      user.failedLoginAttempts = 0;
+      respondLocked(res, user.lockedUntil);
+      return;
     }
+    user.lockedUntil = null;
+    user.failedLoginAttempts = 0;
   }
 
-  // Plaintext comparison — mock only. Real server uses bcrypt.compare().
-  if (!user || !user.isActive || !user.password || user.password !== password) {
-    let attemptsAfterIncrement: number | null = null;
-    // An account that holds no password cannot fail a password check, so it
-    // must not accrue lockout either. A locked account must not accrue one
-    // more strike. Same conditions as the server.
-    if (user && user.isActive && user.password && !openLockUntil) {
-      user.failedLoginAttempts++;
-      attemptsAfterIncrement = user.failedLoginAttempts;
+  if (user.password !== password) {
+    user.failedLoginAttempts++;
 
-      if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
-        user.lockedUntil = new Date(
-          Date.now() + LOCKOUT_DURATION_MS
-        ).toISOString();
-        logAudit('USER_LOGIN_FAILURE', {
-          actorEmail: email,
-          targetId: user.id,
-          targetType: 'User',
-          details: {
-            reason: 'account_locked_after_max_attempts',
-            failedLoginAttempts: user.failedLoginAttempts
-          },
-          ip: req.ip
-        });
-        respondLocked(res, user.lockedUntil);
-        return;
-      }
+    if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+      user.lockedUntil = new Date(
+        Date.now() + LOCKOUT_DURATION_MS
+      ).toISOString();
+      logAudit('USER_LOGIN_FAILURE', {
+        actorEmail: email,
+        targetId: user.id,
+        targetType: 'User',
+        details: {
+          reason: 'account_locked_after_max_attempts',
+          failedLoginAttempts: user.failedLoginAttempts
+        },
+        ip: req.ip
+      });
+      respondLocked(res, user.lockedUntil);
+      return;
     }
-    logAudit('USER_LOGIN_FAILURE', {
-      actorEmail: email,
-      details: {
-        reason: 'invalid_credentials',
-        ...(attemptsAfterIncrement !== null
-          ? { failedLoginAttempts: attemptsAfterIncrement }
-          : {})
-      },
-      ip: req.ip
-    });
-    res.status(401).json({
-      message: 'Invalid credentials',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
-    });
+    respondInvalidCredentials(res, email, user.failedLoginAttempts, req.ip);
     return;
   }
 
-  // The caller holds the password, so the lock window can be disclosed.
-  if (openLockUntil) {
-    respondLocked(res, openLockUntil);
-    return;
-  }
+  // Before the verification check, as on the server: five correct passwords
+  // must not lock an unverified account.
+  user.failedLoginAttempts = 0;
+  user.lockedUntil = null;
 
   // Check email verification
   if (!user.isEmailVerified) {
@@ -267,12 +266,6 @@ router.post('/login', (req, res) => {
       errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
     });
     return;
-  }
-
-  // Success — reset failed attempts
-  if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-    user.failedLoginAttempts = 0;
-    user.lockedUntil = null;
   }
 
   // An account that carries a second factor is not signed in yet. A correct

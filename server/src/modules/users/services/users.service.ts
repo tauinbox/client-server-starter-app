@@ -378,8 +378,11 @@ export class UsersService {
       .update(User)
       .set({
         failedLoginAttempts: () => '"failed_login_attempts" + 1',
+        // An open lock is kept as it is, so the rest of a burst that lands after
+        // it cannot push the window further out.
         lockedUntil: () =>
           `CASE WHEN "failed_login_attempts" + 1 >= :maxAttempts::int ` +
+          `AND ("locked_until" IS NULL OR "locked_until" <= NOW()) ` +
           `THEN NOW() + :lockInterval::interval ` +
           `ELSE "locked_until" END`
       })

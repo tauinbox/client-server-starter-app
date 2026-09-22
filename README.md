@@ -1808,11 +1808,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2497 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 426 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and no mail sink, 408 pass and 18 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2499 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 431 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and a mail sink, 419 pass and 12 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1323 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 271 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 819 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 820 tests pass |
 
 ## CI/CD
 
@@ -1872,10 +1872,10 @@ a second request to the registry for a verdict that gates nothing.
   input, thus each path that sets a password caps there, in characters and in bytes. A path that
   verifies a password keeps the 128-character cap, because a stored hash covers the same truncated
   prefix and a lower cap would lock out the owner of a long legacy password.
-- **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. The lock is tested
-  after the password, thus a wrong password answers the generic 401 and the 423 countdown reaches
-  only a caller that holds the password. A password reset clears it, and the end of the window also
-  clears it.
+- **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. An open lock answers
+  the 423 countdown before the password is checked, so a locked account takes no more guesses. Each
+  attempt takes its slot before the check, so a concurrent burst gets at most 5 checks. A password
+  reset clears the lock, and the end of the window also clears it.
 - **Email verification** is necessary before the first login.
 - **Two-factor authentication** is available to every account. A password on an enrolled account
   buys only an `mfa_pending` token, which `JwtStrategy` refuses as a bearer credential, so one

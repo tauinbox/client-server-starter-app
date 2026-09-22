@@ -289,16 +289,19 @@ export class MfaService {
   ): Promise<User> {
     const user = await this.userFromPendingToken(mfaToken);
 
-    const open = await this.#challengeFailures.read(user.id);
-    if (open.count >= MAX_FAILED_ATTEMPTS) {
-      throw this.challengeLockedException(open.remainingMs);
+    // The attempt takes its slot before the code is checked. Reading the count
+    // first lets every request of a concurrent burst see the same open budget,
+    // so all of them would be checked; the atomic increment hands each one a
+    // distinct slot, and only MAX_FAILED_ATTEMPTS of them fall inside it.
+    const { count, remainingMs } = await this.#challengeFailures.record(
+      user.id,
+      LOCKOUT_DURATION_MS
+    );
+    if (count > MAX_FAILED_ATTEMPTS) {
+      throw this.challengeLockedException(remainingMs);
     }
 
     if (!(await this.consumeTotp(user, code))) {
-      const { count, remainingMs } = await this.#challengeFailures.record(
-        user.id,
-        LOCKOUT_DURATION_MS
-      );
       await this.recordChallengeFailure(user, 'challenge', context, count);
 
       if (count >= MAX_FAILED_ATTEMPTS) {
@@ -388,16 +391,16 @@ export class MfaService {
       return false;
     }
 
-    const open = await this.#stepUpFailures.read(user.id);
-    if (open.count >= MAX_FAILED_ATTEMPTS) {
-      throw this.stepUpLockedException(open.remainingMs);
+    // Reserve before checking, for the reason given in verifyChallenge.
+    const { count, remainingMs } = await this.#stepUpFailures.record(
+      user.id,
+      LOCKOUT_DURATION_MS
+    );
+    if (count > MAX_FAILED_ATTEMPTS) {
+      throw this.stepUpLockedException(remainingMs);
     }
 
     if (!(await this.consumeTotp(user, code))) {
-      const { count, remainingMs } = await this.#stepUpFailures.record(
-        user.id,
-        LOCKOUT_DURATION_MS
-      );
       await this.recordChallengeFailure(user, 'step_up', context, count);
 
       if (count >= MAX_FAILED_ATTEMPTS) {

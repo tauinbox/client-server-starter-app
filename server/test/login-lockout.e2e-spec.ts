@@ -87,6 +87,23 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
     expect(persisted.lockedUntil).toBeInstanceOf(Date);
   }, 30000);
 
+  // Login takes its slot before it checks the password, so the rest of a burst
+  // lands after the lock opened and must not push the window further out
+  it('keeps an open lock when a further attempt lands', async () => {
+    const opened = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ id: userId });
+
+    const further = await usersService.incrementFailedAttemptsAndLockIfNeeded(
+      userId,
+      maxAttempts,
+      lockDurationMs
+    );
+
+    expect(further.failedLoginAttempts).toBe(maxAttempts + 1);
+    expect(further.lockedUntil?.getTime()).toBe(opened.lockedUntil?.getTime());
+  }, 30000);
+
   it('clears the counter and the lock on reset', async () => {
     await usersService.resetLoginAttempts(userId);
 
