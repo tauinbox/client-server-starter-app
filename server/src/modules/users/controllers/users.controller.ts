@@ -55,6 +55,12 @@ import { UserSessionRevocationRequiredEvent } from '../events/user-session-revoc
 import { UserCreatedEvent } from '../events/user-created.event';
 import { UserUpdatedEvent } from '../events/user-updated.event';
 import { UserRestoredEvent } from '../events/user-restored.event';
+import { User } from '../entities/user.entity';
+import { AuthService } from '../../auth/services/auth.service';
+import { CHALLENGE_THROTTLE } from '../../auth/constants/throttle.constants';
+import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Users API')
 @Controller({
@@ -74,7 +80,8 @@ export class UsersController {
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService,
     private readonly permissionService: PermissionService,
-    private readonly caslAbilityFactory: CaslAbilityFactory
+    private readonly caslAbilityFactory: CaslAbilityFactory,
+    private readonly authService: AuthService
   ) {}
 
   @Post()
@@ -233,6 +240,12 @@ export class UsersController {
     };
   }
 
+  // A credential edit verifies a secret of the caller, so a refused attempt
+  // costs the budget a refused sign-in costs. Only the long window is taken:
+  // the per-minute limit of the challenge routes applies to every request,
+  // and a name or status edit presents no secret.
+  @Throttle({ 'login-long-window': CHALLENGE_THROTTLE['login-long-window'] })
+  @CountFailuresOnlyWhenBody('currentPassword', 'code')
   @Patch(':id')
   @Authorize(['update', 'User'])
   @ApiBearerAuth()
@@ -252,25 +265,37 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
+    const { currentPassword, code, ...changes } = updateUserDto;
+
     // The service rewrites the address only when it actually differs, so the
     // pre-image is the only way to tell a real change from a form resubmit -
     // and revoking on a resubmit would log the target out for nothing.
-    const previousEmail =
-      updateUserDto.email === undefined
-        ? undefined
-        : (await this.usersService.findOne(id)).email;
+    let previousEmail: string | undefined;
+    if (changes.email !== undefined || changes.password !== undefined) {
+      const target = await this.usersService.findOne(id);
+      if (changes.email !== undefined) {
+        previousEmail = target.email;
+      }
+      if (changes.password !== undefined || changes.email !== target.email) {
+        await this.assertCredentialStepUp(
+          req,
+          ability,
+          target,
+          currentPassword,
+          code
+        );
+      }
+    }
 
     const updatedUser = await this.usersService.update(
       id,
-      updateUserDto,
+      changes,
       ability,
       req.user.userId
     );
     const emailChanged =
       previousEmail !== undefined && updatedUser.email !== previousEmail;
-    const changedFields = Object.keys(updateUserDto).filter(
-      (k) => k !== 'password'
-    );
+    const changedFields = Object.keys(changes).filter((k) => k !== 'password');
     await this.auditService.log({
       action: AuditAction.USER_UPDATE,
       actorId: req.user.userId,
@@ -281,7 +306,7 @@ export class UsersController {
       context: extractAuditContext(req)
     });
 
-    if (updateUserDto.password) {
+    if (changes.password) {
       this.eventEmitter.emit(
         UserPasswordChangedByAdminEvent.name,
         new UserPasswordChangedByAdminEvent(id)
@@ -332,11 +357,7 @@ export class UsersController {
     // attacker-controlled; leaving the holder's issued tokens alive would
     // defeat it. Mirrors the self-service confirm path, which revokes too.
     // Deactivation too: a surviving refresh row mints tokens on re-activation.
-    if (
-      updateUserDto.password ||
-      emailChanged ||
-      updateUserDto.isActive === false
-    ) {
+    if (changes.password || emailChanged || changes.isActive === false) {
       await this.eventEmitter.emitAsync(
         UserSessionRevocationRequiredEvent.name,
         new UserSessionRevocationRequiredEvent(id)
@@ -345,6 +366,41 @@ export class UsersController {
 
     this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
     return updatedUser;
+  }
+
+  /**
+   * A stolen access token must not set a password or move the address of any
+   * account, the caller's own included, so the factor is the CALLER's. The
+   * instance check runs first: a request refused anyway must not spend a
+   * single-use code or the step-up budget of the caller.
+   *
+   * The provider proof cookie is scoped to the auth routes and never reaches
+   * this one, so an actor with neither a password nor an authenticator is
+   * refused here and sets one on its profile first.
+   */
+  private async assertCredentialStepUp(
+    req: JwtAuthRequest,
+    ability: AppAbility,
+    target: User,
+    currentPassword: string | undefined,
+    code: string | undefined
+  ): Promise<void> {
+    assertCan(
+      ability,
+      'update',
+      subject('User', target),
+      this.auditService,
+      { actorId: req.user.userId, targetId: target.id, targetType: 'User' },
+      this.metricsService
+    );
+    await this.authService.assertStepUp(
+      await this.usersService.findOne(req.user.userId),
+      currentPassword,
+      undefined,
+      STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+      code,
+      extractAuditContext(req)
+    );
   }
 
   @Delete(':id')

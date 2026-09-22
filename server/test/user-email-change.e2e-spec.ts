@@ -8,6 +8,7 @@ import { HttpStatus, HttpException } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { AuthService } from '../src/modules/auth/services/auth.service';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { UsersService } from '../src/modules/users/services/users.service';
@@ -274,6 +275,14 @@ describe('Admin email change - session revocation through the real event bus', (
   beforeEach(async () => {
     store = createStore();
     store.rows.set('user-1', buildSeedUser());
+    // The step-up of an email change loads the caller.
+    store.rows.set(
+      'admin-1',
+      Object.assign(buildSeedUser(), {
+        id: 'admin-1',
+        email: 'admin@example.com'
+      })
+    );
 
     refreshTokenService = {
       deleteByUserId: jest.fn().mockResolvedValue(undefined)
@@ -295,6 +304,8 @@ describe('Admin email change - session revocation through the real event bus', (
       imports: [EventEmitterModule.forRoot()],
       controllers: [UsersController],
       providers: [
+        // Stubbed: the step-up has its own suite, user-credential-step-up.
+        { provide: AuthService, useValue: { assertStepUp: jest.fn() } },
         {
           provide: BreachedPasswordService,
           useValue: { assertNotBreached: jest.fn() }

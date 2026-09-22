@@ -11,6 +11,7 @@ import { buildLoggerOptions } from './logger-options';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { postgresConfig } from '../../postgres.config';
 import { UsersModule } from '../users/users.module';
+import { UsersApiModule } from '../users/users-api.module';
 import { AuthModule } from '../auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -91,6 +92,7 @@ export class CoreModule implements NestModule {
         AuditModule,
         AuthModule,
         UsersModule,
+        UsersApiModule,
         HealthModule,
         NotificationsModule,
         FeatureFlagsModule,

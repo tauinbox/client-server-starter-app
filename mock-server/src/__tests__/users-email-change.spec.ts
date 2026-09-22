@@ -68,7 +68,10 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ email: 'bob@example.com' })
+      body: JSON.stringify({
+        email: 'bob@example.com',
+        currentPassword: 'Password1'
+      })
     });
 
     expect(res.status).toBe(409);
@@ -91,7 +94,10 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ email: 'changed@example.com' })
+      body: JSON.stringify({
+        email: 'changed@example.com',
+        currentPassword: 'Password1'
+      })
     });
 
     expect(res.status).toBe(200);
@@ -113,7 +119,10 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${adminToken}`
       },
-      body: JSON.stringify({ email: 'moved@example.com' })
+      body: JSON.stringify({
+        email: 'moved@example.com',
+        currentPassword: 'Password1'
+      })
     });
     expect(res.status).toBe(200);
 
@@ -175,7 +184,10 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ email: 'moved@example.com' })
+      body: JSON.stringify({
+        email: 'moved@example.com',
+        currentPassword: 'Password1'
+      })
     });
     expect(res.status).toBe(200);
 

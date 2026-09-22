@@ -31,6 +31,10 @@ export type UpdateUser = Pick<
 > & {
   password?: string;
   unlockAccount?: boolean;
+  /** Step-up factor of the caller, sent with a password or email change. */
+  currentPassword?: string;
+  /** Authenticator code of the caller, in place of `currentPassword`. */
+  code?: string;
 };
 
 export type UserCursorListParams = {

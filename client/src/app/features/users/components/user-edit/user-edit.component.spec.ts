@@ -63,10 +63,18 @@ describe('UserEditComponent', () => {
     deleteUser: ReturnType<typeof vi.fn>;
   };
   let permittedSignal: WritableSignal<boolean>;
-  let currentUserSignal: WritableSignal<{ id: string } | null>;
+  let currentUserSignal: WritableSignal<{
+    id: string;
+    hasPassword?: boolean;
+    mfaEnabled?: boolean;
+  } | null>;
   let authStoreMock: {
     hasPermissions: ReturnType<typeof vi.fn>;
-    user: WritableSignal<{ id: string } | null>;
+    user: WritableSignal<{
+      id: string;
+      hasPassword?: boolean;
+      mfaEnabled?: boolean;
+    } | null>;
     updateCurrentUser: ReturnType<typeof vi.fn>;
   };
   let notifyMock: {
@@ -80,7 +88,11 @@ describe('UserEditComponent', () => {
 
   beforeEach(async () => {
     permittedSignal = signal(true);
-    currentUserSignal = signal({ id: 'admin-id' });
+    currentUserSignal = signal<{
+      id: string;
+      hasPassword?: boolean;
+      mfaEnabled?: boolean;
+    } | null>({ id: 'admin-id' });
 
     userServiceMock = {
       getById: vi.fn().mockReturnValue(of(mockUser))
@@ -513,12 +525,16 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: 'newPassword1'
       });
+      component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
       await fixture.whenStable();
       component.onSubmit();
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith(
         'user-1',
-        expect.objectContaining({ password: 'newPassword1' })
+        expect.objectContaining({
+          password: 'newPassword1',
+          currentPassword: 'AdminPass1'
+        })
       );
     });
 
@@ -595,10 +611,12 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: 'OldPassword1'
       });
+      component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
       await fixture.whenStable();
       component.onSubmit();
 
       expect(component.userModel().password).toBe('');
+      expect(component.stepUpPasswordModel().currentPassword).toBe('');
     });
 
     it('should set error on update failure', async () => {
@@ -776,6 +794,111 @@ describe('UserEditComponent', () => {
     });
   });
 
+  describe('credential step-up', () => {
+    beforeEach(async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    function changePassword(): void {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'NewPassword1'
+      });
+    }
+
+    function rendered(): string {
+      fixture.detectChanges();
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    it('asks for nothing while neither the email nor the password changes', async () => {
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Renamed',
+        lastName: 'User',
+        password: ''
+      });
+      await fixture.whenStable();
+
+      expect(component['credentialChanged']()).toBe(false);
+      expect(component['canSubmit']()).toBe(true);
+      expect(rendered()).not.toContain('Your current password');
+    });
+
+    it('blocks a password change until the caller enters its own password', async () => {
+      changePassword();
+      await fixture.whenStable();
+
+      expect(rendered()).toContain('Your current password');
+      expect(component['canSubmit']()).toBe(false);
+      component.onSubmit();
+      expect(usersStoreMock.updateUser).not.toHaveBeenCalled();
+
+      component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
+      await fixture.whenStable();
+      expect(component['canSubmit']()).toBe(true);
+    });
+
+    it('sends an authenticator code for an account without a password', async () => {
+      currentUserSignal.set({
+        id: 'admin-id',
+        hasPassword: false,
+        mfaEnabled: true
+      });
+      changePassword();
+      component.stepUpCodeModel.set({ code: ' 123456 ' });
+      await fixture.whenStable();
+
+      expect(rendered()).toContain('Code from your authenticator app');
+      component.onSubmit();
+
+      const sent = usersStoreMock.updateUser.mock.calls[0][1] as Record<
+        string,
+        unknown
+      >;
+      expect(sent['code']).toBe('123456');
+      expect(sent).not.toHaveProperty('currentPassword');
+    });
+
+    it('explains the change is unavailable to an account with no factor', async () => {
+      currentUserSignal.set({
+        id: 'admin-id',
+        hasPassword: false,
+        mfaEnabled: false
+      });
+      changePassword();
+      await fixture.whenStable();
+
+      expect(rendered()).toContain('first set a password');
+      expect(component['canSubmit']()).toBe(false);
+    });
+
+    it('shows the translated server refusal of a wrong password', async () => {
+      usersStoreMock.updateUser.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              error: {
+                message: 'Current password is incorrect',
+                errorKey: 'errors.auth.invalidCurrentPassword'
+              },
+              status: 400
+            })
+        )
+      );
+      changePassword();
+      component.stepUpPasswordModel.set({ currentPassword: 'Wrong-Pass-00' });
+      await fixture.whenStable();
+      component.onSubmit();
+
+      expect(component['error']()).toBeTruthy();
+      expect(component['error']()).not.toContain('errors.auth');
+    });
+  });
+
   describe('email change confirmation', () => {
     beforeEach(() => {
       fixture.detectChanges();
@@ -793,6 +916,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
+      component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
       await fixture.whenStable();
       component.onSubmit();
 
@@ -814,6 +938,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
+      component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
       await fixture.whenStable();
       component.onSubmit();
 
@@ -832,6 +957,7 @@ describe('UserEditComponent', () => {
         lastName: 'User',
         password: ''
       });
+      component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
       await fixture.whenStable();
       component.onSubmit();
 

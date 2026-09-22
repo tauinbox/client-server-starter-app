@@ -12,6 +12,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { NextFunction, Request, Response } from 'express';
 import * as request from 'supertest';
 import type { Server } from 'http';
+import { AuthService } from '../src/modules/auth/services/auth.service';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
@@ -37,6 +38,8 @@ describe('Admin user update DTO validation (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
+        // Stubbed: the step-up has its own suite, user-credential-step-up.
+        { provide: AuthService, useValue: { assertStepUp: jest.fn() } },
         { provide: UsersService, useValue: usersService },
         { provide: PermissionService, useValue: {} },
         { provide: CaslAbilityFactory, useValue: {} },

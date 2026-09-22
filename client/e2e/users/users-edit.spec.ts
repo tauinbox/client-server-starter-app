@@ -183,6 +183,7 @@ test.describe('User Edit page', () => {
 
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
+    await page.getByLabel('Your current password').fill('Password1');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -207,6 +208,7 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${mockId('user-3')}/edit`);
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
+    await page.getByLabel('Your current password').fill('Password1');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await page
@@ -227,6 +229,7 @@ test.describe('User Edit page', () => {
 
     await page.getByLabel('Email').fill('renamed@example.com');
     await page.getByLabel('Email').blur();
+    await page.getByLabel('Your current password').fill('Password1');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await page
@@ -236,6 +239,33 @@ test.describe('User Edit page', () => {
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/users/${mockId('user-3')}$`));
+  });
+
+  test('asks for the own password of the caller before a password change', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto(`/users/${mockId('user-3')}/edit`);
+
+    await expect(page.getByLabel('Your current password')).toHaveCount(0);
+    await page.getByLabel('New Password (Optional)').fill('Copper-Meadow-83');
+    await expect(page.getByLabel('Your current password')).toBeVisible();
+
+    await page.getByLabel('Your current password').fill('Wrong-Password-00');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(page.locator('.error-message')).toHaveText(
+      'Current password is incorrect'
+    );
+    await expect(page).toHaveURL(
+      new RegExp(`/users/${mockId('user-3')}/edit$`)
+    );
+
+    await page.getByLabel('Your current password').fill('Password1');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(page.getByText('User updated successfully')).toBeVisible();
   });
 
   test('should show confirmation dialog on "Delete" click', async ({

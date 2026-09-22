@@ -21,6 +21,8 @@ import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed
 import { UserSessionRevocationRequiredEvent } from '../events/user-session-revocation-required.event';
 import type { AppAbility } from '../../auth/casl/app-ability';
 import { MfaRequiredGuard } from '../../auth/guards/mfa-required.guard';
+import { AuthService } from '../../auth/services/auth.service';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -64,6 +66,7 @@ describe('UsersController', () => {
   };
   let caslAbilityFactoryMock: { createForUser: jest.Mock };
   let mailServiceMock: { sendPasswordChangedNotification: jest.Mock };
+  let authServiceMock: { assertStepUp: jest.Mock };
 
   beforeEach(async () => {
     usersServiceMock = {
@@ -98,6 +101,8 @@ describe('UsersController', () => {
       sendPasswordChangedNotification: jest.fn().mockResolvedValue(undefined)
     };
 
+    authServiceMock = { assertStepUp: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
@@ -107,7 +112,8 @@ describe('UsersController', () => {
         { provide: MetricsService, useValue: metricsServiceMock },
         { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
-        { provide: MailService, useValue: mailServiceMock }
+        { provide: MailService, useValue: mailServiceMock },
+        { provide: AuthService, useValue: authServiceMock }
       ]
     })
       .overrideGuard(JwtAuthGuard)
@@ -340,6 +346,139 @@ describe('UsersController', () => {
   // ── update ────────────────────────────────────────────────────────
 
   describe('update', () => {
+    beforeEach(() => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'target@example.com'
+      });
+    });
+
+    describe('credential step-up', () => {
+      it('demands the step-up of the caller for a password change', async () => {
+        const actor = { id: 'user-1', email: 'admin@example.com' };
+        usersServiceMock.findOne.mockImplementation((id: string) =>
+          Promise.resolve(
+            id === 'user-1' ? actor : { id, email: 'target@example.com' }
+          )
+        );
+        usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+        const dto: UpdateUserDto = {
+          password: 'NewPassword1',
+          currentPassword: 'ActorPassword1',
+          code: '123456'
+        };
+
+        await controller.update(
+          'user-5',
+          dto,
+          mockJwtRequest() as JwtAuthRequest,
+          mockAbility
+        );
+
+        expect(authServiceMock.assertStepUp).toHaveBeenCalledWith(
+          actor,
+          'ActorPassword1',
+          undefined,
+          STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+          '123456',
+          expect.anything()
+        );
+      });
+
+      it('demands the step-up for a changed email', async () => {
+        usersServiceMock.update.mockResolvedValue({
+          id: 'user-5',
+          email: 'new@example.com'
+        });
+
+        await controller.update(
+          'user-5',
+          { email: 'new@example.com' },
+          mockJwtRequest() as JwtAuthRequest,
+          mockAbility
+        );
+
+        expect(authServiceMock.assertStepUp).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not demand it for a resubmitted email or a name edit', async () => {
+        usersServiceMock.update.mockResolvedValue({
+          id: 'user-5',
+          email: 'target@example.com'
+        });
+        const req = mockJwtRequest() as JwtAuthRequest;
+
+        await controller.update(
+          'user-5',
+          { email: 'target@example.com', firstName: 'Same' },
+          req,
+          mockAbility
+        );
+        await controller.update(
+          'user-5',
+          { firstName: 'Renamed' },
+          req,
+          mockAbility
+        );
+
+        expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+      });
+
+      it('writes nothing when the step-up refuses', async () => {
+        authServiceMock.assertStepUp.mockRejectedValue(new Error('refused'));
+
+        await expect(
+          controller.update(
+            'user-5',
+            { password: 'NewPassword1' },
+            mockJwtRequest() as JwtAuthRequest,
+            mockAbility
+          )
+        ).rejects.toThrow('refused');
+
+        expect(usersServiceMock.update).not.toHaveBeenCalled();
+        expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+      });
+
+      it('refuses a forbidden target before it reads a factor', async () => {
+        await expect(
+          controller.update(
+            'user-5',
+            { password: 'NewPassword1', currentPassword: 'ActorPassword1' },
+            mockJwtRequest() as JwtAuthRequest,
+            denyAbility
+          )
+        ).rejects.toThrow(ForbiddenException);
+
+        expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+        expect(usersServiceMock.update).not.toHaveBeenCalled();
+      });
+
+      it('never passes the factors to the service or the audit row', async () => {
+        usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+
+        await controller.update(
+          'user-5',
+          { password: 'NewPassword1', currentPassword: 'ActorPassword1' },
+          mockJwtRequest() as JwtAuthRequest,
+          mockAbility
+        );
+
+        expect(usersServiceMock.update).toHaveBeenCalledWith(
+          'user-5',
+          { password: 'NewPassword1' },
+          mockAbility,
+          'user-1'
+        );
+        expect(auditServiceMock.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.USER_UPDATE,
+            details: { changedFields: [] }
+          })
+        );
+      });
+    });
+
     it('should call usersService.update with id, dto, ability and actor, and return the updated user', async () => {
       const dto: UpdateUserDto = { firstName: 'Updated', isActive: false };
       const updatedUser = { id: 'user-5', firstName: 'Updated' };

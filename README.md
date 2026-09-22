@@ -1514,7 +1514,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
-| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target. A password change or a change to a different email needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller. This applies to every target, the caller's own record included |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/roles` | `roles:create` | Create a role |
@@ -1802,11 +1802,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2480 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 410 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and no mail sink, 398 pass and 12 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1315 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 270 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 803 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2486 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 416 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and no mail sink, 398 pass and 18 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1320 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 271 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 810 tests pass |
 
 ## CI/CD
 

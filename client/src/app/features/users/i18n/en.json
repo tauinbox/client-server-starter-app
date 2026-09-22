@@ -67,7 +67,14 @@
     "successUpdated": "User updated successfully",
     "errorUpdateFailed": "Failed to update user. Please try again.",
     "successDeleted": "User deleted successfully",
-    "errorDeleteFailed": "Failed to delete user. Please try again."
+    "errorDeleteFailed": "Failed to delete user. Please try again.",
+    "currentPassword": "Your current password",
+    "currentPasswordRequired": "Enter your current password",
+    "stepUpPasswordNote": "Changing the email or the password needs your own password.",
+    "stepUpCode": "Code from your authenticator app",
+    "stepUpCodeRequired": "Enter the code from your authenticator app",
+    "stepUpCodeNote": "Changing the email or the password needs a code from your own authenticator app.",
+    "stepUpUnavailable": "To change the email or the password, first set a password or turn on two-factor authentication on your profile."
   },
   "table": {
     "columnId": "ID",
