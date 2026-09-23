@@ -309,10 +309,13 @@ export class UsersService {
       changes.tokenRevokedAt = new Date();
       // Cancel any in-flight self-service email change so a mailed link cannot
       // confirm against a disabled row, the same reason the soft delete clears
-      // these three columns.
+      // these three columns. A reset link would otherwise revive on
+      // reactivation.
       changes.pendingEmail = null;
       changes.pendingEmailToken = null;
       changes.pendingEmailExpiresAt = null;
+      changes.passwordResetToken = null;
+      changes.passwordResetExpiresAt = null;
     }
 
     let pendingVerificationRawToken: string | null = null;
@@ -336,10 +339,14 @@ export class UsersService {
       changes.isEmailVerified = false;
       changes.emailVerificationToken = issued.hashedToken;
       changes.emailVerificationExpiresAt = issued.expiresAt;
-      // Admin-set email overrides any self-service change in flight.
+      // Admin-set email overrides any self-service change in flight, and voids
+      // a reset link mailed to the old address: this change exists to take the
+      // account back from whoever controls that address.
       changes.pendingEmail = null;
       changes.pendingEmailToken = null;
       changes.pendingEmailExpiresAt = null;
+      changes.passwordResetToken = null;
+      changes.passwordResetExpiresAt = null;
     }
 
     this.userRepository.merge(user, changes);
@@ -483,15 +490,17 @@ export class UsersService {
       this.assertCanWrite(ability, 'delete', user, actorId);
     }
 
-    // Clear pending email-change fields BEFORE soft-delete so a stale token
-    // cannot outlive deletedAt and confirm against a soft-removed row. Both
+    // Clear mailed tokens BEFORE soft-delete so a stale link cannot outlive
+    // deletedAt and confirm, or revive on restore. Both
     // writes share one transaction so a failing soft-delete cannot leave a
     // live row stripped of its pending email change.
     await withTransaction(this.dataSource, async (manager) => {
       await manager.update(User, id, {
         pendingEmail: null,
         pendingEmailToken: null,
-        pendingEmailExpiresAt: null
+        pendingEmailExpiresAt: null,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null
       });
       await manager.softRemove(user);
     });

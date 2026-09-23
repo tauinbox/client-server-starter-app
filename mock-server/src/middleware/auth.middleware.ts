@@ -1153,9 +1153,8 @@ router.post('/profile/email/confirm', (req, res) => {
 
   user.email = newEmail;
   user.isEmailVerified = true;
-  user.pendingEmail = null;
-  user.pendingEmailToken = null;
-  user.pendingEmailExpiresAt = null;
+  // A reset link mailed to the old address dies with the move.
+  clearMailedProofs(user);
   user.tokenRevokedAt = new Date().toISOString();
   user.updatedAt = new Date().toISOString();
   state.pendingEmailTokens.delete(token);

@@ -24,7 +24,7 @@ describe('UserDeletedListener', () => {
     listener = module.get<UserDeletedListener>(UserDeletedListener);
   });
 
-  it('should clear the pending email-change fields on UserDeletedEvent', async () => {
+  it('should clear the mailed tokens on UserDeletedEvent', async () => {
     const userId = 'user-123';
 
     await listener.handleUserDeleted(new UserDeletedEvent(userId));
@@ -32,7 +32,9 @@ describe('UserDeletedListener', () => {
     expect(repositoryMock.update).toHaveBeenCalledWith(userId, {
       pendingEmail: null,
       pendingEmailToken: null,
-      pendingEmailExpiresAt: null
+      pendingEmailExpiresAt: null,
+      passwordResetToken: null,
+      passwordResetExpiresAt: null
     });
   });
 });

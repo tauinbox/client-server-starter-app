@@ -459,13 +459,9 @@ router.patch(
       if (email !== user.email) {
         previousEmail = user.email;
         user.isEmailVerified = false;
-        // Admin-set email overrides any self-service change in flight.
-        if (user.pendingEmailToken) {
-          getState().pendingEmailTokens.delete(user.pendingEmailToken);
-        }
-        user.pendingEmail = null;
-        user.pendingEmailToken = null;
-        user.pendingEmailExpiresAt = null;
+        // Admin-set email overrides any self-service change in flight, and
+        // voids a reset link mailed to the old address.
+        clearMailedProofs(user);
         // The address is moved to recover an account; the previous holder must
         // not keep authenticating with the tokens issued before the move.
         revokeUserSessions(user);
@@ -486,15 +482,9 @@ router.patch(
       // server writes both effects whenever the request carries `false`.
       if (isActive === false) {
         revokeUserSessions(user);
-        // Cancel any in-flight self-service email change so a mailed link
-        // cannot confirm against a disabled row, the same reason the soft
-        // delete clears these three fields.
-        if (user.pendingEmailToken) {
-          getState().pendingEmailTokens.delete(user.pendingEmailToken);
-        }
-        user.pendingEmail = null;
-        user.pendingEmailToken = null;
-        user.pendingEmailExpiresAt = null;
+        // Void every mailed link so none confirms against a disabled row or
+        // revives on reactivation, the same reason the soft delete clears them.
+        clearMailedProofs(user);
       }
       user.isActive = isActive;
     }
@@ -582,14 +572,9 @@ router.delete(
     targetUser.deletedAt = new Date().toISOString();
     targetUser.updatedAt = new Date().toISOString();
 
-    // Clear any in-flight self-service email change so a stale token cannot
-    // confirm against a soft-deleted row.
-    if (targetUser.pendingEmailToken) {
-      state.pendingEmailTokens.delete(targetUser.pendingEmailToken);
-    }
-    targetUser.pendingEmail = null;
-    targetUser.pendingEmailToken = null;
-    targetUser.pendingEmailExpiresAt = null;
+    // Void every mailed link so none confirms against a soft-deleted row or
+    // revives on restore.
+    clearMailedProofs(targetUser);
 
     // Revoke all refresh tokens for this user (active + revoked)
     for (const [token, userId] of state.refreshTokens.entries()) {

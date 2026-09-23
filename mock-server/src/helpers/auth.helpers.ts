@@ -255,9 +255,9 @@ export function pruneOldestUserTokens(
   }
 }
 
-// Mirrors the server: a password change nulls the reset columns and the
-// pending-email trio in the same write, so a link mailed before the change
-// cannot take the account after it.
+// Mirrors the server: a password change, an email move, a deactivation and a
+// soft delete null the reset columns and the pending-email trio in the same
+// write, so a link mailed before the change cannot take the account after it.
 export function clearMailedProofs(user: MockUser): void {
   const state = getState();
   for (const [token, issued] of state.passwordResetTokens.entries()) {

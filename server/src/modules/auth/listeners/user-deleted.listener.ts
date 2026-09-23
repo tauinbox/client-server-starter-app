@@ -17,7 +17,9 @@ export class UserDeletedListener {
     await this.dataSource.getRepository(User).update(event.userId, {
       pendingEmail: null,
       pendingEmailToken: null,
-      pendingEmailExpiresAt: null
+      pendingEmailExpiresAt: null,
+      passwordResetToken: null,
+      passwordResetExpiresAt: null
     });
   }
 }
