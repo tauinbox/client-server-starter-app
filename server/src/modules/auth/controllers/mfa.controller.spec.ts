@@ -137,7 +137,11 @@ describe('MfaController', () => {
     });
 
     it('passes the re-authentication proof cookie through', async () => {
-      await controller.setup(jwtRequest({ reauth_proof: 'proof' }), {}, res);
+      await controller.setup(
+        jwtRequest({ '__Host-reauth_proof': 'proof' }),
+        {},
+        res
+      );
 
       expect(authService.assertStepUp).toHaveBeenCalledWith(
         mockUser,
@@ -255,20 +259,24 @@ describe('MfaController', () => {
   });
 
   describe('the provider proof is cleared once the change is accepted', () => {
-    const clearedProof: [string, { path: string }] = [
-      'reauth_proof',
-      { path: '/api/v1/auth' }
+    const clearedProof: [string, { secure: boolean; path: string }] = [
+      '__Host-reauth_proof',
+      { secure: true, path: '/' }
     ];
 
     it('clears it after an enrolment starts', async () => {
-      await controller.setup(jwtRequest({ reauth_proof: 'proof' }), {}, res);
+      await controller.setup(
+        jwtRequest({ '__Host-reauth_proof': 'proof' }),
+        {},
+        res
+      );
 
       expect(res.clearCookie).toHaveBeenCalledWith(...clearedProof);
     });
 
     it('clears it after two-factor is turned off', async () => {
       await controller.disable(
-        jwtRequest({ reauth_proof: 'proof' }),
+        jwtRequest({ '__Host-reauth_proof': 'proof' }),
         { code: '123456' },
         res
       );
@@ -278,7 +286,7 @@ describe('MfaController', () => {
 
     it('clears it after the recovery codes are replaced', async () => {
       await controller.regenerateRecoveryCodes(
-        jwtRequest({ reauth_proof: 'proof' }),
+        jwtRequest({ '__Host-reauth_proof': 'proof' }),
         { code: '123456' },
         res
       );
@@ -292,7 +300,11 @@ describe('MfaController', () => {
       );
 
       await expect(
-        controller.disable(jwtRequest({ reauth_proof: 'proof' }), {}, res)
+        controller.disable(
+          jwtRequest({ '__Host-reauth_proof': 'proof' }),
+          {},
+          res
+        )
       ).rejects.toBeDefined();
 
       expect(res.clearCookie).not.toHaveBeenCalled();
@@ -322,9 +334,9 @@ describe('MfaController', () => {
       );
 
       expect(res.cookie).toHaveBeenCalledWith(
-        'refresh_token',
+        '__Host-refresh_token',
         'refresh-token',
-        expect.objectContaining({ httpOnly: true, path: '/api/v1/auth' })
+        expect.objectContaining({ httpOnly: true, secure: true, path: '/' })
       );
     });
 

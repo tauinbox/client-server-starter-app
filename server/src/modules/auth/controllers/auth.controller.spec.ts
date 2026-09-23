@@ -354,15 +354,30 @@ describe('AuthController', () => {
       await controller.login(req, res);
 
       expect(res.cookie).toHaveBeenCalledWith(
-        'refresh_token',
+        '__Host-refresh_token',
         'refresh-token',
         expect.objectContaining({
           httpOnly: true,
+          secure: true,
           sameSite: 'strict',
-          path: '/api/v1/auth',
+          path: '/',
           maxAge: 604800 * 1000
         })
       );
+    });
+
+    // A browser that signed in before the prefix still holds the bare cookie
+    // on its old path. Left there, it rides along with every refresh.
+    it('should clear the refresh cookie of the old name and path', async () => {
+      const req = mockLocalAuthRequest() as LocalAuthRequest;
+      const res = mockResponse();
+
+      await controller.login(req, res);
+
+      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
+        secure: true,
+        path: '/api/v1/auth'
+      });
     });
 
     // Regression: the attribute came from an === 'production' comparison, so
@@ -382,9 +397,9 @@ describe('AuthController', () => {
         await controller.login(req, res);
 
         expect(res.cookie).toHaveBeenCalledWith(
-          'refresh_token',
+          secure ? '__Host-refresh_token' : 'refresh_token',
           'refresh-token',
-          expect.objectContaining({ secure })
+          expect.objectContaining({ secure, path: '/' })
         );
       }
     );
@@ -462,7 +477,7 @@ describe('AuthController', () => {
 
     it('should return new tokens and set cookie on success', async () => {
       const req = mockExpressRequest({
-        refresh_token: 'old-refresh'
+        '__Host-refresh_token': 'old-refresh'
       }) as ExpressRequest;
       const res = mockResponse();
 
@@ -471,9 +486,47 @@ describe('AuthController', () => {
       expect(authServiceMock.refreshTokens).toHaveBeenCalledWith('old-refresh');
       expect(result.tokens).not.toHaveProperty('refresh_token');
       expect(res.cookie).toHaveBeenCalledWith(
-        'refresh_token',
+        '__Host-refresh_token',
         'refresh-token',
-        expect.objectContaining({ httpOnly: true, path: '/api/v1/auth' })
+        expect.objectContaining({ httpOnly: true, secure: true, path: '/' })
+      );
+    });
+
+    // Transition: a session from before the prefix refreshes once, moves to
+    // the prefixed name, and the bare cookie is cleared on its old path.
+    it('should accept the bare cookie once and move the session to the prefixed name', async () => {
+      const req = mockExpressRequest({
+        refresh_token: 'legacy-refresh'
+      }) as ExpressRequest;
+      const res = mockResponse();
+
+      await controller.refreshToken(req, res);
+
+      expect(authServiceMock.refreshTokens).toHaveBeenCalledWith(
+        'legacy-refresh'
+      );
+      expect(res.cookie).toHaveBeenCalledWith(
+        '__Host-refresh_token',
+        'refresh-token',
+        expect.objectContaining({ secure: true, path: '/' })
+      );
+      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
+        secure: true,
+        path: '/api/v1/auth'
+      });
+    });
+
+    it('should prefer the prefixed cookie when both names arrive', async () => {
+      const req = mockExpressRequest({
+        refresh_token: 'legacy-refresh',
+        '__Host-refresh_token': 'current-refresh'
+      }) as ExpressRequest;
+      const res = mockResponse();
+
+      await controller.refreshToken(req, res);
+
+      expect(authServiceMock.refreshTokens).toHaveBeenCalledWith(
+        'current-refresh'
       );
     });
 
@@ -481,7 +534,7 @@ describe('AuthController', () => {
     // the client keeps the admin badge after a silent refresh.
     it('should return user.roles as RoleResponse[] objects', async () => {
       const req = mockExpressRequest({
-        refresh_token: 'old-refresh'
+        '__Host-refresh_token': 'old-refresh'
       }) as ExpressRequest;
       const res = mockResponse();
 
@@ -500,7 +553,7 @@ describe('AuthController', () => {
   describe('logout', () => {
     it('should end the presented session only, clear the cookie and return a success message', async () => {
       const req = mockJwtRequest('user-1', 'user@example.com', {
-        refresh_token: 'this-device'
+        '__Host-refresh_token': 'this-device'
       }) as JwtAuthRequest;
       const res = mockResponse();
 
@@ -513,10 +566,33 @@ describe('AuthController', () => {
       // The account-wide teardown belongs to the password change. Calling it
       // here evicts every other device the plan pays for.
       expect(authServiceMock.logout).not.toHaveBeenCalled();
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-refresh_token', {
+        secure: true,
+        path: '/'
+      });
       expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
+        secure: true,
         path: '/api/v1/auth'
       });
       expect(result).toEqual({ message: 'Successfully logged out' });
+    });
+
+    it('should end the session of a bare cookie from before the prefix', async () => {
+      const req = mockJwtRequest('user-1', 'user@example.com', {
+        refresh_token: 'legacy-device'
+      }) as JwtAuthRequest;
+      const res = mockResponse();
+
+      await controller.logout(req, res);
+
+      expect(authServiceMock.logoutSession).toHaveBeenCalledWith(
+        'user-1',
+        'legacy-device'
+      );
+      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
+        secure: true,
+        path: '/api/v1/auth'
+      });
     });
 
     it('should revoke nothing when the request carries no refresh cookie', async () => {
@@ -534,15 +610,16 @@ describe('AuthController', () => {
         undefined
       );
       expect(authServiceMock.logout).not.toHaveBeenCalled();
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
-        path: '/api/v1/auth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-refresh_token', {
+        secure: true,
+        path: '/'
       });
       expect(result).toEqual({ message: 'Successfully logged out' });
     });
 
     it('should ask the browser to drop the cached resources and cookies of the origin', async () => {
       const req = mockJwtRequest('user-1', 'user@example.com', {
-        refresh_token: 'this-device'
+        '__Host-refresh_token': 'this-device'
       }) as JwtAuthRequest;
       const res = mockResponse();
 
@@ -556,10 +633,10 @@ describe('AuthController', () => {
       );
     });
 
-    // Regression: the link cookie sits on a deeper path, so the refresh clear
-    // cannot remove it. Left behind, it makes the next provider sign-in in this
-    // browser link that identity to the account that just signed out.
-    it('should clear the OAuth link cookie on its own path', async () => {
+    // Regression: the refresh clear does not remove the link cookie. Left
+    // behind, it makes the next provider sign-in in this browser link that
+    // identity to the account that just signed out.
+    it('should clear the OAuth link cookie', async () => {
       const req = mockJwtRequest(
         'user-1',
         'user@example.com'
@@ -568,8 +645,9 @@ describe('AuthController', () => {
 
       await controller.logout(req, res);
 
-      expect(res.clearCookie).toHaveBeenCalledWith('oauth_link', {
-        path: '/api/v1/auth/oauth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-oauth_link', {
+        secure: true,
+        path: '/'
       });
     });
 
@@ -664,13 +742,15 @@ describe('AuthController', () => {
         stepUpAuditContext
       );
       expect(authServiceMock.logout).toHaveBeenCalledWith('user-1');
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
-        path: '/api/v1/auth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-refresh_token', {
+        secure: true,
+        path: '/'
       });
       // A password change revokes the sessions, thus it also cancels a link
       // attempt that the previous session started.
-      expect(res.clearCookie).toHaveBeenCalledWith('oauth_link', {
-        path: '/api/v1/auth/oauth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-oauth_link', {
+        secure: true,
+        path: '/'
       });
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -772,7 +852,7 @@ describe('AuthController', () => {
       // An account created through a provider holds no password, so the proof
       // is the only factor it can present before it binds one.
       const req = mockJwtRequest('user-1', 'admin@example.com', {
-        reauth_proof: 'proof'
+        '__Host-reauth_proof': 'proof'
       }) as JwtAuthRequest;
       const res = mockResponse();
 
@@ -785,14 +865,15 @@ describe('AuthController', () => {
         STEP_UP_OPERATION.PASSWORD_SET,
         stepUpAuditContext
       );
-      expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
-        path: '/api/v1/auth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-reauth_proof', {
+        secure: true,
+        path: '/'
       });
     });
 
     it('keeps the proof cookie when the step-up refuses the request', async () => {
       const req = mockJwtRequest('user-1', 'admin@example.com', {
-        reauth_proof: 'proof'
+        '__Host-reauth_proof': 'proof'
       }) as JwtAuthRequest;
       const res = mockResponse();
       authServiceMock.assertStepUpForUser.mockRejectedValueOnce(

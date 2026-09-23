@@ -65,14 +65,16 @@ import {
 import type { AuthenticatedRequest } from '../types';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
-  OAUTH_INTENT_COOKIE_PATH,
+  AUTH_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE,
   REAUTH_PROOF_COOKIE,
-  REAUTH_PROOF_COOKIE_PATH,
-  REFRESH_COOKIE_OPTIONS,
   REFRESH_TOKEN_COOKIE
 } from '../constants';
+import {
+  clearRefreshTokenCookie,
+  setRefreshTokenCookie
+} from '../helpers/refresh-cookie.helpers';
 import {
   isValidReauthProof,
   logStepUpFailure,
@@ -309,7 +311,7 @@ router.post('/login', (req, res) => {
   });
 
   const { refresh_token, ...publicTokens } = tokens;
-  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
+  setRefreshTokenCookie(res, refresh_token);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
@@ -746,16 +748,16 @@ router.post('/refresh-token', (req, res) => {
   registerSession(tokens.refresh_token, sessionId);
 
   const { refresh_token, ...publicTokens } = tokens;
-  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
+  setRefreshTokenCookie(res, refresh_token);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
 // Mirrors `clearOAuthLinkCookie` on the server: an abandoned provider link or
 // step-up must not outlive the session that started it.
 function clearOAuthIntentCookies(res: Response): void {
-  res.clearCookie(OAUTH_LINK_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
-  res.clearCookie(OAUTH_REAUTH_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
-  res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+  res.clearCookie(OAUTH_LINK_COOKIE, { path: AUTH_COOKIE_PATH });
+  res.clearCookie(OAUTH_REAUTH_COOKIE, { path: AUTH_COOKIE_PATH });
+  res.clearCookie(REAUTH_PROOF_COOKIE, { path: AUTH_COOKIE_PATH });
 }
 
 // POST /api/v1/auth/logout
@@ -779,7 +781,7 @@ router.post('/logout', authGuard, (req, res) => {
     ip: req.ip
   });
 
-  res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+  clearRefreshTokenCookie(res);
   clearOAuthIntentCookies(res);
   res.setHeader('Clear-Site-Data', '"cache", "cookies"');
   res.json({ message: 'Successfully logged out' });
@@ -929,10 +931,10 @@ router.patch(
           state.revokedRefreshTokens.delete(rt);
         }
       }
-      res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+      clearRefreshTokenCookie(res);
       clearOAuthIntentCookies(res);
       // Cleared only now, so a rejected attempt keeps its remaining proof window.
-      res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+      res.clearCookie(REAUTH_PROOF_COOKIE, { path: AUTH_COOKIE_PATH });
     }
     user.updatedAt = new Date().toISOString();
 
@@ -1012,7 +1014,7 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
 
   // The server clears the proof once the change is accepted, so a rejected
   // attempt keeps its remaining window. Everything above this line rejects.
-  res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+  res.clearCookie(REAUTH_PROOF_COOKIE, { path: AUTH_COOKIE_PATH });
 
   // Uniqueness check: primary email OR pending email on any OTHER user.
   let conflict = false;

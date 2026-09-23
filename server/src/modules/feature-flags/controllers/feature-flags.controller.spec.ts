@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { FeatureFlagsController } from './feature-flags.controller';
 import { createMockRequest } from '../../../common/testing/express.mock';
 import {
@@ -14,6 +15,7 @@ describe('FeatureFlagsController', () => {
     evaluateForUser: jest.Mock;
     evaluateAnonymous: jest.Mock;
   };
+  let environment: string;
 
   const resolverUser: ResolverUser = {
     userId: 'user-1',
@@ -23,6 +25,7 @@ describe('FeatureFlagsController', () => {
   };
 
   beforeEach(async () => {
+    environment = 'production';
     resolver = {
       buildResolverUser: jest.fn().mockResolvedValue(resolverUser),
       evaluateForUser: jest.fn().mockResolvedValue({
@@ -37,7 +40,13 @@ describe('FeatureFlagsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FeatureFlagsController],
-      providers: [{ provide: FeatureFlagResolverService, useValue: resolver }]
+      providers: [
+        { provide: FeatureFlagResolverService, useValue: resolver },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(() => environment) }
+        }
+      ]
     }).compile();
 
     controller = module.get(FeatureFlagsController);
@@ -59,13 +68,36 @@ describe('FeatureFlagsController', () => {
 
   it('falls back to evaluateAnonymous (with anon-id cookie) when req.user is undefined', async () => {
     const req = createMockRequest({
-      cookies: { [ANON_ID_COOKIE]: 'anon-xyz' }
+      cookies: { [`__Host-${ANON_ID_COOKIE}`]: 'anon-xyz' }
     });
 
     await controller.evaluate(req);
 
     expect(resolver.evaluateAnonymous).toHaveBeenCalledWith('anon-xyz', req);
     expect(resolver.evaluateForUser).not.toHaveBeenCalled();
+  });
+
+  // A sibling host can plant the bare name for the parent domain, and would
+  // then pick the rollout bucket of the visitor.
+  it('ignores the bare cookie name outside local', async () => {
+    const req = createMockRequest({
+      cookies: { [ANON_ID_COOKIE]: 'planted' }
+    });
+
+    await controller.evaluate(req);
+
+    expect(resolver.evaluateAnonymous).toHaveBeenCalledWith(null, req);
+  });
+
+  it('reads the bare cookie name in local', async () => {
+    environment = 'local';
+    const req = createMockRequest({
+      cookies: { [ANON_ID_COOKIE]: 'anon-local' }
+    });
+
+    await controller.evaluate(req);
+
+    expect(resolver.evaluateAnonymous).toHaveBeenCalledWith('anon-local', req);
   });
 
   it('passes null anonId when the cookie is absent', async () => {

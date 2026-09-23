@@ -56,7 +56,7 @@ test.describe('Profile init notifications wait for their translations', () => {
         name: 'reauth_proof',
         value: token,
         domain: 'localhost',
-        path: '/api/v1/auth'
+        path: '/'
       }
     ]);
 

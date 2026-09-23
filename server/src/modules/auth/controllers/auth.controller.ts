@@ -71,14 +71,19 @@ import { Request as ExpressRequest } from 'express';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
 import {
-  OAUTH_INTENT_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE,
-  REAUTH_PROOF_COOKIE,
-  REAUTH_PROOF_COOKIE_PATH
+  REAUTH_PROOF_COOKIE
 } from '../constants/oauth.constants';
-
-const REFRESH_TOKEN_COOKIE = 'refresh_token';
+import {
+  clearHostCookie,
+  readHostCookie
+} from '../../../common/utils/host-cookie';
+import {
+  clearRefreshTokenCookie,
+  readRefreshTokenCookie,
+  setRefreshTokenCookie
+} from '../utils/refresh-token-cookie';
 
 @ApiTags('Auth API')
 @Controller({
@@ -107,30 +112,31 @@ export class AuthController {
     private readonly metricsService: MetricsService
   ) {}
 
+  private get secureCookies(): boolean {
+    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
+  }
+
   private setRefreshTokenCookie(res: Response, token: string): void {
     // getOrThrow: a missing value must fail loudly, not silently downgrade
     // the refresh cookie to a session cookie via a NaN maxAge.
     const maxAge =
       Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
       1000;
-    res.cookie(REFRESH_TOKEN_COOKIE, token, {
-      httpOnly: true,
-      secure: requiresSecureCookies(
-        this.configService.get<string>('ENVIRONMENT')
-      ),
-      sameSite: 'strict',
-      path: '/api/v1/auth',
-      maxAge
-    });
+    setRefreshTokenCookie(res, token, maxAge, this.secureCookies);
   }
 
   private clearRefreshTokenCookie(res: Response): void {
-    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+    clearRefreshTokenCookie(res, this.secureCookies);
   }
 
-  // A cookie is identified by name plus path, so the refresh clear above never
-  // touches this one. An abandoned link attempt must not outlive the session
-  // that started it: the callback links whatever identity signs in next.
+  private reauthProof(req: ExpressRequest): string | undefined {
+    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
+  }
+
+  private clearReauthProofCookie(res: Response): void {
+    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
+  }
+
   /**
    * OWASP session guidance: a sign-out asks the browser to drop what it holds
    * for the origin. `storage` is deliberately absent - `auth_user` in
@@ -141,10 +147,12 @@ export class AuthController {
     res.setHeader('Clear-Site-Data', '"cache", "cookies"');
   }
 
+  // An abandoned link attempt must not outlive the session that started it:
+  // the callback links whatever identity signs in next.
   private clearOAuthLinkCookie(res: Response): void {
-    res.clearCookie(OAUTH_LINK_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
-    res.clearCookie(OAUTH_REAUTH_COOKIE, { path: OAUTH_INTENT_COOKIE_PATH });
-    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+    clearHostCookie(res, OAUTH_LINK_COOKIE, this.secureCookies);
+    clearHostCookie(res, OAUTH_REAUTH_COOKIE, this.secureCookies);
+    this.clearReauthProofCookie(res);
   }
 
   @Public()
@@ -229,9 +237,7 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    const cookieToken = (req.cookies as Record<string, string> | undefined)?.[
-      REFRESH_TOKEN_COOKIE
-    ];
+    const cookieToken = readRefreshTokenCookie(req, this.secureCookies);
     if (!cookieToken) {
       throw new UnauthorizedException('Refresh token is required');
     }
@@ -251,9 +257,7 @@ export class AuthController {
     @Request() req: JwtAuthRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    const cookieToken = (req.cookies as Record<string, string> | undefined)?.[
-      REFRESH_TOKEN_COOKIE
-    ];
+    const cookieToken = readRefreshTokenCookie(req, this.secureCookies);
 
     // Per device, not per account. A cookie that never arrived ends nothing
     // server side: the caller asked to sign this device out, and evicting the
@@ -317,9 +321,7 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const reauthProof = (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
+    const reauthProof = this.reauthProof(req);
 
     if (updateProfileDto.password) {
       // A first password binds a credential that outlives the session, so it
@@ -349,7 +351,7 @@ export class AuthController {
       this.clearOAuthLinkCookie(res);
       // Cleared only now, so a rejected attempt keeps its remaining proof
       // window. The logout above already ends the session that carried it.
-      res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+      this.clearReauthProofCookie(res);
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,
@@ -390,9 +392,7 @@ export class AuthController {
     @Body() dto: InitiateEmailChangeDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const proof = (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
+    const proof = this.reauthProof(req);
 
     const result = await this.authService.initiateEmailChange(
       req.user.userId,
@@ -403,7 +403,7 @@ export class AuthController {
 
     // Cleared only after the change is accepted, so a rejected attempt leaves
     // the user their remaining proof window instead of a second round trip.
-    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+    this.clearReauthProofCookie(res);
 
     return result;
   }

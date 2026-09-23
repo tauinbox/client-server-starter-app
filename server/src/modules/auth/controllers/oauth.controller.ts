@@ -61,12 +61,17 @@ import {
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
 import {
-  OAUTH_INTENT_COOKIE_PATH,
+  OAUTH_DATA_COOKIE,
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE,
-  REAUTH_PROOF_COOKIE,
-  REAUTH_PROOF_COOKIE_PATH
+  REAUTH_PROOF_COOKIE
 } from '../constants/oauth.constants';
+import {
+  clearHostCookie,
+  readHostCookie,
+  setHostCookie
+} from '../../../common/utils/host-cookie';
+import { setRefreshTokenCookie } from '../utils/refresh-token-cookie';
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
@@ -89,7 +94,6 @@ export class OAuthController {
   private readonly logger = new Logger(OAuthController.name);
 
   private static readonly OAUTH_LINK_MAX_AGE_SECONDS = 300;
-  private static readonly OAUTH_DATA_COOKIE = 'oauth_data';
   private static readonly OAUTH_DATA_MAX_AGE_SECONDS = 60;
 
   private readonly oauthDataLedger: SingleUseTokenLedger;
@@ -113,6 +117,14 @@ export class OAuthController {
     );
   }
 
+  private get secureCookies(): boolean {
+    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
+  }
+
+  private reauthProof(req: ExpressRequest): string | undefined {
+    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
+  }
+
   // --- Link initiation ---
 
   /**
@@ -132,9 +144,7 @@ export class OAuthController {
     @Body() dto: OAuthLinkInitDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const reauthProof = (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
+    const reauthProof = this.reauthProof(req);
 
     await this.authService.assertStepUpForUser(
       req.user.userId,
@@ -149,19 +159,15 @@ export class OAuthController {
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
-    res.cookie(OAUTH_LINK_COOKIE, linkToken, {
+    setHostCookie(res, OAUTH_LINK_COOKIE, linkToken, this.secureCookies, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: requiresSecureCookies(
-        this.configService.get<string>('ENVIRONMENT')
-      ),
-      path: OAUTH_INTENT_COOKIE_PATH,
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
 
     // Cleared only now, so a rejected attempt keeps its remaining proof
     // window. The ledger already refuses a second use of the value.
-    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
 
     return { message: 'Link initiated' };
   }
@@ -196,13 +202,9 @@ export class OAuthController {
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
-    res.cookie(OAUTH_REAUTH_COOKIE, reauthToken, {
+    setHostCookie(res, OAUTH_REAUTH_COOKIE, reauthToken, this.secureCookies, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: requiresSecureCookies(
-        this.configService.get<string>('ENVIRONMENT')
-      ),
-      path: OAUTH_INTENT_COOKIE_PATH,
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
     });
 
@@ -323,9 +325,7 @@ export class OAuthController {
 
     const userId = req.user.userId;
 
-    const reauthProof = (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
+    const reauthProof = this.reauthProof(req);
 
     await this.authService.assertStepUpForUser(
       userId,
@@ -342,7 +342,7 @@ export class OAuthController {
 
     // Cleared only now, so a rejected attempt keeps its remaining proof
     // window. The ledger already refuses a second use of the value.
-    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
 
     await this.auditService.log({
       action: AuditAction.OAUTH_UNLINK,
@@ -377,13 +377,9 @@ export class OAuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    const cookie = (req.cookies as Record<string, string> | undefined)?.[
-      OAuthController.OAUTH_DATA_COOKIE
-    ];
+    const cookie = readHostCookie(req, OAUTH_DATA_COOKIE, this.secureCookies);
 
-    res.clearCookie(OAuthController.OAUTH_DATA_COOKIE, {
-      path: '/api/v1/auth/oauth'
-    });
+    clearHostCookie(res, OAUTH_DATA_COOKIE, this.secureCookies);
 
     if (!cookie) {
       throw new HttpException(
@@ -440,15 +436,7 @@ export class OAuthController {
         return payload.data;
       }
       const { refresh_token, ...publicTokens } = payload.data.tokens;
-      res.cookie('refresh_token', refresh_token, {
-        httpOnly: true,
-        secure: requiresSecureCookies(
-          this.configService.get<string>('ENVIRONMENT')
-        ),
-        sameSite: 'strict',
-        path: '/api/v1/auth',
-        maxAge
-      });
+      setRefreshTokenCookie(res, refresh_token, maxAge, this.secureCookies);
       return { tokens: publicTokens, user: payload.data.user };
     } catch {
       throw new HttpException(
@@ -467,7 +455,6 @@ export class OAuthController {
     res: Response
   ): Promise<void> {
     try {
-      const cookies = req.cookies as Record<string, string> | undefined;
       const flowState = req.query?.['state'];
 
       // A cookie says which user this round trip is for; only the state says
@@ -475,7 +462,11 @@ export class OAuthController {
       // this callback a plain sign-in. Neither is cleared here: each stays
       // consumable by its own flow, which may still finish. Re-authentication
       // wins a tie because it links nothing.
-      const reauthIntent = cookies?.[OAUTH_REAUTH_COOKIE];
+      const reauthIntent = readHostCookie(
+        req,
+        OAUTH_REAUTH_COOKIE,
+        this.secureCookies
+      );
       const reauthToken = reauthIntent
         ? readIntentForFlow(reauthIntent, flowState)
         : null;
@@ -484,7 +475,11 @@ export class OAuthController {
         return this.handleOAuthReauth(reauthToken, profile, res);
       }
 
-      const linkIntent = cookies?.[OAUTH_LINK_COOKIE];
+      const linkIntent = readHostCookie(
+        req,
+        OAUTH_LINK_COOKIE,
+        this.secureCookies
+      );
       const linkToken = linkIntent
         ? readIntentForFlow(linkIntent, flowState)
         : null;
@@ -531,13 +526,9 @@ export class OAuthController {
         { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
       );
 
-      res.cookie(OAuthController.OAUTH_DATA_COOKIE, signedData, {
+      setHostCookie(res, OAUTH_DATA_COOKIE, signedData, this.secureCookies, {
         httpOnly: true,
         sameSite: 'lax',
-        secure: requiresSecureCookies(
-          this.configService.get<string>('ENVIRONMENT')
-        ),
-        path: '/api/v1/auth/oauth',
         maxAge: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS * 1000
       });
 
@@ -602,9 +593,7 @@ export class OAuthController {
     profile: OAuthUserProfile,
     res: Response
   ): Promise<void> {
-    res.clearCookie(OAUTH_REAUTH_COOKIE, {
-      path: OAUTH_INTENT_COOKIE_PATH
-    });
+    clearHostCookie(res, OAUTH_REAUTH_COOKIE, this.secureCookies);
 
     try {
       const payload = this.jwtService.verify<{
@@ -644,13 +633,9 @@ export class OAuthController {
         { expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS }
       );
 
-      res.cookie(REAUTH_PROOF_COOKIE, proof, {
+      setHostCookie(res, REAUTH_PROOF_COOKIE, proof, this.secureCookies, {
         httpOnly: true,
         sameSite: 'lax',
-        secure: requiresSecureCookies(
-          this.configService.get<string>('ENVIRONMENT')
-        ),
-        path: REAUTH_PROOF_COOKIE_PATH,
         maxAge: REAUTH_PROOF_MAX_AGE_SECONDS * 1000
       });
 
@@ -669,9 +654,7 @@ export class OAuthController {
     req: ExpressRequest,
     res: Response
   ): Promise<void> {
-    res.clearCookie(OAUTH_LINK_COOKIE, {
-      path: OAUTH_INTENT_COOKIE_PATH
-    });
+    clearHostCookie(res, OAUTH_LINK_COOKIE, this.secureCookies);
 
     try {
       const payload = this.jwtService.verify<{

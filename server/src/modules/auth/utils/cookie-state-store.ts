@@ -1,18 +1,27 @@
 import { randomBytes } from 'crypto';
-import type { CookieOptions, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import type OAuth2Strategy from 'passport-oauth2';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import {
-  OAUTH_INTENT_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE
 } from '../constants/oauth.constants';
+import type { HostCookieOptions } from '../../../common/utils/host-cookie';
+import {
+  clearHostCookie,
+  readHostCookie,
+  setHostCookie
+} from '../../../common/utils/host-cookie';
 import { bindIntent, isIntentBound } from './oauth-flow-intent';
 import { timingSafeStringEqual } from './timing-safe-equal';
 
 const COOKIE_NAME_PREFIX = 'oauth_state_';
 const COOKIE_MAX_AGE_MS = 5 * 60 * 1000;
-const COOKIE_PATH = '/api/v1/auth/oauth';
+const COOKIE_OPTIONS: HostCookieOptions = {
+  httpOnly: true,
+  sameSite: 'lax',
+  maxAge: COOKIE_MAX_AGE_MS
+};
 
 /**
  * Hex states and decimal timestamps never contain these, so they separate the
@@ -67,13 +76,13 @@ function serialize(pending: PendingState[]): string {
 }
 
 export class CookieStateStore implements OAuth2Strategy.StateStore {
-  private readonly cookieName: string;
+  private readonly cookieBase: string;
 
   constructor(
     provider: OAuthProvider,
     private readonly secureCookies: boolean
   ) {
-    this.cookieName = `${COOKIE_NAME_PREFIX}${provider}`;
+    this.cookieBase = `${COOKIE_NAME_PREFIX}${provider}`;
   }
 
   store(req: Request, callback: OAuth2Strategy.StateStoreStoreCallback): void;
@@ -127,7 +136,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
       { state, expiresAt: Date.now() + COOKIE_MAX_AGE_MS, verifier }
     ].slice(-MAX_PENDING_STATES);
 
-    res.cookie(this.cookieName, serialize(pending), this.cookieOptions());
+    this.writePendingStates(res, pending);
     this.bindPendingIntents(req, res, state);
 
     callback(null, state);
@@ -178,10 +187,10 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
 
     const remaining = pending.filter((candidate) => candidate !== matched);
     const res = req.res as Response | undefined;
-    if (remaining.length > 0) {
-      res?.cookie(this.cookieName, serialize(remaining), this.cookieOptions());
-    } else {
-      res?.clearCookie(this.cookieName, { path: COOKIE_PATH });
+    if (res && remaining.length > 0) {
+      this.writePendingStates(res, remaining);
+    } else if (res) {
+      clearHostCookie(res, this.cookieBase, this.secureCookies);
     }
 
     const report = callback as PkceVerifyCallback;
@@ -205,28 +214,24 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
    * that.
    */
   private bindPendingIntents(req: Request, res: Response, state: string): void {
-    const cookies = req.cookies as Record<string, string> | undefined;
-
-    for (const name of [OAUTH_LINK_COOKIE, OAUTH_REAUTH_COOKIE]) {
-      const intent = cookies?.[name];
+    for (const base of [OAUTH_LINK_COOKIE, OAUTH_REAUTH_COOKIE]) {
+      const intent = readHostCookie(req, base, this.secureCookies);
       if (!intent || isIntentBound(intent)) {
         continue;
       }
 
-      res.cookie(name, bindIntent(intent, state), {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: this.secureCookies,
-        path: OAUTH_INTENT_COOKIE_PATH,
-        maxAge: COOKIE_MAX_AGE_MS
-      });
+      setHostCookie(
+        res,
+        base,
+        bindIntent(intent, state),
+        this.secureCookies,
+        COOKIE_OPTIONS
+      );
     }
   }
 
   private readPendingStates(req: Request): PendingState[] {
-    const raw = (req.cookies as Record<string, string> | undefined)?.[
-      this.cookieName
-    ];
+    const raw = readHostCookie(req, this.cookieBase, this.secureCookies);
     if (!raw) {
       return [];
     }
@@ -249,13 +254,13 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
       );
   }
 
-  private cookieOptions(): CookieOptions {
-    return {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: this.secureCookies,
-      path: COOKIE_PATH,
-      maxAge: COOKIE_MAX_AGE_MS
-    };
+  private writePendingStates(res: Response, pending: PendingState[]): void {
+    setHostCookie(
+      res,
+      this.cookieBase,
+      serialize(pending),
+      this.secureCookies,
+      COOKIE_OPTIONS
+    );
   }
 }

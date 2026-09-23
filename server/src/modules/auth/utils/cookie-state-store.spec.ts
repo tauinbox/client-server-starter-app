@@ -90,24 +90,52 @@ describe('CookieStateStore', () => {
             httpOnly: true,
             sameSite: 'lax',
             secure: false,
-            path: '/api/v1/auth/oauth'
+            path: '/'
           })
         );
         done();
       });
     });
 
-    it('should set secure cookie in production', (done) => {
+    it('should set a __Host- prefixed secure cookie in production', (done) => {
       const store = new CookieStateStore(OAuthProvider.GOOGLE, true);
       const { req, cookieFn } = mockReqRes();
 
       store.store(req, () => {
         expect(cookieFn).toHaveBeenCalledWith(
-          'oauth_state_google',
+          '__Host-oauth_state_google',
           expect.any(String),
-          expect.objectContaining({ secure: true })
+          expect.objectContaining({ secure: true, path: '/' })
         );
         done();
+      });
+    });
+
+    // A sibling host can plant the bare name for the parent domain.
+    it('should ignore a bare state cookie in production', () => {
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, true);
+      const { req } = mockReqRes({
+        oauth_state_google: pendingCookie('planted')
+      });
+
+      expect(verifySync(store, req, 'planted')).toBe(false);
+    });
+
+    it('should bind a prefixed intent and clear the prefixed state in production', () => {
+      const store = new CookieStateStore(OAuthProvider.GOOGLE, true);
+      const { req, cookies, clearCookieFn } = mockReqRes({
+        '__Host-oauth_link': 'link-token'
+      });
+
+      const state = storeSync(store, req);
+      expect(readIntentForFlow(cookies['__Host-oauth_link'], state)).toBe(
+        'link-token'
+      );
+
+      expect(verifySync(store, req, state)).toBe(true);
+      expect(clearCookieFn).toHaveBeenCalledWith('__Host-oauth_state_google', {
+        secure: true,
+        path: '/'
       });
     });
 
@@ -212,7 +240,8 @@ describe('CookieStateStore', () => {
         expect(err).toBeNull();
         expect(ok).toBe(true);
         expect(clearCookieFn).toHaveBeenCalledWith('oauth_state_google', {
-          path: '/api/v1/auth/oauth'
+          secure: false,
+          path: '/'
         });
         done();
       });
@@ -292,7 +321,8 @@ describe('CookieStateStore', () => {
 
       store.verify(req, 'stateval', () => {
         expect(clearCookieFn).toHaveBeenCalledWith('oauth_state_google', {
-          path: '/api/v1/auth/oauth'
+          secure: false,
+          path: '/'
         });
         done();
       });

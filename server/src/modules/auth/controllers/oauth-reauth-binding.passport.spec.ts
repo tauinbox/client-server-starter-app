@@ -121,7 +121,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
           clientSecret: 'client-secret',
           callbackURL: '/api/v1/auth/oauth/google/callback',
           state: true,
-          store: new CookieStateStore(OAuthProvider.GOOGLE, false)
+          store: new CookieStateStore(OAuthProvider.GOOGLE, true)
         },
         (
           _accessToken: string,
@@ -174,7 +174,10 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
           provide: MailService,
           useValue: { sendOAuthUnlinkedNotification: jest.fn() }
         },
-        { provide: ConfigService, useValue: { get: jest.fn(() => 'test') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(() => 'production') }
+        },
         {
           provide: JwtService,
           useValue: {
@@ -251,19 +254,19 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     // A proof that carries no operation would satisfy every consumer, which is
     // the binding this flow exists to create.
     const jar = new CookieJar();
-    jar.set('oauth_reauth', UNBOUND_REAUTH_TOKEN);
+    jar.set('__Host-oauth_reauth', UNBOUND_REAUTH_TOKEN);
 
     const state = await authorize(jar);
 
     expect(await callback(jar, state)).toBe(
       `${CLIENT}/profile?oauth_error=reauth_failed`
     );
-    expect(jar.get('reauth_proof')).toBeUndefined();
+    expect(jar.get('__Host-reauth_proof')).toBeUndefined();
   });
 
   it('reaches the re-auth branch on a real round trip and mints a proof', async () => {
     const jar = new CookieJar();
-    jar.set('oauth_reauth', REAUTH_TOKEN);
+    jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const state = await authorize(jar);
 
@@ -274,14 +277,14 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
       PROVIDER_ID,
       expect.any(Number)
     );
-    expect(jar.get('reauth_proof')).toBe(SIGNED_PROOF);
-    expect(jar.get('oauth_reauth')).toBeUndefined();
+    expect(jar.get('__Host-reauth_proof')).toBe(SIGNED_PROOF);
+    expect(jar.get('__Host-oauth_reauth')).toBeUndefined();
     expect(loginWithOAuth).not.toHaveBeenCalled();
   });
 
   it('gives the proof a token id, so the ledger can record it as spent', async () => {
     const jar = new CookieJar();
-    jar.set('oauth_reauth', REAUTH_TOKEN);
+    jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const state = await authorize(jar);
     await callback(jar, state);
@@ -297,7 +300,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
 
   it('mints nothing when a second flow presents its own state', async () => {
     const jar = new CookieJar();
-    jar.set('oauth_reauth', REAUTH_TOKEN);
+    jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const abandonedState = await authorize(jar);
     const strangerState = await authorize(jar);
@@ -307,7 +310,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     const target = await callback(jar, strangerState);
 
     expect(assertReauthenticated).not.toHaveBeenCalled();
-    expect(jar.get('reauth_proof')).toBeUndefined();
+    expect(jar.get('__Host-reauth_proof')).toBeUndefined();
     expect(loginWithOAuth).toHaveBeenCalled();
     expect(target).toBe(`${CLIENT}/oauth/callback`);
   });
@@ -316,20 +319,20 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     assertReauthenticated.mockRejectedValue(new Error('not this account'));
 
     const jar = new CookieJar();
-    jar.set('oauth_reauth', REAUTH_TOKEN);
+    jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const state = await authorize(jar);
 
     expect(await callback(jar, state)).toBe(
       `${CLIENT}/profile?oauth_error=reauth_failed`
     );
-    expect(jar.get('reauth_proof')).toBeUndefined();
+    expect(jar.get('__Host-reauth_proof')).toBeUndefined();
   });
 
   it('takes the re-auth branch ahead of a link intent left by an earlier flow', async () => {
     const jar = new CookieJar();
-    jar.set('oauth_link', 'some-link-token');
-    jar.set('oauth_reauth', REAUTH_TOKEN);
+    jar.set('__Host-oauth_link', 'some-link-token');
+    jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const state = await authorize(jar);
 

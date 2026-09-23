@@ -1,5 +1,6 @@
 import type { ExecutionContext, Type } from '@nestjs/common';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { IAuthGuard } from '@nestjs/passport';
 import { AuthGuard } from '@nestjs/passport';
 import { firstValueFrom, isObservable } from 'rxjs';
@@ -11,10 +12,12 @@ import {
   OAUTH_ERROR_REAUTH_FAILED,
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
+import { requiresSecureCookies } from '@app/shared/constants';
 import {
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE
 } from '../constants/oauth.constants';
+import { readHostCookie } from '../../../common/utils/host-cookie';
 
 // Passport rejects with this message only when the provider's credentials
 // are absent and conditionalProvider skipped registering the strategy.
@@ -31,6 +34,9 @@ export function createOAuthProviderGuard(
 ): Type<IAuthGuard> {
   @Injectable()
   class OAuthProviderGuard extends AuthGuard(strategy) {
+    // A property, so the Passport base constructor keeps its own injection.
+    @Inject(ConfigService) private readonly configService: ConfigService;
+
     async canActivate(context: ExecutionContext): Promise<boolean> {
       try {
         const result = super.canActivate(context);
@@ -69,10 +75,14 @@ export function createOAuthProviderGuard(
     ): TUser {
       if (err || !user) {
         const request = context.switchToHttp().getRequest<ExpressRequest>();
+        const intents = intentCookies(
+          request,
+          requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'))
+        );
         throw new OAuthAuthenticationFailedException(
-          resolveErrorKey(request),
+          resolveErrorKey(request, intents),
           err,
-          resolveRedirectPath(request)
+          resolveRedirectPath(intents)
         );
       }
       return user as TUser;
@@ -81,22 +91,29 @@ export function createOAuthProviderGuard(
   return OAuthProviderGuard;
 }
 
-function intentCookies(request: ExpressRequest): {
+interface IntentCookies {
   link: boolean;
   reauth: boolean;
-} {
-  const cookies = request.cookies as Record<string, string> | undefined;
+}
+
+function intentCookies(
+  request: ExpressRequest,
+  secure: boolean
+): IntentCookies {
   return {
-    link: Boolean(cookies?.[OAUTH_LINK_COOKIE]),
-    reauth: Boolean(cookies?.[OAUTH_REAUTH_COOKIE])
+    link: readHostCookie(request, OAUTH_LINK_COOKIE, secure) !== undefined,
+    reauth: readHostCookie(request, OAUTH_REAUTH_COOKIE, secure) !== undefined
   };
 }
 
-function resolveErrorKey(request: ExpressRequest): string {
+function resolveErrorKey(
+  request: ExpressRequest,
+  intents: IntentCookies
+): string {
   // A step-up that ends at the provider changed nothing, and the profile page
   // has a message written for exactly that. The callback reads the reauth
   // intent first too, so a request holding both cookies is a step-up here.
-  if (intentCookies(request).reauth) {
+  if (intents.reauth) {
     return OAUTH_ERROR_REAUTH_FAILED;
   }
   return request.query?.['error'] === PROVIDER_CANCELLED_ERROR
@@ -104,7 +121,6 @@ function resolveErrorKey(request: ExpressRequest): string {
     : OAUTH_ERROR_AUTH_FAILED;
 }
 
-function resolveRedirectPath(request: ExpressRequest): OAuthFailureRedirect {
-  const { link, reauth } = intentCookies(request);
-  return link || reauth ? '/profile' : '/login';
+function resolveRedirectPath(intents: IntentCookies): OAuthFailureRedirect {
+  return intents.link || intents.reauth ? '/profile' : '/login';
 }

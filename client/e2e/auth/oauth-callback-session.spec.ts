@@ -40,7 +40,7 @@ async function arriveAtCallback(
     {
       name: 'oauth_data',
       value: token,
-      url: `${new URL(page.url()).origin}/api/v1/auth/oauth`
+      url: `${new URL(page.url()).origin}/`
     }
   ]);
 

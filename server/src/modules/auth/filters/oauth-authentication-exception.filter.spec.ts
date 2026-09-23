@@ -14,10 +14,14 @@ describe('OAuthAuthenticationExceptionFilter', () => {
   let clearCookie: jest.Mock;
   let host: ArgumentsHost;
   let warn: jest.SpyInstance;
+  let environment: string;
 
   beforeEach(() => {
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-    filter = new OAuthAuthenticationExceptionFilter(clientUrl);
+    environment = 'production';
+    const configService = { get: jest.fn(() => environment) };
+    // @ts-expect-error - partial mock: the filter only reads ConfigService.get
+    filter = new OAuthAuthenticationExceptionFilter(clientUrl, configService);
     redirect = jest.fn();
     clearCookie = jest.fn();
     const mockResponse = { redirect, clearCookie };
@@ -58,8 +62,9 @@ describe('OAuthAuthenticationExceptionFilter', () => {
     expect(redirect).toHaveBeenCalledWith(
       `${clientUrl}/profile?oauth_error=oauth_cancelled`
     );
-    expect(clearCookie).toHaveBeenCalledWith('oauth_link', {
-      path: '/api/v1/auth/oauth'
+    expect(clearCookie).toHaveBeenCalledWith('__Host-oauth_link', {
+      secure: true,
+      path: '/'
     });
   });
 
@@ -76,8 +81,33 @@ describe('OAuthAuthenticationExceptionFilter', () => {
     expect(redirect).toHaveBeenCalledWith(
       `${clientUrl}/profile?oauth_error=reauth_failed`
     );
+    expect(clearCookie).toHaveBeenCalledWith('__Host-oauth_reauth', {
+      secure: true,
+      path: '/'
+    });
+  });
+
+  // The browser keeps a `__Host-` cookie whose expiring write lacks Secure,
+  // and `local` runs on plain HTTP under the bare name.
+  it('clears the bare names without Secure in local', () => {
+    environment = 'local';
+
+    filter.catch(
+      new OAuthAuthenticationFailedException(
+        OAUTH_ERROR_REAUTH_FAILED,
+        undefined,
+        '/profile'
+      ),
+      host
+    );
+
+    expect(clearCookie).toHaveBeenCalledWith('oauth_link', {
+      secure: false,
+      path: '/'
+    });
     expect(clearCookie).toHaveBeenCalledWith('oauth_reauth', {
-      path: '/api/v1/auth/oauth'
+      secure: false,
+      path: '/'
     });
   });
 

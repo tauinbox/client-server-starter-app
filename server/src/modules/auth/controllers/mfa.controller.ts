@@ -46,13 +46,13 @@ import {
 } from '../dtos/mfa.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
-import {
-  REAUTH_PROOF_COOKIE,
-  REAUTH_PROOF_COOKIE_PATH
-} from '../constants/oauth.constants';
+import { REAUTH_PROOF_COOKIE } from '../constants/oauth.constants';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
-
-const REFRESH_TOKEN_COOKIE = 'refresh_token';
+import {
+  clearHostCookie,
+  readHostCookie
+} from '../../../common/utils/host-cookie';
+import { setRefreshTokenCookie } from '../utils/refresh-token-cookie';
 
 @ApiTags('Auth API')
 @Controller({
@@ -70,25 +70,19 @@ export class MfaController {
     private readonly metricsService: MetricsService
   ) {}
 
+  private get secureCookies(): boolean {
+    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
+  }
+
   private setRefreshTokenCookie(res: Response, token: string): void {
     const maxAge =
       Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
       1000;
-    res.cookie(REFRESH_TOKEN_COOKIE, token, {
-      httpOnly: true,
-      secure: requiresSecureCookies(
-        this.configService.get<string>('ENVIRONMENT')
-      ),
-      sameSite: 'strict',
-      path: '/api/v1/auth',
-      maxAge
-    });
+    setRefreshTokenCookie(res, token, maxAge, this.secureCookies);
   }
 
   private reauthProof(req: ExpressRequest): string | undefined {
-    return (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
+    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
   }
 
   /**
@@ -97,7 +91,7 @@ export class MfaController {
    * value; this stops the browser from holding a credential that is spent.
    */
   private clearReauthProofCookie(res: Response): void {
-    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
   }
 
   @Throttle(CHALLENGE_THROTTLE)

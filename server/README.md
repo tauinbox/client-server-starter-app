@@ -450,7 +450,8 @@ the caller.
 
 `middleware/anon-id.middleware.ts` issues the `nxs_anon_id` cookie at the first request. The cookie
 uses `SameSite=Lax`, `Secure` in each environment other than `local`, a life of 1 year and
-`httpOnly=true`.
+`httpOnly=true`. Outside `local` its name is `__Host-nxs_anon_id`; a visitor who still holds the bare
+name keeps its value, and the middleware clears the bare cookie.
 
 `events/feature-flag-changed.event.ts` holds
 `{ flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }`.
@@ -1476,8 +1477,7 @@ arguments of the PKCE form, and `verify` takes four.
 
 **The link intent also ends with the session.** `POST /auth/logout` clears the `oauth_link` cookie,
 and so does a self-service password change, which revokes the sessions for the same reason. The
-refresh-token clear cannot do it, because a cookie has a path and the two cookies sit on different
-paths: `/api/v1/auth` and `/api/v1/auth/oauth`. `linkOAuthToUser` also refuses a link token whose
+refresh-token clear removes only the refresh cookie, so each handler clears the intent by name. `linkOAuthToUser` also refuses a link token whose
 `iat` is earlier than `User.tokenRevokedAt`, which is the comparison the JWT strategy makes. That leg
 holds when the cookie reaches the callback from a different tab or a different device, and it fires
 only on the paths that still write that column: a password change, a password reset, an administrator
@@ -1493,7 +1493,7 @@ provider (`auth/providers/client-url.provider.ts`), which the controller and the
 
 **The OAuth state is scoped for each provider and for each flow in progress.** `CookieStateStore`
 writes an `oauth_state_<provider>` cookie. The cookie is `httpOnly`, uses `sameSite: 'lax'` and the
-path `/api/v1/auth/oauth`. Its value is a list of a maximum of 5 `<state>-<expiresAt>-<verifier>`
+path `/`. Its value is a list of a maximum of 5 `<state>-<expiresAt>-<verifier>`
 entries. The verifier is base64url and can contain `-`, so it is the last field and is read as the
 remainder of the entry.
 
@@ -2319,9 +2319,9 @@ The value of the cookie seeds the hash of the percentage bucket. Thus a 10 % rol
 converges on the same 10 % of anonymous browsers across reloads.
 
 > **An anonymous percentage rollout is deterministic but the client can control it. It is not a
-> security boundary.** The bucket key of an anonymous caller is the `nxs_anon_id` cookie, which is
-> `httpOnly: false`. Thus JavaScript can read it and write it, and a client can rotate the cookie
-> until it lands in a targeted bucket.
+> security boundary.** The bucket key of an anonymous caller is the `nxs_anon_id` cookie. It is
+> `httpOnly`, but the user controls the browser, so a client can delete the cookie until it lands in
+> a targeted bucket.
 >
 > This is acceptable by design. An anonymous caller sees only a flag with `public: true`. A sensitive
 > feature must require authentication. The bucketing then keys on the `userId` value, which is
