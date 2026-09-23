@@ -383,8 +383,11 @@ export class RoleService {
         roleId: id
       });
     }
-    await this.invalidateUsersWithRole(id);
+    // Invalidate after the remove, or a holder read in between re-caches the
+    // deleted grants for the TTL. Holders are read first: the remove cascades.
+    const holderIds = await this.findHolderIds(id);
     await this.roleRepository.remove(role);
+    await this.invalidateHolders(holderIds);
   }
 
   /**
@@ -644,13 +647,20 @@ export class RoleService {
   }
 
   private async invalidateUsersWithRole(roleId: string): Promise<void> {
+    await this.invalidateHolders(await this.findHolderIds(roleId));
+  }
+
+  private async findHolderIds(roleId: string): Promise<string[]> {
     const users = await this.roleRepository.manager
       .createQueryBuilder(User, 'user')
       .select('user.id')
       .innerJoin('user.roles', 'role', 'role.id = :roleId', { roleId })
       .getMany();
-    if (users.length === 0) return;
-    const userIds = users.map((u) => u.id);
+    return users.map((u) => u.id);
+  }
+
+  private async invalidateHolders(userIds: string[]): Promise<void> {
+    if (userIds.length === 0) return;
     await Promise.all(
       userIds.map((id) => this.permissionService.invalidateUserCache(id))
     );
