@@ -43,6 +43,7 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
@@ -101,6 +102,7 @@ export class OAuthController {
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
+    private readonly metricsService: MetricsService,
     @Inject(CLIENT_URL) private readonly clientUrl: string,
     @Inject(CACHE_MANAGER) cache: Cache
   ) {
@@ -491,10 +493,28 @@ export class OAuthController {
         return this.handleOAuthLink(linkToken, profile, req, res);
       }
 
+      const auditContext = extractAuditContext(req);
       const result = await this.oauthService.loginWithOAuth(
         profile,
-        normalizeUserAgent(req.headers['user-agent'])
+        normalizeUserAgent(req.headers['user-agent']),
+        auditContext
       );
+
+      // A challenge is not a sign-in yet: POST /auth/mfa/verify writes the
+      // success row when it finishes one. Fire-and-forget, because the session
+      // already exists and an audit outage must not redirect to a failure.
+      if (!('mfaRequired' in result)) {
+        this.auditService.logFireAndForget({
+          action: AuditAction.USER_LOGIN_SUCCESS,
+          actorId: result.user.id,
+          actorEmail: result.user.email,
+          targetId: result.user.id,
+          targetType: 'User',
+          details: { method: 'oauth', provider: profile.provider },
+          context: auditContext
+        });
+        this.metricsService.recordAuthEvent('login_success');
+      }
 
       // Serialize here, not at /exchange: the cookie payload is plain JSON, so
       // an entity signed as-is would be echoed verbatim past any interceptor.
@@ -523,6 +543,7 @@ export class OAuthController {
 
       res.redirect(`${this.clientUrl}/oauth/callback`);
     } catch (error) {
+      this.auditOAuthLoginFailure(profile, error, req);
       if (error instanceof OAuthAuthenticationFailedException) {
         this.logger.warn(`${error.message} via ${profile.provider}`);
         res.redirect(`${this.clientUrl}/login?oauth_error=${error.oauthError}`);
@@ -541,6 +562,30 @@ export class OAuthController {
       this.logger.error('OAuth callback error', error);
       res.redirect(`${this.clientUrl}/login?oauth_error=auth_failed`);
     }
+  }
+
+  /**
+   * No field of the provider profile beyond its name enters the row: the
+   * address is the provider's claim, not an identity this server verified.
+   */
+  private auditOAuthLoginFailure(
+    profile: OAuthUserProfile,
+    error: unknown,
+    req: ExpressRequest
+  ): void {
+    let reason = 'unexpected_error';
+    if (error instanceof OAuthAuthenticationFailedException) {
+      reason = error.oauthError;
+    } else if (error instanceof HttpException) {
+      reason =
+        (error.getResponse() as { errorKey?: string })?.errorKey ?? reason;
+    }
+    this.auditService.logFireAndForget({
+      action: AuditAction.USER_LOGIN_FAILURE,
+      details: { method: 'oauth', provider: profile.provider, reason },
+      context: extractAuditContext(req)
+    });
+    this.metricsService.recordAuthEvent('login_failure');
   }
 
   /**

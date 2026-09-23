@@ -15,6 +15,8 @@ import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MfaService } from './mfa.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
 import {
@@ -66,6 +68,9 @@ describe('OAuthService', () => {
   };
   let mockMfaService: {
     issuePendingToken: jest.Mock;
+  };
+  let mockMetricsService: {
+    recordAuthEvent: jest.Mock;
   };
   let mockMailService: {
     sendEmailVerification: jest.Mock;
@@ -171,6 +176,8 @@ describe('OAuthService', () => {
       logFireAndForget: jest.fn()
     };
 
+    mockMetricsService = { recordAuthEvent: jest.fn() };
+
     mockMailService = {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined),
       sendOAuthLinkedNotification: jest.fn().mockResolvedValue(undefined)
@@ -203,7 +210,8 @@ describe('OAuthService', () => {
         { provide: TokenGeneratorService, useValue: mockTokenGenerator },
         { provide: AuditService, useValue: mockAuditService },
         { provide: MailService, useValue: mockMailService },
-        { provide: MfaService, useValue: mockMfaService }
+        { provide: MfaService, useValue: mockMfaService },
+        { provide: MetricsService, useValue: mockMetricsService }
       ]
     }).compile();
 
@@ -740,6 +748,48 @@ describe('OAuthService', () => {
       expect(result.user).toBeDefined();
       // New OAuth user response carries RoleResponse[] (not string[]).
       expect(result.user.roles).toEqual([mockUserRole]);
+    });
+
+    it('records a registration row and metric for an account the provider creates', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+      mockManager.save.mockResolvedValueOnce(oauthUser).mockResolvedValueOnce({
+        id: 'oauth-account-1',
+        userId: 'oauth-user-1',
+        provider: 'google',
+        providerId: 'google-123'
+      });
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
+      const context = { ip: '203.0.113.7', requestId: 'req-1' };
+
+      await service.loginWithOAuth(oauthProfile, null, context);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledTimes(1);
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.USER_REGISTER,
+        actorId: 'oauth-user-1',
+        actorEmail: 'oauth@example.com',
+        targetId: 'oauth-user-1',
+        targetType: 'User',
+        details: { provider: 'google' },
+        context
+      });
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+        'register'
+      );
+    });
+
+    it('records no registration row when the provider identity is already linked', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
+
+      await service.loginWithOAuth(oauthProfile, null);
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+      expect(mockMetricsService.recordAuthEvent).not.toHaveBeenCalled();
     });
 
     // When the provider does NOT assert email verification (e.g. VK, or

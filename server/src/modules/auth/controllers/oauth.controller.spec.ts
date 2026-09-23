@@ -10,6 +10,7 @@ import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuthService } from '../services/auth.service';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
@@ -111,6 +112,7 @@ describe('OAuthController', () => {
     log: jest.Mock;
     logFireAndForget: jest.Mock;
   };
+  let metricsServiceMock: { recordAuthEvent: jest.Mock };
   let mailServiceMock: { sendOAuthUnlinkedNotification: jest.Mock };
   let authServiceMock: { assertStepUpForUser: jest.Mock };
   let configValues: Record<string, string | undefined>;
@@ -149,6 +151,8 @@ describe('OAuthController', () => {
       logFireAndForget: jest.fn()
     };
 
+    metricsServiceMock = { recordAuthEvent: jest.fn() };
+
     authServiceMock = {
       assertStepUpForUser: jest.fn().mockResolvedValue(undefined)
     };
@@ -166,6 +170,7 @@ describe('OAuthController', () => {
         { provide: OAuthService, useValue: oauthServiceMock },
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
         { provide: AuditService, useValue: auditServiceMock },
+        { provide: MetricsService, useValue: metricsServiceMock },
         { provide: MailService, useValue: mailServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: CACHE_MANAGER, useValue: createMockCache() },
@@ -609,6 +614,7 @@ describe('OAuthController', () => {
 
       expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
         profile,
+        expect.anything(),
         expect.anything()
       );
       expect(res.redirect).toHaveBeenCalledWith(
@@ -687,6 +693,103 @@ describe('OAuthController', () => {
 
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/login?oauth_error=auth_failed'
+      );
+    });
+
+    describe('audit trail', () => {
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '123',
+        email: 'provider-claim@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        emailVerified: true
+      };
+
+      it('records a success row and metric for a completed sign-in', async () => {
+        oauthServiceMock.loginWithOAuth.mockResolvedValue({
+          tokens: { access_token: 'a', refresh_token: 'r', expires_in: 3600 },
+          user: { id: 'user-1', email: 'owner@example.com' }
+        });
+
+        await controller.googleCallback(
+          mockExpressRequest(profile),
+          mockResponse()
+        );
+
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+          action: AuditAction.USER_LOGIN_SUCCESS,
+          actorId: 'user-1',
+          actorEmail: 'owner@example.com',
+          targetId: 'user-1',
+          targetType: 'User',
+          details: { method: 'oauth', provider: OAuthProvider.GOOGLE },
+          context: { ip: '127.0.0.1', requestId: undefined }
+        });
+        expect(auditServiceMock.log).not.toHaveBeenCalled();
+        expect(metricsServiceMock.recordAuthEvent).toHaveBeenCalledWith(
+          'login_success'
+        );
+      });
+
+      it('records no success row when the answer is a second-factor challenge', async () => {
+        oauthServiceMock.loginWithOAuth.mockResolvedValue({
+          mfaRequired: true,
+          mfaToken: 'pending-token',
+          expiresIn: 300
+        });
+
+        await controller.googleCallback(
+          mockExpressRequest(profile),
+          mockResponse()
+        );
+
+        expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
+        expect(metricsServiceMock.recordAuthEvent).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        [
+          'a refused provider profile',
+          new OAuthAuthenticationFailedException(OAUTH_ERROR_NO_EMAIL),
+          OAUTH_ERROR_NO_EMAIL
+        ],
+        [
+          'a deactivated account',
+          new HttpException(
+            {
+              message: 'User account is deactivated',
+              errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
+            },
+            HttpStatus.UNAUTHORIZED
+          ),
+          ErrorKeys.AUTH.USER_DEACTIVATED
+        ],
+        ['an unexpected error', new Error('DB error'), 'unexpected_error']
+      ])(
+        'records a failure row for %s without the provider address',
+        async (_label, error, reason) => {
+          oauthServiceMock.loginWithOAuth.mockRejectedValue(error);
+
+          await controller.googleCallback(
+            mockExpressRequest(profile),
+            mockResponse()
+          );
+
+          expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+            action: AuditAction.USER_LOGIN_FAILURE,
+            details: {
+              method: 'oauth',
+              provider: OAuthProvider.GOOGLE,
+              reason
+            },
+            context: { ip: '127.0.0.1', requestId: undefined }
+          });
+          expect(metricsServiceMock.recordAuthEvent).toHaveBeenCalledWith(
+            'login_failure'
+          );
+        }
       );
     });
 
@@ -831,7 +934,8 @@ describe('OAuthController', () => {
 
       expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
         profile,
-        'Mozilla/5.0 Test'
+        'Mozilla/5.0 Test',
+        { ip: '127.0.0.1', requestId: undefined }
       );
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
     });
@@ -867,7 +971,8 @@ describe('OAuthController', () => {
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
       expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
         profile,
-        'Mozilla/5.0 Test'
+        'Mozilla/5.0 Test',
+        { ip: '127.0.0.1', requestId: undefined }
       );
       // The abandoned flow may still finish, so its intent is left in place.
       expect(res.clearCookie).not.toHaveBeenCalled();
@@ -899,7 +1004,8 @@ describe('OAuthController', () => {
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
       expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
         profile,
-        'Mozilla/5.0 Test'
+        'Mozilla/5.0 Test',
+        { ip: '127.0.0.1', requestId: undefined }
       );
     });
   });
