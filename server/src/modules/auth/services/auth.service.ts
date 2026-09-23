@@ -480,24 +480,41 @@ export class AuthService {
     // Without a transaction, a failure between steps could leave the account in an
     // inconsistent state (e.g. password changed but old sessions still active).
     await withTransaction(this.dataSource, async (manager) => {
-      await manager.update(User, user.id, {
-        password: hashedPassword,
-        passwordResetToken: null,
-        passwordResetExpiresAt: null,
-        // Reset also cancels any in-flight self-service email change — proof
-        // of email ownership is invalidated when password ownership changes.
-        pendingEmail: null,
-        pendingEmailToken: null,
-        pendingEmailExpiresAt: null,
-        // Proving mailbox ownership outranks the failed-guess counter: without
-        // this the reset succeeds and the new password is still answered 423.
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        // Redeeming the token is the same proof of mailbox control that the
-        // verification link carries: it is only ever mailed to user.email.
-        isEmailVerified: true,
-        tokenRevokedAt: new Date()
-      });
+      // Keyed on the token too: a password change or an ownership change that
+      // lands between the lookup above and this write clears the token, and
+      // the stale reset must then lose instead of overwriting it. The throw
+      // stays inside the transaction so the session delete rolls back with it.
+      const consumed = await manager.update(
+        User,
+        { id: user.id, passwordResetToken: hashedToken },
+        {
+          password: hashedPassword,
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+          // Reset also cancels any in-flight self-service email change — proof
+          // of email ownership is invalidated when password ownership changes.
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpiresAt: null,
+          // Proving mailbox ownership outranks the failed-guess counter: without
+          // this the reset succeeds and the new password is still answered 423.
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          // Redeeming the token is the same proof of mailbox control that the
+          // verification link carries: it is only ever mailed to user.email.
+          isEmailVerified: true,
+          tokenRevokedAt: new Date()
+        }
+      );
+      if (consumed.affected === 0) {
+        throw new HttpException(
+          {
+            message: 'Invalid or expired password reset token',
+            errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
       await manager.delete(RefreshToken, { userId: user.id });
     });
 
@@ -907,6 +924,10 @@ export class AuthService {
             pendingEmail: null,
             pendingEmailToken: null,
             pendingEmailExpiresAt: null,
+            // A reset link mailed to the old address must not take the account
+            // once that address is no longer the one on the row.
+            passwordResetToken: null,
+            passwordResetExpiresAt: null,
             tokenRevokedAt: new Date()
           });
           await manager.delete(RefreshToken, { userId: user.id });

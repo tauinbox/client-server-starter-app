@@ -857,7 +857,7 @@ describe('UsersService', () => {
       expect(manager.softRemove).toHaveBeenCalledWith(mockUser);
     });
 
-    it('should clear pending email fields and soft-delete in one transaction', async () => {
+    it('should clear mailed tokens and soft-delete in one transaction', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const manager = mockRemoveTransaction();
 
@@ -867,7 +867,9 @@ describe('UsersService', () => {
       expect(manager.update).toHaveBeenCalledWith(User, 'user-1', {
         pendingEmail: null,
         pendingEmailToken: null,
-        pendingEmailExpiresAt: null
+        pendingEmailExpiresAt: null,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null
       });
       // The pending-field clear must not run outside the transaction.
       expect(mockRepository.update).not.toHaveBeenCalled();

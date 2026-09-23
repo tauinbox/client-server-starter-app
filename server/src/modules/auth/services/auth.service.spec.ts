@@ -33,6 +33,7 @@ import { SessionIssuerService } from './session-issuer.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 import { createMockCache } from '../../../common/testing/cache.mock';
+import { hashToken } from '../../../common/utils/hash-token';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -1203,7 +1204,7 @@ describe('AuthService', () => {
       // Password update + token clear + session revocation in one manager.update call
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(), // User entity class
-        'user-1',
+        { id: 'user-1', passwordResetToken: hashToken('valid-token') },
         expect.objectContaining({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           password: expect.any(String), // bcrypt hash
@@ -1240,7 +1241,7 @@ describe('AuthService', () => {
 
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(),
-        'user-1',
+        { id: 'user-1', passwordResetToken: hashToken('valid-token') },
         expect.objectContaining({ failedLoginAttempts: 0, lockedUntil: null })
       );
     });
@@ -1259,9 +1260,30 @@ describe('AuthService', () => {
 
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(),
-        'user-1',
+        { id: 'user-1', passwordResetToken: hashToken('valid-token') },
         expect.objectContaining({ isEmailVerified: true })
       );
+    });
+
+    // Regression: the write was keyed on the id only, so a password change
+    // that landed during the breach lookup was overwritten by the stale reset
+    it('should refuse the reset when the token was cleared after the lookup', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+      mockManager.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.resetPassword('valid-token', 'NewPassword1')
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN }
+      });
+      expect(mockManager.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendPasswordChangedNotification
+      ).not.toHaveBeenCalled();
     });
 
     it('should throw 400 when token not found', async () => {
