@@ -9,6 +9,7 @@ import {
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
+  REFRESH_REUSE_GRACE_MS,
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
   VERIFICATION_TOKEN_EXPIRY_MS
@@ -37,6 +38,7 @@ import {
   findUserById,
   getPackedRulesForUser,
   getState,
+  isLostResponseReplay,
   isMfaMandatoryFor,
   logAudit,
   registerSession,
@@ -628,6 +630,23 @@ router.post('/refresh-token', (req, res) => {
   // possible compromise: revoke ALL sessions for the user.
   const reusedUserId = state.revokedRefreshTokens.get(cookieToken);
   if (reusedUserId) {
+    // A lost rotation response replays the old cookie. End only this
+    // session and issue nothing, so a thief gains no token either.
+    if (isLostResponseReplay(cookieToken, REFRESH_REUSE_GRACE_MS)) {
+      endSessionOfToken(cookieToken);
+      logAudit('TOKEN_REFRESH_FAILURE', {
+        actorId: reusedUserId,
+        details: { reason: 'predecessor_replay_in_grace' },
+        ip: req.ip
+      });
+      res.status(401).json({
+        message: 'Invalid refresh token',
+        statusCode: 401,
+        errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      });
+      return;
+    }
+
     logAudit('TOKEN_REUSE_DETECTED', {
       actorId: reusedUserId,
       targetId: reusedUserId,
@@ -720,6 +739,7 @@ router.post('/refresh-token', (req, res) => {
   // device still holds keeps working.
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
+  state.rotatedTo.set(cookieToken, tokens.refresh_token);
   // The binding of the revoked ancestor stays: a session ends as a whole, and
   // `endSessionOfToken` needs the ancestors to clear the reuse-detection map
   // too. Liveness reads the active map only, so this keeps nothing alive.

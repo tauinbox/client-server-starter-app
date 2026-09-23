@@ -71,6 +71,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     sessionUserAgents: state.sessionUserAgents.size,
     sessionLastActive: state.sessionLastActive.size,
     revokedRefreshTokens: state.revokedRefreshTokens.size,
+    rotatedTo: state.rotatedTo.size,
     emailVerificationTokens: state.emailVerificationTokens.size,
     passwordResetTokens: state.passwordResetTokens.size,
     pendingEmailTokens: state.pendingEmailTokens.size,
