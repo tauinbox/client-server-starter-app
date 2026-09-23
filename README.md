@@ -1159,7 +1159,8 @@ Services:
   The build uses `--base-href /nexus/`, and `docker build --build-arg BASE_HREF=/` changes it. The
   service joins the `default` network and the external `shared` network. The compose file declares
   `shared`, and no person attaches it manually. Thus the proxy stays reachable after a recreate of a
-  container.
+  container. Its access log records paths only, without the query string or the `Referer`, because the
+  mailed verification, reset and email-change links carry a one-time token in the query.
 - **prometheus** is prom/prometheus:v3.12.0. It is on the internal network only and exposes no port.
   It scrapes `/metrics` each 15 s and keeps the data 30 days. Its configuration is
   `monitoring/prometheus.yml`.

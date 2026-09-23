@@ -189,6 +189,10 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
+      # The self-test runs first so a check that has stopped detecting
+      # anything fails loudly instead of passing.
+      - run: node scripts/check-nginx-log-redaction.mjs --self-test
+      - run: npm run check:nginx-log
       # Covers src/ under both project configs. `e2e/` is typechecked in the
       # Client E2E job instead, since its fixtures import mock-server sources
       # and this job does not install that workspace.
