@@ -310,6 +310,18 @@ describe('RoleService', () => {
       expect(mockRoleRepo.remove).toHaveBeenCalledWith(customRole);
     });
 
+    it('should read the members before the remove and invalidate after it', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      await service.delete('role-2');
+      const [read] = mockUserQueryBuilder.getMany.mock.invocationCallOrder;
+      const [remove] = mockRoleRepo.remove.mock.invocationCallOrder;
+      const [invalidate] =
+        mockPermissionService.invalidateUserCache.mock.invocationCallOrder;
+      expect(read).toBeLessThan(remove);
+      expect(remove).toBeLessThan(invalidate);
+    });
+
     it('should delete a custom role with no members without calling invalidate', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await service.delete('role-2');
@@ -1533,10 +1545,14 @@ describe('RoleService', () => {
       await service.delete('role-2');
 
       expectFannedOutTo(['u-1', 'u-2']);
-      // Holder query must run before the role is removed.
-      const emitOrder = mockEventEmitter.emit.mock.invocationCallOrder[0];
+      // The remove cascades to user_roles, so the holders are read before it;
+      // the refetch the event triggers must see the role gone.
+      const queryOrder =
+        mockUserQueryBuilder.getMany.mock.invocationCallOrder[0];
       const removeOrder = mockRoleRepo.remove.mock.invocationCallOrder[0];
-      expect(emitOrder).toBeLessThan(removeOrder);
+      const emitOrder = mockEventEmitter.emit.mock.invocationCallOrder[0];
+      expect(queryOrder).toBeLessThan(removeOrder);
+      expect(emitOrder).toBeGreaterThan(removeOrder);
     });
 
     it('does not emit when the role has no holders', async () => {
