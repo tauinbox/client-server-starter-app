@@ -83,6 +83,15 @@ export const MIN_JWT_EXPIRATION_SECONDS = 2 * TOKEN_REFRESH_WINDOW_SECONDS;
 export const DEFAULT_SESSION_ABSOLUTE_MAX_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
+ * How long after a rotation a replay of the rotated token reads as a lost
+ * response instead of a theft. Inside this window, and only while the
+ * successor is still unused, the replay ends its own session and no other.
+ * A longer value widens the time in which a stolen token is recorded as a
+ * refresh failure and not as reuse.
+ */
+export const REFRESH_REUSE_GRACE_MS = 60 * 1000;
+
+/**
  * How long a step-up re-authentication proof stays usable. A sensitive change
  * must follow the proof closely, so this is much shorter than a session.
  */
