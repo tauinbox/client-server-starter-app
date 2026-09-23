@@ -1004,7 +1004,7 @@ list is the heaviest page, and it repeatedly came near to the default limit of 3
 
 **Live RBAC and authentication regression net.** The suite holds these specs:
 
-- refresh-token reuse detection (`refresh-token-reuse.spec.ts`)
+- refresh-token reuse detection, and a lost rotation response that signs out only its own device (`refresh-token-reuse.spec.ts`)
 - role revocation through SSE hides the admin link (`role-revocation-via-sse.spec.ts`)
 - an administrator on `/admin` goes to `/forbidden` (`admin/admin-panel-permission-loss.spec.ts`)
 - a reactive 401 causes a refresh and a retry (`reactive-token-refresh.spec.ts`)
