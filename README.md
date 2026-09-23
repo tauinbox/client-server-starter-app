@@ -1521,7 +1521,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
-| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target. A password change or a change to a different email needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller. This applies to every target, the caller's own record included |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and an email change or a deactivation clears the same five fields. A password change or a change to a different email needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller. This applies to every target, the caller's own record included |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/roles` | `roles:create` | Create a role |
@@ -1901,6 +1901,8 @@ a second request to the registry for a verdict that gates nothing.
   its profile but gets 403 `errors.auth.mfaEnrolmentRequired` from every authorized route until it
   enrols.
 - A **password reset token** is single-use and expires in 30 minutes. The reset revokes each session.
+  An email change, a deactivation and a soft delete clear the token, thus a link mailed to a
+  previous address does not take the account, and a re-activation or a restore does not revive it.
 - An **administrator password change** immediately revokes each session of the target user.
 - **Each password change voids the mailed proofs of ownership.** The self-service change and the
   administrator change both clear `passwordResetToken`, `passwordResetExpiresAt` and the

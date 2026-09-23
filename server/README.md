@@ -1575,6 +1575,10 @@ taken address gives the same response shape.
 The server clears the `pendingEmail*` fields that are in progress on a `resetPassword` call, on an
 administrator email change, on a deactivation (`isActive` set to false), on a soft delete, and on
 `UserDeletedEvent`. A re-activation does not restore a cancelled change. The user starts a new one.
+The same writes also clear `passwordResetToken` and `passwordResetExpiresAt`, and so does the
+self-service confirmation. Thus a reset link mailed to the previous address, or before a deactivation
+or a delete, does not take the account. `resetPassword` keys its write on the token hash, thus a
+concurrent password change that clears the token wins, and the reset answers 400.
 
 A partial unique index on `LOWER(pending_email)`, plus the dual-email checks in `register`,
 `users.create`, `users.update` and the OAuth sign-up, keep the set of `{email}` and `{pendingEmail}` globally unique
@@ -2397,7 +2401,7 @@ name as the gate. Thus a later reader can go from the code to the configuration 
 | GET | `/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. `isActive` and `includeDeleted` accept `true` or `false` only, and each other value is a 400 |
 | GET | `/:id` | `users:read` | Get a user by ID |
 | GET | `/:id/permissions` | `users:read` | Get the effective permissions of a user: the roles, the resolved permissions and the packed CASL rules |
-| PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, a real email move and a deactivation each revoke each session of the target. A real email move also writes a second audit row, `USER_EMAIL_CHANGE_COMPLETE` with `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row records field names only. The server does not mail the previous address, because this path recovers an account whose address an attacker holds. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target |
+| PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, a real email move and a deactivation each revoke each session of the target. A real email move also writes a second audit row, `USER_EMAIL_CHANGE_COMPLETE` with `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row records field names only. The server does not mail the previous address, because this path recovers an account whose address an attacker holds. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and a real email move or a deactivation clears the same five fields |
 | DELETE | `/:id` | `users:delete` | Soft-delete a user. It sets `deleted_at` and revokes each active session |
 | POST | `/:id/restore` | `users:delete` | Restore a soft-deleted user. It clears `deleted_at` and sets `isActive=true` |
 
