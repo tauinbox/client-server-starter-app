@@ -1,7 +1,8 @@
 import type { Server } from 'http';
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
-  ErrorKeys
+  ErrorKeys,
+  REFRESH_REUSE_GRACE_MS
 } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
@@ -228,13 +229,82 @@ describe('refresh-token failure parity', () => {
 
     const rotated = await refresh(session);
     expect(rotated.status).toBe(200);
+    const next: Session = {
+      userId: session.userId,
+      refreshCookie: refreshCookieOf(rotated)
+    };
+    expect((await refresh(next)).status).toBe(200);
 
     const replay = await refresh(session);
+    expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
     expect(replay.status).toBe(401);
     // Another cookie (the anonymous id) rides on every response, so the
     // assertion has to name the refresh cookie.
     expect(replay.headers.get('set-cookie') ?? '').not.toContain(
       'refresh_token='
     );
+  });
+
+  describe('lost rotation response', () => {
+    function shiftLastActive(ms: number): void {
+      const lastActive = getState().sessionLastActive;
+      for (const [sid, at] of lastActive.entries())
+        lastActive.set(sid, at - ms);
+    }
+
+    it('ends only the replayed session inside the grace window', async () => {
+      const phone = await signIn();
+      const desktop = await signIn();
+
+      expect((await refresh(phone)).status).toBe(200);
+
+      const replay = await refresh(phone);
+      expect(replay.status).toBe(401);
+      expect(await replay.json()).toEqual({
+        message: 'Invalid refresh token',
+        statusCode: 401,
+        errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      });
+      expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
+      const rows = auditRows('TOKEN_REFRESH_FAILURE');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].details).toEqual({
+        reason: 'predecessor_replay_in_grace'
+      });
+      expect(rows[0].actorId).toBe(phone.userId);
+
+      // The replay ended the chain of the phone and nothing else.
+      expect(getState().refreshTokens.size).toBe(1);
+      expect((await refresh(desktop)).status).toBe(200);
+    });
+
+    it('purges every session once the grace window has passed', async () => {
+      const phone = await signIn();
+      const desktop = await signIn();
+
+      expect((await refresh(phone)).status).toBe(200);
+      shiftLastActive(REFRESH_REUSE_GRACE_MS + 1000);
+
+      expect((await refresh(phone)).status).toBe(401);
+      expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
+      expect((await refresh(desktop)).status).toBe(401);
+    });
+
+    it('purges every session when an older ancestor is replayed', async () => {
+      const phone = await signIn();
+      const desktop = await signIn();
+
+      const rotated = await refresh(phone);
+      expect(rotated.status).toBe(200);
+      const next: Session = {
+        userId: phone.userId,
+        refreshCookie: refreshCookieOf(rotated)
+      };
+      expect((await refresh(next)).status).toBe(200);
+
+      expect((await refresh(phone)).status).toBe(401);
+      expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
+      expect((await refresh(desktop)).status).toBe(401);
+    });
   });
 });

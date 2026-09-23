@@ -92,6 +92,7 @@ export function resetState(): void {
     sessionUserAgents: new Map(),
     sessionLastActive: new Map(),
     revokedRefreshTokens: new Map(),
+    rotatedTo: new Map(),
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
     pendingEmailTokens: new Map(),
@@ -178,6 +179,30 @@ export function isSessionLive(sessionId: string): boolean {
 }
 
 /**
+ * Whether a rotated token is the immediate predecessor of a live successor that
+ * was issued less than `graceMs` ago. Mirrors
+ * `RefreshTokenService.isLostResponseReplay`.
+ */
+export function isLostResponseReplay(
+  refreshToken: string,
+  graceMs: number
+): boolean {
+  const successor = state.rotatedTo.get(refreshToken);
+  if (successor === undefined || !state.refreshTokens.has(successor)) {
+    return false;
+  }
+
+  const sessionId = state.refreshSessions.get(successor);
+  // A live successor is the newest row of its session, so the last-active
+  // stamp is its issue time.
+  const issuedAt =
+    sessionId === undefined
+      ? undefined
+      : state.sessionLastActive.get(sessionId);
+  return issuedAt !== undefined && Date.now() - issuedAt < graceMs;
+}
+
+/**
  * Ends the session of one refresh token and leaves the other devices of the
  * account alone. Mirrors `AuthService.logoutSession`.
  */
@@ -193,6 +218,7 @@ function endSession(sessionId: string): boolean {
     if (sid !== sessionId) continue;
     if (state.refreshTokens.delete(token)) ended = true;
     state.revokedRefreshTokens.delete(token);
+    state.rotatedTo.delete(token);
     state.refreshSessions.delete(token);
   }
   state.sessionStarts.delete(sessionId);

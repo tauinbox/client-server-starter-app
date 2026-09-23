@@ -19,6 +19,7 @@ import {
   ErrorKeys,
   MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
+  REFRESH_REUSE_GRACE_MS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
@@ -80,6 +81,7 @@ describe('AuthService', () => {
   let mockRefreshTokenService: {
     createRefreshToken: jest.Mock;
     findByToken: jest.Mock;
+    isLostResponseReplay: jest.Mock;
     deleteByUserId: jest.Mock;
     deleteBySessionId: jest.Mock;
     revokeToken: jest.Mock;
@@ -243,6 +245,7 @@ describe('AuthService', () => {
     mockRefreshTokenService = {
       createRefreshToken: jest.fn().mockResolvedValue(undefined),
       findByToken: jest.fn(),
+      isLostResponseReplay: jest.fn().mockResolvedValue(false),
       deleteByUserId: jest.fn().mockResolvedValue(undefined),
       deleteBySessionId: jest.fn().mockResolvedValue(1),
       revokeToken: jest.fn().mockResolvedValue(undefined),
@@ -1520,6 +1523,46 @@ describe('AuthService', () => {
           })
         );
         expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+          'token_reuse_detected'
+        );
+      });
+
+      it('ends only the presented session when the replay is a lost rotation response', async () => {
+        const revokedToken = {
+          ...mockTokenDoc,
+          revoked: true,
+          isExpired: () => false
+        };
+        mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
+        mockRefreshTokenService.isLostResponseReplay.mockResolvedValue(true);
+
+        await expect(
+          service.refreshTokens('replayed-token')
+        ).rejects.toMatchObject({
+          status: HttpStatus.UNAUTHORIZED,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN }
+        });
+
+        expect(
+          mockRefreshTokenService.isLostResponseReplay
+        ).toHaveBeenCalledWith(revokedToken, REFRESH_REUSE_GRACE_MS);
+        expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+          'session-1'
+        );
+        expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
+        expect(mockUserRepository.update).not.toHaveBeenCalled();
+        expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+          action: AuditAction.TOKEN_REFRESH_FAILURE,
+          actorId: 'user-1',
+          details: { reason: 'predecessor_replay_in_grace' }
+        });
+        expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+          expect.objectContaining({ action: AuditAction.TOKEN_REUSE_DETECTED })
+        );
+        expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+          'token_refresh_failure'
+        );
+        expect(mockMetricsService.recordAuthEvent).not.toHaveBeenCalledWith(
           'token_reuse_detected'
         );
       });

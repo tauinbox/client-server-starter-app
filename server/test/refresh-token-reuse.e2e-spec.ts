@@ -28,7 +28,10 @@ import { BreachedPasswordService } from '../src/modules/auth/breached-password/b
 import { createMockCache } from '../src/common/testing/cache.mock';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
+import {
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
+  REFRESH_REUSE_GRACE_MS
+} from '@app/shared/constants';
 
 interface InMemoryStore {
   tokens: Map<string, RefreshToken>;
@@ -274,15 +277,39 @@ describe('Refresh token reuse detection (e2e)', () => {
     }).compile();
 
     auth = moduleRef.get(AuthService);
+
+    // The real query compares timestamps in SQL, which this fake cannot run.
+    // The same rule over the store; the SQL itself is covered against real
+    // Postgres in refresh-token-lost-response.e2e-spec.ts.
+    jest
+      .spyOn(moduleRef.get(RefreshTokenService), 'isLostResponseReplay')
+      .mockImplementation((token, graceMs) => {
+        const later = Array.from(store.tokens.values()).filter(
+          (t) =>
+            t.sessionId === token.sessionId &&
+            t.createdAt.getTime() > token.createdAt.getTime()
+        );
+        return Promise.resolve(
+          later.length === 1 &&
+            !later[0].revoked &&
+            Date.now() - later[0].createdAt.getTime() < graceMs
+        );
+      });
   });
 
-  it('rotates and revokes ALL sessions when the original token is presented twice', async () => {
+  // Rows created in one millisecond would tie on createdAt in this fake.
+  async function nextMillisecond(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+
+  it('revokes ALL sessions when the original token is replayed after its successor was used', async () => {
     // Login — issues an initial refresh token.
     const loginResult = await auth.login(userRecord, null);
     const originalToken = loginResult.tokens.refresh_token;
 
     expect(store.tokens.size).toBe(1);
 
+    await nextMillisecond();
     // First refresh — original token rotates out, a fresh pair is issued.
     const firstRefresh = await auth.refreshTokens(originalToken);
     expect(firstRefresh.tokens.access_token).toBeDefined();
@@ -294,7 +321,14 @@ describe('Refresh token reuse detection (e2e)', () => {
     expect(rows.find((r) => r.revoked)).toBeDefined();
     expect(rows.find((r) => !r.revoked)).toBeDefined();
 
-    // Second refresh with the SAME original token — reuse detection trips.
+    // The owner uses the successor, so a replay of the original can no longer
+    // be a lost response: this is the theft shape.
+    await nextMillisecond();
+    const secondRefresh = await auth.refreshTokens(
+      firstRefresh.tokens.refresh_token
+    );
+
+    // Refresh with the SAME original token — reuse detection trips.
     await expect(auth.refreshTokens(originalToken)).rejects.toMatchObject({
       response: { errorKey: 'errors.auth.invalidRefreshToken' }
     });
@@ -318,8 +352,63 @@ describe('Refresh token reuse detection (e2e)', () => {
     // A subsequent attempt with the new (post-rotation) token now fails too
     // because all sessions were purged.
     await expect(
-      auth.refreshTokens(firstRefresh.tokens.refresh_token)
+      auth.refreshTokens(secondRefresh.tokens.refresh_token)
     ).rejects.toThrow(HttpException);
+  });
+
+  it('ends only its own session when a just-rotated token is replayed before its successor is used', async () => {
+    const deviceA = await auth.login(userRecord, null);
+    const deviceB = await auth.login(userRecord, null);
+
+    await nextMillisecond();
+    // Device A rotates, but the response never reaches its browser.
+    await auth.refreshTokens(deviceA.tokens.refresh_token);
+
+    await expect(
+      auth.refreshTokens(deviceA.tokens.refresh_token)
+    ).rejects.toMatchObject({
+      response: { errorKey: 'errors.auth.invalidRefreshToken' }
+    });
+
+    // Device A's whole chain is gone; device B is untouched.
+    const remaining = Array.from(store.tokens.values());
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].revoked).toBe(false);
+    expect(store.userRevokedAt.has('user-1')).toBe(false);
+
+    expect(auditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        details: { reason: 'predecessor_replay_in_grace' }
+      })
+    );
+    expect(auditLog).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: AuditAction.TOKEN_REUSE_DETECTED })
+    );
+    expect(recordAuthEvent).not.toHaveBeenCalledWith('token_reuse_detected');
+
+    const refreshedB = await auth.refreshTokens(deviceB.tokens.refresh_token);
+    expect(refreshedB.tokens.access_token).toBeDefined();
+  });
+
+  it('keeps the full purge for a replay once the grace window has passed', async () => {
+    const loginResult = await auth.login(userRecord, null);
+    await nextMillisecond();
+    await auth.refreshTokens(loginResult.tokens.refresh_token);
+
+    for (const row of store.tokens.values()) {
+      row.createdAt = new Date(
+        row.createdAt.getTime() - REFRESH_REUSE_GRACE_MS - 1000
+      );
+    }
+
+    await expect(
+      auth.refreshTokens(loginResult.tokens.refresh_token)
+    ).rejects.toThrow(HttpException);
+
+    expect(store.tokens.size).toBe(0);
+    expect(store.userRevokedAt.get('user-1')).toBeInstanceOf(Date);
+    expect(recordAuthEvent).toHaveBeenCalledWith('token_reuse_detected');
   });
 
   it('returns plain 401 (no panic-revoke) for revoked-AND-expired tokens', async () => {

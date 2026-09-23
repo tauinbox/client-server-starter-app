@@ -380,6 +380,10 @@ export interface State {
   // it would naturally expire, treat as a possible compromise: revoke all
   // sessions for the user.
   revokedRefreshTokens: Map<string, string>; // token -> userId
+  // Rotated refresh token -> its successor. The server reads the same link from
+  // `created_at` order inside one `session_id`, to tell a lost rotation
+  // response from a replayed theft.
+  rotatedTo: Map<string, string>;
   emailVerificationTokens: Map<string, MockIssuedToken>;
   passwordResetTokens: Map<string, MockIssuedToken>;
   pendingEmailTokens: Map<string, string>; // token -> userId

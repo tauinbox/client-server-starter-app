@@ -1004,7 +1004,7 @@ list is the heaviest page, and it repeatedly came near to the default limit of 3
 
 **Live RBAC and authentication regression net.** The suite holds these specs:
 
-- refresh-token reuse detection (`refresh-token-reuse.spec.ts`)
+- refresh-token reuse detection, and a lost rotation response that signs out only its own device (`refresh-token-reuse.spec.ts`)
 - role revocation through SSE hides the admin link (`role-revocation-via-sse.spec.ts`)
 - an administrator on `/admin` goes to `/forbidden` (`admin/admin-panel-permission-loss.spec.ts`)
 - a reactive 401 causes a refresh and a retry (`reactive-token-refresh.spec.ts`)
@@ -1036,8 +1036,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 271 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1292 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 272 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1323 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

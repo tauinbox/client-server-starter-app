@@ -121,6 +121,37 @@ export class RefreshTokenService {
     return result.affected ?? 0;
   }
 
+  /**
+   * Whether a revoked row is the immediate predecessor of a live successor that
+   * was issued less than `graceMs` ago. That is the shape a rotation leaves
+   * when its response never reached the browser, which then presents the old
+   * cookie again.
+   *
+   * Both time comparisons run in SQL: `created_at` holds microseconds and reads
+   * back as a millisecond Date, so a value sent back from JS could misorder two
+   * rows created in the same millisecond.
+   */
+  async isLostResponseReplay(
+    token: RefreshToken,
+    graceMs: number
+  ): Promise<boolean> {
+    const result = await this.repository
+      .createQueryBuilder('rt')
+      .select(
+        `COUNT(*) = 1 AND COALESCE(BOOL_AND(NOT rt.revoked AND rt.created_at >= NOW() - CAST(:graceMs AS integer) * INTERVAL '1 millisecond'), false)`,
+        'replay'
+      )
+      .where('rt.session_id = :sessionId', { sessionId: token.sessionId })
+      .andWhere(
+        'rt.created_at > (SELECT prev.created_at FROM refresh_tokens prev WHERE prev.id = :id)',
+        { id: token.id }
+      )
+      .setParameter('graceMs', graceMs)
+      .getRawOne<{ replay: boolean }>();
+
+    return result?.replay === true;
+  }
+
   async findByToken(token: string): Promise<RefreshToken | null> {
     return this.repository.findOne({ where: { token: hashToken(token) } });
   }

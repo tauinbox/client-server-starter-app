@@ -39,6 +39,7 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   REAUTH_PROOF_MAX_AGE_SECONDS,
+  REFRESH_REUSE_GRACE_MS,
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
   SYSTEM_ROLES,
@@ -532,6 +533,30 @@ export class AuthService {
     // Revoke ALL sessions for the user as a safety measure (RFC 6819,
     // draft-ietf-oauth-security-topics §4.13).
     if (tokenDoc && tokenDoc.revoked && !tokenDoc.isExpired()) {
+      // A lost rotation response replays the old cookie. End only this
+      // session and issue nothing, so a thief gains no token either.
+      if (
+        await this.refreshTokenService.isLostResponseReplay(
+          tokenDoc,
+          REFRESH_REUSE_GRACE_MS
+        )
+      ) {
+        await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
+        this.auditService.logFireAndForget({
+          action: AuditAction.TOKEN_REFRESH_FAILURE,
+          actorId: tokenDoc.userId,
+          details: { reason: 'predecessor_replay_in_grace' }
+        });
+        this.metricsService.recordAuthEvent('token_refresh_failure');
+        throw new HttpException(
+          {
+            message: 'Invalid refresh token',
+            errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+          },
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+
       await this.revokeAllUserSessions(tokenDoc.userId);
       this.auditService.logFireAndForget({
         action: AuditAction.TOKEN_REUSE_DETECTED,
