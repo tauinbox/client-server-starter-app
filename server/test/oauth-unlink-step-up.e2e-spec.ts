@@ -19,6 +19,7 @@ import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { CLIENT_URL } from '../src/modules/auth/providers/client-url.provider';
 
 const USER_ID = 'user-1';
@@ -90,6 +91,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
           }
         },
         { provide: CLIENT_URL, useValue: 'http://localhost:4200' },
+        { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
         { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn() } }
       ]
     }).compile();

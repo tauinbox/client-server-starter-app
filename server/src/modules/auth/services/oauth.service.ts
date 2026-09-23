@@ -13,6 +13,7 @@ import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MailService } from '../../mail/mail.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { maskEmail } from '../../../common/utils/escape-html';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
@@ -52,7 +53,8 @@ export class OAuthService {
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
     private readonly sessionIssuer: SessionIssuerService,
-    private readonly mfaService: MfaService
+    private readonly mfaService: MfaService,
+    private readonly metricsService: MetricsService
   ) {}
 
   /**
@@ -67,9 +69,10 @@ export class OAuthService {
    */
   async loginWithOAuth(
     profile: OAuthUserProfile,
-    userAgent: string | null
+    userAgent: string | null,
+    auditContext?: AuditContext
   ): Promise<{ tokens: TokensResponseDto; user: User } | MfaRequiredResponse> {
-    const user = await this.resolveUserForOAuth(profile);
+    const user = await this.resolveUserForOAuth(profile, auditContext);
 
     if (user.totpEnabledAt) {
       return { mfaRequired: true, ...this.mfaService.issuePendingToken(user) };
@@ -79,7 +82,10 @@ export class OAuthService {
   }
 
   /** Finds, or creates, the account the provider profile names. */
-  private async resolveUserForOAuth(profile: OAuthUserProfile): Promise<User> {
+  private async resolveUserForOAuth(
+    profile: OAuthUserProfile,
+    auditContext?: AuditContext
+  ): Promise<User> {
     // 1. Check if OAuth account already linked
     const existingOAuth =
       await this.oauthAccountService.findByProviderAndProviderId(
@@ -190,6 +196,19 @@ export class OAuthService {
           return newUser.id;
         }
       );
+
+      // The account exists once the transaction commits, so an audit outage
+      // must not turn this sign-in into a failure the user sees.
+      this.auditService.logFireAndForget({
+        action: AuditAction.USER_REGISTER,
+        actorId: createdUserId,
+        actorEmail: email,
+        targetId: createdUserId,
+        targetType: 'User',
+        details: { provider: profile.provider },
+        context: auditContext
+      });
+      this.metricsService.recordAuthEvent('register');
 
       if (rawVerificationToken) {
         this.mailService

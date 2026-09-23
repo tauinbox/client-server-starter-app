@@ -21,6 +21,7 @@ import { TokenGeneratorService } from '../src/modules/auth/services/token-genera
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
@@ -100,7 +101,11 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
         { provide: EntitlementService, useValue: { limitFor: () => null } },
         { provide: RoleService, useValue: {} },
         { provide: AuditService, useValue: { log: () => undefined } },
-        { provide: MailService, useValue: {} }
+        { provide: MailService, useValue: {} },
+        {
+          provide: MetricsService,
+          useValue: { recordAuthEvent: () => undefined }
+        }
       ]
     }).compile();
 
