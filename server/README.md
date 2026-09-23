@@ -1979,7 +1979,7 @@ Without the two directives, the backend continues to answer `CAPTCHA_REQUIRED` w
 blocks the widget silently. The user then sees only the error "Please complete the CAPTCHA challenge
 to continue", and there is no widget to solve.
 
-The `client/nginx.conf` file of the project already has the two directives in each
+The `client/nginx.conf` file of the project already has the two directives in its single
 `add_header Content-Security-Policy` rule.
 
 You can put a different reverse proxy or CDN in front of the client, for example Caddy, Cloudflare or

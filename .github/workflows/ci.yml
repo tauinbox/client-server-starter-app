@@ -193,6 +193,8 @@ jobs:
       # anything fails loudly instead of passing.
       - run: node scripts/check-nginx-log-redaction.mjs --self-test
       - run: npm run check:nginx-log
+      - run: node scripts/check-nginx-headers.mjs --self-test
+      - run: npm run check:nginx-headers
       # Covers src/ under both project configs. `e2e/` is typechecked in the
       # Client E2E job instead, since its fixtures import mock-server sources
       # and this job does not install that workspace.

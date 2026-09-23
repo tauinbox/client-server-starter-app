@@ -1116,6 +1116,16 @@ nginx format would write the token in clear text to `docker logs`. `npm run chec
 `log_format` records `$request`, `$request_uri`, `$args`, `$query_string` or `$http_referer`. CI runs it
 in the `Client` job, after its `--self-test`.
 
+The `server` block sets the security headers one time: `Content-Security-Policy`, `X-Frame-Options`,
+`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and
+`Strict-Transport-Security: max-age=31536000; includeSubDomains`, which is the same value that the API
+sends. By default, a `location` that has its own `add_header` (for example `Cache-Control`) drops all
+the inherited headers. `add_header_inherit merge` keeps them, and that directive needs nginx 1.29.3 or
+later. `npm run check:nginx-headers` (`scripts/check-nginx-headers.mjs`) calculates the headers of each
+`server` and `location` block with the nginx inheritance rules. It fails when a block does not have all
+six headers with `always`, or when the HSTS `max-age` is less than one year. CI runs it in the `Client`
+job, after its `--self-test`.
+
 The server supplies the Angular app from the `/nexus/` base href. Each internal API URL must be an
 absolute path that starts with `/`, for example `/api/v1/users`. Thus the URL resolves to the server
 root and not to `/nexus/api/v1/users`.
