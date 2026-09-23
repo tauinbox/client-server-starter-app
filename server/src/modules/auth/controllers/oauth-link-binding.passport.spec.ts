@@ -116,7 +116,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
           clientSecret: 'client-secret',
           callbackURL: '/api/v1/auth/oauth/google/callback',
           state: true,
-          store: new CookieStateStore(OAuthProvider.GOOGLE, false)
+          store: new CookieStateStore(OAuthProvider.GOOGLE, true)
         },
         (
           _accessToken: string,
@@ -168,7 +168,10 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
           provide: MailService,
           useValue: { sendOAuthUnlinkedNotification: jest.fn() }
         },
-        { provide: ConfigService, useValue: { get: jest.fn(() => 'test') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(() => 'production') }
+        },
         {
           provide: JwtService,
           useValue: {
@@ -235,7 +238,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
 
   it('reaches the link branch on a real round trip of the owning flow', async () => {
     const jar = new CookieJar();
-    jar.set('oauth_link', LINK_TOKEN);
+    jar.set('__Host-oauth_link', LINK_TOKEN);
 
     const state = await authorize(jar);
 
@@ -253,7 +256,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
 
   it('links nothing when a second flow presents its own state', async () => {
     const jar = new CookieJar();
-    jar.set('oauth_link', LINK_TOKEN);
+    jar.set('__Host-oauth_link', LINK_TOKEN);
 
     // The owner starts a link and walks away without a sign-out.
     const abandonedState = await authorize(jar);
@@ -274,6 +277,6 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
 
     await authorize(jar);
 
-    expect(jar.get('oauth_link')).toBeUndefined();
+    expect(jar.get('__Host-oauth_link')).toBeUndefined();
   });
 });

@@ -94,7 +94,7 @@ test.describe('OAuth-only account changes its email', () => {
         name: 'reauth_proof',
         value: token,
         domain: 'localhost',
-        path: '/api/v1/auth'
+        path: '/'
       }
     ]);
 

@@ -64,7 +64,7 @@ test.describe('OAuth — unlink last provider safety', () => {
         name: 'reauth_proof',
         value: token,
         domain: 'localhost',
-        path: '/api/v1/auth'
+        path: '/'
       }
     ]);
     await page.addInitScript(() =>

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
@@ -62,7 +63,11 @@ describe('SessionsController', () => {
           provide: UsersService,
           useValue: { findOne: jest.fn().mockResolvedValue(mockUser) }
         },
-        { provide: AuditService, useValue: auditService }
+        { provide: AuditService, useValue: auditService },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('production') }
+        }
       ]
     }).compile();
 
@@ -118,7 +123,7 @@ describe('SessionsController', () => {
 
       await controller.revokeOne(
         'other-session',
-        jwtRequest({ reauth_proof: 'proof-token' }),
+        jwtRequest({ '__Host-reauth_proof': 'proof-token' }),
         { currentPassword: 'secret', code: '123456' },
         res
       );
@@ -135,8 +140,9 @@ describe('SessionsController', () => {
         'user-1',
         'other-session'
       );
-      expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
-        path: '/api/v1/auth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-reauth_proof', {
+        secure: true,
+        path: '/'
       });
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({

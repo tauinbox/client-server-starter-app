@@ -57,7 +57,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
         name: 'reauth_proof',
         value: token,
         domain: 'localhost',
-        path: '/api/v1/auth'
+        path: '/'
       }
     ]);
   }

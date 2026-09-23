@@ -91,7 +91,7 @@ function mockExpressRequest(
 
 /** Builds the cookie the store writes once a flow claims the intent. */
 function linkCookie(token: string, state: string = FLOW_STATE) {
-  return { oauth_link: bindIntent(token, state) };
+  return { '__Host-oauth_link': bindIntent(token, state) };
 }
 
 describe('OAuthController', () => {
@@ -159,7 +159,8 @@ describe('OAuthController', () => {
 
     configValues = {
       CLIENT_URL: 'http://localhost:4200',
-      JWT_REFRESH_EXPIRATION: '604800'
+      JWT_REFRESH_EXPIRATION: '604800',
+      ENVIRONMENT: 'production'
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -327,7 +328,9 @@ describe('OAuthController', () => {
     });
 
     it('demands a step-up bound to the unlink operation', async () => {
-      const req = mockJwtRequest('user-1', { reauth_proof: 'proof-token' });
+      const req = mockJwtRequest('user-1', {
+        '__Host-reauth_proof': 'proof-token'
+      });
 
       await controller.unlinkOAuth(
         'google',
@@ -351,14 +354,15 @@ describe('OAuthController', () => {
       await controller.unlinkOAuth(
         'google',
         mockJwtRequest('user-1', {
-          reauth_proof: 'proof-token'
+          '__Host-reauth_proof': 'proof-token'
         }) as JwtAuthRequest,
         {},
         res
       );
 
-      expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
-        path: '/api/v1/auth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-reauth_proof', {
+        secure: true,
+        path: '/'
       });
     });
 
@@ -436,12 +440,12 @@ describe('OAuthController', () => {
         { expiresIn: 300 }
       );
       expect(res.cookie).toHaveBeenCalledWith(
-        'oauth_link',
+        '__Host-oauth_link',
         'signed-link-token',
         expect.objectContaining({
           httpOnly: true,
           sameSite: 'lax',
-          path: '/api/v1/auth/oauth'
+          path: '/'
         })
       );
       expect(result).toEqual({ message: 'Link initiated' });
@@ -451,7 +455,9 @@ describe('OAuthController', () => {
     // so a stolen session must not be able to plant one.
     it('demands a step-up bound to the link operation', async () => {
       const res = mockResponse();
-      const req = mockJwtRequest('user-1', { reauth_proof: 'proof-token' });
+      const req = mockJwtRequest('user-1', {
+        '__Host-reauth_proof': 'proof-token'
+      });
 
       await controller.initOAuthLink(
         req as JwtAuthRequest,
@@ -492,12 +498,15 @@ describe('OAuthController', () => {
 
     it('clears the provider proof once the intent is minted', async () => {
       const res = mockResponse();
-      const req = mockJwtRequest('user-1', { reauth_proof: 'proof-token' });
+      const req = mockJwtRequest('user-1', {
+        '__Host-reauth_proof': 'proof-token'
+      });
 
       await controller.initOAuthLink(req as JwtAuthRequest, {}, res);
 
-      expect(res.clearCookie).toHaveBeenCalledWith('reauth_proof', {
-        path: '/api/v1/auth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-reauth_proof', {
+        secure: true,
+        path: '/'
       });
     });
   });
@@ -542,12 +551,12 @@ describe('OAuthController', () => {
       );
       expect(signOptions).toEqual({ expiresIn: 60 });
       expect(res.cookie).toHaveBeenCalledWith(
-        'oauth_data',
+        '__Host-oauth_data',
         'signed-link-token',
         expect.objectContaining({
           httpOnly: true,
           sameSite: 'lax',
-          path: '/api/v1/auth/oauth'
+          path: '/'
         })
       );
       expect(res.redirect).toHaveBeenCalledWith(
@@ -586,9 +595,9 @@ describe('OAuthController', () => {
       });
       expect(signedPayload.purpose).toBe(TOKEN_PURPOSE.OAUTH_DATA);
       expect(res.cookie).toHaveBeenCalledWith(
-        'oauth_data',
+        '__Host-oauth_data',
         'signed-link-token',
-        expect.objectContaining({ path: '/api/v1/auth/oauth' })
+        expect.objectContaining({ path: '/' })
       );
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/oauth/callback'
@@ -817,8 +826,9 @@ describe('OAuthController', () => {
         LINK_TOKEN_IAT,
         expect.objectContaining({ ip: '127.0.0.1' })
       );
-      expect(res.clearCookie).toHaveBeenCalledWith('oauth_link', {
-        path: '/api/v1/auth/oauth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-oauth_link', {
+        secure: true,
+        path: '/'
       });
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/profile?oauth_linked=google'
@@ -997,7 +1007,9 @@ describe('OAuthController', () => {
       };
 
       await controller.googleCallback(
-        mockExpressRequest(profile, { oauth_link: 'valid-link-token' }),
+        mockExpressRequest(profile, {
+          '__Host-oauth_link': 'valid-link-token'
+        }),
         res
       );
 
@@ -1027,23 +1039,24 @@ describe('OAuthController', () => {
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
-        oauth_data: 'signed-jwt'
+        '__Host-oauth_data': 'signed-jwt'
       });
       const res = mockResponse();
 
       const result = await controller.exchangeOAuthData(req, res);
 
       expect(jwtServiceMock.verify).toHaveBeenCalledWith('signed-jwt');
-      expect(res.clearCookie).toHaveBeenCalledWith('oauth_data', {
-        path: '/api/v1/auth/oauth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-oauth_data', {
+        secure: true,
+        path: '/'
       });
       expect(res.cookie).toHaveBeenCalledWith(
-        'refresh_token',
+        '__Host-refresh_token',
         'refresh',
         expect.objectContaining({
           httpOnly: true,
           sameSite: 'strict',
-          path: '/api/v1/auth'
+          path: '/'
         })
       );
       expect(result).toEqual({
@@ -1062,7 +1075,7 @@ describe('OAuthController', () => {
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
-        oauth_data: 'signed-jwt'
+        '__Host-oauth_data': 'signed-jwt'
       });
       const res = mockResponse();
 
@@ -1073,8 +1086,9 @@ describe('OAuthController', () => {
         mfaToken: 'pending-token',
         expiresIn: 300
       });
-      expect(res.clearCookie).toHaveBeenCalledWith('oauth_data', {
-        path: '/api/v1/auth/oauth'
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-oauth_data', {
+        secure: true,
+        path: '/'
       });
       expect(res.cookie).not.toHaveBeenCalled();
     });
@@ -1106,13 +1120,13 @@ describe('OAuthController', () => {
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
-        oauth_data: 'signed-jwt'
+        '__Host-oauth_data': 'signed-jwt'
       });
 
       const first = mockResponse();
       await controller.exchangeOAuthData(req, first);
       expect(first.cookie).toHaveBeenCalledWith(
-        'refresh_token',
+        '__Host-refresh_token',
         'refresh',
         expect.any(Object)
       );
@@ -1138,7 +1152,7 @@ describe('OAuthController', () => {
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
-        oauth_data: 'signed-jwt'
+        '__Host-oauth_data': 'signed-jwt'
       });
       const res = mockResponse();
 
@@ -1166,7 +1180,7 @@ describe('OAuthController', () => {
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
-        oauth_data: 'signed-jwt'
+        '__Host-oauth_data': 'signed-jwt'
       });
       const res = mockResponse();
 
@@ -1176,13 +1190,26 @@ describe('OAuthController', () => {
       expect(res.cookie).not.toHaveBeenCalled();
     });
 
+    // A sibling host can plant the bare name for the parent domain.
+    it('should ignore a bare oauth_data cookie outside local', async () => {
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        oauth_data: 'signed-jwt'
+      });
+      const res = mockResponse();
+
+      await expect(controller.exchangeOAuthData(req, res)).rejects.toThrow(
+        'Missing OAuth data'
+      );
+      expect(jwtServiceMock.verify).not.toHaveBeenCalled();
+    });
+
     it('should throw BadRequestException when JWT is expired', async () => {
       jwtServiceMock.verify.mockImplementation(() => {
         throw new Error('jwt expired');
       });
 
       const req = mockExpressRequest({} as OAuthUserProfile, {
-        oauth_data: 'expired-jwt'
+        '__Host-oauth_data': 'expired-jwt'
       });
       const res = mockResponse();
 

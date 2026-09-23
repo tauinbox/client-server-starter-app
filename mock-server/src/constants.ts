@@ -5,34 +5,40 @@ export const CASL_RESERVED_ACTION_NAMES: readonly string[] = ['manage', 'all'];
 
 export const CASL_RESERVED_SUBJECT_NAMES: readonly string[] = ['all'];
 
+/**
+ * Mirrors HOST_COOKIE_PATH on the server. Outside `local` the server prefixes
+ * every cookie with `__Host-`, which requires this path. The mock only serves
+ * `local`, so it keeps the bare names and shares the path.
+ */
+export const AUTH_COOKIE_PATH = '/';
+
 export const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
 export const REFRESH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   sameSite: 'strict',
-  path: '/api/v1/auth',
+  path: AUTH_COOKIE_PATH,
   maxAge: 7 * 24 * 60 * 60 * 1000
 };
+
+/** Where the refresh cookie lived before the move to AUTH_COOKIE_PATH. */
+export const LEGACY_REFRESH_TOKEN_PATH = '/api/v1/auth';
 
 export const OAUTH_PROVIDERS = ['google', 'facebook', 'vk'];
 
 // Mirrors OAuthController.OAUTH_DATA_COOKIE / OAUTH_DATA_MAX_AGE_SECONDS.
 export const OAUTH_DATA_COOKIE = 'oauth_data';
 
-export const OAUTH_DATA_COOKIE_PATH = '/api/v1/auth/oauth';
-
 export const OAUTH_DATA_MAX_AGE_MS = 60 * 1000;
 
 export const OAUTH_DATA_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   sameSite: 'lax',
-  path: OAUTH_DATA_COOKIE_PATH,
+  path: AUTH_COOKIE_PATH,
   maxAge: OAUTH_DATA_MAX_AGE_MS
 };
 
-/** Mirrors the server: the step-up proof is scoped to the auth routes. */
 export const REAUTH_PROOF_COOKIE = 'reauth_proof';
-export const REAUTH_PROOF_COOKIE_PATH = '/api/v1/auth';
 export const REAUTH_PROOF_MAX_AGE_MS = 300 * 1000;
 
 /**
@@ -41,7 +47,6 @@ export const REAUTH_PROOF_MAX_AGE_MS = 300 * 1000;
  */
 export const OAUTH_LINK_COOKIE = 'oauth_link';
 export const OAUTH_REAUTH_COOKIE = 'oauth_reauth';
-export const OAUTH_INTENT_COOKIE_PATH = '/api/v1/auth/oauth';
 
 /**
  * The mock accepts one fixed code and hands out one fixed secret. A real

@@ -11,12 +11,11 @@ import {
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
+  AUTH_COOKIE_PATH,
   OAUTH_DATA_COOKIE,
-  OAUTH_DATA_COOKIE_PATH,
-  OAUTH_PROVIDERS,
-  REFRESH_COOKIE_OPTIONS,
-  REFRESH_TOKEN_COOKIE
+  OAUTH_PROVIDERS
 } from '../constants';
+import { setRefreshTokenCookie } from '../helpers/refresh-cookie.helpers';
 import type { AuthenticatedRequest } from '../types';
 
 const router = Router();
@@ -140,7 +139,7 @@ router.post('/exchange', (req, res) => {
     OAUTH_DATA_COOKIE
   ];
 
-  res.clearCookie(OAUTH_DATA_COOKIE, { path: OAUTH_DATA_COOKIE_PATH });
+  res.clearCookie(OAUTH_DATA_COOKIE, { path: AUTH_COOKIE_PATH });
 
   if (!cookie) {
     res.status(400).json({
@@ -174,7 +173,7 @@ router.post('/exchange', (req, res) => {
   }
 
   const { refresh_token, ...publicTokens } = pending.tokens;
-  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
+  setRefreshTokenCookie(res, refresh_token);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 

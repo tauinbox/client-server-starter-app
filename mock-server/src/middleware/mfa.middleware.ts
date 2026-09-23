@@ -36,10 +36,9 @@ import {
   MOCK_RECOVERY_CODES,
   MOCK_REGENERATED_RECOVERY_CODES,
   MOCK_TOTP_QR_DATA_URL,
-  MOCK_TOTP_SECRET,
-  REFRESH_COOKIE_OPTIONS,
-  REFRESH_TOKEN_COOKIE
+  MOCK_TOTP_SECRET
 } from '../constants';
+import { setRefreshTokenCookie } from '../helpers/refresh-cookie.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import type { Request, Response } from 'express';
 
@@ -158,7 +157,7 @@ function issueSession(req: Request, res: Response, user: MockUser): void {
   });
 
   const { refresh_token, ...publicTokens } = tokens;
-  res.cookie(REFRESH_TOKEN_COOKIE, refresh_token, REFRESH_COOKIE_OPTIONS);
+  setRefreshTokenCookie(res, refresh_token);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 }
 

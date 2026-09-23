@@ -12,6 +12,9 @@ import {
   ApiTags
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { requiresSecureCookies } from '@app/shared/constants';
+import { readHostCookie } from '../../../common/utils/host-cookie';
 import { OptionalAuth } from '../../auth/decorators/optional-auth.decorator';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { EvaluateFlagsResponseDto } from '../dtos/evaluate-flags-response.dto';
@@ -28,7 +31,10 @@ type RequestWithUser = Request & {
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class FeatureFlagsController {
-  constructor(private readonly resolver: FeatureFlagResolverService) {}
+  constructor(
+    private readonly resolver: FeatureFlagResolverService,
+    private readonly configService: ConfigService
+  ) {}
 
   @Get()
   @OptionalAuth()
@@ -44,9 +50,12 @@ export class FeatureFlagsController {
       const resolverUser = await this.resolver.buildResolverUser(userId);
       return this.resolver.evaluateForUser(resolverUser, req);
     }
-    const cookies = (req.cookies ?? {}) as Record<string, unknown>;
-    const cookieValue = cookies[ANON_ID_COOKIE];
-    const anonId = typeof cookieValue === 'string' ? cookieValue : null;
+    const anonId =
+      readHostCookie(
+        req,
+        ANON_ID_COOKIE,
+        requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'))
+      ) ?? null;
     return this.resolver.evaluateAnonymous(anonId, req);
   }
 }

@@ -9,8 +9,8 @@ import {
 import { getState, logAudit } from '../state';
 import {
   MOCK_TOTP_CODE,
-  REAUTH_PROOF_COOKIE,
-  REAUTH_PROOF_COOKIE_PATH
+  AUTH_COOKIE_PATH,
+  REAUTH_PROOF_COOKIE
 } from '../constants';
 import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
@@ -115,7 +115,7 @@ export function isValidReauthProof(
  * from holding a credential that no longer works.
  */
 export function clearReauthProofCookie(res: Response): void {
-  res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+  res.clearCookie(REAUTH_PROOF_COOKIE, { path: AUTH_COOKIE_PATH });
 }
 
 /**

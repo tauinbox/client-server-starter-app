@@ -12,6 +12,7 @@ import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import type { Request as ExpressRequest } from 'express';
 import * as passport from 'passport';
+import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import * as request from 'supertest';
 import { createOAuthProviderGuard } from './oauth-provider.guard';
@@ -98,7 +99,8 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
       controllers: [ScriptedOAuthController],
       providers: [
         OAuthAuthenticationExceptionFilter,
-        { provide: CLIENT_URL, useValue: CLIENT }
+        { provide: CLIENT_URL, useValue: CLIENT },
+        { provide: ConfigService, useValue: { get: () => 'production' } }
       ]
     }).compile();
 
@@ -150,30 +152,30 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
   it('returns a cancelled link flow to the profile page and clears the link cookie', async () => {
     const response = await request(server)
       .get('/oauth/fail/callback?error=access_denied')
-      .set('Cookie', 'oauth_link=link-token');
+      .set('Cookie', '__Host-oauth_link=link-token');
 
     expect(response.status).toBe(302);
     expect(response.headers['location']).toBe(
       `${CLIENT}/profile?oauth_error=oauth_cancelled`
     );
     expect(response.headers['set-cookie']).toEqual([
-      expect.stringContaining('oauth_link=;'),
-      expect.stringContaining('oauth_reauth=;')
+      expect.stringMatching(/^__Host-oauth_link=;.*Path=\/;.*Secure/),
+      expect.stringMatching(/^__Host-oauth_reauth=;.*Path=\/;.*Secure/)
     ]);
   });
 
   it('returns a cancelled step-up to the profile page and clears the reauth cookie', async () => {
     const response = await request(server)
       .get('/oauth/fail/callback?error=access_denied')
-      .set('Cookie', 'oauth_reauth=reauth-token');
+      .set('Cookie', '__Host-oauth_reauth=reauth-token');
 
     expect(response.status).toBe(302);
     expect(response.headers['location']).toBe(
       `${CLIENT}/profile?oauth_error=reauth_failed`
     );
     expect(response.headers['set-cookie']).toEqual([
-      expect.stringContaining('oauth_link=;'),
-      expect.stringContaining('oauth_reauth=;')
+      expect.stringMatching(/^__Host-oauth_link=;.*Path=\/;.*Secure/),
+      expect.stringMatching(/^__Host-oauth_reauth=;.*Path=\/;.*Secure/)
     ]);
   });
 

@@ -22,7 +22,12 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request as ExpressRequest, Response } from 'express';
-import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
+import { ConfigService } from '@nestjs/config';
+import {
+  ErrorKeys,
+  requiresSecureCookies,
+  STEP_UP_OPERATION
+} from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuthService } from '../services/auth.service';
 import { RefreshTokenService } from '../services/refresh-token.service';
@@ -32,10 +37,11 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { MfaStepUpDto } from '../dtos/mfa.dto';
 import { ActiveSessionResponseDto } from '../dtos/active-session-response.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { REAUTH_PROOF_COOKIE } from '../constants/oauth.constants';
 import {
-  REAUTH_PROOF_COOKIE,
-  REAUTH_PROOF_COOKIE_PATH
-} from '../constants/oauth.constants';
+  clearHostCookie,
+  readHostCookie
+} from '../../../common/utils/host-cookie';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 
@@ -57,8 +63,13 @@ export class SessionsController {
     private readonly authService: AuthService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly userService: UsersService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly configService: ConfigService
   ) {}
+
+  private get secureCookies(): boolean {
+    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
+  }
 
   @Get()
   @ApiBearerAuth()
@@ -181,9 +192,7 @@ export class SessionsController {
   }
 
   private reauthProof(req: ExpressRequest): string | undefined {
-    return (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
+    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
   }
 
   /**
@@ -191,7 +200,7 @@ export class SessionsController {
    * remaining proof window. The ledger already refuses a second use.
    */
   private clearReauthProofCookie(res: Response): void {
-    res.clearCookie(REAUTH_PROOF_COOKIE, { path: REAUTH_PROOF_COOKIE_PATH });
+    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
   }
 
   /** The device label is client data, so it never enters the audit row. */

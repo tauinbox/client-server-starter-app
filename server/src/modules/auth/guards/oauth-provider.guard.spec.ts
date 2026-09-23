@@ -55,8 +55,17 @@ describe.each([
   ['FacebookOAuthGuard', FacebookOAuthGuard, 'facebook', 'Facebook'],
   ['VkOAuthGuard', VkOAuthGuard, 'vkontakte', 'VK']
 ])('%s', (_name, GuardClass, strategy, providerName) => {
+  let environment: string;
+
+  // Nest injects ConfigService as a property; a bare `new` leaves it unset.
+  const createGuard = () =>
+    Object.assign(new GuardClass(), {
+      configService: { get: () => environment }
+    });
+
   beforeEach(() => {
     mockBaseCanActivate.mockReset();
+    environment = 'production';
   });
 
   it(`registers the '${strategy}' passport strategy`, () => {
@@ -65,19 +74,19 @@ describe.each([
 
   it('returns true when the underlying guard resolves', async () => {
     mockBaseCanActivate.mockResolvedValue(true);
-    await expect(new GuardClass().canActivate(context)).resolves.toBe(true);
+    await expect(createGuard().canActivate(context)).resolves.toBe(true);
   });
 
   it('resolves an observable result from the underlying guard', async () => {
     mockBaseCanActivate.mockReturnValue(of(true));
-    await expect(new GuardClass().canActivate(context)).resolves.toBe(true);
+    await expect(createGuard().canActivate(context)).resolves.toBe(true);
   });
 
   it('maps a missing-strategy error to 404 "not configured"', async () => {
     mockBaseCanActivate.mockRejectedValue(
       new Error(`Unknown authentication strategy "${strategy}"`)
     );
-    await expect(new GuardClass().canActivate(context)).rejects.toThrow(
+    await expect(createGuard().canActivate(context)).rejects.toThrow(
       new NotFoundException(`${providerName} OAuth is not configured`)
     );
   });
@@ -87,7 +96,7 @@ describe.each([
       'Unable to verify authorization request state.'
     );
     mockBaseCanActivate.mockRejectedValue(callbackError);
-    await expect(new GuardClass().canActivate(context)).rejects.toBe(
+    await expect(createGuard().canActivate(context)).rejects.toBe(
       callbackError
     );
   });
@@ -95,7 +104,7 @@ describe.each([
   describe('handleRequest', () => {
     it('raises a redirectable failure when Passport rejects the request', () => {
       expect(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           null,
           false,
           undefined,
@@ -108,7 +117,7 @@ describe.each([
       const cause = new Error('Failed to obtain access token');
 
       const failure = captureFailure(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           cause,
           undefined,
           undefined,
@@ -124,7 +133,7 @@ describe.each([
 
     it('reports a declined consent screen as a cancellation, not a failure', () => {
       const failure = captureFailure(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           null,
           false,
           undefined,
@@ -138,13 +147,13 @@ describe.each([
 
     it('sends a failed link flow back to the profile page', () => {
       const failure = captureFailure(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           null,
           false,
           undefined,
           contextWith({
             query: { error: 'access_denied' },
-            cookies: { oauth_link: 'link-token' }
+            cookies: { '__Host-oauth_link': 'link-token' }
           })
         )
       );
@@ -155,13 +164,13 @@ describe.each([
 
     it('sends a cancelled step-up back to the profile page', () => {
       const failure = captureFailure(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           null,
           false,
           undefined,
           contextWith({
             query: { error: 'access_denied' },
-            cookies: { oauth_reauth: 'reauth-token' }
+            cookies: { '__Host-oauth_reauth': 'reauth-token' }
           })
         )
       );
@@ -172,13 +181,13 @@ describe.each([
 
     it('reports a step-up that failed at the provider as reauth_failed', () => {
       const failure = captureFailure(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           new Error('Failed to obtain access token'),
           undefined,
           undefined,
           contextWith({
             query: {},
-            cookies: { oauth_reauth: 'reauth-token' }
+            cookies: { '__Host-oauth_reauth': 'reauth-token' }
           })
         )
       );
@@ -189,13 +198,52 @@ describe.each([
 
     it('lets the step-up intent win when both intent cookies are present', () => {
       const failure = captureFailure(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           null,
           false,
           undefined,
           contextWith({
             query: { error: 'access_denied' },
-            cookies: { oauth_link: 'link-token', oauth_reauth: 'reauth-token' }
+            cookies: {
+              '__Host-oauth_link': 'link-token',
+              '__Host-oauth_reauth': 'reauth-token'
+            }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
+      expect(failure.redirectPath).toBe('/profile');
+    });
+
+    // A sibling host can plant the bare names for the parent domain.
+    it('ignores bare intent cookie names outside local', () => {
+      const failure = captureFailure(() =>
+        createGuard().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'access_denied' },
+            cookies: { oauth_link: 'planted', oauth_reauth: 'planted' }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR_CANCELLED);
+      expect(failure.redirectPath).toBe('/login');
+    });
+
+    it('reads the bare intent cookie names in local', () => {
+      environment = 'local';
+      const failure = captureFailure(() =>
+        createGuard().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'access_denied' },
+            cookies: { oauth_reauth: 'reauth-token' }
           })
         )
       );
@@ -206,7 +254,7 @@ describe.each([
 
     it('never carries an attacker-supplied error value into the key', () => {
       const failure = captureFailure(() =>
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           null,
           false,
           undefined,
@@ -224,7 +272,7 @@ describe.each([
       const profile = { email: 'user@example.com' };
 
       expect(
-        new GuardClass().handleRequest<unknown>(
+        createGuard().handleRequest<unknown>(
           null,
           profile,
           undefined,
@@ -237,7 +285,7 @@ describe.each([
   it('rethrows a non-configuration error unchanged instead of masking it as 404', async () => {
     const exchangeError = new Error('Failed to obtain access token');
     mockBaseCanActivate.mockRejectedValue(exchangeError);
-    await expect(new GuardClass().canActivate(context)).rejects.toBe(
+    await expect(createGuard().canActivate(context)).rejects.toBe(
       exchangeError
     );
   });
@@ -247,6 +295,6 @@ describe.each([
     mockBaseCanActivate.mockImplementation(() => {
       throw syncError;
     });
-    await expect(new GuardClass().canActivate(context)).rejects.toBe(syncError);
+    await expect(createGuard().canActivate(context)).rejects.toBe(syncError);
   });
 });

@@ -15,6 +15,7 @@ import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import type { Request as ExpressRequest } from 'express';
 import * as passport from 'passport';
+import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import * as request from 'supertest';
 import { Strategy as OAuth2Strategy } from 'passport-oauth2';
@@ -137,7 +138,7 @@ describe('OAuth PKCE (real passport-oauth2 against an enforcing provider)', () =
           callbackURL: '/oauth/callback',
           state: true,
           pkce: true,
-          store: new CookieStateStore(OAuthProvider.GOOGLE, false)
+          store: new CookieStateStore(OAuthProvider.GOOGLE, true)
         },
         (
           _accessToken: string,
@@ -153,7 +154,8 @@ describe('OAuth PKCE (real passport-oauth2 against an enforcing provider)', () =
       controllers: [PkceOAuthController],
       providers: [
         OAuthAuthenticationExceptionFilter,
-        { provide: CLIENT_URL, useValue: CLIENT }
+        { provide: CLIENT_URL, useValue: CLIENT },
+        { provide: ConfigService, useValue: { get: () => 'production' } }
       ]
     }).compile();
 

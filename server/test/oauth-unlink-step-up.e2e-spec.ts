@@ -77,7 +77,10 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
           provide: JwtService,
           useValue: { sign: jest.fn(), verify: jest.fn() }
         },
-        { provide: ConfigService, useValue: { get: jest.fn() } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(() => 'production') }
+        },
         {
           provide: AuditService,
           useValue: { log: jest.fn(), logFireAndForget: jest.fn() }
@@ -167,7 +170,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
   it('forwards the re-authentication proof cookie', async () => {
     await request(server)
       .delete('/auth/oauth/accounts/google')
-      .set('Cookie', 'reauth_proof=proof-token')
+      .set('Cookie', '__Host-reauth_proof=proof-token')
       .expect(200);
 
     expect(calls[0]?.reauthProof).toBe('proof-token');

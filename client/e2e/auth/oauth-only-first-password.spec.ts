@@ -90,7 +90,7 @@ test.describe('OAuth-only account sets its first password', () => {
         name: 'reauth_proof',
         value: token,
         domain: 'localhost',
-        path: '/api/v1/auth'
+        path: '/'
       }
     ]);
 
@@ -146,7 +146,7 @@ test.describe('OAuth-only account sets its first password', () => {
         name: 'reauth_proof',
         value: token,
         domain: 'localhost',
-        path: '/api/v1/auth'
+        path: '/'
       }
     ]);
     await page.addInitScript(() =>
