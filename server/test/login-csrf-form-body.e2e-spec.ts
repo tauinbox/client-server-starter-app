@@ -71,7 +71,7 @@ runWithInfra('Login CSRF through a form body (e2e)', () => {
   function refreshCookieOf(res: request.Response): string | undefined {
     return ([] as string[])
       .concat(res.headers['set-cookie'] ?? [])
-      .find((cookie) => cookie.startsWith('refresh_token='));
+      .find((cookie) => /^(__Host-)?refresh_token=[^;]/.test(cookie));
   }
 
   it('refuses a form-encoded login and sets no session cookie', async () => {
