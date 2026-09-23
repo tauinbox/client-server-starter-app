@@ -1103,10 +1103,18 @@ The `Dockerfile` has 2 stages for a production build:
    Angular with `NODE_OPTIONS="--max-old-space-size=2048" npm run build -- --base-href $BASE_HREF`.
    The `BASE_HREF` ARG defaults to `/nexus/`. To change it, use
    `docker build --build-arg BASE_HREF=/`.
-2. The **runner** stage copies the built assets to nginx:1.27-alpine with `client/nginx.conf`. That
+2. The **runner** stage copies the built assets to nginx:1.31-alpine with `client/nginx.conf`. That
    configuration enables gzip and supports HTML5 pushState through `try_files`. It sets
    `Cache-Control: public, max-age=31536000, immutable` for a content-hashed bundle, and
    `Cache-Control: no-cache` for `index.html`.
+
+The access log uses the `nexus_redacted` format. It records the path without the query string, and it
+does not record the `Referer`. The links in the verify-email, reset-password and confirm-email-change
+mails carry a one-time token in `?token=`, and the server keeps only a hash of that token. The stock
+nginx format would write the token in clear text to `docker logs`. `npm run check:nginx-log`
+(`scripts/check-nginx-log-redaction.mjs`) fails when a `server` block does not use that format, or when a
+`log_format` records `$request`, `$request_uri`, `$args`, `$query_string` or `$http_referer`. CI runs it
+in the `Client` job, after its `--self-test`.
 
 The server supplies the Angular app from the `/nexus/` base href. Each internal API URL must be an
 absolute path that starts with `/`, for example `/api/v1/users`. Thus the URL resolves to the server

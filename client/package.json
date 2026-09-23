@@ -22,6 +22,7 @@
     "lint:no-mat-color": "node scripts/lint-no-mat-color.mjs",
     "check:form-fields": "node scripts/check-form-fields.mjs",
     "check:imports": "node ../scripts/check-imports.mjs",
+    "check:nginx-log": "node scripts/check-nginx-log-redaction.mjs",
     "audit:ci": "node ../scripts/audit-ci.mjs",
     "test:e2e": "playwright test",
     "test:e2e:auth": "playwright test e2e/auth",
