@@ -57,3 +57,8 @@ export type FeatureFlagAttributeOp =
 
 export type FeatureFlagPreviewReason =
   (typeof FEATURE_FLAG_PREVIEW_REASONS)[number];
+
+// The anonymous rollout id is always minted by the server as a UUID, so a
+// cookie of any other shape is treated as absent rather than hashed.
+export const ANON_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -53,6 +53,29 @@ export function evaluateFeatureFlag(
   return false;
 }
 
+export type AnonymousEvaluatorFlag = EvaluatorFlag & {
+  public: boolean;
+  rules: readonly { payload: FeatureFlagRulePayload }[];
+};
+
+/**
+ * Whether an anonymous evaluation reads the rollout id: true only when a public
+ * flag that is live in `env` carries a percentage rule. The id is issued only
+ * then, so a visitor never holds a long-lived identifier that nothing reads.
+ */
+export function anonymousEvaluationNeedsAnonId(
+  flags: readonly AnonymousEvaluatorFlag[],
+  env: string
+): boolean {
+  return flags.some(
+    (flag) =>
+      flag.public &&
+      flag.enabled &&
+      (flag.environments.length === 0 || flag.environments.includes(env)) &&
+      flag.rules.some((rule) => rule.payload.type === 'percentage')
+  );
+}
+
 function matchesRule(
   payload: FeatureFlagRulePayload,
   flagKey: string,

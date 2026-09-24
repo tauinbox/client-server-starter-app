@@ -43,6 +43,9 @@ import { PermissionService } from '../src/modules/auth/services/permission.servi
 import { UsersService } from '../src/modules/users/services/users.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
+import { FeatureFlagsController } from '../src/modules/feature-flags/controllers/feature-flags.controller';
+import { ANON_ID_COOKIE } from '../src/modules/feature-flags/utils/anon-id-cookie';
+import * as cookieParser from 'cookie-parser';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 
@@ -662,7 +665,7 @@ describe('Feature flags end-to-end', () => {
       'actor-1'
     );
 
-    const anon = await resolver.evaluateAnonymous(
+    const { result: anon } = await resolver.evaluateAnonymous(
       'anon-cookie-1',
       {} as Parameters<typeof resolver.evaluateAnonymous>[1]
     );
@@ -749,5 +752,176 @@ describe('@RequireFeature guard', () => {
     await request(server)
       .get('/test-feature/beta')
       .expect(HttpStatus.NOT_FOUND);
+  });
+});
+
+// -- Anonymous rollout id over the wire -------------------------------------
+
+// The id is a one-year identifier, so it is issued only when an anonymous
+// evaluation reads it, and only a value the server could have issued is used.
+describe('GET /feature-flags anonymous rollout id', () => {
+  const HOST_ANON_ID_COOKIE = `__Host-${ANON_ID_COOKIE}`;
+  const VALID_ANON_ID = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
+
+  let app: INestApplication;
+  let server: Server;
+  let flagService: FeatureFlagService;
+  let resolver: FeatureFlagResolverService;
+
+  beforeEach(async () => {
+    const stores = createStores();
+    const moduleRef = await Test.createTestingModule({
+      controllers: [FeatureFlagsController],
+      providers: [
+        FeatureFlagService,
+        FeatureFlagResolverService,
+        AttributeRegistryService,
+        {
+          provide: getRepositoryToken(FeatureFlag),
+          useValue: makeFlagRepoMock(stores)
+        },
+        {
+          provide: getRepositoryToken(FeatureFlagRule),
+          useValue: makeRuleRepoMock(stores)
+        },
+        { provide: DataSource, useValue: makeDataSourceMock(stores) },
+        { provide: CACHE_MANAGER, useValue: makeCacheMock().manager },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('production') }
+        },
+        {
+          provide: PermissionService,
+          useValue: { getRoleNamesForUser: jest.fn().mockResolvedValue([]) }
+        },
+        {
+          provide: UsersService,
+          useValue: { findOne: jest.fn().mockResolvedValue(null) }
+        },
+        {
+          provide: MetricsService,
+          useValue: { recordCacheAccess: jest.fn() }
+        }
+      ]
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.use(cookieParser());
+    await app.init();
+    server = app.getHttpServer() as Server;
+    flagService = moduleRef.get(FeatureFlagService);
+    resolver = moduleRef.get(FeatureFlagResolverService);
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  function anonIdCookieOf(res: request.Response): string | undefined {
+    return ([] as string[])
+      .concat(res.headers['set-cookie'] ?? [])
+      .find((c) => c.startsWith(`${HOST_ANON_ID_COOKIE}=`));
+  }
+
+  async function addPublicPercentageFlag(): Promise<void> {
+    const flag = await flagService.create(
+      { key: 'public-rollout', enabled: true, public: true },
+      'actor-1'
+    );
+    await flagService.replaceRules(
+      flag.id,
+      [
+        {
+          type: 'percentage',
+          effect: 'include',
+          payload: { type: 'percentage', percent: 100 }
+        }
+      ],
+      'actor-1'
+    );
+    await resolver.invalidateAll();
+  }
+
+  it('issues no cookie while no public flag has a percentage rule', async () => {
+    await flagService.create(
+      { key: 'public-banner', enabled: true, public: true },
+      'actor-1'
+    );
+    const hidden = await flagService.create(
+      { key: 'private-rollout', enabled: true, public: false },
+      'actor-1'
+    );
+    await flagService.replaceRules(
+      hidden.id,
+      [
+        {
+          type: 'percentage',
+          effect: 'include',
+          payload: { type: 'percentage', percent: 50 }
+        }
+      ],
+      'actor-1'
+    );
+
+    const res = await request(server).get('/feature-flags').expect(200);
+
+    expect(res.headers['set-cookie']).toBeUndefined();
+    expect(res.body).toEqual(
+      expect.objectContaining({ flags: { 'public-banner': true } })
+    );
+  });
+
+  it('issues a prefixed httpOnly UUID cookie once a public percentage flag exists', async () => {
+    await addPublicPercentageFlag();
+
+    const res = await request(server).get('/feature-flags').expect(200);
+
+    const cookie = anonIdCookieOf(res);
+    expect(cookie).toMatch(
+      new RegExp(
+        `^${HOST_ANON_ID_COOKIE}=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12};`
+      )
+    );
+    expect(cookie).toContain('Path=/');
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('SameSite=Lax');
+    // percent 100: true only if the evaluation used the id it just issued.
+    expect((res.body as { flags: Record<string, boolean> }).flags).toEqual({
+      'public-rollout': true
+    });
+  });
+
+  it('keeps a valid cookie without re-issuing it', async () => {
+    await addPublicPercentageFlag();
+
+    const res = await request(server)
+      .get('/feature-flags')
+      .set('Cookie', `${HOST_ANON_ID_COOKIE}=${VALID_ANON_ID}`)
+      .expect(200);
+
+    expect(res.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('replaces a cookie that is not a UUID when an id is needed', async () => {
+    await addPublicPercentageFlag();
+
+    const res = await request(server)
+      .get('/feature-flags')
+      .set('Cookie', `${HOST_ANON_ID_COOKIE}=${'x'.repeat(3000)}`)
+      .expect(200);
+
+    const cookie = anonIdCookieOf(res);
+    expect(cookie).toBeDefined();
+    expect(cookie).not.toContain('xxx');
+  });
+
+  it('ignores a cookie that is not a UUID when no id is needed', async () => {
+    const res = await request(server)
+      .get('/feature-flags')
+      .set('Cookie', `${HOST_ANON_ID_COOKIE}=x`)
+      .expect(200);
+
+    expect(res.headers['set-cookie']).toBeUndefined();
   });
 });

@@ -207,9 +207,97 @@ describe('FeatureFlagResolverService', () => {
       { id: 'f1', key: 'pub', enabled: true, public: true },
       { id: 'f2', key: 'priv', enabled: true, public: false }
     ]);
-    const result = await service.evaluateAnonymous('anon-1', fakeReq);
+    const { result } = await service.evaluateAnonymous('anon-1', fakeReq);
     expect(result.flags['pub']).toBe(true);
     expect('priv' in result.flags).toBe(false);
+  });
+
+  describe('anonymous rollout id', () => {
+    const UUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+    it('issues no id when no public flag has a percentage rule', async () => {
+      seedFlags(
+        [
+          { id: 'f1', key: 'pub-attr', public: true },
+          { id: 'f2', key: 'priv-pct', public: false }
+        ],
+        [
+          {
+            flagId: 'f1',
+            type: 'attribute',
+            payload: {
+              type: 'attribute',
+              field: 'custom',
+              customKey: 'k',
+              op: 'eq',
+              value: 1
+            }
+          },
+          { flagId: 'f2' }
+        ]
+      );
+      const { issuedAnonId } = await service.evaluateAnonymous(null, fakeReq);
+      expect(issuedAnonId).toBeNull();
+    });
+
+    it('issues a UUID and buckets with it when a public percentage flag is live', async () => {
+      seedFlags(
+        [{ id: 'f1', key: 'pub-pct', public: true }],
+        [{ flagId: 'f1' }]
+      );
+      const { result, issuedAnonId } = await service.evaluateAnonymous(
+        null,
+        fakeReq
+      );
+      expect(issuedAnonId).toMatch(UUID);
+      // percent 100: the flag is on only when the evaluation saw the new id.
+      expect(result.flags['pub-pct']).toBe(true);
+    });
+
+    it('keeps an id the visitor already holds', async () => {
+      seedFlags(
+        [{ id: 'f1', key: 'pub-pct', public: true }],
+        [{ flagId: 'f1' }]
+      );
+      const { result, issuedAnonId } = await service.evaluateAnonymous(
+        'held-id',
+        fakeReq
+      );
+      expect(issuedAnonId).toBeNull();
+      expect(result.flags['pub-pct']).toBe(true);
+    });
+
+    it.each([
+      ['disabled', { enabled: false }],
+      ['scoped to another environment', { environments: ['staging'] }]
+    ])(
+      'issues no id for a percentage flag that is %s',
+      async (_label, over) => {
+        seedFlags(
+          [{ id: 'f1', key: 'pub-pct', public: true, ...over }],
+          [{ flagId: 'f1' }]
+        );
+        const { issuedAnonId } = await service.evaluateAnonymous(null, fakeReq);
+        expect(issuedAnonId).toBeNull();
+      }
+    );
+
+    it('issues an id for a percentage flag scoped to the current environment', async () => {
+      seedFlags(
+        [
+          {
+            id: 'f1',
+            key: 'pub-pct',
+            public: true,
+            environments: ['production']
+          }
+        ],
+        [{ flagId: 'f1', effect: 'exclude' }]
+      );
+      const { issuedAnonId } = await service.evaluateAnonymous(null, fakeReq);
+      expect(issuedAnonId).toMatch(UUID);
+    });
   });
 
   it('invalidateAll bumps the version so user caches orphan', async () => {
@@ -282,8 +370,8 @@ describe('FeatureFlagResolverService', () => {
     const [a, b] = await Promise.all([first, second]);
 
     expect(flagRepo.find).toHaveBeenCalledTimes(1);
-    expect(a.flags['pub']).toBe(true);
-    expect(b.flags['pub']).toBe(true);
+    expect(a.result.flags['pub']).toBe(true);
+    expect(b.result.flags['pub']).toBe(true);
   });
 
   it('a load overlapped by invalidateAll does not repopulate the all-flags cache', async () => {
@@ -312,7 +400,7 @@ describe('FeatureFlagResolverService', () => {
     // detached stale one.
     seedFlags([{ id: 'f2', key: 'fresh', enabled: true, public: true }]);
     flagRepo.find.mockClear();
-    const result = await service.evaluateAnonymous('anon-1', fakeReq);
+    const { result } = await service.evaluateAnonymous('anon-1', fakeReq);
     expect(flagRepo.find).toHaveBeenCalledTimes(1);
     expect(result.flags['fresh']).toBe(true);
   });

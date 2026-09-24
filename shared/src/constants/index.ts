@@ -84,6 +84,7 @@ export {
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
   FEATURE_FLAG_PREVIEW_REASONS,
+  ANON_ID_PATTERN,
   type FeatureFlagRuleType,
   type FeatureFlagRuleEffect,
   type FeatureFlagAttributeField,

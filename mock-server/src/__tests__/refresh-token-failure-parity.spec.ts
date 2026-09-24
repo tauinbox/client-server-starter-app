@@ -238,8 +238,7 @@ describe('refresh-token failure parity', () => {
     const replay = await refresh(session);
     expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
     expect(replay.status).toBe(401);
-    // Another cookie (the anonymous id) rides on every response, so the
-    // assertion has to name the refresh cookie.
+    // Named, so that no other cookie on the response can satisfy it.
     expect(replay.headers.get('set-cookie') ?? '').not.toContain(
       'refresh_token='
     );

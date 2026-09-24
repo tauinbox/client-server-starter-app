@@ -4,7 +4,6 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { registerRoutes } from './middleware';
-import { anonIdMiddleware } from './middleware/anon-id.middleware';
 import controlRouter from './control.routes';
 
 export function createApp() {
@@ -14,10 +13,6 @@ export function createApp() {
   // JSON only, as the server: a cross-site form can post a urlencoded body with
   // no preflight, and a login sent that way plants the sender's session.
   app.use(express.json({ limit: '100kb' }));
-  // Anonymous ID cookie (mirrors server's AnonIdMiddleware) — must run after
-  // cookieParser so req.cookies is populated, and before route handlers so
-  // /feature-flags can read it for percentage bucketing.
-  app.use(anonIdMiddleware);
 
   // Request ID middleware (mirrors server's RequestIdMiddleware)
   const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;

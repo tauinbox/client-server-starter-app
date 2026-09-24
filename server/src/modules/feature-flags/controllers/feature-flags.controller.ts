@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Req,
+  Res,
   UseInterceptors
 } from '@nestjs/common';
 import {
@@ -11,14 +12,13 @@ import {
   ApiOperation,
   ApiTags
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { requiresSecureCookies } from '@app/shared/constants';
-import { readHostCookie } from '../../../common/utils/host-cookie';
 import { OptionalAuth } from '../../auth/decorators/optional-auth.decorator';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { EvaluateFlagsResponseDto } from '../dtos/evaluate-flags-response.dto';
-import { ANON_ID_COOKIE } from '../middleware/anon-id.middleware';
+import { readAnonId, writeAnonId } from '../utils/anon-id-cookie';
 
 type RequestWithUser = Request & {
   user?: { userId?: string; email?: string };
@@ -44,18 +44,23 @@ export class FeatureFlagsController {
       'Evaluate feature flags for the caller. Authenticated → all flags; anonymous → public flags only.'
   })
   @ApiOkResponse({ type: EvaluateFlagsResponseDto })
-  async evaluate(@Req() req: RequestWithUser) {
+  async evaluate(
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: Response
+  ) {
     const userId = req.user?.userId;
     if (userId) {
       const resolverUser = await this.resolver.buildResolverUser(userId);
       return this.resolver.evaluateForUser(resolverUser, req);
     }
-    const anonId =
-      readHostCookie(
-        req,
-        ANON_ID_COOKIE,
-        requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'))
-      ) ?? null;
-    return this.resolver.evaluateAnonymous(anonId, req);
+    const secure = requiresSecureCookies(
+      this.configService.get<string>('ENVIRONMENT')
+    );
+    const { result, issuedAnonId } = await this.resolver.evaluateAnonymous(
+      readAnonId(req, secure),
+      req
+    );
+    if (issuedAnonId !== null) writeAnonId(res, issuedAnonId, secure);
+    return result;
   }
 }

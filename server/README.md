@@ -418,7 +418,7 @@ allow rule and keeps it for a deny rule.
 #### feature-flags
 
 `feature-flags.module.ts` registers `TypeOrmModule.forFeature([FeatureFlag, FeatureFlagRule])`. It
-also registers `AnonIdMiddleware` globally through `configure()`.
+registers no middleware.
 
 `entities/` holds `FeatureFlag` and `FeatureFlagRule` with a cascade, plus their entity-contract
 files.
@@ -457,10 +457,12 @@ RBAC stays the true gate.
 `guards/feature-flag.guard.ts` returns 404 against enumeration when the named flag is disabled for
 the caller.
 
-`middleware/anon-id.middleware.ts` issues the `nxs_anon_id` cookie at the first request. The cookie
-uses `SameSite=Lax`, `Secure` in each environment other than `local`, a life of 1 year and
-`httpOnly=true`. Outside `local` its name is `__Host-nxs_anon_id`, and the middleware ignores a bare
-`nxs_anon_id`, because a sibling host can plant that name to pick the rollout bucket of a visitor.
+`utils/anon-id-cookie.ts` reads and writes the `nxs_anon_id` cookie. Only `GET /feature-flags`
+uses it, and only for an anonymous caller. The cookie uses `SameSite=Lax`, `Secure` in each
+environment other than `local`, a life of 1 year and `httpOnly=true`. Outside `local` its name is
+`__Host-nxs_anon_id`, and the read ignores a bare `nxs_anon_id`, because a sibling host can plant
+that name to pick the rollout bucket of a visitor. The read also ignores a value that is not a UUID
+(`ANON_ID_PATTERN`), because each value the server issues is a UUID.
 
 `events/feature-flag-changed.event.ts` holds
 `{ flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }`.
@@ -2289,7 +2291,7 @@ The base URL is `/api/v1`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. It sets the `nxs_anon_id` cookie at the first request |
+| GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. An anonymous call sets the `nxs_anon_id` cookie only when a live public flag has a percentage rule and the caller holds no valid one |
 | GET | `/admin/feature-flags` | `manage:FeatureFlag` | List each flag with its rules |
 | GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
 | POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag. The audit action is `FEATURE_FLAG_CREATE` |
@@ -2320,9 +2322,15 @@ change. One save in a dialog is such a burst, because it emits an update and a r
 `UserRoleChangedEvent` and `UserDeletedEvent` invalidate the cache of the affected user only. The
 cross-module communication uses `EventEmitter2` and never `forwardRef`.
 
-**Anonymous bucketing.** `AnonIdMiddleware` issues the `nxs_anon_id` cookie at the first request to
-any route. The cookie uses `SameSite=Lax`, `Secure` in each environment other than `local`, a
-`maxAge` of 1 year, and `httpOnly: true`.
+**Anonymous bucketing.** `FeatureFlagResolverService.evaluateAnonymous` issues a new
+`nxs_anon_id` only when the caller holds no valid one and a public flag that is enabled in the
+current environment has a percentage rule (`anonymousEvaluationNeedsAnonId` in
+`shared/src/utils/feature-flag-evaluator.ts`). The controller then writes the cookie. No other
+route sets it, because no other route reads it. The cookie uses `SameSite=Lax`, `Secure` in each
+environment other than `local`, a `maxAge` of 1 year, and `httpOnly: true`. A value that is not a
+UUID is treated as absent. The server does not clear a cookie that it no longer needs: a clear
+would re-bucket a rollout each time its flag goes off and on again, and the cookie expires within
+one year.
 
 The value of the cookie seeds the hash of the percentage bucket. Thus a 10 % rollout of a public flag
 converges on the same 10 % of anonymous browsers across reloads.

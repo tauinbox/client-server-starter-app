@@ -72,48 +72,104 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     });
   });
 
-  test('GET /feature-flags as anonymous issues nxs_anon_id and returns only public flags', async ({
+  test('GET /feature-flags as anonymous returns only public flags and issues no nxs_anon_id', async ({
     _mockServer
   }) => {
-    // Talk to mock-server directly via the worker fixture URL — the page.route
+    // Talk to mock-server directly via the worker fixture URL - the page.route
     // /api/ rewriter only applies to browser-initiated requests, not to
-    // Node-side fetch from the test process. Anon-id middleware fires globally
-    // in mock-server's app.ts so the first request issues Set-Cookie regardless
-    // of route.
-    const first = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
-    expect(first.status).toBe(200);
-    const firstBody = (await first.json()) as {
-      flags: Record<string, boolean>;
-    };
+    // Node-side fetch from the test process.
+    const res = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { flags: Record<string, boolean> };
     // Private seed flags (new-dashboard, beta-export) are not public, so anon
-    // sees only the public OAuth provider flags and the billing flag — all of
+    // sees only the public OAuth provider flags and the billing flag - all of
     // which resolve true because the mock environment marks every provider
     // configured.
-    expect(firstBody.flags).toEqual({
+    expect(body.flags).toEqual({
       'oauth-google': true,
       'oauth-facebook': true,
       'oauth-vk': true,
       billing: true
     });
+    // No public seed flag has a percentage rule, so nothing reads a rollout id
+    // and none is issued. The only seed percentage rule is on private
+    // beta-export.
+    expect(res.headers.get('set-cookie')).toBeNull();
 
-    const setCookie = first.headers.get('set-cookie') ?? '';
-    expect(setCookie).toContain('nxs_anon_id=');
+    const health = await fetch(`${_mockServer.url}/api/health/live`);
+    expect(health.headers.get('set-cookie')).toBeNull();
+  });
 
-    // Extract the issued anon-id and replay it on the second request — the
-    // cookie value must survive a round-trip so percentage bucketing stays
-    // sticky across reloads.
-    const anonIdMatch = /nxs_anon_id=([^;]+)/.exec(setCookie);
+  test('a public percentage flag added by an admin makes /feature-flags issue a sticky nxs_anon_id', async ({
+    _mockServer
+  }) => {
+    const login = await fetch(`${_mockServer.url}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'Password1'
+      })
+    });
+    expect(login.status).toBe(200);
+    const { tokens } = (await login.json()) as {
+      tokens: { access_token: string };
+    };
+    const adminHeaders = {
+      Authorization: `Bearer ${tokens.access_token}`,
+      'Content-Type': 'application/json'
+    };
+
+    const created = await fetch(
+      `${_mockServer.url}/api/v1/admin/feature-flags`,
+      {
+        method: 'POST',
+        headers: adminHeaders,
+        body: JSON.stringify({
+          key: 'public-rollout',
+          enabled: true,
+          public: true
+        })
+      }
+    );
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    const rules = await fetch(
+      `${_mockServer.url}/api/v1/admin/feature-flags/${id}/rules`,
+      {
+        method: 'PUT',
+        headers: adminHeaders,
+        body: JSON.stringify({
+          rules: [
+            {
+              type: 'percentage',
+              effect: 'include',
+              payload: { type: 'percentage', percent: 100 }
+            }
+          ]
+        })
+      }
+    );
+    expect(rules.status).toBe(200);
+
+    const first = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
+    expect(first.status).toBe(200);
+    const firstBody = (await first.json()) as {
+      flags: Record<string, boolean>;
+    };
+    // percent 100: true only if the evaluation used the id it just issued.
+    expect(firstBody.flags['public-rollout']).toBe(true);
+    const anonIdMatch = /nxs_anon_id=([0-9a-f-]{36});/.exec(
+      first.headers.get('set-cookie') ?? ''
+    );
     expect(anonIdMatch).not.toBeNull();
-    const anonId = anonIdMatch![1];
 
+    // The value must survive a round-trip so percentage bucketing stays
+    // sticky across reloads, and a held id is never re-issued.
     const second = await fetch(`${_mockServer.url}/api/v1/feature-flags`, {
-      headers: { Cookie: `nxs_anon_id=${anonId}` }
+      headers: { Cookie: `nxs_anon_id=${anonIdMatch![1]}` }
     });
     expect(second.status).toBe(200);
-    // Server must NOT re-issue the cookie on subsequent requests with a valid
-    // anon-id already present.
-    expect(second.headers.get('set-cookie') ?? '').not.toContain(
-      'nxs_anon_id='
-    );
+    expect(second.headers.get('set-cookie')).toBeNull();
   });
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -6,6 +7,7 @@ import type { Cache } from 'cache-manager';
 import type { Request } from 'express';
 import { In, Repository } from 'typeorm';
 import {
+  anonymousEvaluationNeedsAnonId,
   evaluateFeatureFlag,
   type EvaluatorFlag,
   type EvaluatorRule,
@@ -25,6 +27,12 @@ export interface ResolverUser {
   email: string | null;
   createdAt: Date | null;
   roles: string[];
+}
+
+export interface AnonymousEvaluation {
+  result: EvaluatedFeatureFlagsResponse;
+  // Set only when this evaluation minted the rollout id; the caller persists it.
+  issuedAnonId: string | null;
 }
 
 interface CachedFlag {
@@ -109,13 +117,25 @@ export class FeatureFlagResolverService {
     return result;
   }
 
+  /**
+   * Evaluates the public flags for a visitor. `anonId` is the visitor's valid
+   * rollout id or null; a new one is minted only when a percentage rule would
+   * read it, so no identifier is handed out that nothing uses.
+   */
   async evaluateAnonymous(
     anonId: string | null,
     req: Request
-  ): Promise<EvaluatedFeatureFlagsResponse> {
+  ): Promise<AnonymousEvaluation> {
     const flags = await this.loadAllFlags();
-    const ctx = this.buildContext(null, anonId, req);
-    return this.evaluate(flags, ctx, /* publicOnly */ true);
+    const issuedAnonId =
+      anonId === null && anonymousEvaluationNeedsAnonId(flags, this.env())
+        ? randomUUID()
+        : null;
+    const ctx = this.buildContext(null, anonId ?? issuedAnonId, req);
+    return {
+      result: this.evaluate(flags, ctx, /* publicOnly */ true),
+      issuedAnonId
+    };
   }
 
   async isEnabledForUser(
@@ -208,7 +228,7 @@ export class FeatureFlagResolverService {
     anonId: string | null,
     req: Request
   ): FeatureFlagEvaluationContext {
-    const env = this.configService.get<string>('ENVIRONMENT') ?? 'production';
+    const env = this.env();
     const attributes = this.attributeRegistry.resolveAll(
       user
         ? {
@@ -226,6 +246,10 @@ export class FeatureFlagResolverService {
       attributes,
       env
     };
+  }
+
+  private env(): string {
+    return this.configService.get<string>('ENVIRONMENT') ?? 'production';
   }
 
   private evaluate(
