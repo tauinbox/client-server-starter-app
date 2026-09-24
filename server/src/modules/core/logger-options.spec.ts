@@ -5,6 +5,8 @@ import { LoggerModule, Logger as PinoNestLogger } from 'nestjs-pino';
 import { __resetOutOfContextForTests } from 'nestjs-pino/PinoLogger';
 import { pinoHttp } from 'pino-http';
 import type { Options } from 'pino-http';
+import { IncomingMessage, ServerResponse } from 'http';
+import { Socket } from 'net';
 import { Writable } from 'stream';
 import { QueryFailedError } from 'typeorm';
 import { buildLoggerOptions, maskEmailsInText } from './logger-options';
@@ -17,6 +19,7 @@ interface LogLine {
   msg?: string;
   context?: string;
   err?: Record<string, unknown>;
+  req?: Record<string, unknown>;
 }
 
 function collect(lines: LogLine[]): Writable {
@@ -179,6 +182,47 @@ describe('buildLoggerOptions inside a request', () => {
     ]);
     expect(lines[0].err?.['type']).toBe('QueryFailedError');
     expect(JSON.stringify(lines[0])).not.toContain(ADDRESS);
+  });
+
+  it('writes only the allowlisted request fields and redacts the OAuth code', () => {
+    const lines: LogLine[] = [];
+    const middleware = pinoHttp(productionOptions(), collect(lines));
+    const req = new IncomingMessage(new Socket());
+    req.method = 'GET';
+    req.url = '/api/v1/auth/google/callback?code=OAUTHCODE&state=OAUTHSTATE';
+    req.headers = {
+      authorization: 'Bearer ACCESS-SECRET',
+      cookie: '__Host-refresh_token=REFRESH-SECRET',
+      'user-agent': 'Probe-UA',
+      'x-request-id': 'rid-1'
+    };
+    middleware(req, new ServerResponse(req));
+
+    req.log.warn('Callback failed');
+
+    const written = JSON.stringify(lines[0]);
+    for (const secret of [
+      'ACCESS-SECRET',
+      'REFRESH-SECRET',
+      'OAUTHCODE',
+      'OAUTHSTATE'
+    ]) {
+      expect(written).not.toContain(secret);
+    }
+    expect(Object.keys(lines[0].req ?? {}).sort()).toEqual([
+      'headers',
+      'id',
+      'method',
+      'url'
+    ]);
+    expect(lines[0].req).toMatchObject({
+      method: 'GET',
+      url: '/api/v1/auth/google/callback?code=REDACTED&state=REDACTED'
+    });
+    expect(lines[0].req?.['headers']).toEqual({
+      'user-agent': 'Probe-UA',
+      'x-request-id': 'rid-1'
+    });
   });
 });
 

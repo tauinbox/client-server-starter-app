@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import * as ipaddr from 'ipaddr.js';
+import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 
 type AllowedRange = [ipaddr.IPv4 | ipaddr.IPv6, number];
 
@@ -49,7 +50,7 @@ export class WebhookIpAllowlistGuard implements CanActivate {
       return true;
     }
     this.logger.warn(
-      `Rejected webhook from non-allowlisted IP ${req.ip ?? '<unknown>'} on ${req.method} ${req.originalUrl}`
+      `Rejected webhook from non-allowlisted IP ${req.ip ?? '<unknown>'} on ${req.method} ${redactSensitiveQuery(req.originalUrl)}`
     );
     throw new ForbiddenException();
   }

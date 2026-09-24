@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import * as ipaddr from 'ipaddr.js';
+import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 
 // Covers every legitimate scrape path (Prometheus on the docker bridge,
 // host-local checks). req.ip honors `trust proxy` (TRUSTED_PROXIES), so an
@@ -23,7 +24,7 @@ export class InternalNetworkGuard implements CanActivate {
       return true;
     }
     this.logger.warn(
-      `Rejected request from non-internal IP ${req.ip ?? '<unknown>'} on ${req.method} ${req.originalUrl}`
+      `Rejected request from non-internal IP ${req.ip ?? '<unknown>'} on ${req.method} ${redactSensitiveQuery(req.originalUrl)}`
     );
     throw new ForbiddenException();
   }

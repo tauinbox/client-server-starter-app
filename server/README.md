@@ -250,6 +250,15 @@ reply that quotes the recipient. Add a field to the allowlist only after you mak
 cannot carry PII or a secret. The allowlist keeps `message`, thus a third-party error message can
 still carry PII that is not an email address.
 
+The `req` serializer also writes an allowlist only: `id`, `method`, `url`, `remoteAddress`, and the
+`user-agent`, `x-request-id` and `content-type` headers. `nestjs-pino` binds the request to each line
+that code writes inside it, and the default serializer copies each header and the query. Thus
+each 4xx warning wrote the Bearer token and the refresh cookie, and the OAuth callback lines wrote
+the `code` and `state` values. The `url` goes through `redactSensitiveQuery`, and so does each
+URL in a log message (`GlobalExceptionFilter`, `RequestLoggingMiddleware` and the two IP guards). The log keeps no
+`query`, no `params` and no `x-forwarded-for`. The client IP of a security event stays in
+`audit_logs`. Add a header to the allowlist only after you make sure that it cannot carry a secret.
+
 `health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
 readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
 environment is production.

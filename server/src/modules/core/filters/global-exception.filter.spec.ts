@@ -338,6 +338,23 @@ describe('GlobalExceptionFilter', () => {
     expect(loggerWarnSpy).toHaveBeenCalledWith(expect.stringContaining('404'));
     expect(loggerErrorSpy).not.toHaveBeenCalled();
   });
+
+  it('redacts the credential query values in the logged path only', () => {
+    const url = '/api/v1/auth/google/callback?code=OAUTHCODE&state=OAUTHSTATE';
+    mockHttpAdapter.getRequestUrl.mockReturnValue(url);
+
+    filter.catch(new NotFoundException('Not found'), mockHost);
+
+    const [logged] = loggerWarnSpy.mock.calls[0] as [string];
+    expect(logged).toContain('code=REDACTED&state=REDACTED');
+    expect(logged).not.toContain('OAUTHCODE');
+    expect(logged).not.toContain('OAUTHSTATE');
+    expect(mockHttpAdapter.reply).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ path: url }),
+      404
+    );
+  });
 });
 
 function createQueryFailedError(pgCode: string): QueryFailedError {
