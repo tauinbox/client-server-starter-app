@@ -1811,8 +1811,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2527 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 456 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and a mail sink, 444 pass and 12 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1323 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 272 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1339 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 275 tests pass |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 828 tests pass |
 
 ## CI/CD
@@ -1952,6 +1952,11 @@ a second request to the registry for a verdict that gates nothing.
   One session still ends at `SESSION_ABSOLUTE_MAX_MS`, which is 30 days by default. The session
   start is a column of its own, and the rotation carries it over unchanged, thus a refresh cannot
   move that bound. Past it the refresh answers 401 and the server deletes every row of the session.
+
+  An open tab ends its session after 30 minutes without user input (`SESSION_IDLE_TIMEOUT_MS`,
+  ASVS 5.0 V7.3.1). Input in one tab keeps all tabs of the browser alive. The client revokes the
+  session on the server and shows the reason on the login page. This control is on the client, and a
+  closed browser is not in its scope: it stays bound by the 7-day refresh cookie only.
 
   The server rotates the token at each use. The rotation revokes the presented row conditionally.
   Thus two requests that race with the same token make exactly one live successor. The loser gets a

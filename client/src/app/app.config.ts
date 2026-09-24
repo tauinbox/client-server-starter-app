@@ -63,6 +63,7 @@ export const appConfig: ApplicationConfig = {
             .then(() => authService.fetchRbacMetadata()),
           featureFlagsStore.load()
         ]);
+        authService.startIdleTimeout();
         notificationsService.connect();
       } else if (authStore.hasPersistedUser()) {
         // Page reload: access token gone from memory, try to restore via refresh cookie
@@ -74,6 +75,7 @@ export const appConfig: ApplicationConfig = {
               .then(() => authService.fetchRbacMetadata()),
             featureFlagsStore.load()
           ]);
+          authService.startIdleTimeout();
           notificationsService.connect();
         } catch {
           authService.clearSession();

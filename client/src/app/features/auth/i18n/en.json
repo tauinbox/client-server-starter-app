@@ -9,6 +9,7 @@
     "registrationPendingVerification": "Registration successful! Please check your email to verify your account before logging in.",
     "passwordChanged": "Your password was changed and every session was ended. Sign in with the new password.",
     "passwordChangedEmailPending": "Your password was changed and every session was ended. Sign in with the new password. A confirmation link was sent to your new email address.",
+    "signedOutIdle": "You were signed out after {{ minutes }} minutes without activity. Sign in again to continue.",
     "lockoutCountdown": "Try again in {{ seconds }} seconds",
     "verificationSent": "Verification email sent! Check your inbox.",
     "sending": "Sending...",

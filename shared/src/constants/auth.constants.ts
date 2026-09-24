@@ -83,6 +83,13 @@ export const MIN_JWT_EXPIRATION_SECONDS = 2 * TOKEN_REFRESH_WINDOW_SECONDS;
 export const DEFAULT_SESSION_ABSOLUTE_MAX_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
+ * How long an open tab stays signed in without user input. Input in any tab of
+ * the same browser keeps every tab alive. A closed browser is not covered: it
+ * is bound by the refresh token lifetime only.
+ */
+export const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
+/**
  * How long after a rotation a replay of the rotated token reads as a lost
  * response instead of a theft. Inside this window, and only while the
  * successor is still unused, the replay ends its own session and no other.

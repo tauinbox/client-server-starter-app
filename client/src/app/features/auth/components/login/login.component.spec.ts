@@ -398,6 +398,27 @@ describe('LoginComponent', () => {
     });
   });
 
+  describe('session_ended query parameter', () => {
+    const renderWith = (value: string): HTMLElement => {
+      queryParams['session_ended'] = value;
+      const bannerFixture = TestBed.createComponent(LoginComponent);
+      bannerFixture.detectChanges();
+      return bannerFixture.nativeElement as HTMLElement;
+    };
+
+    it('says the session ended after the idle timeout', () => {
+      expect(renderWith('idle').textContent).toContain(
+        'You were signed out after 30 minutes without activity.'
+      );
+    });
+
+    it('shows no banner for an unknown value', () => {
+      expect(renderWith('expired').textContent).not.toContain(
+        'You were signed out'
+      );
+    });
+  });
+
   describe('form validation', () => {
     it('should be invalid when empty', () => {
       expect(component.loginForm().valid()).toBe(false);

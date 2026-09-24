@@ -26,9 +26,15 @@ import type {
 import { AuthStore, AUTH_USER_KEY } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import { navigateToLogin } from '../utils/navigate-to-login';
+import type { SessionEndedValue } from '../constants/session-ended.const';
+import {
+  SESSION_ENDED,
+  SESSION_ENDED_PARAM
+} from '../constants/session-ended.const';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import { TokenService } from './token.service';
+import { IdleTimeoutService } from './idle-timeout.service';
 import { RbacMetadataService } from './rbac-metadata.service';
 import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
@@ -45,6 +51,7 @@ export class AuthService {
   readonly #router = inject(Router);
   readonly #authStore = inject(AuthStore);
   readonly #tokenService = inject(TokenService);
+  readonly #idleTimeout = inject(IdleTimeoutService);
   readonly #rbacMetadataService = inject(RbacMetadataService);
   readonly #rbacMetadataStore = inject(RbacMetadataStore);
   readonly #notificationsService = inject(NotificationsService);
@@ -86,6 +93,10 @@ export class AuthService {
     this.#tokenService.sessionCleared$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.#clearSessionState());
+
+    this.#idleTimeout.timedOut$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => this.logout(this.#router.url, SESSION_ENDED.Idle));
 
     this.#listenForCrossTabLogout();
   }
@@ -255,6 +266,7 @@ export class AuthService {
    */
   completeAuthentication(): Promise<void> {
     this.scheduleTokenRefresh();
+    this.#idleTimeout.start();
     // reload(), not load(): flags may already be loaded from the
     // anonymous bootstrap and the authenticated set can differ.
     void this.#featureFlagsStore.reload();
@@ -279,14 +291,17 @@ export class AuthService {
     });
   }
 
-  logout(returnUrl?: string): void {
+  logout(returnUrl?: string, reason?: SessionEndedValue): void {
     this.#tokenService.cancelRefresh();
 
     const completeLogout = () => {
+      const queryParams = reason ? { [SESSION_ENDED_PARAM]: reason } : {};
       if (returnUrl) {
-        navigateToLogin(this.#router, returnUrl);
+        navigateToLogin(this.#router, returnUrl, queryParams);
       } else {
-        void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
+        void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
+          queryParams
+        });
       }
     };
 
@@ -334,6 +349,7 @@ export class AuthService {
    * caches one of them skips outlive the session on a shared device.
    */
   #clearSessionState(): void {
+    this.#idleTimeout.stop();
     this.#notificationsService.disconnect();
     this.#authStore.clearSession();
     this.#rbacMetadataStore.clear();
@@ -363,6 +379,11 @@ export class AuthService {
 
   scheduleTokenRefresh(): void {
     this.#tokenService.scheduleTokenRefresh();
+  }
+
+  /** For the bootstrap initializer, which restores a session without a sign-in. */
+  startIdleTimeout(): void {
+    this.#idleTimeout.start();
   }
 
   cancelRefresh(): void {

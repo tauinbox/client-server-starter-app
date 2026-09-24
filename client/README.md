@@ -504,6 +504,19 @@ in `AUTH_EXCLUDED_URLS`, thus the interceptor does not retry it, and the failed 
 this refusal. `session-absolute-lifetime.spec.ts` drives the flow against the mock through
 `POST /__control/age-session`, because no test can wait 30 days out.
 
+An open tab also ends its session after `SESSION_IDLE_TIMEOUT_MS` (30 minutes) without user input.
+`IdleTimeoutService` listens for `pointerdown`, `keydown`, `wheel` and `touchstart` outside the
+Angular zone. It writes the time of the last input to the `auth_last_activity` key in `localStorage`,
+at most once in 30 s, thus input in one tab keeps all tabs alive. It compares that time with the
+clock each 60 s and when the tab becomes visible, because a hidden tab runs about one timer each
+minute and a frozen tab runs none. On a timeout it emits `timedOut$`, and `AuthService` calls
+`logout()` with the `session_ended=idle` marker. The logout revokes the session on the server, and
+the removal of `auth_user` signs out the other tabs. `completeAuthentication()` and the bootstrap
+initializer start the service, and the session teardown stops it. A start counts as input. Thus a
+browser that opens again inside the refresh window is not signed out at once: a closed browser is
+bound by `JWT_REFRESH_EXPIRATION` only. `idle-timeout.spec.ts` drives the three cases with
+`page.clock`.
+
 The session teardown is one routine. `logout()` runs it on both branches.
 `TokenService.forceLogout()` reaches it through the `sessionCleared$` subject, because `TokenService`
 cannot import `AuthService`. Such an import closes a dependency cycle. Thus each exit path
@@ -1036,7 +1049,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 272 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 275 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1323 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
