@@ -9,6 +9,7 @@ import {
 import { HttpAdapterHost } from '@nestjs/core';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
+import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { ErrorResponse } from './error-response.interface';
 
 const PG_ERROR_MAP: Record<
@@ -79,13 +80,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       ...(retryAfter !== undefined && { retryAfter })
     };
 
+    const loggedPath = redactSensitiveQuery(path);
     if (statusCode >= 500) {
       this.logger.error(
-        `${path} ${statusCode} — ${message}`,
+        `${loggedPath} ${statusCode} — ${message}`,
         exception instanceof Error ? exception.stack : undefined
       );
     } else {
-      this.logger.warn(`${path} ${statusCode} — ${message}`);
+      this.logger.warn(`${loggedPath} ${statusCode} — ${message}`);
     }
 
     const response = ctx.getResponse<unknown>();

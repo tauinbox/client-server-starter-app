@@ -1,3 +1,4 @@
+import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import type { Params } from 'nestjs-pino';
 import { stdSerializers } from 'pino';
 import type { LogFn } from 'pino';
@@ -76,6 +77,52 @@ export function serializeLoggedError(value: unknown): unknown {
   return result;
 }
 
+const LOGGED_REQUEST_HEADERS: readonly string[] = [
+  'user-agent',
+  'x-request-id',
+  'content-type'
+];
+
+interface SerializedRequest {
+  id?: unknown;
+  method?: string;
+  url?: string;
+  remoteAddress?: string;
+  headers: Record<string, string>;
+}
+
+/**
+ * nestjs-pino binds the request to every line written inside it, and the
+ * standard serializer copies every header, the query and the raw URL. Those
+ * carry the Bearer token, the refresh cookie and the OAuth code. Keep only an
+ * allowlist, and redact the credential query parameters in the URL. Add a
+ * header here only after you confirm that it cannot carry a secret.
+ *
+ * pino-http passes the output of the standard serializer to this one.
+ */
+export function serializeLoggedRequest(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+
+  const source = value as Record<string, unknown>;
+  const result: SerializedRequest = { headers: {} };
+  if (source['id'] !== undefined) result.id = source['id'];
+  if (typeof source['method'] === 'string') result.method = source['method'];
+  if (typeof source['url'] === 'string') {
+    result.url = redactSensitiveQuery(source['url']);
+  }
+  if (typeof source['remoteAddress'] === 'string') {
+    result.remoteAddress = source['remoteAddress'];
+  }
+  const headers = source['headers'];
+  if (typeof headers === 'object' && headers !== null) {
+    for (const name of LOGGED_REQUEST_HEADERS) {
+      const header = (headers as Record<string, unknown>)[name];
+      if (typeof header === 'string') result.headers[name] = header;
+    }
+  }
+  return result;
+}
+
 export function buildLoggerOptions(environment: string | undefined): Params {
   const production = environment === 'production';
   return {
@@ -88,7 +135,7 @@ export function buildLoggerOptions(environment: string | undefined): Params {
           method.apply(this, moveErrorArgToErrKey(args) as Parameters<LogFn>);
         }
       },
-      serializers: { err: serializeLoggedError },
+      serializers: { err: serializeLoggedError, req: serializeLoggedRequest },
       transport: production
         ? undefined
         : {
