@@ -453,6 +453,39 @@ describe('recovery codes', () => {
 
     expect(res.status).toBe(400);
   });
+
+  // Enrolments before the entropy rise got two-group codes, and the owner
+  // keeps them until the set is replaced.
+  it('accepts a legacy two-group code beside the three-group set', async () => {
+    await enrol();
+    const user = findUserByEmail(CREDENTIALS.email);
+    if (!user) throw new Error('seed user missing');
+    user.totpRecoveryCodes = [...MOCK_RECOVERY_CODES, 'VVVVVVVV-VVVVVVVV'];
+
+    const { mfaToken } = (await login()) as { mfaToken: string };
+    const res = await post('/auth/mfa/recovery', {
+      mfaToken,
+      recoveryCode: 'vvvvvvvvvvvvvvvv'
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects a third group of the wrong length with the server message', async () => {
+    await enrol();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+
+    const res = await post('/auth/mfa/recovery', {
+      mfaToken,
+      recoveryCode: 'AAAAAAAA-AAAAAAAA-AAAA'
+    });
+    const body = (await res.json()) as { errors: string[] };
+
+    expect(res.status).toBe(400);
+    expect(body.errors).toEqual([
+      'recoveryCode must match /^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}(?:-?[A-Za-z2-7]{8})?$/ regular expression'
+    ]);
+  });
 });
 
 describe('replacing the recovery codes', () => {

@@ -1092,8 +1092,8 @@ with `lockedUntil` and `retryAfter`, and a correct code is refused for the rest 
 The window opens on the first refused code and is never extended. A correct code closes it, and so
 does a spent recovery code.
 
-`POST /auth/mfa/recovery` is outside the brake on purpose. A recovery code is 80 bits of base32, so
-brute force is not the threat there, and it is the owner's way back in while the authenticator is
+`POST /auth/mfa/recovery` is outside the brake on purpose. A recovery code is 120 bits of base32
+(80 bits for a set issued before 2026-09-24), so brute force is not the threat there, and it is the owner's way back in while the authenticator is
 shut: a brake that closes every door lets a caller who holds only the password deny the owner the
 account. The enrolment stage is not counted either, because that caller is an authenticated owner
 setting up their own device.

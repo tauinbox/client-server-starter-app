@@ -444,6 +444,10 @@ router.post('/verify', (req, res) => {
   issueSession(req, res, user);
 });
 
+/** Mirrors `RECOVERY_CODE_PATTERN` in the server DTO, legacy two-group form included. */
+const RECOVERY_CODE_PATTERN =
+  /^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}(?:-?[A-Za-z2-7]{8})?$/;
+
 // POST /api/v1/auth/mfa/recovery
 router.post('/recovery', (req, res) => {
   const { mfaToken, recoveryCode } = req.body;
@@ -454,13 +458,13 @@ router.post('/recovery', (req, res) => {
   }
   if (
     typeof recoveryCode !== 'string' ||
-    !/^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}$/.test(recoveryCode)
+    !RECOVERY_CODE_PATTERN.test(recoveryCode)
   ) {
     res
       .status(400)
       .json(
         validationError(
-          'recoveryCode must match /^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}$/ regular expression'
+          `recoveryCode must match ${RECOVERY_CODE_PATTERN} regular expression`
         )
       );
     return;
