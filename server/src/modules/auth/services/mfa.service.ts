@@ -267,6 +267,43 @@ export class MfaService {
   }
 
   /**
+   * The way back for an owner who lost the authenticator and the recovery codes
+   * too. The administrator has already proved itself through
+   * AuthService.assertStepUp and has proved the owner's identity outside the
+   * system. The owner is never the caller here: that path is `disable`, which
+   * demands the owner's own factor.
+   */
+  async resetByAdmin(
+    target: User,
+    actor: { id: string; email: string },
+    context?: AuditContext
+  ): Promise<void> {
+    this.assertEnabled(target);
+
+    await this.dataSource.getRepository(User).update(target.id, {
+      totpSecret: null,
+      totpEnabledAt: null,
+      totpRecoveryCodes: null,
+      totpLastUsedStep: null
+    });
+
+    await this.auditService.log({
+      action: AuditAction.MFA_RESET_BY_ADMIN,
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: target.id,
+      targetType: 'User',
+      context
+    });
+
+    this.mailService
+      .sendMfaResetByAdminNotification(target.email, target.locale, context?.ip)
+      .catch((err) =>
+        this.logger.error('Failed to send MFA reset notification', err)
+      );
+  }
+
+  /**
    * What a correct password buys on an account that carries the factor. The
    * `mfa_pending` purpose is what stops it being usable as a bearer token:
    * JwtStrategy accepts the access purpose only.

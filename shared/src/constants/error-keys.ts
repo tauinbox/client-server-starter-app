@@ -57,7 +57,8 @@ export const ErrorKeys = {
   USERS: {
     NOT_FOUND: 'errors.users.notFound',
     EMAIL_EXISTS: 'errors.users.emailExists',
-    SUPER_TARGET_FORBIDDEN: 'errors.users.superTargetForbidden'
+    SUPER_TARGET_FORBIDDEN: 'errors.users.superTargetForbidden',
+    MFA_RESET_SELF: 'errors.users.mfaResetSelf'
   },
   ROLES: {
     NOT_FOUND: 'errors.roles.notFound',
