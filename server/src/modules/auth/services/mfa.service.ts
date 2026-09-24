@@ -48,7 +48,7 @@ import { withTransaction } from '../../../common/utils/with-transaction.util';
 
 const base32 = new ScureBase32Plugin();
 
-/** Both halves of a recovery code, as the user reads it: ABCDEFGH-IJKLMNOP. */
+/** One group of a recovery code, as the user reads it: ABCDEFGH-IJKLMNOP-QRSTUVWX. */
 const RECOVERY_CODE_GROUP = 8;
 
 /** Namespace of the per-account counter of refused authenticator codes. */
@@ -584,9 +584,11 @@ export class MfaService {
           padding: false
         })
         .toUpperCase();
-      const head = encoded.slice(0, RECOVERY_CODE_GROUP);
-      const tail = encoded.slice(RECOVERY_CODE_GROUP);
-      return head + '-' + tail;
+      const groups: string[] = [];
+      for (let i = 0; i < encoded.length; i += RECOVERY_CODE_GROUP) {
+        groups.push(encoded.slice(i, i + RECOVERY_CODE_GROUP));
+      }
+      return groups.join('-');
     });
   }
 

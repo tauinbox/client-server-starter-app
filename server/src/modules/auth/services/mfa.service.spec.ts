@@ -3,10 +3,11 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource, IsNull, Not } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { generateSync } from 'otplib';
+import { ScureBase32Plugin, generateSync } from 'otplib';
 import {
   ErrorKeys,
   MAX_FAILED_ATTEMPTS,
+  MFA_RECOVERY_CODE_BYTES,
   TOKEN_PURPOSE,
   TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
@@ -258,8 +259,28 @@ describe('MfaService', () => {
 
       expect(stored.totpRecoveryCodes).not.toContain(recoveryCodes[0]);
       expect(stored.totpRecoveryCodes).toContain(
-        hashToken(recoveryCodes[0].replace('-', ''))
+        hashToken(recoveryCodes[0].replaceAll('-', ''))
       );
+    });
+
+    // Below 112 bits ASVS 5.0 V6.5.2 wants a salted password hash, and the
+    // service stores a plain SHA-256. The entropy is what keeps that legal.
+    it('issues codes of three groups that carry 120 bits', async () => {
+      const { user, secret } = await enrol();
+
+      const { recoveryCodes } = await service.completeEnrolment(
+        user,
+        generateSync({ secret })
+      );
+
+      for (const recoveryCode of recoveryCodes) {
+        expect(recoveryCode).toMatch(/^[A-Z2-7]{8}-[A-Z2-7]{8}-[A-Z2-7]{8}$/);
+        const bytes = new ScureBase32Plugin().decode(
+          recoveryCode.replaceAll('-', '')
+        );
+        expect(bytes).toHaveLength(MFA_RECOVERY_CODE_BYTES);
+      }
+      expect(MFA_RECOVERY_CODE_BYTES * 8).toBeGreaterThanOrEqual(112);
     });
 
     it('does not turn the factor on for a wrong code', async () => {
@@ -397,7 +418,7 @@ describe('MfaService', () => {
       expect(stored.totpRecoveryCodes).not.toContain('spent-hash');
       expect(stored.totpRecoveryCodes).not.toContain(recoveryCodes[0]);
       expect(stored.totpRecoveryCodes).toContain(
-        hashToken(recoveryCodes[0].replace('-', ''))
+        hashToken(recoveryCodes[0].replaceAll('-', ''))
       );
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -727,6 +748,31 @@ describe('MfaService', () => {
       await expect(
         service.consumeRecoveryCode('token', 'abcdefgh ijklmnop')
       ).resolves.toBeDefined();
+    });
+
+    // The two-group form is what every enrolment before the entropy rise got,
+    // and nothing forces those owners to replace it.
+    it('accepts a three-group code and a legacy two-group code alike', async () => {
+      repository.findOne.mockResolvedValue(
+        buildUser({
+          totpSecret: 'v1.a.b.c',
+          totpEnabledAt: new Date(),
+          totpRecoveryCodes: [
+            hashToken('ABCDEFGHIJKLMNOPQRSTUVWX'),
+            hashToken('ABCDEFGHIJKLMNOP')
+          ]
+        })
+      );
+
+      await service.consumeRecoveryCode('token', 'abcdefgh-ijklmnop-qrstuvwx');
+      expect(repository.update).toHaveBeenLastCalledWith('user-1', {
+        totpRecoveryCodes: [hashToken('ABCDEFGHIJKLMNOP')]
+      });
+
+      await service.consumeRecoveryCode('token', code);
+      expect(repository.update).toHaveBeenLastCalledWith('user-1', {
+        totpRecoveryCodes: [hashToken('ABCDEFGHIJKLMNOPQRSTUVWX')]
+      });
     });
 
     // A brake that shuts every door lets a caller who holds only the password

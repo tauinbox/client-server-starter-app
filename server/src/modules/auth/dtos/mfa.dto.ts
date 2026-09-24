@@ -22,10 +22,13 @@ const CODE_DESCRIPTION = 'Code from the authenticator app';
 const CODE_EXAMPLE = '123456';
 
 /**
- * A recovery code as the user reads it: sixteen base32 characters in two
- * groups. The separator is optional because people retype it either way.
+ * A recovery code as the user reads it: 24 base32 characters in three groups.
+ * The separator is optional because people retype it either way. The third
+ * group is optional too: codes issued before the entropy rise carry two
+ * groups, and they stay valid until the owner replaces the set.
  */
-const RECOVERY_CODE_PATTERN = /^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}$/;
+const RECOVERY_CODE_PATTERN =
+  /^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}(?:-?[A-Za-z2-7]{8})?$/;
 
 export class MfaSetupDto {
   @ApiPropertyOptional({
@@ -105,7 +108,7 @@ export class MfaRecoveryDto {
 
   @ApiProperty({
     description: 'One of the recovery codes issued at enrolment',
-    example: 'ABCDEFGH-IJKLMNOP'
+    example: 'ABCDEFGH-IJKLMNOP-QRSTUVWX'
   })
   @IsString()
   @Matches(RECOVERY_CODE_PATTERN)
@@ -135,7 +138,7 @@ export class MfaSetupResponseDto {
 export class MfaRecoveryCodesResponseDto {
   @ApiProperty({
     description: 'Single-use recovery codes. They are readable only once.',
-    example: ['ABCDEFGH-IJKLMNOP']
+    example: ['ABCDEFGH-IJKLMNOP-QRSTUVWX']
   })
   recoveryCodes: string[];
 }

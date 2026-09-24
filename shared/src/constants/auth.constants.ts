@@ -135,7 +135,9 @@ export const TOTP_EPOCH_TOLERANCE_SECONDS = 30;
 export const MFA_RECOVERY_CODE_COUNT = 10;
 
 /**
- * Bytes of entropy behind one recovery code. Ten bytes render as sixteen
- * base32 characters, which the server presents in two groups of eight.
+ * Bytes of entropy behind one recovery code. Fifteen bytes render as 24
+ * base32 characters, which the server presents in three groups of eight.
+ * The 120 bits clear the 112-bit floor under which ASVS 5.0 V6.5.2 demands a
+ * salted password hash, so a plain SHA-256 of the code stays sufficient.
  */
-export const MFA_RECOVERY_CODE_BYTES = 10;
+export const MFA_RECOVERY_CODE_BYTES = 15;
