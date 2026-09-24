@@ -67,6 +67,7 @@ interface MessageBuilders {
   mfaEnabled: (details: CredentialChangeDetails) => EmailMessage;
   mfaDisabled: (details: CredentialChangeDetails) => EmailMessage;
   mfaRecoveryCodesReplaced: (details: CredentialChangeDetails) => EmailMessage;
+  mfaResetByAdmin: (details: CredentialChangeDetails) => EmailMessage;
 }
 
 /**
@@ -201,6 +202,16 @@ const en: MessageBuilders = {
       enDetails(details),
       EN_RECOVERY
     ]
+  }),
+  mfaResetByAdmin: (details) => ({
+    subject: 'An administrator turned off your two-factor authentication',
+    heading: 'Two-factor authentication was reset',
+    paragraphs: [
+      'An administrator removed the authenticator and the recovery codes of your account. You now sign in with your password alone, and every active session was signed out.',
+      enDetails(details),
+      'Set up two-factor authentication again from your profile.',
+      EN_RECOVERY
+    ]
   })
 };
 
@@ -302,6 +313,16 @@ const ru: MessageBuilders = {
     paragraphs: [
       'Для аккаунта выпущен новый набор резервных кодов. Все коды прежнего набора больше не работают.',
       ruDetails(details),
+      RU_RECOVERY
+    ]
+  }),
+  mfaResetByAdmin: (details) => ({
+    subject: 'Администратор отключил двухфакторную аутентификацию',
+    heading: 'Двухфакторная аутентификация сброшена',
+    paragraphs: [
+      'Администратор удалил аутентификатор и резервные коды вашего аккаунта. Теперь вход выполняется только по паролю, а все активные сеансы завершены.',
+      ruDetails(details),
+      'Снова включите двухфакторную аутентификацию в профиле.',
       RU_RECOVERY
     ]
   })

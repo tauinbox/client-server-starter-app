@@ -6,7 +6,8 @@ import {
   DestroyRef,
   inject,
   input,
-  signal
+  signal,
+  ViewContainerRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -36,6 +37,7 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatChipSet, MatChip, MatChipAvatar } from '@angular/material/chips';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
+import { MatDialog } from '@angular/material/dialog';
 import { UserService } from '../../services/user.service';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserRoleService } from '../../services/user-role.service';
@@ -58,6 +60,9 @@ import {
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { passwordByteLimit } from '@shared/forms/password-byte-limit';
+import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
+import type { MfaResetDialogData } from '../mfa-reset-dialog/mfa-reset-dialog.component';
+import { MfaResetDialogComponent } from '../mfa-reset-dialog/mfa-reset-dialog.component';
 
 type UserFormData = {
   email: string;
@@ -121,6 +126,8 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
   readonly #shortcuts = inject(KeyboardShortcutsService);
+  readonly #dialog = inject(MatDialog);
+  readonly #viewContainerRef = inject(ViewContainerRef);
 
   readonly id = input.required<string>();
   readonly user = signal<User | null>(null);
@@ -249,6 +256,14 @@ export class UserEditComponent implements OnInit, OnDestroy {
       }) && this.id() !== this.#authStore.user()?.id
     );
   });
+
+  /** The owner turns the factor off on the profile, with the owner's factor. */
+  protected readonly canResetMfa = computed(
+    () =>
+      this.user()?.mfaEnabled === true &&
+      this.canManageUser() &&
+      this.id() !== this.#authStore.user()?.id
+  );
 
   ngOnInit(): void {
     this.loadUser();
@@ -489,6 +504,29 @@ export class UserEditComponent implements OnInit, OnDestroy {
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.#notify.error(err, 'users.edit.errorUnlockFailed');
+        }
+      });
+  }
+
+  openMfaReset(): void {
+    const u = this.user();
+    if (!u) return;
+
+    const data: MfaResetDialogData = { user: u, factor: this.stepUpFactor() };
+    this.#dialog
+      .open<MfaResetDialogComponent, MfaResetDialogData, User>(
+        MfaResetDialogComponent,
+        {
+          ...dialogSizeConfig(DialogSize.Form),
+          viewContainerRef: this.#viewContainerRef,
+          data
+        }
+      )
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((updated) => {
+        if (updated) {
+          this.user.set(updated);
         }
       });
   }

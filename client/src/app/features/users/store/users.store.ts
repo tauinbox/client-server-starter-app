@@ -20,6 +20,7 @@ import { NotifyService } from '@core/services/notify.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import type { CursorPageRequest } from '@shared/utils/pagination.utils';
 import { UserService } from '../services/user.service';
+import type { MfaResetRequest } from '../services/user.service';
 import type {
   CursorPaginatedResponse,
   SortOrder,
@@ -143,6 +144,14 @@ export const UsersStore = signalStore(
 
       restoreUser(id: string): Observable<User> {
         return userService.restore(id).pipe(
+          tap((user) => {
+            patchState(store, setEntity(user));
+          })
+        );
+      },
+
+      resetMfa(id: string, request: MfaResetRequest): Observable<User> {
+        return userService.resetMfa(id, request).pipe(
           tap((user) => {
             patchState(store, setEntity(user));
           })

@@ -730,6 +730,72 @@ describe('UserEditComponent', () => {
     });
   });
 
+  describe('two-factor reset', () => {
+    const enrolledUser: User = { ...mockUser, mfaEnabled: true };
+
+    function resetButton(): HTMLButtonElement | undefined {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+      ).find((b) => b.textContent?.trim() === 'Reset two-factor');
+    }
+
+    it('offers the reset for an enrolled user who is not the current one', () => {
+      userServiceMock.getById.mockReturnValue(of(enrolledUser));
+      fixture.detectChanges();
+
+      expect(component['canResetMfa']()).toBe(true);
+      expect(resetButton()).toBeTruthy();
+    });
+
+    it('hides the reset for a user without the factor', () => {
+      fixture.detectChanges();
+
+      expect(component['canResetMfa']()).toBe(false);
+      expect(resetButton()).toBeUndefined();
+    });
+
+    it('hides the reset on the own record, which the profile owns', () => {
+      userServiceMock.getById.mockReturnValue(of(enrolledUser));
+      currentUserSignal.set({ id: 'user-1' });
+      fixture.detectChanges();
+
+      expect(component['canResetMfa']()).toBe(false);
+      expect(resetButton()).toBeUndefined();
+    });
+
+    it('opens the dialog with the caller factor and keeps the record it returns', () => {
+      userServiceMock.getById.mockReturnValue(of(enrolledUser));
+      currentUserSignal.set({
+        id: 'admin-id',
+        hasPassword: false,
+        mfaEnabled: true
+      });
+      const resetUser = { ...enrolledUser, mfaEnabled: false };
+      dialogMock.open.mockReturnValue({ afterClosed: () => of(resetUser) });
+      fixture.detectChanges();
+
+      component.openMfaReset();
+
+      expect(dialogMock.open).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          data: { user: enrolledUser, factor: 'code' }
+        })
+      );
+      expect(component['user']()).toEqual(resetUser);
+    });
+
+    it('keeps the record when the dialog is dismissed', () => {
+      userServiceMock.getById.mockReturnValue(of(enrolledUser));
+      dialogMock.open.mockReturnValue({ afterClosed: () => of(undefined) });
+      fixture.detectChanges();
+
+      component.openMfaReset();
+
+      expect(component['user']()).toEqual(enrolledUser);
+    });
+  });
+
   describe('role assignment', () => {
     const mockRoles = [
       {

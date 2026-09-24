@@ -746,6 +746,9 @@ router.post('/billing/seed-usage', (req, res) => {
     return;
   }
 
+  // The default is the start of the open period, not the clock. The period
+  // closes at [start, now), so a record stamped "now" and a renewal advanced
+  // in the same millisecond drop the record from the period it was seeded for.
   const now = new Date().toISOString();
   const record: MockUsageRecord = {
     id: randomUUID(),
@@ -753,7 +756,10 @@ router.post('/billing/seed-usage', (req, res) => {
     subscriptionId: subId,
     meterKey,
     quantity,
-    occurredAt: occurredAt ?? now,
+    occurredAt:
+      occurredAt ??
+      state.billingSubscriptions.get(subId)?.currentPeriodStart ??
+      now,
     idempotencyKey: idempotencyKey ?? `seed-${randomUUID()}`,
     recordedAt: now
   };

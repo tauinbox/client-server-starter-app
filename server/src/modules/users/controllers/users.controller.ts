@@ -4,6 +4,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpException,
   HttpStatus,
   Logger,
   Param,
@@ -59,8 +61,10 @@ import { User } from '../entities/user.entity';
 import { AuthService } from '../../auth/services/auth.service';
 import { CHALLENGE_THROTTLE } from '../../auth/constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
-import { STEP_UP_OPERATION } from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { Throttle } from '@nestjs/throttler';
+import { MfaService } from '../../auth/services/mfa.service';
+import { MfaStepUpDto } from '../../auth/dtos/mfa.dto';
 
 @ApiTags('Users API')
 @Controller({
@@ -81,7 +85,8 @@ export class UsersController {
     private readonly metricsService: MetricsService,
     private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private readonly mfaService: MfaService
   ) {}
 
   @Post()
@@ -366,6 +371,84 @@ export class UsersController {
 
     this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
     return updatedUser;
+  }
+
+  // For an owner who lost the authenticator and every recovery code. A self
+  // target is refused: `POST /auth/mfa/disable` demands the owner's factor.
+  @Throttle({ 'login-long-window': CHALLENGE_THROTTLE['login-long-window'] })
+  @Post(':id/mfa/reset')
+  @HttpCode(HttpStatus.OK)
+  @Authorize(['update', 'User'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Reset the two-factor enrolment of another user (admin only)'
+  })
+  @ApiParam({ name: 'id', description: 'The user ID' })
+  @ApiBody({ type: MfaStepUpDto })
+  @ApiOkResponse({
+    description: 'Two-factor has been reset and every session ended',
+    type: AdminUserResponseDto
+  })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
+  async resetMfa(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MfaStepUpDto,
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    if (id === req.user.userId) {
+      throw new HttpException(
+        {
+          message:
+            'Turn off your own two-factor authentication from your profile',
+          errorKey: ErrorKeys.USERS.MFA_RESET_SELF
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const target = await this.usersService.findOne(id);
+    // Before the step-up, so a request refused anyway spends no code; the
+    // instance check leads so an outsider cannot probe for the factor.
+    this.usersService.assertCanWrite(
+      ability,
+      'update',
+      target,
+      req.user.userId
+    );
+    if (!target.mfaEnabled) {
+      throw new HttpException(
+        {
+          message: 'Two-factor authentication is not enabled',
+          errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    await this.assertCredentialStepUp(
+      req,
+      ability,
+      target,
+      dto.currentPassword,
+      dto.code
+    );
+
+    await this.mfaService.resetByAdmin(
+      target,
+      { id: req.user.userId, email: req.user.email },
+      extractAuditContext(req)
+    );
+
+    // The sessions were opened with the factor the owner no longer holds, and
+    // one of them may be the reason the owner asked for a reset.
+    await this.eventEmitter.emitAsync(
+      UserSessionRevocationRequiredEvent.name,
+      new UserSessionRevocationRequiredEvent(id)
+    );
+    this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
+    return this.usersService.findOne(id);
   }
 
   /**

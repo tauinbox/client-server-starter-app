@@ -9,6 +9,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/modules/auth/services/auth.service';
+import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { UsersService } from '../src/modules/users/services/users.service';
@@ -306,6 +307,7 @@ describe('Admin email change - session revocation through the real event bus', (
       providers: [
         // Stubbed: the step-up has its own suite, user-credential-step-up.
         { provide: AuthService, useValue: { assertStepUp: jest.fn() } },
+        { provide: MfaService, useValue: {} },
         {
           provide: BreachedPasswordService,
           useValue: { assertNotBreached: jest.fn() }

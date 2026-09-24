@@ -24,6 +24,7 @@ import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { eventually } from './eventually';
 
 // The seeded `user` role may update its own record, so a bare access token
 // reached the password and the address of the account. The whole pipeline is
@@ -153,10 +154,12 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     );
     expect(await holdsPassword(id, password)).toBe(true);
 
-    const audit = await dataSource.getRepository(AuditLog).findOne({
-      where: { action: AuditAction.STEP_UP_FAILURE, actorEmail: ownerEmail },
-      order: { createdAt: 'DESC' }
-    });
+    const audit = await eventually(() =>
+      dataSource.getRepository(AuditLog).findOne({
+        where: { action: AuditAction.STEP_UP_FAILURE, actorEmail: ownerEmail },
+        order: { createdAt: 'DESC' }
+      })
+    );
     expect(audit?.details).toMatchObject({
       operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
       factor: 'password'

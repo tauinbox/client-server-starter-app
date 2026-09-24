@@ -22,7 +22,8 @@ import { UserSessionRevocationRequiredEvent } from '../events/user-session-revoc
 import type { AppAbility } from '../../auth/casl/app-ability';
 import { MfaRequiredGuard } from '../../auth/guards/mfa-required.guard';
 import { AuthService } from '../../auth/services/auth.service';
-import { STEP_UP_OPERATION } from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
+import { MfaService } from '../../auth/services/mfa.service';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -68,6 +69,7 @@ describe('UsersController', () => {
   let caslAbilityFactoryMock: { createForUser: jest.Mock };
   let mailServiceMock: { sendPasswordChangedNotification: jest.Mock };
   let authServiceMock: { assertStepUp: jest.Mock };
+  let mfaServiceMock: { resetByAdmin: jest.Mock };
 
   beforeEach(async () => {
     usersServiceMock = {
@@ -109,6 +111,8 @@ describe('UsersController', () => {
 
     authServiceMock = { assertStepUp: jest.fn().mockResolvedValue(undefined) };
 
+    mfaServiceMock = { resetByAdmin: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
@@ -119,7 +123,8 @@ describe('UsersController', () => {
         { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
         { provide: MailService, useValue: mailServiceMock },
-        { provide: AuthService, useValue: authServiceMock }
+        { provide: AuthService, useValue: authServiceMock },
+        { provide: MfaService, useValue: mfaServiceMock }
       ]
     })
       .overrideGuard(JwtAuthGuard)
@@ -1048,6 +1053,116 @@ describe('UsersController', () => {
           details: { targetEmail: 'restored@example.com' }
         })
       );
+    });
+  });
+
+  // ── resetMfa ──────────────────────────────────────────────────────
+
+  describe('resetMfa', () => {
+    const enrolled = {
+      id: 'user-9',
+      email: 'owner@example.com',
+      mfaEnabled: true
+    };
+    const actor = { id: 'user-1', email: 'admin@example.com' };
+
+    function statusAndKey(err: unknown): [number, unknown] {
+      const httpErr = err as { getStatus(): number; getResponse(): unknown };
+      return [
+        httpErr.getStatus(),
+        (httpErr.getResponse() as { errorKey?: string }).errorKey
+      ];
+    }
+
+    it('resets the factor of another user after the caller step-up, ends the sessions and returns the fresh record', async () => {
+      const fresh = { ...enrolled, mfaEnabled: false };
+      usersServiceMock.findOne
+        .mockResolvedValueOnce(enrolled)
+        .mockResolvedValueOnce({ id: actor.id })
+        .mockResolvedValueOnce(fresh);
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      const result = await controller.resetMfa(
+        'user-9',
+        { code: '123456' },
+        req,
+        mockAbility
+      );
+
+      expect(authServiceMock.assertStepUp).toHaveBeenCalledWith(
+        { id: actor.id },
+        undefined,
+        undefined,
+        STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+        '123456',
+        expect.anything()
+      );
+      expect(mfaServiceMock.resetByAdmin).toHaveBeenCalledWith(
+        enrolled,
+        actor,
+        expect.anything()
+      );
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserSessionRevocationRequiredEvent.name,
+        new UserSessionRevocationRequiredEvent('user-9')
+      );
+      expect(result).toBe(fresh);
+    });
+
+    it('refuses a self-target before it reads the record or a factor', async () => {
+      const req = mockJwtRequest('user-9') as JwtAuthRequest;
+
+      const err: unknown = await controller
+        .resetMfa('user-9', { code: '123456' }, req, mockAbility)
+        .catch((e: unknown) => e);
+
+      expect(statusAndKey(err)).toEqual([400, ErrorKeys.USERS.MFA_RESET_SELF]);
+      expect(usersServiceMock.findOne).not.toHaveBeenCalled();
+      expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+      expect(mfaServiceMock.resetByAdmin).not.toHaveBeenCalled();
+    });
+
+    it('refuses a target without the factor before the step-up spends a code', async () => {
+      usersServiceMock.findOne.mockResolvedValueOnce({
+        ...enrolled,
+        mfaEnabled: false
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      const err: unknown = await controller
+        .resetMfa('user-9', { code: '123456' }, req, mockAbility)
+        .catch((e: unknown) => e);
+
+      expect(statusAndKey(err)).toEqual([400, ErrorKeys.AUTH.MFA_NOT_ENABLED]);
+      expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+    });
+
+    it('answers 403 for a target the caller may not write, without saying whether it is enrolled', async () => {
+      usersServiceMock.findOne.mockResolvedValueOnce({
+        ...enrolled,
+        mfaEnabled: false
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.resetMfa('user-9', { code: '123456' }, req, denyAbility)
+      ).rejects.toThrow(ForbiddenException);
+      expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+    });
+
+    it('does not reset or end sessions when the caller step-up fails', async () => {
+      usersServiceMock.findOne.mockResolvedValue(enrolled);
+      authServiceMock.assertStepUp.mockRejectedValueOnce(
+        new ForbiddenException()
+      );
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.resetMfa('user-9', {}, req, mockAbility)
+      ).rejects.toThrow(ForbiddenException);
+      expect(mfaServiceMock.resetByAdmin).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
     });
   });
 

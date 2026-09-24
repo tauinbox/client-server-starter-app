@@ -59,6 +59,23 @@ describe('mail-content', () => {
     ).not.toBe(mailMessages('en').mfaRecoveryCodesReplaced(details).subject);
   });
 
+  it('says an administrator reset the factor and ended the sessions, in both locales', () => {
+    const details = { when: '2026-09-01 12:34 UTC', ip: '198.51.100.7' };
+
+    for (const locale of ['en', 'ru'] as const) {
+      const msg = mailMessages(locale).mfaResetByAdmin(details);
+      expect(msg.button).toBeUndefined();
+      expect(msg.paragraphs.join(' ')).toContain('198.51.100.7');
+    }
+
+    const en = mailMessages('en').mfaResetByAdmin(details);
+    expect(en.subject).toContain('administrator');
+    expect(en.paragraphs[0]).toContain('session was signed out');
+    expect(mailMessages('ru').mfaResetByAdmin(details).subject).not.toBe(
+      en.subject
+    );
+  });
+
   it('names the source of a password change', () => {
     const details = { when: '2026-09-01 12:34 UTC' };
     const self = mailMessages('en').passwordChanged('self', details);

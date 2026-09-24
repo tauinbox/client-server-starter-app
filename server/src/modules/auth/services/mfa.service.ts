@@ -8,7 +8,7 @@ import {
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import type { Cache } from 'cache-manager';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull, Not } from 'typeorm';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
 import {
@@ -263,6 +263,51 @@ export class MfaService {
       .sendMfaDisabledNotification(user.email, user.locale, context?.ip)
       .catch((err) =>
         this.logger.error('Failed to send MFA disabled notification', err)
+      );
+  }
+
+  /**
+   * The way back for an owner who lost the authenticator and the recovery codes
+   * too. The administrator has already proved itself through
+   * AuthService.assertStepUp and has proved the owner's identity outside the
+   * system. The owner is never the caller here: that path is `disable`, which
+   * demands the owner's own factor.
+   */
+  async resetByAdmin(
+    target: User,
+    actor: { id: string; email: string },
+    context?: AuditContext
+  ): Promise<void> {
+    this.assertEnabled(target);
+
+    // Conditional on the factor still being on, so of two concurrent resets
+    // only one audits and mails; the other is told there is nothing to reset.
+    const { affected } = await this.dataSource.getRepository(User).update(
+      { id: target.id, totpEnabledAt: Not(IsNull()) },
+      {
+        totpSecret: null,
+        totpEnabledAt: null,
+        totpRecoveryCodes: null,
+        totpLastUsedStep: null
+      }
+    );
+    if (!affected) {
+      throw this.notEnabledException();
+    }
+
+    await this.auditService.log({
+      action: AuditAction.MFA_RESET_BY_ADMIN,
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: target.id,
+      targetType: 'User',
+      context
+    });
+
+    this.mailService
+      .sendMfaResetByAdminNotification(target.email, target.locale, context?.ip)
+      .catch((err) =>
+        this.logger.error('Failed to send MFA reset notification', err)
       );
   }
 
@@ -559,14 +604,18 @@ export class MfaService {
 
   private assertEnabled(user: User): void {
     if (user.totpEnabledAt === null) {
-      throw new HttpException(
-        {
-          message: 'Two-factor authentication is not enabled',
-          errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-        },
-        HttpStatus.BAD_REQUEST
-      );
+      throw this.notEnabledException();
     }
+  }
+
+  private notEnabledException(): HttpException {
+    return new HttpException(
+      {
+        message: 'Two-factor authentication is not enabled',
+        errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
+      },
+      HttpStatus.BAD_REQUEST
+    );
   }
 
   private assertNotEnabled(user: User): void {

@@ -144,6 +144,14 @@
                     {{ t('users.edit.accountLocked') }}
                   </mat-chip>
                 }
+                @if (u.mfaEnabled) {
+                  <mat-chip disabled role="listitem">
+                    <mat-icon matChipAvatar aria-hidden="true"
+                      >verified_user</mat-icon
+                    >
+                    {{ t('users.edit.mfaEnabled') }}
+                  </mat-chip>
+                }
               </mat-chip-set>
               @if (u.lockedUntil) {
                 <button
@@ -153,6 +161,16 @@
                   [disabled]="saving()"
                 >
                   {{ t('users.edit.unlock') }}
+                </button>
+              }
+              @if (canResetMfa()) {
+                <button
+                  matButton="text"
+                  type="button"
+                  (click)="openMfaReset()"
+                  [disabled]="saving()"
+                >
+                  {{ t('users.edit.resetMfa') }}
                 </button>
               }
             </div>
