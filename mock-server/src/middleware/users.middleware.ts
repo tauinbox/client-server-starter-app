@@ -649,4 +649,100 @@ router.post(
   }
 );
 
+// POST /api/v1/users/:id/mfa/reset
+// Mirrors UsersController.resetMfa, check for check and in the same order.
+router.post(
+  '/:id/mfa/reset',
+  permissionGuard('update', 'User'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const { currentPassword, code } = req.body;
+    if (
+      currentPassword !== undefined &&
+      !isValidPasswordShape(currentPassword)
+    ) {
+      res.status(400).json(validationError('currentPassword is required'));
+      return;
+    }
+    if (code !== undefined && !isValidCodeShape(code)) {
+      res
+        .status(400)
+        .json(
+          validationError(
+            `code must be longer than or equal to ${TOTP_DIGITS} characters`
+          )
+        );
+      return;
+    }
+
+    const actor = (req as AuthenticatedRequest).user;
+    if (id === actor.id) {
+      res.status(400).json({
+        message:
+          'Turn off your own two-factor authentication from your profile',
+        statusCode: 400,
+        errorKey: ErrorKeys.USERS.MFA_RESET_SELF
+      });
+      return;
+    }
+
+    const user = findUserById(id);
+    if (!user) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
+      });
+      return;
+    }
+
+    if (!assertCanWriteUser(req, res, 'update', user)) {
+      return;
+    }
+
+    if (!user.totpEnabledAt) {
+      res.status(400).json({
+        message: 'Two-factor authentication is not enabled',
+        statusCode: 400,
+        errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
+      });
+      return;
+    }
+
+    const refusal = stepUpError(
+      req,
+      actor,
+      currentPassword,
+      code,
+      STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+      false
+    );
+    if (refusal) {
+      sendWithRetryAfter(res, refusal);
+      return;
+    }
+
+    user.totpSecret = null;
+    user.totpEnabledAt = null;
+    user.totpRecoveryCodes = null;
+    user.totpLastUsedStep = null;
+    user.updatedAt = new Date().toISOString();
+    revokeUserSessions(user);
+
+    logAudit('MFA_RESET_BY_ADMIN', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'User',
+      ip: req.ip
+    });
+
+    console.log(`[MFA RESET BY ADMIN] To: ${user.email} | IP: ${req.ip}`);
+
+    pushUserCrudEvent('updated', id);
+    res.json(toAdminUserResponse(user));
+  }
+);
+
 export default router;

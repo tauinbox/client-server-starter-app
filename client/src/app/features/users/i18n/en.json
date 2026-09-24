@@ -75,7 +75,17 @@
     "stepUpCode": "Code from your authenticator app",
     "stepUpCodeRequired": "Enter the code from your authenticator app",
     "stepUpCodeNote": "Changing the email or the password needs a code from your own authenticator app.",
-    "stepUpUnavailable": "To change the email or the password, first set a password or turn on two-factor authentication on your profile."
+    "stepUpUnavailable": "To change the email or the password, first set a password or turn on two-factor authentication on your profile.",
+    "mfaEnabled": "Two-factor on",
+    "resetMfa": "Reset two-factor",
+    "resetMfaTitle": "Reset two-factor authentication",
+    "resetMfaMessage": "This removes the authenticator and the recovery codes of {{ firstName }} {{ lastName }} and signs them out of every session. After that they sign in with the password alone. Do this only after you confirm the identity of the person who asks.",
+    "resetMfaPasswordNote": "Confirm with your own password.",
+    "resetMfaCodeNote": "Confirm with a code from your own authenticator app.",
+    "resetMfaUnavailable": "To reset two-factor authentication, first set a password or turn on two-factor authentication on your profile.",
+    "resetMfaConfirm": "Reset",
+    "successMfaReset": "Two-factor authentication was reset",
+    "errorMfaResetFailed": "Failed to reset two-factor authentication. Please try again."
   },
   "table": {
     "columnId": "ID",

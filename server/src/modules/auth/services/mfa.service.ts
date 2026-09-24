@@ -8,7 +8,7 @@ import {
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import type { Cache } from 'cache-manager';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull, Not } from 'typeorm';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
 import {
@@ -280,12 +280,20 @@ export class MfaService {
   ): Promise<void> {
     this.assertEnabled(target);
 
-    await this.dataSource.getRepository(User).update(target.id, {
-      totpSecret: null,
-      totpEnabledAt: null,
-      totpRecoveryCodes: null,
-      totpLastUsedStep: null
-    });
+    // Conditional on the factor still being on, so of two concurrent resets
+    // only one audits and mails; the other is told there is nothing to reset.
+    const { affected } = await this.dataSource.getRepository(User).update(
+      { id: target.id, totpEnabledAt: Not(IsNull()) },
+      {
+        totpSecret: null,
+        totpEnabledAt: null,
+        totpRecoveryCodes: null,
+        totpLastUsedStep: null
+      }
+    );
+    if (!affected) {
+      throw this.notEnabledException();
+    }
 
     await this.auditService.log({
       action: AuditAction.MFA_RESET_BY_ADMIN,
@@ -596,14 +604,18 @@ export class MfaService {
 
   private assertEnabled(user: User): void {
     if (user.totpEnabledAt === null) {
-      throw new HttpException(
-        {
-          message: 'Two-factor authentication is not enabled',
-          errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-        },
-        HttpStatus.BAD_REQUEST
-      );
+      throw this.notEnabledException();
     }
+  }
+
+  private notEnabledException(): HttpException {
+    return new HttpException(
+      {
+        message: 'Two-factor authentication is not enabled',
+        errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
+      },
+      HttpStatus.BAD_REQUEST
+    );
   }
 
   private assertNotEnabled(user: User): void {

@@ -25,6 +25,7 @@ import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { AuthService } from '../src/modules/auth/services/auth.service';
+import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
 import { RolesController } from '../src/modules/auth/controllers/roles.controller';
 import { RbacController } from '../src/modules/auth/controllers/rbac.controller';
@@ -133,6 +134,7 @@ describe('Instance-level @Authorize re-check', () => {
       providers: [
         // Stubbed: the step-up has its own suite, user-credential-step-up.
         { provide: AuthService, useValue: { assertStepUp: jest.fn() } },
+        { provide: MfaService, useValue: {} },
         { provide: AbilityHolder, useValue: holder },
         { provide: APP_GUARD, useClass: TestJwtAuthGuard },
         { provide: APP_GUARD, useClass: TestPermissionsGuard },

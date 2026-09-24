@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull, Not } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { generateSync } from 'otplib';
 import {
@@ -66,7 +66,10 @@ describe('MfaService', () => {
   // The update mock is typed, so a call argument reads as Partial<User>
   // instead of `any` at every assertion below.
   let repository: {
-    update: jest.Mock<Promise<void>, [string, Partial<User>]>;
+    update: jest.Mock<
+      Promise<{ affected?: number } | undefined>,
+      [unknown, Partial<User>]
+    >;
     findOne: jest.Mock;
   };
   let jwtService: { sign: jest.Mock; verify: jest.Mock };
@@ -75,13 +78,17 @@ describe('MfaService', () => {
     sendMfaEnabledNotification: jest.Mock;
     sendMfaDisabledNotification: jest.Mock;
     sendMfaRecoveryCodesReplacedNotification: jest.Mock;
+    sendMfaResetByAdminNotification: jest.Mock;
   };
 
   async function build(key: string | undefined = KEY): Promise<void> {
     encryption = encryptionServiceWith(key);
     repository = {
       update: jest
-        .fn<Promise<void>, [string, Partial<User>]>()
+        .fn<
+          Promise<{ affected?: number } | undefined>,
+          [unknown, Partial<User>]
+        >()
         .mockResolvedValue(undefined),
       findOne: jest.fn().mockResolvedValue(null)
     };
@@ -95,7 +102,8 @@ describe('MfaService', () => {
       sendMfaDisabledNotification: jest.fn().mockResolvedValue(undefined),
       sendMfaRecoveryCodesReplacedNotification: jest
         .fn()
-        .mockResolvedValue(undefined)
+        .mockResolvedValue(undefined),
+      sendMfaResetByAdminNotification: jest.fn().mockResolvedValue(undefined)
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -310,6 +318,67 @@ describe('MfaService', () => {
         status: 400,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
+    });
+  });
+
+  describe('resetByAdmin', () => {
+    const actor = { id: 'admin-1', email: 'admin@example.com' };
+
+    function enrolled(): User {
+      return buildUser({
+        totpSecret: 'v1.a.b.c',
+        totpEnabledAt: new Date(),
+        totpRecoveryCodes: ['hash']
+      });
+    }
+
+    it('clears the enrolment only while it is on, audits the administrator and warns the owner', async () => {
+      repository.update.mockResolvedValueOnce({ affected: 1 });
+
+      await service.resetByAdmin(enrolled(), actor);
+
+      const [criteria, changes] = repository.update.mock.calls[0];
+      expect(criteria).toEqual({ id: 'user-1', totpEnabledAt: Not(IsNull()) });
+      expect(changes).toEqual({
+        totpSecret: null,
+        totpEnabledAt: null,
+        totpRecoveryCodes: null,
+        totpLastUsedStep: null
+      });
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.MFA_RESET_BY_ADMIN,
+          actorId: 'admin-1',
+          actorEmail: 'admin@example.com',
+          targetId: 'user-1'
+        })
+      );
+      expect(mailService.sendMfaResetByAdminNotification).toHaveBeenCalled();
+    });
+
+    it('refuses when the factor is not on', async () => {
+      await expect(
+        service.resetByAdmin(buildUser(), actor)
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
+      });
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses, and neither audits nor mails, when a concurrent reset cleared the factor first', async () => {
+      repository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.resetByAdmin(enrolled(), actor)
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
+      });
+      expect(auditService.log).not.toHaveBeenCalled();
+      expect(
+        mailService.sendMfaResetByAdminNotification
+      ).not.toHaveBeenCalled();
     });
   });
 

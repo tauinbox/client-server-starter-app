@@ -39,6 +39,11 @@
       "method": "POST",
       "path": "/api/v1/users/1/restore",
       "expectedStatus": 401
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/1/mfa/reset",
+      "expectedStatus": 401
     }
   ]
 }

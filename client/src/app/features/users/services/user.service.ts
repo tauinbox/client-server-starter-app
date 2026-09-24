@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
+import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import type { Observable } from 'rxjs';
 import type { UserEffectivePermissionsResponse } from '@app/shared/types';
 import type {
@@ -12,6 +13,12 @@ import type {
 } from '../models/user.types';
 
 export const USERS_API_V1 = '/api/v1/users';
+
+/** The step-up of the CALLER, not of the user whose factor is reset. */
+export type MfaResetRequest = {
+  currentPassword?: string;
+  code?: string;
+};
 
 @Injectable({
   providedIn: 'root'
@@ -37,6 +44,16 @@ export class UserService {
 
   restore(id: string): Observable<User> {
     return this.#http.post<User>(`${USERS_API_V1}/${id}/restore`, {});
+  }
+
+  resetMfa(id: string, request: MfaResetRequest): Observable<User> {
+    // The dialog shows the refusal inline, as the owner's step-up routes do.
+    return this.#http.post<User>(`${USERS_API_V1}/${id}/mfa/reset`, request, {
+      context: new HttpContext().set(
+        DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
+        true
+      )
+    });
   }
 
   getPermissions(id: string): Observable<UserEffectivePermissionsResponse> {

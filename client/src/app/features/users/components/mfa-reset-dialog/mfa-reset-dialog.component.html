@@ -1,0 +1,76 @@
+<ng-container *transloco="let t; scope: 'users'">
+  <h2 mat-dialog-title>{{ t('users.edit.resetMfaTitle') }}</h2>
+
+  <mat-dialog-content>
+    <p class="reset-message">
+      {{
+        t('users.edit.resetMfaMessage', {
+          firstName: data.user.firstName,
+          lastName: data.user.lastName
+        })
+      }}
+    </p>
+
+    <form (submit)="$event.preventDefault(); submit()">
+      @switch (data.factor) {
+        @case ('password') {
+          <p class="step-up-note">{{ t('users.edit.resetMfaPasswordNote') }}</p>
+          <nxs-form-field
+            [field]="passwordForm.currentPassword"
+            label="users.edit.currentPassword"
+            [type]="pwdToggle.show() ? 'text' : 'password'"
+            prefixIcon="verified_user"
+            autocomplete="current-password"
+          >
+            <nxs-password-toggle formFieldSuffix #pwdToggle />
+          </nxs-form-field>
+        }
+        @case ('code') {
+          <p class="step-up-note">{{ t('users.edit.resetMfaCodeNote') }}</p>
+          <nxs-form-field
+            [field]="codeForm.code"
+            label="users.edit.stepUpCode"
+            prefixIcon="password"
+            autocomplete="one-time-code"
+          />
+        }
+        @default {
+          <p class="step-up-note step-up-unavailable" role="status">
+            {{ t('users.edit.resetMfaUnavailable') }}
+          </p>
+        }
+      }
+    </form>
+
+    @if (errorMessage()) {
+      <p class="form-error" role="alert">{{ errorMessage() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button
+      matButton="text"
+      type="button"
+      [disabled]="isLoading()"
+      (click)="cancel()"
+    >
+      {{ t('common.cancel') }}
+    </button>
+    <button
+      matButton="filled"
+      class="app-btn-danger"
+      type="button"
+      [disabled]="!canSubmit()"
+      (click)="submit()"
+    >
+      @if (isLoading()) {
+        <span class="app-btn-loading">
+          <mat-spinner diameter="18" />
+          {{ t('users.edit.resetMfaConfirm') }}
+        </span>
+      } @else {
+        {{ t('users.edit.resetMfaConfirm') }}
+      }
+    </button>
+  </mat-dialog-actions>
+</ng-container>

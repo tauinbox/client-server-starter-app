@@ -1,0 +1,22 @@
+@use 'abstracts/variables' as vars;
+
+.reset-message {
+  margin-block: 0 vars.$spacing-md;
+}
+
+.step-up-note {
+  margin-block: 0 vars.$spacing-sm;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.step-up-unavailable {
+  color: var(--mat-sys-error);
+}
+
+.form-error {
+  margin-top: vars.$spacing-sm;
+  margin-bottom: 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-error);
+}
