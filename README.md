@@ -1946,8 +1946,8 @@ a second request to the registry for a verdict that gates nothing.
   7 days. JavaScript can neither read nor steal the token, thus XSS cannot take it.
 
   Outside `local` every cookie the server sets is `__Host-` prefixed, `Secure`, on `Path=/` and has
-  no `Domain`, so a sibling host of the same registrable domain can neither set nor shadow it. A
-  refresh cookie from before the prefix is accepted once and then cleared.
+  no `Domain`, so a sibling host of the same registrable domain can neither set nor shadow it. The
+  server reads the prefixed name only, so a bare `refresh_token` planted by such a host answers 401.
 
   One session still ends at `SESSION_ABSOLUTE_MAX_MS`, which is 30 days by default. The session
   start is a column of its own, and the rotation carries it over unchanged, thus a refresh cannot

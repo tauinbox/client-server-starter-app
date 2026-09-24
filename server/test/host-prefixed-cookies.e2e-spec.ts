@@ -297,7 +297,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
     jest.restoreAllMocks();
   });
 
-  it('POST /auth/login sets the prefixed refresh cookie and clears the bare one', async () => {
+  it('POST /auth/login sets the prefixed refresh cookie and no bare one', async () => {
     const res = await request(server)
       .post('/api/v1/auth/login')
       .send({ email: 'user@example.com', password: 'irrelevant' })
@@ -308,10 +308,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
     expect(cookie).toContain('SameSite=Strict');
     expect(isClear(cookie)).toBe(false);
 
-    const legacy = findCookie(res, 'refresh_token');
-    expect(legacy).toBeDefined();
-    expect(isClear(legacy!)).toBe(true);
-    expect(legacy).toContain('Path=/api/v1/auth');
+    expect(findCookie(res, 'refresh_token')).toBeUndefined();
   });
 
   it('POST /auth/refresh-token rotates the prefixed refresh cookie', async () => {
@@ -326,19 +323,16 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
     );
   });
 
-  it('POST /auth/refresh-token moves a session of the bare name to the prefixed one', async () => {
+  // A sibling host of the registrable domain can plant the bare name with a
+  // valid token of its own. Accepting it signs the victim in to that account.
+  it('POST /auth/refresh-token refuses a session of the bare name', async () => {
     const res = await request(server)
       .post('/api/v1/auth/refresh-token')
-      .set('Cookie', 'refresh_token=legacy-refresh-token')
-      .expect(200);
+      .set('Cookie', 'refresh_token=planted-refresh-token')
+      .expect(401);
 
-    expect(findByToken).toHaveBeenCalledWith('legacy-refresh-token');
-    expect(expectHostCookie(res, 'refresh_token')).toMatch(
-      /^__Host-refresh_token=rotated-refresh-token;/
-    );
-    const legacy = findCookie(res, 'refresh_token');
-    expect(isClear(legacy!)).toBe(true);
-    expect(legacy).toContain('Path=/api/v1/auth');
+    expect(findByToken).not.toHaveBeenCalled();
+    expect(findCookie(res, '__Host-refresh_token')).toBeUndefined();
   });
 
   it('POST /auth/logout clears the prefixed cookies with Secure', async () => {

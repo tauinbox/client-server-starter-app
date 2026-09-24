@@ -450,8 +450,8 @@ the caller.
 
 `middleware/anon-id.middleware.ts` issues the `nxs_anon_id` cookie at the first request. The cookie
 uses `SameSite=Lax`, `Secure` in each environment other than `local`, a life of 1 year and
-`httpOnly=true`. Outside `local` its name is `__Host-nxs_anon_id`; a visitor who still holds the bare
-name keeps its value, and the middleware clears the bare cookie.
+`httpOnly=true`. Outside `local` its name is `__Host-nxs_anon_id`, and the middleware ignores a bare
+`nxs_anon_id`, because a sibling host can plant that name to pick the rollout bucket of a visitor.
 
 `events/feature-flag-changed.event.ts` holds
 `{ flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }`.

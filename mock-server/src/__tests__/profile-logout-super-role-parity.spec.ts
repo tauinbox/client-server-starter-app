@@ -82,9 +82,7 @@ const SESSION_BOUND_COOKIES = [
   'refresh_token /',
   'oauth_link /',
   'oauth_reauth /',
-  'reauth_proof /',
-  // The refresh cookie of a browser that signed in before the path moved.
-  'refresh_token /api/v1/auth'
+  'reauth_proof /'
 ];
 
 describe('PATCH /auth/profile', () => {

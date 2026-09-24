@@ -366,20 +366,6 @@ describe('AuthController', () => {
       );
     });
 
-    // A browser that signed in before the prefix still holds the bare cookie
-    // on its old path. Left there, it rides along with every refresh.
-    it('should clear the refresh cookie of the old name and path', async () => {
-      const req = mockLocalAuthRequest() as LocalAuthRequest;
-      const res = mockResponse();
-
-      await controller.login(req, res);
-
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
-        secure: true,
-        path: '/api/v1/auth'
-      });
-    });
-
     // Regression: the attribute came from an === 'production' comparison, so
     // a staging deployment put the refresh token on the wire without Secure.
     it.each<[string, boolean]>([
@@ -492,33 +478,25 @@ describe('AuthController', () => {
       );
     });
 
-    // Transition: a session from before the prefix refreshes once, moves to
-    // the prefixed name, and the bare cookie is cleared on its old path.
-    it('should accept the bare cookie once and move the session to the prefixed name', async () => {
+    // A sibling host of the registrable domain can plant the bare name, but
+    // never the prefixed one. Accepting the bare name signs the victim in to
+    // an account of the attacker's choice.
+    it('should refuse a bare refresh cookie outside local', async () => {
       const req = mockExpressRequest({
-        refresh_token: 'legacy-refresh'
+        refresh_token: 'planted-refresh'
       }) as ExpressRequest;
       const res = mockResponse();
 
-      await controller.refreshToken(req, res);
-
-      expect(authServiceMock.refreshTokens).toHaveBeenCalledWith(
-        'legacy-refresh'
+      await expect(controller.refreshToken(req, res)).rejects.toThrow(
+        UnauthorizedException
       );
-      expect(res.cookie).toHaveBeenCalledWith(
-        '__Host-refresh_token',
-        'refresh-token',
-        expect.objectContaining({ secure: true, path: '/' })
-      );
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
-        secure: true,
-        path: '/api/v1/auth'
-      });
+      expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
+      expect(res.cookie).not.toHaveBeenCalled();
     });
 
-    it('should prefer the prefixed cookie when both names arrive', async () => {
+    it('should read the prefixed cookie when a bare one arrives beside it', async () => {
       const req = mockExpressRequest({
-        refresh_token: 'legacy-refresh',
+        refresh_token: 'planted-refresh',
         '__Host-refresh_token': 'current-refresh'
       }) as ExpressRequest;
       const res = mockResponse();
@@ -570,29 +548,26 @@ describe('AuthController', () => {
         secure: true,
         path: '/'
       });
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
-        secure: true,
-        path: '/api/v1/auth'
-      });
+      expect(res.clearCookie).not.toHaveBeenCalledWith(
+        'refresh_token',
+        expect.anything()
+      );
       expect(result).toEqual({ message: 'Successfully logged out' });
     });
 
-    it('should end the session of a bare cookie from before the prefix', async () => {
+    it('should end no session for a bare cookie outside local', async () => {
       const req = mockJwtRequest('user-1', 'user@example.com', {
-        refresh_token: 'legacy-device'
+        refresh_token: 'planted-device'
       }) as JwtAuthRequest;
       const res = mockResponse();
+      authServiceMock.logoutSession.mockResolvedValue(false);
 
       await controller.logout(req, res);
 
       expect(authServiceMock.logoutSession).toHaveBeenCalledWith(
         'user-1',
-        'legacy-device'
+        undefined
       );
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', {
-        secure: true,
-        path: '/api/v1/auth'
-      });
     });
 
     it('should revoke nothing when the request carries no refresh cookie', async () => {
