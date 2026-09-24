@@ -458,7 +458,8 @@ RBAC stays the true gate.
 the caller.
 
 `utils/anon-id-cookie.ts` reads and writes the `nxs_anon_id` cookie. Only `GET /feature-flags`
-uses it, and only for an anonymous caller. The cookie uses `SameSite=Lax`, `Secure` in each
+uses it: for an anonymous caller, and for a signed-in caller while a live rule has
+`bucketBy: 'device'`. The cookie uses `SameSite=Lax`, `Secure` in each
 environment other than `local`, a life of 1 year and `httpOnly=true`. Outside `local` its name is
 `__Host-nxs_anon_id`, and the read ignores a bare `nxs_anon_id`, because a sibling host can plant
 that name to pick the rollout bucket of a visitor. The read also ignores a value that is not a UUID
@@ -2292,7 +2293,7 @@ The base URL is `/api/v1`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. An anonymous call sets the `nxs_anon_id` cookie only when a live public flag has a percentage rule and the caller holds no valid one |
+| GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. An anonymous call sets the `nxs_anon_id` cookie only when a live public flag has a percentage rule and the caller holds no valid one. A signed-in call sets it only when a live flag has a percentage rule with `bucketBy: 'device'` and the caller holds no valid one |
 | GET | `/admin/feature-flags` | `manage:FeatureFlag` | List each flag with its rules |
 | GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
 | POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag. The audit action is `FEATURE_FLAG_CREATE` |
@@ -2327,7 +2328,10 @@ cross-module communication uses `EventEmitter2` and never `forwardRef`.
 `nxs_anon_id` only when the caller holds no valid one and a public flag that is enabled in the
 current environment has a percentage rule (`anonymousEvaluationNeedsAnonId` in
 `shared/src/utils/feature-flag-evaluator.ts`). The controller then writes the cookie. No other
-route sets it, because no other route reads it. The cookie uses `SameSite=Lax`, `Secure` in each
+route sets it, because no other route reads it. `evaluateSignedIn` does the same for a signed-in
+caller when a live flag, public or not, has a percentage rule with `bucketBy: 'device'`
+(`signedInEvaluationNeedsAnonId`). That map depends on the browser, so it does not use the per-user
+cache. The cookie uses `SameSite=Lax`, `Secure` in each
 environment other than `local`, a `maxAge` of 1 year, and `httpOnly: true`. A value that is not a
 UUID is treated as absent. The server does not clear a cookie that it no longer needs: a clear
 would re-bucket a rollout each time its flag goes off and on again, and the cookie expires within
@@ -2342,11 +2346,18 @@ converges on the same 10 % of anonymous browsers across reloads.
 > a targeted bucket.
 >
 > This is acceptable by design. An anonymous caller sees only a flag with `public: true`. A sensitive
-> feature must require authentication. The bucketing then keys on the `userId` value, which is
-> immutable and which the client cannot control.
+> feature must require authentication and a percentage rule with `bucketBy: 'user'` (the default).
+> The bucketing then keys on the `userId` value, which is immutable and which the client cannot
+> control.
 >
-> Never use an anonymous percentage rollout for access control or for data isolation. Use it as a
-> mechanism for gradual exposure only. If a future flag needs an anonymous rollout that resists this
+> A rule with `bucketBy: 'device'` keys on the cookie for a signed-in caller too. It keeps the bucket
+> of a guest across sign-in, and the user can change the bucket: clear the cookie, or sign out, until
+> the bucket fits. Two browsers of one user can have two different buckets. For this reason the
+> `@RequireFeature` guard evaluates without the cookie, and a `device` rule never opens a
+> server-gated route. The server stores no link between the cookie and the `userId`.
+>
+> Never use an anonymous or a `device` percentage rollout for access control or for data isolation.
+> Use it as a mechanism for gradual exposure only. If a future flag needs an anonymous rollout that resists this
 > attack, sign the `nxs_anon_id` value with an HMAC and a server secret. A client can then not forge a
 > bucket.
 

@@ -224,7 +224,9 @@ management and theming.
   An anonymous user goes into a bucket by the `nxs_anon_id` cookie. `GET /feature-flags` sets it
   only when a live public flag has a percentage rule, because nothing else reads it. Thus a 10 %
   rollout of a public flag converges on the same 10 % of anonymous browsers across reloads, and a
-  visitor gets no long-lived identifier while no such flag exists.
+  visitor gets no long-lived identifier while no such flag exists. A percentage rule with
+  `bucketBy: 'device'` hashes the same cookie for a signed-in user, so a guest keeps the bucket
+  across sign-in on that browser. The default, `user`, hashes the user id.
 
   `FeatureFlagChangedListener` invalidates the cache on each change. It also coalesces the SSE
   broadcast of `{ type: 'feature_flags_updated' }`, thus a burst of changes causes one synchronized
@@ -1813,11 +1815,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2558 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 470 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 468 pass and 2 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1348 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 279 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 842 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2579 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 476 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 474 pass and 2 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1351 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 280 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 847 tests pass |
 
 ## CI/CD
 

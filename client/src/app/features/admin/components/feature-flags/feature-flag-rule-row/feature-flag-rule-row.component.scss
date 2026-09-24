@@ -69,7 +69,8 @@ nxs-chips-autocomplete {
 
 .rule-percentage {
   display: flex;
-  gap: vars.$spacing-sm;
+  flex-wrap: wrap;
+  gap: vars.$spacing-xs vars.$spacing-sm;
   align-items: center;
 
   // Match the intrinsic height of the sibling outlined mat-form-field cells
@@ -78,8 +79,14 @@ nxs-chips-autocomplete {
   min-height: func.rem(56);
 }
 
+.rule-bucket-by {
+  flex: 0 0 func.rem(140);
+}
+
 .rule-slider {
-  flex: 1 1 auto;
+  // Below this width the slider and its value wrap under the bucket select
+  // instead of being squeezed to zero.
+  flex: 1 1 func.rem(120);
   min-width: 0;
 }
 

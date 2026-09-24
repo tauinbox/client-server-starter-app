@@ -53,10 +53,20 @@ export function evaluateFeatureFlag(
   return false;
 }
 
-export type AnonymousEvaluatorFlag = EvaluatorFlag & {
-  public: boolean;
+export type RolloutEvaluatorFlag = EvaluatorFlag & {
   rules: readonly { payload: FeatureFlagRulePayload }[];
 };
+
+export type AnonymousEvaluatorFlag = RolloutEvaluatorFlag & {
+  public: boolean;
+};
+
+function isLiveIn(flag: EvaluatorFlag, env: string): boolean {
+  return (
+    flag.enabled &&
+    (flag.environments.length === 0 || flag.environments.includes(env))
+  );
+}
 
 /**
  * Whether an anonymous evaluation reads the rollout id: true only when a public
@@ -70,9 +80,28 @@ export function anonymousEvaluationNeedsAnonId(
   return flags.some(
     (flag) =>
       flag.public &&
-      flag.enabled &&
-      (flag.environments.length === 0 || flag.environments.includes(env)) &&
+      isLiveIn(flag, env) &&
       flag.rules.some((rule) => rule.payload.type === 'percentage')
+  );
+}
+
+/**
+ * Whether a signed-in evaluation reads the rollout id: true only when a flag
+ * that is live in `env` carries a percentage rule bucketed by `device`. Every
+ * other rule keys on the user, so the id is neither issued nor read otherwise.
+ */
+export function signedInEvaluationNeedsAnonId(
+  flags: readonly RolloutEvaluatorFlag[],
+  env: string
+): boolean {
+  return flags.some(
+    (flag) =>
+      isLiveIn(flag, env) &&
+      flag.rules.some(
+        (rule) =>
+          rule.payload.type === 'percentage' &&
+          rule.payload.bucketBy === 'device'
+      )
   );
 }
 
@@ -87,7 +116,8 @@ function matchesRule(
     case 'role':
       return ctx.roles.some((r) => payload.roleNames.includes(r));
     case 'percentage': {
-      const id = ctx.userId ?? ctx.anonId;
+      const id =
+        payload.bucketBy === 'device' ? ctx.anonId : (ctx.userId ?? ctx.anonId);
       if (id === null) return false;
       return percentageBucket(id, flagKey) < payload.percent;
     }

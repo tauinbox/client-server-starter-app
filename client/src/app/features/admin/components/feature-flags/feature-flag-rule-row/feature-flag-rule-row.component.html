@@ -63,6 +63,23 @@
         }
         @case ('percentage') {
           <div class="rule-percentage">
+            <mat-form-field
+              class="rule-bucket-by"
+              subscriptSizing="dynamic"
+              [matTooltip]="t('admin.featureFlagRule.bucketByHint')"
+            >
+              <mat-label>{{ t('admin.featureFlagRule.bucketBy') }}</mat-label>
+              <mat-select
+                [value]="bucketByValue"
+                (selectionChange)="onBucketByChange($event.value)"
+              >
+                @for (bucketBy of bucketByOptions; track bucketBy) {
+                  <mat-option [value]="bucketBy">
+                    {{ t('admin.featureFlagRule.bucketBy_' + bucketBy) }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
             <mat-slider
               min="0"
               max="100"

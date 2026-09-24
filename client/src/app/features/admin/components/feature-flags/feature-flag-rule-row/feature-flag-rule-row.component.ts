@@ -35,10 +35,12 @@ import { catchError, map } from 'rxjs/operators';
 import {
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
   type FeatureFlagAttributeField,
   type FeatureFlagAttributeOp,
+  type FeatureFlagBucketBy,
   type FeatureFlagRuleEffect,
   type FeatureFlagRuleType
 } from '@app/shared/constants';
@@ -68,6 +70,10 @@ export type FeatureFlagRuleDraft = {
 };
 
 type AttributePayload = Extract<FeatureFlagRulePayload, { type: 'attribute' }>;
+type PercentagePayload = Extract<
+  FeatureFlagRulePayload,
+  { type: 'percentage' }
+>;
 
 const PERCENT_STEP = 5;
 
@@ -145,6 +151,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected readonly effects = FEATURE_FLAG_RULE_EFFECTS;
   protected readonly attributeFields = FEATURE_FLAG_ATTRIBUTE_FIELDS;
   protected readonly attributeOps = FEATURE_FLAG_ATTRIBUTE_OPS;
+  protected readonly bucketByOptions = FEATURE_FLAG_BUCKET_BY;
 
   // Chip-label caches — keyed by the underlying API value (user UUID or role
   // name) so subsequent edits keep the human-readable display even if the
@@ -190,6 +197,11 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected get percentValue(): number {
     const p = this.rule().payload;
     return p.type === 'percentage' ? p.percent : 0;
+  }
+
+  protected get bucketByValue(): FeatureFlagBucketBy {
+    const p = this.rule().payload;
+    return p.type === 'percentage' ? (p.bucketBy ?? 'user') : 'user';
   }
 
   protected get attributeField(): FeatureFlagAttributeField {
@@ -388,7 +400,25 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
           : 0;
     const snapped = Math.round(num / PERCENT_STEP) * PERCENT_STEP;
     const clamped = Math.max(0, Math.min(100, snapped));
-    this.#updatePayload({ type: 'percentage', percent: clamped });
+    this.#updatePercentage({ percent: clamped });
+  }
+
+  onBucketByChange(bucketBy: FeatureFlagBucketBy): void {
+    this.#updatePercentage({ bucketBy });
+  }
+
+  #updatePercentage(partial: Partial<Omit<PercentagePayload, 'type'>>): void {
+    const current = this.rule().payload;
+    const percent =
+      partial.percent ?? (current.type === 'percentage' ? current.percent : 0);
+    const bucketBy =
+      partial.bucketBy ??
+      (current.type === 'percentage' ? current.bucketBy : undefined);
+    this.#updatePayload({
+      type: 'percentage',
+      percent,
+      ...(bucketBy !== undefined ? { bucketBy } : {})
+    });
   }
 
   onAttributeFieldChange(field: FeatureFlagAttributeField): void {

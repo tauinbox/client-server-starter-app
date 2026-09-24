@@ -19,7 +19,7 @@ describe('FeatureFlagsController', () => {
   let controller: FeatureFlagsController;
   let resolver: {
     buildResolverUser: jest.Mock;
-    evaluateForUser: jest.Mock;
+    evaluateSignedIn: jest.Mock;
     evaluateAnonymous: jest.Mock;
   };
   let environment: string;
@@ -29,6 +29,10 @@ describe('FeatureFlagsController', () => {
     email: 'a@b.com',
     createdAt: new Date('2026-01-01T00:00:00Z'),
     roles: ['admin']
+  };
+  const signedInResult = {
+    flags: { 'beta-feature': true },
+    evaluatedAt: new Date().toISOString()
   };
   const anonymousResult = {
     flags: { 'public-only': true },
@@ -43,10 +47,9 @@ describe('FeatureFlagsController', () => {
     environment = 'production';
     resolver = {
       buildResolverUser: jest.fn().mockResolvedValue(resolverUser),
-      evaluateForUser: jest.fn().mockResolvedValue({
-        flags: { 'beta-feature': true },
-        evaluatedAt: new Date().toISOString()
-      }),
+      evaluateSignedIn: jest
+        .fn()
+        .mockResolvedValue({ result: signedInResult, issuedAnonId: null }),
       evaluateAnonymous: jest
         .fn()
         .mockResolvedValue({ result: anonymousResult, issuedAnonId: null })
@@ -66,7 +69,7 @@ describe('FeatureFlagsController', () => {
     controller = module.get(FeatureFlagsController);
   });
 
-  it('routes authenticated requests through buildResolverUser + evaluateForUser', async () => {
+  it('routes authenticated requests through buildResolverUser + evaluateSignedIn', async () => {
     const req = createMockRequest({
       user: { userId: 'user-1', email: 'a@b.com' },
       cookies: {}
@@ -76,10 +79,54 @@ describe('FeatureFlagsController', () => {
     const result = await controller.evaluate(req, res);
 
     expect(resolver.buildResolverUser).toHaveBeenCalledWith('user-1');
-    expect(resolver.evaluateForUser).toHaveBeenCalledWith(resolverUser, req);
+    expect(resolver.evaluateSignedIn).toHaveBeenCalledWith(
+      resolverUser,
+      null,
+      req
+    );
     expect(resolver.evaluateAnonymous).not.toHaveBeenCalled();
     expect(res.cookie).not.toHaveBeenCalled();
-    expect(result.flags['beta-feature']).toBe(true);
+    expect(result).toBe(signedInResult);
+  });
+
+  // A rule bucketed by device keeps the bucket a guest had, so a signed-in
+  // caller must pass the same cookie on.
+  it('passes the anon-id cookie of a signed-in caller to the resolver', async () => {
+    const req = createMockRequest({
+      user: { userId: 'user-1', email: 'a@b.com' },
+      cookies: { [HOST_ANON_ID_COOKIE]: VALID_ANON_ID }
+    });
+
+    await controller.evaluate(req, newResponse());
+
+    expect(resolver.evaluateSignedIn).toHaveBeenCalledWith(
+      resolverUser,
+      VALID_ANON_ID,
+      req
+    );
+  });
+
+  it('persists the id the resolver issues for a signed-in caller', async () => {
+    resolver.evaluateSignedIn.mockResolvedValue({
+      result: signedInResult,
+      issuedAnonId: ISSUED_ANON_ID
+    });
+    const res = newResponse();
+
+    const result = await controller.evaluate(
+      createMockRequest({
+        user: { userId: 'user-1', email: 'a@b.com' },
+        cookies: {}
+      }),
+      res
+    );
+
+    expect(result).toBe(signedInResult);
+    expect(res.cookie).toHaveBeenCalledWith(
+      HOST_ANON_ID_COOKIE,
+      ISSUED_ANON_ID,
+      expect.objectContaining({ httpOnly: true, secure: true })
+    );
   });
 
   it('falls back to evaluateAnonymous (with anon-id cookie) when req.user is undefined', async () => {
@@ -91,7 +138,7 @@ describe('FeatureFlagsController', () => {
     const result = await controller.evaluate(req, res);
 
     expect(resolver.evaluateAnonymous).toHaveBeenCalledWith(VALID_ANON_ID, req);
-    expect(resolver.evaluateForUser).not.toHaveBeenCalled();
+    expect(resolver.evaluateSignedIn).not.toHaveBeenCalled();
     expect(res.cookie).not.toHaveBeenCalled();
     expect(result).toBe(anonymousResult);
   });

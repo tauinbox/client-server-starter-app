@@ -16,6 +16,12 @@ export const FEATURE_FLAG_RULE_TYPES = [
 
 export const FEATURE_FLAG_RULE_EFFECTS = ['include', 'exclude'] as const;
 
+// What a percentage rule hashes for a signed-in caller: `user` keys on the
+// user id, so the bucket follows the account; `device` keys on the rollout
+// cookie, so the bucket a guest had is kept across sign-in on that browser.
+// An anonymous caller has only the cookie, so both read it.
+export const FEATURE_FLAG_BUCKET_BY = ['user', 'device'] as const;
+
 export const FEATURE_FLAG_ATTRIBUTE_FIELDS = [
   'email',
   'emailDomain',
@@ -48,6 +54,8 @@ export const FEATURE_FLAG_PREVIEW_REASONS = [
 export type FeatureFlagRuleType = (typeof FEATURE_FLAG_RULE_TYPES)[number];
 
 export type FeatureFlagRuleEffect = (typeof FEATURE_FLAG_RULE_EFFECTS)[number];
+
+export type FeatureFlagBucketBy = (typeof FEATURE_FLAG_BUCKET_BY)[number];
 
 export type FeatureFlagAttributeField =
   (typeof FEATURE_FLAG_ATTRIBUTE_FIELDS)[number];

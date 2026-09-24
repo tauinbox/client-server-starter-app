@@ -226,6 +226,41 @@ describe('feature-flag validation parity with server', () => {
     });
   });
 
+  describe('percentage rule bucketBy', () => {
+    async function ruleResponse(bucketBy: unknown): Promise<Response> {
+      const created = await createFlag({ key: `pct-${String(bucketBy)}` });
+      expect(created.status).toBe(201);
+      const flag = (await created.json()) as { id: string };
+      return replaceRules(flag.id, [
+        {
+          type: 'percentage',
+          effect: 'include',
+          payload: { type: 'percentage', percent: 10, bucketBy }
+        }
+      ]);
+    }
+
+    it('stores device', async () => {
+      const res = await ruleResponse('device');
+      expect(res.status).toBe(200);
+      const flag = (await res.json()) as {
+        rules: { payload: Record<string, unknown> }[];
+      };
+      expect(flag.rules[0]?.payload).toEqual({
+        type: 'percentage',
+        percent: 10,
+        bucketBy: 'device'
+      });
+    });
+
+    it('rejects a value outside the list', async () => {
+      const res = await ruleResponse('session');
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toContain('bucketBy');
+    });
+  });
+
   // The preview body may carry an unsaved rule set, an unsaved enabled state
   // and an unsaved environment list. The server evaluates those instead of the
   // stored flag, and runs the same rule-payload validator as the save path.

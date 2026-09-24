@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import {
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_PREVIEW_REASONS,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES
@@ -37,6 +38,10 @@ describe('feature-flag rule vocabulary', () => {
       'createdAt',
       'custom'
     ]);
+  });
+
+  it('pins the percentage bucketBy values', () => {
+    expect(FEATURE_FLAG_BUCKET_BY).toEqual(['user', 'device']);
   });
 
   it('pins the attribute operators', () => {
@@ -163,4 +168,27 @@ describe('validateRulePayload attribute value', () => {
       )
     ).toEqual({ type: 'percentage', percent: 25 });
   });
+
+  it.each(['user', 'device'])('keeps percentage bucketBy=%s', (bucketBy) => {
+    expect(
+      validateRulePayload(
+        'percentage',
+        { type: 'percentage', percent: 25, bucketBy },
+        knownCustomKeys
+      )
+    ).toEqual({ type: 'percentage', percent: 25, bucketBy });
+  });
+
+  it.each(['session', null, 1])(
+    'rejects percentage bucketBy=%p',
+    (bucketBy) => {
+      expect(() =>
+        validateRulePayload(
+          'percentage',
+          { type: 'percentage', percent: 25, bucketBy },
+          knownCustomKeys
+        )
+      ).toThrow(BadRequestException);
+    }
+  );
 });

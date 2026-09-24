@@ -9,6 +9,7 @@ import { In, Repository } from 'typeorm';
 import {
   anonymousEvaluationNeedsAnonId,
   evaluateFeatureFlag,
+  signedInEvaluationNeedsAnonId,
   type EvaluatorFlag,
   type EvaluatorRule,
   type FeatureFlagEvaluationContext
@@ -29,7 +30,7 @@ export interface ResolverUser {
   roles: string[];
 }
 
-export interface AnonymousEvaluation {
+export interface RolloutEvaluation {
   result: EvaluatedFeatureFlagsResponse;
   // Set only when this evaluation minted the rollout id; the caller persists it.
   issuedAnonId: string | null;
@@ -99,6 +100,36 @@ export class FeatureFlagResolverService {
     };
   }
 
+  /**
+   * Evaluates every flag for a signed-in caller. The rollout id is read, and
+   * minted when absent, only while a live rule buckets by `device`. That map
+   * depends on the browser, so it skips the per-user cache: `invalidateUser`
+   * could not reach one cache entry per device.
+   */
+  async evaluateSignedIn(
+    user: ResolverUser,
+    anonId: string | null,
+    req: Request
+  ): Promise<RolloutEvaluation> {
+    const flags = await this.loadAllFlags();
+    if (!signedInEvaluationNeedsAnonId(flags, this.env())) {
+      return {
+        result: await this.evaluateForUser(user, req),
+        issuedAnonId: null
+      };
+    }
+    const issuedAnonId = anonId === null ? randomUUID() : null;
+    const ctx = this.buildContext(user, anonId ?? issuedAnonId, req);
+    return {
+      result: this.evaluate(flags, ctx, /* publicOnly */ false),
+      issuedAnonId
+    };
+  }
+
+  /**
+   * Evaluates every flag for a user with no rollout id, so a rule bucketed by
+   * `device` never matches here and a server gate built on it stays closed.
+   */
   async evaluateForUser(
     user: ResolverUser,
     req: Request
@@ -125,7 +156,7 @@ export class FeatureFlagResolverService {
   async evaluateAnonymous(
     anonId: string | null,
     req: Request
-  ): Promise<AnonymousEvaluation> {
+  ): Promise<RolloutEvaluation> {
     const flags = await this.loadAllFlags();
     const issuedAnonId =
       anonId === null && anonymousEvaluationNeedsAnonId(flags, this.env())

@@ -2,13 +2,15 @@ import {
   anonymousEvaluationNeedsAnonId,
   evaluateFeatureFlag,
   percentageBucket,
-  previewFeatureFlag
+  previewFeatureFlag,
+  signedInEvaluationNeedsAnonId
 } from '@app/shared/utils/feature-flag-evaluator';
 import type {
   AnonymousEvaluatorFlag,
   EvaluatorFlag,
   EvaluatorRule,
-  FeatureFlagEvaluationContext
+  FeatureFlagEvaluationContext,
+  RolloutEvaluatorFlag
 } from '@app/shared/utils/feature-flag-evaluator';
 
 const baseFlag = (overrides: Partial<EvaluatorFlag> = {}): EvaluatorFlag => ({
@@ -127,6 +129,60 @@ describe('evaluateFeatureFlag — rule types', () => {
         baseCtx({ userId: null, anonId: null })
       )
     ).toBe(false);
+  });
+
+  describe('percentage bucketBy', () => {
+    // Ids on opposite sides of a 50 % split for `demo-flag`.
+    const idIn = pickId((b) => b < 50);
+    const idOut = pickId((b) => b >= 50);
+    const half = (bucketBy?: 'user' | 'device') => [
+      rule('include', {
+        type: 'percentage',
+        percent: 50,
+        ...(bucketBy ? { bucketBy } : {})
+      })
+    ];
+
+    function pickId(fits: (bucket: number) => boolean): string {
+      for (let i = 0; ; i++) {
+        if (fits(percentageBucket(`id-${i}`, 'demo-flag'))) return `id-${i}`;
+      }
+    }
+
+    it('device keys on anonId and ignores userId', () => {
+      const ctx = baseCtx({ userId: idOut, anonId: idIn });
+      expect(evaluateFeatureFlag(baseFlag(), half('device'), ctx)).toBe(true);
+    });
+
+    it('device does not match without an anonId, even for a user', () => {
+      const all = [
+        rule('include', {
+          type: 'percentage',
+          percent: 100,
+          bucketBy: 'device'
+        })
+      ];
+      expect(
+        evaluateFeatureFlag(baseFlag(), all, baseCtx({ anonId: null }))
+      ).toBe(false);
+    });
+
+    it('user keys on userId before anonId', () => {
+      const ctx = baseCtx({ userId: idOut, anonId: idIn });
+      expect(evaluateFeatureFlag(baseFlag(), half('user'), ctx)).toBe(false);
+    });
+
+    it('an absent bucketBy behaves as user', () => {
+      for (const ctx of [
+        baseCtx({ userId: idOut, anonId: idIn }),
+        baseCtx({ userId: idIn, anonId: idOut }),
+        baseCtx({ userId: null, anonId: idIn })
+      ]) {
+        expect(evaluateFeatureFlag(baseFlag(), half(), ctx)).toBe(
+          evaluateFeatureFlag(baseFlag(), half('user'), ctx)
+        );
+      }
+    });
   });
 
   it('attribute rule eq op matches when attribute equals expected', () => {
@@ -702,5 +758,34 @@ describe('anonymousEvaluationNeedsAnonId', () => {
         'production'
       )
     ).toBe(true);
+  });
+});
+
+describe('signedInEvaluationNeedsAnonId', () => {
+  const device = {
+    payload: { type: 'percentage', percent: 50, bucketBy: 'device' }
+  } as const;
+  const flag = (
+    overrides: Partial<RolloutEvaluatorFlag> = {}
+  ): RolloutEvaluatorFlag => ({
+    ...baseFlag(),
+    rules: [device],
+    ...overrides
+  });
+
+  it('is true for a live flag with a device rule', () => {
+    expect(signedInEvaluationNeedsAnonId([flag()], 'production')).toBe(true);
+  });
+
+  it.each([
+    ['no flags', []],
+    ['a disabled flag', [flag({ enabled: false })]],
+    ['a flag of another environment', [flag({ environments: ['staging'] })]],
+    [
+      'a percentage rule bucketed by user',
+      [flag({ rules: [{ payload: { type: 'percentage', percent: 50 } }] })]
+    ]
+  ])('is false with %s', (_label, flags: RolloutEvaluatorFlag[]) => {
+    expect(signedInEvaluationNeedsAnonId(flags, 'production')).toBe(false);
   });
 });

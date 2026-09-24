@@ -2,8 +2,10 @@ import { BadRequestException } from '@nestjs/common';
 import {
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_BUCKET_BY,
   type FeatureFlagAttributeField,
   type FeatureFlagAttributeOp,
+  type FeatureFlagBucketBy,
   type FeatureFlagRuleType
 } from '@app/shared/constants';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
@@ -58,7 +60,22 @@ export function validateRulePayload(
           `percentage rule requires percent: number in [0, 100]`
         );
       }
-      return { type: 'percentage', percent };
+      const bucketBy = p['bucketBy'];
+      if (
+        bucketBy !== undefined &&
+        !FEATURE_FLAG_BUCKET_BY.includes(bucketBy as FeatureFlagBucketBy)
+      ) {
+        throw new BadRequestException(
+          `percentage rule bucketBy must be one of ${FEATURE_FLAG_BUCKET_BY.join(', ')}`
+        );
+      }
+      return {
+        type: 'percentage',
+        percent,
+        ...(bucketBy !== undefined
+          ? { bucketBy: bucketBy as FeatureFlagBucketBy }
+          : {})
+      };
     }
     case 'attribute': {
       const field = p['field'];

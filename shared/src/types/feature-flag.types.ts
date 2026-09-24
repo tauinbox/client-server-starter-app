@@ -1,6 +1,7 @@
 import type {
   FeatureFlagAttributeField,
   FeatureFlagAttributeOp,
+  FeatureFlagBucketBy,
   FeatureFlagPreviewReason,
   FeatureFlagRuleEffect,
   FeatureFlagRuleType
@@ -9,7 +10,9 @@ import type {
 export type FeatureFlagRulePayload =
   | { type: 'user'; userIds: string[] }
   | { type: 'role'; roleNames: string[] }
-  | { type: 'percentage'; percent: number }
+  // An absent `bucketBy` is `user`, so rows stored before it existed keep
+  // their buckets.
+  | { type: 'percentage'; percent: number; bucketBy?: FeatureFlagBucketBy }
   | {
       type: 'attribute';
       field: FeatureFlagAttributeField;
