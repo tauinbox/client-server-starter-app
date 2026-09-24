@@ -41,7 +41,9 @@ management and theming.
   only a code or a recovery code turns it into a session. Wrong codes are counted against the
   account, not against the caller: five of them shut the code step for 15 minutes, which is the same
   budget the password gets, while the recovery code stays accepted so the owner always keeps a way
-  back in. The shared secret is encrypted at rest
+  back in. An owner who lost the recovery codes as well is reset by an administrator, who proves
+  their identity outside the system and then confirms with their own factor on the user edit page
+  (`POST /users/:id/mfa/reset`). The reset ends every session of the account. The shared secret is encrypted at rest
   with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 503 and every other
   path is unchanged. An account created through a provider holds no password, so the card takes it
   through a round trip at that provider and picks the enrolment up on the return, and it turns the
@@ -604,8 +606,8 @@ condition check. Each button is visible, each route is available, and each API c
 with one exception: no caller can assign or remove a super role through the API.
 
 In the other direction, an account that holds a super role is out of reach of every actor that is not
-super. `PATCH /users/:id`, `DELETE /users/:id`, `POST /users/:id/restore` and the two role-assignment
-routes answer 403 with `errors.users.superTargetForbidden` for such an actor. Without that rule, a
+super. `PATCH /users/:id`, `DELETE /users/:id`, `POST /users/:id/restore`, `POST /users/:id/mfa/reset`
+and the two role-assignment routes answer 403 with `errors.users.superTargetForbidden` for such an actor. Without that rule, a
 delegated role with `update:User` could set the password of the super account and sign in as it, or
 keep it signed out, because each role change ends every session of the target.
 
@@ -1525,6 +1527,7 @@ The base URL of the API is `/api/v1`.
 | PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and an email change or a deactivation clears the same five fields. A password change or a change to a different email needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller. This applies to every target, the caller's own record included |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
+| POST | `/users/:id/mfa/reset` | `users:update` | Reset the two-factor enrolment of another user who lost the authenticator and the recovery codes. Needs a step-up of the CALLER (`currentPassword` or `code`). Refused for the caller's own account and for an account with no factor. Ends every session of the target, audits `MFA_RESET_BY_ADMIN` and mails the owner |
 | POST | `/roles` | `roles:create` | Create a role |
 | GET | `/roles` | `roles:read` | List the roles with their permissions |
 | GET | `/roles/:id` | `roles:read` | Get a role by ID |
@@ -1810,11 +1813,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2538 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 461 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With no Redis and a mail sink, 449 pass and 12 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1339 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 276 tests pass |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 834 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2547 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 467 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 465 pass and 2 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1348 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 279 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 840 tests pass |
 
 ## CI/CD
 

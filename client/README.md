@@ -1043,6 +1043,9 @@ list is the heaviest page, and it repeatedly came near to the default limit of 3
   record on `/users/<own-id>/edit` and refuses every other record (`users/users-edit.spec.ts`).
   The route runs `instancePermissionGuard`, so the MongoQuery condition of the grant is compared
   against the record id in the URL
+- an administrator resets the two-factor enrolment of an enrolled user from the edit page, with
+  the administrator's own password in the dialog, and that user then signs in with the password
+  alone; a wrong password leaves the factor on (`users/users-mfa-reset.spec.ts`)
 
 **Design-token regression net.** `e2e/visual/m3-colors.spec.ts` asserts that each destructive utility
 resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that the drawer, the rail
