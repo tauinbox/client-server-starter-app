@@ -5,6 +5,7 @@ import {
   anonymousEvaluationNeedsAnonId,
   evaluateFeatureFlag,
   previewFeatureFlag,
+  signedInEvaluationNeedsAnonId,
   type EvaluatorRule,
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
@@ -21,12 +22,14 @@ import {
   ErrorKeys,
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
+  FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
   OAUTH_PROVIDER_FLAGS,
   normalizeEnvironmentList,
   type FeatureFlagAttributeField,
   type FeatureFlagAttributeOp,
+  type FeatureFlagBucketBy,
   type FeatureFlagRuleEffect,
   type FeatureFlagRuleType
 } from '@app/shared/constants';
@@ -309,7 +312,25 @@ function validateRulePayload(
           'percentage rule requires percent: number in [0, 100]'
         );
       }
-      return { ok: true, payload: { type: 'percentage', percent } };
+      const bucketBy = p['bucketBy'];
+      if (
+        bucketBy !== undefined &&
+        !FEATURE_FLAG_BUCKET_BY.includes(bucketBy as FeatureFlagBucketBy)
+      ) {
+        return serviceFail(
+          `percentage rule bucketBy must be one of ${FEATURE_FLAG_BUCKET_BY.join(', ')}`
+        );
+      }
+      return {
+        ok: true,
+        payload: {
+          type: 'percentage',
+          percent,
+          ...(bucketBy !== undefined
+            ? { bucketBy: bucketBy as FeatureFlagBucketBy }
+            : {})
+        }
+      };
     }
     case 'attribute': {
       const field = p['field'];
@@ -477,7 +498,10 @@ function anonymousContext(anonId: string | null): FeatureFlagEvaluationContext {
   };
 }
 
-function userContext(user: MockUser): FeatureFlagEvaluationContext {
+function userContext(
+  user: MockUser,
+  anonId: string | null
+): FeatureFlagEvaluationContext {
   const at = user.email.lastIndexOf('@');
   const emailDomain = at >= 0 ? user.email.slice(at + 1) : undefined;
   const attributes: Record<string, unknown> = {
@@ -486,19 +510,24 @@ function userContext(user: MockUser): FeatureFlagEvaluationContext {
   };
   if (emailDomain) attributes['emailDomain'] = emailDomain;
   if (user.createdAt) attributes['createdAt'] = user.createdAt;
-  // As the server: a signed-in caller is bucketed by user id only.
+  // As the server: only a rule bucketed by device reads `anonId` here.
   return {
     userId: user.id,
-    anonId: null,
+    anonId,
     roles: user.roles,
     attributes,
     env: evaluationEnv()
   };
 }
 
-// Mirrors FeatureFlagResolverService.evaluateAnonymous: the rollout id is
-// issued only when a public percentage rule would read it.
-function resolveAnonId(req: Request, res: Response): string | null {
+// Mirrors FeatureFlagResolverService.evaluateAnonymous / evaluateSignedIn: an
+// anonymous caller gets the rollout id only when a public percentage rule
+// reads it, a signed-in caller only when a live rule buckets by device.
+function resolveAnonId(
+  req: Request,
+  res: Response,
+  signedIn: boolean
+): string | null {
   const held = readAnonId(req);
   if (held !== null) return held;
   const state = getState();
@@ -509,7 +538,10 @@ function resolveAnonId(req: Request, res: Response): string | null {
     public: flag.public,
     rules: state.featureFlagRules.filter((r) => r.flagId === flag.id)
   }));
-  if (!anonymousEvaluationNeedsAnonId(flags, evaluationEnv())) return null;
+  const needed = signedIn
+    ? signedInEvaluationNeedsAnonId(flags, evaluationEnv())
+    : anonymousEvaluationNeedsAnonId(flags, evaluationEnv());
+  if (!needed) return null;
   const issued = randomUUID();
   writeAnonId(res, issued);
   return issued;
@@ -547,9 +579,13 @@ const publicRouter = Router();
 
 publicRouter.get('/', (req, res) => {
   const authenticated = authenticateRequest(req);
+  const anonId = resolveAnonId(req, res, authenticated !== null);
   const response = authenticated
-    ? evaluateAll(userContext(authenticated.user), /* publicOnly */ false)
-    : evaluateAll(anonymousContext(resolveAnonId(req, res)), true);
+    ? evaluateAll(
+        userContext(authenticated.user, anonId),
+        /* publicOnly */ false
+      )
+    : evaluateAll(anonymousContext(anonId), true);
   res.json(response);
 });
 

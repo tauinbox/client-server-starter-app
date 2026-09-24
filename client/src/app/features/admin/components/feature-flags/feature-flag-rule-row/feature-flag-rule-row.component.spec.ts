@@ -1,6 +1,8 @@
 import { Component, signal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
+import type { MatSelect } from '@angular/material/select';
+import { By } from '@angular/platform-browser';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
@@ -141,6 +143,50 @@ describe('FeatureFlagRuleRowComponent', () => {
       type: 'percentage',
       percent: 0
     });
+  });
+
+  it('writes the chosen bucketBy into the payload', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+
+    cmp.onBucketByChange('device');
+
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'percentage',
+      percent: 25,
+      bucketBy: 'device'
+    });
+  });
+
+  it('keeps bucketBy when the percent changes', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'percentage',
+      payload: { type: 'percentage', percent: 25, bucketBy: 'device' }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+
+    cmp.onPercentChange(60);
+
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'percentage',
+      percent: 60,
+      bucketBy: 'device'
+    });
+  });
+
+  it('selects user for a stored rule without bucketBy', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    const select = fixture.debugElement.query(
+      By.css('.rule-bucket-by mat-select')
+    ).componentInstance as MatSelect;
+    expect(select.value).toBe('user');
   });
 
   it('reflects rule effect on the root .rule-row via data-effect', () => {

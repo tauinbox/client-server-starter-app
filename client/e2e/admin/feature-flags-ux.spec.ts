@@ -200,4 +200,40 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await expect(keyInput).toHaveValue('oauthGoogleConfigured');
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
+
+  test('FF-UX-012: a percentage rule saves and reloads its bucketBy', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: mockId('user-104'),
+      email: 'flagbucketadmin@example.com',
+      roles: ['admin']
+    });
+
+    await page.goto('/admin/feature-flags');
+    const editButton = page
+      .getByRole('row', { name: /beta-export/ })
+      .getByRole('button', { name: /Edit flag beta-export/ });
+    await editButton.click();
+
+    let dialog = await openedDialog(page);
+    const bucketBy = dialog.getByRole('combobox', { name: 'Bucket by' });
+    // The seed rule has no bucketBy, which the server reads as user.
+    await expect(bucketBy).toHaveText('User');
+    await bucketBy.click();
+    await page.getByRole('option', { name: 'Device', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(
+      page.getByText('Feature flag "beta-export" updated')
+    ).toBeVisible();
+    await expect(dialog).toBeHidden();
+
+    await page.reload();
+    await editButton.click();
+    dialog = await openedDialog(page);
+    await expect(
+      dialog.getByRole('combobox', { name: 'Bucket by' })
+    ).toHaveText('Device');
+  });
 });

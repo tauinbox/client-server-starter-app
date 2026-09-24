@@ -4,6 +4,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import KeyvRedis from '@keyv/redis';
 import type { Request } from 'express';
+import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import { FeatureFlagResolverService } from './feature-flag-resolver.service';
 import { AttributeRegistryService } from './attribute-registry.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
@@ -297,6 +298,79 @@ describe('FeatureFlagResolverService', () => {
       );
       const { issuedAnonId } = await service.evaluateAnonymous(null, fakeReq);
       expect(issuedAnonId).toMatch(UUID);
+    });
+  });
+
+  describe('signed-in rollout id', () => {
+    const UUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    const user = {
+      userId: 'u1',
+      email: 'a@b.com',
+      createdAt: null,
+      roles: []
+    };
+    const deviceRule = (percent: number) => ({
+      flagId: 'f1',
+      payload: {
+        type: 'percentage' as const,
+        percent,
+        bucketBy: 'device' as const
+      }
+    });
+    // Two ids on opposite sides of a 50 % split for the flag key `dev-pct`.
+    const inId = pickAnonId((b) => b < 50);
+    const outId = pickAnonId((b) => b >= 50);
+
+    const hasUserEntry = () =>
+      [...cacheStore.keys()].some((k) => k.startsWith('featureflags:user:u1:'));
+
+    function pickAnonId(fits: (bucket: number) => boolean): string {
+      for (let i = 0; ; i++) {
+        const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+        if (fits(percentageBucket(id, 'dev-pct'))) return id;
+      }
+    }
+
+    it('issues no id and uses the per-user cache when no rule buckets by device', async () => {
+      seedFlags([{ id: 'f1', key: 'pct' }], [{ flagId: 'f1' }]);
+      const { result, issuedAnonId } = await service.evaluateSignedIn(
+        user,
+        null,
+        fakeReq
+      );
+      expect(issuedAnonId).toBeNull();
+      expect(result.flags['pct']).toBe(true);
+      expect(hasUserEntry()).toBe(true);
+    });
+
+    it('issues an id for a device rule on a flag that is not public', async () => {
+      seedFlags([{ id: 'f1', key: 'dev-pct' }], [deviceRule(100)]);
+      const { result, issuedAnonId } = await service.evaluateSignedIn(
+        user,
+        null,
+        fakeReq
+      );
+      expect(issuedAnonId).toMatch(UUID);
+      expect(result.flags['dev-pct']).toBe(true);
+    });
+
+    it('buckets a device rule by the anon id, not the user id', async () => {
+      seedFlags([{ id: 'f1', key: 'dev-pct' }], [deviceRule(50)]);
+      const inside = await service.evaluateSignedIn(user, inId, fakeReq);
+      const outside = await service.evaluateSignedIn(user, outId, fakeReq);
+      expect(inside.result.flags).toEqual({ 'dev-pct': true });
+      expect(inside.issuedAnonId).toBeNull();
+      // A shared per-user entry would hand the first device's map to the second.
+      expect(outside.result.flags['dev-pct']).toBeUndefined();
+      expect(hasUserEntry()).toBe(false);
+    });
+
+    it('never opens a device rule for an evaluation without an anon id', async () => {
+      seedFlags([{ id: 'f1', key: 'dev-pct' }], [deviceRule(100)]);
+      expect(await service.isEnabledForUser(user, fakeReq, 'dev-pct')).toBe(
+        false
+      );
     });
   });
 

@@ -224,7 +224,9 @@ management and theming.
   An anonymous user goes into a bucket by the `nxs_anon_id` cookie. `GET /feature-flags` sets it
   only when a live public flag has a percentage rule, because nothing else reads it. Thus a 10 %
   rollout of a public flag converges on the same 10 % of anonymous browsers across reloads, and a
-  visitor gets no long-lived identifier while no such flag exists.
+  visitor gets no long-lived identifier while no such flag exists. A percentage rule with
+  `bucketBy: 'device'` hashes the same cookie for a signed-in user, so a guest keeps the bucket
+  across sign-in on that browser. The default, `user`, hashes the user id.
 
   `FeatureFlagChangedListener` invalidates the cache on each change. It also coalesces the SSE
   broadcast of `{ type: 'feature_flags_updated' }`, thus a burst of changes causes one synchronized

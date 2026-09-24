@@ -1,6 +1,8 @@
 import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
+import type { FeatureFlagRulePayload } from '@app/shared/types';
+import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import { getState, resetState } from '../state';
 
 // Mirrors server/test/feature-flags.e2e-spec.ts: the one-year rollout id is
@@ -27,6 +29,13 @@ beforeEach(() => {
 });
 
 function addPublicPercentageFlag(): void {
+  addPercentageFlag({ public: true }, { type: 'percentage', percent: 100 });
+}
+
+function addPercentageFlag(
+  flag: { public: boolean },
+  payload: FeatureFlagRulePayload
+): void {
   const state = getState();
   const now = new Date().toISOString();
   state.featureFlags.set('flag-public-rollout', {
@@ -35,7 +44,7 @@ function addPublicPercentageFlag(): void {
     description: null,
     enabled: true,
     environments: [],
-    public: true,
+    public: flag.public,
     version: 1,
     updatedByUserId: null,
     createdAt: now,
@@ -46,16 +55,30 @@ function addPublicPercentageFlag(): void {
     flagId: 'flag-public-rollout',
     type: 'percentage',
     effect: 'include',
-    payload: { type: 'percentage', percent: 100 },
+    payload,
     createdAt: now,
     updatedAt: now
   });
 }
 
-function getFlags(cookie?: string): Promise<Response> {
+function getFlags(cookie?: string, token?: string): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/feature-flags`, {
-    headers: cookie === undefined ? {} : { cookie }
+    headers: {
+      ...(cookie === undefined ? {} : { cookie }),
+      ...(token === undefined ? {} : { authorization: `Bearer ${token}` })
+    }
   });
+}
+
+async function loginAsUser(): Promise<string> {
+  const res = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'user@example.com', password: 'Password1' })
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { tokens: { access_token: string } };
+  return body.tokens.access_token;
 }
 
 describe('anonymous rollout id issuance', () => {
@@ -96,5 +119,59 @@ describe('anonymous rollout id issuance', () => {
   it('ignores a cookie that is not a UUID when no id is needed', async () => {
     const res = await getFlags('nxs_anon_id=x');
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+});
+
+// Mirrors FeatureFlagResolverService.evaluateSignedIn: a signed-in caller gets
+// the id only when a live rule buckets by device, public flag or not.
+describe('signed-in rollout id issuance', () => {
+  it('sets no cookie while no rule buckets by device', async () => {
+    addPublicPercentageFlag();
+    const res = await getFlags(undefined, await loginAsUser());
+    expect(res.status).toBe(200);
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('issues a UUID for a device rule on a flag that is not public', async () => {
+    addPercentageFlag(
+      { public: false },
+      { type: 'percentage', percent: 100, bucketBy: 'device' }
+    );
+    const res = await getFlags(undefined, await loginAsUser());
+    expect(res.headers.get('set-cookie') ?? '').toMatch(UUID_COOKIE);
+    const body = (await res.json()) as { flags: Record<string, boolean> };
+    expect(body.flags['public-rollout']).toBe(true);
+  });
+
+  it('buckets a device rule by the cookie the guest already held', async () => {
+    const user = [...getState().users.values()].find(
+      (u) => u.email === 'user@example.com'
+    );
+    // Pick a cookie on the other side of the split from the user id, so a
+    // user-keyed bucket would give the opposite result.
+    const userIsIn = percentageBucket(user?.id ?? '', 'public-rollout') < 50;
+    let anonId = '';
+    for (let i = 0; anonId === ''; i++) {
+      const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+      if (percentageBucket(id, 'public-rollout') < 50 !== userIsIn) anonId = id;
+    }
+    addPercentageFlag(
+      { public: true },
+      { type: 'percentage', percent: 50, bucketBy: 'device' }
+    );
+    const guest = await getFlags(`nxs_anon_id=${anonId}`);
+    const signedIn = await getFlags(
+      `nxs_anon_id=${anonId}`,
+      await loginAsUser()
+    );
+    const guestBody = (await guest.json()) as {
+      flags: Record<string, boolean>;
+    };
+    const userBody = (await signedIn.json()) as {
+      flags: Record<string, boolean>;
+    };
+    expect(guestBody.flags['public-rollout']).toBe(!userIsIn);
+    expect(userBody.flags['public-rollout']).toBe(!userIsIn);
+    expect(signedIn.headers.get('set-cookie')).toBeNull();
   });
 });

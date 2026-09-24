@@ -48,6 +48,7 @@ import { ANON_ID_COOKIE } from '../src/modules/feature-flags/utils/anon-id-cooki
 import * as cookieParser from 'cookie-parser';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
+import type { FeatureFlagRulePayload } from '@app/shared/types';
 
 // ── In-memory repository stand-ins ─────────────────────────────────────────
 
@@ -762,6 +763,8 @@ describe('@RequireFeature guard', () => {
 describe('GET /feature-flags anonymous rollout id', () => {
   const HOST_ANON_ID_COOKIE = `__Host-${ANON_ID_COOKIE}`;
   const VALID_ANON_ID = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
+  const SIGNED_IN_HEADER = 'x-test-user-id';
+  const USER_ID = 'user-1';
 
   let app: INestApplication;
   let server: Server;
@@ -771,11 +774,12 @@ describe('GET /feature-flags anonymous rollout id', () => {
   beforeEach(async () => {
     const stores = createStores();
     const moduleRef = await Test.createTestingModule({
-      controllers: [FeatureFlagsController],
+      controllers: [FeatureFlagsController, TestFeatureController],
       providers: [
         FeatureFlagService,
         FeatureFlagResolverService,
         AttributeRegistryService,
+        FeatureFlagGuard,
         {
           provide: getRepositoryToken(FeatureFlag),
           useValue: makeFlagRepoMock(stores)
@@ -807,6 +811,19 @@ describe('GET /feature-flags anonymous rollout id', () => {
 
     app = moduleRef.createNestApplication();
     app.use(cookieParser());
+    // Stands in for the JWT guard: a request that names a user is signed in.
+    app.use((req: JwtAuthRequest, _res: unknown, next: () => void) => {
+      const userId = req.headers[SIGNED_IN_HEADER];
+      if (typeof userId === 'string') {
+        req.user = {
+          userId,
+          email: 'u@example.com',
+          roles: [],
+          sessionId: 's'
+        };
+      }
+      next();
+    });
     await app.init();
     server = app.getHttpServer() as Server;
     flagService = moduleRef.get(FeatureFlagService);
@@ -824,22 +841,39 @@ describe('GET /feature-flags anonymous rollout id', () => {
   }
 
   async function addPublicPercentageFlag(): Promise<void> {
+    await addPercentageFlag('public-rollout', true, {
+      type: 'percentage',
+      percent: 100
+    });
+  }
+
+  async function addPercentageFlag(
+    key: string,
+    isPublic: boolean,
+    payload: FeatureFlagRulePayload
+  ): Promise<void> {
     const flag = await flagService.create(
-      { key: 'public-rollout', enabled: true, public: true },
+      { key, enabled: true, public: isPublic },
       'actor-1'
     );
     await flagService.replaceRules(
       flag.id,
-      [
-        {
-          type: 'percentage',
-          effect: 'include',
-          payload: { type: 'percentage', percent: 100 }
-        }
-      ],
+      [{ type: 'percentage', effect: 'include', payload }],
       'actor-1'
     );
     await resolver.invalidateAll();
+  }
+
+  function flagsOf(res: request.Response): Record<string, boolean> {
+    return (res.body as { flags: Record<string, boolean> }).flags;
+  }
+
+  // A UUID on the chosen side of a 50 % split for `flagKey`.
+  function anonIdWhere(flagKey: string, inside: boolean): string {
+    for (let i = 0; ; i++) {
+      const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+      if (percentageBucket(id, flagKey) < 50 === inside) return id;
+    }
   }
 
   it('issues no cookie while no public flag has a percentage rule', async () => {
@@ -923,5 +957,109 @@ describe('GET /feature-flags anonymous rollout id', () => {
       .expect(200);
 
     expect(res.headers['set-cookie']).toBeUndefined();
+  });
+
+  describe('rule bucketed by device', () => {
+    const device = (percent: number): FeatureFlagRulePayload => ({
+      type: 'percentage',
+      percent,
+      bucketBy: 'device'
+    });
+
+    it('keeps the guest bucket after sign-in with the same cookie', async () => {
+      await addPercentageFlag('device-rollout', true, device(50));
+      // The cookie sits on the other side of the split from the user id, so a
+      // user-keyed bucket would flip the result at sign-in.
+      const userIsIn = percentageBucket(USER_ID, 'device-rollout') < 50;
+      const cookie = `${HOST_ANON_ID_COOKIE}=${anonIdWhere('device-rollout', !userIsIn)}`;
+
+      const guest = await request(server)
+        .get('/feature-flags')
+        .set('Cookie', cookie)
+        .expect(200);
+      const signedIn = await request(server)
+        .get('/feature-flags')
+        .set('Cookie', cookie)
+        .set(SIGNED_IN_HEADER, USER_ID)
+        .expect(200);
+
+      expect(flagsOf(guest)['device-rollout']).toBe(!userIsIn);
+      expect(flagsOf(signedIn)['device-rollout']).toBe(!userIsIn);
+      expect(signedIn.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('issues the cookie to a signed-in caller for a flag that is not public', async () => {
+      await addPercentageFlag('device-private', false, device(100));
+
+      const res = await request(server)
+        .get('/feature-flags')
+        .set(SIGNED_IN_HEADER, USER_ID)
+        .expect(200);
+
+      expect(anonIdCookieOf(res)).toMatch(
+        new RegExp(`^${HOST_ANON_ID_COOKIE}=[0-9a-f-]{36};`)
+      );
+      expect(flagsOf(res)['device-private']).toBe(true);
+    });
+
+    it('issues no cookie to a signed-in caller while every rule keys on the user', async () => {
+      await addPublicPercentageFlag();
+
+      const res = await request(server)
+        .get('/feature-flags')
+        .set(SIGNED_IN_HEADER, USER_ID)
+        .expect(200);
+
+      expect(res.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('does not share one cached map between two devices of one user', async () => {
+      await addPercentageFlag('device-private', false, device(50));
+
+      const inside = await request(server)
+        .get('/feature-flags')
+        .set(
+          'Cookie',
+          `${HOST_ANON_ID_COOKIE}=${anonIdWhere('device-private', true)}`
+        )
+        .set(SIGNED_IN_HEADER, USER_ID)
+        .expect(200);
+      const outside = await request(server)
+        .get('/feature-flags')
+        .set(
+          'Cookie',
+          `${HOST_ANON_ID_COOKIE}=${anonIdWhere('device-private', false)}`
+        )
+        .set(SIGNED_IN_HEADER, USER_ID)
+        .expect(200);
+
+      expect(flagsOf(inside)['device-private']).toBe(true);
+      // A disabled private flag is omitted from the signed-in response.
+      expect(flagsOf(outside)['device-private']).toBeUndefined();
+    });
+
+    // Control for the case below: the same route and wiring opens for a rule
+    // keyed on the user.
+    it('opens a @RequireFeature route for a 100 % user rule', async () => {
+      await addPercentageFlag('beta', false, {
+        type: 'percentage',
+        percent: 100
+      });
+
+      await request(server)
+        .get('/test-feature/beta')
+        .set(SIGNED_IN_HEADER, USER_ID)
+        .expect(HttpStatus.OK);
+    });
+
+    it('never opens a @RequireFeature route', async () => {
+      await addPercentageFlag('beta', false, device(100));
+
+      await request(server)
+        .get('/test-feature/beta')
+        .set('Cookie', `${HOST_ANON_ID_COOKIE}=${VALID_ANON_ID}`)
+        .set(SIGNED_IN_HEADER, USER_ID)
+        .expect(HttpStatus.NOT_FOUND);
+    });
   });
 });

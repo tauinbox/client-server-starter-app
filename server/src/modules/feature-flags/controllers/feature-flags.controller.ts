@@ -48,18 +48,18 @@ export class FeatureFlagsController {
     @Req() req: RequestWithUser,
     @Res({ passthrough: true }) res: Response
   ) {
-    const userId = req.user?.userId;
-    if (userId) {
-      const resolverUser = await this.resolver.buildResolverUser(userId);
-      return this.resolver.evaluateForUser(resolverUser, req);
-    }
     const secure = requiresSecureCookies(
       this.configService.get<string>('ENVIRONMENT')
     );
-    const { result, issuedAnonId } = await this.resolver.evaluateAnonymous(
-      readAnonId(req, secure),
-      req
-    );
+    const anonId = readAnonId(req, secure);
+    const userId = req.user?.userId;
+    const { result, issuedAnonId } = userId
+      ? await this.resolver.evaluateSignedIn(
+          await this.resolver.buildResolverUser(userId),
+          anonId,
+          req
+        )
+      : await this.resolver.evaluateAnonymous(anonId, req);
     if (issuedAnonId !== null) writeAnonId(res, issuedAnonId, secure);
     return result;
   }
