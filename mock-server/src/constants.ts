@@ -21,9 +21,6 @@ export const REFRESH_COOKIE_OPTIONS: CookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000
 };
 
-/** Where the refresh cookie lived before the move to AUTH_COOKIE_PATH. */
-export const LEGACY_REFRESH_TOKEN_PATH = '/api/v1/auth';
-
 export const OAUTH_PROVIDERS = ['google', 'facebook', 'vk'];
 
 // Mirrors OAuthController.OAUTH_DATA_COOKIE / OAUTH_DATA_MAX_AGE_SECONDS.

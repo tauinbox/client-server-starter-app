@@ -374,9 +374,9 @@ export class UsersController {
    * instance check runs first: a request refused anyway must not spend a
    * single-use code or the step-up budget of the caller.
    *
-   * The provider proof cookie is scoped to the auth routes and never reaches
-   * this one, so an actor with neither a password nor an authenticator is
-   * refused here and sets one on its profile first.
+   * The provider proof cookie is not accepted here, so an actor with neither a
+   * password nor an authenticator is refused and sets one on its profile
+   * first.
    */
   private async assertCredentialStepUp(
     req: JwtAuthRequest,

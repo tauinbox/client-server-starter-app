@@ -5,7 +5,6 @@ import { requiresSecureCookies } from '@app/shared/constants';
 import type { NextFunction, Request, Response } from 'express';
 import {
   cookieName,
-  HOST_COOKIE_PATH,
   readHostCookie,
   setHostCookie
 } from '../../../common/utils/host-cookie';
@@ -25,17 +24,7 @@ export class AnonIdMiddleware implements NestMiddleware {
       next();
       return;
     }
-    // The bare name was issued before the `__Host-` prefix. Carrying its value
-    // over keeps a returning visitor in the same rollout bucket. Remove this
-    // once JWT_REFRESH_EXPIRATION has passed since that change shipped, with
-    // the refresh cookie fallback.
-    const legacy = secure
-      ? readHostCookie(req, ANON_ID_COOKIE, false)
-      : undefined;
-    if (legacy !== undefined) {
-      res.clearCookie(ANON_ID_COOKIE, { secure, path: HOST_COOKIE_PATH });
-    }
-    const value = legacy ?? randomUUID();
+    const value = randomUUID();
     setHostCookie(res, ANON_ID_COOKIE, value, secure, {
       // Bucketing is resolved server-side from the cookie, so no browser script
       // needs to read it.

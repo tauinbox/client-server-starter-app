@@ -50,9 +50,11 @@ describe('AnonIdMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('carries a bare cookie from before the prefix over to the prefixed name', () => {
+  // A sibling host can plant the bare name to steer a visitor into a rollout
+  // bucket of its choice, so the value never crosses to the prefixed name.
+  it('ignores a bare cookie outside local and issues a fresh value', () => {
     const req = createMockRequest({
-      cookies: { [ANON_ID_COOKIE]: 'returning-visitor' }
+      cookies: { [ANON_ID_COOKIE]: 'planted-bucket' }
     });
     const res = createMockResponse({
       cookie: jest.fn(),
@@ -61,14 +63,11 @@ describe('AnonIdMiddleware', () => {
     middleware.use(req, res, jest.fn());
     expect(res.cookie).toHaveBeenCalledWith(
       HOST_ANON_ID_COOKIE,
-      'returning-visitor',
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
       expect.objectContaining({ secure: true, path: '/' })
     );
-    expect(res.clearCookie).toHaveBeenCalledWith(ANON_ID_COOKIE, {
-      secure: true,
-      path: '/'
-    });
-    expect(req.cookies[HOST_ANON_ID_COOKIE]).toBe('returning-visitor');
+    expect(req.cookies[HOST_ANON_ID_COOKIE]).not.toBe('planted-bucket');
+    expect(res.clearCookie).not.toHaveBeenCalled();
   });
 
   it('issues the bare name in local and never clears it', () => {
