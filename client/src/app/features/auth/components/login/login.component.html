@@ -23,6 +23,15 @@
         </div>
       }
 
+      @if (signedOutIdle()) {
+        <div class="info-message">
+          <mat-icon>timer_off</mat-icon>
+          <span>{{
+            t('auth.login.signedOutIdle', { minutes: idleTimeoutMinutes })
+          }}</span>
+        </div>
+      }
+
       @if (mfaChallenge(); as challenge) {
         <nxs-mfa-challenge
           [challenge]="challenge"

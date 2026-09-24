@@ -1953,6 +1953,11 @@ a second request to the registry for a verdict that gates nothing.
   start is a column of its own, and the rotation carries it over unchanged, thus a refresh cannot
   move that bound. Past it the refresh answers 401 and the server deletes every row of the session.
 
+  An open tab ends its session after 30 minutes without user input (`SESSION_IDLE_TIMEOUT_MS`,
+  ASVS 5.0 V7.3.1). Input in one tab keeps all tabs of the browser alive. The client revokes the
+  session on the server and shows the reason on the login page. This control is on the client, and a
+  closed browser is not in its scope: it stays bound by the 7-day refresh cookie only.
+
   The server rotates the token at each use. The rotation revokes the presented row conditionally.
   Thus two requests that race with the same token make exactly one live successor. The loser gets a
   plain 401 and not a session purge, because a benign double refresh from two tabs must not log the

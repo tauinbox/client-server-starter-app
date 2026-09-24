@@ -38,6 +38,11 @@ import {
   PASSWORD_CHANGED_PARAM
 } from '../../constants/password-changed.const';
 import type { PasswordChangedValue } from '../../constants/password-changed.const';
+import {
+  SESSION_ENDED,
+  SESSION_ENDED_PARAM
+} from '../../constants/session-ended.const';
+import { SESSION_IDLE_TIMEOUT_MS } from '@app/shared/constants';
 import { safeReturnUrl } from '../../utils/safe-return-url';
 import type {
   LockoutErrorData,
@@ -139,6 +144,10 @@ export class LoginComponent implements OnInit, OnDestroy {
   );
   protected readonly passwordChangedValues = PASSWORD_CHANGED;
 
+  // Idle-timeout banner: the client ended the session after no input.
+  protected readonly signedOutIdle = signal(false);
+  protected readonly idleTimeoutMinutes = SESSION_IDLE_TIMEOUT_MS / 60_000;
+
   // The challenge a correct password buys on an account with a second factor.
   // Holding it here, rather than in storage, keeps it out of every other tab
   // and drops it the moment the user leaves the page.
@@ -185,6 +194,13 @@ export class LoginComponent implements OnInit, OnDestroy {
     } else if (passwordChanged === PASSWORD_CHANGED.EmailPending) {
       this.passwordChanged.set(PASSWORD_CHANGED.EmailPending);
     }
+
+    if (
+      this.#route.snapshot.queryParams[SESSION_ENDED_PARAM] ===
+      SESSION_ENDED.Idle
+    ) {
+      this.signedOutIdle.set(true);
+    }
   }
 
   ngOnDestroy(): void {
@@ -210,6 +226,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.resendError.set(null);
     this.pendingVerification.set(false);
     this.passwordChanged.set(null);
+    this.signedOutIdle.set(false);
 
     this.#authService
       .login(this.loginModel())
