@@ -1,9 +1,11 @@
 import {
+  anonymousEvaluationNeedsAnonId,
   evaluateFeatureFlag,
   percentageBucket,
   previewFeatureFlag
 } from '@app/shared/utils/feature-flag-evaluator';
 import type {
+  AnonymousEvaluatorFlag,
   EvaluatorFlag,
   EvaluatorRule,
   FeatureFlagEvaluationContext
@@ -653,5 +655,52 @@ describe('percentageBucket — stability and distribution', () => {
     }
     expect(hits).toBeGreaterThan(900);
     expect(hits).toBeLessThan(1100);
+  });
+});
+
+describe('anonymousEvaluationNeedsAnonId', () => {
+  const percentage = { payload: { type: 'percentage', percent: 50 } } as const;
+  const attribute = {
+    payload: { type: 'attribute', field: 'email', op: 'eq', value: 'a@b.c' }
+  } as const;
+  const flag = (
+    overrides: Partial<AnonymousEvaluatorFlag> = {}
+  ): AnonymousEvaluatorFlag => ({
+    ...baseFlag(),
+    public: true,
+    rules: [percentage],
+    ...overrides
+  });
+
+  it('is true for a live public flag with a percentage rule', () => {
+    expect(anonymousEvaluationNeedsAnonId([flag()], 'production')).toBe(true);
+  });
+
+  it('is true when the percentage rule is an exclude', () => {
+    expect(
+      anonymousEvaluationNeedsAnonId(
+        [flag({ rules: [attribute, percentage] })],
+        'production'
+      )
+    ).toBe(true);
+  });
+
+  it.each([
+    ['no flags', []],
+    ['a private flag', [flag({ public: false })]],
+    ['a disabled flag', [flag({ enabled: false })]],
+    ['a flag of another environment', [flag({ environments: ['staging'] })]],
+    ['no percentage rule', [flag({ rules: [attribute] })]]
+  ])('is false with %s', (_label, flags: AnonymousEvaluatorFlag[]) => {
+    expect(anonymousEvaluationNeedsAnonId(flags, 'production')).toBe(false);
+  });
+
+  it('is true for a flag scoped to the current environment', () => {
+    expect(
+      anonymousEvaluationNeedsAnonId(
+        [flag({ environments: ['production'] })],
+        'production'
+      )
+    ).toBe(true);
   });
 });

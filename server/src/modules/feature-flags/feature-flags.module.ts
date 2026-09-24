@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
@@ -12,7 +12,6 @@ import { FeatureFlagsAdminController } from './controllers/feature-flags-admin.c
 import { FeatureFlagsController } from './controllers/feature-flags.controller';
 import { FeatureFlagChangedListener } from './listeners/feature-flag-changed.listener';
 import { FeatureFlagGuard } from './guards/feature-flag.guard';
-import { AnonIdMiddleware } from './middleware/anon-id.middleware';
 
 @Module({
   imports: [
@@ -35,8 +34,4 @@ import { AnonIdMiddleware } from './middleware/anon-id.middleware';
     AttributeRegistryService
   ]
 })
-export class FeatureFlagsModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(AnonIdMiddleware).forRoutes('*');
-  }
-}
+export class FeatureFlagsModule {}

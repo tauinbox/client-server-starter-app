@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
+  anonymousEvaluationNeedsAnonId,
   evaluateFeatureFlag,
   previewFeatureFlag,
   type EvaluatorRule,
@@ -49,8 +50,8 @@ import {
 } from '../utils/validation';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
-import type { MockFeatureFlag, MockFeatureFlagRule } from '../types';
-import { ANON_ID_COOKIE } from './anon-id.middleware';
+import type { MockFeatureFlag, MockFeatureFlagRule, MockUser } from '../types';
+import { readAnonId, writeAnonId } from '../helpers/anon-id.helpers';
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
@@ -462,22 +463,21 @@ function actorIdFromReq(req: Request): string | null {
   return result?.user.id ?? null;
 }
 
-function buildEvaluationContext(req: Request): FeatureFlagEvaluationContext {
-  const result = authenticateRequest(req);
-  const env = process.env['ENVIRONMENT'] ?? 'production';
-  const cookies = (req.cookies ?? {}) as Record<string, unknown>;
-  const cookieValue = cookies[ANON_ID_COOKIE];
-  const anonId = typeof cookieValue === 'string' ? cookieValue : null;
-  if (!result) {
-    return {
-      userId: null,
-      anonId,
-      roles: [],
-      attributes: { ...CONFIGURED_ATTRIBUTES },
-      env
-    };
-  }
-  const { user } = result;
+function evaluationEnv(): string {
+  return process.env['ENVIRONMENT'] ?? 'production';
+}
+
+function anonymousContext(anonId: string | null): FeatureFlagEvaluationContext {
+  return {
+    userId: null,
+    anonId,
+    roles: [],
+    attributes: { ...CONFIGURED_ATTRIBUTES },
+    env: evaluationEnv()
+  };
+}
+
+function userContext(user: MockUser): FeatureFlagEvaluationContext {
   const at = user.email.lastIndexOf('@');
   const emailDomain = at >= 0 ? user.email.slice(at + 1) : undefined;
   const attributes: Record<string, unknown> = {
@@ -486,13 +486,33 @@ function buildEvaluationContext(req: Request): FeatureFlagEvaluationContext {
   };
   if (emailDomain) attributes['emailDomain'] = emailDomain;
   if (user.createdAt) attributes['createdAt'] = user.createdAt;
+  // As the server: a signed-in caller is bucketed by user id only.
   return {
     userId: user.id,
-    anonId,
+    anonId: null,
     roles: user.roles,
     attributes,
-    env
+    env: evaluationEnv()
   };
+}
+
+// Mirrors FeatureFlagResolverService.evaluateAnonymous: the rollout id is
+// issued only when a public percentage rule would read it.
+function resolveAnonId(req: Request, res: Response): string | null {
+  const held = readAnonId(req);
+  if (held !== null) return held;
+  const state = getState();
+  const flags = [...state.featureFlags.values()].map((flag) => ({
+    key: flag.key,
+    enabled: flag.enabled,
+    environments: flag.environments,
+    public: flag.public,
+    rules: state.featureFlagRules.filter((r) => r.flagId === flag.id)
+  }));
+  if (!anonymousEvaluationNeedsAnonId(flags, evaluationEnv())) return null;
+  const issued = randomUUID();
+  writeAnonId(res, issued);
+  return issued;
 }
 
 function evaluateAll(
@@ -527,8 +547,9 @@ const publicRouter = Router();
 
 publicRouter.get('/', (req, res) => {
   const authenticated = authenticateRequest(req);
-  const ctx = buildEvaluationContext(req);
-  const response = evaluateAll(ctx, /* publicOnly */ authenticated === null);
+  const response = authenticated
+    ? evaluateAll(userContext(authenticated.user), /* publicOnly */ false)
+    : evaluateAll(anonymousContext(resolveAnonId(req, res)), true);
   res.json(response);
 });
 
