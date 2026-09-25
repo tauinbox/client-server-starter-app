@@ -66,7 +66,9 @@ grant removes permissions in production silently.
 This report closes that gap. It lists two groups. The first group holds each grant whose stored
 condition the resolver vetoes, which is inert today. The second group holds each grant that its
 author, from the `PERMISSION_ASSIGN` audit trail, could not authorize today. The report runs those
-grants through the true `assertCanGrantPermissions` function.
+grants through the true `assertCanGrantPermissions` function. It builds the ability of each author
+with `buildAbility` (`src/modules/auth/casl/build-ability.ts`), the same function that
+`CaslAbilityFactory` calls.
 
 The attribution depends on the audit trail, which the system prunes after
 `AUDIT_LOG_RETENTION_DAYS`. The report also evaluates the abilities as they are now. Thus a verdict
