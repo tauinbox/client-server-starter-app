@@ -1686,7 +1686,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('should revoke token and throw when JWT_MIN_IAT is set and token was created before it', async () => {
+    it('ends the session and throws when JWT_MIN_IAT is set and token was created before it', async () => {
       const oldToken = {
         ...mockTokenDoc,
         createdAt: new Date('2024-01-01T00:00:00Z')
@@ -1705,9 +1705,10 @@ describe('AuthService', () => {
         HttpException
       );
 
-      expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
-        'token-1'
+      expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+        'session-1'
       );
+      expect(mockRefreshTokenService.revokeToken).not.toHaveBeenCalled();
     });
 
     it('refuses a refresh past the absolute session lifetime and ends the session', async () => {

@@ -639,7 +639,9 @@ export class AuthService {
     if (rawMinIat !== undefined) {
       const minIat = Number(rawMinIat);
       if (tokenDoc.createdAt.getTime() / 1000 < minIat) {
-        await this.refreshTokenService.revokeToken(tokenDoc.id);
+        // Deleted, not revoked: a revoked unexpired row is what the reuse
+        // detector reads as theft, so a replay would purge every session.
+        await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
         this.auditService.logFireAndForget({
           action: AuditAction.TOKEN_REFRESH_FAILURE,
           actorId: tokenDoc.userId,
