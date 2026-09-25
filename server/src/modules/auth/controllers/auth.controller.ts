@@ -204,6 +204,11 @@ export class AuthController {
       return { mfaRequired: true, mfaToken, expiresIn };
     }
 
+    // Before the new session exists, so the session limit prunes against a
+    // count that no longer holds the session this browser is replacing.
+    await this.authService.endPresentedSession(
+      readRefreshTokenCookie(req, this.secureCookies)
+    );
     const result = await this.authService.login(
       req.user,
       normalizeUserAgent(req.headers['user-agent'])

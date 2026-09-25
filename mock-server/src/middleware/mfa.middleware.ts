@@ -38,7 +38,10 @@ import {
   MOCK_TOTP_QR_DATA_URL,
   MOCK_TOTP_SECRET
 } from '../constants';
-import { setRefreshTokenCookie } from '../helpers/refresh-cookie.helpers';
+import {
+  endPresentedSession,
+  setRefreshTokenCookie
+} from '../helpers/refresh-cookie.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import type { Request, Response } from 'express';
 
@@ -133,6 +136,7 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
 /** The sign-in the password alone did not buy. */
 function issueSession(req: Request, res: Response, user: MockUser): void {
   const state = getState();
+  endPresentedSession(req);
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);

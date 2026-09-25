@@ -126,6 +126,7 @@ describe('AuthController', () => {
     refreshTokens: jest.Mock;
     logout: jest.Mock;
     logoutSession: jest.Mock;
+    endPresentedSession: jest.Mock;
     verifyEmail: jest.Mock;
     resendVerificationEmail: jest.Mock;
     forgotPassword: jest.Mock;
@@ -187,6 +188,7 @@ describe('AuthController', () => {
       refreshTokens: jest.fn().mockResolvedValue(mockAuthResult),
       logout: jest.fn().mockResolvedValue(undefined),
       logoutSession: jest.fn().mockResolvedValue(true),
+      endPresentedSession: jest.fn().mockResolvedValue(undefined),
       verifyEmail: jest.fn().mockResolvedValue({ message: 'verified' }),
       resendVerificationEmail: jest.fn().mockResolvedValue({ message: 'sent' }),
       forgotPassword: jest.fn().mockResolvedValue({ message: 'sent' }),
@@ -345,6 +347,25 @@ describe('AuthController', () => {
       expect(res.cookie).not.toHaveBeenCalled();
       expect(authServiceMock.login).not.toHaveBeenCalled();
       expect(auditServiceMock.log).not.toHaveBeenCalled();
+      // The browser keeps its cookie until the second factor is met.
+      expect(authServiceMock.endPresentedSession).not.toHaveBeenCalled();
+    });
+
+    // The browser overwrites its refresh cookie with the new one, so the
+    // session behind the old value must not outlive it on the server.
+    it('ends the session of the refresh cookie the browser presented, before the new one exists', async () => {
+      const req = mockLocalAuthRequest() as LocalAuthRequest;
+      req.cookies['__Host-refresh_token'] = 'previous-refresh-token';
+      const res = mockResponse();
+
+      await controller.login(req, res);
+
+      expect(authServiceMock.endPresentedSession).toHaveBeenCalledWith(
+        'previous-refresh-token'
+      );
+      expect(
+        authServiceMock.endPresentedSession.mock.invocationCallOrder[0]
+      ).toBeLessThan(authServiceMock.login.mock.invocationCallOrder[0]);
     });
 
     it('should set refresh_token cookie', async () => {

@@ -1249,6 +1249,25 @@ export class AuthService {
     return deleted > 0;
   }
 
+  /**
+   * Ends the session whose refresh cookie a sign-in request carried. The
+   * browser overwrites that cookie with the new one, so the old session would
+   * have no owner here and yet stay usable by anyone who copied the value.
+   *
+   * Unlike `logoutSession` there is no owner check: presenting the cookie
+   * proves possession of it, and the browser replaces it whichever account
+   * signs in. Call it only after the credentials were accepted, so a failed
+   * sign-in ends nothing.
+   */
+  async endPresentedSession(refreshToken?: string): Promise<void> {
+    if (!refreshToken) return;
+
+    const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
+    if (!tokenDoc) return;
+
+    await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
+  }
+
   async revokeAllUserSessions(userId: string): Promise<void> {
     await this.invalidateAllSessions(userId);
   }

@@ -52,7 +52,10 @@ import {
   clearHostCookie,
   readHostCookie
 } from '../../../common/utils/host-cookie';
-import { setRefreshTokenCookie } from '../utils/refresh-token-cookie';
+import {
+  readRefreshTokenCookie,
+  setRefreshTokenCookie
+} from '../utils/refresh-token-cookie';
 
 @ApiTags('Auth API')
 @Controller({
@@ -266,6 +269,11 @@ export class MfaController {
    * password check that preceded it.
    */
   private async issueSession(user: User, req: ExpressRequest, res: Response) {
+    // Before the new session exists, so the session limit prunes against a
+    // count that no longer holds the session this browser is replacing.
+    await this.authService.endPresentedSession(
+      readRefreshTokenCookie(req, this.secureCookies)
+    );
     const result = await this.authService.login(
       user,
       normalizeUserAgent(req.headers['user-agent'])

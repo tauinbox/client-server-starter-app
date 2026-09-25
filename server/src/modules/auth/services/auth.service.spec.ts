@@ -1408,6 +1408,57 @@ describe('AuthService', () => {
     });
   });
 
+  describe('endPresentedSession', () => {
+    it('ends only the session the presented token belongs to', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue({
+        id: 'token-1',
+        userId: 'user-1',
+        sessionId: 'session-1',
+        revoked: false
+      });
+
+      await service.endPresentedSession('raw-token');
+
+      expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+        'session-1'
+      );
+      expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
+      expect(mockUserRepository.update).not.toHaveBeenCalled();
+    });
+
+    // The browser replaces the cookie whichever account signs in, so the
+    // owner check that protects the logout route does not apply here.
+    it('ends the session whatever account owns it', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue({
+        id: 'token-2',
+        userId: 'user-2',
+        sessionId: 'session-2',
+        revoked: false
+      });
+
+      await service.endPresentedSession('other-account-token');
+
+      expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+        'session-2'
+      );
+    });
+
+    it('does nothing when the request carries no refresh token', async () => {
+      await service.endPresentedSession(undefined);
+
+      expect(mockRefreshTokenService.findByToken).not.toHaveBeenCalled();
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the token resolves to no row', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue(null);
+
+      await service.endPresentedSession('stale-token');
+
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
+    });
+  });
+
   describe('revokeAllUserSessions', () => {
     it('should delete all refresh tokens and set tokenRevokedAt', async () => {
       await service.revokeAllUserSessions('user-1');

@@ -71,7 +71,10 @@ import {
   readHostCookie,
   setHostCookie
 } from '../../../common/utils/host-cookie';
-import { setRefreshTokenCookie } from '../utils/refresh-token-cookie';
+import {
+  readRefreshTokenCookie,
+  setRefreshTokenCookie
+} from '../utils/refresh-token-cookie';
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
@@ -398,20 +401,21 @@ export class OAuthController {
       Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
       1000;
 
+    let data:
+      | {
+          tokens: {
+            refresh_token: string;
+            access_token: string;
+            expires_in: number;
+          };
+          user: unknown;
+        }
+      | MfaRequiredResponseDto;
     try {
       const payload = this.jwtService.verify<{
         purpose?: string;
         jti?: string;
-        data:
-          | {
-              tokens: {
-                refresh_token: string;
-                access_token: string;
-                expires_in: number;
-              };
-              user: unknown;
-            }
-          | MfaRequiredResponseDto;
+        data: typeof data;
       }>(cookie);
       if (payload.purpose !== TOKEN_PURPOSE.OAUTH_DATA) {
         throw new Error('Unexpected token purpose');
@@ -430,14 +434,7 @@ export class OAuthController {
       ) {
         throw new Error('OAuth data already exchanged');
       }
-      // The account carries a second factor, so the round trip bought only the
-      // right to present a code. No session exists yet and no cookie is set.
-      if ('mfaRequired' in payload.data) {
-        return payload.data;
-      }
-      const { refresh_token, ...publicTokens } = payload.data.tokens;
-      setRefreshTokenCookie(res, refresh_token, maxAge, this.secureCookies);
-      return { tokens: publicTokens, user: payload.data.user };
+      data = payload.data;
     } catch {
       throw new HttpException(
         {
@@ -447,6 +444,20 @@ export class OAuthController {
         HttpStatus.BAD_REQUEST
       );
     }
+
+    // The account carries a second factor, so the round trip bought only the
+    // right to present a code. No session exists yet and no cookie is set.
+    if ('mfaRequired' in data) {
+      return data;
+    }
+    // The session was issued at the callback, but this is the request that
+    // hands the browser its cookie, and the provider redirect carried none.
+    await this.authService.endPresentedSession(
+      readRefreshTokenCookie(req, this.secureCookies)
+    );
+    const { refresh_token, ...publicTokens } = data.tokens;
+    setRefreshTokenCookie(res, refresh_token, maxAge, this.secureCookies);
+    return { tokens: publicTokens, user: data.user };
   }
 
   private async handleOAuthCallback(
