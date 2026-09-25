@@ -56,7 +56,10 @@
         </p>
       } @else if (!actionsLoaded()) {
         <div class="allowed-actions__loading">
-          <mat-spinner [diameter]="24" />
+          <mat-spinner
+            [attr.aria-label]="t('common.loading')"
+            [diameter]="24"
+          />
         </div>
       } @else if (isCustomMode()) {
         <div class="allowed-actions__checkboxes">
@@ -103,7 +106,7 @@
     >
       @if (isLoading()) {
         <span class="app-btn-loading">
-          <mat-spinner diameter="18" />
+          <mat-spinner [attr.aria-label]="t('common.loading')" diameter="18" />
           {{ t('common.save') }}
         </span>
       } @else {

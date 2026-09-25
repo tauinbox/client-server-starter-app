@@ -11,7 +11,10 @@
   <mat-dialog-content class="dialog-content">
     @if (loading()) {
       <div class="state-container">
-        <mat-spinner diameter="40"></mat-spinner>
+        <mat-spinner
+          [attr.aria-label]="t('common.loading')"
+          diameter="40"
+        ></mat-spinner>
       </div>
     } @else if (error()) {
       <div class="state-container error">
@@ -355,7 +358,10 @@
         (click)="save()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20"></mat-spinner>
+          <mat-spinner
+            [attr.aria-label]="t('common.loading')"
+            diameter="20"
+          ></mat-spinner>
         } @else {
           {{ t('common.save') }}
         }

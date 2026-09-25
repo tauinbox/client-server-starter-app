@@ -115,7 +115,10 @@
 
       @if (isLoadingMore()) {
         <div class="load-more-container">
-          <mat-spinner [diameter]="36"></mat-spinner>
+          <mat-spinner
+            [attr.aria-label]="t('common.loading')"
+            [diameter]="36"
+          ></mat-spinner>
         </div>
       }
     </mat-card-content>

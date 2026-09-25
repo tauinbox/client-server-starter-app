@@ -61,7 +61,7 @@
     >
       @if (isLoading()) {
         <span class="app-btn-loading">
-          <mat-spinner diameter="18" />
+          <mat-spinner [attr.aria-label]="t('common.loading')" diameter="18" />
           {{ isEdit ? t('common.save') : t('common.add') }}
         </span>
       } @else {

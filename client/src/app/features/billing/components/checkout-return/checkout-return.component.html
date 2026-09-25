@@ -11,7 +11,10 @@
       } @else if (purchase(); as pending) {
         @switch (pollState()) {
           @case ('pending') {
-            <mat-spinner diameter="48" />
+            <mat-spinner
+              [attr.aria-label]="t('common.loading')"
+              diameter="48"
+            />
             <h1>{{ t('billing.checkout.purchaseProcessingTitle') }}</h1>
             <p>{{ t('billing.checkout.processingMessage') }}</p>
           }
@@ -44,7 +47,10 @@
       } @else {
         @switch (pollState()) {
           @case ('pending') {
-            <mat-spinner diameter="48" />
+            <mat-spinner
+              [attr.aria-label]="t('common.loading')"
+              diameter="48"
+            />
             <h1>{{ t('billing.checkout.processingTitle') }}</h1>
             <p>{{ t('billing.checkout.processingMessage') }}</p>
           }

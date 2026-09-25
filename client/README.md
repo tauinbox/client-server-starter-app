@@ -1020,6 +1020,12 @@ focus trap of a dialog. The a11y file sets its own `timeout: 60_000` through
 same scan takes approximately 9 s with one worker, and 21 s to 30 s in a full parallel run. The users
 list is the heaviest page, and it repeatedly came near to the default limit of 30 s.
 
+A scan sees a loading spinner only when it runs before the data arrives, so the a11y suite cannot
+guard spinners reliably. `check:spinner-labels` (`scripts/check-spinner-labels.mjs`, part of
+`npm run lint`) fails when a `<mat-spinner>` or `<mat-progress-spinner>` opening tag has no
+`aria-label`, `[attr.aria-label]` or `aria-hidden`. The spinner renders `role="progressbar"`, and
+axe rule `aria-progressbar-name` requires a name for it. Use `[attr.aria-label]="t('common.loading')"`.
+
 **Live RBAC and authentication regression net.** The suite holds these specs:
 
 - refresh-token reuse detection, and a lost rotation response that signs out only its own device (`refresh-token-reuse.spec.ts`)

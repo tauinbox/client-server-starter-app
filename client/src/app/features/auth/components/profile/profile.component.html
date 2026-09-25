@@ -1,7 +1,7 @@
 <div class="profile-page" *transloco="let t; scope: 'auth'">
   @if (loading()) {
     <div class="loading-container">
-      <mat-spinner></mat-spinner>
+      <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
     </div>
   } @else {
     @let u = user();
@@ -142,7 +142,10 @@
                 >
                   @if (saving()) {
                     <span class="app-btn-loading">
-                      <mat-spinner diameter="24"></mat-spinner>
+                      <mat-spinner
+                        [attr.aria-label]="t('common.loading')"
+                        diameter="24"
+                      ></mat-spinner>
                       {{ t('auth.profile.saving') }}
                     </span>
                   } @else {
@@ -226,7 +229,10 @@
                       >
                         @if (oauthLoading()) {
                           <span class="app-btn-loading">
-                            <mat-spinner diameter="20"></mat-spinner>
+                            <mat-spinner
+                              [attr.aria-label]="t('common.loading')"
+                              diameter="20"
+                            ></mat-spinner>
                             {{ t('auth.profile.saving') }}
                           </span>
                         } @else {
