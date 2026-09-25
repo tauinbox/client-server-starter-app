@@ -60,9 +60,17 @@ const header = [
   '// Server and mock-server only: the list is too large for the client bundle.'
 ];
 
+// MIT asks that the notice travel with any substantial portion of the lists,
+// so it is fetched from the same commit and embedded in the output.
+const licence = (await fetchLines('LICENSE')).join('\n').trimEnd();
+if (licence.includes('*/')) {
+  throw new Error('LICENSE text would close the comment block');
+}
+
 const body = [...entries].map((e) => `  ${JSON.stringify(e)},`).join('\n');
 const out =
   `${header.join('\n')}\n` +
+  `/*\n${licence}\n*/\n` +
   `export const COMMON_PASSWORDS: ReadonlySet<string> = new Set([\n${body}\n]);\n`;
 
 const target = join(
