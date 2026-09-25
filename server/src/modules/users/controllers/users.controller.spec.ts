@@ -909,6 +909,70 @@ describe('UsersController', () => {
         })
       );
     });
+
+    describe('moderation of the own record', () => {
+      it.each<[string, UpdateUserDto]>([
+        ['isActive false', { isActive: false }],
+        ['isActive true', { isActive: true }],
+        ['unlockAccount', { unlockAccount: true }],
+        ['isActive beside a name', { firstName: 'Renamed', isActive: false }]
+      ])(
+        'refuses %s before any read, step-up or write',
+        async (_label, dto) => {
+          const req = mockJwtRequest('user-5') as JwtAuthRequest;
+
+          const err: unknown = await controller
+            .update('user-5', dto, req, mockAbility)
+            .catch((e: unknown) => e);
+
+          const httpErr = err as {
+            getStatus(): number;
+            getResponse(): { errorKey?: string };
+          };
+          expect(httpErr.getStatus()).toBe(400);
+          expect(httpErr.getResponse().errorKey).toBe(
+            ErrorKeys.USERS.MODERATION_SELF
+          );
+          expect(usersServiceMock.findOne).not.toHaveBeenCalled();
+          expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+          expect(usersServiceMock.update).not.toHaveBeenCalled();
+          expect(auditServiceMock.log).not.toHaveBeenCalled();
+        }
+      );
+
+      it('accepts a name change on the own record', async () => {
+        usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+        const req = mockJwtRequest('user-5') as JwtAuthRequest;
+
+        await controller.update(
+          'user-5',
+          { firstName: 'Renamed' },
+          req,
+          mockAbility
+        );
+
+        expect(usersServiceMock.update).toHaveBeenCalled();
+      });
+
+      it('accepts a deactivation of another record', async () => {
+        usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+        const req = mockJwtRequest('user-1') as JwtAuthRequest;
+
+        await controller.update(
+          'user-5',
+          { isActive: false },
+          req,
+          mockAbility
+        );
+
+        expect(usersServiceMock.update).toHaveBeenCalledWith(
+          'user-5',
+          { isActive: false },
+          mockAbility,
+          'user-1'
+        );
+      });
+    });
   });
 
   // ── remove ────────────────────────────────────────────────────────

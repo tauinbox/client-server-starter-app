@@ -60,23 +60,36 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    // Login as user id=100 (admin), edit user id=100 (self)
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-    await page.goto(`/users/${mockId('user-100')}/edit`);
+    const selfId = mockId('user-100');
+    await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
+    await page.goto(`/users/${selfId}/edit`);
 
+    // The form must render, or a not-found page would pass the check below.
+    await expect(page.getByLabel('First Name')).toHaveValue('John');
     await expect(
       page.getByRole('button', { name: 'Delete', exact: true })
     ).toBeHidden();
   });
 
-  test('should redirect non-admin to forbidden on edit self', async ({
+  // The server refuses isActive and unlockAccount on the caller's own record,
+  // so the form must neither offer nor send them there.
+  test('saves an own-record edit without the moderation controls', async ({
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {});
-    await page.goto(`/users/${mockId('user-100')}/edit`);
+    const selfId = mockId('user-100');
+    await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
+    await page.goto(`/users/${selfId}/edit`);
 
-    await expect(page).toHaveURL(/.*\/forbidden$/);
+    await expect(page.getByLabel('First Name')).toHaveValue('John');
+    await expect(page.getByLabel('Active')).toBeHidden();
+
+    await page.getByLabel('First Name').fill('Renamed');
+    await page.getByLabel('First Name').blur();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(page.getByText('User updated successfully')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/users/${selfId}$`));
   });
 
   // The seeded `user` role holds update:User only as

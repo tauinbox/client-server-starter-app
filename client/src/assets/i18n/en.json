@@ -133,7 +133,8 @@
       "notFound": "User not found",
       "emailExists": "User with this email already exists",
       "superTargetForbidden": "Only a super administrator can change or delete a super administrator account",
-      "mfaResetSelf": "Turn off your own two-factor authentication from your profile"
+      "mfaResetSelf": "Turn off your own two-factor authentication from your profile",
+      "moderationSelf": "You cannot deactivate or unlock your own account. Ask another administrator."
     },
     "roles": {
       "notFound": "Role not found",

@@ -245,6 +245,8 @@ export class UserEditComponent implements OnInit, OnDestroy {
     this.#authStore.hasPermissions({ action: 'assign', subject: 'Role' })
   );
 
+  readonly #isSelf = computed(() => this.id() === this.#authStore.user()?.id);
+
   protected readonly canDelete = computed(() => {
     const u = this.user();
     if (!u) return false;
@@ -253,7 +255,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
         action: 'delete',
         subject: 'User',
         instance: { id: u.id }
-      }) && this.id() !== this.#authStore.user()?.id
+      }) && !this.#isSelf()
     );
   });
 
@@ -262,7 +264,12 @@ export class UserEditComponent implements OnInit, OnDestroy {
     () =>
       this.user()?.mfaEnabled === true &&
       this.canManageUser() &&
-      this.id() !== this.#authStore.user()?.id
+      !this.#isSelf()
+  );
+
+  /** The server refuses `isActive` and `unlockAccount` on the caller's own record. */
+  protected readonly canModerate = computed(
+    () => this.canManageUser() && !this.#isSelf()
   );
 
   ngOnInit(): void {
@@ -422,7 +429,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
           if (updatedUser) {
             this.user.set(updatedUser);
-            if (this.id() === this.#authStore.user()?.id) {
+            if (this.#isSelf()) {
               this.#authStore.updateCurrentUser(updatedUser);
             }
           }
@@ -457,7 +464,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
       updateData.password = password;
     }
 
-    if (this.canManageUser()) {
+    if (this.canModerate()) {
       updateData.isActive = this.isActive();
     }
 
