@@ -172,13 +172,13 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
     );
     jest
       .spyOn(breachedPasswordService, 'assertNotBreached')
-      .mockImplementationOnce(async (password: string) => {
+      .mockImplementationOnce(async (password, context) => {
         await usersService.update(
           user.id,
           { password: ownerPassword },
           SYSTEM_ABILITY
         );
-        await original(password);
+        await original(password, context);
       });
 
     expect(

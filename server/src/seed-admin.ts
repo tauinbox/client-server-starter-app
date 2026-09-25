@@ -6,6 +6,7 @@ import {
   MAX_NEW_PASSWORD_BYTES
 } from '@app/shared/constants';
 import { exceedsPasswordByteLimit } from '@app/shared/utils/password-bytes';
+import { localPasswordRefusal } from '@app/shared/utils/password-policy';
 import { postgresConfig } from './postgres.config';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { User } from './modules/users/entities/user.entity';
@@ -80,6 +81,14 @@ export async function seedAdmin(): Promise<void> {
         'WARNING: ADMIN_PASSWORD appears in a public data breach. The admin ' +
           'user is being created with it - change the password after the ' +
           'first sign-in and rotate the ADMIN_PASSWORD secret.'
+      );
+    }
+    if (localPasswordRefusal(password, { email, firstName, lastName })) {
+      console.warn(
+        'WARNING: ADMIN_PASSWORD is a common password, or it contains the ' +
+          'admin name, email or the product name. The admin user is being ' +
+          'created with it - change the password after the first sign-in ' +
+          'and rotate the ADMIN_PASSWORD secret.'
       );
     }
 

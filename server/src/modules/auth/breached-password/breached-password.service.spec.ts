@@ -4,9 +4,11 @@ import { HttpException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { ErrorKeys } from '@app/shared/constants';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import type { PasswordContext } from '@app/shared/utils/password-policy';
 import { BreachedPasswordService } from './breached-password.service';
 
 const RANGE_URL = 'https://blocklist.test/range';
+const NO_CONTEXT: PasswordContext = {};
 
 function suffixOf(password: string): string {
   return createHash('sha1')
@@ -68,7 +70,7 @@ describe('BreachedPasswordService', () => {
   it('sends only the five-character hash prefix to the blocklist', async () => {
     fetchMock.mockResolvedValue(okResponse(''));
 
-    await service.assertNotBreached('Sunrise-Kettle-19');
+    await service.assertNotBreached('Sunrise-Kettle-19', NO_CONTEXT);
 
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toBe(`${RANGE_URL}/${prefixOf('Sunrise-Kettle-19')}`);
@@ -79,7 +81,9 @@ describe('BreachedPasswordService', () => {
     const password = 'Sunrise-Kettle-19';
     fetchMock.mockResolvedValue(okResponse(`${suffixOf(password)}:42\r\n`));
 
-    await expect(service.assertNotBreached(password)).rejects.toMatchObject({
+    await expect(
+      service.assertNotBreached(password, NO_CONTEXT)
+    ).rejects.toMatchObject({
       status: 400,
       response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
     });
@@ -92,7 +96,7 @@ describe('BreachedPasswordService', () => {
     );
 
     await expect(
-      service.assertNotBreached('Sunrise-Kettle-19')
+      service.assertNotBreached('Sunrise-Kettle-19', NO_CONTEXT)
     ).resolves.toBeUndefined();
     expect(recordBreachLookup).toHaveBeenCalledWith('clean');
   });
@@ -103,7 +107,9 @@ describe('BreachedPasswordService', () => {
     const password = 'Sunrise-Kettle-19';
     fetchMock.mockResolvedValue(okResponse(`${suffixOf(password)}:0\r\n`));
 
-    await expect(service.assertNotBreached(password)).resolves.toBeUndefined();
+    await expect(
+      service.assertNotBreached(password, NO_CONTEXT)
+    ).resolves.toBeUndefined();
     expect(recordBreachLookup).toHaveBeenCalledWith('clean');
   });
 
@@ -112,7 +118,7 @@ describe('BreachedPasswordService', () => {
       fetchMock.mockRejectedValue(new Error('network down'));
 
       await expect(
-        service.assertNotBreached('Sunrise-Kettle-19')
+        service.assertNotBreached('Sunrise-Kettle-19', NO_CONTEXT)
       ).resolves.toBeUndefined();
       expect(recordBreachLookup).toHaveBeenCalledWith('unavailable');
     });
@@ -127,7 +133,7 @@ describe('BreachedPasswordService', () => {
       fetchMock.mockResolvedValue(failed);
 
       await expect(
-        service.assertNotBreached('Sunrise-Kettle-19')
+        service.assertNotBreached('Sunrise-Kettle-19', NO_CONTEXT)
       ).resolves.toBeUndefined();
       expect(recordBreachLookup).toHaveBeenCalledWith('unavailable');
     });
@@ -142,7 +148,7 @@ describe('BreachedPasswordService', () => {
       });
 
       await expect(
-        service.assertNotBreached('Sunrise-Kettle-19')
+        service.assertNotBreached('Sunrise-Kettle-19', NO_CONTEXT)
       ).resolves.toBeUndefined();
       expect(recordBreachLookup).toHaveBeenCalledWith('unavailable');
       expect(init?.signal).toBeInstanceOf(AbortSignal);
@@ -154,7 +160,7 @@ describe('BreachedPasswordService', () => {
     fetchMock.mockResolvedValue(okResponse(''));
 
     await expect(
-      service.assertNotBreached('kettlesunrise')
+      service.assertNotBreached('kettlesunrise', NO_CONTEXT)
     ).resolves.toBeUndefined();
   });
 
@@ -162,8 +168,47 @@ describe('BreachedPasswordService', () => {
     const password = 'Sunrise-Kettle-19';
     fetchMock.mockResolvedValue(okResponse(`${suffixOf(password)}:1\r\n`));
 
-    await expect(service.assertNotBreached(password)).rejects.toBeInstanceOf(
-      HttpException
-    );
+    await expect(
+      service.assertNotBreached(password, NO_CONTEXT)
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  describe('local check', () => {
+    it('refuses a common password without a network call', async () => {
+      await expect(
+        service.assertNotBreached('Password123', NO_CONTEXT)
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.AUTH.PASSWORD_TOO_COMMON }
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(recordBreachLookup).not.toHaveBeenCalled();
+    });
+
+    it('refuses a password that contains the caller first name', async () => {
+      await expect(
+        service.assertNotBreached('Sunrise-Martina-19', {
+          email: 'm.rossi@example.com',
+          firstName: 'Martina',
+          lastName: 'Rossi'
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.AUTH.PASSWORD_TOO_COMMON }
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('still runs the range lookup for a password the local check passes', async () => {
+      fetchMock.mockResolvedValue(okResponse(''));
+
+      await service.assertNotBreached('Sunrise-Kettle-19', {
+        email: 'm.rossi@example.com',
+        firstName: 'Martina',
+        lastName: 'Rossi'
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

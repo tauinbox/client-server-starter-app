@@ -7,10 +7,7 @@ import {
   TOTP_DIGITS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
-import {
-  breachedPasswordEnvelope,
-  isBreachedPassword
-} from '../helpers/breached-password.helpers';
+import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
   emailErrors,
   passwordLengthError,
@@ -452,8 +449,16 @@ router.patch(
     // The blocklist verdict comes from UsersService.update on the real server,
     // after the ability check and before any field assignment, so a 400 must
     // leave the record unchanged.
-    if (password !== undefined && isBreachedPassword(password)) {
-      res.status(400).json(breachedPasswordEnvelope());
+    const passwordRefusal =
+      password === undefined
+        ? null
+        : newPasswordRefusal(password, {
+            email: email ?? user.email,
+            firstName: firstName ?? user.firstName,
+            lastName: lastName ?? user.lastName
+          });
+    if (passwordRefusal) {
+      res.status(400).json(passwordRefusal);
       return;
     }
 

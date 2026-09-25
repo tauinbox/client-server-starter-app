@@ -859,8 +859,10 @@ the same permission both apply.
   server: the shared `MIN_PASSWORD_LENGTH` and `MAX_NEW_PASSWORD_LENGTH`. Thus a password that is
   too short gets a translated message on the field, and it does not need a server round trip. A new
   password also gets a byte check, because bcrypt reads at most 72 bytes and a Cyrillic letter is
-  two of them. There is no composition rule. The server refuses a password that appears in a public breach corpus, and
-  that verdict needs a round trip because only the server may query the corpus.
+  two of them. There is no composition rule. The server refuses one of the 10 000 most common passwords,
+  a password that contains the user's name, email local part or the product name, and a password
+  that appears in a public breach corpus. Those verdicts need a round trip: the common list is too
+  large for the bundle, and only the server may query the corpus.
   A reusable password strength indicator (`<nxs-password-strength>`) has a visual meter of 4 bars,
   an aria-live label and a hint that advises on length while the typed value scores low.
   The register page, the profile page and the reset-password page show it.

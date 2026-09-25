@@ -891,7 +891,14 @@ describe('AuthService', () => {
       expect(result.message).toContain('Registration successful');
       expect(
         mockBreachedPasswordService.assertNotBreached
-      ).toHaveBeenCalledWith('kettlesunrise');
+      ).toHaveBeenCalledWith(
+        'kettlesunrise',
+        expect.objectContaining({
+          email: registerDto.email,
+          firstName: registerDto.firstName,
+          lastName: registerDto.lastName
+        })
+      );
     });
 
     it('translates a unique violation on the insert into the same 409', async () => {

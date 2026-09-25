@@ -248,7 +248,10 @@ export class AuthService {
     // Ahead of the address conflict below, so the caller reads the same verdict
     // whether or not the address happens to be taken, and ahead of the hash so
     // a refused password never costs a bcrypt round.
-    await this.breachedPasswordService.assertNotBreached(registerDto.password);
+    await this.breachedPasswordService.assertNotBreached(
+      registerDto.password,
+      registerDto
+    );
 
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
     const hashedPassword = await bcrypt.hash(
@@ -471,7 +474,7 @@ export class AuthService {
 
     // After the token checks: the token is what authorises this call, and an
     // invalid one must not buy an outbound lookup.
-    await this.breachedPasswordService.assertNotBreached(newPassword);
+    await this.breachedPasswordService.assertNotBreached(newPassword, user);
 
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
     const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);

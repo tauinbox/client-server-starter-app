@@ -2217,8 +2217,9 @@ when the user exists, and when `ADMIN_EMAIL` has no value.
 
 **The seeder must never exit non-zero, and `seed-admin.spec.ts` pins that.** The entrypoint runs it
 under `set -e`, so any non-zero exit aborts the entrypoint and the API never starts. It checks the
-breached-password blocklist on the branch that creates the user, and a listed `ADMIN_PASSWORD`
-produces a WARNING in the deploy log, not a refusal. Trading the whole API for a weak seed password
+breached-password blocklist and the local common-password check on the branch that creates the
+user, and a listed `ADMIN_PASSWORD` (or one that contains the admin name, email or the product
+name) produces a WARNING in the deploy log, not a refusal. Trading the whole API for a weak seed password
 is not a trade worth making, and it caused a production outage on 2026-09-02.
 
 The `docker-compose.yml` file in the root of the repository is the **production** stack. It holds the

@@ -533,6 +533,25 @@ describe('UsersService', () => {
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 
+    it('checks the password against the names the record has after the update', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRepository.save.mockResolvedValue(mockUser);
+
+      await service.update(
+        'user-1',
+        { password: 'Copper-Meadow-83', firstName: 'Martina' },
+        SYSTEM_ABILITY
+      );
+
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).toHaveBeenCalledWith('Copper-Meadow-83', {
+        email: mockUser.email,
+        firstName: 'Martina',
+        lastName: mockUser.lastName
+      });
+    });
+
     it('spends no lookup on an update that carries no password', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue(mockUser);
