@@ -28,7 +28,8 @@ function grant(
     role_is_super: false,
     permission_id: PERMISSION_ID,
     action_name: 'update',
-    resource_name: 'User',
+    // A resource name differs from its CASL subject for every real resource.
+    resource_name: 'users',
     resource_subject: 'User',
     is_orphaned: false,
     conditions
@@ -98,6 +99,20 @@ describe('analyzeGrants', () => {
       ],
       userRoles: [aliceHoldsNarrow],
       auditRows: [audit('role-equal', ALICE)]
+    });
+
+    expect(report.findings).toHaveLength(0);
+    expect(report.accepted).toBe(1);
+  });
+
+  it('accepts a grant delegated by an author who holds it unconditionally', () => {
+    const report = analyzeGrants({
+      grants: [
+        grant('role-narrow', 'narrow-admin', null),
+        grant('role-delegated', 'delegated-role', null)
+      ],
+      userRoles: [aliceHoldsNarrow],
+      auditRows: [audit('role-delegated', ALICE)]
     });
 
     expect(report.findings).toHaveLength(0);

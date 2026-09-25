@@ -3,17 +3,10 @@ import type {
   PermissionCondition,
   ResolvedPermission
 } from '@app/shared/types';
-import {
-  AbilityBuilder,
-  createMongoAbility,
-  type AppAbility,
-  type Subjects
-} from '../casl/app-ability';
+import type { AppAbility } from '../casl/app-ability';
+import { buildAbility } from '../casl/build-ability';
 import { resolveConditions } from '../casl/resolve-conditions';
-import {
-  CASL_RESERVED_ACTION_NAMES,
-  CASL_RESERVED_SUBJECT_NAMES
-} from '../casl/constants';
+import type { SubjectMaps } from '../services/resource.service';
 import { assertCanGrantPermissions } from './can-grant.util';
 
 /**
@@ -26,9 +19,9 @@ import { assertCanGrantPermissions } from './can-grant.util';
  * read-only diagnostic that fills that gap. It decides nothing and changes
  * nothing; the script that calls it only reads and prints.
  *
- * The verdicts come from the real `assertCanGrantPermissions` and the real
- * `resolveConditions`, so they cannot drift from the enforcement. Only the
- * ability construction is reproduced here (see `buildAbility`).
+ * The verdicts come from the real `assertCanGrantPermissions`, and the author's
+ * ability from the same `buildAbility` the application uses, so neither can
+ * drift from the enforcement.
  */
 
 /** One `role_permissions` row joined with the labels needed to judge it. */
@@ -108,80 +101,6 @@ export class SilentLogger extends Logger {
 
 const silent = new SilentLogger('grant-scope-report');
 
-/**
- * Mirrors `CaslAbilityFactory.createForUser` for the rules this report needs:
- * allows before denies, reserved keywords skipped, an allow only from a live
- * resource, and a vetoed allow granting nothing.
- *
- * This is the one piece that is reproduced rather than reused - the factory
- * needs Nest DI and a repository, which a read-only report should not boot. Keep
- * it in step with that factory; the verdict itself comes from the real check.
- */
-export function buildAbility(
-  userId: string,
-  isSuper: boolean,
-  permissions: ResolvedPermission[],
-  subjectMaps: { active: Set<string>; orphaned: Set<string> }
-): AppAbility {
-  const { can, cannot, build } = new AbilityBuilder<AppAbility>(
-    createMongoAbility
-  );
-
-  if (isSuper) {
-    can('manage', 'all');
-    return build();
-  }
-
-  const ordered = [
-    ...permissions.filter((p) => p.conditions?.effect !== 'deny'),
-    ...permissions.filter((p) => p.conditions?.effect === 'deny')
-  ];
-
-  for (const p of ordered) {
-    const isDeny = p.conditions?.effect === 'deny';
-    const register = isDeny ? cannot : can;
-    const subject = p.resource as Extract<Subjects, string>;
-
-    const live = isDeny
-      ? subjectMaps.active.has(p.resource) ||
-        subjectMaps.orphaned.has(p.resource)
-      : subjectMaps.active.has(p.resource);
-    if (!live) continue;
-
-    if (
-      CASL_RESERVED_ACTION_NAMES.includes(p.action) ||
-      CASL_RESERVED_SUBJECT_NAMES.includes(p.resource.toLowerCase())
-    ) {
-      if (isDeny) register(p.action, subject);
-      continue;
-    }
-
-    if (!p.conditions) {
-      register(p.action, subject);
-      continue;
-    }
-
-    const resolved = resolveConditions(p.conditions, {
-      userId,
-      permissionLabel: p.permission,
-      logger: silent
-    });
-
-    if (resolved.skipPermission) {
-      if (isDeny) register(p.action, subject);
-      continue;
-    }
-
-    if (Object.keys(resolved.query).length > 0) {
-      register(p.action, subject, resolved.query);
-    } else {
-      register(p.action, subject);
-    }
-  }
-
-  return build();
-}
-
 /** Runs the production grant check for one stored grant, as one actor. */
 export function verdictFor(
   ability: AppAbility,
@@ -236,14 +155,13 @@ export function analyzeGrants(input: {
 }): GrantScopeReport {
   const { grants, userRoles, auditRows } = input;
 
-  const subjectMaps = {
-    active: new Set(
-      grants.filter((g) => !g.is_orphaned).map((g) => g.resource_name)
-    ),
-    orphaned: new Set(
-      grants.filter((g) => g.is_orphaned).map((g) => g.resource_name)
-    )
-  };
+  // Keyed by resource name, valued by CASL subject, as `ResourceService`
+  // builds them: a permission names its resource, the rule names the subject.
+  const subjectMaps: SubjectMaps = { active: {}, orphaned: {} };
+  for (const g of grants) {
+    const map = g.is_orphaned ? subjectMaps.orphaned : subjectMaps.active;
+    map[g.resource_name] = g.resource_subject;
+  }
 
   const rolesByUser = new Map<string, UserRoleRow[]>();
   for (const ur of userRoles) {
@@ -303,7 +221,8 @@ export function analyzeGrants(input: {
       userId,
       roles.some((r) => r.is_super),
       permissions,
-      subjectMaps
+      subjectMaps,
+      silent
     );
     abilityCache.set(userId, ability);
     return ability;
