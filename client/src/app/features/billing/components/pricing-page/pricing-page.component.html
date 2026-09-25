@@ -29,7 +29,7 @@
 
   @if (store.loading()) {
     <div class="pricing-loading">
-      <mat-spinner diameter="40" />
+      <mat-spinner [attr.aria-label]="t('common.loading')" diameter="40" />
     </div>
   } @else {
     <div class="plan-grid">

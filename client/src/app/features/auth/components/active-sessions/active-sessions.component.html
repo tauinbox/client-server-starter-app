@@ -151,7 +151,10 @@
             >
               @if (busy()) {
                 <span class="app-btn-loading">
-                  <mat-spinner diameter="20"></mat-spinner>
+                  <mat-spinner
+                    [attr.aria-label]="t('common.loading')"
+                    diameter="20"
+                  ></mat-spinner>
                   {{ t('auth.sessions.working') }}
                 </span>
               } @else {

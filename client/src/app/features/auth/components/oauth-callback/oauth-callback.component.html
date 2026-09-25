@@ -16,7 +16,7 @@
     </mat-card>
   } @else {
     <div class="oauth-callback-progress">
-      <mat-spinner></mat-spinner>
+      <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
       <p>{{ t('auth.oauthCallback.completingSignIn') }}</p>
     </div>
   }

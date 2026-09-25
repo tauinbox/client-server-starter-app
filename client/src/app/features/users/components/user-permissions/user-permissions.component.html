@@ -16,7 +16,7 @@
     <mat-card-content>
       @if (loading()) {
         <div class="loading-container">
-          <mat-spinner></mat-spinner>
+          <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
         </div>
       } @else if (error()) {
         <div class="error-container">

@@ -16,7 +16,7 @@
     <mat-card-content>
       @if (loading()) {
         <div class="loading-container">
-          <mat-spinner></mat-spinner>
+          <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
         </div>
       } @else if (u) {
         <form (submit)="$event.preventDefault(); onSubmit()">
@@ -210,7 +210,10 @@
             <button matButton="filled" type="submit">
               @if (saving()) {
                 <span class="app-btn-loading">
-                  <mat-spinner diameter="24"></mat-spinner>
+                  <mat-spinner
+                    [attr.aria-label]="t('common.loading')"
+                    diameter="24"
+                  ></mat-spinner>
                   {{ t('users.edit.saving') }}
                 </span>
               } @else {

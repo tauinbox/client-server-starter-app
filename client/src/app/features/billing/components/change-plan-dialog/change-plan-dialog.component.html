@@ -65,7 +65,7 @@
 
       @if (previewLoading()) {
         <div class="proration-loading">
-          <mat-spinner diameter="24" />
+          <mat-spinner [attr.aria-label]="t('common.loading')" diameter="24" />
         </div>
       } @else if (previewError()) {
         <p class="proration-error">

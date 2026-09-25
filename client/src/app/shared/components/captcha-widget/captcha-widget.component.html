@@ -1,7 +1,10 @@
 <div class="captcha-widget" *transloco="let t">
   @if (status() === 'loading') {
     <div class="captcha-widget__placeholder" role="status">
-      <mat-spinner diameter="20"></mat-spinner>
+      <mat-spinner
+        [attr.aria-label]="t('common.loading')"
+        diameter="20"
+      ></mat-spinner>
       <span>{{ t('common.loading') }}</span>
     </div>
   } @else if (status() === 'error') {

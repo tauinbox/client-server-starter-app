@@ -101,7 +101,10 @@
                 >
                   @if (resendingVerification()) {
                     <span class="app-btn-loading">
-                      <mat-spinner diameter="16"></mat-spinner>
+                      <mat-spinner
+                        [attr.aria-label]="t('common.loading')"
+                        diameter="16"
+                      ></mat-spinner>
                       {{ t('auth.login.sending') }}
                     </span>
                   } @else {
@@ -122,7 +125,10 @@
             >
               @if (loading()) {
                 <span class="app-btn-loading">
-                  <mat-spinner diameter="24"></mat-spinner>
+                  <mat-spinner
+                    [attr.aria-label]="t('common.loading')"
+                    diameter="24"
+                  ></mat-spinner>
                   {{ t('auth.login.loggingIn') }}
                 </span>
               } @else {

@@ -86,7 +86,11 @@
       (click)="run()"
     >
       @if (loading()) {
-        <mat-spinner class="run-indicator" diameter="18" />
+        <mat-spinner
+          [attr.aria-label]="t('common.loading')"
+          class="run-indicator"
+          diameter="18"
+        />
       } @else {
         <mat-icon>play_arrow</mat-icon>
       }
