@@ -150,34 +150,25 @@ test.describe('Error translation: global error interceptor → snackbar', () => 
     page,
     _mockServer
   }) => {
-    // Login via UI so we can reach the profile page.
-    // auth.service login/register/forgotPassword etc. all use silentContext()
-    // which suppresses the snackbar — so we use the profile-update endpoint
-    // (PATCH /auth/profile) which is NOT silenced and goes through the global
-    // error interceptor.
+    // Most auth requests use silentContext(), because their callers show the
+    // error themselves. The linked-accounts list on the profile page is not
+    // silenced: it falls back to an empty list, so the snackbar from the
+    // global error interceptor is its only error signal.
     await loginViaUi(page, _mockServer.url);
 
-    // Intercept only PATCH /auth/profile; let other profile requests through.
-    await page.route('**/api/v1/auth/profile', async (route) => {
-      if (route.request().method() === 'PATCH') {
-        await route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            message: RAW_MSG,
-            errorKey: ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
-            statusCode: 500
-          })
-        });
-      } else {
-        await route.fallback();
-      }
-    });
+    await page.route('**/api/v1/auth/oauth/accounts', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: RAW_MSG,
+          errorKey: ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
+          statusCode: 500
+        })
+      })
+    );
 
-    // Make the form dirty and submit.
-    await page.getByLabel('First Name').fill('Updated');
-    await page.getByLabel('First Name').blur();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.reload();
 
     const snackbar = page.locator('mat-snack-bar-container');
     await expect(snackbar).toBeVisible({ timeout: 5000 });

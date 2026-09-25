@@ -7,6 +7,7 @@ import {
   provideHttpClientTesting
 } from '@angular/common/http/testing';
 import { firstValueFrom, of, EMPTY, Subject } from 'rxjs';
+import type { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
 import { TokenService } from './token.service';
@@ -19,6 +20,8 @@ import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { NotificationEvent, RoleResponse } from '@app/shared/types';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
+import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -653,6 +656,57 @@ describe('AuthService', () => {
       req.flush({ message: 'Unlinked' });
 
       return expect(unlinkPromise).resolves.toEqual({ message: 'Unlinked' });
+    });
+  });
+
+  // Each caller of these requests shows the refusal itself, so a global
+  // notification would show the same error a second time.
+  describe('error notifications', () => {
+    it.each<[string, string, () => Observable<unknown>]>([
+      ['getProfile', AuthApiEnum.Profile, () => service.getProfile()],
+      [
+        'updateProfile',
+        AuthApiEnum.Profile,
+        () => service.updateProfile({ firstName: 'A' })
+      ],
+      [
+        'exchangeOAuthData',
+        AuthApiEnum.OAuthExchange,
+        () => service.exchangeOAuthData()
+      ],
+      [
+        'initOAuthReauth',
+        AuthApiEnum.OAuthReauthInit,
+        () => service.initOAuthReauth(STEP_UP_OPERATION.EMAIL_CHANGE)
+      ]
+    ])('%s disables the global error notification', (_name, url, call) => {
+      call().subscribe({ error: () => undefined });
+
+      const req = httpMock.expectOne(url);
+      expect(
+        req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
+      ).toBe(true);
+      req.flush(null, { status: 400, statusText: 'Bad Request' });
+    });
+
+    it('keeps the credentials on the OAuth data exchange', () => {
+      service.exchangeOAuthData().subscribe({ error: () => undefined });
+
+      const req = httpMock.expectOne(AuthApiEnum.OAuthExchange);
+      expect(req.request.withCredentials).toBe(true);
+      req.flush(null, { status: 400, statusText: 'Bad Request' });
+    });
+
+    // The profile page falls back to an empty list, so the global
+    // notification is the only sign that the request failed.
+    it('leaves the linked-accounts request to the global notification', () => {
+      service.getOAuthAccounts().subscribe({ error: () => undefined });
+
+      const req = httpMock.expectOne(AuthApiEnum.OAuthAccounts);
+      expect(
+        req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
+      ).toBe(false);
+      req.flush(null, { status: 500, statusText: 'Server Error' });
     });
   });
 });
