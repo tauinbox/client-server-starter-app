@@ -119,14 +119,16 @@
           }
 
           @if (canManageUser()) {
-            <div class="checkbox-group">
-              <mat-checkbox
-                [checked]="isActive()"
-                (change)="isActive.set($event.checked)"
-              >
-                {{ t('users.edit.active') }}
-              </mat-checkbox>
-            </div>
+            @if (canModerate()) {
+              <div class="checkbox-group">
+                <mat-checkbox
+                  [checked]="isActive()"
+                  (change)="isActive.set($event.checked)"
+                >
+                  {{ t('users.edit.active') }}
+                </mat-checkbox>
+              </div>
+            }
 
             <div class="account-status">
               <mat-chip-set role="list" aria-live="polite">
@@ -153,7 +155,7 @@
                   </mat-chip>
                 }
               </mat-chip-set>
-              @if (u.lockedUntil) {
+              @if (u.lockedUntil && canModerate()) {
                 <button
                   matButton="text"
                   type="button"

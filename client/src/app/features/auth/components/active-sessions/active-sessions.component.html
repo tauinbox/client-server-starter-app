@@ -8,7 +8,10 @@
 
     @if (loading()) {
       <div class="sessions-loading">
-        <mat-spinner diameter="32"></mat-spinner>
+        <mat-spinner
+          diameter="32"
+          [attr.aria-label]="t('common.loading')"
+        ></mat-spinner>
       </div>
     } @else if (loadFailed()) {
       <p class="sessions-note" role="alert">

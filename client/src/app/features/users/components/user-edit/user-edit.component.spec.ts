@@ -796,6 +796,62 @@ describe('UserEditComponent', () => {
     });
   });
 
+  describe('moderation on the own record', () => {
+    const lockedUser: User = {
+      ...mockUser,
+      lockedUntil: new Date(Date.now() + 60_000).toISOString()
+    };
+
+    function activeCheckbox(): Element | null {
+      return (fixture.nativeElement as HTMLElement).querySelector(
+        'mat-checkbox'
+      );
+    }
+
+    function unlockButton(): HTMLButtonElement | undefined {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+      ).find((b) => b.textContent?.trim() === 'Unlock');
+    }
+
+    it('offers the active checkbox and the unlock on another record', () => {
+      userServiceMock.getById.mockReturnValue(of(lockedUser));
+      fixture.detectChanges();
+
+      expect(activeCheckbox()).not.toBeNull();
+      expect(unlockButton()).toBeTruthy();
+    });
+
+    it('hides the active checkbox and the unlock on the own record', () => {
+      userServiceMock.getById.mockReturnValue(of(lockedUser));
+      currentUserSignal.set({ id: 'user-1' });
+      fixture.detectChanges();
+
+      expect(activeCheckbox()).toBeNull();
+      expect(unlockButton()).toBeUndefined();
+    });
+
+    it('leaves isActive out of the update of the own record', async () => {
+      currentUserSignal.set({ id: 'user-1' });
+      fixture.detectChanges();
+      component.userModel.set({
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User',
+        password: ''
+      });
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User'
+      });
+    });
+  });
+
   describe('role assignment', () => {
     const mockRoles = [
       {

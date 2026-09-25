@@ -272,6 +272,23 @@ export class UsersController {
   ) {
     const { currentPassword, code, ...changes } = updateUserDto;
 
+    // The ownership grant of the seeded `user` role reaches this route, and a
+    // bare access token must not lock its owner out or lift a login lock.
+    // Before the step-up, so a refused request spends no factor.
+    if (
+      id === req.user.userId &&
+      (changes.isActive !== undefined || changes.unlockAccount !== undefined)
+    ) {
+      throw new HttpException(
+        {
+          message:
+            'You cannot deactivate or unlock your own account. Ask another administrator.',
+          errorKey: ErrorKeys.USERS.MODERATION_SELF
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
     // The service rewrites the address only when it actually differs, so the
     // pre-image is the only way to tell a real change from a form resubmit -
     // and revoking on a resubmit would log the target out for nothing.

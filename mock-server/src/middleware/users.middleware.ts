@@ -399,6 +399,21 @@ router.patch(
       return;
     }
 
+    // Mirrors UsersController.update: a moderation field on the caller's own
+    // record is refused before the lookup and the step-up.
+    if (
+      id === (req as AuthenticatedRequest).user.id &&
+      (isActive !== undefined || unlockAccount !== undefined)
+    ) {
+      res.status(400).json({
+        message:
+          'You cannot deactivate or unlock your own account. Ask another administrator.',
+        statusCode: 400,
+        errorKey: ErrorKeys.USERS.MODERATION_SELF
+      });
+      return;
+    }
+
     const user = findUserById(id);
     if (!user) {
       res.status(404).json({
