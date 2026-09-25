@@ -27,8 +27,8 @@ of `BACKEND_URL` is `http://localhost:3000`.
 | Format check | `npm run format:check` examines `src/`, `e2e/`, `scripts/` and the root-level configuration files |
 | Format | `npm run format` uses the same scope and writes the corrections |
 | Unit tests | `npm test` (Vitest) |
-| E2E tests | `npm run test:e2e` (Playwright) |
-| E2E tests (UI) | `npm run test:e2e:ui` |
+| E2E tests | `npm run test:e2e` (builds, then Playwright against `dist/`) |
+| E2E tests (UI) | `npm run test:e2e:ui` (builds, then interactive UI) |
 | Audit dependencies | `npm run audit:ci` runs `npm audit --audit-level=high --omit=dev` through `scripts/audit-ci.mjs`. This is the same gate that CI applies. The script retries a failed registry endpoint, with each attempt bounded by `--fetch-timeout=30000`, but it never retries a true finding |
 | Release | `npm run release` increases the versions, makes `CHANGELOG.md`, and makes a git tag |
 
@@ -969,9 +969,14 @@ request with an error that named no port.
 `page.route(/\/api\//)` intercepts an API call and rewrites the URL to the mock-server port of the
 worker.
 
-**CI web server.** CI runs `ng build` before `playwright test`. Then it serves the built output with
-`serve -s dist/client/browser`. This removes the 60 s to 90 s start time of the Angular dev server.
-Local development continues to use `ng serve`.
+**E2E web server.** Each `test:e2e*` script builds the client first (a `pre` hook runs `npm run build`).
+Then Playwright serves the built output with `serve -s dist/client/browser`, locally and in CI. The
+`page.route` above makes Playwright intercept every request of the page, not only the API calls. Under
+`ng serve`, one full page load is several hundred unbundled module requests, and in a full parallel run
+some of them stall for 4 s to 5 s, so a lazy route renders nothing. Measured on one machine: one full
+run on `ng serve` had 20 such stalls in 10.4 min; two full runs on the build had 0 stalls in 4.8 and
+4.1 min. Set `E2E_DEV_SERVER=1` to run against `ng serve` for a debugging session. Only that mode reuses
+a server that is already on the port.
 
 Seed data: 5 well-known users and 65 users from faker, thus 70 users in total. The credentials are
 `admin@example.com / Password1` for the administrator and `user@example.com / Password1` for the
@@ -1101,14 +1106,13 @@ snackbar of the global interceptor.
 
 - Workers: 4. They run fully in parallel, and each worker has its own mock-server instance on a
   dynamic port.
-- Web server start: `webServer.timeout` is 180 s. Playwright starts `ng serve` locally. The first
-  build with an empty `.angular/cache` can take much more than the Playwright default of 60 s on a
-  slow or loaded machine. CI serves the built `dist/` and starts in seconds, thus the additional
-  time has no effect there.
+- Web server: Playwright serves the built `dist/`, which starts in seconds. `webServer.timeout` is
+  180 s for the `E2E_DEV_SERVER=1` mode: a first `ng serve` with an empty `.angular/cache` can take
+  much more than the Playwright default of 60 s on a slow or loaded machine.
 
 ```bash
-npm run test:e2e           # Headless
-npm run test:e2e:ui        # Interactive UI
+npm run test:e2e           # Build, then headless
+npm run test:e2e:ui        # Build, then interactive UI
 ```
 
 ## Docker
