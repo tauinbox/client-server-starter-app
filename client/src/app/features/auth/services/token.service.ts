@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import type { Observable, Subscription } from 'rxjs';
 import {
   defer,
@@ -17,14 +17,11 @@ import { AuthStore } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import { navigateToLogin } from '../utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
-import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
+import { silentContext } from '@core/context-tokens/error-notifications';
 import { TOKEN_REFRESH_WINDOW_SECONDS } from '@app/shared/constants';
 
 const REFRESH_LOCK_NAME = 'auth_token_refresh';
 const MIN_REFRESH_DELAY_MS = 1000;
-
-const silentContext = () =>
-  new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
 
 @Injectable({ providedIn: 'root' })
 export class TokenService {

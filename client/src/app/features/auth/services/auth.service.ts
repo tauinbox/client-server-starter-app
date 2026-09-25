@@ -1,7 +1,7 @@
 import { DestroyRef, inject, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DOCUMENT } from '@angular/common';
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { EMPTY, finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
@@ -32,7 +32,7 @@ import {
   SESSION_ENDED_PARAM
 } from '../constants/session-ended.const';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
-import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
+import { silentContext } from '@core/context-tokens/error-notifications';
 import { TokenService } from './token.service';
 import { IdleTimeoutService } from './idle-timeout.service';
 import { RbacMetadataService } from './rbac-metadata.service';
@@ -41,9 +41,6 @@ import { NotificationsService } from '@core/services/notifications.service';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
-
-const silentContext = () =>
-  new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -359,13 +356,13 @@ export class AuthService {
 
   getProfile(): Observable<User> {
     return this.#http
-      .get<User>(AuthApiEnum.Profile)
+      .get<User>(AuthApiEnum.Profile, { context: silentContext() })
       .pipe(tap((profile) => this.#authStore.updateCurrentUser(profile)));
   }
 
   updateProfile(data: UpdateProfile): Observable<User> {
     return this.#http
-      .patch<User>(AuthApiEnum.Profile, data)
+      .patch<User>(AuthApiEnum.Profile, data, { context: silentContext() })
       .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
   }
 
@@ -398,6 +395,10 @@ export class AuthService {
     this.#clearSessionState();
   }
 
+  /**
+   * Not silent: the profile page falls back to an empty list on a failure, so
+   * the global notification is the only sign that the list did not load.
+   */
   getOAuthAccounts(): Observable<{ provider: string; createdAt: string }[]> {
     return this.#http.get<{ provider: string; createdAt: string }[]>(
       AuthApiEnum.OAuthAccounts
@@ -413,7 +414,7 @@ export class AuthService {
     return this.#http.post<LoginResponse>(
       AuthApiEnum.OAuthExchange,
       {},
-      { withCredentials: true }
+      { context: silentContext(), withCredentials: true }
     );
   }
 
@@ -439,9 +440,11 @@ export class AuthService {
    * The proof binds to `operation`, so it opens that change and no other.
    */
   initOAuthReauth(operation: StepUpOperation): Observable<{ message: string }> {
-    return this.#http.post<{ message: string }>(AuthApiEnum.OAuthReauthInit, {
-      operation
-    });
+    return this.#http.post<{ message: string }>(
+      AuthApiEnum.OAuthReauthInit,
+      { operation },
+      { context: silentContext() }
+    );
   }
 
   /**

@@ -1,12 +1,12 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpContext, HttpEventType } from '@angular/common/http';
+import { HttpClient, HttpEventType } from '@angular/common/http';
 import type { HttpDownloadProgressEvent } from '@angular/common/http';
 import { filter, retry, Subject, tap, timer } from 'rxjs';
 import type { Observable, OperatorFunction, Subscription } from 'rxjs';
 import type { NotificationEvent } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TokenService } from '@features/auth/services/token.service';
-import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
+import { silentContext } from '@core/context-tokens/error-notifications';
 
 const NOTIFICATIONS_STREAM_URL = '/api/v1/notifications/stream';
 const MAX_RETRIES = 10;
@@ -15,9 +15,6 @@ const MAX_RETRY_DELAY_MS = 60_000;
 const RECONNECT_DELAY_MS = 5000;
 const RECYCLE_MIN_DELAY_MS = 4 * 60 * 60 * 1000;
 const RECYCLE_JITTER_MS = 4 * 60 * 60 * 1000;
-
-const silentContext = () =>
-  new HttpContext().set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);
 
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
