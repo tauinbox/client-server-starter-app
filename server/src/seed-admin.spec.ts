@@ -98,6 +98,18 @@ describe('seedAdmin', () => {
     );
   });
 
+  it('warns and still creates the admin when the password contains the admin name', async () => {
+    process.env['ADMIN_PASSWORD'] = 'Admin-Kettle-Sunrise-19';
+
+    await seedAdmin();
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(userRepo.save).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('common password')
+    );
+  });
+
   it('never exits when the blocklist is unreachable', async () => {
     mockedLookup.mockResolvedValue('unavailable');
 

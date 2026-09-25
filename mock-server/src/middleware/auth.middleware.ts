@@ -28,10 +28,7 @@ import {
   generateSessionId,
   generateTokens
 } from '../jwt.utils';
-import {
-  breachedPasswordEnvelope,
-  isBreachedPassword
-} from '../helpers/breached-password.helpers';
+import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
   endSessionOfToken,
   findUserByEmail,
@@ -541,8 +538,9 @@ router.post('/reset-password', (req, res) => {
 
   // The server checks the blocklist inside the service, after the token checks
   // that authorise the call: an invalid token must not buy a lookup.
-  if (isBreachedPassword(password)) {
-    res.status(400).json(breachedPasswordEnvelope());
+  const passwordRefusal = newPasswordRefusal(password, user);
+  if (passwordRefusal) {
+    res.status(400).json(passwordRefusal);
     return;
   }
 
@@ -894,8 +892,13 @@ router.patch(
       // The blocklist verdict comes from UsersService.update on the real server,
       // after the step up and before any field assignment, so a 400 must leave
       // the profile unchanged.
-      if (isBreachedPassword(password)) {
-        res.status(400).json(breachedPasswordEnvelope());
+      const passwordRefusal = newPasswordRefusal(password, {
+        email: user.email,
+        firstName: firstName ?? user.firstName,
+        lastName: lastName ?? user.lastName
+      });
+      if (passwordRefusal) {
+        res.status(400).json(passwordRefusal);
         return;
       }
     }

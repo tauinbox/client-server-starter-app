@@ -13,8 +13,10 @@ let baseUrl: string;
 const INVALID_PASSWORD = 'short';
 const PASSWORD_LENGTH_ERROR = `password must be longer than or equal to ${MIN_PASSWORD_LENGTH} characters`;
 
-// Seeded into the mock breach corpus, so the blocklist refuses it.
-const BREACHED_PASSWORD = 'Password1';
+// Passes the local common-password check, so the breach corpus is what
+// refuses it once `seedBreached` adds it there. A seeded value such as
+// 'Password1' is on the local list too and never reaches the corpus.
+const BREACHED_PASSWORD = 'Copper-Meadow-83';
 
 async function seedBreached(baseUrl: string, values: string[]): Promise<void> {
   const res = await fetch(`${baseUrl}/__control/breached-passwords`, {
@@ -139,6 +141,10 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
 });
 
 describe('the breach blocklist mirrors the server verdict', () => {
+  beforeEach(async () => {
+    await seedBreached(baseUrl, [BREACHED_PASSWORD]);
+  });
+
   it('refuses a listed password on the admin update and leaves the row untouched', async () => {
     const token = await login('admin@example.com');
 

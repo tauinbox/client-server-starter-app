@@ -9,10 +9,7 @@ import {
 } from '../utils/validation';
 import { findUserByEmail, findUserByPendingEmail } from '../state';
 import { validationError } from './validation-error.helpers';
-import {
-  breachedPasswordEnvelope,
-  isBreachedPassword
-} from './breached-password.helpers';
+import { newPasswordRefusal } from './breached-password.helpers';
 import type { MockUser } from '../types';
 
 export interface CreateUserFields {
@@ -107,8 +104,9 @@ export function validateCreateUserDto(
 export function findCreateUserConflict(
   fields: CreateUserFields
 ): CreateUserConflict | null {
-  if (isBreachedPassword(fields.password)) {
-    return { status: 400, body: breachedPasswordEnvelope() };
+  const passwordRefusal = newPasswordRefusal(fields.password, fields);
+  if (passwordRefusal) {
+    return { status: 400, body: passwordRefusal };
   }
 
   if (findUserByEmail(fields.email) || findUserByPendingEmail(fields.email)) {

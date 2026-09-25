@@ -40,6 +40,7 @@ export const ErrorKeys = {
     PENDING_EMAIL_TOKEN_EXPIRED: 'errors.auth.pendingEmailTokenExpired',
     REAUTH_REQUIRED: 'errors.auth.reauthRequired',
     PASSWORD_BREACHED: 'errors.auth.passwordBreached',
+    PASSWORD_TOO_COMMON: 'errors.auth.passwordTooCommon',
     MFA_UNAVAILABLE: 'errors.auth.mfaUnavailable',
     MFA_ALREADY_ENABLED: 'errors.auth.mfaAlreadyEnabled',
     MFA_NOT_ENABLED: 'errors.auth.mfaNotEnabled',

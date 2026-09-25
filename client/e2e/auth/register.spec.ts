@@ -273,6 +273,10 @@ test.describe('Register page', () => {
     _mockServer,
     page
   }) => {
+    // Passes the local common-password check, so only the breach corpus can
+    // refuse it once the test seeds it there.
+    const breached = 'Copper-Meadow-83';
+    await _mockServer.seedBreachedPasswords([breached]);
     await page.goto('/register');
 
     const main = page.getByRole('main');
@@ -282,14 +286,36 @@ test.describe('Register page', () => {
     await page.getByLabel('First Name').blur();
     await page.getByLabel('Last Name').fill('Smith');
     await page.getByLabel('Last Name').blur();
-    // Seeded into the mock corpus, and genuinely one of the most breached
-    // values there is, so the real server refuses it too.
-    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).fill(breached);
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(
       page.getByText(
         'This password has appeared in a public data breach. Please choose a different one.'
+      )
+    ).toBeVisible();
+    await expect(page).toHaveURL(/.*\/register$/);
+  });
+
+  test('refuses one of the most common passwords', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+
+    const main = page.getByRole('main');
+    await page.getByLabel('Email').fill('common@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByLabel('First Name').fill('Jane');
+    await page.getByLabel('First Name').blur();
+    await page.getByLabel('Last Name').fill('Smith');
+    await page.getByLabel('Last Name').blur();
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await main.getByRole('button', { name: 'Register' }).click();
+
+    await expect(
+      page.getByText(
+        'This password is too common, or it contains your name, your email address or the product name. Please choose a different one.'
       )
     ).toBeVisible();
     await expect(page).toHaveURL(/.*\/register$/);

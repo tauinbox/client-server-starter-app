@@ -51,7 +51,10 @@ export class UsersService {
 
     // Ahead of the address conflict, matching AuthService.register: both routes
     // carry the same DTO and must answer the same way for the same body.
-    await this.breachedPasswordService.assertNotBreached(password);
+    await this.breachedPasswordService.assertNotBreached(
+      password,
+      createUserDto
+    );
 
     // Reject if address is held by another user as primary email OR as a
     // pending email-change request — both are reservations on the address.
@@ -288,7 +291,13 @@ export class UsersService {
     if (rest.password) {
       // After the ability check, which decides whether this caller may write to
       // the record at all, and before the hash.
-      await this.breachedPasswordService.assertNotBreached(rest.password);
+      // The names and email checked are the ones the record has after this
+      // write, so a rename in the same body is covered.
+      await this.breachedPasswordService.assertNotBreached(rest.password, {
+        email: rest.email ?? user.email,
+        firstName: rest.firstName ?? user.firstName,
+        lastName: rest.lastName ?? user.lastName
+      });
       changes.password = await bcrypt.hash(rest.password, BCRYPT_SALT_ROUNDS);
       // A password change voids every mailed proof of ownership, the same rule
       // resetPassword states: a link kept from before the change must not still

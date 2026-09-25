@@ -859,8 +859,10 @@ the same permission both apply.
   server: the shared `MIN_PASSWORD_LENGTH` and `MAX_NEW_PASSWORD_LENGTH`. Thus a password that is
   too short gets a translated message on the field, and it does not need a server round trip. A new
   password also gets a byte check, because bcrypt reads at most 72 bytes and a Cyrillic letter is
-  two of them. There is no composition rule. The server refuses a password that appears in a public breach corpus, and
-  that verdict needs a round trip because only the server may query the corpus.
+  two of them. There is no composition rule. The server refuses one of the 10 000 most common passwords,
+  a password that contains the user's name, email local part or the product name, and a password
+  that appears in a public breach corpus. Those verdicts need a round trip: the common list is too
+  large for the bundle, and only the server may query the corpus.
   A reusable password strength indicator (`<nxs-password-strength>`) has a visual meter of 4 bars,
   an aria-live label and a hint that advises on length while the typed value scores low.
   The register page, the profile page and the reset-password page show it.
@@ -1815,11 +1817,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2592 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 484 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 482 pass and 2 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2608 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 486 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 482 pass and 2 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1360 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 283 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 857 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 284 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 865 tests pass |
 
 ## CI/CD
 
