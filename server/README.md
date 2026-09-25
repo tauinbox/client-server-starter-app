@@ -1373,6 +1373,11 @@ compromise, and **before** the `JWT_MIN_IAT` branch. The value `0` disables the 
 below `JWT_REFRESH_EXPIRATION * 1000` aborts the boot, because it would end a session sooner than the
 refresh window promises.
 
+The `JWT_MIN_IAT` branch ends the session the same way. A refresh token created before that value
+answers 401 with `errors.auth.sessionInvalidated`, and `deleteBySessionId` removes the session. A
+second presentation of the same cookie is therefore an unknown token, and it does not purge the
+sessions that the user started after the key rotation.
+
 The column is real and not derived. `MIN(created_at)` of a session looks sufficient, because a
 rotation revokes an ancestor instead of deleting it, but `removeRevokedAndExpiredTokens` deletes each
 revoked row once it is past its own expiry. The oldest row of a long session is therefore gone well
