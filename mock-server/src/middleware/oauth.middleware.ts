@@ -15,7 +15,10 @@ import {
   OAUTH_DATA_COOKIE,
   OAUTH_PROVIDERS
 } from '../constants';
-import { setRefreshTokenCookie } from '../helpers/refresh-cookie.helpers';
+import {
+  endPresentedSession,
+  setRefreshTokenCookie
+} from '../helpers/refresh-cookie.helpers';
 import type { AuthenticatedRequest } from '../types';
 
 const router = Router();
@@ -172,6 +175,7 @@ router.post('/exchange', (req, res) => {
     return;
   }
 
+  endPresentedSession(req);
   const { refresh_token, ...publicTokens } = pending.tokens;
   setRefreshTokenCookie(res, refresh_token);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });

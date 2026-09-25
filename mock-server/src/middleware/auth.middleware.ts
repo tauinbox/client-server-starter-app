@@ -73,6 +73,7 @@ import {
 } from '../constants';
 import {
   clearRefreshTokenCookie,
+  endPresentedSession,
   setRefreshTokenCookie
 } from '../helpers/refresh-cookie.helpers';
 import {
@@ -286,6 +287,7 @@ router.post('/login', (req, res) => {
 
   const state = getState();
 
+  endPresentedSession(req);
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);

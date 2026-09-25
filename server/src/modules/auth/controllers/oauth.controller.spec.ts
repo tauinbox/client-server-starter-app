@@ -114,7 +114,10 @@ describe('OAuthController', () => {
   };
   let metricsServiceMock: { recordAuthEvent: jest.Mock };
   let mailServiceMock: { sendOAuthUnlinkedNotification: jest.Mock };
-  let authServiceMock: { assertStepUpForUser: jest.Mock };
+  let authServiceMock: {
+    assertStepUpForUser: jest.Mock;
+    endPresentedSession: jest.Mock;
+  };
   let configValues: Record<string, string | undefined>;
 
   beforeEach(async () => {
@@ -154,7 +157,8 @@ describe('OAuthController', () => {
     metricsServiceMock = { recordAuthEvent: jest.fn() };
 
     authServiceMock = {
-      assertStepUpForUser: jest.fn().mockResolvedValue(undefined)
+      assertStepUpForUser: jest.fn().mockResolvedValue(undefined),
+      endPresentedSession: jest.fn().mockResolvedValue(undefined)
     };
 
     configValues = {
@@ -1091,6 +1095,54 @@ describe('OAuthController', () => {
         path: '/'
       });
       expect(res.cookie).not.toHaveBeenCalled();
+      // The browser keeps its cookie until the second factor is met.
+      expect(authServiceMock.endPresentedSession).not.toHaveBeenCalled();
+    });
+
+    // The provider redirect carries no refresh cookie, so this request, which
+    // hands the browser its new one, is where the old session ends.
+    it('ends the session of the refresh cookie the browser presented', async () => {
+      jwtServiceMock.verify.mockReturnValue({
+        data: {
+          tokens: {
+            access_token: 'token',
+            refresh_token: 'refresh',
+            expires_in: 3600
+          },
+          user: { id: '1', email: 'test@example.com' }
+        },
+        purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        jti: 'token-id'
+      });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        '__Host-oauth_data': 'signed-jwt',
+        '__Host-refresh_token': 'previous-refresh-token'
+      });
+      const res = mockResponse();
+
+      await controller.exchangeOAuthData(req, res);
+
+      expect(authServiceMock.endPresentedSession).toHaveBeenCalledWith(
+        'previous-refresh-token'
+      );
+    });
+
+    it('ends no session when the OAuth data is refused', async () => {
+      jwtServiceMock.verify.mockImplementation(() => {
+        throw new Error('invalid signature');
+      });
+
+      const req = mockExpressRequest({} as OAuthUserProfile, {
+        '__Host-oauth_data': 'forged-jwt',
+        '__Host-refresh_token': 'previous-refresh-token'
+      });
+      const res = mockResponse();
+
+      await expect(controller.exchangeOAuthData(req, res)).rejects.toThrow(
+        HttpException
+      );
+      expect(authServiceMock.endPresentedSession).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when cookie is missing', async () => {

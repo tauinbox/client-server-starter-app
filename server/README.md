@@ -1067,6 +1067,11 @@ under the **same** session id, so a refresh in one tab does not strand the acces
 of the same device holds. `AuthService.logoutSession` deletes every row of one session, which is what
 `POST /auth/logout` calls. `AuthService.logout` deletes every row of the account and stamps
 `tokenRevokedAt`; it belongs to the password change and to the other account-wide paths.
+`AuthService.endPresentedSession` deletes the session of the refresh cookie that a sign-in request
+carries, whatever account owns it, because the browser replaces that cookie. `POST /auth/login` and
+the second-factor routes call it before the new session is issued, so the session limit does not
+evict another device. `POST /auth/oauth/exchange` calls it too, because the provider callback is a
+cross-site redirect that carries no `sameSite: strict` cookie.
 
 **Active sessions.** Each sign-in stores the `User-Agent` header of the device on the refresh row
 (`user_agent`, cut to 512 characters with control characters removed by `normalizeUserAgent`), and

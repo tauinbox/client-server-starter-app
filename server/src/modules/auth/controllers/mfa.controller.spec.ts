@@ -40,13 +40,17 @@ function jwtRequest(cookies: Record<string, string> = {}): JwtAuthRequest {
   });
 }
 
-function publicRequest(): ExpressRequest {
-  return createMockRequest({ ip: '127.0.0.1', headers: {}, cookies: {} });
+function publicRequest(cookies: Record<string, string> = {}): ExpressRequest {
+  return createMockRequest({ ip: '127.0.0.1', headers: {}, cookies });
 }
 
 describe('MfaController', () => {
   let controller: MfaController;
-  let authService: { assertStepUp: jest.Mock; login: jest.Mock };
+  let authService: {
+    assertStepUp: jest.Mock;
+    login: jest.Mock;
+    endPresentedSession: jest.Mock;
+  };
   let mfaService: {
     beginEnrolment: jest.Mock;
     completeEnrolment: jest.Mock;
@@ -62,6 +66,7 @@ describe('MfaController', () => {
   beforeEach(async () => {
     authService = {
       assertStepUp: jest.fn().mockResolvedValue(undefined),
+      endPresentedSession: jest.fn().mockResolvedValue(undefined),
       login: jest.fn().mockResolvedValue({
         tokens: {
           access_token: 'access-token',
@@ -375,6 +380,22 @@ describe('MfaController', () => {
       ).rejects.toMatchObject({ status: 401 });
       expect(res.cookie).not.toHaveBeenCalled();
       expect(authService.login).not.toHaveBeenCalled();
+      expect(authService.endPresentedSession).not.toHaveBeenCalled();
+    });
+
+    it('ends the session of the refresh cookie the browser presented, before the new one exists', async () => {
+      await controller.verify(
+        publicRequest({ '__Host-refresh_token': 'previous-refresh-token' }),
+        { mfaToken: 'pending', code: '123456' },
+        res
+      );
+
+      expect(authService.endPresentedSession).toHaveBeenCalledWith(
+        'previous-refresh-token'
+      );
+      expect(
+        authService.endPresentedSession.mock.invocationCallOrder[0]
+      ).toBeLessThan(authService.login.mock.invocationCallOrder[0]);
     });
   });
 
@@ -393,6 +414,18 @@ describe('MfaController', () => {
       );
       expect(result.user).toBe(mockUser);
       expect(res.cookie).toHaveBeenCalled();
+    });
+
+    it('ends the session of the refresh cookie the browser presented', async () => {
+      await controller.recovery(
+        publicRequest({ '__Host-refresh_token': 'previous-refresh-token' }),
+        { mfaToken: 'pending', recoveryCode: 'ABCDEFGH-IJKLMNOP' },
+        res
+      );
+
+      expect(authService.endPresentedSession).toHaveBeenCalledWith(
+        'previous-refresh-token'
+      );
     });
   });
 });
