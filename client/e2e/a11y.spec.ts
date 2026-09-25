@@ -82,6 +82,36 @@ test.describe('Accessibility (axe-core)', () => {
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
+  // The scan above passes or fails on timing alone: it reported the session
+  // list spinner only when it ran before the list arrived. This one holds the
+  // list so the spinner is always on screen during the scan.
+  test('profile page has no serious a11y violations while sessions load', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/api/v1/auth/sessions', async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      await held;
+      return route.fallback();
+    });
+    await page.reload();
+    const spinner = page.locator('.sessions-loading mat-spinner');
+    await expect(spinner).toBeVisible();
+    // A raw key would also satisfy axe, so the text is asserted too.
+    await expect(spinner).toHaveAttribute('aria-label', 'Loading...');
+
+    const { violations } = await buildAxeScanner(page)
+      .include('.sessions-loading')
+      .analyze();
+    release();
+
+    expect(seriousOrCritical(violations)).toEqual([]);
+  });
+
   /* ------------------------------------------------------------------
    * Authenticated routes (admin)
    * ----------------------------------------------------------------*/
