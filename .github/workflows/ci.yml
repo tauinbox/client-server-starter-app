@@ -274,9 +274,7 @@ jobs:
         timeout-minutes: 5
         run: npx playwright install chromium
 
-      - name: Build client
-        run: npm run build
-
+      # `pretest:e2e` builds the client, so the suite never runs against a stale bundle.
       - run: npm run test:e2e
 
       - uses: actions/upload-artifact@v7

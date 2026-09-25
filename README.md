@@ -1631,8 +1631,8 @@ npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix (TS + SCSS)
 npm test                   # Unit tests (Vitest)
 npm run check:imports      # Repo-wide cycle + barrel check (same script in all workspaces)
-npm run test:e2e           # E2E tests (Playwright, uses mock-server)
-npm run test:e2e:ui        # E2E tests (interactive UI)
+npm run test:e2e           # E2E tests (builds, then Playwright against dist/ with mock-server)
+npm run test:e2e:ui        # E2E tests (builds, then interactive UI)
 npm run release            # Bump versions, generate CHANGELOG.md, create git tag
 ```
 
