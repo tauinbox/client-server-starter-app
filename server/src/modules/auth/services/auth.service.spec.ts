@@ -1767,6 +1767,15 @@ describe('AuthService', () => {
         expect.objectContaining({ errorKey: ErrorKeys.AUTH.USER_NOT_FOUND })
       );
       expect(mockUsersService.findById).toHaveBeenCalledWith('user-1');
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        actorId: 'user-1',
+        details: { reason: 'user_not_found' }
+      });
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+        'token_refresh_failure'
+      );
     });
 
     it('should revoke token and throw when user is deactivated', async () => {
@@ -1776,10 +1785,26 @@ describe('AuthService', () => {
 
       await expect(
         service.refreshTokens('valid-refresh-token')
-      ).rejects.toThrow(HttpException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.UNAUTHORIZED,
+        response: {
+          message: 'User account is deactivated',
+          errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
+        }
+      });
 
       expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
         'token-1'
+      );
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        actorId: inactiveUser.id,
+        actorEmail: inactiveUser.email,
+        details: { reason: 'user_deactivated' }
+      });
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+        'token_refresh_failure'
       );
     });
 

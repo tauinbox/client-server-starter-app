@@ -21,7 +21,11 @@ import { RoleService } from './role.service';
 import { SessionIssuerService } from './session-issuer.service';
 import { TokenGeneratorService } from './token-generator.service';
 import { MailService } from '../../mail/mail.service';
-import { AuditService, AuditContext } from '../../audit/audit.service';
+import {
+  AuditService,
+  AuditContext,
+  AuditLogParams
+} from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { MfaService } from './mfa.service';
@@ -54,6 +58,7 @@ import {
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
+import { readJwtMinIat } from '../jwt-module-options.factory';
 
 type ConfirmEmailChangeOutcome =
   | {
@@ -93,6 +98,11 @@ function isEmailExistsConflict(error: unknown): boolean {
     response.errorKey === ErrorKeys.USERS.EMAIL_EXISTS
   );
 }
+
+const INVALID_REFRESH_TOKEN_BODY = {
+  message: 'Invalid refresh token',
+  errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+};
 
 const ENUMERATION_SAFE_INITIATE_RESPONSE = {
   message:
@@ -588,19 +598,9 @@ export class AuthService {
         )
       ) {
         await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
-        this.auditService.logFireAndForget({
-          action: AuditAction.TOKEN_REFRESH_FAILURE,
-          actorId: tokenDoc.userId,
-          details: { reason: 'predecessor_replay_in_grace' }
+        throw this.refreshRefusal('predecessor_replay_in_grace', {
+          actorId: tokenDoc.userId
         });
-        this.metricsService.recordAuthEvent('token_refresh_failure');
-        throw new HttpException(
-          {
-            message: 'Invalid refresh token',
-            errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-          },
-          HttpStatus.UNAUTHORIZED
-        );
       }
 
       await this.revokeAllUserSessions(tokenDoc.userId);
@@ -613,27 +613,13 @@ export class AuthService {
       });
       this.metricsService.recordAuthEvent('token_reuse_detected');
       throw new HttpException(
-        {
-          message: 'Invalid refresh token',
-          errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-        },
+        INVALID_REFRESH_TOKEN_BODY,
         HttpStatus.UNAUTHORIZED
       );
     }
 
     if (!tokenDoc || tokenDoc.revoked || tokenDoc.isExpired()) {
-      this.auditService.logFireAndForget({
-        action: AuditAction.TOKEN_REFRESH_FAILURE,
-        details: { reason: 'invalid_or_expired_token' }
-      });
-      this.metricsService.recordAuthEvent('token_refresh_failure');
-      throw new HttpException(
-        {
-          message: 'Invalid refresh token',
-          errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-        },
-        HttpStatus.UNAUTHORIZED
-      );
+      throw this.refreshRefusal('invalid_or_expired_token', {});
     }
 
     // Absolute session timeout (OWASP ASVS 5.0 V7). Rotation restarts the
@@ -648,75 +634,53 @@ export class AuthService {
       Date.now() - tokenDoc.sessionStartedAt.getTime() >= absoluteMaxMs
     ) {
       await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
-      this.auditService.logFireAndForget({
-        action: AuditAction.TOKEN_REFRESH_FAILURE,
-        actorId: tokenDoc.userId,
-        details: { reason: 'session_absolute_lifetime_exceeded' }
-      });
-      this.metricsService.recordAuthEvent('token_refresh_failure');
-      throw new HttpException(
+      throw this.refreshRefusal(
+        'session_absolute_lifetime_exceeded',
+        { actorId: tokenDoc.userId },
         {
           message:
             'Session has reached its maximum duration. Please log in again.',
           errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
-        },
-        HttpStatus.UNAUTHORIZED
+        }
       );
     }
 
-    const rawMinIat = this.configService.get<number>('JWT_MIN_IAT');
-    if (rawMinIat !== undefined) {
-      const minIat = Number(rawMinIat);
-      if (tokenDoc.createdAt.getTime() / 1000 < minIat) {
-        // Deleted, not revoked: a revoked unexpired row is what the reuse
-        // detector reads as theft, so a replay would purge every session.
-        await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
-        this.auditService.logFireAndForget({
-          action: AuditAction.TOKEN_REFRESH_FAILURE,
-          actorId: tokenDoc.userId,
-          details: { reason: 'session_invalidated_by_rotation' }
-        });
-        this.metricsService.recordAuthEvent('token_refresh_failure');
-        throw new HttpException(
-          {
-            message:
-              'Session invalidated due to key rotation. Please log in again.',
-            errorKey: ErrorKeys.AUTH.SESSION_INVALIDATED
-          },
-          HttpStatus.UNAUTHORIZED
-        );
-      }
+    const minIat = readJwtMinIat(this.configService);
+    if (minIat !== undefined && tokenDoc.createdAt.getTime() / 1000 < minIat) {
+      // Deleted, not revoked: a revoked unexpired row is what the reuse
+      // detector reads as theft, so a replay would purge every session.
+      await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
+      throw this.refreshRefusal(
+        'session_invalidated_by_rotation',
+        { actorId: tokenDoc.userId },
+        {
+          message:
+            'Session invalidated due to key rotation. Please log in again.',
+          errorKey: ErrorKeys.AUTH.SESSION_INVALIDATED
+        }
+      );
     }
 
     // Not `findOne`: its 404 would replace the 401 below, and a soft-deleted
     // account whose session is not yet revoked arrives here.
     const user = await this.usersService.findById(tokenDoc.userId);
     if (!user) {
-      this.auditService.logFireAndForget({
-        action: AuditAction.TOKEN_REFRESH_FAILURE,
-        actorId: tokenDoc.userId,
-        details: { reason: 'user_not_found' }
-      });
-      throw new HttpException(
-        { message: 'User not found', errorKey: ErrorKeys.AUTH.USER_NOT_FOUND },
-        HttpStatus.UNAUTHORIZED
+      throw this.refreshRefusal(
+        'user_not_found',
+        { actorId: tokenDoc.userId },
+        { message: 'User not found', errorKey: ErrorKeys.AUTH.USER_NOT_FOUND }
       );
     }
 
     if (!user.isActive) {
       await this.refreshTokenService.revokeToken(tokenDoc.id);
-      this.auditService.logFireAndForget({
-        action: AuditAction.TOKEN_REFRESH_FAILURE,
-        actorId: user.id,
-        actorEmail: user.email,
-        details: { reason: 'user_deactivated' }
-      });
-      throw new HttpException(
+      throw this.refreshRefusal(
+        'user_deactivated',
+        { actorId: user.id, actorEmail: user.email },
         {
           message: 'User account is deactivated',
           errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
-        },
-        HttpStatus.UNAUTHORIZED
+        }
       );
     }
 
@@ -750,20 +714,10 @@ export class AuthService {
       );
 
       if (revoked.affected === 0) {
-        this.auditService.logFireAndForget({
-          action: AuditAction.TOKEN_REFRESH_FAILURE,
+        throw this.refreshRefusal('concurrent_rotation', {
           actorId: user.id,
-          actorEmail: user.email,
-          details: { reason: 'concurrent_rotation' }
+          actorEmail: user.email
         });
-        this.metricsService.recordAuthEvent('token_refresh_failure');
-        throw new HttpException(
-          {
-            message: 'Invalid refresh token',
-            errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-          },
-          HttpStatus.UNAUTHORIZED
-        );
       }
 
       await manager.save(RefreshToken, {
@@ -1311,6 +1265,25 @@ export class AuthService {
         .getRepository(User)
         .update(userId, { tokenRevokedAt: new Date() })
     ]);
+  }
+
+  /**
+   * Every refused refresh goes through here, so no branch can write its audit
+   * row and skip the metric. Reuse detection is not one of them: it records
+   * `token_reuse_detected` instead.
+   */
+  private refreshRefusal(
+    reason: string,
+    actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>,
+    body: { message: string; errorKey: string } = INVALID_REFRESH_TOKEN_BODY
+  ): HttpException {
+    this.auditService.logFireAndForget({
+      action: AuditAction.TOKEN_REFRESH_FAILURE,
+      ...actor,
+      details: { reason }
+    });
+    this.metricsService.recordAuthEvent('token_refresh_failure');
+    return new HttpException(body, HttpStatus.UNAUTHORIZED);
   }
 
   private invalidCredentials(

@@ -6,12 +6,11 @@ import { DataSource } from 'typeorm';
 import { CustomJwtPayload, PayloadFromJwt } from '../types/jwt-payload';
 import { User } from '../../users/entities/user.entity';
 import { RefreshTokenService } from '../services/refresh-token.service';
+import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
 import {
-  ErrorKeys,
-  JWT_AUDIENCE,
-  JWT_ISSUER,
-  TOKEN_PURPOSE
-} from '@app/shared/constants';
+  buildJwtVerification,
+  readJwtMinIat
+} from '../jwt-module-options.factory';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -22,26 +21,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private dataSource: DataSource,
     private readonly refreshTokenService: RefreshTokenService
   ) {
-    const algorithm = configService.get<string>('JWT_ALGORITHM') ?? 'HS256';
-    const secretOrKey =
-      algorithm === 'RS256'
-        ? Buffer.from(
-            configService.getOrThrow<string>('JWT_PUBLIC_KEY'),
-            'base64'
-          ).toString('utf-8')
-        : configService.getOrThrow<string>('JWT_SECRET');
-
+    const { algorithm, key, issuer, audience } =
+      buildJwtVerification(configService);
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey,
-      algorithms: [algorithm as 'HS256' | 'RS256'],
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE
+      secretOrKey: key,
+      algorithms: [algorithm],
+      issuer,
+      audience
     });
 
-    const rawMinIat = this.configService.get<number>('JWT_MIN_IAT');
-    this.minIat = rawMinIat !== undefined ? Number(rawMinIat) : undefined;
+    this.minIat = readJwtMinIat(this.configService);
   }
 
   async validate(payload: CustomJwtPayload): Promise<PayloadFromJwt> {
