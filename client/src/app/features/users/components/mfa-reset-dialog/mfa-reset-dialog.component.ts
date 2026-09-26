@@ -7,7 +7,6 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { form, required } from '@angular/forms/signals';
 import { MatButton } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -24,18 +23,14 @@ import { PasswordToggleComponent } from '@shared/components/password-toggle/pass
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { NotifyService } from '@core/services/notify.service';
 import { UsersStore } from '../../store/users.store';
-import type { MfaResetRequest } from '../../services/user.service';
+import type { StepUpFactor } from '../../../auth/utils/step-up-factor-form';
+import { createStepUpFactorForm } from '../../../auth/utils/step-up-factor-form';
 import type { User } from '../../models/user.types';
-
-/**
- * The factor the CALLER proves itself with. `none` is an account with neither
- * a password nor an authenticator, which the route refuses.
- */
-export type MfaResetStepUpFactor = 'password' | 'code' | 'none';
 
 export type MfaResetDialogData = {
   user: User;
-  factor: MfaResetStepUpFactor;
+  /** The factor the CALLER proves itself with. The route refuses `none`. */
+  factor: StepUpFactor;
 };
 
 @Component({
@@ -63,32 +58,21 @@ export class MfaResetDialogComponent {
   readonly #destroyRef = inject(DestroyRef);
   protected readonly data = inject<MfaResetDialogData>(MAT_DIALOG_DATA);
 
-  readonly passwordModel = signal({ currentPassword: '' });
-  readonly passwordForm = form(this.passwordModel, (path) => {
-    required(path.currentPassword, {
-      message: 'users.edit.currentPasswordRequired'
-    });
+  readonly #stepUp = createStepUpFactorForm(signal(this.data.factor), {
+    passwordRequired: 'users.edit.currentPasswordRequired',
+    codeRequired: 'users.edit.stepUpCodeRequired'
   });
-
-  readonly codeModel = signal({ code: '' });
-  readonly codeForm = form(this.codeModel, (path) => {
-    required(path.code, { message: 'users.edit.stepUpCodeRequired' });
-  });
+  readonly passwordModel = this.#stepUp.passwordModel;
+  readonly passwordForm = this.#stepUp.passwordForm;
+  readonly codeModel = this.#stepUp.codeModel;
+  readonly codeForm = this.#stepUp.codeForm;
 
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
-  protected readonly canSubmit = computed(() => {
-    if (this.isLoading()) return false;
-    switch (this.data.factor) {
-      case 'password':
-        return this.passwordForm().valid();
-      case 'code':
-        return this.codeForm().valid();
-      default:
-        return false;
-    }
-  });
+  protected readonly canSubmit = computed(
+    () => !this.isLoading() && !this.#stepUp.invalid()
+  );
 
   submit(): void {
     if (!this.canSubmit()) return;
@@ -97,7 +81,7 @@ export class MfaResetDialogComponent {
     this.errorMessage.set(null);
 
     this.#usersStore
-      .resetMfa(this.data.user.id, this.#request())
+      .resetMfa(this.data.user.id, this.#stepUp.request())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (user) => {
@@ -119,11 +103,5 @@ export class MfaResetDialogComponent {
 
   cancel(): void {
     this.#dialogRef.close();
-  }
-
-  #request(): MfaResetRequest {
-    return this.data.factor === 'code'
-      ? { code: this.codeModel().code.trim() }
-      : { currentPassword: this.passwordModel().currentPassword };
   }
 }

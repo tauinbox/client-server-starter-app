@@ -43,6 +43,10 @@ import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserRoleService } from '../../services/user-role.service';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '../../../auth/store/auth.store';
+import {
+  createStepUpFactorForm,
+  stepUpFactorOf
+} from '../../../auth/utils/step-up-factor-form';
 import type { UpdateUser, User } from '../../models/user.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
@@ -69,13 +73,6 @@ type UserFormData = {
   lastName: string;
   password: string;
 };
-
-/**
- * The factor the CALLER proves itself with before a password or email change.
- * `none` is an account with neither a password nor an authenticator: the
- * provider proof never reaches the users route, so it cannot change them here.
- */
-type StepUpFactor = 'password' | 'code' | 'none';
 
 const INITIAL_USER_FORM: UserFormData = {
   email: '',
@@ -177,36 +174,23 @@ export class UserEditComponent implements OnInit, OnDestroy {
     );
   });
 
-  protected readonly stepUpFactor = computed<StepUpFactor>(() => {
-    const actor = this.#authStore.user();
-    if (actor?.hasPassword !== false) return 'password';
-    return actor.mfaEnabled ? 'code' : 'none';
-  });
+  /**
+   * The factor the CALLER proves itself with before a password or email
+   * change. The provider proof never reaches the users route, so an account
+   * with factor `none` cannot change them here.
+   */
+  protected readonly stepUpFactor = computed(() =>
+    stepUpFactorOf(this.#authStore.user())
+  );
 
-  readonly stepUpPasswordModel = signal<{ currentPassword: string }>({
-    currentPassword: ''
+  readonly #stepUp = createStepUpFactorForm(this.stepUpFactor, {
+    passwordRequired: 'users.edit.currentPasswordRequired',
+    codeRequired: 'users.edit.stepUpCodeRequired'
   });
-  readonly stepUpPasswordForm = form(this.stepUpPasswordModel, (path) => {
-    required(path.currentPassword, {
-      message: 'users.edit.currentPasswordRequired'
-    });
-  });
-
-  readonly stepUpCodeModel = signal<{ code: string }>({ code: '' });
-  readonly stepUpCodeForm = form(this.stepUpCodeModel, (path) => {
-    required(path.code, { message: 'users.edit.stepUpCodeRequired' });
-  });
-
-  readonly #stepUpReady = computed(() => {
-    switch (this.stepUpFactor()) {
-      case 'password':
-        return this.stepUpPasswordForm().valid();
-      case 'code':
-        return this.stepUpCodeForm().valid();
-      default:
-        return false;
-    }
-  });
+  readonly stepUpPasswordModel = this.#stepUp.passwordModel;
+  readonly stepUpPasswordForm = this.#stepUp.passwordForm;
+  readonly stepUpCodeModel = this.#stepUp.codeModel;
+  readonly stepUpCodeForm = this.#stepUp.codeForm;
 
   protected readonly rolesChanged = computed(() => {
     const initial = this.#initialRoleIds();
@@ -224,7 +208,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
     return (
       state.valid() &&
       !this.saving() &&
-      (!this.credentialChanged() || this.#stepUpReady()) &&
+      (!this.credentialChanged() || !this.#stepUp.invalid()) &&
       (this.formChanged() || this.rolesChanged() || this.isActiveChanged())
     );
   });
@@ -440,7 +424,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
           this.userModel.update((m) => ({ ...m, password: '' }));
           this.#initialFormData.set({ ...this.userModel() });
           this.userForm().reset();
-          this.#resetStepUp();
+          this.#stepUp.reset();
 
           this.#notify.success('users.edit.successUpdated');
           void this.#router.navigate([
@@ -469,22 +453,9 @@ export class UserEditComponent implements OnInit, OnDestroy {
       updateData.isActive = this.isActive();
     }
 
-    if (this.credentialChanged()) {
-      if (this.stepUpFactor() === 'code') {
-        updateData.code = this.stepUpCodeModel().code.trim();
-      } else {
-        updateData.currentPassword = this.stepUpPasswordModel().currentPassword;
-      }
-    }
-
-    return updateData;
-  }
-
-  #resetStepUp(): void {
-    this.stepUpPasswordModel.set({ currentPassword: '' });
-    this.stepUpCodeModel.set({ code: '' });
-    this.stepUpPasswordForm().reset();
-    this.stepUpCodeForm().reset();
+    return this.credentialChanged()
+      ? { ...updateData, ...this.#stepUp.request() }
+      : updateData;
   }
 
   #handleUpdateError(err: HttpErrorResponse): void {
