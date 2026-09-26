@@ -20,13 +20,28 @@
         </div>
       } @else if (u) {
         <form (submit)="$event.preventDefault(); onSubmit()">
-          <nxs-form-field
-            [field]="userForm.email"
-            label="users.edit.email"
-            type="email"
-            prefixIcon="email"
-            autocomplete="off"
-          />
+          @if (canChangeCredentials()) {
+            <nxs-form-field
+              [field]="userForm.email"
+              label="users.edit.email"
+              type="email"
+              prefixIcon="email"
+              autocomplete="off"
+            />
+          } @else {
+            <div class="own-email" data-testid="credentials-on-profile">
+              <mat-icon class="own-email-icon" aria-hidden="true"
+                >email</mat-icon
+              >
+              <div class="own-email-text">
+                <span class="own-email-label">{{ t('users.edit.email') }}</span>
+                <span class="own-email-value">{{ u.email }}</span>
+                <a class="own-email-link" routerLink="/profile">{{
+                  t('users.edit.credentialsOnProfileLink')
+                }}</a>
+              </div>
+            </div>
+          }
 
           <div class="form-name-row">
             <nxs-form-field
@@ -54,13 +69,6 @@
             >
               <nxs-password-toggle formFieldSuffix #pwdToggle />
             </nxs-form-field>
-          } @else {
-            <p class="step-up-note" data-testid="credentials-on-profile">
-              {{ t('users.edit.credentialsOnProfile') }}
-              <a routerLink="/profile">{{
-                t('users.edit.credentialsOnProfileLink')
-              }}</a>
-            </p>
           }
 
           @if (credentialChanged()) {

@@ -26,7 +26,6 @@ import {
   form,
   maxLength,
   minLength,
-  readonly,
   required
 } from '@angular/forms/signals';
 import {
@@ -153,7 +152,6 @@ export class UserEditComponent implements OnInit, OnDestroy {
     maxLength(path.password, MAX_PASSWORD_LENGTH, {
       message: 'users.edit.passwordMaxLength'
     });
-    readonly(path.email, () => !this.canChangeCredentials());
   });
 
   protected readonly formChanged = computed(() => {
