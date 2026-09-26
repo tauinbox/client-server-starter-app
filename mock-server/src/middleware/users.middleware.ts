@@ -27,6 +27,7 @@ import {
   getResolvedPermissionsForUser,
   getState,
   logAudit,
+  revokeUserSessions,
   toAdminUserResponse
 } from '../state';
 import {
@@ -47,7 +48,7 @@ import {
   stepUpError
 } from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
-import type { AuthenticatedRequest, MockUser } from '../types';
+import type { AuthenticatedRequest } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
 import {
   requireUuid,
@@ -65,24 +66,6 @@ function pushUserCrudEvent(action: UserCrudAction, userId: string): void {
       findUserById(connectedUserId)?.roles?.includes('admin') === true,
     { type: 'user_crud_events', action, userId }
   );
-}
-
-// Mirrors the server's session-revocation listener: the stamp alone kills
-// access tokens only, and dropping the refresh rows alone leaves issued access
-// tokens valid until they expire, so both legs are required.
-function revokeUserSessions(user: MockUser): void {
-  user.tokenRevokedAt = new Date().toISOString();
-  const sessionState = getState();
-  for (const [token, uid] of sessionState.refreshTokens.entries()) {
-    if (uid === user.id) {
-      sessionState.refreshTokens.delete(token);
-    }
-  }
-  for (const [token, uid] of sessionState.revokedRefreshTokens.entries()) {
-    if (uid === user.id) {
-      sessionState.revokedRefreshTokens.delete(token);
-    }
-  }
 }
 
 // Mirrors the real server's UserFiltersQueryDto: an array-valued query param
@@ -484,7 +467,7 @@ router.patch(
         clearMailedProofs(user);
         // The address is moved to recover an account; the previous holder must
         // not keep authenticating with the tokens issued before the move.
-        revokeUserSessions(user);
+        revokeUserSessions(user.id);
       }
       user.email = email;
     }
@@ -494,14 +477,14 @@ router.patch(
     if (password !== undefined) {
       user.password = password;
       // Invalidate target user's sessions so attacker cannot keep access after admin password reset
-      revokeUserSessions(user);
+      revokeUserSessions(user.id);
       clearMailedProofs(user);
     }
     if (isActive !== undefined) {
       // Keyed on the submitted value and not on a transition, because the
       // server writes both effects whenever the request carries `false`.
       if (isActive === false) {
-        revokeUserSessions(user);
+        revokeUserSessions(user.id);
         // Void every mailed link so none confirms against a disabled row or
         // revives on reactivation, the same reason the soft delete clears them.
         clearMailedProofs(user);
@@ -573,7 +556,6 @@ router.delete(
   requireUuid('id'),
   (req, res) => {
     const id = req.params['id'] as string;
-    const state = getState();
     const targetUser = findUserById(id);
     if (!targetUser) {
       res.status(404).json({
@@ -596,17 +578,8 @@ router.delete(
     // revives on restore.
     clearMailedProofs(targetUser);
 
-    // Revoke all refresh tokens for this user (active + revoked)
-    for (const [token, userId] of state.refreshTokens.entries()) {
-      if (userId === id) {
-        state.refreshTokens.delete(token);
-      }
-    }
-    for (const [token, userId] of state.revokedRefreshTokens.entries()) {
-      if (userId === id) {
-        state.revokedRefreshTokens.delete(token);
-      }
-    }
+    // End every session, as the server's revocation listener does on delete.
+    revokeUserSessions(targetUser.id);
 
     // Stop any renewals/charges on the deleted user's subscriptions.
     cancelSubscriptionsForDeletedUser(id);
@@ -748,7 +721,7 @@ router.post(
     user.totpRecoveryCodes = null;
     user.totpLastUsedStep = null;
     user.updatedAt = new Date().toISOString();
-    revokeUserSessions(user);
+    revokeUserSessions(user.id);
 
     logAudit('MFA_RESET_BY_ADMIN', {
       actorId: actor.id,
@@ -797,7 +770,7 @@ router.post(
       return;
     }
 
-    revokeUserSessions(user);
+    revokeUserSessions(user.id);
 
     logAudit('SESSION_REVOKE', {
       actorId: actor.id,

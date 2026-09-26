@@ -101,6 +101,23 @@ describe('a role change ends the sessions (UserRoleChangedListener)', () => {
   });
 });
 
+describe('a user delete ends the sessions (SessionRevocationListener)', () => {
+  it('stamps tokenRevokedAt and refuses the refresh token', async () => {
+    const userId = findUserByEmail(USER_EMAIL)!.id;
+    const admin = await signIn(ADMIN_EMAIL);
+    const user = await signIn(USER_EMAIL);
+
+    const res = await fetch(`${baseUrl}/api/v1/users/${userId}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${admin.accessToken}` }
+    });
+    expect(res.status).toBe(200);
+
+    expect(getState().users.get(userId)!.tokenRevokedAt).not.toBeNull();
+    expect((await refresh(user)).status).toBe(401);
+  });
+});
+
 describe('the revocation stamp is compared at whole seconds (JwtStrategy)', () => {
   it('accepts a token issued later in the second the revocation landed in', async () => {
     const user = await signIn(USER_EMAIL);

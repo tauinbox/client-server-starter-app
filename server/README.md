@@ -1065,8 +1065,9 @@ There is no `isAdmin` flag.
 `sid` and the refresh row stores it as `session_id`. Rotation revokes one row and inserts the next
 under the **same** session id, so a refresh in one tab does not strand the access token another tab
 of the same device holds. `AuthService.logoutSession` deletes every row of one session, which is what
-`POST /auth/logout` calls. `AuthService.logout` deletes every row of the account and stamps
-`tokenRevokedAt`; it belongs to the password change and to the other account-wide paths.
+`POST /auth/logout` calls. `AuthService.revokeAllUserSessions` deletes every row of the account and
+stamps `tokenRevokedAt`; it belongs to the password change and to the other account-wide paths. It is
+the only owner of that pair: the session-revocation and role-change listeners call it.
 `AuthService.endPresentedSession` deletes the session of the refresh cookie that a sign-in request
 carries, whatever account owns it, because the browser replaces that cookie. `POST /auth/login` and
 the second-factor routes call it before the new session is issued, so the session limit does not

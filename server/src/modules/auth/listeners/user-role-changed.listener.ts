@@ -1,17 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { DataSource } from 'typeorm';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
-import { RefreshTokenService } from '../services/refresh-token.service';
+import { AuthService } from '../services/auth.service';
 import { PermissionService } from '../services/permission.service';
-import { User } from '../../users/entities/user.entity';
 
 @Injectable()
 export class UserRoleChangedListener {
   constructor(
-    private readonly refreshTokenService: RefreshTokenService,
-    private readonly permissionService: PermissionService,
-    private readonly dataSource: DataSource
+    private readonly authService: AuthService,
+    private readonly permissionService: PermissionService
   ) {}
 
   // suppressErrors: false is what makes the awaited emit in the controller
@@ -21,10 +18,7 @@ export class UserRoleChangedListener {
   @OnEvent(UserRoleChangedEvent.name, { suppressErrors: false })
   async handleUserRoleChanged(event: UserRoleChangedEvent): Promise<void> {
     await Promise.all([
-      this.refreshTokenService.deleteByUserId(event.userId),
-      this.dataSource
-        .getRepository(User)
-        .update(event.userId, { tokenRevokedAt: new Date() }),
+      this.authService.revokeAllUserSessions(event.userId),
       this.permissionService.invalidateUserCache(event.userId)
     ]);
   }

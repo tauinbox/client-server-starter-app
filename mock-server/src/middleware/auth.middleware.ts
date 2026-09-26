@@ -39,6 +39,7 @@ import {
   isMfaMandatoryFor,
   logAudit,
   registerSession,
+  revokeUserSessions,
   sessionAgeMs,
   toUserResponse
 } from '../state';
@@ -546,7 +547,6 @@ router.post('/reset-password', (req, res) => {
 
   // Update password
   user.password = password;
-  user.tokenRevokedAt = new Date().toISOString();
   user.updatedAt = new Date().toISOString();
 
   // Proving mailbox ownership outranks the failed-guess counter: without this
@@ -570,17 +570,8 @@ router.post('/reset-password', (req, res) => {
   // Clear the reset token
   state.passwordResetTokens.delete(token);
 
-  // Invalidate all refresh tokens for this user (active + revoked)
-  for (const [rt, uid] of state.refreshTokens.entries()) {
-    if (uid === user.id) {
-      state.refreshTokens.delete(rt);
-    }
-  }
-  for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
-    if (uid === user.id) {
-      state.revokedRefreshTokens.delete(rt);
-    }
-  }
+  // A new credential ends every session the old one issued.
+  revokeUserSessions(user.id);
 
   logAudit('PASSWORD_RESET_COMPLETE', {
     actorId: user.id,
@@ -596,18 +587,6 @@ router.post('/reset-password', (req, res) => {
 
   res.json({ message: 'Password has been reset successfully' });
 });
-
-function revokeAllUserSessions(userId: string): void {
-  const state = getState();
-  for (const [rt, uid] of state.refreshTokens.entries()) {
-    if (uid === userId) state.refreshTokens.delete(rt);
-  }
-  for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
-    if (uid === userId) state.revokedRefreshTokens.delete(rt);
-  }
-  const user = findUserById(userId);
-  if (user) user.tokenRevokedAt = new Date().toISOString();
-}
 
 // POST /api/v1/auth/refresh-token
 router.post('/refresh-token', (req, res) => {
@@ -655,7 +634,7 @@ router.post('/refresh-token', (req, res) => {
       targetType: 'User',
       ip: req.ip
     });
-    revokeAllUserSessions(reusedUserId);
+    revokeUserSessions(reusedUserId);
     res.status(401).json({
       message: 'Invalid refresh token',
       statusCode: 401,
@@ -908,7 +887,6 @@ router.patch(
     if (locale !== undefined) user.locale = locale as string;
     if (password !== undefined) {
       user.password = password;
-      user.tokenRevokedAt = new Date().toISOString();
       clearMailedProofs(user);
 
       logAudit('PASSWORD_CHANGE', {
@@ -924,18 +902,8 @@ router.patch(
         `[PASSWORD CHANGED] To: ${user.email}\n  Source: profile page | IP: ${req.ip}`
       );
 
-      // Invalidate all refresh tokens on password change (matches real server)
-      const state = getState();
-      for (const [rt, uid] of state.refreshTokens.entries()) {
-        if (uid === user.id) {
-          state.refreshTokens.delete(rt);
-        }
-      }
-      for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
-        if (uid === user.id) {
-          state.revokedRefreshTokens.delete(rt);
-        }
-      }
+      // End every session on password change (matches real server).
+      revokeUserSessions(user.id);
       clearRefreshTokenCookie(res);
       clearOAuthIntentCookies(res);
       // Cleared only now, so a rejected attempt keeps its remaining proof window.
@@ -1162,17 +1130,11 @@ router.post('/profile/email/confirm', (req, res) => {
   user.isEmailVerified = true;
   // A reset link mailed to the old address dies with the move.
   clearMailedProofs(user);
-  user.tokenRevokedAt = new Date().toISOString();
   user.updatedAt = new Date().toISOString();
   state.pendingEmailTokens.delete(token);
 
-  // Invalidate all refresh tokens — the JWT email claim is stale.
-  for (const [rt, uid] of state.refreshTokens.entries()) {
-    if (uid === user.id) state.refreshTokens.delete(rt);
-  }
-  for (const [rt, uid] of state.revokedRefreshTokens.entries()) {
-    if (uid === user.id) state.revokedRefreshTokens.delete(rt);
-  }
+  // End every session: the JWT email claim is stale.
+  revokeUserSessions(user.id);
 
   logAudit('USER_EMAIL_CHANGE_COMPLETE', {
     actorId: user.id,

@@ -7,6 +7,7 @@ import {
   rekeyUserSessions,
   registerSession,
   resetState,
+  revokeUserSessions,
   toInvoiceResponse,
   toSubscriptionResponse,
   toUsageResponse,
@@ -510,13 +511,7 @@ router.post('/revoke-user-sessions', (req, res) => {
   if (Array.isArray(newRoles)) {
     user.roles = newRoles;
   }
-  for (const [token, uid] of state.refreshTokens.entries()) {
-    if (uid === userId) state.refreshTokens.delete(token);
-  }
-  for (const [token, uid] of state.revokedRefreshTokens.entries()) {
-    if (uid === userId) state.revokedRefreshTokens.delete(token);
-  }
-  user.tokenRevokedAt = new Date().toISOString();
+  revokeUserSessions(userId);
   pushToUser(userId, { type: 'permissions_updated', userId });
   res.json({ message: `sessions revoked for user ${userId}` });
 });

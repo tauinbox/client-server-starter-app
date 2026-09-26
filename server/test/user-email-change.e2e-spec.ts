@@ -306,7 +306,19 @@ describe('Admin email change - session revocation through the real event bus', (
       controllers: [UsersController],
       providers: [
         // Stubbed: the step-up has its own suite, user-credential-step-up.
-        { provide: AuthService, useValue: { assertStepUp: jest.fn() } },
+        // The revocation runs the real method body against this suite's
+        // doubles, so the whole chain stays under test.
+        {
+          provide: AuthService,
+          useValue: {
+            assertStepUp: jest.fn(),
+            revokeAllUserSessions: (userId: string) =>
+              AuthService.prototype.revokeAllUserSessions.call(
+                { refreshTokenService, dataSource },
+                userId
+              )
+          }
+        },
         { provide: MfaService, useValue: {} },
         {
           provide: BreachedPasswordService,

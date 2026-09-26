@@ -124,7 +124,7 @@ describe('AuthController', () => {
     register: jest.Mock;
     login: jest.Mock;
     refreshTokens: jest.Mock;
-    logout: jest.Mock;
+    revokeAllUserSessions: jest.Mock;
     logoutSession: jest.Mock;
     endPresentedSession: jest.Mock;
     verifyEmail: jest.Mock;
@@ -186,7 +186,7 @@ describe('AuthController', () => {
       register: jest.fn().mockResolvedValue({ id: 'user-1' }),
       login: jest.fn().mockResolvedValue(mockAuthResult),
       refreshTokens: jest.fn().mockResolvedValue(mockAuthResult),
-      logout: jest.fn().mockResolvedValue(undefined),
+      revokeAllUserSessions: jest.fn().mockResolvedValue(undefined),
       logoutSession: jest.fn().mockResolvedValue(true),
       endPresentedSession: jest.fn().mockResolvedValue(undefined),
       verifyEmail: jest.fn().mockResolvedValue({ message: 'verified' }),
@@ -564,7 +564,7 @@ describe('AuthController', () => {
       );
       // The account-wide teardown belongs to the password change. Calling it
       // here evicts every other device the plan pays for.
-      expect(authServiceMock.logout).not.toHaveBeenCalled();
+      expect(authServiceMock.revokeAllUserSessions).not.toHaveBeenCalled();
       expect(res.clearCookie).toHaveBeenCalledWith('__Host-refresh_token', {
         secure: true,
         path: '/'
@@ -605,7 +605,7 @@ describe('AuthController', () => {
         'user-1',
         undefined
       );
-      expect(authServiceMock.logout).not.toHaveBeenCalled();
+      expect(authServiceMock.revokeAllUserSessions).not.toHaveBeenCalled();
       expect(res.clearCookie).toHaveBeenCalledWith('__Host-refresh_token', {
         secure: true,
         path: '/'
@@ -714,7 +714,7 @@ describe('AuthController', () => {
         SYSTEM_ABILITY
       );
       expect(authServiceMock.assertStepUpForUser).not.toHaveBeenCalled();
-      expect(authServiceMock.logout).not.toHaveBeenCalled();
+      expect(authServiceMock.revokeAllUserSessions).not.toHaveBeenCalled();
       expect(res.clearCookie).not.toHaveBeenCalled();
       expect(auditServiceMock.log).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'user-1', email: 'admin@example.com' });
@@ -737,7 +737,9 @@ describe('AuthController', () => {
         STEP_UP_OPERATION.PASSWORD_SET,
         stepUpAuditContext
       );
-      expect(authServiceMock.logout).toHaveBeenCalledWith('user-1');
+      expect(authServiceMock.revokeAllUserSessions).toHaveBeenCalledWith(
+        'user-1'
+      );
       expect(res.clearCookie).toHaveBeenCalledWith('__Host-refresh_token', {
         secure: true,
         path: '/'
@@ -841,7 +843,7 @@ describe('AuthController', () => {
       ).rejects.toBe(httpErr);
 
       expect(userServiceMock.update).not.toHaveBeenCalled();
-      expect(authServiceMock.logout).not.toHaveBeenCalled();
+      expect(authServiceMock.revokeAllUserSessions).not.toHaveBeenCalled();
     });
 
     it('hands the re-authentication proof cookie to the step-up', async () => {
