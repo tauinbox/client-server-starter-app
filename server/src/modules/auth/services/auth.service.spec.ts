@@ -1391,21 +1391,6 @@ describe('AuthService', () => {
     });
   });
 
-  describe('logout', () => {
-    it('should delete all refresh tokens and set tokenRevokedAt', async () => {
-      await service.logout('user-1');
-
-      expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
-        'user-1'
-      );
-      expect(mockUserRepository.update).toHaveBeenCalledWith(
-        'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
-      );
-    });
-  });
-
   describe('logoutSession', () => {
     const sessionRow = {
       id: 'token-1',

@@ -1249,15 +1249,6 @@ export class AuthService {
   }
 
   /**
-   * Ends every session of the account. This is the password-change teardown,
-   * not the sign-out button: a new credential has to invalidate what the old
-   * one issued, everywhere.
-   */
-  async logout(userId: string): Promise<void> {
-    await this.invalidateAllSessions(userId);
-  }
-
-  /**
    * Ends the one session the presented refresh token belongs to. A device that
    * signs out must not evict the other devices the plan pays for, so this
    * writes no `tokenRevokedAt`: the access token of this device dies with its
@@ -1301,8 +1292,21 @@ export class AuthService {
     await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
   }
 
+  /**
+   * Ends every session of the account. This is the teardown for a new
+   * credential, a changed role or a detected token reuse, not the sign-out
+   * button. Both legs are required: the refresh flow never reads
+   * `tokenRevokedAt`, so the stamp alone kills access tokens only, and
+   * deleting the refresh rows alone leaves issued access tokens valid until
+   * they expire.
+   */
   async revokeAllUserSessions(userId: string): Promise<void> {
-    await this.invalidateAllSessions(userId);
+    await Promise.all([
+      this.refreshTokenService.deleteByUserId(userId),
+      this.dataSource
+        .getRepository(User)
+        .update(userId, { tokenRevokedAt: new Date() })
+    ]);
   }
 
   private invalidCredentials(
@@ -1351,14 +1355,5 @@ export class AuthService {
       },
       HttpStatus.LOCKED
     );
-  }
-
-  private async invalidateAllSessions(userId: string): Promise<void> {
-    await Promise.all([
-      this.refreshTokenService.deleteByUserId(userId),
-      this.dataSource
-        .getRepository(User)
-        .update(userId, { tokenRevokedAt: new Date() })
-    ]);
   }
 }

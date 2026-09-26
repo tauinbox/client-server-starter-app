@@ -351,11 +351,11 @@ export class AuthController {
     );
 
     if (updateProfileDto.password) {
-      await this.authService.logout(req.user.userId);
+      await this.authService.revokeAllUserSessions(req.user.userId);
       this.clearRefreshTokenCookie(res);
       this.clearOAuthLinkCookie(res);
       // Cleared only now, so a rejected attempt keeps its remaining proof
-      // window. The logout above already ends the session that carried it.
+      // window. The revocation above already ends the session that carried it.
       this.clearReauthProofCookie(res);
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,

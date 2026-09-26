@@ -356,7 +356,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
 
   it('PATCH /auth/profile with a new password clears the prefixed cookies with Secure', async () => {
     jest.spyOn(authService, 'assertStepUpForUser').mockResolvedValue();
-    jest.spyOn(authService, 'logout').mockResolvedValue();
+    jest.spyOn(authService, 'revokeAllUserSessions').mockResolvedValue();
 
     const res = await request(server)
       .patch('/api/v1/auth/profile')
