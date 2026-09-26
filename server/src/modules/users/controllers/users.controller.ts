@@ -65,6 +65,7 @@ import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { Throttle } from '@nestjs/throttler';
 import { MfaService } from '../../auth/services/mfa.service';
 import { MfaStepUpDto } from '../../auth/dtos/mfa.dto';
+import { maskEmail } from '../../../common/utils/escape-html';
 
 @ApiTags('Users API')
 @Controller({
@@ -298,6 +299,22 @@ export class UsersController {
       if (changes.email !== undefined) {
         previousEmail = target.email;
       }
+      // The profile flows own these for the caller: the address change waits
+      // for a link from the new mailbox and alerts the old one, and neither
+      // happens here. Compared with the stored address because the editor
+      // resubmits it on every save.
+      if (
+        id === req.user.userId &&
+        (changes.password !== undefined || changes.email !== target.email)
+      ) {
+        throw new HttpException(
+          {
+            message: 'Change your own email and password on your profile page',
+            errorKey: ErrorKeys.USERS.CREDENTIAL_SELF
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
       if (changes.password !== undefined || changes.email !== target.email) {
         await this.assertCredentialStepUp(
           req,
@@ -359,7 +376,7 @@ export class UsersController {
     // address the account moved to would otherwise be unrecoverable. This is
     // the administrator counterpart of the self-service confirm row, and
     // `source` is what separates the two.
-    if (emailChanged) {
+    if (previousEmail !== undefined && emailChanged) {
       await this.auditService.log({
         action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
         actorId: req.user.userId,
@@ -373,6 +390,21 @@ export class UsersController {
         },
         context: extractAuditContext(req)
       });
+
+      // Masked: the case this route exists for is an old mailbox that an
+      // attacker holds, and it must not learn the recovered address.
+      this.mailService
+        .sendEmailChangeCompletedNotification(
+          previousEmail,
+          maskEmail(updatedUser.email),
+          updatedUser.locale
+        )
+        .catch((err) =>
+          this.logger.error(
+            'Failed to send email-change notification to the old address',
+            err
+          )
+        );
     }
 
     // An admin email change exists to recover an account whose address is

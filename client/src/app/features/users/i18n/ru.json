@@ -75,6 +75,8 @@
     "stepUpCodeRequired": "Введите код из приложения-аутентификатора",
     "stepUpCodeNote": "Для смены email или пароля нужен код из вашего приложения-аутентификатора.",
     "stepUpUnavailable": "Чтобы сменить email или пароль, сначала задайте пароль или включите двухфакторную аутентификацию в профиле.",
+    "credentialsOnProfile": "Свои email и пароль вы меняете в профиле.",
+    "credentialsOnProfileLink": "Открыть профиль",
     "mfaEnabled": "2FA включена",
     "revokeSessions": "Завершить все сеансы",
     "confirmRevokeSessionsTitle": "Завершить все сеансы",

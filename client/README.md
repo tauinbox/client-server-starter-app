@@ -447,6 +447,10 @@ and `delete` on a `User` whose `roles` hold one with `isSuper`. It mirrors the s
 disabled for such an actor, and `UserEditComponent` sends a direct visit back to the detail page with
 a notice. A type-level check such as `{ action: 'update', subject: 'User' }` is not affected.
 
+On the editor's own record, `UserEditComponent` hides the moderation controls and makes the email
+read-only, hides the new-password field and links to `/profile`. The server refuses those fields
+there (`errors.users.moderationSelf`, `errors.users.credentialSelf`).
+
 Each RBAC check must use `hasPermissions`. Never compare a role name with the `'admin'` literal. For
 a rare display-only label, use `SYSTEM_ROLES.ADMIN` from `@app/shared/constants`.
 

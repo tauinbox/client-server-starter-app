@@ -75,6 +75,8 @@
     "stepUpCodeRequired": "Enter the code from your authenticator app",
     "stepUpCodeNote": "Changing the email or the password needs a code from your own authenticator app.",
     "stepUpUnavailable": "To change the email or the password, first set a password or turn on two-factor authentication on your profile.",
+    "credentialsOnProfile": "You change your own email and password on your profile.",
+    "credentialsOnProfileLink": "Open the profile",
     "mfaEnabled": "Two-factor on",
     "revokeSessions": "Sign out everywhere",
     "confirmRevokeSessionsTitle": "Sign out everywhere",

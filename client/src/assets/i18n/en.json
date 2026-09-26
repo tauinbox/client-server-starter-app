@@ -136,7 +136,8 @@
       "superTargetForbidden": "Only a super administrator can change or delete a super administrator account",
       "mfaResetSelf": "Turn off your own two-factor authentication from your profile",
       "sessionRevokeSelf": "End your own sessions from your profile",
-      "moderationSelf": "You cannot deactivate or unlock your own account. Ask another administrator."
+      "moderationSelf": "You cannot deactivate or unlock your own account. Ask another administrator.",
+      "credentialSelf": "Change your own email and password on your profile page"
     },
     "roles": {
       "notFound": "Role not found",

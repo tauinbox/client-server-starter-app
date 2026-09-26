@@ -71,9 +71,9 @@ test.describe('User Edit page', () => {
     ).toBeHidden();
   });
 
-  // The server refuses isActive and unlockAccount on the caller's own record,
-  // so the form must neither offer nor send them there.
-  test('saves an own-record edit without the moderation controls', async ({
+  // The server refuses isActive, unlockAccount, a password and a changed email
+  // on the caller's own record, so the form must neither offer nor send them.
+  test('saves an own-record edit without the moderation and credential controls', async ({
     _mockServer,
     page
   }) => {
@@ -83,6 +83,11 @@ test.describe('User Edit page', () => {
 
     await expect(page.getByLabel('First Name')).toHaveValue('John');
     await expect(page.getByLabel('Active')).toBeHidden();
+    await expect(page.getByLabel('Email')).not.toBeEditable();
+    await expect(page.getByLabel('New Password')).toBeHidden();
+    await expect(
+      page.getByRole('link', { name: 'Open the profile' })
+    ).toHaveAttribute('href', '/profile');
 
     await page.getByLabel('First Name').fill('Renamed');
     await page.getByLabel('First Name').blur();

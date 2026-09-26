@@ -67,7 +67,10 @@ describe('UsersController', () => {
     getPermissionsForUser: jest.Mock;
   };
   let caslAbilityFactoryMock: { createForUser: jest.Mock };
-  let mailServiceMock: { sendPasswordChangedNotification: jest.Mock };
+  let mailServiceMock: {
+    sendPasswordChangedNotification: jest.Mock;
+    sendEmailChangeCompletedNotification: jest.Mock;
+  };
   let authServiceMock: { assertStepUp: jest.Mock };
   let mfaServiceMock: { resetByAdmin: jest.Mock };
 
@@ -106,7 +109,10 @@ describe('UsersController', () => {
     caslAbilityFactoryMock = { createForUser: jest.fn() };
 
     mailServiceMock = {
-      sendPasswordChangedNotification: jest.fn().mockResolvedValue(undefined)
+      sendPasswordChangedNotification: jest.fn().mockResolvedValue(undefined),
+      sendEmailChangeCompletedNotification: jest
+        .fn()
+        .mockResolvedValue(undefined)
     };
 
     authServiceMock = { assertStepUp: jest.fn().mockResolvedValue(undefined) };
@@ -872,6 +878,82 @@ describe('UsersController', () => {
       );
     });
 
+    it('should mail the old address the masked new one when the admin changes the email', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'old@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'recovered@example.com',
+        locale: 'ru'
+      });
+
+      await controller.update(
+        'user-5',
+        { email: 'recovered@example.com' },
+        mockJwtRequest() as JwtAuthRequest,
+        mockAbility
+      );
+
+      expect(
+        mailServiceMock.sendEmailChangeCompletedNotification
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mailServiceMock.sendEmailChangeCompletedNotification
+      ).toHaveBeenCalledWith('old@example.com', 'r***d@example.com', 'ru');
+    });
+
+    it('should complete the admin email change when the old-address mail fails', async () => {
+      const loggerError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+      mailServiceMock.sendEmailChangeCompletedNotification.mockRejectedValueOnce(
+        new Error('smtp down')
+      );
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'old@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'new@example.com'
+      });
+
+      const result = await controller.update(
+        'user-5',
+        { email: 'new@example.com' },
+        mockJwtRequest() as JwtAuthRequest,
+        mockAbility
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(result).toBeDefined();
+      expect(loggerError).toHaveBeenCalled();
+    });
+
+    it('should NOT mail the old address when the submitted email is unchanged', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+
+      await controller.update(
+        'user-5',
+        { email: 'same@example.com', firstName: 'Updated' },
+        mockJwtRequest() as JwtAuthRequest,
+        mockAbility
+      );
+
+      expect(
+        mailServiceMock.sendEmailChangeCompletedNotification
+      ).not.toHaveBeenCalled();
+    });
+
     it('should NOT log USER_EMAIL_CHANGE_COMPLETE when the submitted email is unchanged', async () => {
       const dto: UpdateUserDto = {
         email: 'same@example.com',
@@ -908,6 +990,61 @@ describe('UsersController', () => {
           action: AuditAction.USER_EMAIL_CHANGE_COMPLETE
         })
       );
+    });
+
+    describe('credentials of the own record', () => {
+      it.each<[string, UpdateUserDto]>([
+        ['a password', { password: 'NewPassword1', currentPassword: 'Pw1' }],
+        ['a changed email', { email: 'moved@example.com' }],
+        [
+          'a changed email beside a name',
+          { email: 'moved@example.com', firstName: 'Renamed' }
+        ]
+      ])('refuses %s before the step-up and the write', async (_label, dto) => {
+        usersServiceMock.findOne.mockResolvedValue({
+          id: 'user-5',
+          email: 'self@example.com'
+        });
+        const req = mockJwtRequest('user-5') as JwtAuthRequest;
+
+        const err: unknown = await controller
+          .update('user-5', dto, req, mockAbility)
+          .catch((e: unknown) => e);
+
+        const httpErr = err as {
+          getStatus(): number;
+          getResponse(): { errorKey?: string };
+        };
+        expect(httpErr.getStatus()).toBe(400);
+        expect(httpErr.getResponse().errorKey).toBe(
+          ErrorKeys.USERS.CREDENTIAL_SELF
+        );
+        expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+        expect(usersServiceMock.update).not.toHaveBeenCalled();
+        expect(auditServiceMock.log).not.toHaveBeenCalled();
+      });
+
+      it('accepts a resubmitted address beside a name change', async () => {
+        usersServiceMock.findOne.mockResolvedValue({
+          id: 'user-5',
+          email: 'self@example.com'
+        });
+        usersServiceMock.update.mockResolvedValue({
+          id: 'user-5',
+          email: 'self@example.com'
+        });
+        const req = mockJwtRequest('user-5') as JwtAuthRequest;
+
+        await controller.update(
+          'user-5',
+          { email: 'self@example.com', firstName: 'Renamed' },
+          req,
+          mockAbility
+        );
+
+        expect(usersServiceMock.update).toHaveBeenCalled();
+        expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+      });
     });
 
     describe('moderation of the own record', () => {

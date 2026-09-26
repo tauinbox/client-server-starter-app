@@ -23,14 +23,15 @@ import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { MailService } from '../src/modules/mail/mail.service';
+import { maskEmail } from '../src/common/utils/escape-html';
 import { withPrivateThrottlerStorage } from './private-throttler';
 import { eventually } from './eventually';
 
-// The seeded `user` role may update its own record, so a bare access token
-// reached the password and the address of the account. The whole pipeline is
-// real: the ownership grant, the global guards, the step-up and the write.
-// CI runs the migrations and not the seeders, so the suite grants the same
-// ownership condition through a role of its own instead of relying on it.
+// A credential change of another account proves the factor of the CALLER; on
+// the own record the profile flows own it, so the route refuses it outright.
+// CI runs the migrations and not the seeders, so the suite grants the seeded
+// ownership condition, and an unconditional one, through roles of its own.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
@@ -40,6 +41,8 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   let usersService: UsersService;
   const stamp = Date.now();
   const selfEditRoleName = `step-up-self-edit-${stamp}`;
+  const adminEditRoleName = `step-up-admin-edit-${stamp}`;
+  const adminEmail = `step-up-admin-${stamp}@example.com`;
   const ownerEmail = `step-up-owner-${stamp}@example.com`;
   const otherEmail = `step-up-other-${stamp}@example.com`;
   const movedEmail = `step-up-moved-${stamp}@example.com`;
@@ -71,7 +74,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
-    for (const email of [ownerEmail, otherEmail]) {
+    for (const email of [adminEmail, ownerEmail, otherEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
         .send({ email, password, firstName: 'Step', lastName: 'Up' })
@@ -94,15 +97,21 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     for (const email of [ownerEmail, otherEmail]) {
       await roleService.assignRoleToUser(await userId(email), selfEdit.id);
     }
+    const adminEdit = await roleService.create({ name: adminEditRoleName });
+    await roleService.setPermissionsForRole(adminEdit.id, [
+      { permissionId: updateUser.id }
+    ]);
+    await roleService.assignRoleToUser(await userId(adminEmail), adminEdit.id);
   }, 60000);
 
   afterAll(async () => {
     await dataSource
       ?.getRepository(Role)
-      .delete({ name: In([selfEditRoleName]) });
+      .delete({ name: In([selfEditRoleName, adminEditRoleName]) });
     await dataSource
       ?.getRepository(User)
       .delete([
+        { email: adminEmail },
         { email: ownerEmail },
         { email: otherEmail },
         { email: movedEmail }
@@ -146,9 +155,15 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       .send(body);
   }
 
-  it('refuses a password change on the own record without a factor', async () => {
-    const id = await userId(ownerEmail);
-    const token = await tokenFor(ownerEmail);
+  function stepUpFailures(actorEmail: string): Promise<number> {
+    return dataSource.getRepository(AuditLog).count({
+      where: { action: AuditAction.STEP_UP_FAILURE, actorEmail }
+    });
+  }
+
+  it('refuses a password change on another record without the factor of the caller', async () => {
+    const id = await userId(otherEmail);
+    const token = await tokenFor(adminEmail);
 
     const refused = await patch(token, id, { password: newPassword });
     expect(refused.status).toBe(400);
@@ -159,7 +174,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
 
     const audit = await eventually(() =>
       dataSource.getRepository(AuditLog).findOne({
-        where: { action: AuditAction.STEP_UP_FAILURE, actorEmail: ownerEmail },
+        where: { action: AuditAction.STEP_UP_FAILURE, actorEmail: adminEmail },
         order: { createdAt: 'DESC' }
       })
     );
@@ -170,8 +185,8 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   }, 30000);
 
   it('refuses a wrong current password', async () => {
-    const id = await userId(ownerEmail);
-    const token = await tokenFor(ownerEmail);
+    const id = await userId(otherEmail);
+    const token = await tokenFor(adminEmail);
 
     const refused = await patch(token, id, {
       password: newPassword,
@@ -183,9 +198,9 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     );
   }, 30000);
 
-  it('refuses an email change on the own record without a factor', async () => {
-    const id = await userId(ownerEmail);
-    const token = await tokenFor(ownerEmail);
+  it('refuses an email change on another record without a factor', async () => {
+    const id = await userId(otherEmail);
+    const token = await tokenFor(adminEmail);
 
     const before = await dataSource
       .getRepository(User)
@@ -197,8 +212,36 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const row = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id } });
-    expect(row.email).toBe(ownerEmail);
+    expect(row.email).toBe(otherEmail);
     expect(row.emailVerificationToken).toBe(before.emailVerificationToken);
+  }, 30000);
+
+  it('refuses the credentials of the own record before it reads a factor', async () => {
+    const id = await userId(ownerEmail);
+    const token = await tokenFor(ownerEmail);
+    const failuresBefore = await stepUpFailures(ownerEmail);
+
+    // One body carries the factor: each refused one spends the long-window
+    // budget that the last case of the suite still needs.
+    for (const body of [
+      { password: newPassword, currentPassword: password },
+      { email: movedEmail },
+      { email: movedEmail, firstName: 'Moved' }
+    ]) {
+      const refused = await patch(token, id, body);
+      expect(refused.status).toBe(400);
+      expect((refused.body as { errorKey?: string }).errorKey).toBe(
+        ErrorKeys.USERS.CREDENTIAL_SELF
+      );
+    }
+
+    const row = await dataSource
+      .getRepository(User)
+      .findOneOrFail({ where: { id } });
+    expect(row.email).toBe(ownerEmail);
+    expect(row.firstName).not.toBe('Moved');
+    expect(await holdsPassword(id, password)).toBe(true);
+    expect(await stepUpFailures(ownerEmail)).toBe(failuresBefore);
   }, 30000);
 
   it('keeps a non-credential edit and a resubmitted address free of a factor', async () => {
@@ -215,9 +258,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
 
   it('answers 403 for another record before it reads a factor', async () => {
     const token = await tokenFor(ownerEmail);
-    const before = await dataSource.getRepository(AuditLog).count({
-      where: { action: AuditAction.STEP_UP_FAILURE, actorEmail: ownerEmail }
-    });
+    const before = await stepUpFailures(ownerEmail);
 
     const res = await patch(token, await userId(otherEmail), {
       password: newPassword,
@@ -225,16 +266,16 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     });
     expect(res.status).toBe(403);
 
-    const after = await dataSource.getRepository(AuditLog).count({
-      where: { action: AuditAction.STEP_UP_FAILURE, actorEmail: ownerEmail }
-    });
-    expect(after).toBe(before);
+    expect(await stepUpFailures(ownerEmail)).toBe(before);
   }, 30000);
 
-  it('accepts the credential changes with the current password', async () => {
-    const id = await userId(ownerEmail);
+  it('accepts the credential changes with the current password of the caller', async () => {
+    const id = await userId(otherEmail);
+    const oldAddressMail = jest
+      .spyOn(app.get(MailService), 'sendEmailChangeCompletedNotification')
+      .mockResolvedValue(undefined);
 
-    const moved = await patch(await tokenFor(ownerEmail), id, {
+    const moved = await patch(await tokenFor(adminEmail), id, {
       email: movedEmail,
       currentPassword: password
     });
@@ -246,8 +287,15 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       order: { createdAt: 'DESC' }
     });
     expect(update?.details).toEqual({ changedFields: ['email'] });
+    // The old mailbox hears of the move, and not where the account went.
+    expect(oldAddressMail).toHaveBeenCalledTimes(1);
+    expect(oldAddressMail).toHaveBeenCalledWith(
+      otherEmail,
+      maskEmail(movedEmail),
+      expect.any(String)
+    );
 
-    await patch(await tokenFor(movedEmail), id, {
+    await patch(await tokenFor(adminEmail), id, {
       password: newPassword,
       currentPassword: password
     }).expect(200);
