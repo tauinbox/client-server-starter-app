@@ -1,12 +1,8 @@
 import {
-  MAX_NEW_PASSWORD_LENGTH,
+  MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
-import {
-  exceedsPasswordByteLimit,
-  passwordByteLimitMessage
-} from '@app/shared/utils/password-bytes';
 import { normalizeEmail } from '@app/shared/utils/email';
 import isEmail from 'validator/lib/isEmail';
 
@@ -86,10 +82,7 @@ export function validateMinLength(
 export function passwordLengthError(value: unknown): string | null {
   return (
     validateMinLength(value, MIN_PASSWORD_LENGTH, 'password') ??
-    validateMaxLength(value, MAX_NEW_PASSWORD_LENGTH, 'password') ??
-    (exceedsPasswordByteLimit(value)
-      ? passwordByteLimitMessage('password')
-      : null)
+    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password')
   );
 }
 

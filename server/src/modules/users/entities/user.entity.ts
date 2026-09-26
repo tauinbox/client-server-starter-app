@@ -31,6 +31,11 @@ export class User {
   @Exclude()
   password: string | null;
 
+  /** A `PasswordHashVersion`: how `password` was computed. */
+  @Column({ name: 'password_hash_version', type: 'smallint', default: 1 })
+  @Exclude()
+  passwordHashVersion: number;
+
   @Column({ default: true })
   isActive: boolean;
 

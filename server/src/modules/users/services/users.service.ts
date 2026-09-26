@@ -4,8 +4,8 @@ import { Brackets, DataSource, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
-import * as bcrypt from 'bcrypt';
-import { BCRYPT_SALT_ROUNDS, ErrorKeys } from '@app/shared/constants';
+import { hashPassword } from '../../../common/utils/password-hash';
+import { ErrorKeys } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
@@ -71,11 +71,12 @@ export class UsersService {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+    const { hash, version } = await hashPassword(password);
 
     const user = this.userRepository.create({
       ...createUserDto,
-      password: hashedPassword
+      password: hash,
+      passwordHashVersion: version
     });
 
     try {
@@ -298,7 +299,9 @@ export class UsersService {
         firstName: rest.firstName ?? user.firstName,
         lastName: rest.lastName ?? user.lastName
       });
-      changes.password = await bcrypt.hash(rest.password, BCRYPT_SALT_ROUNDS);
+      const { hash, version } = await hashPassword(rest.password);
+      changes.password = hash;
+      changes.passwordHashVersion = version;
       // A password change voids every mailed proof of ownership, the same rule
       // resetPassword states: a link kept from before the change must not still
       // take the account, and neither must an email change in flight.
@@ -427,6 +430,22 @@ export class UsersService {
       failedLoginAttempts: raw.failed_login_attempts,
       lockedUntil: raw.locked_until ? new Date(raw.locked_until) : null
     };
+  }
+
+  /**
+   * Moves a legacy row to the current hash format. Keyed on the old hash, so a
+   * password change that lands in between keeps its own value.
+   */
+  async upgradePasswordHash(
+    user: Pick<User, 'id' | 'password'>,
+    password: string
+  ): Promise<void> {
+    if (user.password === null) return;
+    const { hash, version } = await hashPassword(password);
+    await this.userRepository.update(
+      { id: user.id, password: user.password },
+      { password: hash, passwordHashVersion: version }
+    );
   }
 
   async resetLoginAttempts(userId: string): Promise<void> {

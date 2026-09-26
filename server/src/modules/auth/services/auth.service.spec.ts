@@ -6,6 +6,10 @@ import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
+import {
+  PasswordHashVersion,
+  prehashPassword
+} from '../../../common/utils/password-hash';
 import { AuthService } from './auth.service';
 import { User } from '../../users/entities/user.entity';
 import { UsersService } from '../../users/services/users.service';
@@ -64,6 +68,7 @@ describe('AuthService', () => {
     create: jest.Mock;
     incrementFailedAttemptsAndLockIfNeeded: jest.Mock;
     resetLoginAttempts: jest.Mock;
+    upgradePasswordHash: jest.Mock;
     setEmailVerificationToken: jest.Mock;
     findByEmailVerificationToken: jest.Mock;
     markEmailVerified: jest.Mock;
@@ -138,6 +143,7 @@ describe('AuthService', () => {
     firstName: 'John',
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
+    passwordHashVersion: 2,
     hasPassword: true,
     mfaEnabled: false,
     isActive: true,
@@ -203,6 +209,7 @@ describe('AuthService', () => {
         lockedUntil: null
       }),
       resetLoginAttempts: jest.fn().mockResolvedValue(undefined),
+      upgradePasswordHash: jest.fn().mockResolvedValue(undefined),
       setEmailVerificationToken: jest.fn().mockResolvedValue(undefined),
       findByEmailVerificationToken: jest.fn(),
       markEmailVerified: jest.fn().mockResolvedValue(undefined),
@@ -360,6 +367,53 @@ describe('AuthService', () => {
   });
 
   describe('validateUser', () => {
+    it('compares the pre-hash for a current row and leaves it as it is', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      const compare = jest
+        .spyOn(bcrypt, 'compare')
+        .mockResolvedValue(true as never);
+
+      await service.validateUser('test@example.com', 'Password1');
+
+      expect(compare).toHaveBeenCalledWith(
+        prehashPassword('Password1'),
+        mockUser.password
+      );
+      expect(mockUsersService.upgradePasswordHash).not.toHaveBeenCalled();
+    });
+
+    it('upgrades a legacy row after a correct password', async () => {
+      const legacyUser = {
+        ...mockUser,
+        passwordHashVersion: PasswordHashVersion.LEGACY
+      };
+      mockUsersService.findByEmail.mockResolvedValue(legacyUser);
+      const compare = jest
+        .spyOn(bcrypt, 'compare')
+        .mockResolvedValue(true as never);
+
+      await service.validateUser('test@example.com', 'Password1');
+
+      expect(compare).toHaveBeenCalledWith('Password1', mockUser.password);
+      expect(mockUsersService.upgradePasswordHash).toHaveBeenCalledWith(
+        legacyUser,
+        'Password1'
+      );
+    });
+
+    it('does not upgrade a legacy row after a wrong password', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        passwordHashVersion: PasswordHashVersion.LEGACY
+      });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      await expect(
+        service.validateUser('test@example.com', 'wrong')
+      ).rejects.toThrow(HttpException);
+      expect(mockUsersService.upgradePasswordHash).not.toHaveBeenCalled();
+    });
+
     it('should return the User entity when credentials are valid', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
@@ -1864,6 +1918,27 @@ describe('AuthService', () => {
   });
 
   describe('assertStepUpForUser', () => {
+    it('upgrades a legacy row after a correct current password', async () => {
+      const legacyUser = {
+        ...mockUser,
+        passwordHashVersion: PasswordHashVersion.LEGACY
+      };
+      mockUsersService.findOne.mockResolvedValue(legacyUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await service.assertStepUpForUser(
+        mockUser.id,
+        'CurrentPass1',
+        undefined,
+        STEP_UP_OPERATION.PASSWORD_SET
+      );
+
+      expect(mockUsersService.upgradePasswordHash).toHaveBeenCalledWith(
+        legacyUser,
+        'CurrentPass1'
+      );
+    });
+
     it('should resolve when bcrypt.compare succeeds', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);

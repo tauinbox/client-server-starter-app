@@ -28,6 +28,12 @@ import { BreachedPasswordService } from '../breached-password/breached-password.
 import { MfaService } from './mfa.service';
 import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { hashToken } from '../../../common/utils/hash-token';
+import {
+  hashPassword,
+  PasswordHashVersion,
+  prehashPassword,
+  verifyPassword
+} from '../../../common/utils/password-hash';
 import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
 import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -158,8 +164,10 @@ export class AuthService {
   // Dummy hash for constant-time rejection (prevents timing attacks).
   // Derived from BCRYPT_SALT_ROUNDS so its cost can never drift from real
   // password hashes - a cost mismatch would reopen the timing oracle.
+  // Pre-hashed like a current row, so an unusable address pays the same
+  // HMAC and bcrypt as a real one.
   private static readonly DUMMY_HASH = bcrypt.hashSync(
-    'dummy-password-for-timing-equalization',
+    prehashPassword('dummy-password-for-timing-equalization'),
     BCRYPT_SALT_ROUNDS
   );
 
@@ -168,7 +176,11 @@ export class AuthService {
 
     // The dummy comparison keeps an unusable address as slow as a wrong password.
     if (!user || !user.isActive || !user.password) {
-      await bcrypt.compare(password, AuthService.DUMMY_HASH);
+      await verifyPassword(
+        password,
+        AuthService.DUMMY_HASH,
+        PasswordHashVersion.PREHASHED
+      );
       throw this.invalidCredentials(email, null);
     }
 
@@ -200,7 +212,12 @@ export class AuthService {
       });
     }
 
-    if (!(await bcrypt.compare(password, user.password))) {
+    const verdict = await verifyPassword(
+      password,
+      user.password,
+      user.passwordHashVersion
+    );
+    if (!verdict.valid) {
       if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
         throw this.lockedLogin(email, user.id, lockedUntil, {
           reason: 'account_locked_after_max_attempts',
@@ -213,6 +230,10 @@ export class AuthService {
     // Before the verification check: five correct passwords must not lock an
     // unverified account.
     await this.usersService.resetLoginAttempts(user.id);
+
+    if (verdict.upgrade) {
+      await this.usersService.upgradePasswordHash(user, password);
+    }
 
     // Check email verification
     if (!user.isEmailVerified) {
@@ -254,10 +275,8 @@ export class AuthService {
     );
 
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
-    const hashedPassword = await bcrypt.hash(
-      registerDto.password,
-      BCRYPT_SALT_ROUNDS
-    );
+    const { hash: hashedPassword, version: passwordHashVersion } =
+      await hashPassword(registerDto.password);
     const { rawToken, hashedToken, expiresAt } = issueEmailVerificationToken();
 
     // Create user and set verification token atomically so a partial failure
@@ -282,6 +301,7 @@ export class AuthService {
           newUser = await manager.save(User, {
             ...registerDto,
             password: hashedPassword,
+            passwordHashVersion,
             emailVerificationToken: hashedToken,
             emailVerificationExpiresAt: expiresAt
           });
@@ -477,7 +497,8 @@ export class AuthService {
     await this.breachedPasswordService.assertNotBreached(newPassword, user);
 
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
-    const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+    const { hash: hashedPassword, version: passwordHashVersion } =
+      await hashPassword(newPassword);
 
     // Update password, clear reset token, and invalidate all sessions atomically.
     // Without a transaction, a failure between steps could leave the account in an
@@ -492,6 +513,7 @@ export class AuthService {
         { id: user.id, passwordResetToken: hashedToken },
         {
           password: hashedPassword,
+          passwordHashVersion,
           passwordResetToken: null,
           passwordResetExpiresAt: null,
           // Reset also cancels any in-flight self-service email change — proof
@@ -1113,13 +1135,21 @@ export class AuthService {
       throw this.stepUpPasswordLockedException(remainingMs);
     }
 
-    if (!(await bcrypt.compare(currentPassword, user.password))) {
+    const verdict = await verifyPassword(
+      currentPassword,
+      user.password,
+      user.passwordHashVersion
+    );
+    if (!verdict.valid) {
       return count >= MAX_FAILED_ATTEMPTS
         ? { factor: 'password', lockedMs: remainingMs }
         : { factor: 'password' };
     }
 
     await this.stepUpPasswordFailures.clear(user.id);
+    if (verdict.upgrade) {
+      await this.usersService.upgradePasswordHash(user, currentPassword);
+    }
     return { factor: null };
   }
 

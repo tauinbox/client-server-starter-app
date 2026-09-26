@@ -60,38 +60,37 @@ describe('RegisterComponent', () => {
       expect(component.registerForm().valid()).toBe(false);
     });
 
-    it('rejects a 37-character Cyrillic password on the bcrypt byte cap', async () => {
-      // 37 characters and 73 bytes: below every character cap, above the
-      // 72 bytes bcrypt reads.
+    it('accepts 64 Cyrillic characters, which are 128 bytes', async () => {
       component.registerModel.set({
         email: 'user@example.com',
         firstName: 'Test',
         lastName: 'User',
-        password: 'Пароль1' + 'я'.repeat(30)
-      });
-      await fixture.whenStable();
-
-      const errors = component.registerForm.password().errors();
-      expect(errors.some((e) => e.kind === 'maxLength')).toBe(false);
-      expect(
-        errors.some(
-          (e) =>
-            e.kind === 'passwordMaxBytes' &&
-            e.message === 'auth.register.passwordMaxBytes'
-        )
-      ).toBe(true);
-    });
-
-    it('accepts a 72-character ASCII password', async () => {
-      component.registerModel.set({
-        email: 'user@example.com',
-        firstName: 'Test',
-        lastName: 'User',
-        password: 'A1' + 'a'.repeat(70)
+        password: 'Пароль1' + 'я'.repeat(57)
       });
       await fixture.whenStable();
 
       expect(component.registerForm.password().errors()).toEqual([]);
+    });
+
+    it('rejects 129 characters on the length cap', async () => {
+      component.registerModel.set({
+        email: 'user@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        password: 'A1' + 'a'.repeat(127)
+      });
+      await fixture.whenStable();
+
+      expect(
+        component.registerForm
+          .password()
+          .errors()
+          .some(
+            (e) =>
+              e.kind === 'maxLength' &&
+              e.message === 'auth.register.passwordMaxLength'
+          )
+      ).toBe(true);
     });
 
     it('should require email', () => {

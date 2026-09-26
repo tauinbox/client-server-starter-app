@@ -1,6 +1,6 @@
 import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
+import { verifyPassword } from '../src/common/utils/password-hash';
 import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -191,8 +191,14 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
       .addSelect('u.password')
       .where('u.id = :id', { id: user.id })
       .getOneOrFail();
-    expect(await bcrypt.compare(ownerPassword, after.password ?? '')).toBe(
-      true
-    );
+    expect(
+      (
+        await verifyPassword(
+          ownerPassword,
+          after.password ?? '',
+          after.passwordHashVersion
+        )
+      ).valid
+    ).toBe(true);
   }, 60000);
 });

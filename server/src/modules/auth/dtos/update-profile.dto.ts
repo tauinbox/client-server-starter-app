@@ -8,12 +8,10 @@ import {
   ValidateIf
 } from 'class-validator';
 import {
-  MAX_NEW_PASSWORD_LENGTH,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
-import { IsWithinPasswordByteLimit } from '../../../common/validators/password-byte-limit.validator';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class UpdateProfileDto {
@@ -43,8 +41,7 @@ export class UpdateProfileDto {
   })
   @ValidateIf(propertyIsDefined)
   @MinLength(MIN_PASSWORD_LENGTH)
-  @MaxLength(MAX_NEW_PASSWORD_LENGTH)
-  @IsWithinPasswordByteLimit()
+  @MaxLength(MAX_PASSWORD_LENGTH)
   password?: string;
 
   @ApiPropertyOptional({

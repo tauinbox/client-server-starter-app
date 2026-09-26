@@ -2,6 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import {
+  PasswordHashVersion,
+  prehashPassword
+} from '../../../common/utils/password-hash';
 import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS, ErrorKeys } from '@app/shared/constants';
 import { UsersService } from './users.service';
@@ -51,6 +55,7 @@ describe('UsersService', () => {
     firstName: 'John',
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
+    passwordHashVersion: 2,
     hasPassword: true,
     mfaEnabled: false,
     isActive: true,
@@ -156,10 +161,14 @@ describe('UsersService', () => {
           { pendingEmail: 'new@example.com' }
         ]
       });
-      expect(bcrypt.hash).toHaveBeenCalledWith('Password1', BCRYPT_SALT_ROUNDS);
+      expect(bcrypt.hash).toHaveBeenCalledWith(
+        prehashPassword('Password1'),
+        BCRYPT_SALT_ROUNDS
+      );
       expect(mockRepository.create).toHaveBeenCalledWith({
         ...createUserDto,
-        password: 'hashed'
+        password: 'hashed',
+        passwordHashVersion: PasswordHashVersion.PREHASHED
       });
       expect(mockRepository.save).toHaveBeenCalledWith(mockUser);
       expect(result).toEqual(mockUser);
@@ -189,7 +198,7 @@ describe('UsersService', () => {
       await service.create({ ...createUserDto, password: 'kettlesunrise' });
 
       expect(bcrypt.hash).toHaveBeenCalledWith(
-        'kettlesunrise',
+        prehashPassword('kettlesunrise'),
         BCRYPT_SALT_ROUNDS
       );
     });
@@ -451,12 +460,15 @@ describe('UsersService', () => {
       await service.update('user-1', updateDto, SYSTEM_ABILITY);
 
       expect(bcrypt.hash).toHaveBeenCalledWith(
-        'NewPassword1',
+        prehashPassword('NewPassword1'),
         BCRYPT_SALT_ROUNDS
       );
       expect(mockRepository.merge).toHaveBeenCalledWith(
         mockUser,
-        expect.objectContaining({ password: 'new-hashed' })
+        expect.objectContaining({
+          password: 'new-hashed',
+          passwordHashVersion: PasswordHashVersion.PREHASHED
+        })
       );
     });
 
@@ -1179,6 +1191,38 @@ describe('UsersService', () => {
         failedLoginAttempts: 0,
         lockedUntil: null
       });
+    });
+  });
+
+  describe('upgradePasswordHash', () => {
+    it('rewrites the row keyed on the old hash', async () => {
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
+
+      await service.upgradePasswordHash(
+        { id: 'user-1', password: 'legacy-hash' },
+        'Password1'
+      );
+
+      expect(bcrypt.hash).toHaveBeenCalledWith(
+        prehashPassword('Password1'),
+        BCRYPT_SALT_ROUNDS
+      );
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: 'user-1', password: 'legacy-hash' },
+        {
+          password: 'new-hashed',
+          passwordHashVersion: PasswordHashVersion.PREHASHED
+        }
+      );
+    });
+
+    it('does nothing for an account without a password', async () => {
+      await service.upgradePasswordHash(
+        { id: 'user-1', password: null },
+        'Password1'
+      );
+
+      expect(mockRepository.update).not.toHaveBeenCalled();
     });
   });
 

@@ -1,13 +1,8 @@
 import * as dotenv from 'dotenv';
-import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
-import {
-  BCRYPT_SALT_ROUNDS,
-  MAX_NEW_PASSWORD_BYTES
-} from '@app/shared/constants';
-import { exceedsPasswordByteLimit } from '@app/shared/utils/password-bytes';
 import { localPasswordRefusal } from '@app/shared/utils/password-policy';
 import { postgresConfig } from './postgres.config';
+import { hashPassword } from './common/utils/password-hash';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { User } from './modules/users/entities/user.entity';
 import { Role } from './modules/auth/entities/role.entity';
@@ -92,22 +87,11 @@ export async function seedAdmin(): Promise<void> {
       );
     }
 
-    // The set-password routes reject an over-long value; this one only warns,
-    // for the same reason the breach check above only warns. A truncated admin
-    // password is a problem to fix at leisure. Refusing to boot over it is an
-    // outage.
-    if (exceedsPasswordByteLimit(password)) {
-      console.warn(
-        `WARNING: ADMIN_PASSWORD is longer than ${MAX_NEW_PASSWORD_BYTES} ` +
-          'bytes. bcrypt ignores every byte past that point, so the tail is ' +
-          'not part of the stored credential - shorten the secret.'
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+    const { hash, version } = await hashPassword(password);
     const admin = userRepo.create({
       email,
-      password: hashedPassword,
+      password: hash,
+      passwordHashVersion: version,
       firstName,
       lastName,
       isActive: true,
