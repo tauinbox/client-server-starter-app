@@ -61,7 +61,8 @@ export const ErrorKeys = {
     SUPER_TARGET_FORBIDDEN: 'errors.users.superTargetForbidden',
     MFA_RESET_SELF: 'errors.users.mfaResetSelf',
     SESSION_REVOKE_SELF: 'errors.users.sessionRevokeSelf',
-    MODERATION_SELF: 'errors.users.moderationSelf'
+    MODERATION_SELF: 'errors.users.moderationSelf',
+    CREDENTIAL_SELF: 'errors.users.credentialSelf'
   },
   ROLES: {
     NOT_FOUND: 'errors.roles.notFound',

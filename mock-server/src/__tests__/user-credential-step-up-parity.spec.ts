@@ -5,7 +5,8 @@ import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
 
 // Mirrors server/test/user-credential-step-up.e2e-spec.ts: PATCH /users/:id
-// demands the step-up of the CALLER for a password or an email change.
+// demands the step-up of the CALLER for a password or an email change of
+// another record, and refuses both on the caller's own record.
 
 const SEED_PASSWORD = 'Password1';
 const NEW_PASSWORD = 'Copper-Meadow-83';
@@ -56,32 +57,59 @@ function stepUpFailures(actorEmail: string) {
 }
 
 describe('PATCH /api/v1/users/:id credential step-up parity', () => {
-  it('refuses a password change on the own record without a factor', async () => {
-    const token = await login('user@example.com');
-    const self = findUserByEmail('user@example.com')!;
+  it('refuses a password change on another record without the factor of the caller', async () => {
+    const token = await login('admin@example.com');
+    const target = findUserByEmail('user@example.com')!;
 
-    const res = await patch(token, self.id, { password: NEW_PASSWORD });
+    const res = await patch(token, target.id, { password: NEW_PASSWORD });
 
     expect(res.status).toBe(400);
     expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     );
-    expect(self.password).toBe(SEED_PASSWORD);
-    expect(stepUpFailures('user@example.com').at(-1)?.details).toMatchObject({
+    expect(target.password).toBe(SEED_PASSWORD);
+    expect(stepUpFailures('admin@example.com').at(-1)?.details).toMatchObject({
       operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
       factor: 'password'
     });
   });
 
-  it('refuses an email change on the own record without a factor', async () => {
-    const token = await login('user@example.com');
-    const self = findUserByEmail('user@example.com')!;
+  it('refuses an email change on another record without a factor', async () => {
+    const token = await login('admin@example.com');
+    const target = findUserByEmail('user@example.com')!;
 
-    const res = await patch(token, self.id, { email: 'moved@example.com' });
+    const res = await patch(token, target.id, { email: 'moved@example.com' });
 
     expect(res.status).toBe(400);
-    expect(self.email).toBe('user@example.com');
+    expect(target.email).toBe('user@example.com');
   });
+
+  it.each<[string, object]>([
+    ['a password', { password: NEW_PASSWORD, currentPassword: SEED_PASSWORD }],
+    ['a changed email', { email: 'moved@example.com' }],
+    [
+      'a changed email beside a name',
+      { email: 'moved@example.com', firstName: 'Moved' }
+    ]
+  ])(
+    'refuses %s on the own record before it reads a factor',
+    async (_label, body) => {
+      const token = await login('user@example.com');
+      const self = findUserByEmail('user@example.com')!;
+      const before = stepUpFailures('user@example.com').length;
+
+      const res = await patch(token, self.id, body);
+
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
+        ErrorKeys.USERS.CREDENTIAL_SELF
+      );
+      expect(self.email).toBe('user@example.com');
+      expect(self.firstName).not.toBe('Moved');
+      expect(self.password).toBe(SEED_PASSWORD);
+      expect(stepUpFailures('user@example.com')).toHaveLength(before);
+    }
+  );
 
   it('refuses an administrator without the administrator factor', async () => {
     const token = await login('admin@example.com');
@@ -135,16 +163,16 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
   });
 
   it('accepts the change with the current password and keeps it out of the audit', async () => {
-    const token = await login('user@example.com');
-    const self = findUserByEmail('user@example.com')!;
+    const token = await login('admin@example.com');
+    const target = findUserByEmail('user@example.com')!;
 
-    const res = await patch(token, self.id, {
+    const res = await patch(token, target.id, {
       password: NEW_PASSWORD,
       currentPassword: SEED_PASSWORD
     });
 
     expect(res.status).toBe(200);
-    expect(self.password).toBe(NEW_PASSWORD);
+    expect(target.password).toBe(NEW_PASSWORD);
     const update = getState()
       .auditLogs.filter((row) => row.action === 'USER_UPDATE')
       .at(-1);

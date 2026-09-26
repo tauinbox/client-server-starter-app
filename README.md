@@ -549,7 +549,7 @@ system vetoes the whole permission and fails closed.
 
 | # | Scenario | Resource | Action | Condition | Result |
 |---|----------|----------|--------|-----------|--------|
-| 1 | A user edits their own profile | User | update | `{ "ownership": { "userField": "id" } }` | The Edit button appears on their own record only. This is the default seed configuration |
+| 1 | A user edits their own profile | User | update | `{ "ownership": { "userField": "id" } }` | The Edit button appears on their own record only. The name changes there; the email and the password change on the profile. This is the default seed configuration |
 | 2 | A moderator deletes inactive users | User | delete | `{ "fieldMatch": { "isActive": [false] } }` | The Delete button appears on an inactive record only |
 | 3 | An editor updates inexpensive products | Product | update | `{ "custom": "{\"price\":{\"$lt\":100}}" }` | The edit is permitted only while `price < 100` |
 | 4 | Support sees active EU and NA users | User | read | `{ "fieldMatch": { "isActive": [true] }, "custom": "{\"$or\":[{\"region\":\"EU\"},{\"region\":\"NA\"}]}" }` | The list holds the active users in the EU or in NA |
@@ -1525,7 +1525,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
-| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and an email change or a deactivation clears the same five fields. A password change or a change to a different email needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller. This applies to every target, the caller's own record included |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and an email change or a deactivation clears the same five fields. A password change or a change to a different email of another account needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller, and an email change mails the old address with the new one masked. On the caller's own record both are refused with 400 `errors.users.credentialSelf`: the profile changes them |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/users/:id/mfa/reset` | `users:update` | Reset the two-factor enrolment of another user who lost the authenticator and the recovery codes. Needs a step-up of the CALLER (`currentPassword` or `code`). Refused for the caller's own account and for an account with no factor. Ends every session of the target, audits `MFA_RESET_BY_ADMIN` and mails the owner |
@@ -1815,11 +1815,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2625 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 496 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 494 pass and 2 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1375 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2632 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 498 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 494 pass and 2 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1378 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 286 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 872 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 875 tests pass |
 
 ## CI/CD
 

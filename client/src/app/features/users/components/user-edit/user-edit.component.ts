@@ -26,6 +26,7 @@ import {
   form,
   maxLength,
   minLength,
+  readonly,
   required
 } from '@angular/forms/signals';
 import {
@@ -152,6 +153,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
     maxLength(path.password, MAX_PASSWORD_LENGTH, {
       message: 'users.edit.passwordMaxLength'
     });
+    readonly(path.email, () => !this.canChangeCredentials());
   });
 
   protected readonly formChanged = computed(() => {
@@ -228,6 +230,12 @@ export class UserEditComponent implements OnInit, OnDestroy {
   );
 
   readonly #isSelf = computed(() => this.id() === this.#authStore.user()?.id);
+
+  /**
+   * The server refuses a password and a changed email on the caller's own
+   * record: the profile flows own them.
+   */
+  protected readonly canChangeCredentials = computed(() => !this.#isSelf());
 
   protected readonly canDelete = computed(() => {
     const u = this.user();

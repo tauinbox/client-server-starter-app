@@ -925,6 +925,55 @@ describe('UserEditComponent', () => {
     });
   });
 
+  describe('credentials on the own record', () => {
+    function host(): HTMLElement {
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('offers the email and the new password on another record', () => {
+      fixture.detectChanges();
+
+      expect(
+        host().querySelector<HTMLInputElement>('input[type="email"]')?.readOnly
+      ).toBe(false);
+      expect(host().querySelector('input[type="password"]')).not.toBeNull();
+      expect(
+        host().querySelector('[data-testid="credentials-on-profile"]')
+      ).toBeNull();
+    });
+
+    it('locks the email, hides the new password and links the profile', async () => {
+      currentUserSignal.set({ id: 'user-1' });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(
+        host().querySelector<HTMLInputElement>('input[type="email"]')?.readOnly
+      ).toBe(true);
+      expect(host().querySelector('input[type="password"]')).toBeNull();
+      const note = host().querySelector(
+        '[data-testid="credentials-on-profile"]'
+      );
+      expect(note?.querySelector('a')?.getAttribute('href')).toBe('/profile');
+    });
+
+    it('saves a name edit of the own record with the stored address and no factor', async () => {
+      currentUserSignal.set({ id: 'user-1' });
+      fixture.detectChanges();
+      component.userModel.update((m) => ({ ...m, firstName: 'Changed' }));
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(dialogMock.open).not.toHaveBeenCalled();
+      expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
+        email: 'test@example.com',
+        firstName: 'Changed',
+        lastName: 'User'
+      });
+    });
+  });
+
   describe('role assignment', () => {
     const mockRoles = [
       {

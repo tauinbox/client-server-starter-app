@@ -257,6 +257,7 @@ describe('Admin email change - session revocation through the real event bus', (
   let refreshTokenService: { deleteByUserId: jest.Mock };
   let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
   let userUpdate: jest.Mock;
+  let sendEmailChangeCompletedNotification: jest.Mock;
 
   // @ts-expect-error partial mock - the update path reads only user/ip/headers
   const adminRequest: JwtAuthRequest = {
@@ -288,6 +289,9 @@ describe('Admin email change - session revocation through the real event bus', (
     refreshTokenService = {
       deleteByUserId: jest.fn().mockResolvedValue(undefined)
     };
+    sendEmailChangeCompletedNotification = jest
+      .fn()
+      .mockResolvedValue(undefined);
     auditService = {
       log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn()
@@ -340,7 +344,8 @@ describe('Admin email change - session revocation through the real event bus', (
         {
           provide: MailService,
           useValue: {
-            sendEmailVerification: jest.fn().mockResolvedValue(undefined)
+            sendEmailVerification: jest.fn().mockResolvedValue(undefined),
+            sendEmailChangeCompletedNotification
           }
         },
         { provide: PermissionService, useValue: {} },
@@ -407,6 +412,22 @@ describe('Admin email change - session revocation through the real event bus', (
     );
   });
 
+  it('tells the old address of the move, with the new address masked', async () => {
+    await controller.update(
+      'user-1',
+      { email: 'after@example.com' },
+      adminRequest,
+      ability
+    );
+
+    expect(sendEmailChangeCompletedNotification).toHaveBeenCalledTimes(1);
+    expect(sendEmailChangeCompletedNotification).toHaveBeenCalledWith(
+      'before@example.com',
+      'a***r@example.com',
+      expect.any(String)
+    );
+  });
+
   it('writes no email-change row when the submitted email is unchanged', async () => {
     await controller.update(
       'user-1',
@@ -432,5 +453,6 @@ describe('Admin email change - session revocation through the real event bus', (
 
     expect(refreshTokenService.deleteByUserId).not.toHaveBeenCalled();
     expect(store.rows.get('user-1')?.tokenRevokedAt).toBeNull();
+    expect(sendEmailChangeCompletedNotification).not.toHaveBeenCalled();
   });
 });

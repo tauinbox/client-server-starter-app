@@ -44,15 +44,24 @@
             />
           </div>
 
-          <nxs-form-field
-            [field]="userForm.password"
-            label="users.edit.newPassword"
-            [type]="pwdToggle.show() ? 'text' : 'password'"
-            prefixIcon="lock"
-            autocomplete="new-password"
-          >
-            <nxs-password-toggle formFieldSuffix #pwdToggle />
-          </nxs-form-field>
+          @if (canChangeCredentials()) {
+            <nxs-form-field
+              [field]="userForm.password"
+              label="users.edit.newPassword"
+              [type]="pwdToggle.show() ? 'text' : 'password'"
+              prefixIcon="lock"
+              autocomplete="new-password"
+            >
+              <nxs-password-toggle formFieldSuffix #pwdToggle />
+            </nxs-form-field>
+          } @else {
+            <p class="step-up-note" data-testid="credentials-on-profile">
+              {{ t('users.edit.credentialsOnProfile') }}
+              <a routerLink="/profile">{{
+                t('users.edit.credentialsOnProfileLink')
+              }}</a>
+            </p>
+          }
 
           @if (credentialChanged()) {
             @switch (stepUpFactor()) {

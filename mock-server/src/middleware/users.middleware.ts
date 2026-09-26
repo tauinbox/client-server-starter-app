@@ -404,6 +404,21 @@ router.patch(
       return;
     }
 
+    // Mirrors UsersController.update: the credentials of the caller's own
+    // record change only through the profile flows. After the lookup, since
+    // a resubmitted address is compared with the stored one.
+    if (
+      id === (req as AuthenticatedRequest).user.id &&
+      (password !== undefined || (email !== undefined && email !== user.email))
+    ) {
+      res.status(400).json({
+        message: 'Change your own email and password on your profile page',
+        statusCode: 400,
+        errorKey: ErrorKeys.USERS.CREDENTIAL_SELF
+      });
+      return;
+    }
+
     if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
@@ -526,6 +541,9 @@ router.patch(
         },
         ip: req.ip
       });
+      console.log(
+        `[EMAIL CHANGE COMPLETE] To: ${previousEmail}\n  Source: administrator`
+      );
     }
 
     if (password !== undefined) {

@@ -447,6 +447,10 @@ and `delete` on a `User` whose `roles` hold one with `isSuper`. It mirrors the s
 disabled for such an actor, and `UserEditComponent` sends a direct visit back to the detail page with
 a notice. A type-level check such as `{ action: 'update', subject: 'User' }` is not affected.
 
+On the editor's own record, `UserEditComponent` hides the moderation controls and makes the email
+read-only, hides the new-password field and links to `/profile`. The server refuses those fields
+there (`errors.users.moderationSelf`, `errors.users.credentialSelf`).
+
 Each RBAC check must use `hasPermissions`. Never compare a role name with the `'admin'` literal. For
 a rare display-only label, use `SYSTEM_ROLES.ADMIN` from `@app/shared/constants`.
 
@@ -1067,7 +1071,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 286 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1368 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1378 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
