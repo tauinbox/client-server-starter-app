@@ -1181,8 +1181,10 @@ its own purpose.
 Without that claim, a token from one flow authenticates on another flow. An OAuth-data token carries
 no `sub` claim, and a user lookup with no id then resolves to an arbitrary row instead of a failure.
 
-One factory (`jwt-module-options.factory.ts`) pins the issuer and the audience for the signing and
-for the verification. Thus the two cannot diverge.
+One factory (`jwt-module-options.factory.ts`) pins the issuer, the audience and the algorithm for
+the signing and for the verification. `JwtModule` and `JwtStrategy` both get the key, the algorithm
+and the claims from its `buildJwtVerification`, and both read `JWT_MIN_IAT` through its
+`readJwtMinIat`. Thus the verifiers cannot diverge.
 
 **GoogleStrategy, FacebookStrategy and VkStrategy** do the OAuth2 login. The module registers each
 one only when its environment variables have a value.
@@ -2096,7 +2098,7 @@ These are the counters and the histograms:
 |--------|------|--------|-------------|
 | `http_requests_total` | counter | `method`, `route`, `status_code` | Each HTTP request that reaches the app |
 | `http_request_duration_seconds` | histogram | `method`, `route`, `status_code` | The latency of each route, in seconds |
-| `auth_events_total` | counter | `event`, one of `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | The authentication events |
+| `auth_events_total` | counter | `event`, one of `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | The authentication events. Every refused refresh records `token_refresh_failure`, except a reuse, which records `token_reuse_detected` |
 | `rbac_permission_denied_total` | counter | `action`, `subject`, `level`, one of `guard` or `instance` | The RBAC and ABAC denials. `level=guard` is a rejection from the `@Authorize` decorator. `level=instance` is an `ability.can(action, entity)` rejection after the server loaded the record |
 | `sse_connections_active` | gauge | - | The SSE notification streams that are open now |
 | `mail_queue_jobs` | gauge | `state`, one of `waiting`, `active`, `completed`, `failed`, `delayed` | The depth of the BullMQ mail queue, by job state. The metric stays absent when no queue is configured, that is when `REDIS_URL` is empty and `MailService` sends the mail in the process |
