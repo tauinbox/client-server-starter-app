@@ -765,4 +765,51 @@ router.post(
   }
 );
 
+// POST /api/v1/users/:id/sessions/revoke
+// Mirrors UsersController.revokeSessions, check for check and in the same order.
+router.post(
+  '/:id/sessions/revoke',
+  permissionGuard('update', 'User'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = req.params['id'] as string;
+    const actor = (req as AuthenticatedRequest).user;
+    if (id === actor.id) {
+      res.status(400).json({
+        message: 'End your own sessions from your profile',
+        statusCode: 400,
+        errorKey: ErrorKeys.USERS.SESSION_REVOKE_SELF
+      });
+      return;
+    }
+
+    const user = findUserById(id);
+    if (!user) {
+      res.status(404).json({
+        message: 'User not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.USERS.NOT_FOUND
+      });
+      return;
+    }
+
+    if (!assertCanWriteUser(req, res, 'update', user)) {
+      return;
+    }
+
+    revokeUserSessions(user);
+
+    logAudit('SESSION_REVOKE', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: id,
+      targetType: 'User',
+      details: { scope: 'all', source: 'admin' },
+      ip: req.ip
+    });
+
+    res.json({ message: 'Every session of the user has ended' });
+  }
+);
+
 export default router;

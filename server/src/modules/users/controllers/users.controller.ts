@@ -468,6 +468,60 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  // No step-up: the same permission deactivates the account without one, and
+  // a deactivation ends the sessions too. A self target is refused: it would
+  // sign the caller out, and `DELETE /auth/sessions` keeps this device.
+  @Post(':id/sessions/revoke')
+  @HttpCode(HttpStatus.OK)
+  @Authorize(['update', 'User'])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'End every session of another user (admin only)'
+  })
+  @ApiParam({ name: 'id', description: 'The user ID' })
+  @ApiOkResponse({ description: 'Every session of the user has ended' })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
+  async revokeSessions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ): Promise<{ message: string }> {
+    if (id === req.user.userId) {
+      throw new HttpException(
+        {
+          message: 'End your own sessions from your profile',
+          errorKey: ErrorKeys.USERS.SESSION_REVOKE_SELF
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const target = await this.usersService.findOne(id);
+    this.usersService.assertCanWrite(
+      ability,
+      'update',
+      target,
+      req.user.userId
+    );
+
+    await this.eventEmitter.emitAsync(
+      UserSessionRevocationRequiredEvent.name,
+      new UserSessionRevocationRequiredEvent(id)
+    );
+    await this.auditService.log({
+      action: AuditAction.SESSION_REVOKE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'User',
+      details: { scope: 'all', source: 'admin' },
+      context: extractAuditContext(req)
+    });
+    return { message: 'Every session of the user has ended' };
+  }
+
   /**
    * A stolen access token must not set a password or move the address of any
    * account, the caller's own included, so the factor is the CALLER's. The

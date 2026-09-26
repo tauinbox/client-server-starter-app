@@ -1230,6 +1230,58 @@ describe('UsersController', () => {
     });
   });
 
+  // ── revokeSessions ────────────────────────────────────────────────
+
+  describe('revokeSessions', () => {
+    const target = { id: 'user-9', email: 'owner@example.com' };
+
+    it('ends the sessions of another user and audits the administrator', async () => {
+      usersServiceMock.findOne.mockResolvedValueOnce(target);
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.revokeSessions('user-9', req, mockAbility);
+
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        UserSessionRevocationRequiredEvent.name,
+        new UserSessionRevocationRequiredEvent('user-9')
+      );
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.SESSION_REVOKE,
+          targetId: 'user-9',
+          details: { scope: 'all', source: 'admin' }
+        })
+      );
+    });
+
+    it('refuses a self-target before it reads the record', async () => {
+      const req = mockJwtRequest('user-9') as JwtAuthRequest;
+
+      const err: unknown = await controller
+        .revokeSessions('user-9', req, mockAbility)
+        .catch((e: unknown) => e);
+
+      const httpErr = err as { getStatus(): number; getResponse(): unknown };
+      expect(httpErr.getStatus()).toBe(400);
+      expect((httpErr.getResponse() as { errorKey?: string }).errorKey).toBe(
+        ErrorKeys.USERS.SESSION_REVOKE_SELF
+      );
+      expect(usersServiceMock.findOne).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+    });
+
+    it('ends no session for a target the caller may not write', async () => {
+      usersServiceMock.findOne.mockResolvedValueOnce(target);
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.revokeSessions('user-9', req, denyAbility)
+      ).rejects.toThrow(ForbiddenException);
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+      expect(auditServiceMock.log).not.toHaveBeenCalled();
+    });
+  });
+
   // ── getPermissions ────────────────────────────────────────────────
 
   describe('getPermissions', () => {

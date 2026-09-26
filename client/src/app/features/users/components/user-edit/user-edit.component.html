@@ -175,6 +175,16 @@
                   {{ t('users.edit.resetMfa') }}
                 </button>
               }
+              @if (canModerate()) {
+                <button
+                  matButton="text"
+                  type="button"
+                  (click)="confirmRevokeSessions()"
+                  [disabled]="saving()"
+                >
+                  {{ t('users.edit.revokeSessions') }}
+                </button>
+              }
             </div>
           }
 
