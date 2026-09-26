@@ -164,8 +164,10 @@ src/
 │   │                       #   EntityCursorQueryDto
 │   ├── utils/              # escapeLikePattern, hashToken, withTransaction,
 │   │                       #   extractAuditContext, cursor encode/decode,
-│   │                       #   applyKeysetPagination, cache-version-counter,
-│   │                       #   single-use-token-ledger, money-column.transformer
+│   │                       #   applyKeysetPagination, issueMailedToken,
+│   │                       #   cache-version-counter, failed-attempt-counter,
+│   │                       #   single-use-token-ledger, redis-client,
+│   │                       #   money-column.transformer
 │   ├── validators/         # is-safe-mongo-query, permission-condition-shape,
 │   │                       #   property-is-defined
 │   └── upload/             # createDiskStorageOptions()
@@ -193,8 +195,16 @@ The subsections below give the detail of each directory.
 
 `common/utils/` holds the shared utilities. They are `escapeLikePattern`, `hashToken`,
 `withTransaction`, `extractAuditContext`, the cursor encoder and decoder, and
-`applyKeysetPagination`. It also holds `cache-version-counter.ts`,
-`single-use-token-ledger.ts` and `money-column.transformer.ts`.
+`applyKeysetPagination`. It also holds `issue-mailed-token.util.ts`, `cache-version-counter.ts`,
+`failed-attempt-counter.ts`, `single-use-token-ledger.ts`, `redis-client.ts` and
+`money-column.transformer.ts`.
+
+`issue-mailed-token.util.ts` issues every one-time token that is sent by mail: email verification,
+password reset and email change. The token is 32 random bytes. The database keeps only its hash.
+
+`redis-client.ts` gives the raw Redis client behind the cache, or null for the in-memory fallback.
+The version counter, the attempt counter and the single-use ledger use it. It also holds the
+warning that these classes write when Redis fails. The warning is written once in 30 seconds.
 
 `single-use-token-ledger.ts` records that a short-lived bearer credential was spent, so a second
 presentation of the same value is refused. With Redis the claim is one conditional write,

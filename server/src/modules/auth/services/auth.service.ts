@@ -10,7 +10,6 @@ import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { RegisterDto } from '../dtos/register.dto';
@@ -35,7 +34,7 @@ import {
   verifyPassword
 } from '../../../common/utils/password-hash';
 import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
-import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
+import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import {
@@ -50,6 +49,7 @@ import {
   STEP_UP_OPERATION,
   SYSTEM_ROLES,
   TOKEN_PURPOSE,
+  VERIFICATION_TOKEN_EXPIRY_MS,
   type StepUpOperation
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -277,7 +277,9 @@ export class AuthService {
     // Compute hash outside the transaction (CPU-intensive, no DB involvement)
     const { hash: hashedPassword, version: passwordHashVersion } =
       await hashPassword(registerDto.password);
-    const { rawToken, hashedToken, expiresAt } = issueEmailVerificationToken();
+    const { rawToken, hashedToken, expiresAt } = issueMailedToken(
+      VERIFICATION_TOKEN_EXPIRY_MS
+    );
 
     // Create user and set verification token atomically so a partial failure
     // never leaves a user without a token (which would prevent email verification).
@@ -402,7 +404,9 @@ export class AuthService {
       return ENUMERATION_SAFE_RESEND_RESPONSE;
     }
 
-    const { rawToken, hashedToken, expiresAt } = issueEmailVerificationToken();
+    const { rawToken, hashedToken, expiresAt } = issueMailedToken(
+      VERIFICATION_TOKEN_EXPIRY_MS
+    );
 
     await this.usersService.setEmailVerificationToken(
       user.id,
@@ -430,9 +434,9 @@ export class AuthService {
       return ENUMERATION_SAFE_FORGOT_RESPONSE;
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
+    const { rawToken, hashedToken, expiresAt } = issueMailedToken(
+      RESET_TOKEN_EXPIRY_MS
+    );
 
     await this.usersService.setPasswordResetToken(
       user.id,
@@ -820,9 +824,9 @@ export class AuthService {
       );
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + EMAIL_CHANGE_TOKEN_EXPIRY_MS);
+    const { rawToken, hashedToken, expiresAt } = issueMailedToken(
+      EMAIL_CHANGE_TOKEN_EXPIRY_MS
+    );
 
     let conflict: boolean;
     try {

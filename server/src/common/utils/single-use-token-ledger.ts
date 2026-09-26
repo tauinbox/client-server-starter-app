@@ -1,8 +1,6 @@
 import { Logger } from '@nestjs/common';
-import KeyvRedis, { type RedisClientConnectionType } from '@keyv/redis';
 import type { Cache } from 'cache-manager';
-
-const ERROR_LOG_THROTTLE_MS = 30_000;
+import { redisClientOf, ThrottledFailureLog } from './redis-client';
 
 /**
  * Records that a short-lived bearer credential was spent, so a second
@@ -30,9 +28,8 @@ const ERROR_LOG_THROTTLE_MS = 30_000;
 export class SingleUseTokenLedger {
   readonly #cache: Cache;
   readonly #keyPrefix: string;
-  readonly #logger: Logger;
+  readonly #failureLog: ThrottledFailureLog;
   readonly #inFlight = new Set<string>();
-  #errorLoggedAt = 0;
 
   /**
    * @param keyPrefix namespace for the claim keys, e.g. `oauth-data:spent:`
@@ -40,7 +37,10 @@ export class SingleUseTokenLedger {
   constructor(cache: Cache, keyPrefix: string, logger: Logger) {
     this.#cache = cache;
     this.#keyPrefix = keyPrefix;
-    this.#logger = logger;
+    this.#failureLog = new ThrottledFailureLog(
+      logger,
+      `Single-use ledger "${keyPrefix}" unavailable, a replay inside the token lifetime is not refused`
+    );
   }
 
   /**
@@ -52,7 +52,7 @@ export class SingleUseTokenLedger {
    */
   async claim(id: string, ttlMs: number): Promise<boolean> {
     const key = `${this.#keyPrefix}${id}`;
-    const redis = this.#redisClient();
+    const redis = redisClientOf(this.#cache);
 
     if (redis) {
       try {
@@ -62,7 +62,7 @@ export class SingleUseTokenLedger {
         });
         return reply !== null;
       } catch (error: unknown) {
-        this.#logFailure(error);
+        this.#failureLog.log(error);
         return true;
       }
     }
@@ -74,35 +74,12 @@ export class SingleUseTokenLedger {
       await this.#cache.set(key, true, ttlMs);
       return true;
     } catch (error: unknown) {
-      this.#logFailure(error);
+      this.#failureLog.log(error);
       return true;
     } finally {
       // The cache holds the claim from here on, so the reservation is only
       // needed for the two awaits above.
       this.#inFlight.delete(key);
     }
-  }
-
-  /**
-   * The Redis client behind the cache, or null when the cache is the in-memory
-   * fallback. Nest wraps the configured adapter in a Keyv, so the adapter sits
-   * at `stores[0].store`. Probed defensively because `stores` is an
-   * implementation detail of the injected cache: a partial stand-in must
-   * degrade, not break the caller.
-   */
-  #redisClient(): RedisClientConnectionType | null {
-    const store: unknown = this.#cache.stores?.[0]?.store;
-    return store instanceof KeyvRedis ? store.client : null;
-  }
-
-  #logFailure(error: unknown): void {
-    const now = Date.now();
-    if (now - this.#errorLoggedAt < ERROR_LOG_THROTTLE_MS) return;
-    this.#errorLoggedAt = now;
-    this.#logger.warn(
-      `Single-use ledger "${this.#keyPrefix}" unavailable, a replay inside the token lifetime is not refused: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
   }
 }

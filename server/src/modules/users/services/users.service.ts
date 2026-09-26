@@ -5,7 +5,7 @@ import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { hashPassword } from '../../../common/utils/password-hash';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, VERIFICATION_TOKEN_EXPIRY_MS } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
@@ -14,7 +14,7 @@ import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-tar
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
 import { MailService } from '../../mail/mail.service';
-import { issueEmailVerificationToken } from '../../../common/utils/issue-verification-token.util';
+import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -346,7 +346,7 @@ export class UsersService {
           HttpStatus.CONFLICT
         );
       }
-      const issued = issueEmailVerificationToken();
+      const issued = issueMailedToken(VERIFICATION_TOKEN_EXPIRY_MS);
       pendingVerificationRawToken = issued.rawToken;
       changes.isEmailVerified = false;
       changes.emailVerificationToken = issued.hashedToken;
