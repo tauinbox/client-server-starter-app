@@ -97,7 +97,10 @@ test.describe('OAuth-only account sets its first password', () => {
     // Seed before the document runs: the component reads and clears the key
     // during bootstrap, which happens after `page.goto` resolves.
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_password_set', 'true')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'password_set' })
+      )
     );
 
     await page.goto('/profile?reauth=ok');
@@ -150,7 +153,10 @@ test.describe('OAuth-only account sets its first password', () => {
       }
     ]);
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_password_set', 'true')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'password_set' })
+      )
     );
 
     await page.goto('/profile?reauth=ok');

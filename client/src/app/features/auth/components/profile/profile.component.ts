@@ -1,4 +1,4 @@
-import type { OnInit } from '@angular/core';
+import type { OnInit, WritableSignal } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -36,7 +36,6 @@ import { TwoFactorComponent } from '../two-factor/two-factor.component';
 import { ActiveSessionsComponent } from '../active-sessions/active-sessions.component';
 import type { UserResponse } from '@app/shared/types';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
-import type { StepUpOperation } from '@app/shared/constants';
 import type {
   SessionRevokeTarget,
   UpdateProfile
@@ -44,7 +43,7 @@ import type {
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Observable } from 'rxjs';
-import { concat, defer, take, tap } from 'rxjs';
+import { concat, defer, EMPTY, take, tap } from 'rxjs';
 import {
   isOAuthProvider,
   OAUTH_URLS,
@@ -54,6 +53,7 @@ import {
   OAUTH_ERROR_CANCELLED,
   OAUTH_ERROR_REAUTH_FAILED
 } from '../../constants/oauth-error.const';
+import { OAUTH_RETURN_URL_KEY } from '../../constants/oauth-return-url.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -105,44 +105,34 @@ type OAuthAccountInfo = {
 
 /**
  * A step-up re-authentication leaves the app for the provider and comes back
- * as a full page load, so the address the user asked for has to survive it.
+ * as a full page load, so the change the user asked for has to survive it.
+ * One record holds it, because one round trip is bound to one operation.
  */
-const PENDING_EMAIL_KEY = 'pending_email_change';
+const PENDING_REAUTH_KEY = 'pending_reauth';
 
 /**
- * The other resume path. It holds a marker and never the password itself: a
- * credential must not sit in web storage, so the user types it again on return.
+ * A first password is stored as the bare operation and never as the password
+ * itself: a credential must not sit in web storage, so the user types it again
+ * on return.
  */
-const PENDING_PASSWORD_KEY = 'pending_password_set';
+type PendingReauth =
+  | { operation: typeof STEP_UP_OPERATION.EMAIL_CHANGE; email: string }
+  | {
+      operation:
+        | typeof STEP_UP_OPERATION.PASSWORD_SET
+        | typeof STEP_UP_OPERATION.MFA_SETUP;
+    }
+  | {
+      operation:
+        | typeof STEP_UP_OPERATION.OAUTH_LINK
+        | typeof STEP_UP_OPERATION.OAUTH_UNLINK;
+      provider: OAuthProvider;
+    }
+  | {
+      operation: typeof STEP_UP_OPERATION.SESSION_REVOKE;
+      target: SessionRevokeTarget;
+    };
 
-/**
- * The third resume path. The two-factor card asks for the round trip and picks
- * the enrolment up again on the load that follows it.
- */
-const PENDING_MFA_KEY = 'pending_mfa_setup';
-
-/**
- * The fourth resume path. It holds the provider the user asked to link, so the
- * load that follows the step-up round trip can start the link round trip at
- * the right provider without asking again.
- */
-const PENDING_LINK_KEY = 'pending_oauth_link';
-
-/**
- * The fifth resume path. It holds the provider the user asked to remove, so
- * the load that follows the step-up round trip can finish the unlink without
- * asking again.
- */
-const PENDING_UNLINK_KEY = 'pending_oauth_unlink';
-
-/**
- * The sixth resume path. It holds the session change the user asked for, so
- * the load that follows the step-up round trip can send it without asking
- * again.
- */
-const PENDING_SESSION_REVOKE_KEY = 'pending_session_revoke';
-
-/** The stored value is read back from session storage, so its shape is checked. */
 function isSessionRevokeTarget(value: unknown): value is SessionRevokeTarget {
   if (typeof value !== 'object' || value === null) return false;
   const target = value as Record<string, unknown>;
@@ -150,6 +140,29 @@ function isSessionRevokeTarget(value: unknown): value is SessionRevokeTarget {
     target['scope'] === 'others' ||
     (target['scope'] === 'one' && typeof target['sessionId'] === 'string')
   );
+}
+
+/** The record is read back from session storage, so its shape is checked. */
+function isPendingReauth(value: unknown): value is PendingReauth {
+  if (typeof value !== 'object' || value === null) return false;
+  const pending = value as Record<string, unknown>;
+  switch (pending['operation']) {
+    case STEP_UP_OPERATION.EMAIL_CHANGE:
+      return typeof pending['email'] === 'string' && pending['email'] !== '';
+    case STEP_UP_OPERATION.PASSWORD_SET:
+    case STEP_UP_OPERATION.MFA_SETUP:
+      return true;
+    case STEP_UP_OPERATION.OAUTH_LINK:
+    case STEP_UP_OPERATION.OAUTH_UNLINK:
+      return (
+        typeof pending['provider'] === 'string' &&
+        isOAuthProvider(pending['provider'])
+      );
+    case STEP_UP_OPERATION.SESSION_REVOKE:
+      return isSessionRevokeTarget(pending['target']);
+    default:
+      return false;
+  }
 }
 
 /** Which credential change the open password prompt authorises. */
@@ -439,30 +452,16 @@ export class ProfileComponent implements OnInit {
   /**
    * Runs on the page load that follows a provider round trip. The proof lives
    * in an httpOnly cookie the server set, so all this needs is which change the
-   * user asked for before leaving. The two pending keys are read separately,
-   * because an email change resumes on its own and a first password waits for
-   * the user to type it again.
+   * user asked for before leaving. An email change resumes on its own, and a
+   * first password waits for the user to type it again.
    */
   #resumeAfterReauth(): void {
     const reauth = this.#route.snapshot.queryParamMap.get('reauth');
-    const pendingEmail =
-      this.#sessionStorage.getItem<string>(PENDING_EMAIL_KEY);
-    const pendingPassword =
-      this.#sessionStorage.getItem<boolean>(PENDING_PASSWORD_KEY);
-    const pendingMfa = this.#sessionStorage.getItem<boolean>(PENDING_MFA_KEY);
-    const pendingLink = this.#sessionStorage.getItem<string>(PENDING_LINK_KEY);
-    const pendingUnlink =
-      this.#sessionStorage.getItem<string>(PENDING_UNLINK_KEY);
-    const pendingSessionRevoke = this.#sessionStorage.getItem(
-      PENDING_SESSION_REVOKE_KEY,
-      isSessionRevokeTarget
+    const pending = this.#sessionStorage.getItem(
+      PENDING_REAUTH_KEY,
+      isPendingReauth
     );
-    this.#sessionStorage.removeItem(PENDING_EMAIL_KEY);
-    this.#sessionStorage.removeItem(PENDING_PASSWORD_KEY);
-    this.#sessionStorage.removeItem(PENDING_MFA_KEY);
-    this.#sessionStorage.removeItem(PENDING_LINK_KEY);
-    this.#sessionStorage.removeItem(PENDING_UNLINK_KEY);
-    this.#sessionStorage.removeItem(PENDING_SESSION_REVOKE_KEY);
+    this.#sessionStorage.removeItem(PENDING_REAUTH_KEY);
 
     if (reauth !== 'ok') return;
 
@@ -474,42 +473,44 @@ export class ProfileComponent implements OnInit {
     // Confirmed for the password only. The proof is bound to the operation the
     // round trip declared, so a trip taken for the address opens no password
     // submit, and a bare `?reauth=ok` load opens nothing at all.
-    this.#reauthConfirmed.set(Boolean(pendingPassword) && !pendingEmail);
+    this.#reauthConfirmed.set(
+      pending?.operation === STEP_UP_OPERATION.PASSWORD_SET
+    );
 
-    if (pendingEmail) {
-      this.#resumeEmailChange(pendingEmail);
-      return;
-    }
+    if (!pending) return;
 
-    if (pendingPassword) {
-      this.#notify.info('auth.profile.reauthDonePassword');
-      return;
+    switch (pending.operation) {
+      case STEP_UP_OPERATION.EMAIL_CHANGE:
+        this.#resumeEmailChange(pending.email);
+        return;
+      case STEP_UP_OPERATION.PASSWORD_SET:
+        this.#notify.info('auth.profile.reauthDonePassword');
+        return;
+      // The proof this trip earned is in place, so the link trip can start at
+      // the provider the user picked before leaving.
+      case STEP_UP_OPERATION.OAUTH_LINK:
+        this.#startLink(pending.provider);
+        return;
+      // The proof this trip earned is what the unlink was refused for, so the
+      // request can go straight out: removing the row needs no second trip.
+      case STEP_UP_OPERATION.OAUTH_UNLINK:
+        this.#unlink(pending.provider);
+        return;
+      case STEP_UP_OPERATION.SESSION_REVOKE:
+        this.resumeSessionRevoke.set(pending.target);
+        return;
+      // The card holds the enrolment, so all it needs is the signal that the
+      // proof its request will carry is now there.
+      case STEP_UP_OPERATION.MFA_SETUP:
+        this.resumeMfaSetup.set(true);
+        return;
     }
+  }
 
-    // The proof this trip earned is in place, so the link trip can start at
-    // the provider the user picked before leaving.
-    if (pendingLink && isOAuthProvider(pendingLink)) {
-      this.#startLink(pendingLink);
-      return;
-    }
-
-    // The proof this trip earned is what the unlink was refused for, so the
-    // request can go straight out: removing the row needs no second trip.
-    if (pendingUnlink && isOAuthProvider(pendingUnlink)) {
-      this.#unlink(pendingUnlink);
-      return;
-    }
-
-    if (pendingSessionRevoke) {
-      this.resumeSessionRevoke.set(pendingSessionRevoke);
-      return;
-    }
-
-    // The card holds the enrolment, so all it needs is the signal that the
-    // proof its request will carry is now there.
-    if (pendingMfa) {
-      this.resumeMfaSetup.set(true);
-    }
+  /** Every event of the two-factor card changes a sign-in factor. */
+  protected onTwoFactorChanged(): void {
+    this.offerSignOutOthers.set(true);
+    this.loadProfile();
   }
 
   /**
@@ -517,57 +518,73 @@ export class ProfileComponent implements OnInit {
    * label and the return address all belong to this page, exactly as they do
    * for an email change and for a first password.
    */
-  /** Every event of the two-factor card changes a sign-in factor. */
-  protected onTwoFactorChanged(): void {
-    this.offerSignOutOthers.set(true);
-    this.loadProfile();
-  }
-
   protected startMfaReauth(): void {
-    this.#leaveForCardReauth(
-      STEP_UP_OPERATION.MFA_SETUP,
-      PENDING_MFA_KEY,
-      true
-    );
+    this.#startReauth({ operation: STEP_UP_OPERATION.MFA_SETUP });
   }
 
   /** The sessions card asks for the round trip the same way. */
   protected startSessionsReauth(target: SessionRevokeTarget): void {
-    this.#leaveForCardReauth(
-      STEP_UP_OPERATION.SESSION_REVOKE,
-      PENDING_SESSION_REVOKE_KEY,
-      target
-    );
+    this.#startReauth({ operation: STEP_UP_OPERATION.SESSION_REVOKE, target });
   }
 
-  #leaveForCardReauth(
-    operation: StepUpOperation,
-    pendingKey: string,
-    pendingValue: unknown
-  ): void {
-    const provider = this.reauthProvider();
-    if (!provider) {
+  /**
+   * The round trip that the cards and the provider controls ask for. Both
+   * outcomes that stop it are reported in a snackbar; `busy` is the control
+   * that stays disabled while the request is out, when there is one.
+   */
+  #startReauth(pending: PendingReauth, busy?: WritableSignal<boolean>): void {
+    const trip$ = this.#reauthTrip(pending);
+    if (!trip$) {
       this.#notify.error('auth.profile.errorReauthNoProvider');
       return;
     }
 
-    this.#authService
-      .initOAuthReauth(operation)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: () => {
-          this.#sessionStorage.setItem(pendingKey, pendingValue);
+    busy?.set(true);
+    trip$.subscribe({
+      error: (err: HttpErrorResponse) => {
+        busy?.set(false);
+        this.#notify.error(err, 'auth.profile.errorReauthFailed');
+      }
+    });
+  }
+
+  /**
+   * The one way this page leaves for a step-up round trip. `before$` runs
+   * first, so what the user typed is saved before the redirect can discard
+   * it. Null when no linked provider can run the trip. Each caller reports
+   * that, and a failed request, in its own place.
+   */
+  #reauthTrip(
+    pending: PendingReauth,
+    before$: Observable<unknown> = EMPTY
+  ): Observable<unknown> | null {
+    const provider = this.reauthProvider();
+    if (!provider) return null;
+
+    return concat(
+      before$,
+      defer(() => this.#authService.initOAuthReauth(pending.operation))
+    ).pipe(
+      tap({
+        complete: () => {
+          this.#sessionStorage.setItem(PENDING_REAUTH_KEY, pending);
           this.#notify.info('auth.profile.reauthRedirecting', {
             provider: this.reauthProviderLabel()
           });
           if (this.#window) {
             this.#window.location.href = OAUTH_URLS[provider];
           }
-        },
-        error: (err: HttpErrorResponse) => {
-          this.#notify.error(err, 'auth.profile.errorReauthFailed');
         }
-      });
+      }),
+      takeUntilDestroyed(this.#destroyRef)
+    );
+  }
+
+  /** A save that runs before leaving, so the page shows the stored names. */
+  #saveBeforeLeaving(update: UpdateProfile): Observable<unknown> {
+    return this.#authService
+      .updateProfile(update)
+      .pipe(tap((user) => this.user.set(user)));
   }
 
   #resumeEmailChange(pending: string): void {
@@ -733,10 +750,9 @@ export class ProfileComponent implements OnInit {
       return;
     }
 
-    this.#startProviderReauth(
-      provider,
-      STEP_UP_OPERATION.OAUTH_LINK,
-      PENDING_LINK_KEY
+    this.#startReauth(
+      { operation: STEP_UP_OPERATION.OAUTH_LINK, provider },
+      this.oauthLoading
     );
   }
 
@@ -779,7 +795,7 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         next: () => {
           this.#closeStepUpPrompt();
-          this.#sessionStorage.setItem('oauth_return_url', '/profile');
+          this.#sessionStorage.setItem(OAUTH_RETURN_URL_KEY, '/profile');
           if (this.#window) {
             this.#window.location.href = OAUTH_URLS[provider];
           }
@@ -787,43 +803,6 @@ export class ProfileComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.oauthLoading.set(false);
           this.#notify.error(err, 'auth.profile.errorInitiateLinkFailed');
-        }
-      });
-  }
-
-  /**
-   * An account with no password proves itself at a provider it already holds.
-   * The provider the change applies to waits in session storage, because the
-   * round trip comes back as a full page load.
-   */
-  #startProviderReauth(
-    provider: OAuthProvider,
-    operation: StepUpOperation,
-    pendingKey: string
-  ): void {
-    const reauthProvider = this.reauthProvider();
-    if (!reauthProvider) {
-      this.#notify.error('auth.profile.errorReauthNoProvider');
-      return;
-    }
-
-    this.oauthLoading.set(true);
-    this.#authService
-      .initOAuthReauth(operation)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: () => {
-          this.#sessionStorage.setItem(pendingKey, provider);
-          this.#notify.info('auth.profile.reauthRedirecting', {
-            provider: this.reauthProviderLabel()
-          });
-          if (this.#window) {
-            this.#window.location.href = OAUTH_URLS[reauthProvider];
-          }
-        },
-        error: (err: HttpErrorResponse) => {
-          this.oauthLoading.set(false);
-          this.#notify.error(err, 'auth.profile.errorReauthFailed');
         }
       });
   }
@@ -842,10 +821,9 @@ export class ProfileComponent implements OnInit {
       return;
     }
 
-    this.#startProviderReauth(
-      provider,
-      STEP_UP_OPERATION.OAUTH_UNLINK,
-      PENDING_UNLINK_KEY
+    this.#startReauth(
+      { operation: STEP_UP_OPERATION.OAUTH_UNLINK, provider },
+      this.oauthLoading
     );
   }
 
@@ -1019,8 +997,11 @@ export class ProfileComponent implements OnInit {
       return;
     }
 
-    const provider = this.reauthProvider();
-    if (!provider) {
+    const trip$ = this.#reauthTrip(
+      { operation: STEP_UP_OPERATION.EMAIL_CHANGE, email: newEmail },
+      updateData ? this.#saveBeforeLeaving(updateData) : EMPTY
+    );
+    if (!trip$) {
       this.error.set(
         this.#transloco.translate('auth.profile.errorReauthNoProvider')
       );
@@ -1029,46 +1010,18 @@ export class ProfileComponent implements OnInit {
 
     this.saving.set(true);
     this.error.set(null);
-
-    const ops: Observable<unknown>[] = [];
-    if (updateData) {
-      ops.push(
-        this.#authService.updateProfile(updateData).pipe(
-          tap((user) => {
-            this.user.set(user);
-          })
-        )
-      );
-    }
-    ops.push(
-      defer(() =>
-        this.#authService.initOAuthReauth(STEP_UP_OPERATION.EMAIL_CHANGE)
-      )
-    );
-
-    concat(...ops)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        complete: () => {
-          this.#sessionStorage.setItem(PENDING_EMAIL_KEY, newEmail);
-          this.#notify.info('auth.profile.reauthRedirecting', {
-            provider: this.reauthProviderLabel()
-          });
-          if (this.#window) {
-            this.#window.location.href = OAUTH_URLS[provider];
-          }
-        },
-        error: (err: HttpErrorResponse) => {
-          this.saving.set(false);
-          this.error.set(
-            parseHttpErrorMessage(
-              err,
-              this.#transloco,
-              'auth.profile.errorEmailChangeFailed'
-            )
-          );
-        }
-      });
+    trip$.subscribe({
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.error.set(
+          parseHttpErrorMessage(
+            err,
+            this.#transloco,
+            'auth.profile.errorEmailChangeFailed'
+          )
+        );
+      }
+    });
   }
 
   /**
@@ -1083,8 +1036,21 @@ export class ProfileComponent implements OnInit {
    * return, which the resume notice asks for.
    */
   #startReauthForPasswordSet(): void {
-    const provider = this.reauthProvider();
-    if (!provider) {
+    const values = this.profileModel();
+    const u = this.user();
+    const nameChanged =
+      !u || values.firstName !== u.firstName || values.lastName !== u.lastName;
+
+    const trip$ = this.#reauthTrip(
+      { operation: STEP_UP_OPERATION.PASSWORD_SET },
+      nameChanged
+        ? this.#saveBeforeLeaving({
+            firstName: values.firstName,
+            lastName: values.lastName
+          })
+        : EMPTY
+    );
+    if (!trip$) {
       this.error.set(
         this.#transloco.translate('auth.profile.errorReauthNoProvider')
       );
@@ -1093,56 +1059,18 @@ export class ProfileComponent implements OnInit {
 
     this.saving.set(true);
     this.error.set(null);
-
-    const values = this.profileModel();
-    const u = this.user();
-    const nameChanged =
-      !u || values.firstName !== u.firstName || values.lastName !== u.lastName;
-
-    const ops: Observable<unknown>[] = [];
-    if (nameChanged) {
-      ops.push(
-        this.#authService
-          .updateProfile({
-            firstName: values.firstName,
-            lastName: values.lastName
-          })
-          .pipe(
-            tap((user) => {
-              this.user.set(user);
-            })
+    trip$.subscribe({
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.error.set(
+          parseHttpErrorMessage(
+            err,
+            this.#transloco,
+            'auth.profile.errorUpdateFailed'
           )
-      );
-    }
-    ops.push(
-      defer(() =>
-        this.#authService.initOAuthReauth(STEP_UP_OPERATION.PASSWORD_SET)
-      )
-    );
-
-    concat(...ops)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        complete: () => {
-          this.#sessionStorage.setItem(PENDING_PASSWORD_KEY, true);
-          this.#notify.info('auth.profile.reauthRedirecting', {
-            provider: this.reauthProviderLabel()
-          });
-          if (this.#window) {
-            this.#window.location.href = OAUTH_URLS[provider];
-          }
-        },
-        error: (err: HttpErrorResponse) => {
-          this.saving.set(false);
-          this.error.set(
-            parseHttpErrorMessage(
-              err,
-              this.#transloco,
-              'auth.profile.errorUpdateFailed'
-            )
-          );
-        }
-      });
+        );
+      }
+    });
   }
 
   /**

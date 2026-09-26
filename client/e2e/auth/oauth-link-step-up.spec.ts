@@ -212,7 +212,10 @@ test.describe('Linking a provider demands a step-up', () => {
     // Seed before the document runs: the page reads and clears the key during
     // bootstrap, which happens after `page.goto` resolves.
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_link', 'facebook')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'oauth_link', provider: 'facebook' })
+      )
     );
 
     const accepted = page.waitForResponse(
@@ -246,7 +249,10 @@ test.describe('Linking a provider demands a step-up', () => {
     await seedProviderOnlyUser(_mockServer);
 
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_link', 'facebook')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'oauth_link', provider: 'facebook' })
+      )
     );
 
     await page.goto('/profile?oauth_error=reauth_failed');
@@ -257,7 +263,7 @@ test.describe('Linking a provider demands a step-up', () => {
 
     await expect(page).toHaveURL(/\/profile$/);
     expect(
-      await page.evaluate(() => sessionStorage.getItem('pending_oauth_link'))
+      await page.evaluate(() => sessionStorage.getItem('pending_reauth'))
     ).toBeNull();
   });
 
@@ -280,7 +286,10 @@ test.describe('Linking a provider demands a step-up', () => {
     );
     await seedProof(page, token);
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_link', 'facebook')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'oauth_link', provider: 'facebook' })
+      )
     );
 
     const refused = page.waitForResponse(

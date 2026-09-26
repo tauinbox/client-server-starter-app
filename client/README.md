@@ -537,7 +537,7 @@ the sessions from `GET /auth/sessions`, names each device with `describeUserAgen
 browsers and systems, with the raw header as the fallback, rendered as text only) and ends one
 other device or all of them. It asks for the factor the account holds: the password, else a code
 from the authenticator, else a provider round trip that the page starts and resumes through the
-`pending_session_revoke` session-storage key. After a sign-in method changes on the page, the card
+`pending_reauth` session-storage key (one record for every step-up round trip on the page). After a sign-in method changes on the page, the card
 offers "Sign out all other devices"; it never signs anything out on its own.
 
 A logout in one tab also ends the session in the other tabs. The constructor listens for the
@@ -1060,7 +1060,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 286 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1366 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1368 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
