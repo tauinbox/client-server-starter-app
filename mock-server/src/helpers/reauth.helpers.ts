@@ -14,6 +14,7 @@ import {
 } from '../constants';
 import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import type { FailedAttemptWindow, MockUser } from '../types';
 
 /**
@@ -98,10 +99,7 @@ export function isValidReauthProof(
     return false;
   }
 
-  if (
-    user.tokenRevokedAt &&
-    record.issuedAt < new Date(user.tokenRevokedAt).getTime() / 1000
-  ) {
+  if (issuedBeforeRevocation(record.issuedAt, user.tokenRevokedAt)) {
     return false;
   }
 

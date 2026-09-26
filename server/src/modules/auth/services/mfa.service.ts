@@ -35,6 +35,7 @@ import type {
   MfaSetupResponse
 } from '@app/shared/types';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { User } from '../../users/entities/user.entity';
 import { AuditContext, AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
@@ -490,20 +491,14 @@ export class MfaService {
     });
 
     // Anything that ended the account's sessions since the password check
-    // must end this attempt too. The floor is load-bearing: `iat` has
-    // one-second resolution and the timestamp has milliseconds, so an
-    // unfloored bound refuses every sign-in inside the second a sign-out
-    // landed in.
-    const revokedAtSeconds = user?.tokenRevokedAt
-      ? Math.floor(user.tokenRevokedAt.getTime() / 1000)
-      : null;
-
+    // must end this attempt too.
     if (
       !user ||
       !user.isActive ||
       user.totpEnabledAt === null ||
-      (revokedAtSeconds !== null &&
-        (typeof payload.iat !== 'number' || payload.iat < revokedAtSeconds))
+      (user.tokenRevokedAt &&
+        (typeof payload.iat !== 'number' ||
+          issuedBeforeRevocation(payload.iat, user.tokenRevokedAt)))
     ) {
       throw invalidTokenError;
     }

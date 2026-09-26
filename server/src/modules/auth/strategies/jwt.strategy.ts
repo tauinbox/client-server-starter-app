@@ -7,6 +7,7 @@ import { CustomJwtPayload, PayloadFromJwt } from '../types/jwt-payload';
 import { User } from '../../users/entities/user.entity';
 import { RefreshTokenService } from '../services/refresh-token.service';
 import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import {
   buildJwtVerification,
   readJwtMinIat
@@ -100,12 +101,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         HttpStatus.UNAUTHORIZED
       );
     }
-    // `iat` is whole seconds. A token minted earlier in the revocation's second
-    // passes here and dies at the session check: every revocation deletes rows.
-    if (
-      user.tokenRevokedAt &&
-      iat < Math.floor(user.tokenRevokedAt.getTime() / 1000)
-    ) {
+    if (issuedBeforeRevocation(iat, user.tokenRevokedAt)) {
       throw new HttpException(
         {
           message: 'Token has been revoked',

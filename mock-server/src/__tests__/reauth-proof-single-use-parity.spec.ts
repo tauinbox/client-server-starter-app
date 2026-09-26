@@ -183,3 +183,45 @@ describe('a reauth proof is spent on its first successful use', () => {
     });
   });
 });
+
+function iatOf(jwt: string): number {
+  const payload = JSON.parse(
+    Buffer.from(jwt.split('.')[1], 'base64url').toString()
+  ) as { iat: number };
+  return payload.iat;
+}
+
+/**
+ * Same rule as the server: the revocation is floored to its second, because
+ * `issuedAt` has one-second resolution. The proof is pinned to the second of
+ * the access token, so that the access token itself stays valid.
+ */
+describe('a reauth proof is compared with the revocation at whole seconds', () => {
+  async function unlinkAfterRevocation(proofOffset: number): Promise<Response> {
+    const token = await accessToken(OAUTH_ONLY_ID);
+    const iat = iatOf(token);
+    const proof = await issueProof(
+      OAUTH_ONLY_ID,
+      STEP_UP_OPERATION.OAUTH_UNLINK
+    );
+    getState().reauthProofs.get(proof)!.issuedAt = iat + proofOffset;
+    getState().users.get(OAUTH_ONLY_ID)!.tokenRevokedAt = new Date(
+      iat * 1000 + 700
+    ).toISOString();
+
+    return unlink(token, 'google', proof);
+  }
+
+  it('accepts a proof issued in the second of the revocation', async () => {
+    expect((await unlinkAfterRevocation(0)).status).toBe(200);
+  });
+
+  it('refuses a proof issued in the second before the revocation', async () => {
+    const res = await unlinkAfterRevocation(-1);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+    });
+  });
+});

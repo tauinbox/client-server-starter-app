@@ -905,6 +905,22 @@ describe('OAuthService', () => {
       expect(mockOAuthAccountService.createOAuthAccount).not.toHaveBeenCalled();
     });
 
+    it('should link when the token was issued in the second of the last revocation', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: new Date(LINK_TOKEN_IAT * 1000 + 700)
+      });
+
+      await service.linkOAuthToUser(
+        'user-1',
+        'google',
+        'google-123',
+        LINK_TOKEN_IAT
+      );
+
+      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalled();
+    });
+
     it('should link when the token was issued after the last revocation', async () => {
       mockUsersService.findOne.mockResolvedValue({
         ...mockUser,
@@ -1009,6 +1025,22 @@ describe('OAuthService', () => {
       expect(
         mockOAuthAccountService.findByProviderAndProviderId
       ).not.toHaveBeenCalled();
+    });
+
+    it('accepts an intent minted in the second of the last session revocation', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: new Date(IAT * 1000 + 700)
+      });
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        userId: mockUser.id,
+        provider: 'google',
+        providerId: 'google-123'
+      });
+
+      await expect(
+        service.assertReauthenticated(mockUser.id, 'google', 'google-123', IAT)
+      ).resolves.toBeUndefined();
     });
 
     it('refuses a deactivated account', async () => {

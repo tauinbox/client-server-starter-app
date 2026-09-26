@@ -8,6 +8,7 @@ import {
   TOTP_DIGITS,
   TOTP_ISSUER
 } from '@app/shared/constants';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { authGuard } from '../helpers/auth.helpers';
 import {
   clearFailures,
@@ -108,15 +109,8 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
   const user = findUserById(decoded.sub);
   if (!user || !user.isActive || !user.totpEnabledAt) return null;
 
-  // A sign-out everywhere since the password check must end this attempt
-  // too. The floor mirrors the server: it keeps a token minted inside the
-  // same second as the sign-out usable.
-  if (
-    user.tokenRevokedAt &&
-    decoded.iat < Math.floor(new Date(user.tokenRevokedAt).getTime() / 1000)
-  ) {
-    return null;
-  }
+  // A sign-out everywhere since the password check must end this attempt too.
+  if (issuedBeforeRevocation(decoded.iat, user.tokenRevokedAt)) return null;
 
   return user;
 }

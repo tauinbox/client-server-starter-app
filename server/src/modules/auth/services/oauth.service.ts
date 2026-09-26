@@ -21,6 +21,7 @@ import {
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import {
   OAUTH_ERROR_NO_EMAIL,
   OAuthAuthenticationFailedException
@@ -284,12 +285,7 @@ export class OAuthService {
       );
     }
 
-    // Same comparison shape as the link path and the JWT strategy, so a proof
-    // minted before a session revocation is refused everywhere alike.
-    if (
-      user.tokenRevokedAt &&
-      reauthTokenIssuedAt < user.tokenRevokedAt.getTime() / 1000
-    ) {
+    if (issuedBeforeRevocation(reauthTokenIssuedAt, user.tokenRevokedAt)) {
       throw new HttpException(
         {
           message: 'Token has been revoked',
@@ -343,12 +339,8 @@ export class OAuthService {
       );
     }
     // The link intent travels in a browser cookie that can outlive the session
-    // that minted it - another tab, another device, a replayed request. Same
-    // comparison shape as the JWT strategy, so the two cannot drift.
-    if (
-      user.tokenRevokedAt &&
-      linkTokenIssuedAt < user.tokenRevokedAt.getTime() / 1000
-    ) {
+    // that minted it - another tab, another device, a replayed request.
+    if (issuedBeforeRevocation(linkTokenIssuedAt, user.tokenRevokedAt)) {
       throw new HttpException(
         {
           message: 'Token has been revoked',

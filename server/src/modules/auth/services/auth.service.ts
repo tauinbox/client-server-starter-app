@@ -57,6 +57,7 @@ import {
   type StepUpOperation
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import { readJwtMinIat } from '../jwt-module-options.factory';
 
@@ -1156,16 +1157,12 @@ export class AuthService {
         jti?: string;
       }>(proof);
 
-      const revokedAtSeconds = user.tokenRevokedAt
-        ? user.tokenRevokedAt.getTime() / 1000
-        : null;
-
       const isIntact =
         payload.purpose === TOKEN_PURPOSE.REAUTH_PROOF &&
         payload.sub === user.id &&
         payload.operation === operation &&
         typeof payload.iat === 'number' &&
-        (revokedAtSeconds === null || payload.iat >= revokedAtSeconds);
+        !issuedBeforeRevocation(payload.iat, user.tokenRevokedAt);
 
       // A proof minted before the ledger existed carries no id and cannot be
       // recorded as spent, so it is refused rather than trusted.

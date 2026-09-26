@@ -24,12 +24,7 @@ test.describe('Logout after the access token has gone stale', () => {
       }
     });
 
-    // The mock compares `iat < tokenRevokedAt / 1000`, so the revocation and the
-    // refresh after it must land on different seconds - see
-    // reactive-token-refresh.spec.ts.
-    await waitForNextSecondBoundary();
     await _mockServer.invalidateAccessTokens(userId);
-    await waitForNextSecondBoundary();
 
     // The laptop lid closes for two hours: the clock jumps, the refresh timer
     // never runs.
@@ -47,8 +42,3 @@ test.describe('Logout after the access token has gone stale', () => {
     expect(loggedOut.revokedRefreshTokens).toBe(0);
   });
 });
-
-function waitForNextSecondBoundary(): Promise<void> {
-  const ms = Date.now() % 1000;
-  return new Promise((resolve) => setTimeout(resolve, 1000 - ms + 50));
-}

@@ -2,6 +2,7 @@ import { subject as caslSubject } from '@casl/ability';
 import type { Request, Response, NextFunction } from 'express';
 import { validateToken, type DecodedToken } from '../jwt.utils';
 import { ErrorKeys } from '@app/shared/constants';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import {
   buildAbilityForUser,
   findUserById,
@@ -31,14 +32,7 @@ export function authenticateRequest(req: Request): AuthResult | null {
   const user = findUserById(decoded.sub);
   if (!user) return null;
 
-  // Floored like JwtStrategy: `iat` is whole seconds, and every revocation
-  // also ends the sessions, so the session check below refuses the rest.
-  if (
-    user.tokenRevokedAt &&
-    decoded.iat < Math.floor(new Date(user.tokenRevokedAt).getTime() / 1000)
-  ) {
-    return null;
-  }
+  if (issuedBeforeRevocation(decoded.iat, user.tokenRevokedAt)) return null;
 
   // Fail closed on a missing session claim, matching JwtStrategy: a token that
   // names no session cannot be ended by a sign-out on its own device.
