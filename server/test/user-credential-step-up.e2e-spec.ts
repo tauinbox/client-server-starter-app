@@ -8,7 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import { verifyPassword } from '../src/common/utils/password-hash';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -133,7 +133,10 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const row = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id } });
-    return row.password !== null && bcrypt.compare(value, row.password);
+    return (
+      row.password !== null &&
+      (await verifyPassword(value, row.password, row.passwordHashVersion)).valid
+    );
   }
 
   function patch(token: string, id: string, body: object) {

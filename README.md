@@ -856,10 +856,9 @@ the same permission both apply.
 - A responsive SCSS architecture.
 - Snackbar error notifications.
 - Form validation with error messages. The client applies the same password length rules as the
-  server: the shared `MIN_PASSWORD_LENGTH` and `MAX_NEW_PASSWORD_LENGTH`. Thus a password that is
-  too short gets a translated message on the field, and it does not need a server round trip. A new
-  password also gets a byte check, because bcrypt reads at most 72 bytes and a Cyrillic letter is
-  two of them. There is no composition rule. The server refuses one of the 10 000 most common passwords,
+  server: the shared `MIN_PASSWORD_LENGTH` and `MAX_PASSWORD_LENGTH` (8 to 128 characters, in any
+  script). Thus a password that is too short gets a translated message on the field, and it does not
+  need a server round trip. There is no composition rule. The server refuses one of the 10 000 most common passwords,
   a password that contains the user's name, email local part or the product name, and a password
   that appears in a public breach corpus. Those verdicts need a round trip: the common list is too
   large for the bundle, and only the server may query the corpus.
@@ -911,14 +910,12 @@ fullstack-starter-app/
 │       ├── types/          # UserResponse, AdminUserResponse, AuthResponse, CursorPaginatedResponse<T>,
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
-│       ├── constants/      # MIN/MAX_PASSWORD_LENGTH, MAX_NEW_PASSWORD_LENGTH/_BYTES (72,
-│       │                   # the bcrypt input limit), cursor page size, SYSTEM_ROLES,
+│       ├── constants/      # MIN/MAX_PASSWORD_LENGTH, cursor page size, SYSTEM_ROLES,
 │       │                   # MAX_CONCURRENT_SESSIONS,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
 │       ├── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
 │       │                   # feature-flag-attribute-value + feature-flag-timestamp (also imported by
 │       │                   # the client, thus free of node built-ins), mongo-query-safety,
-│       │                   # password-bytes (TextEncoder, thus also free of node built-ins),
 │       │                   # time (Temporal barrel), money (BigInt value object)
 │       └── test-fixtures/  # email-address-corpus - the address verdicts the server and the mock
 │                           # must agree on (test data, imported by no production module)
@@ -1817,8 +1814,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2608 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 486 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 482 pass and 2 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2615 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 490 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 482 pass and 2 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1360 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 284 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 865 tests pass |
@@ -1878,9 +1875,11 @@ a second request to the registry for a verdict that gates nothing.
 ## Security
 
 - bcrypt hashes each password, with a cost factor of 12. bcrypt reads at most 72 bytes of its
-  input, thus each path that sets a password caps there, in characters and in bytes. A path that
-  verifies a password keeps the 128-character cap, because a stored hash covers the same truncated
-  prefix and a lower cap would lock out the owner of a long legacy password.
+  input, thus the server first pre-hashes the password with HMAC-SHA-256 under a fixed key and
+  gives bcrypt the 44-character base64 result (`server/src/common/utils/password-hash.ts`). Every
+  character of a password up to 128 counts, in any script. The column `password_hash_version` tells
+  a pre-hashed row (2) from a row written before this change (1). A version 1 row still verifies
+  over the raw value, and a correct sign-in or step-up rewrites it to version 2 in the same request.
 - **Account lockout** starts after 5 failed logins. The cooldown is 15 minutes. An open lock answers
   the 423 countdown before the password is checked, so a locked account takes no more guesses. Each
   attempt takes its slot before the check, so a concurrent burst gets at most 5 checks. A password

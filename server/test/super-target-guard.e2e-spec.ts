@@ -8,7 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import { verifyPassword } from '../src/common/utils/password-hash';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
@@ -168,7 +168,15 @@ runWithInfra('User writes on a super target (e2e)', () => {
 
     expectSuperTargetRefusal(res);
     const target = await row(superEmail);
-    expect(await bcrypt.compare(password, target.password ?? '')).toBe(true);
+    expect(
+      (
+        await verifyPassword(
+          password,
+          target.password ?? '',
+          target.passwordHashVersion
+        )
+      ).valid
+    ).toBe(true);
   }, 30000);
 
   it('refuses the super target before it reads the factor of the caller', async () => {

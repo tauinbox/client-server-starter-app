@@ -5,18 +5,15 @@ import { resetState } from '../state';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { passwordLengthError } from '../utils/validation';
 
-// Mirrors the server split: a path that SETS a password caps at 72 bytes,
-// because bcrypt ignores the rest; a path that only VERIFIES one keeps 128.
+// Mirrors the server: the password is pre-hashed before bcrypt, so every
+// path caps at MAX_PASSWORD_LENGTH characters whatever their byte count.
 let server: Server;
 let baseUrl: string;
 
-// 'Parol1' written in Cyrillic, then 30 more Cyrillic letters: 37 characters
-// and 73 bytes.
-const CYRILLIC_73_BYTES = 'Пароль1' + 'я'.repeat(30);
+// 'Parol1' written in Cyrillic, then 57 more Cyrillic letters: 64 characters
+// and 128 bytes, which the old 72-byte cap refused.
+const CYRILLIC_64 = 'Пароль1' + 'я'.repeat(57);
 const ASCII_128 = 'A1' + 'a'.repeat(126);
-const BYTE_MESSAGE =
-  'password is too long: some characters count as more than one byte, ' +
-  'so it must be at most 72 bytes';
 
 beforeAll(async () => {
   resetState();
@@ -34,38 +31,36 @@ beforeEach(() => {
 });
 
 describe('passwordLengthError', () => {
-  it('accepts a password of exactly 72 bytes', () => {
-    expect(passwordLengthError('A1' + 'a'.repeat(70))).toBeNull();
+  it('accepts 64 Cyrillic characters', () => {
+    expect(CYRILLIC_64).toHaveLength(64);
+    expect(passwordLengthError(CYRILLIC_64)).toBeNull();
   });
 
-  it('rejects 73 ASCII characters on the character cap', () => {
-    expect(passwordLengthError('A1' + 'a'.repeat(71))).toBe(
-      'password must be shorter than or equal to 72 characters'
+  it(`accepts ${MAX_PASSWORD_LENGTH} characters`, () => {
+    expect(passwordLengthError(ASCII_128)).toBeNull();
+  });
+
+  it(`rejects ${MAX_PASSWORD_LENGTH + 1} characters`, () => {
+    expect(passwordLengthError(ASCII_128 + 'a')).toBe(
+      `password must be shorter than or equal to ${MAX_PASSWORD_LENGTH} characters`
     );
-  });
-
-  it('rejects a 37-character Cyrillic password on the byte cap', () => {
-    expect(CYRILLIC_73_BYTES).toHaveLength(37);
-    expect(passwordLengthError(CYRILLIC_73_BYTES)).toBe(BYTE_MESSAGE);
   });
 });
 
 describe('POST /api/v1/auth/register', () => {
-  it('rejects a 73-byte Cyrillic password with the byte message', async () => {
+  it('accepts a 64-character Cyrillic password', async () => {
     const res = await fetch(`${baseUrl}/api/v1/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        email: 'byte.cap@example.com',
-        firstName: 'Byte',
-        lastName: 'Cap',
-        password: CYRILLIC_73_BYTES
+        email: 'long.cyrillic@example.com',
+        firstName: 'Olga',
+        lastName: 'Smirnova',
+        password: CYRILLIC_64
       })
     });
 
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { errors?: string[] };
-    expect(body.errors).toContain(BYTE_MESSAGE);
+    expect(res.status).toBe(201);
   });
 });
 

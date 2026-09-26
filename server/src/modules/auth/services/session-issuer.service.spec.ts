@@ -37,6 +37,7 @@ describe('SessionIssuerService', () => {
     firstName: 'John',
     lastName: 'Doe',
     password: '$2b$10$hashedpassword',
+    passwordHashVersion: 2,
     hasPassword: true,
     mfaEnabled: false,
     isActive: true,

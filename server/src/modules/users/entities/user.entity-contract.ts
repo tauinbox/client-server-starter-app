@@ -30,6 +30,7 @@ import type { UserResponse, _AssertNever } from '@app/shared/types';
  */
 type _ExcludedFields =
   | 'password'
+  | 'passwordHashVersion'
   | 'emailVerificationToken'
   | 'emailVerificationExpiresAt'
   | 'passwordResetToken'
