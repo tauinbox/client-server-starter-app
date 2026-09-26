@@ -540,6 +540,13 @@ from the authenticator, else a provider round trip that the page starts and resu
 `pending_reauth` session-storage key (one record for every step-up round trip on the page). After a sign-in method changes on the page, the card
 offers "Sign out all other devices"; it never signs anything out on its own.
 
+**One step-up form.** The four prompts that ask for the password or an authenticator code (the
+two-factor card, the signed-in devices card, the MFA reset dialog and the user edit page) build
+their fields with `createStepUpFactorForm` from `features/auth/utils/step-up-factor-form.ts`.
+`stepUpFactorOf(user)` picks the factor: `password`, else `code`, else `none`. The helper sends
+exactly one of `{ currentPassword }` or `{ code }`, and its reset also clears the touched state, so
+a prompt that opens again shows no stale error.
+
 A logout in one tab also ends the session in the other tabs. The constructor listens for the
 `storage` event. That event fires in each other tab of the same origin, and never in the tab that
 made the change. When `auth_user` goes away, the listener calls

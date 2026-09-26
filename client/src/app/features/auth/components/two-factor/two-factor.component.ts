@@ -18,7 +18,6 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { form, required } from '@angular/forms/signals';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoDirective } from '@jsverse/transloco';
@@ -27,7 +26,7 @@ import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '../../services/auth.service';
-import type { MfaStepUpRequest } from '../../models/auth.types';
+import { createStepUpFactorForm } from '../../utils/step-up-factor-form';
 
 /**
  * The enrolment is a strict sequence, and each step needs the answer of the
@@ -100,30 +99,25 @@ export class TwoFactorComponent {
     () => this.user()?.hasPassword !== false
   );
 
-  readonly passwordModel = signal<{ currentPassword: string }>({
-    currentPassword: ''
-  });
-  readonly passwordForm = form(this.passwordModel, (path) => {
-    required(path.currentPassword, {
-      message: 'auth.twoFactor.passwordRequired'
-    });
-  });
-
-  readonly codeModel = signal<{ code: string }>({ code: '' });
-  readonly codeForm = form(this.codeModel, (path) => {
-    required(path.code, { message: 'auth.twoFactor.codeRequired' });
-  });
-
   /**
    * An account with no password proves itself with a code from the
    * authenticator it enrolled, which is the only factor it holds. Turning the
    * factor off and replacing the recovery set ask for the same proof.
    */
+  readonly #stepUp = createStepUpFactorForm(
+    computed(() => (this.accountHasPassword() ? 'password' : 'code')),
+    {
+      passwordRequired: 'auth.twoFactor.passwordRequired',
+      codeRequired: 'auth.twoFactor.codeRequired'
+    }
+  );
+  readonly passwordModel = this.#stepUp.passwordModel;
+  readonly passwordForm = this.#stepUp.passwordForm;
+  readonly codeModel = this.#stepUp.codeModel;
+  readonly codeForm = this.#stepUp.codeForm;
+
   protected readonly stepUpBlocked = computed(
-    () =>
-      (this.accountHasPassword()
-        ? this.passwordForm().invalid()
-        : this.codeForm().invalid()) || this.busy()
+    () => this.#stepUp.invalid() || this.busy()
   );
 
   /** A resumed round trip asks for one secret, however often the input emits. */
@@ -218,7 +212,7 @@ export class TwoFactorComponent {
 
     this.busy.set(true);
     this.#authService
-      .disableMfa(this.#stepUpRequest())
+      .disableMfa(this.#stepUp.request())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -244,13 +238,12 @@ export class TwoFactorComponent {
 
     this.busy.set(true);
     this.#authService
-      .regenerateRecoveryCodes(this.#stepUpRequest())
+      .regenerateRecoveryCodes(this.#stepUp.request())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (response) => {
           this.busy.set(false);
-          this.passwordModel.set({ currentPassword: '' });
-          this.codeModel.set({ code: '' });
+          this.#stepUp.reset();
           this.recoveryCodes.set(response.recoveryCodes);
           this.codesReplaced.set(true);
           this.stage.set('codes');
@@ -292,21 +285,10 @@ export class TwoFactorComponent {
       });
   }
 
-  /**
-   * The factor is live in both paths that send this, so the account always
-   * holds a code. The password is what an account that has one uses.
-   */
-  #stepUpRequest(): MfaStepUpRequest {
-    return this.accountHasPassword()
-      ? { currentPassword: this.passwordModel().currentPassword }
-      : { code: this.codeModel().code.trim() };
-  }
-
   #reset(): void {
     this.setup.set(null);
     this.recoveryCodes.set([]);
     this.codesReplaced.set(false);
-    this.passwordModel.set({ currentPassword: '' });
-    this.codeModel.set({ code: '' });
+    this.#stepUp.reset();
   }
 }

@@ -19,7 +19,6 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { form, required } from '@angular/forms/signals';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
@@ -30,6 +29,10 @@ import { PasswordToggleComponent } from '@shared/components/password-toggle/pass
 import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '../../services/auth.service';
 import { describeUserAgent } from '../../utils/describe-user-agent';
+import {
+  createStepUpFactorForm,
+  stepUpFactorOf
+} from '../../utils/step-up-factor-form';
 import type {
   MfaStepUpRequest,
   SessionRevokeTarget
@@ -100,10 +103,11 @@ export class ActiveSessionsComponent {
     this.sessions().filter((s) => !s.current)
   );
 
+  readonly #stepUpFactor = computed(() => stepUpFactorOf(this.user()));
+
   protected readonly factor = computed<StepUpFactor>(() => {
-    const user = this.user();
-    if (user?.hasPassword !== false) return 'password';
-    return user.mfaEnabled ? 'code' : 'provider';
+    const factor = this.#stepUpFactor();
+    return factor === 'none' ? 'provider' : factor;
   });
 
   /** An account with no password and no linked provider cannot prove itself. */
@@ -111,25 +115,17 @@ export class ActiveSessionsComponent {
     () => this.factor() === 'provider' && !this.reauthProviderLabel()
   );
 
-  readonly passwordModel = signal<{ currentPassword: string }>({
-    currentPassword: ''
+  readonly #stepUp = createStepUpFactorForm(this.#stepUpFactor, {
+    passwordRequired: 'auth.sessions.passwordRequired',
+    codeRequired: 'auth.sessions.codeRequired'
   });
-  readonly passwordForm = form(this.passwordModel, (path) => {
-    required(path.currentPassword, {
-      message: 'auth.sessions.passwordRequired'
-    });
-  });
-
-  readonly codeModel = signal<{ code: string }>({ code: '' });
-  readonly codeForm = form(this.codeModel, (path) => {
-    required(path.code, { message: 'auth.sessions.codeRequired' });
-  });
+  readonly passwordModel = this.#stepUp.passwordModel;
+  readonly passwordForm = this.#stepUp.passwordForm;
+  readonly codeModel = this.#stepUp.codeModel;
+  readonly codeForm = this.#stepUp.codeForm;
 
   protected readonly stepUpBlocked = computed(
-    () =>
-      (this.factor() === 'password'
-        ? this.passwordForm().invalid()
-        : this.codeForm().invalid()) || this.busy()
+    () => this.#stepUp.invalid() || this.busy()
   );
 
   /** A resumed round trip sends one request, however often the input emits. */
@@ -186,11 +182,7 @@ export class ActiveSessionsComponent {
     const target = this.pending();
     if (!target || this.stepUpBlocked()) return;
 
-    const request: MfaStepUpRequest =
-      this.factor() === 'password'
-        ? { currentPassword: this.passwordModel().currentPassword }
-        : { code: this.codeModel().code.trim() };
-    this.#revoke(target, request);
+    this.#revoke(target, this.#stepUp.request());
   }
 
   #revoke(target: SessionRevokeTarget, request: MfaStepUpRequest): void {
@@ -221,7 +213,6 @@ export class ActiveSessionsComponent {
   }
 
   #resetFactors(): void {
-    this.passwordModel.set({ currentPassword: '' });
-    this.codeModel.set({ code: '' });
+    this.#stepUp.reset();
   }
 }
