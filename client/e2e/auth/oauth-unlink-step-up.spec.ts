@@ -232,7 +232,10 @@ test.describe('Unlinking a provider demands a step-up', () => {
     // Seed before the document runs: the page reads and clears the key during
     // bootstrap, which happens after `page.goto` resolves.
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_unlink', 'facebook')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'oauth_unlink', provider: 'facebook' })
+      )
     );
 
     const accepted = page.waitForResponse(
@@ -270,7 +273,10 @@ test.describe('Unlinking a provider demands a step-up', () => {
     );
     await seedProof(page, token);
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_unlink', 'facebook')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'oauth_unlink', provider: 'facebook' })
+      )
     );
 
     const refused = page.waitForResponse(

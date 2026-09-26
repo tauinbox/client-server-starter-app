@@ -46,6 +46,16 @@ const mockUser: UserResponse = {
   deletedAt: null
 };
 
+/** What the page stores before it leaves for a step-up round trip. */
+function storePendingReauth(pending: object): void {
+  sessionStorage.setItem('pending_reauth', JSON.stringify(pending));
+}
+
+function readPendingReauth(): unknown {
+  const raw = sessionStorage.getItem('pending_reauth');
+  return raw === null ? null : JSON.parse(raw);
+}
+
 describe('ProfileComponent', () => {
   let component: ProfileComponent;
   let fixture: ComponentFixture<ProfileComponent>;
@@ -482,13 +492,13 @@ describe('ProfileComponent', () => {
 
       component.onSubmit();
 
-      const stored = sessionStorage.getItem('pending_password_set');
+      const stored = sessionStorage.getItem('pending_reauth');
       expect(stored).not.toBeNull();
       expect(stored).not.toContain('Sunrise-Kettle-19');
     });
 
     it('asks for the password again on the load that follows the round trip', async () => {
-      sessionStorage.setItem('pending_password_set', 'true');
+      storePendingReauth({ operation: STEP_UP_OPERATION.PASSWORD_SET });
       activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
       fixture.detectChanges();
@@ -501,7 +511,7 @@ describe('ProfileComponent', () => {
     });
 
     it('sends the password once the round trip is done', async () => {
-      sessionStorage.setItem('pending_password_set', 'true');
+      storePendingReauth({ operation: STEP_UP_OPERATION.PASSWORD_SET });
       activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
       authServiceMock.updateProfile.mockReturnValue(of(oauthOnlyUser));
 
@@ -519,7 +529,10 @@ describe('ProfileComponent', () => {
     it('does not accept a round trip that was taken for the email change', async () => {
       // That proof is bound to `email_change`, so a password submit behind it
       // would be refused by the server. The form must start its own trip.
-      sessionStorage.setItem('pending_email_change', 'new@example.com');
+      storePendingReauth({
+        operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+        email: 'new@example.com'
+      });
       activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
       authServiceMock.initiateEmailChange.mockReturnValue(
         of({ message: 'ok' })
@@ -559,7 +572,9 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
         STEP_UP_OPERATION.MFA_SETUP
       );
-      expect(sessionStorage.getItem('pending_mfa_setup')).not.toBeNull();
+      expect(readPendingReauth()).toEqual({
+        operation: STEP_UP_OPERATION.MFA_SETUP
+      });
     });
 
     it('reports that no provider can confirm the account', async () => {
@@ -576,7 +591,7 @@ describe('ProfileComponent', () => {
     });
 
     it('tells the card to resume on the load that follows the round trip', async () => {
-      sessionStorage.setItem('pending_mfa_setup', 'true');
+      storePendingReauth({ operation: STEP_UP_OPERATION.MFA_SETUP });
       activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
       fixture.detectChanges();
@@ -589,7 +604,10 @@ describe('ProfileComponent', () => {
     });
 
     it('does not resume on a round trip taken for the email change', async () => {
-      sessionStorage.setItem('pending_email_change', 'new@example.com');
+      storePendingReauth({
+        operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+        email: 'new@example.com'
+      });
       activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
       authServiceMock.initiateEmailChange.mockReturnValue(
         of({ message: 'ok' })
@@ -622,14 +640,17 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
         STEP_UP_OPERATION.SESSION_REVOKE
       );
-      expect(sessionStorage.getItem('pending_session_revoke')).not.toBeNull();
+      expect(readPendingReauth()).toEqual({
+        operation: STEP_UP_OPERATION.SESSION_REVOKE,
+        target: { scope: 'others' }
+      });
     });
 
     it('sends the stored change on the load that follows the round trip', async () => {
-      sessionStorage.setItem(
-        'pending_session_revoke',
-        JSON.stringify({ scope: 'one', sessionId: 'other-id' })
-      );
+      storePendingReauth({
+        operation: STEP_UP_OPERATION.SESSION_REVOKE,
+        target: { scope: 'one', sessionId: 'other-id' }
+      });
       activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
       fixture.detectChanges();
@@ -641,14 +662,14 @@ describe('ProfileComponent', () => {
         'other-id',
         {}
       );
-      expect(sessionStorage.getItem('pending_session_revoke')).toBeNull();
+      expect(sessionStorage.getItem('pending_reauth')).toBeNull();
     });
 
     it('ignores a stored value of the wrong shape', async () => {
-      sessionStorage.setItem(
-        'pending_session_revoke',
-        JSON.stringify({ scope: 'one' })
-      );
+      storePendingReauth({
+        operation: STEP_UP_OPERATION.SESSION_REVOKE,
+        target: { scope: 'one' }
+      });
       activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
       fixture.detectChanges();
@@ -1053,29 +1074,63 @@ describe('ProfileComponent', () => {
           STEP_UP_OPERATION.OAUTH_LINK
         );
         expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
-        expect(sessionStorage.getItem('pending_oauth_link')).toBe('facebook');
+        expect(readPendingReauth()).toEqual({
+          operation: STEP_UP_OPERATION.OAUTH_LINK,
+          provider: 'facebook'
+        });
         expect(component['stepUpPrompt']()).toBeNull();
       });
 
       it('links on the load that follows the round trip', async () => {
-        sessionStorage.setItem('pending_oauth_link', 'facebook');
+        storePendingReauth({
+          operation: STEP_UP_OPERATION.OAUTH_LINK,
+          provider: 'facebook'
+        });
         activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
         fixture.detectChanges();
         await fixture.whenStable();
 
         expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith(undefined);
-        expect(sessionStorage.getItem('pending_oauth_link')).toBeNull();
+        expect(sessionStorage.getItem('pending_reauth')).toBeNull();
       });
 
       it('does not link on a round trip taken for the enrolment', async () => {
-        sessionStorage.setItem('pending_mfa_setup', 'true');
+        storePendingReauth({ operation: STEP_UP_OPERATION.MFA_SETUP });
         activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
         fixture.detectChanges();
         await fixture.whenStable();
 
         expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
+      });
+
+      it('ignores a stored link to a provider it does not know', async () => {
+        storePendingReauth({
+          operation: STEP_UP_OPERATION.OAUTH_LINK,
+          provider: 'unknown-provider'
+        });
+        activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem('pending_reauth')).toBeNull();
+      });
+
+      it('ignores a stored operation that this page does not resume', async () => {
+        storePendingReauth({ operation: STEP_UP_OPERATION.MFA_DISABLE });
+        activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
+        expect(authServiceMock.initiateEmailChange).not.toHaveBeenCalled();
+        expect(component['resumeMfaSetup']()).toBe(false);
+        expect(component['resumeSessionRevoke']()).toBeNull();
+        expect(sessionStorage.getItem('pending_reauth')).toBeNull();
       });
     });
   });
@@ -1147,7 +1202,10 @@ describe('ProfileComponent', () => {
           STEP_UP_OPERATION.OAUTH_UNLINK
         );
         expect(authServiceMock.unlinkOAuthAccount).not.toHaveBeenCalled();
-        expect(sessionStorage.getItem('pending_oauth_unlink')).toBe('facebook');
+        expect(readPendingReauth()).toEqual({
+          operation: STEP_UP_OPERATION.OAUTH_UNLINK,
+          provider: 'facebook'
+        });
         expect(component['stepUpPrompt']()).toBeNull();
       });
 
@@ -1155,7 +1213,10 @@ describe('ProfileComponent', () => {
         authServiceMock.unlinkOAuthAccount.mockReturnValue(
           of({ message: 'Unlinked' })
         );
-        sessionStorage.setItem('pending_oauth_unlink', 'facebook');
+        storePendingReauth({
+          operation: STEP_UP_OPERATION.OAUTH_UNLINK,
+          provider: 'facebook'
+        });
         activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
         fixture.detectChanges();
@@ -1165,11 +1226,14 @@ describe('ProfileComponent', () => {
           'facebook',
           undefined
         );
-        expect(sessionStorage.getItem('pending_oauth_unlink')).toBeNull();
+        expect(sessionStorage.getItem('pending_reauth')).toBeNull();
       });
 
       it('does not unlink on a round trip taken for the link', async () => {
-        sessionStorage.setItem('pending_oauth_link', 'facebook');
+        storePendingReauth({
+          operation: STEP_UP_OPERATION.OAUTH_LINK,
+          provider: 'facebook'
+        });
         activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
 
         fixture.detectChanges();

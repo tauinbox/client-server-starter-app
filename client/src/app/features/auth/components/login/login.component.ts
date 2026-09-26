@@ -33,6 +33,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
+import { OAUTH_RETURN_URL_KEY } from '../../constants/oauth-return-url.const';
 import {
   PASSWORD_CHANGED,
   PASSWORD_CHANGED_PARAM
@@ -210,7 +211,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   onOAuthLogin(provider: string): void {
     if (!isOAuthProvider(provider)) return;
 
-    this.#sessionStorage.setItem('oauth_return_url', this.#returnUrl());
+    this.#sessionStorage.setItem(OAUTH_RETURN_URL_KEY, this.#returnUrl());
     if (this.#window) {
       this.#window.location.href = this.oauthUrls[provider];
     }

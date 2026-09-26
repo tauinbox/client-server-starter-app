@@ -102,7 +102,13 @@ test.describe('OAuth-only account changes its email', () => {
     // Angular bootstraps after it, so writing the key from the test can land
     // after the component has already read and cleared it.
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_email_change', 'new-address@example.com')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({
+          operation: 'email_change',
+          email: 'new-address@example.com'
+        })
+      )
     );
     // The outcome is a snackbar, and its 5000ms life is the same as the default
     // expect timeout. It is raised only after the initiate round trip and the
@@ -143,7 +149,13 @@ test.describe('OAuth-only account changes its email', () => {
     await seedOAuthOnlyUser(_mockServer);
 
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_email_change', 'new-address@example.com')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({
+          operation: 'email_change',
+          email: 'new-address@example.com'
+        })
+      )
     );
     await page.goto('/profile?reauth=ok');
 

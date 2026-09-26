@@ -68,7 +68,10 @@ test.describe('OAuth — unlink last provider safety', () => {
       }
     ]);
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_oauth_unlink', 'google')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'oauth_unlink', provider: 'google' })
+      )
     );
 
     await page.goto('/profile?reauth=ok');

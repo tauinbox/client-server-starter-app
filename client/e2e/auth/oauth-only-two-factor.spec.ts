@@ -136,7 +136,10 @@ test.describe('OAuth-only account turns two-factor on', () => {
     // Seed before the document runs: the page reads and clears the key during
     // bootstrap, which happens after `page.goto` resolves.
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_mfa_setup', 'true')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'mfa_setup' })
+      )
     );
 
     // The reload that follows the enrolment builds a new card, which must not
@@ -192,7 +195,10 @@ test.describe('OAuth-only account turns two-factor on', () => {
     );
     await seedProof(page, token);
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_mfa_setup', 'true')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({ operation: 'mfa_setup' })
+      )
     );
 
     const refused = page.waitForResponse(

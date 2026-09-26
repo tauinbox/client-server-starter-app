@@ -61,7 +61,13 @@ test.describe('Profile init notifications wait for their translations', () => {
     ]);
 
     await page.addInitScript(() =>
-      sessionStorage.setItem('pending_email_change', 'new-address@example.com')
+      sessionStorage.setItem(
+        'pending_reauth',
+        JSON.stringify({
+          operation: 'email_change',
+          email: 'new-address@example.com'
+        })
+      )
     );
 
     await page.route(/features\/auth\/i18n\/en\.json/, async (route) => {

@@ -20,6 +20,7 @@ import { SessionStorageService } from '@core/services/session-storage.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { safeReturnUrl } from '../../utils/safe-return-url';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
+import { OAUTH_RETURN_URL_KEY } from '../../constants/oauth-return-url.const';
 import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component';
 import type { MfaRequiredResponse } from '../../models/auth.types';
 import { TranslocoDirective } from '@jsverse/transloco';
@@ -107,8 +108,9 @@ export class OAuthCallbackComponent implements OnInit {
   }
 
   #navigateToReturnUrl(): void {
-    const returnUrl = this.#sessionStorage.getItem<string>('oauth_return_url');
-    this.#sessionStorage.removeItem('oauth_return_url');
+    const returnUrl =
+      this.#sessionStorage.getItem<string>(OAUTH_RETURN_URL_KEY);
+    this.#sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
 
     const safeUrl =
       safeReturnUrl(returnUrl, this.#window?.location.origin) ??
