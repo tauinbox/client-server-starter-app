@@ -1079,7 +1079,9 @@ that OAuth makes. The
 **JwtStrategy** verifies the signature of the Bearer token. It pins the issuer, the audience and the
 signing algorithm. It requires the `access` token purpose and a `sub` claim that is not empty. It
 applies the `JWT_MIN_IAT` cutoff and the per-user `tokenRevokedAt` cutoff, which it floors to whole
-seconds because `iat` has no finer unit. It then requires a `sid`
+seconds because `iat` has no finer unit. That rule is `issuedBeforeRevocation` in
+`shared/src/utils/token-revocation.ts`. The pending sign-in token, the re-authentication proof, the
+provider re-authentication intent, the link intent and the mock use the same function. It then requires a `sid`
 claim and asks `RefreshTokenService.hasLiveSession`, which looks for a row of that session which is
 not revoked and not expired, so a sign-out on one device refuses that device on its next request
 while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, roles, sessionId }`.

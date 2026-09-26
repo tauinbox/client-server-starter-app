@@ -1,9 +1,4 @@
-import {
-  expect,
-  loginViaUi,
-  test,
-  type MockServerApi
-} from '../fixtures/base.fixture';
+import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 
 // Regression for the reactive token-refresh path. Fixes the gap where a user
 // whose access token has just been invalidated (server-side revocation, near
@@ -39,7 +34,7 @@ test.describe('Reactive access-token refresh', () => {
 
     // Invalidate the user's access tokens. Refresh cookie stays valid so the
     // refresh-and-retry loop can succeed.
-    await invalidateAfterIatBoundary(_mockServer, userId);
+    await _mockServer.invalidateAccessTokens(userId);
 
     // Navigate to a list page that fires GET /api/v1/users (admin-only).
     // The first request returns 401 because the access token is now revoked;
@@ -67,27 +62,3 @@ test.describe('Reactive access-token refresh', () => {
     expect(refreshStatuses).toContain(200);
   });
 });
-
-// Mock-server compares `decoded.iat < tokenRevokedAt/1000`. JWT `iat` is
-// whole-second precision; `tokenRevokedAt` is ms precision. So even after a
-// fresh refresh, the new token's `iat` could equal the integer second of
-// `tokenRevokedAt` and stay rejected. To make the test deterministic without
-// racing the clock:
-//   1. wait until the next second boundary, THEN invalidate (so the existing
-//      token's iat is strictly less than tokenRevokedAt's second);
-//   2. wait again until the NEXT second boundary, so any refresh-issued
-//      token's iat is strictly greater than tokenRevokedAt's second and
-//      passes the auth check.
-async function invalidateAfterIatBoundary(
-  mockServer: MockServerApi,
-  userId: string
-): Promise<void> {
-  await waitForNextSecondBoundary();
-  await mockServer.invalidateAccessTokens(userId);
-  await waitForNextSecondBoundary();
-}
-
-function waitForNextSecondBoundary(): Promise<void> {
-  const ms = Date.now() % 1000;
-  return new Promise((resolve) => setTimeout(resolve, 1000 - ms + 50));
-}

@@ -2689,6 +2689,24 @@ describe('AuthService', () => {
         });
       });
 
+      it('accepts a proof minted in the second of the last session revocation', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        mockUsersService.findOne.mockResolvedValue({
+          ...oauthOnlyUser(),
+          tokenRevokedAt: new Date(now * 1000 + 700)
+        });
+        mockJwtService.verify.mockReturnValue({ ...validProof(), iat: now });
+
+        const result = await service.initiateEmailChange(
+          'user-1',
+          { newEmail: 'new@example.com' },
+          'same-second-proof'
+        );
+
+        expect(result.message).toBeDefined();
+        expect(mockManager.update).toHaveBeenCalled();
+      });
+
       it('refuses a proof that does not verify at all', async () => {
         mockJwtService.verify.mockImplementation(() => {
           throw new Error('bad signature');

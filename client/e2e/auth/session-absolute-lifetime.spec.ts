@@ -19,12 +19,7 @@ test.describe('Absolute session lifetime', () => {
       }
     });
 
-    // The mock compares `iat < tokenRevokedAt / 1000`, so the revocation and
-    // the request after it must land on different seconds - see
-    // reactive-token-refresh.spec.ts.
-    await waitForNextSecondBoundary();
     await _mockServer.invalidateAccessTokens(userId);
-    await waitForNextSecondBoundary();
 
     // No test can wait 30 days out, so the session start moves instead.
     await _mockServer.ageSession(userId);
@@ -49,8 +44,3 @@ test.describe('Absolute session lifetime', () => {
     await expect(page.getByText(/errors\.auth\./)).toHaveCount(0);
   });
 });
-
-function waitForNextSecondBoundary(): Promise<void> {
-  const ms = Date.now() % 1000;
-  return new Promise((resolve) => setTimeout(resolve, 1000 - ms + 50));
-}
