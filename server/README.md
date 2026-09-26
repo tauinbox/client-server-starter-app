@@ -1238,7 +1238,7 @@ malformed condition with a 400 at authoring time.
 
 **Instance-level enforcement.** Each single-entity endpoint loads the target record and runs
 `assertCan(ability, action, subject(<Subject>, entity))` BEFORE it returns or changes the record.
-Those endpoints are `GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`, `POST /users/:id/mfa/reset`,
+Those endpoints are `GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`, `POST /users/:id/mfa/reset`, `POST /users/:id/sessions/revoke`,
 `GET/PATCH/DELETE /roles/:id`, `GET /roles/:id/permissions`, `PATCH /rbac/resources/:id`,
 `POST /rbac/resources/:id/restore`, and `PATCH/DELETE /rbac/actions/:id`.
 

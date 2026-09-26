@@ -56,6 +56,20 @@ export class UserService {
     });
   }
 
+  revokeSessions(id: string): Observable<{ message: string }> {
+    // The page shows one message with its own fallback key.
+    return this.#http.post<{ message: string }>(
+      `${USERS_API_V1}/${id}/sessions/revoke`,
+      {},
+      {
+        context: new HttpContext().set(
+          DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
+          true
+        )
+      }
+    );
+  }
+
   getPermissions(id: string): Observable<UserEffectivePermissionsResponse> {
     return this.#http.get<UserEffectivePermissionsResponse>(
       `${USERS_API_V1}/${id}/permissions`

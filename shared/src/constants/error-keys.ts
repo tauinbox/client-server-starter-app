@@ -60,6 +60,7 @@ export const ErrorKeys = {
     EMAIL_EXISTS: 'errors.users.emailExists',
     SUPER_TARGET_FORBIDDEN: 'errors.users.superTargetForbidden',
     MFA_RESET_SELF: 'errors.users.mfaResetSelf',
+    SESSION_REVOKE_SELF: 'errors.users.sessionRevokeSelf',
     MODERATION_SELF: 'errors.users.moderationSelf'
   },
   ROLES: {

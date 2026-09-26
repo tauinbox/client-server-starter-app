@@ -52,7 +52,10 @@ const mockUser: User = {
 describe('UserEditComponent', () => {
   let component: UserEditComponent;
   let fixture: ComponentFixture<UserEditComponent>;
-  let userServiceMock: { getById: ReturnType<typeof vi.fn> };
+  let userServiceMock: {
+    getById: ReturnType<typeof vi.fn>;
+    revokeSessions: ReturnType<typeof vi.fn>;
+  };
   let roleCatalogMock: { getAll: ReturnType<typeof vi.fn> };
   let userRoleServiceMock: {
     assignRole: ReturnType<typeof vi.fn>;
@@ -95,7 +98,8 @@ describe('UserEditComponent', () => {
     } | null>({ id: 'admin-id' });
 
     userServiceMock = {
-      getById: vi.fn().mockReturnValue(of(mockUser))
+      getById: vi.fn().mockReturnValue(of(mockUser)),
+      revokeSessions: vi.fn().mockReturnValue(of({ message: 'ok' }))
     };
 
     roleCatalogMock = { getAll: vi.fn().mockReturnValue(of([])) };
@@ -793,6 +797,75 @@ describe('UserEditComponent', () => {
       component.openMfaReset();
 
       expect(component['user']()).toEqual(enrolledUser);
+    });
+  });
+
+  describe('session revocation', () => {
+    function revokeButton(): HTMLButtonElement | undefined {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+      ).find((b) => b.textContent?.trim() === 'Sign out everywhere');
+    }
+
+    it('offers the action for another user', () => {
+      fixture.detectChanges();
+
+      expect(revokeButton()).toBeTruthy();
+    });
+
+    it('hides the action on the own record', () => {
+      currentUserSignal.set({ id: 'user-1' });
+      fixture.detectChanges();
+
+      expect(revokeButton()).toBeUndefined();
+    });
+
+    it('hides the action without update:User', () => {
+      permittedSignal.set(false);
+      fixture.detectChanges();
+
+      expect(revokeButton()).toBeUndefined();
+    });
+
+    it('ends the sessions after the confirmation and reports success', () => {
+      dialogMock.open.mockReturnValue({ afterClosed: () => of(true) });
+      fixture.detectChanges();
+
+      component.confirmRevokeSessions();
+
+      const dialogData = dialogMock.open.mock.calls[0][1]['data'];
+      expect(dialogData['message']).toContain('Test User');
+      expect(userServiceMock.revokeSessions).toHaveBeenCalledWith('user-1');
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'users.edit.successSessionsRevoked'
+      );
+      expect(component['saving']()).toBe(false);
+    });
+
+    it('does nothing when the confirmation is dismissed', () => {
+      dialogMock.open.mockReturnValue({ afterClosed: () => of(false) });
+      fixture.detectChanges();
+
+      component.confirmRevokeSessions();
+
+      expect(userServiceMock.revokeSessions).not.toHaveBeenCalled();
+    });
+
+    it('reports a failure with the fallback key', () => {
+      const httpError = new HttpErrorResponse({ error: null, status: 500 });
+      userServiceMock.revokeSessions.mockReturnValue(
+        throwError(() => httpError)
+      );
+      dialogMock.open.mockReturnValue({ afterClosed: () => of(true) });
+      fixture.detectChanges();
+
+      component.confirmRevokeSessions();
+
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        httpError,
+        'users.edit.errorRevokeSessionsFailed'
+      );
+      expect(component['saving']()).toBe(false);
     });
   });
 

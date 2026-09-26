@@ -608,8 +608,8 @@ condition check. Each button is visible, each route is available, and each API c
 with one exception: no caller can assign or remove a super role through the API.
 
 In the other direction, an account that holds a super role is out of reach of every actor that is not
-super. `PATCH /users/:id`, `DELETE /users/:id`, `POST /users/:id/restore`, `POST /users/:id/mfa/reset`
-and the two role-assignment routes answer 403 with `errors.users.superTargetForbidden` for such an actor. Without that rule, a
+super. `PATCH /users/:id`, `DELETE /users/:id`, `POST /users/:id/restore`, `POST /users/:id/mfa/reset`,
+`POST /users/:id/sessions/revoke` and the two role-assignment routes answer 403 with `errors.users.superTargetForbidden` for such an actor. Without that rule, a
 delegated role with `update:User` could set the password of the super account and sign in as it, or
 keep it signed out, because each role change ends every session of the target.
 
@@ -1529,6 +1529,7 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/users/:id/mfa/reset` | `users:update` | Reset the two-factor enrolment of another user who lost the authenticator and the recovery codes. Needs a step-up of the CALLER (`currentPassword` or `code`). Refused for the caller's own account and for an account with no factor. Ends every session of the target, audits `MFA_RESET_BY_ADMIN` and mails the owner |
+| POST | `/users/:id/sessions/revoke` | `users:update` | End every session of another user on every device. No step-up and no body. Refused for the caller's own account, who uses `DELETE /auth/sessions`. Audits `SESSION_REVOKE` with `details: { scope: 'all', source: 'admin' }` |
 | POST | `/roles` | `roles:create` | Create a role |
 | GET | `/roles` | `roles:read` | List the roles with their permissions |
 | GET | `/roles/:id` | `roles:read` | Get a role by ID |

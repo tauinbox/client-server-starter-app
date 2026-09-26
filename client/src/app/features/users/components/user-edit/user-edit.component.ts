@@ -265,7 +265,10 @@ export class UserEditComponent implements OnInit, OnDestroy {
       !this.#isSelf()
   );
 
-  /** The server refuses `isActive` and `unlockAccount` on the caller's own record. */
+  /**
+   * The server refuses `isActive`, `unlockAccount` and the session revocation
+   * on the caller's own record.
+   */
   protected readonly canModerate = computed(
     () => this.canManageUser() && !this.#isSelf()
   );
@@ -509,6 +512,50 @@ export class UserEditComponent implements OnInit, OnDestroy {
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.#notify.error(err, 'users.edit.errorUnlockFailed');
+        }
+      });
+  }
+
+  confirmRevokeSessions(): void {
+    const u = this.user();
+    if (!u) return;
+
+    this.#adaptiveDialog
+      .openConfirm({
+        title: this.#translocoService.translate(
+          'users.edit.confirmRevokeSessionsTitle'
+        ),
+        message: this.#translocoService.translate(
+          'users.edit.confirmRevokeSessionsMessage',
+          { firstName: u.firstName, lastName: u.lastName }
+        ),
+        confirmButton: this.#translocoService.translate(
+          'users.edit.confirmRevokeSessionsButton'
+        ),
+        cancelButton: this.#translocoService.translate('common.cancel'),
+        icon: 'logout'
+      })
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe((confirmed) => {
+        if (confirmed) {
+          this.#revokeSessions();
+        }
+      });
+  }
+
+  #revokeSessions(): void {
+    this.saving.set(true);
+    this.#userService
+      .revokeSessions(this.id())
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.#notify.success('users.edit.successSessionsRevoked');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saving.set(false);
+          this.#notify.error(err, 'users.edit.errorRevokeSessionsFailed');
         }
       });
   }
