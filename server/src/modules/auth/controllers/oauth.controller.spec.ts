@@ -12,6 +12,8 @@ import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuthService } from '../services/auth.service';
+import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { UsersService } from '../../users/services/users.service';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthUserProfile } from '../types/oauth-profile';
@@ -74,6 +76,11 @@ function mockResponse(): MockedResponse & Response {
 // intent is consumable by the flow that carries this state and by no other.
 const FLOW_STATE = 'a'.repeat(64);
 
+// What loginWithOAuth resolves for an account with no second factor, and what
+// the callback signs for it.
+const OAUTH_USER = { id: '1', email: 'test@example.com', isActive: true };
+const SIGN_IN_DATA = { userId: '1', provider: OAuthProvider.GOOGLE };
+
 function mockExpressRequest(
   user: OAuthUserProfile,
   cookies: Record<string, string> = {},
@@ -118,7 +125,9 @@ describe('OAuthController', () => {
   let authServiceMock: {
     assertStepUpForUser: jest.Mock;
     endPresentedSession: jest.Mock;
+    login: jest.Mock;
   };
+  let usersServiceMock: { findById: jest.Mock };
   let configValues: Record<string, string | undefined>;
 
   beforeEach(async () => {
@@ -159,7 +168,19 @@ describe('OAuthController', () => {
 
     authServiceMock = {
       assertStepUpForUser: jest.fn().mockResolvedValue(undefined),
-      endPresentedSession: jest.fn().mockResolvedValue(undefined)
+      endPresentedSession: jest.fn().mockResolvedValue(undefined),
+      login: jest.fn().mockResolvedValue({
+        tokens: {
+          access_token: 'token',
+          refresh_token: 'refresh',
+          expires_in: 3600
+        },
+        user: OAUTH_USER
+      })
+    };
+
+    usersServiceMock = {
+      findById: jest.fn().mockResolvedValue(OAUTH_USER)
     };
 
     configValues = {
@@ -172,6 +193,8 @@ describe('OAuthController', () => {
       controllers: [OAuthController],
       providers: [
         AuthCookies,
+        SignInCompletionService,
+        { provide: UsersService, useValue: usersServiceMock },
         { provide: CLIENT_URL, useValue: configValues['CLIENT_URL'] },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: OAuthService, useValue: oauthServiceMock },
@@ -518,18 +541,11 @@ describe('OAuthController', () => {
   });
 
   describe('handleOAuthCallback', () => {
-    it('should set oauth_data cookie and redirect without fragment on success', async () => {
-      const mockAuthResponse = {
-        tokens: {
-          access_token: 'token',
-          refresh_token: 'refresh',
-          expires_in: 3600
-        },
-        user: { id: '1', email: 'test@example.com' }
-      };
-      // The full auth response (with refresh_token) is passed into the JWT payload;
-      // the controller's exchangeOAuthData strips refresh_token before returning to client
-      oauthServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
+    // The callback carries no refresh cookie, so it cannot end the session the
+    // browser replaces. It signs who signed in and leaves the session to the
+    // exchange.
+    it('should sign the account into the oauth_data cookie and redirect without fragment on success', async () => {
+      oauthServiceMock.loginWithOAuth.mockResolvedValue(OAUTH_USER);
 
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -550,7 +566,8 @@ describe('OAuthController', () => {
         { data: unknown; purpose: string; jti: string },
         { expiresIn: number }
       ];
-      expect(signedPayload.data).toEqual(mockAuthResponse);
+      expect(signedPayload.data).toEqual(SIGN_IN_DATA);
+      expect(authServiceMock.login).not.toHaveBeenCalled();
       expect(signedPayload.purpose).toBe(TOKEN_PURPOSE.OAUTH_DATA);
       expect(signedPayload.jti).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -612,8 +629,8 @@ describe('OAuthController', () => {
 
     it('should leave a missing email to the service, which signs a linked account in', async () => {
       oauthServiceMock.loginWithOAuth.mockResolvedValue({
-        tokens: { access_token: 'access', expires_in: 3600 },
-        user: { id: '1', email: 'linked@example.com' }
+        id: '1',
+        email: 'linked@example.com'
       });
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -629,7 +646,6 @@ describe('OAuthController', () => {
 
       expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
         profile,
-        expect.anything(),
         expect.anything()
       );
       expect(res.redirect).toHaveBeenCalledWith(
@@ -721,31 +737,19 @@ describe('OAuthController', () => {
         emailVerified: true
       };
 
-      it('records a success row and metric for a completed sign-in', async () => {
-        oauthServiceMock.loginWithOAuth.mockResolvedValue({
-          tokens: { access_token: 'a', refresh_token: 'r', expires_in: 3600 },
-          user: { id: 'user-1', email: 'owner@example.com' }
-        });
+      // The sign-in is not complete until the exchange issues the session,
+      // which writes the success row.
+      it('records no success row for an account the callback resolves', async () => {
+        oauthServiceMock.loginWithOAuth.mockResolvedValue(OAUTH_USER);
 
         await controller.googleCallback(
           mockExpressRequest(profile),
           mockResponse()
         );
 
-        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
-        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
-          action: AuditAction.USER_LOGIN_SUCCESS,
-          actorId: 'user-1',
-          actorEmail: 'owner@example.com',
-          targetId: 'user-1',
-          targetType: 'User',
-          details: { method: 'oauth', provider: OAuthProvider.GOOGLE },
-          context: { ip: '127.0.0.1', requestId: undefined }
-        });
+        expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
         expect(auditServiceMock.log).not.toHaveBeenCalled();
-        expect(metricsServiceMock.recordAuthEvent).toHaveBeenCalledWith(
-          'login_success'
-        );
+        expect(metricsServiceMock.recordAuthEvent).not.toHaveBeenCalled();
       });
 
       it('records no success row when the answer is a second-factor challenge', async () => {
@@ -926,15 +930,7 @@ describe('OAuthController', () => {
     });
 
     it('should use loginWithOAuth when no link cookie present', async () => {
-      const mockAuthResponse = {
-        tokens: {
-          access_token: 'token',
-          refresh_token: 'refresh',
-          expires_in: 3600
-        },
-        user: { id: '1', email: 'test@example.com' }
-      };
-      oauthServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
+      oauthServiceMock.loginWithOAuth.mockResolvedValue(OAUTH_USER);
 
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -948,11 +944,10 @@ describe('OAuthController', () => {
 
       await controller.googleCallback(mockExpressRequest(profile), res);
 
-      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
-        profile,
-        'Mozilla/5.0 Test',
-        { ip: '127.0.0.1', requestId: undefined }
-      );
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile, {
+        ip: '127.0.0.1',
+        requestId: undefined
+      });
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
     });
 
@@ -961,8 +956,8 @@ describe('OAuthController', () => {
     // sign-in rather than hand their identity to the account that walked away.
     it('should sign in, not link, when the intent belongs to another flow', async () => {
       oauthServiceMock.loginWithOAuth.mockResolvedValue({
-        tokens: { access_token: 'token' },
-        user: { id: '2', email: 'stranger@example.com' }
+        id: '2',
+        email: 'stranger@example.com'
       });
 
       const res = mockResponse();
@@ -985,11 +980,10 @@ describe('OAuthController', () => {
       );
 
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
-      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
-        profile,
-        'Mozilla/5.0 Test',
-        { ip: '127.0.0.1', requestId: undefined }
-      );
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile, {
+        ip: '127.0.0.1',
+        requestId: undefined
+      });
       // The abandoned flow may still finish, so its intent is left in place.
       expect(res.clearCookie).not.toHaveBeenCalled();
     });
@@ -998,8 +992,8 @@ describe('OAuthController', () => {
     // belongs to no flow, so nothing may consume it.
     it('should sign in, not link, when the intent is bound to no flow', async () => {
       oauthServiceMock.loginWithOAuth.mockResolvedValue({
-        tokens: { access_token: 'token' },
-        user: { id: '2', email: 'stranger@example.com' }
+        id: '2',
+        email: 'stranger@example.com'
       });
 
       const res = mockResponse();
@@ -1020,26 +1014,17 @@ describe('OAuthController', () => {
       );
 
       expect(oauthServiceMock.linkOAuthToUser).not.toHaveBeenCalled();
-      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(
-        profile,
-        'Mozilla/5.0 Test',
-        { ip: '127.0.0.1', requestId: undefined }
-      );
+      expect(oauthServiceMock.loginWithOAuth).toHaveBeenCalledWith(profile, {
+        ip: '127.0.0.1',
+        requestId: undefined
+      });
     });
   });
 
   describe('exchangeOAuthData', () => {
     it('should set refresh_token cookie and return auth data without refresh_token', async () => {
-      const mockPayloadData = {
-        tokens: {
-          access_token: 'token',
-          refresh_token: 'refresh',
-          expires_in: 3600
-        },
-        user: { id: '1', email: 'test@example.com' }
-      };
       jwtServiceMock.verify.mockReturnValue({
-        data: mockPayloadData,
+        data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         jti: 'token-id'
       });
@@ -1065,11 +1050,79 @@ describe('OAuthController', () => {
           path: '/'
         })
       );
+      expect(usersServiceMock.findById).toHaveBeenCalledWith('1');
+      expect(authServiceMock.login).toHaveBeenCalledWith(
+        OAUTH_USER,
+        'Mozilla/5.0 Test'
+      );
       expect(result).toEqual({
         tokens: { access_token: 'token', expires_in: 3600 },
-        user: { id: '1', email: 'test@example.com' }
+        user: OAUTH_USER
       });
     });
+
+    it('records the success row and metric once the session is issued', async () => {
+      jwtServiceMock.verify.mockReturnValue({
+        data: SIGN_IN_DATA,
+        purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        jti: 'token-id'
+      });
+
+      await controller.exchangeOAuthData(
+        mockExpressRequest({} as OAuthUserProfile, {
+          '__Host-oauth_data': 'signed-jwt'
+        }),
+        mockResponse()
+      );
+
+      expect(auditServiceMock.log).toHaveBeenCalledWith({
+        action: AuditAction.USER_LOGIN_SUCCESS,
+        actorId: '1',
+        actorEmail: 'test@example.com',
+        targetId: '1',
+        targetType: 'User',
+        details: { method: 'oauth', provider: OAuthProvider.GOOGLE },
+        context: { ip: '127.0.0.1', requestId: undefined }
+      });
+      expect(metricsServiceMock.recordAuthEvent).toHaveBeenCalledWith(
+        'login_success'
+      );
+    });
+
+    // Deactivated or deleted between the callback and the exchange. The
+    // refusal is the one a bad cookie gets, so it tells nothing about the
+    // account.
+    it.each([
+      ['deactivated', { ...OAUTH_USER, isActive: false }],
+      ['gone', null]
+    ])(
+      'issues no session when the account is %s by the exchange',
+      async (_label, user) => {
+        usersServiceMock.findById.mockResolvedValue(user);
+        jwtServiceMock.verify.mockReturnValue({
+          data: SIGN_IN_DATA,
+          purpose: TOKEN_PURPOSE.OAUTH_DATA,
+          jti: 'token-id'
+        });
+        const res = mockResponse();
+
+        await expect(
+          controller.exchangeOAuthData(
+            mockExpressRequest({} as OAuthUserProfile, {
+              '__Host-oauth_data': 'signed-jwt',
+              '__Host-refresh_token': 'previous-refresh-token'
+            }),
+            res
+          )
+        ).rejects.toMatchObject({
+          status: HttpStatus.BAD_REQUEST,
+          response: { errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA }
+        });
+        expect(authServiceMock.login).not.toHaveBeenCalled();
+        expect(authServiceMock.endPresentedSession).not.toHaveBeenCalled();
+        expect(res.cookie).not.toHaveBeenCalled();
+      }
+    );
 
     // No session exists behind a challenge, so the exchange must hand the
     // challenge through and plant no refresh cookie.
@@ -1099,20 +1152,15 @@ describe('OAuthController', () => {
       expect(res.cookie).not.toHaveBeenCalled();
       // The browser keeps its cookie until the second factor is met.
       expect(authServiceMock.endPresentedSession).not.toHaveBeenCalled();
+      expect(authServiceMock.login).not.toHaveBeenCalled();
     });
 
-    // The provider redirect carries no refresh cookie, so this request, which
-    // hands the browser its new one, is where the old session ends.
-    it('ends the session of the refresh cookie the browser presented', async () => {
+    // The provider redirect carries no refresh cookie, so this request is where
+    // the old session ends, and it must end before the new one is counted
+    // against the session limit.
+    it('ends the session of the refresh cookie the browser presented before it issues the new one', async () => {
       jwtServiceMock.verify.mockReturnValue({
-        data: {
-          tokens: {
-            access_token: 'token',
-            refresh_token: 'refresh',
-            expires_in: 3600
-          },
-          user: { id: '1', email: 'test@example.com' }
-        },
+        data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         jti: 'token-id'
       });
@@ -1128,6 +1176,9 @@ describe('OAuthController', () => {
       expect(authServiceMock.endPresentedSession).toHaveBeenCalledWith(
         'previous-refresh-token'
       );
+      expect(
+        authServiceMock.endPresentedSession.mock.invocationCallOrder[0]
+      ).toBeLessThan(authServiceMock.login.mock.invocationCallOrder[0]);
     });
 
     it('ends no session when the OAuth data is refused', async () => {
@@ -1145,6 +1196,7 @@ describe('OAuthController', () => {
         HttpException
       );
       expect(authServiceMock.endPresentedSession).not.toHaveBeenCalled();
+      expect(authServiceMock.login).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when cookie is missing', async () => {
@@ -1161,14 +1213,7 @@ describe('OAuthController', () => {
     // second independent session inside the 60-second lifetime of the token.
     it('should refuse a replayed payload and set no second refresh cookie', async () => {
       jwtServiceMock.verify.mockReturnValue({
-        data: {
-          tokens: {
-            access_token: 'token',
-            refresh_token: 'refresh',
-            expires_in: 3600
-          },
-          user: { id: '1', email: 'test@example.com' }
-        },
+        data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         jti: 'replayed-token-id'
       });
@@ -1194,14 +1239,7 @@ describe('OAuthController', () => {
 
     it('should throw BadRequestException when the payload carries no token id', async () => {
       jwtServiceMock.verify.mockReturnValue({
-        data: {
-          tokens: {
-            access_token: 'token',
-            refresh_token: 'refresh',
-            expires_in: 3600
-          },
-          user: { id: '1', email: 'test@example.com' }
-        },
+        data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA
       });
 
@@ -1221,14 +1259,7 @@ describe('OAuthController', () => {
     it('should throw a configuration error and set no cookie when JWT_REFRESH_EXPIRATION is missing', async () => {
       delete configValues['JWT_REFRESH_EXPIRATION'];
       jwtServiceMock.verify.mockReturnValue({
-        data: {
-          tokens: {
-            access_token: 'token',
-            refresh_token: 'refresh',
-            expires_in: 3600
-          },
-          user: { id: '1', email: 'test@example.com' }
-        },
+        data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         jti: 'token-id'
       });
@@ -1275,15 +1306,7 @@ describe('OAuthController', () => {
 
   describe('facebookCallback', () => {
     it('should delegate to handleOAuthCallback and redirect on success', async () => {
-      const mockAuthResponse = {
-        tokens: {
-          access_token: 'token',
-          refresh_token: 'refresh',
-          expires_in: 3600
-        },
-        user: { id: '1', email: 'test@example.com' }
-      };
-      oauthServiceMock.loginWithOAuth.mockResolvedValue(mockAuthResponse);
+      oauthServiceMock.loginWithOAuth.mockResolvedValue(OAUTH_USER);
 
       const res = mockResponse();
       const profile: OAuthUserProfile = {

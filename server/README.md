@@ -324,21 +324,24 @@ share: the `Secure` decision, the refresh cookie and its lifetime, the re-authen
 the link and re-authentication intents. It adds no cookie rule. It calls `refresh-token-cookie.ts`
 and `common/utils/host-cookie.ts`.
 
-`SignInCompletionService.complete` is the last step of the password sign-in and the second-factor
-sign-in. It ends the session that the browser presents, issues the new session, writes the
-`USER_LOGIN_SUCCESS` audit entry and the `login_success` metric, sets the refresh cookie and removes
-the refresh token from the body. The OAuth callback does not use it: its audit entry is
-fire-and-forget and its tokens go into the `oauth_data` cookie.
+`SignInCompletionService.complete` is the last step of each sign-in: the password sign-in, the
+second-factor sign-in and `POST /auth/oauth/exchange`. It ends the session that the browser presents,
+issues the new session, writes the `USER_LOGIN_SUCCESS` audit entry and the `login_success` metric,
+sets the refresh cookie and removes the refresh token from the body. The OAuth callback creates no
+session. It signs only `{ userId, provider }` (or the second-factor challenge) into the `oauth_data`
+cookie, because the provider redirect carries no refresh cookie and cannot end the session that the
+browser replaces. The exchange loads the account again and refuses a deactivated or deleted account
+with the same 400 `INVALID_OAUTH_DATA` that a bad cookie gets.
 
 `SessionIssuerService.issueSession(user, userAgent)` is the single place where a sign-in becomes a session. It
 generates the tokens, persists the refresh token, and then prunes the sessions to the resolved
-allowance. `AuthService.login` and `OAuthService.loginWithOAuth` both delegate to it and hold no
-session logic. Thus the two paths cannot diverge.
+allowance. `AuthService.login` delegates to it and holds no session logic, and every sign-in reaches
+`AuthService.login` through `SignInCompletionService.complete`. Thus the paths cannot diverge.
 
 Neither path reaches it for an account that carries a second factor. `AuthController.login` answers
 `{ mfaRequired, mfaToken, expiresIn }` before it calls `SignInCompletionService.complete`, and `loginWithOAuth`
-resolves the account first and returns the same shape, so the challenge branch creates no session
-and no refresh row. The gate is not inside `issueSession` on purpose: `MfaController` reaches that
+resolves the account first and returns the same shape. `loginWithOAuth` creates no session on either
+branch. The gate is not inside `issueSession` on purpose: `MfaController` reaches that
 method through `SignInCompletionService.complete` after the code was verified, so a test there would
 refuse the request that satisfies it.
 
@@ -1092,8 +1095,9 @@ the only owner of that pair: the session-revocation and role-change listeners ca
 `AuthService.endPresentedSession` deletes the session of the refresh cookie that a sign-in request
 carries, whatever account owns it, because the browser replaces that cookie. `POST /auth/login` and
 the second-factor routes call it before the new session is issued, so the session limit does not
-evict another device. `POST /auth/oauth/exchange` calls it too, because the provider callback is a
-cross-site redirect that carries no `sameSite: strict` cookie.
+evict another device. `POST /auth/oauth/exchange` issues the provider sign-in session for the same
+reason: the provider callback is a cross-site redirect that carries no `sameSite: strict` cookie, so
+a session issued there would be counted before the replaced one ends.
 
 **Active sessions.** Each sign-in stores the `User-Agent` header of the device on the refresh row
 (`user_agent`, cut to 512 characters with control characters removed by `normalizeUserAgent`), and
@@ -1365,8 +1369,8 @@ they give the public form. The administrator endpoints, that is `UsersController
 
 This works on an entity instance only. A handler that spreads an entity into a plain object removes
 the metadata that the interceptor reads. Thus a response must return the entity itself. A payload
-that leaves the reach of the interceptor, such as the signed `oauth_data` cookie, must go through
-`instanceToPlain` at the point where a person builds it.
+that leaves the reach of the interceptor, such as a signed cookie, must go through `instanceToPlain`
+at the point where a person builds it, or carry no entity at all, as the `oauth_data` cookie does.
 
 **Refresh tokens.** A refresh token is an opaque hex string of 80 characters. The database keeps it
 as a SHA-256 hash. The server delivers it as an `HttpOnly SameSite=Strict` cookie with the path

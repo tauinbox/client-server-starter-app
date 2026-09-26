@@ -1,17 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
 import { OAuthService } from './oauth.service';
 import { UsersService } from '../../users/services/users.service';
-import { RefreshTokenService } from './refresh-token.service';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
-import { SessionIssuerService } from './session-issuer.service';
-import { SessionLimitService } from './session-limit.service';
-import { EntitlementService } from '../../entitlements/entitlement.service';
-import { TokenGeneratorService } from './token-generator.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MfaService } from './mfa.service';
@@ -23,7 +17,7 @@ import {
   OAUTH_ERROR_NO_EMAIL,
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
-import { ErrorKeys, MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
+import { ErrorKeys } from '@app/shared/constants';
 
 describe('OAuthService', () => {
   let service: OAuthService;
@@ -44,23 +38,12 @@ describe('OAuthService', () => {
     findOne: jest.Mock;
     markEmailVerified: jest.Mock;
   };
-  let mockConfigService: {
-    getOrThrow: jest.Mock;
-  };
-  let mockRefreshTokenService: {
-    createRefreshToken: jest.Mock;
-    pruneOldestTokens: jest.Mock;
-    deleteByUserId: jest.Mock;
-  };
   let mockOAuthAccountService: {
     findByProviderAndProviderId: jest.Mock;
     createOAuthAccount: jest.Mock;
   };
   let mockRoleService: {
     findRoleByName: jest.Mock;
-  };
-  let mockTokenGenerator: {
-    generateTokens: jest.Mock;
   };
   let mockAuditService: {
     log: jest.Mock;
@@ -75,9 +58,6 @@ describe('OAuthService', () => {
   let mockMailService: {
     sendEmailVerification: jest.Mock;
     sendOAuthLinkedNotification: jest.Mock;
-  };
-  let mockEntitlementService: {
-    limitFor: jest.Mock;
   };
 
   const mockUserRole = {
@@ -133,25 +113,6 @@ describe('OAuthService', () => {
       markEmailVerified: jest.fn().mockResolvedValue(undefined)
     };
 
-    mockConfigService = {
-      getOrThrow: jest.fn().mockImplementation((key: string) => {
-        const config: Record<string, string> = {
-          JWT_REFRESH_EXPIRATION: '604800'
-        };
-        const value = config[key];
-        if (value === undefined) {
-          throw new Error(`Configuration key "${key}" does not exist`);
-        }
-        return value;
-      })
-    };
-
-    mockRefreshTokenService = {
-      createRefreshToken: jest.fn().mockResolvedValue(undefined),
-      pruneOldestTokens: jest.fn().mockResolvedValue(undefined),
-      deleteByUserId: jest.fn().mockResolvedValue(undefined)
-    };
-
     mockOAuthAccountService = {
       findByProviderAndProviderId: jest.fn(),
       createOAuthAccount: jest.fn().mockResolvedValue(undefined)
@@ -161,14 +122,6 @@ describe('OAuthService', () => {
       findRoleByName: jest
         .fn()
         .mockResolvedValue({ id: 'role-uuid', name: 'user' })
-    };
-
-    mockTokenGenerator = {
-      generateTokens: jest.fn().mockReturnValue({
-        access_token: 'mock-access-token',
-        refresh_token: 'mock-refresh-token',
-        expires_in: 3600
-      })
     };
 
     mockAuditService = {
@@ -189,25 +142,13 @@ describe('OAuthService', () => {
         .mockReturnValue({ mfaToken: 'mock-mfa-token', expiresIn: 300 })
     };
 
-    // Free tier by default: no plan-specific allowance, so pruning must fall
-    // back to the constant. Individual tests raise or break it.
-    mockEntitlementService = {
-      limitFor: jest.fn().mockResolvedValue(null)
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OAuthService,
-        SessionIssuerService,
-        SessionLimitService,
-        { provide: EntitlementService, useValue: mockEntitlementService },
         { provide: DataSource, useValue: mockDataSource },
         { provide: UsersService, useValue: mockUsersService },
-        { provide: ConfigService, useValue: mockConfigService },
-        { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         { provide: OAuthAccountService, useValue: mockOAuthAccountService },
         { provide: RoleService, useValue: mockRoleService },
-        { provide: TokenGeneratorService, useValue: mockTokenGenerator },
         { provide: AuditService, useValue: mockAuditService },
         { provide: MailService, useValue: mockMailService },
         { provide: MfaService, useValue: mockMfaService },
@@ -219,14 +160,14 @@ describe('OAuthService', () => {
   });
 
   /**
-   * Narrows away the two-factor branch. Every case that reads `tokens` or
-   * `user` signs in an account with no factor, so a challenge there is a
-   * failure and not a shape to handle.
+   * Narrows away the two-factor branch. Every case that reads the user signs
+   * in an account with no factor, so a challenge there is a failure and not a
+   * shape to handle.
    */
-  const loginExpectingSession = async (profile: OAuthUserProfile) => {
-    const result = await service.loginWithOAuth(profile, null);
+  const loginExpectingUser = async (profile: OAuthUserProfile) => {
+    const result = await service.loginWithOAuth(profile);
     if ('mfaRequired' in result) {
-      throw new Error('Expected a session, received a two-factor challenge');
+      throw new Error('Expected a user, received a two-factor challenge');
     }
     return result;
   };
@@ -267,23 +208,17 @@ describe('OAuthService', () => {
       );
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      const result = await loginExpectingSession(oauthProfile);
+      const result = await loginExpectingUser(oauthProfile);
 
-      expect(result.user.email).toBe('oauth@example.com');
-      expect(result.tokens).toBeDefined();
-      expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
-      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
-        'oauth-user-1',
-        MAX_CONCURRENT_SESSIONS
-      );
-      // OAuth response must carry roles as RoleResponse[] (not string[]).
-      expect(result.user.roles).toEqual([mockUserRole]);
+      expect(result.email).toBe('oauth@example.com');
+      // The exchange issues the session from this user, and the access token
+      // carries its role names.
+      expect(result.roles).toEqual([mockUserRole]);
     });
 
     // A provider proves one credential. An enrolled account is therefore not
-    // signed in yet: it answers with a challenge, and no session is created -
-    // otherwise a refresh row would have to be deleted after the fact.
-    it('answers with a challenge and issues no session when the account carries a second factor', async () => {
+    // signed in yet: it answers with a challenge.
+    it('answers with a challenge when the account carries a second factor', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         id: '1',
         provider: 'google',
@@ -295,62 +230,13 @@ describe('OAuthService', () => {
         totpEnabledAt: new Date()
       });
 
-      const result = await service.loginWithOAuth(oauthProfile, null);
+      const result = await service.loginWithOAuth(oauthProfile);
 
       expect(result).toEqual({
         mfaRequired: true,
         mfaToken: 'mock-mfa-token',
         expiresIn: 300
       });
-      expect(mockRefreshTokenService.createRefreshToken).not.toHaveBeenCalled();
-      expect(mockRefreshTokenService.pruneOldestTokens).not.toHaveBeenCalled();
-      expect(mockTokenGenerator.generateTokens).not.toHaveBeenCalled();
-    });
-
-    it('prunes to the plan allowance when the plan carries a sessions limit', async () => {
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
-        id: '1',
-        provider: 'google',
-        providerId: 'google-123',
-        userId: 'oauth-user-1'
-      });
-      mockUsersService.findOne.mockResolvedValue(oauthUser);
-      mockEntitlementService.limitFor.mockResolvedValue(10);
-
-      await service.loginWithOAuth(oauthProfile, null);
-
-      // A paid allowance must survive the provider path too: trimming to the
-      // constant here would evict devices the user paid for the moment they
-      // signed in with Google rather than a password.
-      expect(mockEntitlementService.limitFor).toHaveBeenCalledWith(
-        'oauth-user-1',
-        'sessions'
-      );
-      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
-        'oauth-user-1',
-        10
-      );
-    });
-
-    it('still signs in on the default allowance when entitlement resolution throws', async () => {
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
-        id: '1',
-        provider: 'google',
-        providerId: 'google-123',
-        userId: 'oauth-user-1'
-      });
-      mockUsersService.findOne.mockResolvedValue(oauthUser);
-      mockEntitlementService.limitFor.mockRejectedValue(
-        new Error('billing unavailable')
-      );
-
-      const result = await loginExpectingSession(oauthProfile);
-
-      expect(result.tokens).toBeDefined();
-      expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
-        'oauth-user-1',
-        MAX_CONCURRENT_SESSIONS
-      );
     });
 
     it('should return the User entity instance so @Exclude() fields can be stripped downstream', async () => {
@@ -365,10 +251,10 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(entity);
 
-      const result = await loginExpectingSession(oauthProfile);
+      const result = await loginExpectingUser(oauthProfile);
 
-      expect(result.user).toBe(entity);
-      expect(instanceToPlain(result.user)).not.toHaveProperty(
+      expect(result).toBe(entity);
+      expect(instanceToPlain(result)).not.toHaveProperty(
         'emailVerificationToken'
       );
     });
@@ -389,12 +275,12 @@ describe('OAuthService', () => {
       );
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      const result = await loginExpectingSession(oauthProfile);
+      const result = await loginExpectingUser(oauthProfile);
 
       expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
         'oauth-user-1'
       );
-      expect(result.user.isEmailVerified).toBe(true);
+      expect(result.isEmailVerified).toBe(true);
     });
 
     it('should not verify a returning OAuth user when the provider asserts nothing', async () => {
@@ -410,7 +296,7 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      const result = await loginExpectingSession({
+      const result = await loginExpectingUser({
         ...oauthProfile,
         provider: 'vkontakte',
         providerId: 'vk-123',
@@ -418,7 +304,7 @@ describe('OAuthService', () => {
       });
 
       expect(mockUsersService.markEmailVerified).not.toHaveBeenCalled();
-      expect(result.user.isEmailVerified).toBe(false);
+      expect(result.isEmailVerified).toBe(false);
     });
 
     it('should not verify a returning OAuth user when the provider vouches for a different address', async () => {
@@ -434,13 +320,13 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      const result = await loginExpectingSession({
+      const result = await loginExpectingUser({
         ...oauthProfile,
         email: 'someone-else@example.com'
       });
 
       expect(mockUsersService.markEmailVerified).not.toHaveBeenCalled();
-      expect(result.user.isEmailVerified).toBe(false);
+      expect(result.isEmailVerified).toBe(false);
     });
 
     it('should verify a returning OAuth user whose asserted address differs only in case', async () => {
@@ -456,13 +342,10 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
 
-      await service.loginWithOAuth(
-        {
-          ...oauthProfile,
-          email: 'OAuth@Example.com'
-        },
-        null
-      );
+      await service.loginWithOAuth({
+        ...oauthProfile,
+        email: 'OAuth@Example.com'
+      });
 
       expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
         'oauth-user-1'
@@ -484,7 +367,7 @@ describe('OAuthService', () => {
         isActive: false
       });
 
-      await expect(service.loginWithOAuth(oauthProfile, null)).rejects.toThrow(
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
         HttpException
       );
     });
@@ -501,7 +384,7 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      const result = await loginExpectingSession({
+      const result = await loginExpectingUser({
         ...oauthProfile,
         provider: 'facebook',
         providerId: 'fb-123',
@@ -509,8 +392,7 @@ describe('OAuthService', () => {
         emailVerified: false
       });
 
-      expect(result.user.id).toBe('oauth-user-1');
-      expect(result.tokens).toBeDefined();
+      expect(result.id).toBe('oauth-user-1');
     });
 
     it('refuses to create an account when the provider sends no email', async () => {
@@ -519,10 +401,11 @@ describe('OAuthService', () => {
       );
 
       await expect(
-        service.loginWithOAuth(
-          { ...oauthProfile, email: '', emailVerified: false },
-          null
-        )
+        service.loginWithOAuth({
+          ...oauthProfile,
+          email: '',
+          emailVerified: false
+        })
       ).rejects.toMatchObject({
         constructor: OAuthAuthenticationFailedException,
         oauthError: OAUTH_ERROR_NO_EMAIL
@@ -530,7 +413,6 @@ describe('OAuthService', () => {
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
       expect(mockManager.save).not.toHaveBeenCalled();
-      expect(mockTokenGenerator.generateTokens).not.toHaveBeenCalled();
     });
 
     it('should throw OAUTH_EMAIL_ALREADY_REGISTERED when local account exists for the email', async () => {
@@ -542,9 +424,7 @@ describe('OAuthService', () => {
         email: 'oauth@example.com'
       });
 
-      await expect(
-        service.loginWithOAuth(oauthProfile, null)
-      ).rejects.toMatchObject({
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
         constructor: HttpException,
         status: HttpStatus.CONFLICT,
         response: {
@@ -552,11 +432,9 @@ describe('OAuthService', () => {
         }
       });
 
-      // Side-effect assertion: NO OAuth account row created, NO tokens issued.
+      // Side-effect assertion: NO OAuth account row created.
       expect(mockOAuthAccountService.createOAuthAccount).not.toHaveBeenCalled();
       expect(mockManager.save).not.toHaveBeenCalled();
-      expect(mockTokenGenerator.generateTokens).not.toHaveBeenCalled();
-      expect(mockRefreshTokenService.createRefreshToken).not.toHaveBeenCalled();
     });
 
     it('should throw OAUTH_EMAIL_ALREADY_REGISTERED even if the existing local account is deactivated', async () => {
@@ -569,9 +447,7 @@ describe('OAuthService', () => {
         isActive: false
       });
 
-      await expect(
-        service.loginWithOAuth(oauthProfile, null)
-      ).rejects.toMatchObject({
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
         response: {
           errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
         }
@@ -594,13 +470,10 @@ describe('OAuthService', () => {
       );
 
       await expect(
-        service.loginWithOAuth(
-          {
-            ...oauthProfile,
-            email: ' OAuth@Example.COM '
-          },
-          null
-        )
+        service.loginWithOAuth({
+          ...oauthProfile,
+          email: ' OAuth@Example.COM '
+        })
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
         response: {
@@ -635,9 +508,7 @@ describe('OAuthService', () => {
           )
       );
 
-      await expect(
-        service.loginWithOAuth(oauthProfile, null)
-      ).rejects.toMatchObject({
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
         response: {
           errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
@@ -656,9 +527,7 @@ describe('OAuthService', () => {
         Object.assign(new Error('duplicate key'), { code: '23505' })
       );
 
-      await expect(
-        service.loginWithOAuth(oauthProfile, null)
-      ).rejects.toMatchObject({
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
         response: {
           errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
@@ -674,9 +543,7 @@ describe('OAuthService', () => {
       const failure = new Error('connection lost');
       mockManager.save.mockRejectedValueOnce(failure);
 
-      await expect(service.loginWithOAuth(oauthProfile, null)).rejects.toBe(
-        failure
-      );
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toBe(failure);
     });
 
     it('stores a canonical address when creating the user', async () => {
@@ -691,13 +558,10 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      await service.loginWithOAuth(
-        {
-          ...oauthProfile,
-          email: ' OAuth@Example.COM '
-        },
-        null
-      );
+      await service.loginWithOAuth({
+        ...oauthProfile,
+        email: ' OAuth@Example.COM '
+      });
 
       expect(mockManager.save).toHaveBeenCalledWith(
         User,
@@ -719,7 +583,7 @@ describe('OAuthService', () => {
       // `roles` relation hydrated so the response carries RoleResponse[].
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      const result = await loginExpectingSession(oauthProfile);
+      const result = await loginExpectingUser(oauthProfile);
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockManager.save).toHaveBeenCalledWith(
@@ -745,9 +609,9 @@ describe('OAuthService', () => {
       expect(mockUsersService.findOne).toHaveBeenCalledWith('oauth-user-1');
       // Verification email is NOT sent when provider already verified.
       expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
-      expect(result.user).toBeDefined();
-      // New OAuth user response carries RoleResponse[] (not string[]).
-      expect(result.user.roles).toEqual([mockUserRole]);
+      // The new user carries its roles, which the exchange signs into the
+      // access token.
+      expect(result.roles).toEqual([mockUserRole]);
     });
 
     it('records a registration row and metric for an account the provider creates', async () => {
@@ -763,7 +627,7 @@ describe('OAuthService', () => {
       mockUsersService.findOne.mockResolvedValue(oauthUser);
       const context = { ip: '203.0.113.7', requestId: 'req-1' };
 
-      await service.loginWithOAuth(oauthProfile, null, context);
+      await service.loginWithOAuth(oauthProfile, context);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledTimes(1);
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
@@ -786,7 +650,7 @@ describe('OAuthService', () => {
       });
       mockUsersService.findOne.mockResolvedValue(oauthUser);
 
-      await service.loginWithOAuth(oauthProfile, null);
+      await service.loginWithOAuth(oauthProfile);
 
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
       expect(mockMetricsService.recordAuthEvent).not.toHaveBeenCalled();
@@ -818,7 +682,7 @@ describe('OAuthService', () => {
         isEmailVerified: false
       });
 
-      await service.loginWithOAuth(unverifiedProfile, null);
+      await service.loginWithOAuth(unverifiedProfile);
 
       expect(mockManager.save).toHaveBeenCalledWith(
         expect.anything(),
@@ -865,10 +729,7 @@ describe('OAuthService', () => {
         new Error('smtp down')
       );
 
-      await service.loginWithOAuth(
-        { ...oauthProfile, emailVerified: false },
-        null
-      );
+      await service.loginWithOAuth({ ...oauthProfile, emailVerified: false });
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(loggerError).toHaveBeenCalledWith(

@@ -154,7 +154,7 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
       userId
     ]);
 
-    const result = await service.loginWithOAuth(profile(), null);
+    const result = await service.loginWithOAuth(profile());
 
     expect(result).toEqual({
       mfaRequired: true,
@@ -164,10 +164,13 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
     expect(await refreshRowCount()).toBe(0);
   }, 30000);
 
-  it('still issues a session, and its refresh row, for an account with no factor', async () => {
-    const result = await service.loginWithOAuth(profile(), null);
+  // The callback writes no row on this branch either: POST
+  // /auth/oauth/exchange issues the session, after it ends the one the
+  // browser replaces.
+  it('returns the account and writes no refresh row for an account with no factor', async () => {
+    const result = await service.loginWithOAuth(profile());
 
     expect('mfaRequired' in result).toBe(false);
-    expect(await refreshRowCount()).toBe(1);
+    expect(await refreshRowCount()).toBe(0);
   }, 30000);
 });

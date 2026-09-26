@@ -28,7 +28,6 @@ import { Request as ExpressRequest, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import { instanceToPlain } from 'class-transformer';
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { OAuthService } from '../services/oauth.service';
@@ -45,7 +44,6 @@ import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
 import {
   ErrorKeys,
   REAUTH_PROOF_MAX_AGE_SECONDS,
@@ -78,8 +76,26 @@ import { OAuthUnlinkDto } from '../dtos/oauth-unlink.dto';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { AuthService } from '../services/auth.service';
+import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { UsersService } from '../../users/services/users.service';
 import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
 import { MfaRequiredResponseDto } from '../dtos/mfa.dto';
+
+/** What the callback signs into the `oauth_data` cookie for a plain sign-in. */
+interface OAuthSignInData {
+  userId: string;
+  provider: string;
+}
+
+function invalidOAuthData(): HttpException {
+  return new HttpException(
+    {
+      message: 'Invalid or expired OAuth data',
+      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+    },
+    HttpStatus.BAD_REQUEST
+  );
+}
 
 @ApiTags('OAuth API')
 @Controller({
@@ -105,6 +121,8 @@ export class OAuthController {
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
     private readonly metricsService: MetricsService,
+    private readonly usersService: UsersService,
+    private readonly signIn: SignInCompletionService,
     @Inject(CLIENT_URL) private readonly clientUrl: string,
     @Inject(CACHE_MANAGER) cache: Cache
   ) {
@@ -381,21 +399,7 @@ export class OAuthController {
       );
     }
 
-    // getOrThrow, outside the try: a missing value must fail loudly (500),
-    // not silently downgrade the refresh cookie to a session cookie via a
-    // NaN maxAge or get masked as an invalid-OAuth-data 400.
-    const maxAge = this.cookies.refreshMaxAge;
-
-    let data:
-      | {
-          tokens: {
-            refresh_token: string;
-            access_token: string;
-            expires_in: number;
-          };
-          user: unknown;
-        }
-      | MfaRequiredResponseDto;
+    let data: OAuthSignInData | MfaRequiredResponseDto;
     try {
       const payload = this.jwtService.verify<{
         purpose?: string;
@@ -421,13 +425,7 @@ export class OAuthController {
       }
       data = payload.data;
     } catch {
-      throw new HttpException(
-        {
-          message: 'Invalid or expired OAuth data',
-          errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
-        },
-        HttpStatus.BAD_REQUEST
-      );
+      throw invalidOAuthData();
     }
 
     // The account carries a second factor, so the round trip bought only the
@@ -435,12 +433,19 @@ export class OAuthController {
     if ('mfaRequired' in data) {
       return data;
     }
-    // The session was issued at the callback, but this is the request that
-    // hands the browser its cookie, and the provider redirect carried none.
-    await this.authService.endPresentedSession(this.cookies.readRefresh(req));
-    const { refresh_token, ...publicTokens } = data.tokens;
-    this.cookies.setRefresh(res, refresh_token, maxAge);
-    return { tokens: publicTokens, user: data.user };
+    // The session is issued here and not at the callback: only this request
+    // carries the refresh cookie of the session it replaces, which must end
+    // before the session limit counts the new one. The account can have been
+    // deactivated or deleted since the callback, and it gets the same refusal
+    // as a bad cookie so the exchange leaks no account state.
+    const user = await this.usersService.findById(data.userId);
+    if (!user?.isActive) {
+      throw invalidOAuthData();
+    }
+    return await this.signIn.complete(user, req, res, {
+      method: 'oauth',
+      provider: data.provider
+    });
   }
 
   private async handleOAuthCallback(
@@ -482,38 +487,20 @@ export class OAuthController {
         return this.handleOAuthLink(linkToken, profile, req, res);
       }
 
-      const auditContext = extractAuditContext(req);
       const result = await this.oauthService.loginWithOAuth(
         profile,
-        normalizeUserAgent(req.headers['user-agent']),
-        auditContext
+        extractAuditContext(req)
       );
 
-      // A challenge is not a sign-in yet: POST /auth/mfa/verify writes the
-      // success row when it finishes one. Fire-and-forget, because the session
-      // already exists and an audit outage must not redirect to a failure.
-      if (!('mfaRequired' in result)) {
-        this.auditService.logFireAndForget({
-          action: AuditAction.USER_LOGIN_SUCCESS,
-          actorId: result.user.id,
-          actorEmail: result.user.email,
-          targetId: result.user.id,
-          targetType: 'User',
-          details: { method: 'oauth', provider: profile.provider },
-          context: auditContext
-        });
-        this.metricsService.recordAuthEvent('login_success');
-      }
-
-      // Serialize here, not at /exchange: the cookie payload is plain JSON, so
-      // an entity signed as-is would be echoed verbatim past any interceptor.
-      // A challenge carries no entity, so it travels as it stands.
+      // No session and no success row yet: /exchange writes both when it
+      // finishes the sign-in, and POST /auth/mfa/verify does for a challenge.
+      const data =
+        'mfaRequired' in result
+          ? result
+          : { userId: result.id, provider: profile.provider };
       const signedData = this.jwtService.sign(
         {
-          data:
-            'mfaRequired' in result
-              ? result
-              : { tokens: result.tokens, user: instanceToPlain(result.user) },
+          data,
           purpose: TOKEN_PURPOSE.OAUTH_DATA,
           jti: randomUUID()
         },

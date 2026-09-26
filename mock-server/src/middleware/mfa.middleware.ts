@@ -1,14 +1,14 @@
 import { Router } from 'express';
+import { completeSignIn } from '../helpers/sign-in.helpers';
 import {
   ErrorKeys,
-  MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE,
   TOTP_DIGITS,
   TOTP_ISSUER
 } from '@app/shared/constants';
-import { authGuard, pruneOldestUserTokens } from '../helpers/auth.helpers';
+import { authGuard } from '../helpers/auth.helpers';
 import {
   clearFailures,
   clearReauthProofCookie,
@@ -22,26 +22,14 @@ import {
   stepUpError
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
-import { decodeToken, generateSessionId, generateTokens } from '../jwt.utils';
-import {
-  findUserById,
-  getState,
-  logAudit,
-  registerSession,
-  toUserResponse
-} from '../state';
-import { normalizeUserAgent } from '../utils/user-agent';
-import { resolveEntitlementLimit } from './billing.middleware';
+import { decodeToken } from '../jwt.utils';
+import { findUserById, getState, logAudit } from '../state';
 import {
   MOCK_RECOVERY_CODES,
   MOCK_REGENERATED_RECOVERY_CODES,
   MOCK_TOTP_QR_DATA_URL,
   MOCK_TOTP_SECRET
 } from '../constants';
-import {
-  endPresentedSession,
-  setRefreshTokenCookie
-} from '../helpers/refresh-cookie.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import type { Request, Response } from 'express';
 
@@ -135,34 +123,7 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
 
 /** The sign-in the password alone did not buy. */
 function issueSession(req: Request, res: Response, user: MockUser): void {
-  const state = getState();
-  endPresentedSession(req);
-  const sessionId = generateSessionId();
-  const tokens = generateTokens(user, sessionId);
-  state.refreshTokens.set(tokens.refresh_token, user.id);
-  registerSession(
-    tokens.refresh_token,
-    sessionId,
-    normalizeUserAgent(req.headers['user-agent'])
-  );
-  pruneOldestUserTokens(
-    state.refreshTokens,
-    user.id,
-    resolveEntitlementLimit(user.id, 'sessions') ?? MAX_CONCURRENT_SESSIONS
-  );
-
-  logAudit('USER_LOGIN_SUCCESS', {
-    actorId: user.id,
-    actorEmail: user.email,
-    targetId: user.id,
-    targetType: 'User',
-    details: { factor: 'mfa' },
-    ip: req.ip
-  });
-
-  const { refresh_token, ...publicTokens } = tokens;
-  setRefreshTokenCookie(res, refresh_token);
-  res.json({ tokens: publicTokens, user: toUserResponse(user) });
+  completeSignIn(req, res, user, { factor: 'mfa' });
 }
 
 // POST /api/v1/auth/mfa/setup
