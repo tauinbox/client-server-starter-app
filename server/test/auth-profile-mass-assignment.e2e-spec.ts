@@ -28,6 +28,8 @@ import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { CaptchaRequiredGuard } from '../src/modules/auth/captcha/captcha-required.guard';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
+import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
+import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
 
 describe('Profile mass-assignment protection (e2e)', () => {
   let app: INestApplication;
@@ -43,6 +45,8 @@ describe('Profile mass-assignment protection (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        AuthCookies,
+        SignInCompletionService,
         { provide: AuthService, useValue: {} },
         {
           // These suites never present a second factor. The mock answers the two

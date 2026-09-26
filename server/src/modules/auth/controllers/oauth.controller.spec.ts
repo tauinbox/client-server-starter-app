@@ -27,6 +27,7 @@ import {
   OAUTH_ERROR_NO_EMAIL,
   OAuthAuthenticationFailedException
 } from '../exceptions/oauth-authentication-failed.exception';
+import { AuthCookies } from '../utils/auth-cookies';
 
 // Seconds, as a JWT `iat` is.
 const LINK_TOKEN_IAT = Math.floor(
@@ -170,6 +171,7 @@ describe('OAuthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OAuthController],
       providers: [
+        AuthCookies,
         { provide: CLIENT_URL, useValue: configValues['CLIENT_URL'] },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: OAuthService, useValue: oauthServiceMock },

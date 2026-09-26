@@ -21,13 +21,8 @@ import {
   ApiTags
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Request as ExpressRequest, Response } from 'express';
-import { ConfigService } from '@nestjs/config';
-import {
-  ErrorKeys,
-  requiresSecureCookies,
-  STEP_UP_OPERATION
-} from '@app/shared/constants';
+import { Response } from 'express';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuthService } from '../services/auth.service';
 import { RefreshTokenService } from '../services/refresh-token.service';
@@ -37,11 +32,7 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { MfaStepUpDto } from '../dtos/mfa.dto';
 import { ActiveSessionResponseDto } from '../dtos/active-session-response.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { REAUTH_PROOF_COOKIE } from '../constants/oauth.constants';
-import {
-  clearHostCookie,
-  readHostCookie
-} from '../../../common/utils/host-cookie';
+import { AuthCookies } from '../utils/auth-cookies';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 
@@ -64,12 +55,8 @@ export class SessionsController {
     private readonly refreshTokenService: RefreshTokenService,
     private readonly userService: UsersService,
     private readonly auditService: AuditService,
-    private readonly configService: ConfigService
+    private readonly cookies: AuthCookies
   ) {}
-
-  private get secureCookies(): boolean {
-    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
-  }
 
   @Get()
   @ApiBearerAuth()
@@ -140,7 +127,7 @@ export class SessionsController {
       );
     }
 
-    this.clearReauthProofCookie(res);
+    this.cookies.clearReauthProof(res);
     await this.logRevoke(req, 'one', 1);
     return { message: 'Session has ended' };
   }
@@ -167,7 +154,7 @@ export class SessionsController {
       req.user.sessionId
     );
 
-    this.clearReauthProofCookie(res);
+    this.cookies.clearReauthProof(res);
     await this.logRevoke(req, 'others', count);
     return { message: 'Other sessions have ended', count };
   }
@@ -184,23 +171,11 @@ export class SessionsController {
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,
-      this.reauthProof(req),
+      this.cookies.readReauthProof(req),
       STEP_UP_OPERATION.SESSION_REVOKE,
       dto.code,
       extractAuditContext(req)
     );
-  }
-
-  private reauthProof(req: ExpressRequest): string | undefined {
-    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
-  }
-
-  /**
-   * Called only after the change is accepted, so a rejected attempt keeps its
-   * remaining proof window. The ledger already refuses a second use.
-   */
-  private clearReauthProofCookie(res: Response): void {
-    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
   }
 
   /** The device label is client data, so it never enters the audit row. */

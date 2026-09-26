@@ -48,6 +48,8 @@ import {
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
+import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
+import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
 
 const FLOW_STATE = 'b'.repeat(64);
 
@@ -140,6 +142,8 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
       imports: [JwtModule.register({ secret: 'test-secret' })],
       controllers: [AuthController, OAuthController],
       providers: [
+        AuthCookies,
+        SignInCompletionService,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: BreachedPasswordService,

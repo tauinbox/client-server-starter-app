@@ -13,6 +13,8 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { User } from '../../users/entities/user.entity';
 import { JwtAuthRequest } from '../types/auth.request';
 import { createMockRequest } from '../../../common/testing/express.mock';
+import { AuthCookies } from '../utils/auth-cookies';
+import { SignInCompletionService } from '../services/sign-in-completion.service';
 
 type MockedResponse = { cookie: jest.Mock; clearCookie: jest.Mock };
 
@@ -99,6 +101,8 @@ describe('MfaController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MfaController],
       providers: [
+        AuthCookies,
+        SignInCompletionService,
         { provide: AuthService, useValue: authService },
         { provide: MfaService, useValue: mfaService },
         {

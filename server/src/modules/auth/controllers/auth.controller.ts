@@ -18,7 +18,6 @@ import { Throttle } from '@nestjs/throttler';
 import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
-  requiresSecureCookies,
   STEP_UP_OPERATION
 } from '@app/shared/constants';
 import {
@@ -32,7 +31,6 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { packRules } from '@casl/ability/extra';
-import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { AuthService } from '../services/auth.service';
@@ -64,26 +62,13 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { UserPermissionsResponse } from '@app/shared/types';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import { Request as ExpressRequest } from 'express';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
-import {
-  OAUTH_LINK_COOKIE,
-  OAUTH_REAUTH_COOKIE,
-  REAUTH_PROOF_COOKIE
-} from '../constants/oauth.constants';
-import {
-  clearHostCookie,
-  readHostCookie
-} from '../../../common/utils/host-cookie';
-import {
-  clearRefreshTokenCookie,
-  readRefreshTokenCookie,
-  setRefreshTokenCookie
-} from '../utils/refresh-token-cookie';
+import { AuthCookies } from '../utils/auth-cookies';
+import { SignInCompletionService } from '../services/sign-in-completion.service';
 
 @ApiTags('Auth API')
 @Controller({
@@ -108,34 +93,10 @@ export class AuthController {
     private readonly mfaPolicy: MfaPolicyService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
-    private readonly configService: ConfigService,
-    private readonly metricsService: MetricsService
+    private readonly metricsService: MetricsService,
+    private readonly cookies: AuthCookies,
+    private readonly signIn: SignInCompletionService
   ) {}
-
-  private get secureCookies(): boolean {
-    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
-  }
-
-  private setRefreshTokenCookie(res: Response, token: string): void {
-    // getOrThrow: a missing value must fail loudly, not silently downgrade
-    // the refresh cookie to a session cookie via a NaN maxAge.
-    const maxAge =
-      Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
-      1000;
-    setRefreshTokenCookie(res, token, maxAge, this.secureCookies);
-  }
-
-  private clearRefreshTokenCookie(res: Response): void {
-    clearRefreshTokenCookie(res, this.secureCookies);
-  }
-
-  private reauthProof(req: ExpressRequest): string | undefined {
-    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
-  }
-
-  private clearReauthProofCookie(res: Response): void {
-    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
-  }
 
   /**
    * OWASP session guidance: a sign-out asks the browser to drop what it holds
@@ -145,14 +106,6 @@ export class AuthController {
    */
   private setClearSiteData(res: Response): void {
     res.setHeader('Clear-Site-Data', '"cache", "cookies"');
-  }
-
-  // An abandoned link attempt must not outlive the session that started it:
-  // the callback links whatever identity signs in next.
-  private clearOAuthLinkCookie(res: Response): void {
-    clearHostCookie(res, OAUTH_LINK_COOKIE, this.secureCookies);
-    clearHostCookie(res, OAUTH_REAUTH_COOKIE, this.secureCookies);
-    this.clearReauthProofCookie(res);
   }
 
   @Public()
@@ -204,28 +157,7 @@ export class AuthController {
       return { mfaRequired: true, mfaToken, expiresIn };
     }
 
-    // Before the new session exists, so the session limit prunes against a
-    // count that no longer holds the session this browser is replacing.
-    await this.authService.endPresentedSession(
-      readRefreshTokenCookie(req, this.secureCookies)
-    );
-    const result = await this.authService.login(
-      req.user,
-      normalizeUserAgent(req.headers['user-agent'])
-    );
-    await this.auditService.log({
-      action: AuditAction.USER_LOGIN_SUCCESS,
-      actorId: req.user.id,
-      actorEmail: req.user.email,
-      targetId: req.user.id,
-      targetType: 'User',
-      context: extractAuditContext(req)
-    });
-    this.metricsService.recordAuthEvent('login_success');
-
-    const { refresh_token, ...publicTokens } = result.tokens;
-    this.setRefreshTokenCookie(res, refresh_token);
-    return { tokens: publicTokens, user: result.user };
+    return await this.signIn.complete(req.user, req, res);
   }
 
   @Public()
@@ -242,14 +174,14 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    const cookieToken = readRefreshTokenCookie(req, this.secureCookies);
+    const cookieToken = this.cookies.readRefresh(req);
     if (!cookieToken) {
       throw new UnauthorizedException('Refresh token is required');
     }
 
     const result = await this.authService.refreshTokens(cookieToken);
     const { refresh_token, ...publicTokens } = result.tokens;
-    this.setRefreshTokenCookie(res, refresh_token);
+    this.cookies.setRefresh(res, refresh_token);
     return { tokens: publicTokens, user: result.user };
   }
 
@@ -262,7 +194,7 @@ export class AuthController {
     @Request() req: JwtAuthRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    const cookieToken = readRefreshTokenCookie(req, this.secureCookies);
+    const cookieToken = this.cookies.readRefresh(req);
 
     // Per device, not per account. A cookie that never arrived ends nothing
     // server side: the caller asked to sign this device out, and evicting the
@@ -271,8 +203,8 @@ export class AuthController {
       req.user.userId,
       cookieToken
     );
-    this.clearRefreshTokenCookie(res);
-    this.clearOAuthLinkCookie(res);
+    this.cookies.clearRefresh(res);
+    this.cookies.clearIntents(res);
     this.setClearSiteData(res);
     await this.auditService.log({
       action: AuditAction.USER_LOGOUT,
@@ -326,7 +258,7 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const reauthProof = this.reauthProof(req);
+    const reauthProof = this.cookies.readReauthProof(req);
 
     if (updateProfileDto.password) {
       // A first password binds a credential that outlives the session, so it
@@ -352,11 +284,11 @@ export class AuthController {
 
     if (updateProfileDto.password) {
       await this.authService.revokeAllUserSessions(req.user.userId);
-      this.clearRefreshTokenCookie(res);
-      this.clearOAuthLinkCookie(res);
+      this.cookies.clearRefresh(res);
+      this.cookies.clearIntents(res);
       // Cleared only now, so a rejected attempt keeps its remaining proof
       // window. The revocation above already ends the session that carried it.
-      this.clearReauthProofCookie(res);
+      this.cookies.clearReauthProof(res);
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,
@@ -397,7 +329,7 @@ export class AuthController {
     @Body() dto: InitiateEmailChangeDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const proof = this.reauthProof(req);
+    const proof = this.cookies.readReauthProof(req);
 
     const result = await this.authService.initiateEmailChange(
       req.user.userId,
@@ -408,7 +340,7 @@ export class AuthController {
 
     // Cleared only after the change is accepted, so a rejected attempt leaves
     // the user their remaining proof window instead of a second round trip.
-    this.clearReauthProofCookie(res);
+    this.cookies.clearReauthProof(res);
 
     return result;
   }

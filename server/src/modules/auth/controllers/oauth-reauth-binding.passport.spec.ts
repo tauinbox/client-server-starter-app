@@ -24,6 +24,7 @@ import { CookieStateStore } from '../utils/cookie-state-store';
 import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { STEP_UP_OPERATION, TOKEN_PURPOSE } from '@app/shared/constants';
+import { AuthCookies } from '../utils/auth-cookies';
 
 const CLIENT = 'http://localhost:4200';
 const REAUTH_TOKEN = 'reauth-token-for-user-a';
@@ -152,6 +153,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
       imports: [PassportModule],
       controllers: [OAuthController],
       providers: [
+        AuthCookies,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: OAuthService,
