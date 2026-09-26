@@ -1,8 +1,6 @@
 import { Logger } from '@nestjs/common';
-import KeyvRedis, { type RedisClientConnectionType } from '@keyv/redis';
 import type { Cache } from 'cache-manager';
-
-const ERROR_LOG_THROTTLE_MS = 30_000;
+import { redisClientOf, ThrottledFailureLog } from './redis-client';
 
 /**
  * A monotonic generation counter used to suffix per-user cache keys, so a
@@ -25,8 +23,7 @@ export class CacheVersionCounter {
   readonly #cache: Cache;
   readonly #counterKey: string;
   readonly #fallbackKey: string;
-  readonly #logger: Logger;
-  #errorLoggedAt = 0;
+  readonly #failureLog: ThrottledFailureLog;
 
   /**
    * @param counterKey raw Redis key holding the integer counter
@@ -41,11 +38,14 @@ export class CacheVersionCounter {
     this.#cache = cache;
     this.#counterKey = counterKey;
     this.#fallbackKey = fallbackKey;
-    this.#logger = logger;
+    this.#failureLog = new ThrottledFailureLog(
+      logger,
+      `Version counter "${counterKey}" unavailable, falling back to the cache-manager counter`
+    );
   }
 
   async read(): Promise<number> {
-    const redis = this.#redisClient();
+    const redis = redisClientOf(this.#cache);
     if (redis) {
       try {
         const raw = await redis.get(this.#counterKey);
@@ -54,7 +54,7 @@ export class CacheVersionCounter {
         const parsed = Number(raw);
         if (Number.isFinite(parsed)) return parsed;
       } catch (error: unknown) {
-        this.#logFailure(error);
+        this.#failureLog.log(error);
       }
     }
 
@@ -66,13 +66,13 @@ export class CacheVersionCounter {
   }
 
   async bump(): Promise<void> {
-    const redis = this.#redisClient();
+    const redis = redisClientOf(this.#cache);
     if (redis) {
       try {
         await redis.incr(this.#counterKey);
         return;
       } catch (error: unknown) {
-        this.#logFailure(error);
+        this.#failureLog.log(error);
       }
     }
 
@@ -85,28 +85,5 @@ export class CacheVersionCounter {
       (typeof previous === 'number' ? previous : 0) + 1
     );
     await this.#cache.set(this.#fallbackKey, next, 0);
-  }
-
-  /**
-   * The Redis client behind the cache, or null when the cache is the in-memory
-   * fallback. Nest wraps the configured adapter in a Keyv, so the adapter sits
-   * at `stores[0].store`. Probed defensively because `stores` is an
-   * implementation detail of the injected cache: a partial stand-in must
-   * degrade, not break the caller.
-   */
-  #redisClient(): RedisClientConnectionType | null {
-    const store: unknown = this.#cache.stores?.[0]?.store;
-    return store instanceof KeyvRedis ? store.client : null;
-  }
-
-  #logFailure(error: unknown): void {
-    const now = Date.now();
-    if (now - this.#errorLoggedAt < ERROR_LOG_THROTTLE_MS) return;
-    this.#errorLoggedAt = now;
-    this.#logger.warn(
-      `Version counter "${this.#counterKey}" unavailable, falling back to the cache-manager counter: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
   }
 }

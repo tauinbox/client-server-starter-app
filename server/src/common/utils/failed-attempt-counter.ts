@@ -1,8 +1,7 @@
 import { Logger } from '@nestjs/common';
-import KeyvRedis, { type RedisClientConnectionType } from '@keyv/redis';
+import type { RedisClientConnectionType } from '@keyv/redis';
 import type { Cache } from 'cache-manager';
-
-const ERROR_LOG_THROTTLE_MS = 30_000;
+import { redisClientOf, ThrottledFailureLog } from './redis-client';
 
 /** What a caller needs to decide whether the subject is barred, and for how long. */
 export interface AttemptWindow {
@@ -42,9 +41,8 @@ const NO_WINDOW: AttemptWindow = { count: 0, remainingMs: 0 };
 export class FailedAttemptCounter {
   readonly #cache: Cache;
   readonly #keyPrefix: string;
-  readonly #logger: Logger;
+  readonly #failureLog: ThrottledFailureLog;
   readonly #local = new Map<string, { count: number; expiresAt: number }>();
-  #errorLoggedAt = 0;
 
   /**
    * @param keyPrefix namespace for the counter keys, e.g. `mfa:challenge:`
@@ -52,7 +50,10 @@ export class FailedAttemptCounter {
   constructor(cache: Cache, keyPrefix: string, logger: Logger) {
     this.#cache = cache;
     this.#keyPrefix = keyPrefix;
-    this.#logger = logger;
+    this.#failureLog = new ThrottledFailureLog(
+      logger,
+      `Attempt counter "${keyPrefix}" unavailable, the per-subject limit is not enforced`
+    );
   }
 
   /**
@@ -64,7 +65,7 @@ export class FailedAttemptCounter {
    */
   async record(id: string, windowMs: number): Promise<AttemptWindow> {
     const key = this.#key(id);
-    const redis = this.#redisClient();
+    const redis = redisClientOf(this.#cache);
 
     if (redis) {
       try {
@@ -75,7 +76,7 @@ export class FailedAttemptCounter {
         const count = await redis.incr(key);
         return { count, remainingMs: await this.#remainingMs(redis, key) };
       } catch (error: unknown) {
-        this.#logFailure(error);
+        this.#failureLog.log(error);
         return NO_WINDOW;
       }
     }
@@ -95,7 +96,7 @@ export class FailedAttemptCounter {
   /** Reports the open window for `id` without counting anything. */
   async read(id: string): Promise<AttemptWindow> {
     const key = this.#key(id);
-    const redis = this.#redisClient();
+    const redis = redisClientOf(this.#cache);
 
     if (redis) {
       try {
@@ -104,7 +105,7 @@ export class FailedAttemptCounter {
         if (!Number.isFinite(count) || count <= 0) return NO_WINDOW;
         return { count, remainingMs: await this.#remainingMs(redis, key) };
       } catch (error: unknown) {
-        this.#logFailure(error);
+        this.#failureLog.log(error);
         return NO_WINDOW;
       }
     }
@@ -118,13 +119,13 @@ export class FailedAttemptCounter {
   /** Closes the window for `id`, which a caller does once the subject passes. */
   async clear(id: string): Promise<void> {
     const key = this.#key(id);
-    const redis = this.#redisClient();
+    const redis = redisClientOf(this.#cache);
 
     if (redis) {
       try {
         await redis.del(key);
       } catch (error: unknown) {
-        this.#logFailure(error);
+        this.#failureLog.log(error);
       }
       return;
     }
@@ -152,28 +153,5 @@ export class FailedAttemptCounter {
     for (const [key, entry] of this.#local) {
       if (entry.expiresAt <= now) this.#local.delete(key);
     }
-  }
-
-  /**
-   * The Redis client behind the cache, or null when the cache is the in-memory
-   * fallback. Nest wraps the configured adapter in a Keyv, so the adapter sits
-   * at `stores[0].store`. Probed defensively because `stores` is an
-   * implementation detail of the injected cache: a partial stand-in must
-   * degrade, not break the caller.
-   */
-  #redisClient(): RedisClientConnectionType | null {
-    const store: unknown = this.#cache.stores?.[0]?.store;
-    return store instanceof KeyvRedis ? store.client : null;
-  }
-
-  #logFailure(error: unknown): void {
-    const now = Date.now();
-    if (now - this.#errorLoggedAt < ERROR_LOG_THROTTLE_MS) return;
-    this.#errorLoggedAt = now;
-    this.#logger.warn(
-      `Attempt counter "${this.#keyPrefix}" unavailable, the per-subject limit is not enforced: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
   }
 }

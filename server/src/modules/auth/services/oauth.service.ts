@@ -1,5 +1,4 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
@@ -14,7 +13,7 @@ import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
-import { hashToken } from '../../../common/utils/hash-token';
+import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util';
 import { maskEmail } from '../../../common/utils/escape-html';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -136,15 +135,9 @@ export class OAuthService {
       // If the provider asserts the email is verified, mark verified;
       // otherwise issue a verification token and send the email.
       const isEmailVerified = profile.emailVerified;
-      const rawVerificationToken = isEmailVerified
+      const verification = isEmailVerified
         ? null
-        : crypto.randomBytes(32).toString('hex');
-      const hashedVerificationToken = rawVerificationToken
-        ? hashToken(rawVerificationToken)
-        : null;
-      const verificationExpiresAt = rawVerificationToken
-        ? new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS)
-        : null;
+        : issueMailedToken(VERIFICATION_TOKEN_EXPIRY_MS);
 
       const createdUserId = await withTransaction(
         this.dataSource,
@@ -168,8 +161,8 @@ export class OAuthService {
               lastName: profile.lastName,
               password: null,
               isEmailVerified,
-              emailVerificationToken: hashedVerificationToken,
-              emailVerificationExpiresAt: verificationExpiresAt
+              emailVerificationToken: verification?.hashedToken ?? null,
+              emailVerificationExpiresAt: verification?.expiresAt ?? null
             });
           } catch (error: unknown) {
             if (isUniqueViolation(error)) {
@@ -210,9 +203,9 @@ export class OAuthService {
       });
       this.metricsService.recordAuthEvent('register');
 
-      if (rawVerificationToken) {
+      if (verification) {
         this.mailService
-          .sendEmailVerification(email, rawVerificationToken)
+          .sendEmailVerification(email, verification.rawToken)
           .catch((err) =>
             this.logger.error(
               `Failed to send OAuth verification email to ${maskEmail(email)}`,

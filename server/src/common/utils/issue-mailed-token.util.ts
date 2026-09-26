@@ -1,16 +1,19 @@
 import * as crypto from 'crypto';
-import { VERIFICATION_TOKEN_EXPIRY_MS } from '@app/shared/constants';
 import { hashToken } from './hash-token';
 
-export interface IssuedVerificationToken {
+export interface IssuedMailedToken {
   rawToken: string;
   hashedToken: string;
   expiresAt: Date;
 }
 
-export function issueEmailVerificationToken(): IssuedVerificationToken {
+/**
+ * A one-time token for a link sent by mail. The raw value goes into the mail
+ * only; the database keeps the hash.
+ */
+export function issueMailedToken(expiryMs: number): IssuedMailedToken {
   const rawToken = crypto.randomBytes(32).toString('hex');
   const hashedToken = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS);
+  const expiresAt = new Date(Date.now() + expiryMs);
   return { rawToken, hashedToken, expiresAt };
 }
