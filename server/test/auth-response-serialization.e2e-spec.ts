@@ -42,6 +42,8 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { CLIENT_URL } from '../src/modules/auth/providers/client-url.provider';
 import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
+import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
+import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
 
 const PUBLIC_USER_FIELDS = [
   'id',
@@ -172,6 +174,8 @@ describe('Auth response serialization (e2e)', () => {
       imports: [JwtModule.register({ secret: 'test-secret' })],
       controllers: [AuthController, OAuthController],
       providers: [
+        AuthCookies,
+        SignInCompletionService,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: BreachedPasswordService,

@@ -29,7 +29,6 @@ import { randomUUID } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { instanceToPlain } from 'class-transformer';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { OAuthService } from '../services/oauth.service';
@@ -50,7 +49,6 @@ import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
 import {
   ErrorKeys,
   REAUTH_PROOF_MAX_AGE_SECONDS,
-  requiresSecureCookies,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
@@ -71,10 +69,7 @@ import {
   readHostCookie,
   setHostCookie
 } from '../../../common/utils/host-cookie';
-import {
-  readRefreshTokenCookie,
-  setRefreshTokenCookie
-} from '../utils/refresh-token-cookie';
+import { AuthCookies } from '../utils/auth-cookies';
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
@@ -105,7 +100,7 @@ export class OAuthController {
     private readonly oauthService: OAuthService,
     private readonly oauthAccountService: OAuthAccountService,
     private readonly authService: AuthService,
-    private readonly configService: ConfigService,
+    private readonly cookies: AuthCookies,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
@@ -118,14 +113,6 @@ export class OAuthController {
       'oauth-data:spent:',
       this.logger
     );
-  }
-
-  private get secureCookies(): boolean {
-    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
-  }
-
-  private reauthProof(req: ExpressRequest): string | undefined {
-    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
   }
 
   // --- Link initiation ---
@@ -147,7 +134,7 @@ export class OAuthController {
     @Body() dto: OAuthLinkInitDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const reauthProof = this.reauthProof(req);
+    const reauthProof = this.cookies.readReauthProof(req);
 
     await this.authService.assertStepUpForUser(
       req.user.userId,
@@ -162,7 +149,7 @@ export class OAuthController {
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
-    setHostCookie(res, OAUTH_LINK_COOKIE, linkToken, this.secureCookies, {
+    setHostCookie(res, OAUTH_LINK_COOKIE, linkToken, this.cookies.secure, {
       httpOnly: true,
       sameSite: 'lax',
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
@@ -170,7 +157,7 @@ export class OAuthController {
 
     // Cleared only now, so a rejected attempt keeps its remaining proof
     // window. The ledger already refuses a second use of the value.
-    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
+    this.cookies.clearReauthProof(res);
 
     return { message: 'Link initiated' };
   }
@@ -205,7 +192,7 @@ export class OAuthController {
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
-    setHostCookie(res, OAUTH_REAUTH_COOKIE, reauthToken, this.secureCookies, {
+    setHostCookie(res, OAUTH_REAUTH_COOKIE, reauthToken, this.cookies.secure, {
       httpOnly: true,
       sameSite: 'lax',
       maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
@@ -328,7 +315,7 @@ export class OAuthController {
 
     const userId = req.user.userId;
 
-    const reauthProof = this.reauthProof(req);
+    const reauthProof = this.cookies.readReauthProof(req);
 
     await this.authService.assertStepUpForUser(
       userId,
@@ -345,7 +332,7 @@ export class OAuthController {
 
     // Cleared only now, so a rejected attempt keeps its remaining proof
     // window. The ledger already refuses a second use of the value.
-    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
+    this.cookies.clearReauthProof(res);
 
     await this.auditService.log({
       action: AuditAction.OAUTH_UNLINK,
@@ -380,9 +367,9 @@ export class OAuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    const cookie = readHostCookie(req, OAUTH_DATA_COOKIE, this.secureCookies);
+    const cookie = readHostCookie(req, OAUTH_DATA_COOKIE, this.cookies.secure);
 
-    clearHostCookie(res, OAUTH_DATA_COOKIE, this.secureCookies);
+    clearHostCookie(res, OAUTH_DATA_COOKIE, this.cookies.secure);
 
     if (!cookie) {
       throw new HttpException(
@@ -397,9 +384,7 @@ export class OAuthController {
     // getOrThrow, outside the try: a missing value must fail loudly (500),
     // not silently downgrade the refresh cookie to a session cookie via a
     // NaN maxAge or get masked as an invalid-OAuth-data 400.
-    const maxAge =
-      Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
-      1000;
+    const maxAge = this.cookies.refreshMaxAge;
 
     let data:
       | {
@@ -452,11 +437,9 @@ export class OAuthController {
     }
     // The session was issued at the callback, but this is the request that
     // hands the browser its cookie, and the provider redirect carried none.
-    await this.authService.endPresentedSession(
-      readRefreshTokenCookie(req, this.secureCookies)
-    );
+    await this.authService.endPresentedSession(this.cookies.readRefresh(req));
     const { refresh_token, ...publicTokens } = data.tokens;
-    setRefreshTokenCookie(res, refresh_token, maxAge, this.secureCookies);
+    this.cookies.setRefresh(res, refresh_token, maxAge);
     return { tokens: publicTokens, user: data.user };
   }
 
@@ -476,7 +459,7 @@ export class OAuthController {
       const reauthIntent = readHostCookie(
         req,
         OAUTH_REAUTH_COOKIE,
-        this.secureCookies
+        this.cookies.secure
       );
       const reauthToken = reauthIntent
         ? readIntentForFlow(reauthIntent, flowState)
@@ -489,7 +472,7 @@ export class OAuthController {
       const linkIntent = readHostCookie(
         req,
         OAUTH_LINK_COOKIE,
-        this.secureCookies
+        this.cookies.secure
       );
       const linkToken = linkIntent
         ? readIntentForFlow(linkIntent, flowState)
@@ -537,7 +520,7 @@ export class OAuthController {
         { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
       );
 
-      setHostCookie(res, OAUTH_DATA_COOKIE, signedData, this.secureCookies, {
+      setHostCookie(res, OAUTH_DATA_COOKIE, signedData, this.cookies.secure, {
         httpOnly: true,
         sameSite: 'lax',
         maxAge: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS * 1000
@@ -604,7 +587,7 @@ export class OAuthController {
     profile: OAuthUserProfile,
     res: Response
   ): Promise<void> {
-    clearHostCookie(res, OAUTH_REAUTH_COOKIE, this.secureCookies);
+    clearHostCookie(res, OAUTH_REAUTH_COOKIE, this.cookies.secure);
 
     try {
       const payload = this.jwtService.verify<{
@@ -644,7 +627,7 @@ export class OAuthController {
         { expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS }
       );
 
-      setHostCookie(res, REAUTH_PROOF_COOKIE, proof, this.secureCookies, {
+      setHostCookie(res, REAUTH_PROOF_COOKIE, proof, this.cookies.secure, {
         httpOnly: true,
         sameSite: 'lax',
         maxAge: REAUTH_PROOF_MAX_AGE_SECONDS * 1000
@@ -665,7 +648,7 @@ export class OAuthController {
     req: ExpressRequest,
     res: Response
   ): Promise<void> {
-    clearHostCookie(res, OAUTH_LINK_COOKIE, this.secureCookies);
+    clearHostCookie(res, OAUTH_LINK_COOKIE, this.cookies.secure);
 
     try {
       const payload = this.jwtService.verify<{

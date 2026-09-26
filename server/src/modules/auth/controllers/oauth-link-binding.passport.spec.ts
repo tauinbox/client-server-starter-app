@@ -24,6 +24,7 @@ import { CookieStateStore } from '../utils/cookie-state-store';
 import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { TOKEN_PURPOSE } from '@app/shared/constants';
+import { AuthCookies } from '../utils/auth-cookies';
 
 const CLIENT = 'http://localhost:4200';
 const LINK_TOKEN = 'link-token-for-user-a';
@@ -146,6 +147,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
       imports: [PassportModule],
       controllers: [OAuthController],
       providers: [
+        AuthCookies,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: OAuthService,

@@ -22,6 +22,8 @@ import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { MfaRequiredGuard } from '../guards/mfa-required.guard';
+import { AuthCookies } from '../utils/auth-cookies';
+import { SignInCompletionService } from '../services/sign-in-completion.service';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -240,6 +242,8 @@ describe('AuthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        AuthCookies,
+        SignInCompletionService,
         { provide: AuthService, useValue: authServiceMock },
         { provide: MfaService, useValue: mfaServiceMock },
         { provide: UsersService, useValue: userServiceMock },

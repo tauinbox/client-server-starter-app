@@ -12,6 +12,7 @@ import { AuditService } from '../../audit/audit.service';
 import { User } from '../../users/entities/user.entity';
 import { JwtAuthRequest } from '../types/auth.request';
 import { createMockRequest } from '../../../common/testing/express.mock';
+import { AuthCookies } from '../utils/auth-cookies';
 
 type MockedResponse = { clearCookie: jest.Mock };
 
@@ -57,6 +58,7 @@ describe('SessionsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SessionsController],
       providers: [
+        AuthCookies,
         { provide: AuthService, useValue: authService },
         { provide: RefreshTokenService, useValue: refreshTokenService },
         {

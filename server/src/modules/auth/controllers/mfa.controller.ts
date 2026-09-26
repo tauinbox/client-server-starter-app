@@ -19,18 +19,11 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { ConfigService } from '@nestjs/config';
 import { Request as ExpressRequest, Response } from 'express';
-import {
-  requiresSecureCookies,
-  STEP_UP_OPERATION
-} from '@app/shared/constants';
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuthService } from '../services/auth.service';
 import { MfaService } from '../services/mfa.service';
 import { UsersService } from '../../users/services/users.service';
-import { AuditService } from '../../audit/audit.service';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { Public } from '../decorators/public.decorator';
 import { JwtAuthRequest } from '../types/auth.request';
 import { User } from '../../users/entities/user.entity';
@@ -45,17 +38,9 @@ import {
   MfaVerifyDto
 } from '../dtos/mfa.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
-import { REAUTH_PROOF_COOKIE } from '../constants/oauth.constants';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
-import {
-  clearHostCookie,
-  readHostCookie
-} from '../../../common/utils/host-cookie';
-import {
-  readRefreshTokenCookie,
-  setRefreshTokenCookie
-} from '../utils/refresh-token-cookie';
+import { AuthCookies } from '../utils/auth-cookies';
+import { SignInCompletionService } from '../services/sign-in-completion.service';
 
 @ApiTags('Auth API')
 @Controller({
@@ -68,34 +53,9 @@ export class MfaController {
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
     private readonly userService: UsersService,
-    private readonly auditService: AuditService,
-    private readonly configService: ConfigService,
-    private readonly metricsService: MetricsService
+    private readonly cookies: AuthCookies,
+    private readonly signIn: SignInCompletionService
   ) {}
-
-  private get secureCookies(): boolean {
-    return requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'));
-  }
-
-  private setRefreshTokenCookie(res: Response, token: string): void {
-    const maxAge =
-      Number(this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')) *
-      1000;
-    setRefreshTokenCookie(res, token, maxAge, this.secureCookies);
-  }
-
-  private reauthProof(req: ExpressRequest): string | undefined {
-    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secureCookies);
-  }
-
-  /**
-   * Called only after the change is accepted, so a rejected attempt keeps its
-   * remaining proof window. The ledger already refuses a second use of the
-   * value; this stops the browser from holding a credential that is spent.
-   */
-  private clearReauthProofCookie(res: Response): void {
-    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secureCookies);
-  }
 
   @Throttle(CHALLENGE_THROTTLE)
   @Post('setup')
@@ -119,14 +79,14 @@ export class MfaController {
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,
-      this.reauthProof(req),
+      this.cookies.readReauthProof(req),
       STEP_UP_OPERATION.MFA_SETUP,
       undefined,
       extractAuditContext(req)
     );
 
     const enrolment = await this.mfaService.beginEnrolment(user);
-    this.clearReauthProofCookie(res);
+    this.cookies.clearReauthProof(res);
     return enrolment;
   }
 
@@ -169,14 +129,14 @@ export class MfaController {
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,
-      this.reauthProof(req),
+      this.cookies.readReauthProof(req),
       STEP_UP_OPERATION.MFA_DISABLE,
       dto.code,
       extractAuditContext(req)
     );
 
     await this.mfaService.disable(user, extractAuditContext(req));
-    this.clearReauthProofCookie(res);
+    this.cookies.clearReauthProof(res);
     return { message: 'Two-factor authentication has been turned off' };
   }
 
@@ -199,7 +159,7 @@ export class MfaController {
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,
-      this.reauthProof(req),
+      this.cookies.readReauthProof(req),
       STEP_UP_OPERATION.MFA_RECOVERY_CODES,
       dto.code,
       extractAuditContext(req)
@@ -209,7 +169,7 @@ export class MfaController {
       user,
       extractAuditContext(req)
     );
-    this.clearReauthProofCookie(res);
+    this.cookies.clearReauthProof(res);
     return codes;
   }
 
@@ -268,30 +228,7 @@ export class MfaController {
    * The audit entry and the metric belong to this point rather than to the
    * password check that preceded it.
    */
-  private async issueSession(user: User, req: ExpressRequest, res: Response) {
-    // Before the new session exists, so the session limit prunes against a
-    // count that no longer holds the session this browser is replacing.
-    await this.authService.endPresentedSession(
-      readRefreshTokenCookie(req, this.secureCookies)
-    );
-    const result = await this.authService.login(
-      user,
-      normalizeUserAgent(req.headers['user-agent'])
-    );
-
-    await this.auditService.log({
-      action: AuditAction.USER_LOGIN_SUCCESS,
-      actorId: user.id,
-      actorEmail: user.email,
-      targetId: user.id,
-      targetType: 'User',
-      details: { factor: 'mfa' },
-      context: extractAuditContext(req)
-    });
-    this.metricsService.recordAuthEvent('login_success');
-
-    const { refresh_token, ...publicTokens } = result.tokens;
-    this.setRefreshTokenCookie(res, refresh_token);
-    return { tokens: publicTokens, user: result.user };
+  private issueSession(user: User, req: ExpressRequest, res: Response) {
+    return this.signIn.complete(user, req, res, { factor: 'mfa' });
   }
 }

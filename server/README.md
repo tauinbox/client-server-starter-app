@@ -306,8 +306,19 @@ succeeding and no error rate moves. That counter is the only place the gap shows
 `OAuthController` and `RbacController`.
 
 `services/` holds `AuthService`, `OAuthService`, `TokenGeneratorService`, `RefreshTokenService`,
-`SessionIssuerService`, `SessionLimitService`, `OAuthAccountService`, `TokenCleanupService`,
-`ResourceService`, `ActionService` and `ResourceSyncService`.
+`SessionIssuerService`, `SignInCompletionService`, `SessionLimitService`, `OAuthAccountService`,
+`TokenCleanupService`, `ResourceService`, `ActionService` and `ResourceSyncService`.
+
+`utils/auth-cookies.ts` holds `AuthCookies`, the one owner of the cookies that the auth controllers
+share: the `Secure` decision, the refresh cookie and its lifetime, the re-authentication proof, and
+the link and re-authentication intents. It adds no cookie rule. It calls `refresh-token-cookie.ts`
+and `common/utils/host-cookie.ts`.
+
+`SignInCompletionService.complete` is the last step of the password sign-in and the second-factor
+sign-in. It ends the session that the browser presents, issues the new session, writes the
+`USER_LOGIN_SUCCESS` audit entry and the `login_success` metric, sets the refresh cookie and removes
+the refresh token from the body. The OAuth callback does not use it: its audit entry is
+fire-and-forget and its tokens go into the `oauth_data` cookie.
 
 `SessionIssuerService.issueSession(user, userAgent)` is the single place where a sign-in becomes a session. It
 generates the tokens, persists the refresh token, and then prunes the sessions to the resolved
@@ -315,11 +326,11 @@ allowance. `AuthService.login` and `OAuthService.loginWithOAuth` both delegate t
 session logic. Thus the two paths cannot diverge.
 
 Neither path reaches it for an account that carries a second factor. `AuthController.login` answers
-`{ mfaRequired, mfaToken, expiresIn }` before it calls `AuthService.login`, and `loginWithOAuth`
+`{ mfaRequired, mfaToken, expiresIn }` before it calls `SignInCompletionService.complete`, and `loginWithOAuth`
 resolves the account first and returns the same shape, so the challenge branch creates no session
-and no refresh row. The gate is not inside `issueSession` on purpose: `MfaController.issueSession`
-reaches that method after the code was verified, so a test there would refuse the request that
-satisfies it.
+and no refresh row. The gate is not inside `issueSession` on purpose: `MfaController` reaches that
+method through `SignInCompletionService.complete` after the code was verified, so a test there would
+refuse the request that satisfies it.
 
 Token rotation intentionally does NOT use that method. A rotation replaces a session instead of an
 addition of one, and it runs no prune.
