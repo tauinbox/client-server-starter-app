@@ -933,28 +933,25 @@ describe('UserEditComponent', () => {
     it('offers the email and the new password on another record', () => {
       fixture.detectChanges();
 
-      expect(
-        host().querySelector<HTMLInputElement>('input[type="email"]')?.readOnly
-      ).toBe(false);
+      expect(host().querySelector('input[type="email"]')).not.toBeNull();
       expect(host().querySelector('input[type="password"]')).not.toBeNull();
       expect(
         host().querySelector('[data-testid="credentials-on-profile"]')
       ).toBeNull();
     });
 
-    it('locks the email, hides the new password and links the profile', async () => {
+    it('shows the email as text, hides the new password and links the profile', async () => {
       currentUserSignal.set({ id: 'user-1' });
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(
-        host().querySelector<HTMLInputElement>('input[type="email"]')?.readOnly
-      ).toBe(true);
+      expect(host().querySelector('input[type="email"]')).toBeNull();
       expect(host().querySelector('input[type="password"]')).toBeNull();
-      const note = host().querySelector(
+      const block = host().querySelector(
         '[data-testid="credentials-on-profile"]'
       );
-      expect(note?.querySelector('a')?.getAttribute('href')).toBe('/profile');
+      expect(block?.textContent).toContain('test@example.com');
+      expect(block?.querySelector('a')?.getAttribute('href')).toBe('/profile');
     });
 
     it('saves a name edit of the own record with the stored address and no factor', async () => {

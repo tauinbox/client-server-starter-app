@@ -83,10 +83,13 @@ test.describe('User Edit page', () => {
 
     await expect(page.getByLabel('First Name')).toHaveValue('John');
     await expect(page.getByLabel('Active')).toBeHidden();
-    await expect(page.getByLabel('Email')).not.toBeEditable();
+    await expect(page.getByRole('textbox', { name: 'Email' })).toBeHidden();
     await expect(page.getByLabel('New Password')).toBeHidden();
+    await expect(page.getByTestId('credentials-on-profile')).toContainText('@');
     await expect(
-      page.getByRole('link', { name: 'Open the profile' })
+      page.getByRole('link', {
+        name: 'Change email or password on the profile'
+      })
     ).toHaveAttribute('href', '/profile');
 
     await page.getByLabel('First Name').fill('Renamed');
