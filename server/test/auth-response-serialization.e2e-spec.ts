@@ -1,6 +1,6 @@
 // Asserted over the wire, not at service level: ClassSerializerInterceptor is
-// invisible to a service-level check, and the OAuth user is serialized before
-// it is signed into the oauth_data cookie that /exchange echoes back.
+// invisible to a service-level check, and /exchange loads the OAuth user again
+// rather than echoing one out of the oauth_data cookie.
 
 import { Test } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';

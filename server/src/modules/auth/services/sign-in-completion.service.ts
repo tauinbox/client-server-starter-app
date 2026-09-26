@@ -11,9 +11,8 @@ import { AuthCookies } from '../utils/auth-cookies';
 import { AuthService } from './auth.service';
 
 /**
- * The last step of the password and the second-factor sign-in, so the two can
- * never drift. The OAuth callback stays apart on purpose: its audit entry is
- * fire-and-forget and its tokens travel in the `oauth_data` cookie.
+ * The last step of every sign-in (password, second factor and the OAuth
+ * exchange), so they can never drift.
  *
  * Not part of SessionIssuerService, because AuthService already depends on
  * that one and this step calls AuthService.

@@ -5,13 +5,15 @@ import {
   ValidationPipe,
   VersioningType
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
+import * as cookieParser from 'cookie-parser';
 import * as crypto from 'crypto';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, requiresSecureCookies } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
@@ -27,6 +29,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let oauthDataCookieName: string;
   let currentProfile: OAuthUserProfile;
   const emails: string[] = [];
 
@@ -57,6 +60,26 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
       .get('/api/v1/auth/oauth/google/callback')
       .set('X-Request-Id', requestId)
       .expect(302);
+
+  // The exchange issues the session and writes the success row, under its own
+  // request id.
+  const exchange = async (
+    callbackResponse: request.Response,
+    requestId: string
+  ): Promise<void> => {
+    const header = callbackResponse.headers['set-cookie'] as
+      string[] | string | undefined;
+    const lines = Array.isArray(header) ? header : [header ?? ''];
+    const oauthData = lines
+      .find((line) => line.startsWith(`${oauthDataCookieName}=`))
+      ?.split(';')[0];
+    if (!oauthData) throw new Error('the callback set no oauth_data cookie');
+    await request(app.getHttpServer() as Server)
+      .post('/api/v1/auth/oauth/exchange')
+      .set('X-Request-Id', requestId)
+      .set('Cookie', oauthData)
+      .expect(201);
+  };
 
   const rowsFor = (requestId: string): Promise<AuditLog[]> =>
     dataSource
@@ -108,6 +131,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         transform: true,
@@ -120,6 +144,11 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    oauthDataCookieName = requiresSecureCookies(
+      app.get(ConfigService).get<string>('ENVIRONMENT')
+    )
+      ? '__Host-oauth_data'
+      : 'oauth_data';
   }, 60000);
 
   afterAll(async () => {
@@ -137,40 +166,46 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     await app?.close();
   });
 
-  it('records a registration and a sign-in for an account the provider creates', async () => {
+  it('records a registration at the callback and a sign-in at the exchange for an account the provider creates', async () => {
     currentProfile = newProfile();
     const requestId = `oauth-audit-new-${crypto.randomUUID()}`;
+    const exchangeId = `oauth-audit-new-exchange-${crypto.randomUUID()}`;
 
     const response = await callback(requestId);
     expect(response.headers['location']).toMatch(/\/oauth\/callback$/);
+    await exchange(response, exchangeId);
 
-    const rows = await settledRows(requestId, 2);
     const user = await dataSource
       .getRepository(User)
       .findOneByOrFail({ email: currentProfile.email });
-    expect(rows.map((r) => r.action).sort()).toEqual(
-      [AuditAction.USER_LOGIN_SUCCESS, AuditAction.USER_REGISTER].sort()
-    );
-    for (const row of rows) {
+    const callbackRows = await settledRows(requestId, 1);
+    expect(callbackRows).toHaveLength(1);
+    expect(callbackRows[0].action).toBe(AuditAction.USER_REGISTER);
+    expect(callbackRows[0].details).toEqual({ provider: 'google' });
+
+    const exchangeRows = await settledRows(exchangeId, 1);
+    expect(exchangeRows).toHaveLength(1);
+    expect(exchangeRows[0].action).toBe(AuditAction.USER_LOGIN_SUCCESS);
+    expect(exchangeRows[0].details).toEqual({
+      method: 'oauth',
+      provider: 'google'
+    });
+    for (const row of [...callbackRows, ...exchangeRows]) {
       expect(row.actorId).toBe(user.id);
       expect(row.ipAddress).toBeTruthy();
     }
-    expect(
-      rows.find((r) => r.action === AuditAction.USER_LOGIN_SUCCESS)?.details
-    ).toEqual({ method: 'oauth', provider: 'google' });
-    expect(
-      rows.find((r) => r.action === AuditAction.USER_REGISTER)?.details
-    ).toEqual({ provider: 'google' });
   });
 
-  it('records only a sign-in for an identity that is already linked', async () => {
+  it('records only a sign-in, at the exchange, for an identity that is already linked', async () => {
     currentProfile = newProfile();
     const user = await linkedAccount(currentProfile, {});
     const requestId = `oauth-audit-linked-${crypto.randomUUID()}`;
+    const exchangeId = `oauth-audit-linked-exchange-${crypto.randomUUID()}`;
 
-    await callback(requestId);
+    await exchange(await callback(requestId), exchangeId);
 
-    const rows = await settledRows(requestId, 1);
+    expect(await settledRows(requestId, 0)).toEqual([]);
+    const rows = await settledRows(exchangeId, 1);
     expect(rows).toHaveLength(1);
     expect(rows[0].action).toBe(AuditAction.USER_LOGIN_SUCCESS);
     expect(rows[0].actorId).toBe(user.id);

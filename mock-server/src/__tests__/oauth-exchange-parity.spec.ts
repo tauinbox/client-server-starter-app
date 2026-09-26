@@ -1,6 +1,7 @@
 import type { Server } from 'http';
 import {
   ErrorKeys,
+  MAX_CONCURRENT_SESSIONS,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS
 } from '@app/shared/constants';
 import { createApp } from '../app';
@@ -37,11 +38,25 @@ async function issueOAuthData(userId: string): Promise<string> {
   return body.token;
 }
 
-function exchange(cookie?: string): Promise<Response> {
+function exchange(cookie?: string, presented?: string): Promise<Response> {
+  const cookies = [cookie && `oauth_data=${cookie}`, presented].filter(Boolean);
   return fetch(`${baseUrl}/api/v1/auth/oauth/exchange`, {
     method: 'POST',
-    headers: cookie ? { cookie: `oauth_data=${cookie}` } : {}
+    headers: cookies.length ? { cookie: cookies.join('; ') } : {}
   });
+}
+
+function refreshCookieOf(res: Response): string {
+  const match = /refresh_token=([^;]+)/.exec(
+    res.headers.get('set-cookie') ?? ''
+  );
+  expect(match).not.toBeNull();
+  return `refresh_token=${match?.[1] ?? ''}`;
+}
+
+function liveTokensOf(userId: string): number {
+  return [...getState().refreshTokens.values()].filter((id) => id === userId)
+    .length;
 }
 
 describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
@@ -149,6 +164,78 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
 
     expect((await exchange(token)).status).toBe(200);
     expect((await exchange(token)).status).toBe(400);
+  });
+
+  // The session is issued at the exchange, the one request that carries the
+  // cookie of the session it replaces, as on the server.
+  it('mints no session before the exchange', async () => {
+    const admin = findUserByEmail('admin@example.com');
+    const before = liveTokensOf(admin!.id);
+
+    await issueOAuthData(admin!.id);
+
+    expect(liveTokensOf(admin!.id)).toBe(before);
+  });
+
+  it('keeps every other device when the quota is full and the browser signs in again', async () => {
+    const admin = findUserByEmail('admin@example.com');
+    const devices: string[] = [];
+    for (let i = 0; i < MAX_CONCURRENT_SESSIONS; i++) {
+      devices.push(
+        refreshCookieOf(await exchange(await issueOAuthData(admin!.id)))
+      );
+    }
+    expect(liveTokensOf(admin!.id)).toBe(MAX_CONCURRENT_SESSIONS);
+
+    const res = await exchange(
+      await issueOAuthData(admin!.id),
+      devices[devices.length - 1]
+    );
+
+    expect(res.status).toBe(200);
+    expect(liveTokensOf(admin!.id)).toBe(MAX_CONCURRENT_SESSIONS);
+    const refresh = (cookie: string) =>
+      fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
+        method: 'POST',
+        headers: { cookie }
+      }).then((r) => r.status);
+    expect(await refresh(devices[devices.length - 1])).toBe(401);
+    expect(await refresh(devices[0])).toBe(200);
+  });
+
+  it('refuses an account deactivated after the callback like a bad cookie', async () => {
+    const admin = findUserByEmail('admin@example.com');
+    const token = await issueOAuthData(admin!.id);
+    admin!.isActive = false;
+
+    const res = await exchange(token);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      message: 'Invalid or expired OAuth data',
+      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+    });
+    expect(res.headers.get('set-cookie')).not.toContain('refresh_token=');
+    expect(liveTokensOf(admin!.id)).toBe(0);
+  });
+
+  it('records the sign-in with its method and provider at the exchange', async () => {
+    const admin = findUserByEmail('admin@example.com');
+    const token = await issueOAuthData(admin!.id);
+    expect(
+      getState().auditLogs.filter((l) => l.action === 'USER_LOGIN_SUCCESS')
+    ).toHaveLength(0);
+
+    await exchange(token);
+
+    const rows = getState().auditLogs.filter(
+      (l) => l.action === 'USER_LOGIN_SUCCESS'
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      actorId: admin!.id,
+      details: { method: 'oauth', provider: 'google' }
+    });
   });
 
   it('issues an access token that authenticates the session', async () => {

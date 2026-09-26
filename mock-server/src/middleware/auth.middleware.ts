@@ -1,11 +1,11 @@
 import { Router, type Response } from 'express';
+import { completeSignIn } from '../helpers/sign-in.helpers';
 import { v4 as uuidv4 } from 'uuid';
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   EMAIL_CHANGE_TOKEN_EXPIRY_MS,
   ErrorKeys,
   LOCKOUT_DURATION_MS,
-  MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
@@ -43,18 +43,15 @@ import {
   sessionAgeMs,
   toUserResponse
 } from '../state';
-import { normalizeUserAgent } from '../utils/user-agent';
 import {
   authGuard,
   clearMailedProofs,
-  permissionGuard,
-  pruneOldestUserTokens
+  permissionGuard
 } from '../helpers/auth.helpers';
 import {
   buildMockUser,
   validateCreateUserBody
 } from '../helpers/user-create.helpers';
-import { resolveEntitlementLimit } from './billing.middleware';
 import {
   CAPTCHA_ROUTE_LIMITS,
   evaluateCaptcha,
@@ -71,7 +68,6 @@ import {
 } from '../constants';
 import {
   clearRefreshTokenCookie,
-  endPresentedSession,
   setRefreshTokenCookie
 } from '../helpers/refresh-cookie.helpers';
 import {
@@ -283,36 +279,7 @@ router.post('/login', (req, res) => {
     return;
   }
 
-  const state = getState();
-
-  endPresentedSession(req);
-  const sessionId = generateSessionId();
-  const tokens = generateTokens(user, sessionId);
-  state.refreshTokens.set(tokens.refresh_token, user.id);
-  registerSession(
-    tokens.refresh_token,
-    sessionId,
-    normalizeUserAgent(req.headers['user-agent'])
-  );
-  // Concurrent-session allowance is plan-driven; a plan carrying no `sessions`
-  // limit (Free, usage) keeps the constant, exactly as the server resolves it.
-  pruneOldestUserTokens(
-    state.refreshTokens,
-    user.id,
-    resolveEntitlementLimit(user.id, 'sessions') ?? MAX_CONCURRENT_SESSIONS
-  );
-
-  logAudit('USER_LOGIN_SUCCESS', {
-    actorId: user.id,
-    actorEmail: user.email,
-    targetId: user.id,
-    targetType: 'User',
-    ip: req.ip
-  });
-
-  const { refresh_token, ...publicTokens } = tokens;
-  setRefreshTokenCookie(res, refresh_token);
-  res.json({ tokens: publicTokens, user: toUserResponse(user) });
+  completeSignIn(req, res, user);
 });
 
 // POST /api/v1/auth/verify-email

@@ -5,9 +5,7 @@ import { User } from '../../users/entities/user.entity';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
-import { SessionIssuerService } from './session-issuer.service';
 import { MfaService } from './mfa.service';
-import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -51,7 +49,6 @@ export class OAuthService {
     private readonly roleService: RoleService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
-    private readonly sessionIssuer: SessionIssuerService,
     private readonly mfaService: MfaService,
     private readonly metricsService: MetricsService
   ) {}
@@ -62,22 +59,21 @@ export class OAuthService {
    * password: it answers with a challenge and `POST /auth/mfa/verify` finishes
    * the sign-in.
    *
-   * The session is never created on that branch, so no refresh row has to be
-   * deleted afterwards - a live refresh token value in flight between two
-   * writes is the shape this split exists to avoid.
+   * No session is created here on either branch. The provider redirect
+   * carries no refresh cookie, so only `POST /auth/oauth/exchange` can end the
+   * session the browser replaces before a new one is counted against the limit.
    */
   async loginWithOAuth(
     profile: OAuthUserProfile,
-    userAgent: string | null,
     auditContext?: AuditContext
-  ): Promise<{ tokens: TokensResponseDto; user: User } | MfaRequiredResponse> {
+  ): Promise<User | MfaRequiredResponse> {
     const user = await this.resolveUserForOAuth(profile, auditContext);
 
     if (user.totpEnabledAt) {
       return { mfaRequired: true, ...this.mfaService.issuePendingToken(user) };
     }
 
-    return this.sessionIssuer.issueSession(user, userAgent);
+    return user;
   }
 
   /** Finds, or creates, the account the provider profile names. */

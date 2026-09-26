@@ -18,6 +18,8 @@ import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuthService } from '../services/auth.service';
+import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { UsersService } from '../../users/services/users.service';
 import { MailService } from '../../mail/mail.service';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { CookieStateStore } from '../utils/cookie-state-store';
@@ -139,8 +141,8 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
 
     linkOAuthToUser = jest.fn().mockResolvedValue(undefined);
     loginWithOAuth = jest.fn().mockResolvedValue({
-      tokens: { accessToken: 'a', refreshToken: 'r' },
-      user: { id: 'signer', email: 'signer@example.com' }
+      id: 'signer',
+      email: 'signer@example.com'
     });
 
     const moduleRef = await Test.createTestingModule({
@@ -166,6 +168,8 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
           provide: AuthService,
           useValue: { assertStepUpForUser: jest.fn() }
         },
+        { provide: UsersService, useValue: { findById: jest.fn() } },
+        { provide: SignInCompletionService, useValue: { complete: jest.fn() } },
         {
           provide: MailService,
           useValue: { sendOAuthUnlinkedNotification: jest.fn() }

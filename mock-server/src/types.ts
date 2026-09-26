@@ -318,9 +318,12 @@ interface MockOAuthDataBase {
   expiresAt: number;
 }
 
-/** The provider round trip signed the caller in: a session already exists. */
+/**
+ * The provider round trip proved the account. The exchange issues the
+ * session, because only it carries the cookie of the session it replaces.
+ */
 export interface MockOAuthSessionData extends MockOAuthDataBase {
-  tokens: { access_token: string; refresh_token: string; expires_in: number };
+  provider: string;
 }
 
 /**

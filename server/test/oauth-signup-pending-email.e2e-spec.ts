@@ -90,9 +90,7 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
     );
 
     expect(
-      await errorKeyOf(
-        oauthService.loginWithOAuth(vkProfile(pendingEmail), null)
-      )
+      await errorKeyOf(oauthService.loginWithOAuth(vkProfile(pendingEmail)))
     ).toBe(ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED);
     expect(await repository.countBy({ email: pendingEmail })).toBe(0);
 
@@ -108,13 +106,10 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
   it('still creates the account for an address that nobody holds', async () => {
     const email = uniqueEmail('free');
 
-    const result = await oauthService.loginWithOAuth(
-      {
-        ...vkProfile(email),
-        emailVerified: true
-      },
-      null
-    );
+    const result = await oauthService.loginWithOAuth({
+      ...vkProfile(email),
+      emailVerified: true
+    });
 
     expect('mfaRequired' in result).toBe(false);
     expect(await dataSource.getRepository(User).countBy({ email })).toBe(1);

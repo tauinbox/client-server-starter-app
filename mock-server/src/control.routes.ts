@@ -5,7 +5,6 @@ import {
   findUserById,
   getState,
   rekeyUserSessions,
-  registerSession,
   resetState,
   revokeUserSessions,
   toInvoiceResponse,
@@ -13,7 +12,6 @@ import {
   toUsageResponse,
   toUserResponse
 } from './state';
-import { normalizeUserAgent } from './utils/user-agent';
 import type { StateSnapshot } from './control.types';
 import type {
   MockCustomer,
@@ -33,22 +31,15 @@ import type {
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   ENTITLED_SUBSCRIPTION_STATUSES,
-  MAX_CONCURRENT_SESSIONS,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
-import {
-  generateMfaPendingToken,
-  generateSessionId,
-  generateTokens
-} from './jwt.utils';
-import { pruneOldestUserTokens } from './helpers/auth.helpers';
+import { generateMfaPendingToken } from './jwt.utils';
 import {
   billClosingUsagePeriod,
   sumPlanMeterUnits
 } from './helpers/billing.helpers';
-import { resolveEntitlementLimit } from './middleware/billing.middleware';
 import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
@@ -202,8 +193,10 @@ router.post('/oauth-accounts', (req, res) => {
 });
 
 // POST /__control/oauth-data — mint an `oauth_data` cookie value for a user
+// `provider` names the provider the round trip went through (default google).
 router.post('/oauth-data', (req, res) => {
-  const { userId }: { userId: string } = req.body;
+  const { userId, provider = 'google' }: { userId: string; provider?: string } =
+    req.body;
   const user = userId ? findUserById(userId) : undefined;
 
   if (!user) {
@@ -232,23 +225,10 @@ router.post('/oauth-data', (req, res) => {
     return;
   }
 
-  const sessionId = generateSessionId();
-  const tokens = generateTokens(user, sessionId);
-  state.refreshTokens.set(tokens.refresh_token, user.id);
-  registerSession(
-    tokens.refresh_token,
-    sessionId,
-    normalizeUserAgent(req.headers['user-agent'])
-  );
-  pruneOldestUserTokens(
-    state.refreshTokens,
-    user.id,
-    resolveEntitlementLimit(user.id, 'sessions') ?? MAX_CONCURRENT_SESSIONS
-  );
-
+  // No session yet: POST /auth/oauth/exchange issues it, as on the server.
   state.oauthDataTokens.set(token, {
     userId: user.id,
-    tokens,
+    provider,
     expiresAt
   });
 

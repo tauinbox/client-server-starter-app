@@ -1,7 +1,8 @@
 import { Router } from 'express';
+import { completeSignIn } from '../helpers/sign-in.helpers';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
-import { findUserById, getState, logAudit, toUserResponse } from '../state';
+import { findUserById, getState, logAudit } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import {
   clearReauthProofCookie,
@@ -15,10 +16,6 @@ import {
   OAUTH_DATA_COOKIE,
   OAUTH_PROVIDERS
 } from '../constants';
-import {
-  endPresentedSession,
-  setRefreshTokenCookie
-} from '../helpers/refresh-cookie.helpers';
 import type { AuthenticatedRequest } from '../types';
 
 const router = Router();
@@ -159,7 +156,9 @@ router.post('/exchange', (req, res) => {
   state.oauthDataTokens.delete(cookie);
   const user = pending ? findUserById(pending.userId) : undefined;
 
-  if (!pending || pending.expiresAt < Date.now() || !user) {
+  // A deactivated account gets the refusal a bad cookie gets, as on the
+  // server, so the exchange tells nothing about the account.
+  if (!pending || pending.expiresAt < Date.now() || !user?.isActive) {
     res.status(400).json({
       message: 'Invalid or expired OAuth data',
       statusCode: 400,
@@ -175,10 +174,12 @@ router.post('/exchange', (req, res) => {
     return;
   }
 
-  endPresentedSession(req);
-  const { refresh_token, ...publicTokens } = pending.tokens;
-  setRefreshTokenCookie(res, refresh_token);
-  res.json({ tokens: publicTokens, user: toUserResponse(user) });
+  // The session is issued here, as on the server: only this request carries
+  // the refresh cookie of the session it replaces.
+  completeSignIn(req, res, user, {
+    method: 'oauth',
+    provider: pending.provider
+  });
 });
 
 // POST /api/v1/auth/oauth/link-init
