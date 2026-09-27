@@ -59,8 +59,7 @@ export default defineConfig(
   {
     files: ['src/**/*.ts'],
     rules: {
-      // Flat config replaces this rule's options, so the base selectors are
-      // appended to, not dropped.
+      // Flat config replaces rule options, so the base selectors are re-added.
       'no-restricted-syntax': [
         'error',
         ...(
@@ -78,8 +77,7 @@ export default defineConfig(
   },
   {
     files: ['src/**/*.ts'],
-    // These two are CLI entry points (TypeORM CLI, container seed step) that
-    // run outside Nest, so there is no logger to use.
+    // CLI entry points that run outside Nest, so no logger exists there.
     ignores: [
       '**/*.spec.ts',
       'src/postgres-data-source.ts',

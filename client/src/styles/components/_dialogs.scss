@@ -1,8 +1,7 @@
 @use '../abstracts/variables' as vars;
 @use '../abstracts/functions' as func;
 
-// This file is the single owner of --mat-dialog-* tokens; stylelint bans them
-// in every other file.
+// The single owner of --mat-dialog-* tokens; stylelint bans them elsewhere.
 /* stylelint-disable property-disallowed-list */
 
 // ── Standard dialog sizing ─────────────────────────────────────────────────
@@ -48,10 +47,8 @@
   max-height: 80vh;
 }
 
-// Opt-in panelClass for dialogs whose panels pad themselves (role permissions).
-// The tokens are set on the content element, the same element the component
-// used to set them on, so the result does not depend on token inheritance.
-// padding-top still comes from the #26352 rule above.
+// Opt-in panelClass for dialogs whose panels pad themselves; padding-top still
+// comes from the Angular Material bug #26352 workaround above.
 .app-dialog-flush-content .mat-mdc-dialog-content {
   --mat-dialog-content-padding: 0;
   --mat-dialog-with-actions-content-padding: 0;

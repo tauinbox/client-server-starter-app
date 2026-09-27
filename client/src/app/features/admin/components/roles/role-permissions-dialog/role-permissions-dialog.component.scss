@@ -13,9 +13,7 @@
 // ── Dialog content: two-column layout ─────────────────────────────────────
 
 .dialog-content {
-  // Side padding is removed by the `app-dialog-flush-content` panelClass in
-  // styles/components/_dialogs.scss. Material's overflow: auto is removed here
-  // because the panels control their own scroll.
+  // Panels control their own scroll (side padding: app-dialog-flush-content).
   overflow: hidden;
 }
 
