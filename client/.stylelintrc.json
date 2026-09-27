@@ -16,6 +16,18 @@
         "message": "Use func.rem(N) instead of px (breakpoints in media queries stay px)"
       }
     ],
+    "declaration-no-important": [
+      true,
+      {
+        "message": "Do not use !important. Override Angular Material with a CSS variable, a mat.<component>-overrides() mixin, or matched specificity in src/styles/"
+      }
+    ],
+    "property-disallowed-list": [
+      ["/^--mat-dialog-/"],
+      {
+        "message": "Set --mat-dialog-* tokens only in src/styles/components/_dialogs.scss (use an opt-in panelClass)"
+      }
+    ],
     "order/order": [
       "custom-properties",
       "declarations",

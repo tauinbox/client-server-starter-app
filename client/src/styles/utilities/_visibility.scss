@@ -1,3 +1,5 @@
+// Utility classes must win over any component rule, so !important is intended.
+/* stylelint-disable declaration-no-important */
 .d-none {
   display: none !important;
 }

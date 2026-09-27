@@ -13,14 +13,7 @@
 // ── Dialog content: two-column layout ─────────────────────────────────────
 
 .dialog-content {
-  // Remove side padding — panels add their own padding.
-  // We use CSS custom properties so Material's own padding rule is overridden
-  // without !important; padding-top is still applied by the global
-  // .mat-mdc-dialog-title + .mat-mdc-dialog-content fix.
-  --mat-dialog-content-padding: 0;
-  --mat-dialog-with-actions-content-padding: 0;
-
-  // Remove Material's overflow: auto — panels control their own scroll.
+  // Panels control their own scroll (side padding: app-dialog-flush-content).
   overflow: hidden;
 }
 
