@@ -43,6 +43,8 @@ import { PreferencesCardComponent } from '../preferences-card/preferences-card.c
 import type { UserResponse } from '@app/shared/types';
 import {
   ErrorKeys,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
   OAUTH_ERROR,
   STEP_UP_OPERATION
 } from '@app/shared/constants';
@@ -70,10 +72,6 @@ import {
 } from '@shared/utils/role-display.utils';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
-import {
-  MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH
-} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import {
