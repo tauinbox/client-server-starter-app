@@ -41,7 +41,13 @@ import {
 } from '../linked-providers/linked-providers.component';
 import { PreferencesCardComponent } from '../preferences-card/preferences-card.component';
 import type { UserResponse } from '@app/shared/types';
-import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  OAUTH_ERROR,
+  STEP_UP_OPERATION
+} from '@app/shared/constants';
 import type {
   SessionRevokeTarget,
   UpdateProfile
@@ -56,10 +62,6 @@ import {
   OAUTH_URLS,
   type OAuthProvider
 } from '../../constants/auth-api.const';
-import {
-  OAUTH_ERROR_CANCELLED,
-  OAUTH_ERROR_REAUTH_FAILED
-} from '../../constants/oauth-error.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -70,10 +72,6 @@ import {
 } from '@shared/utils/role-display.utils';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
-import {
-  MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH
-} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import {
@@ -563,9 +561,9 @@ export class ProfileComponent implements OnInit {
         queryParamsHandling: 'merge'
       });
     } else if (error) {
-      if (error === OAUTH_ERROR_CANCELLED) {
+      if (error === OAUTH_ERROR.CANCELLED) {
         this.#notify.info('auth.profile.linkCancelled');
-      } else if (error === OAUTH_ERROR_REAUTH_FAILED) {
+      } else if (error === OAUTH_ERROR.REAUTH_FAILED) {
         this.#notify.error('auth.profile.errorReauthFailed');
       } else {
         this.#notify.error('auth.profile.errorLinkFailed');

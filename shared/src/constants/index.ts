@@ -18,6 +18,7 @@ export {
   TOKEN_PURPOSE,
   STEP_UP_OPERATION,
   STEP_UP_OPERATIONS,
+  OAUTH_ERROR,
   TOKEN_REFRESH_WINDOW_SECONDS,
   MIN_JWT_EXPIRATION_SECONDS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
@@ -32,7 +33,8 @@ export {
   MFA_RECOVERY_CODE_COUNT,
   MFA_RECOVERY_CODE_BYTES,
   type TokenPurpose,
-  type StepUpOperation
+  type StepUpOperation,
+  type OAuthError
 } from './auth.constants';
 
 export {

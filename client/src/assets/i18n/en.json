@@ -90,7 +90,6 @@
       "userDeactivated": "User account is deactivated",
       "userNotFound": "User not found",
       "oauthAlreadyLinked": "This OAuth account is already linked to another user",
-      "oauthEmailAlreadyRegistered": "This email is already registered. Log in with your password first, then link the provider from your profile.",
       "userNotFoundOrDeactivated": "User account not found or deactivated",
       "invalidVerificationToken": "Invalid or expired verification token",
       "verificationTokenExpired": "Verification token has expired. Please request a new one.",

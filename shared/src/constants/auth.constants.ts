@@ -60,6 +60,22 @@ export const STEP_UP_OPERATIONS = Object.values(
 ) as StepUpOperation[];
 
 /**
+ * Values the server puts in `?oauth_error=`. The server picks them from this
+ * set and never from the provider response, so the client treats an unknown
+ * value as the generic failure.
+ */
+export const OAUTH_ERROR = {
+  AUTH_FAILED: 'auth_failed',
+  CANCELLED: 'oauth_cancelled',
+  REAUTH_FAILED: 'reauth_failed',
+  NO_EMAIL: 'no_email',
+  EMAIL_ALREADY_REGISTERED: 'email_already_registered',
+  LINK_FAILED: 'link_failed'
+} as const;
+
+export type OAuthError = (typeof OAUTH_ERROR)[keyof typeof OAUTH_ERROR];
+
+/**
  * How long before an access token expires the client refreshes it.
  *
  * Paired with MIN_JWT_EXPIRATION_SECONDS: a token whose whole lifetime fits

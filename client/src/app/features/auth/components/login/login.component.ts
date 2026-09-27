@@ -32,7 +32,6 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
-import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import {
   PASSWORD_CHANGED,
   PASSWORD_CHANGED_PARAM
@@ -54,7 +53,11 @@ import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component'
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
-import { ErrorKeys, OAUTH_PROVIDER_FLAGS } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  OAUTH_ERROR,
+  OAUTH_PROVIDER_FLAGS
+} from '@app/shared/constants';
 
 type LoginData = {
   email: string;
@@ -62,10 +65,11 @@ type LoginData = {
 };
 
 const OAUTH_ERROR_KEYS: Record<string, string> = {
-  auth_failed: 'auth.login.errorOauthFailed',
-  [OAUTH_ERROR_CANCELLED]: 'auth.login.errorOauthCancelled',
-  no_email: 'auth.login.errorNoEmail',
-  email_already_registered: 'auth.login.errorEmailAlreadyRegistered'
+  [OAUTH_ERROR.AUTH_FAILED]: 'auth.login.errorOauthFailed',
+  [OAUTH_ERROR.CANCELLED]: 'auth.login.errorOauthCancelled',
+  [OAUTH_ERROR.NO_EMAIL]: 'auth.login.errorNoEmail',
+  [OAUTH_ERROR.EMAIL_ALREADY_REGISTERED]:
+    'auth.login.errorEmailAlreadyRegistered'
 };
 
 @Component({

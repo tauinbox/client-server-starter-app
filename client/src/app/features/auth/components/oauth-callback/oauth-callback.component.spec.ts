@@ -24,7 +24,7 @@ import { RbacMetadataService } from '../../services/rbac-metadata.service';
 import { RbacMetadataStore } from '../../store/rbac-metadata.store';
 import { permissionGuard } from '../../guards/permission.guard';
 import { AuthApiEnum } from '../../constants/auth-api.const';
-import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
+import { OAUTH_ERROR } from '@app/shared/constants';
 import type { AppAbility } from '../../casl/app-ability';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { OAuthIntentService } from '../../services/oauth-intent.service';
@@ -224,7 +224,7 @@ describe('OAuthCallbackComponent', () => {
       await fixture.whenStable();
 
       expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-        queryParams: { oauth_error: OAUTH_ERROR_CANCELLED },
+        queryParams: { oauth_error: OAUTH_ERROR.CANCELLED },
         replaceUrl: true
       });
     });

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { HttpException, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
 import { OAuthService } from './oauth.service';
@@ -13,11 +13,8 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
-import {
-  OAUTH_ERROR_NO_EMAIL,
-  OAuthAuthenticationFailedException
-} from '../exceptions/oauth-authentication-failed.exception';
-import { ErrorKeys } from '@app/shared/constants';
+import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
+import { ErrorKeys, OAUTH_ERROR } from '@app/shared/constants';
 
 describe('OAuthService', () => {
   let service: OAuthService;
@@ -408,14 +405,14 @@ describe('OAuthService', () => {
         })
       ).rejects.toMatchObject({
         constructor: OAuthAuthenticationFailedException,
-        oauthError: OAUTH_ERROR_NO_EMAIL
+        oauthError: OAUTH_ERROR.NO_EMAIL
       });
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
       expect(mockManager.save).not.toHaveBeenCalled();
     });
 
-    it('should throw OAUTH_EMAIL_ALREADY_REGISTERED when local account exists for the email', async () => {
+    it('should refuse with email_already_registered when local account exists for the email', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -425,11 +422,8 @@ describe('OAuthService', () => {
       });
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
-        constructor: HttpException,
-        status: HttpStatus.CONFLICT,
-        response: {
-          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-        }
+        constructor: OAuthAuthenticationFailedException,
+        oauthError: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
       });
 
       // Side-effect assertion: NO OAuth account row created.
@@ -437,7 +431,7 @@ describe('OAuthService', () => {
       expect(mockManager.save).not.toHaveBeenCalled();
     });
 
-    it('should throw OAUTH_EMAIL_ALREADY_REGISTERED even if the existing local account is deactivated', async () => {
+    it('should refuse with email_already_registered even if the existing local account is deactivated', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -448,9 +442,8 @@ describe('OAuthService', () => {
       });
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
-        response: {
-          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-        }
+        constructor: OAuthAuthenticationFailedException,
+        oauthError: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
       });
     });
 
@@ -475,10 +468,8 @@ describe('OAuthService', () => {
           email: ' OAuth@Example.COM '
         })
       ).rejects.toMatchObject({
-        status: HttpStatus.CONFLICT,
-        response: {
-          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-        }
+        constructor: OAuthAuthenticationFailedException,
+        oauthError: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
       });
 
       expect(mockManager.findOne).toHaveBeenCalledWith(User, {
@@ -492,7 +483,7 @@ describe('OAuthService', () => {
 
     // The address is reserved while another account is changing to it:
     // taking it would make that owner's confirmation fail with a conflict.
-    it('should throw OAUTH_EMAIL_ALREADY_REGISTERED when another account has the email pending', async () => {
+    it('should refuse with email_already_registered when another account has the email pending', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -509,17 +500,15 @@ describe('OAuthService', () => {
       );
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
-        status: HttpStatus.CONFLICT,
-        response: {
-          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-        }
+        constructor: OAuthAuthenticationFailedException,
+        oauthError: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
       });
       expect(mockManager.save).not.toHaveBeenCalled();
     });
 
     // A concurrent sign-up for the same address passes the check and loses
     // on the unique index; that must answer as a conflict, not as a 500.
-    it('should throw OAUTH_EMAIL_ALREADY_REGISTERED when the user insert hits a unique violation', async () => {
+    it('should refuse with email_already_registered when the user insert hits a unique violation', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -528,10 +517,8 @@ describe('OAuthService', () => {
       );
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
-        status: HttpStatus.CONFLICT,
-        response: {
-          errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-        }
+        constructor: OAuthAuthenticationFailedException,
+        oauthError: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
       });
       expect(mockManager.save).toHaveBeenCalledTimes(1);
     });

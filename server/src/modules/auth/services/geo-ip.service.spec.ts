@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { readFile } from 'fs/promises';
 import { Reader } from 'maxmind';
 import { GEOIP_IDLE_RELEASE_MS, GeoIpService } from './geo-ip.service';

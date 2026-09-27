@@ -18,26 +18,13 @@ import { withTransaction } from '../../../common/utils/with-transaction.util';
 import {
   SYSTEM_ROLES,
   ErrorKeys,
+  OAUTH_ERROR,
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
-import {
-  OAUTH_ERROR_NO_EMAIL,
-  OAuthAuthenticationFailedException
-} from '../exceptions/oauth-authentication-failed.exception';
+import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import type { MfaRequiredResponse } from '@app/shared/types';
-
-function emailAlreadyRegisteredConflict(): HttpException {
-  return new HttpException(
-    {
-      message:
-        'This email is already registered. Log in with your password first, then link the provider from your profile.',
-      errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-    },
-    HttpStatus.CONFLICT
-  );
-}
 
 @Injectable()
 export class OAuthService {
@@ -122,7 +109,7 @@ export class OAuthService {
       const email = normalizeEmail(profile.email);
       // Only creation needs an address; a linked account signs in without one.
       if (!email) {
-        throw new OAuthAuthenticationFailedException(OAUTH_ERROR_NO_EMAIL);
+        throw new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL);
       }
 
       // 2. Create new user + OAuth account atomically.
@@ -147,7 +134,9 @@ export class OAuthService {
             where: [{ email }, { pendingEmail: email }]
           });
           if (existing) {
-            throw emailAlreadyRegisteredConflict();
+            throw new OAuthAuthenticationFailedException(
+              OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
+            );
           }
 
           let newUser: User;
@@ -163,7 +152,9 @@ export class OAuthService {
             });
           } catch (error: unknown) {
             if (isUniqueViolation(error)) {
-              throw emailAlreadyRegisteredConflict();
+              throw new OAuthAuthenticationFailedException(
+                OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
+              );
             }
             throw error;
           }

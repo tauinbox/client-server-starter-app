@@ -20,15 +20,13 @@ import { OAuthUserProfile } from '../types/oauth-profile';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   ErrorKeys,
+  OAUTH_ERROR,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { bindIntent } from '../utils/oauth-flow-intent';
 import { createMockCache } from '../../../common/testing/cache.mock';
-import {
-  OAUTH_ERROR_NO_EMAIL,
-  OAuthAuthenticationFailedException
-} from '../exceptions/oauth-authentication-failed.exception';
+import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { AuthCookies } from '../utils/auth-cookies';
 
 // Seconds, as a JWT `iat` is.
@@ -655,7 +653,7 @@ describe('OAuthController', () => {
 
     it('should redirect to login with error when the service refuses a missing email', async () => {
       oauthServiceMock.loginWithOAuth.mockRejectedValue(
-        new OAuthAuthenticationFailedException(OAUTH_ERROR_NO_EMAIL)
+        new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL)
       );
       const res = mockResponse();
       const profile: OAuthUserProfile = {
@@ -674,17 +672,10 @@ describe('OAuthController', () => {
       );
     });
 
-    // When OAuthService throws OAUTH_EMAIL_ALREADY_REGISTERED, the controller
-    // redirects with a specific oauth_error param so the login page can show
-    // the right translated message.
-    it('should redirect with email_already_registered when service throws OAUTH_EMAIL_ALREADY_REGISTERED', async () => {
+    it('should redirect with email_already_registered when the service refuses a taken email', async () => {
       oauthServiceMock.loginWithOAuth.mockRejectedValue(
-        new HttpException(
-          {
-            message: 'This email is already registered',
-            errorKey: ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-          },
-          HttpStatus.CONFLICT
+        new OAuthAuthenticationFailedException(
+          OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
         )
       );
 
@@ -771,8 +762,8 @@ describe('OAuthController', () => {
       it.each([
         [
           'a refused provider profile',
-          new OAuthAuthenticationFailedException(OAUTH_ERROR_NO_EMAIL),
-          OAUTH_ERROR_NO_EMAIL
+          new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL),
+          OAUTH_ERROR.NO_EMAIL
         ],
         [
           'a deactivated account',
