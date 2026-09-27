@@ -21,12 +21,8 @@ import type { Request as ExpressRequest } from 'express';
 import { GoogleOAuthGuard } from './google-oauth.guard';
 import { FacebookOAuthGuard } from './facebook-oauth.guard';
 import { VkOAuthGuard } from './vk-oauth.guard';
-import {
-  OAUTH_ERROR_AUTH_FAILED,
-  OAUTH_ERROR_CANCELLED,
-  OAUTH_ERROR_REAUTH_FAILED,
-  OAuthAuthenticationFailedException
-} from '../exceptions/oauth-authentication-failed.exception';
+import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
+import { OAUTH_ERROR } from '@app/shared/constants';
 
 const context = {} as ExecutionContext;
 
@@ -127,7 +123,7 @@ describe.each([
 
       expect(failure).toBeInstanceOf(OAuthAuthenticationFailedException);
       expect(failure.reason).toBe(cause);
-      expect(failure.oauthError).toBe(OAUTH_ERROR_AUTH_FAILED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.AUTH_FAILED);
       expect(failure.redirectPath).toBe('/login');
     });
 
@@ -141,7 +137,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_CANCELLED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.CANCELLED);
       expect(failure.redirectPath).toBe('/login');
     });
 
@@ -158,7 +154,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_CANCELLED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.CANCELLED);
       expect(failure.redirectPath).toBe('/profile');
     });
 
@@ -175,7 +171,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.REAUTH_FAILED);
       expect(failure.redirectPath).toBe('/profile');
     });
 
@@ -192,7 +188,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.REAUTH_FAILED);
       expect(failure.redirectPath).toBe('/profile');
     });
 
@@ -212,7 +208,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.REAUTH_FAILED);
       expect(failure.redirectPath).toBe('/profile');
     });
 
@@ -230,7 +226,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_CANCELLED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.CANCELLED);
       expect(failure.redirectPath).toBe('/login');
     });
 
@@ -248,7 +244,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_REAUTH_FAILED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.REAUTH_FAILED);
       expect(failure.redirectPath).toBe('/profile');
     });
 
@@ -265,7 +261,7 @@ describe.each([
         )
       );
 
-      expect(failure.oauthError).toBe(OAUTH_ERROR_AUTH_FAILED);
+      expect(failure.oauthError).toBe(OAUTH_ERROR.AUTH_FAILED);
     });
 
     it('returns the authenticated profile untouched', () => {

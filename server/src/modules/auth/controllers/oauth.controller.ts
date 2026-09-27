@@ -46,16 +46,14 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import {
   ErrorKeys,
+  OAUTH_ERROR,
   REAUTH_PROOF_MAX_AGE_SECONDS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
-import {
-  OAUTH_ERROR_REAUTH_FAILED,
-  OAuthAuthenticationFailedException
-} from '../exceptions/oauth-authentication-failed.exception';
+import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import {
   OAUTH_DATA_COOKIE,
   OAUTH_LINK_COOKIE,
@@ -521,18 +519,10 @@ export class OAuthController {
         res.redirect(`${this.clientUrl}/login?oauth_error=${error.oauthError}`);
         return;
       }
-      if (
-        error instanceof HttpException &&
-        (error.getResponse() as { errorKey?: string })?.errorKey ===
-          ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED
-      ) {
-        res.redirect(
-          `${this.clientUrl}/login?oauth_error=email_already_registered`
-        );
-        return;
-      }
       this.logger.error('OAuth callback error', error);
-      res.redirect(`${this.clientUrl}/login?oauth_error=auth_failed`);
+      res.redirect(
+        `${this.clientUrl}/login?oauth_error=${OAUTH_ERROR.AUTH_FAILED}`
+      );
     }
   }
 
@@ -624,7 +614,7 @@ export class OAuthController {
     } catch (error) {
       this.logger.error('OAuth re-authentication error', error);
       res.redirect(
-        `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR_REAUTH_FAILED}`
+        `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.REAUTH_FAILED}`
       );
     }
   }
@@ -666,7 +656,9 @@ export class OAuthController {
       );
     } catch (error) {
       this.logger.error('OAuth link error', error);
-      res.redirect(`${this.clientUrl}/profile?oauth_error=link_failed`);
+      res.redirect(
+        `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.LINK_FAILED}`
+      );
     }
   }
 }

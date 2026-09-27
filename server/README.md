@@ -1497,8 +1497,8 @@ The mock has no link path to mirror, because both provider halves answer 501.
 
 **Automatic linking is disabled.** When a local account already exists for the email address that
 OAuth asserts, or another account has that address as its `pendingEmail`, the callback throws
-`OAUTH_EMAIL_ALREADY_REGISTERED` (409). A unique violation on the user insert gives the same 409. It redirects to
-`/login?oauth_error=email_already_registered`. The user must log in with their password and then link
+`OAuthAuthenticationFailedException(email_already_registered)`. A unique violation on the user insert gives the same
+refusal. It redirects to `/login?oauth_error=email_already_registered`. The user must log in with their password and then link
 the provider with `POST /auth/oauth/link-init`, which asks for their password first: a linked
 provider signs the account in and no recovery path removes it.
 

@@ -18,10 +18,10 @@ import { AuthService } from '../../services/auth.service';
 import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { safeReturnUrl } from '../../utils/safe-return-url';
-import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component';
 import type { MfaRequiredResponse } from '../../models/auth.types';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
 
 @Component({
   selector: 'nxs-oauth-callback',
@@ -56,7 +56,7 @@ export class OAuthCallbackComponent implements OnInit {
     this.#returnUrl = this.#oauthIntent.take();
     if (this.#returnUrl === null) {
       // This tab did not start the round trip, so it signs nobody in.
-      this.#redirectToLogin('auth_failed');
+      this.#redirectToLogin(OAUTH_ERROR.AUTH_FAILED);
       return;
     }
 
@@ -74,7 +74,7 @@ export class OAuthCallbackComponent implements OnInit {
       // The spinner is this component's only state, so every failure,
       // including an incomplete response, must leave it for /login.
       error: () => {
-        this.#redirectToLogin('auth_failed');
+        this.#redirectToLogin(OAUTH_ERROR.AUTH_FAILED);
       }
     });
   }
@@ -89,11 +89,11 @@ export class OAuthCallbackComponent implements OnInit {
 
   /** No password form to fall back to here, so the sign-in restarts. */
   onMfaCancelled(): void {
-    this.#redirectToLogin(OAUTH_ERROR_CANCELLED);
+    this.#redirectToLogin(OAUTH_ERROR.CANCELLED);
   }
 
   onMfaExpired(): void {
-    this.#redirectToLogin('auth_failed');
+    this.#redirectToLogin(OAUTH_ERROR.AUTH_FAILED);
   }
 
   #navigateToReturnUrl(): void {
@@ -104,7 +104,7 @@ export class OAuthCallbackComponent implements OnInit {
     void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });
   }
 
-  #redirectToLogin(error: string): void {
+  #redirectToLogin(error: OAuthError): void {
     void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
       queryParams: { oauth_error: error },
       replaceUrl: true

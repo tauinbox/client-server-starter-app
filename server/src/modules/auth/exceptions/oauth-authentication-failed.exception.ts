@@ -1,11 +1,4 @@
-/**
- * Keys the client maps to a user-facing message. Anything it does not
- * recognise falls back to the same generic text.
- */
-export const OAUTH_ERROR_AUTH_FAILED = 'auth_failed';
-export const OAUTH_ERROR_CANCELLED = 'oauth_cancelled';
-export const OAUTH_ERROR_REAUTH_FAILED = 'reauth_failed';
-export const OAUTH_ERROR_NO_EMAIL = 'no_email';
+import type { OAuthError } from '@app/shared/constants';
 
 /**
  * Where the browser is sent after a failure. A cancelled or failed link flow
@@ -23,7 +16,7 @@ export type OAuthFailureRedirect = '/login' | '/profile';
  */
 export class OAuthAuthenticationFailedException extends Error {
   constructor(
-    readonly oauthError: string,
+    readonly oauthError: OAuthError,
     readonly reason?: unknown,
     readonly redirectPath: OAuthFailureRedirect = '/login'
   ) {

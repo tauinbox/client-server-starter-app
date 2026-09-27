@@ -6,13 +6,12 @@ import { AuthGuard } from '@nestjs/passport';
 import { firstValueFrom, isObservable } from 'rxjs';
 import type { Request as ExpressRequest } from 'express';
 import type { OAuthFailureRedirect } from '../exceptions/oauth-authentication-failed.exception';
+import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import {
-  OAUTH_ERROR_AUTH_FAILED,
-  OAUTH_ERROR_CANCELLED,
-  OAUTH_ERROR_REAUTH_FAILED,
-  OAuthAuthenticationFailedException
-} from '../exceptions/oauth-authentication-failed.exception';
-import { requiresSecureCookies } from '@app/shared/constants';
+  OAUTH_ERROR,
+  requiresSecureCookies,
+  type OAuthError
+} from '@app/shared/constants';
 import {
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE
@@ -109,16 +108,16 @@ function intentCookies(
 function resolveErrorKey(
   request: ExpressRequest,
   intents: IntentCookies
-): string {
+): OAuthError {
   // A step-up that ends at the provider changed nothing, and the profile page
   // has a message written for exactly that. The callback reads the reauth
   // intent first too, so a request holding both cookies is a step-up here.
   if (intents.reauth) {
-    return OAUTH_ERROR_REAUTH_FAILED;
+    return OAUTH_ERROR.REAUTH_FAILED;
   }
   return request.query?.['error'] === PROVIDER_CANCELLED_ERROR
-    ? OAUTH_ERROR_CANCELLED
-    : OAUTH_ERROR_AUTH_FAILED;
+    ? OAUTH_ERROR.CANCELLED
+    : OAUTH_ERROR.AUTH_FAILED;
 }
 
 function resolveRedirectPath(intents: IntentCookies): OAuthFailureRedirect {

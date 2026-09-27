@@ -1,11 +1,7 @@
 import { ArgumentsHost, Logger } from '@nestjs/common';
 import { OAuthAuthenticationExceptionFilter } from './oauth-authentication-exception.filter';
-import {
-  OAUTH_ERROR_AUTH_FAILED,
-  OAUTH_ERROR_CANCELLED,
-  OAUTH_ERROR_REAUTH_FAILED,
-  OAuthAuthenticationFailedException
-} from '../exceptions/oauth-authentication-failed.exception';
+import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
+import { OAUTH_ERROR } from '@app/shared/constants';
 
 describe('OAuthAuthenticationExceptionFilter', () => {
   const clientUrl = 'http://localhost:4200';
@@ -39,7 +35,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
 
   it('redirects to the client login page carrying the error key', () => {
     filter.catch(
-      new OAuthAuthenticationFailedException(OAUTH_ERROR_AUTH_FAILED),
+      new OAuthAuthenticationFailedException(OAUTH_ERROR.AUTH_FAILED),
       host
     );
 
@@ -52,7 +48,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
   it('sends a failed link flow back to the profile page and drops the link cookie', () => {
     filter.catch(
       new OAuthAuthenticationFailedException(
-        OAUTH_ERROR_CANCELLED,
+        OAUTH_ERROR.CANCELLED,
         undefined,
         '/profile'
       ),
@@ -71,7 +67,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
   it('sends a failed step-up back to the profile page and drops the reauth cookie', () => {
     filter.catch(
       new OAuthAuthenticationFailedException(
-        OAUTH_ERROR_REAUTH_FAILED,
+        OAUTH_ERROR.REAUTH_FAILED,
         undefined,
         '/profile'
       ),
@@ -94,7 +90,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
 
     filter.catch(
       new OAuthAuthenticationFailedException(
-        OAUTH_ERROR_REAUTH_FAILED,
+        OAUTH_ERROR.REAUTH_FAILED,
         undefined,
         '/profile'
       ),
@@ -114,7 +110,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
   it('logs the underlying reason so the failure stays diagnosable', () => {
     filter.catch(
       new OAuthAuthenticationFailedException(
-        OAUTH_ERROR_AUTH_FAILED,
+        OAUTH_ERROR.AUTH_FAILED,
         new Error('Failed to obtain access token')
       ),
       host

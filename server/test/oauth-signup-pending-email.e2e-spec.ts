@@ -7,7 +7,8 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { OAuthService } from '../src/modules/auth/services/oauth.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { hashToken } from '../src/common/utils/hash-token';
-import { ErrorKeys } from '@app/shared/constants';
+import { OAuthAuthenticationFailedException } from '../src/modules/auth/exceptions/oauth-authentication-failed.exception';
+import { OAUTH_ERROR } from '@app/shared/constants';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 
 // A provider sign-up that took an address in flight would make the owner's
@@ -89,9 +90,12 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
       })
     );
 
-    expect(
-      await errorKeyOf(oauthService.loginWithOAuth(vkProfile(pendingEmail)))
-    ).toBe(ErrorKeys.AUTH.OAUTH_EMAIL_ALREADY_REGISTERED);
+    await expect(
+      oauthService.loginWithOAuth(vkProfile(pendingEmail))
+    ).rejects.toMatchObject({
+      constructor: OAuthAuthenticationFailedException,
+      oauthError: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
+    });
     expect(await repository.countBy({ email: pendingEmail })).toBe(0);
 
     // Pre-fix this confirmation threw the email conflict.
