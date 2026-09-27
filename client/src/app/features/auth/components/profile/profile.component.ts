@@ -34,6 +34,12 @@ import { SessionStorageService } from '@core/services/session-storage.service';
 import { NotifyService } from '@core/services/notify.service';
 import { TwoFactorComponent } from '../two-factor/two-factor.component';
 import { ActiveSessionsComponent } from '../active-sessions/active-sessions.component';
+import {
+  LinkedProvidersComponent,
+  type LinkedAccount,
+  type ProviderChange
+} from '../linked-providers/linked-providers.component';
+import { PreferencesCardComponent } from '../preferences-card/preferences-card.component';
 import type { UserResponse } from '@app/shared/types';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import type {
@@ -46,6 +52,7 @@ import type { Observable } from 'rxjs';
 import { concat, defer, EMPTY, take, tap } from 'rxjs';
 import {
   isOAuthProvider,
+  OAUTH_PROVIDER_LABEL_KEYS,
   OAUTH_URLS,
   type OAuthProvider
 } from '../../constants/auth-api.const';
@@ -53,7 +60,6 @@ import {
   OAUTH_ERROR_CANCELLED,
   OAUTH_ERROR_REAUTH_FAILED
 } from '../../constants/oauth-error.const';
-import { OAUTH_RETURN_URL_KEY } from '../../constants/oauth-return-url.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -65,22 +71,8 @@ import {
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import {
-  MatButtonToggle,
-  MatButtonToggleGroup
-} from '@angular/material/button-toggle';
-import { LanguageService } from '@core/services/language.service';
-import type { AppLanguage } from '@core/services/language.service';
-import { MatSlider, MatSliderThumb } from '@angular/material/slider';
-import { DisplayPreferencesService } from '@core/services/display-preferences.service';
-import {
-  DENSITY_MAX,
-  DENSITY_MIN
-} from '@core/services/display-preferences.service';
-import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
-import {
   MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH,
-  OAUTH_PROVIDER_FLAGS
+  MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
@@ -96,11 +88,6 @@ type ProfileData = {
   currentPassword: string;
   password: string;
   confirmPassword: string;
-};
-
-type OAuthAccountInfo = {
-  provider: string;
-  createdAt: string;
 };
 
 /**
@@ -122,12 +109,7 @@ type PendingReauth =
         | typeof STEP_UP_OPERATION.PASSWORD_SET
         | typeof STEP_UP_OPERATION.MFA_SETUP;
     }
-  | {
-      operation:
-        | typeof STEP_UP_OPERATION.OAUTH_LINK
-        | typeof STEP_UP_OPERATION.OAUTH_UNLINK;
-      provider: OAuthProvider;
-    }
+  | ProviderChange
   | {
       operation: typeof STEP_UP_OPERATION.SESSION_REVOKE;
       target: SessionRevokeTarget;
@@ -165,16 +147,6 @@ function isPendingReauth(value: unknown): value is PendingReauth {
   }
 }
 
-/** Which credential change the open password prompt authorises. */
-type StepUpPromptMode = 'link' | 'unlink';
-
-/** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
-const PROVIDER_KEYS: Record<OAuthProvider, string> = {
-  google: 'auth.providers.google',
-  facebook: 'auth.providers.facebook',
-  vk: 'auth.providers.vk'
-};
-
 const INITIAL_PROFILE: ProfileData = {
   email: '',
   firstName: '',
@@ -210,12 +182,10 @@ function canonicalEmail(value: string | undefined): string {
     PasswordStrengthComponent,
     NxsFormFieldComponent,
     TranslocoDirective,
-    MatButtonToggle,
-    MatButtonToggleGroup,
-    MatSlider,
-    MatSliderThumb,
+    LinkedProvidersComponent,
     TwoFactorComponent,
-    ActiveSessionsComponent
+    ActiveSessionsComponent,
+    PreferencesCardComponent
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -231,16 +201,9 @@ export class ProfileComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #transloco = inject(TranslocoService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
-  readonly #languageService = inject(LanguageService);
-  readonly #flagsStore = inject(FeatureFlagsStore);
-  readonly #displayPreferences = inject(DisplayPreferencesService);
   readonly #authStore = inject(AuthStore);
 
   protected readonly mustEnrolMfa = this.#authStore.mustEnrolMfa;
-
-  protected readonly displayDensity = this.#displayPreferences.density;
-  protected readonly densityMin = DENSITY_MIN;
-  protected readonly densityMax = DENSITY_MAX;
 
   protected readonly user = signal<UserResponse | null>(null);
   readonly roleChips = computed(() =>
@@ -256,47 +219,10 @@ export class ProfileComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly oauthAccounts = signal<OAuthAccountInfo[]>([]);
-  protected readonly oauthLoading = signal(false);
+  protected readonly oauthAccounts = signal<LinkedAccount[]>([]);
 
-  // A provider is shown when its public flag resolves true (server-gated on the
-  // provider being configured) OR the user already has it linked — so a stale
-  // link to a now-unconfigured provider can still be removed. The whole
-  // "connected accounts" card is hidden when none qualify.
-  protected readonly visibleProviders = computed(() => {
-    const flags = this.#flagsStore.flags();
-    const linked = new Set(this.oauthAccounts().map((a) => a.provider));
-    return OAUTH_PROVIDER_FLAGS.filter(
-      (p) => flags[p.flagKey] === true || linked.has(p.provider)
-    ).map((p) => p.provider);
-  });
-  protected readonly locale = signal<AppLanguage>('en');
-  protected readonly savingLocale = signal(false);
-
-  /**
-   * The provider whose step-up prompt is waiting for the password, and the
-   * change that prompt authorises. Null when no prompt is open: one prompt at
-   * a time, because one credential change at a time.
-   */
-  protected readonly stepUpPrompt = signal<{
-    provider: OAuthProvider;
-    mode: StepUpPromptMode;
-  } | null>(null);
-
-  protected readonly stepUpPromptLabel = computed(() => {
-    const prompt = this.stepUpPrompt();
-    return prompt ? this.#providerLabel(prompt.provider) : '';
-  });
-
-  readonly stepUpPasswordModel = signal<{ currentPassword: string }>({
-    currentPassword: ''
-  });
-
-  readonly stepUpPasswordForm = form(this.stepUpPasswordModel, (path) => {
-    required(path.currentPassword, {
-      message: 'auth.profile.stepUpPasswordRequired'
-    });
-  });
+  /** Shared with the providers card, so a round trip it asks for disables it. */
+  protected readonly providersBusy = signal(false);
 
   readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
 
@@ -409,6 +335,9 @@ export class ProfileComponent implements OnInit {
     null
   );
 
+  /** The same signal for the providers card. */
+  protected readonly resumeProviderChange = signal<ProviderChange | null>(null);
+
   /**
    * True once a sign-in method changed on this page. A device that signed in
    * with the old method keeps its session, so the sessions card offers to end
@@ -486,15 +415,9 @@ export class ProfileComponent implements OnInit {
       case STEP_UP_OPERATION.PASSWORD_SET:
         this.#notify.info('auth.profile.reauthDonePassword');
         return;
-      // The proof this trip earned is in place, so the link trip can start at
-      // the provider the user picked before leaving.
       case STEP_UP_OPERATION.OAUTH_LINK:
-        this.#startLink(pending.provider);
-        return;
-      // The proof this trip earned is what the unlink was refused for, so the
-      // request can go straight out: removing the row needs no second trip.
       case STEP_UP_OPERATION.OAUTH_UNLINK:
-        this.#unlink(pending.provider);
+        this.resumeProviderChange.set(pending);
         return;
       case STEP_UP_OPERATION.SESSION_REVOKE:
         this.resumeSessionRevoke.set(pending.target);
@@ -525,6 +448,19 @@ export class ProfileComponent implements OnInit {
   /** The sessions card asks for the round trip the same way. */
   protected startSessionsReauth(target: SessionRevokeTarget): void {
     this.#startReauth({ operation: STEP_UP_OPERATION.SESSION_REVOKE, target });
+  }
+
+  /** And so does the providers card, for a link or an unlink. */
+  protected startProviderReauth(change: ProviderChange): void {
+    this.#startReauth(change, this.providersBusy);
+  }
+
+  /** A device that signed in with the removed provider keeps its session. */
+  protected onProviderUnlinked(provider: OAuthProvider): void {
+    this.oauthAccounts.update((accounts) =>
+      accounts.filter((a) => a.provider !== provider)
+    );
+    this.offerSignOutOthers.set(true);
   }
 
   /**
@@ -644,7 +580,7 @@ export class ProfileComponent implements OnInit {
   /** Unknown providers cannot reach a label key, so the raw name is the last resort. */
   #providerLabel(provider: string): string {
     return isOAuthProvider(provider)
-      ? this.#transloco.translate(PROVIDER_KEYS[provider])
+      ? this.#transloco.translate(OAUTH_PROVIDER_LABEL_KEYS[provider])
       : provider;
   }
 
@@ -653,9 +589,10 @@ export class ProfileComponent implements OnInit {
     this.error.set(null);
     // A reload takes the two-factor card down and builds a new one, which
     // would read a stale resume signal and ask for a second secret. The same
-    // holds for the sessions card and its spent proof.
+    // holds for the sessions and providers cards and their spent proofs.
     this.resumeMfaSetup.set(false);
     this.resumeSessionRevoke.set(null);
+    this.resumeProviderChange.set(null);
 
     this.#authService
       .getProfile()
@@ -663,7 +600,6 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         next: (user) => {
           this.user.set(user);
-          this.locale.set(user.locale === 'ru' ? 'ru' : 'en');
           this.profileModel.set({
             email: user.email,
             firstName: user.firstName,
@@ -688,39 +624,6 @@ export class ProfileComponent implements OnInit {
       });
   }
 
-  /**
-   * Persists the account's preferred locale (used for server-sent emails) and
-   * syncs the live UI language. Persistence is independent of the profile form.
-   */
-  onLocaleChange(value: AppLanguage): void {
-    const previous = this.locale();
-    if (value === previous) return;
-
-    this.locale.set(value);
-    this.savingLocale.set(true);
-
-    this.#authService
-      .updateProfile({ locale: value })
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: (updated) => {
-          this.savingLocale.set(false);
-          this.user.set(updated);
-          void this.#languageService.setLanguage(value);
-          this.#notify.success('auth.profile.languageUpdated');
-        },
-        error: (err: HttpErrorResponse) => {
-          this.savingLocale.set(false);
-          this.locale.set(previous);
-          this.#notify.error(err, 'auth.profile.errorUpdateFailed');
-        }
-      });
-  }
-
-  onDensityChange(level: number): void {
-    this.#displayPreferences.setDensity(level);
-  }
-
   loadOAuthAccounts(): void {
     this.#authService
       .getOAuthAccounts()
@@ -728,126 +631,6 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         next: (accounts) => this.oauthAccounts.set(accounts),
         error: () => this.oauthAccounts.set([])
-      });
-  }
-
-  isProviderLinked(provider: string): boolean {
-    return this.oauthAccounts().some((a) => a.provider === provider);
-  }
-
-  /**
-   * A link plants a credential the account owner cannot revoke by changing
-   * their password, so it asks for a factor first. An account that holds a
-   * password types it here; an account created through a provider proves
-   * itself at that provider, which is a round trip of its own before the one
-   * that does the linking.
-   */
-  connectProvider(provider: string): void {
-    if (!isOAuthProvider(provider)) return;
-
-    if (this.accountHasPassword()) {
-      this.#openStepUpPrompt(provider, 'link');
-      return;
-    }
-
-    this.#startReauth(
-      { operation: STEP_UP_OPERATION.OAUTH_LINK, provider },
-      this.oauthLoading
-    );
-  }
-
-  /** The password prompt on the provider controls, answered. */
-  protected confirmStepUp(): void {
-    const prompt = this.stepUpPrompt();
-    if (!prompt || this.stepUpPasswordForm().invalid() || this.oauthLoading()) {
-      return;
-    }
-
-    const currentPassword = this.stepUpPasswordModel().currentPassword;
-
-    if (prompt.mode === 'link') {
-      this.#startLink(prompt.provider, currentPassword);
-      return;
-    }
-
-    this.#unlink(prompt.provider, currentPassword);
-  }
-
-  protected cancelStepUp(): void {
-    this.#closeStepUpPrompt();
-  }
-
-  #openStepUpPrompt(provider: OAuthProvider, mode: StepUpPromptMode): void {
-    this.stepUpPasswordModel.set({ currentPassword: '' });
-    this.stepUpPrompt.set({ provider, mode });
-  }
-
-  #closeStepUpPrompt(): void {
-    this.stepUpPrompt.set(null);
-    this.stepUpPasswordModel.set({ currentPassword: '' });
-  }
-
-  #startLink(provider: OAuthProvider, currentPassword?: string): void {
-    this.oauthLoading.set(true);
-    this.#authService
-      .initOAuthLink(currentPassword)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: () => {
-          this.#closeStepUpPrompt();
-          this.#sessionStorage.setItem(OAUTH_RETURN_URL_KEY, '/profile');
-          if (this.#window) {
-            this.#window.location.href = OAUTH_URLS[provider];
-          }
-        },
-        error: (err: HttpErrorResponse) => {
-          this.oauthLoading.set(false);
-          this.#notify.error(err, 'auth.profile.errorInitiateLinkFailed');
-        }
-      });
-  }
-
-  /**
-   * The row an unlink deletes is a sign-in credential that a password change
-   * does not revoke, so removing one costs the factor that adding one costs.
-   * An account that holds a password types it here; an account created through
-   * a provider proves itself at a provider it still holds.
-   */
-  disconnectProvider(provider: string): void {
-    if (!isOAuthProvider(provider)) return;
-
-    if (this.accountHasPassword()) {
-      this.#openStepUpPrompt(provider, 'unlink');
-      return;
-    }
-
-    this.#startReauth(
-      { operation: STEP_UP_OPERATION.OAUTH_UNLINK, provider },
-      this.oauthLoading
-    );
-  }
-
-  #unlink(provider: OAuthProvider, currentPassword?: string): void {
-    this.oauthLoading.set(true);
-    this.#authService
-      .unlinkOAuthAccount(provider, currentPassword)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: () => {
-          this.oauthLoading.set(false);
-          this.#closeStepUpPrompt();
-          this.oauthAccounts.update((accounts) =>
-            accounts.filter((a) => a.provider !== provider)
-          );
-          this.#notify.success('auth.profile.oauthDisconnected', {
-            provider: this.#providerLabel(provider)
-          });
-          this.offerSignOutOthers.set(true);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.oauthLoading.set(false);
-          this.#notify.error(err, 'auth.profile.errorDisconnectFailed');
-        }
       });
   }
 

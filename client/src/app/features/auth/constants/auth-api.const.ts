@@ -35,6 +35,13 @@ export const OAUTH_URLS = {
 
 export type OAuthProvider = keyof typeof OAUTH_URLS;
 
+/** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
+export const OAUTH_PROVIDER_LABEL_KEYS: Record<OAuthProvider, string> = {
+  google: 'auth.providers.google',
+  facebook: 'auth.providers.facebook',
+  vk: 'auth.providers.vk'
+};
+
 /**
  * Providers arrive as plain strings (feature flags, route params), and an
  * unknown one would index OAUTH_URLS to `undefined` and navigate the window to

@@ -1,0 +1,47 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+// The card is a cell of the profile grid, and it renders nothing when no
+// provider qualifies. A host box would hold an empty cell there.
+:host {
+  display: contents;
+
+  .oauth-providers {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .oauth-provider-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: vars.$spacing-sm 0;
+
+    & + .oauth-provider-row {
+      border-top: func.rem(1) solid var(--mat-sys-outline-variant);
+    }
+  }
+
+  .oauth-provider-info {
+    display: flex;
+    gap: vars.$spacing-sm;
+    align-items: center;
+  }
+
+  .oauth-step-up-confirm {
+    padding-top: vars.$spacing-md;
+    border-top: func.rem(1) solid var(--mat-sys-outline-variant);
+  }
+
+  .oauth-step-up-note {
+    margin: 0 0 vars.$spacing-sm;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .oauth-step-up-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-sm;
+  }
+}

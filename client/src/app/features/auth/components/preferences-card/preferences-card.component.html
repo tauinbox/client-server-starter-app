@@ -1,0 +1,47 @@
+<mat-card *transloco="let t; scope: 'auth'">
+  <mat-card-header>
+    <mat-card-title>{{ t('auth.profile.preferences') }}</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p class="preference-label">{{ t('auth.profile.language') }}</p>
+    <mat-button-toggle-group
+      [value]="locale()"
+      [disabled]="savingLocale()"
+      [hideSingleSelectionIndicator]="true"
+      (change)="onLocaleChange($event.value)"
+      [attr.aria-label]="t('auth.profile.language')"
+    >
+      <mat-button-toggle value="en">English</mat-button-toggle>
+      <mat-button-toggle value="ru">Русский</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <div class="display-section">
+      <p id="density-label" class="preference-label">
+        {{ t('auth.profile.density') }}
+      </p>
+      <p class="preference-hint">{{ t('auth.profile.densityHint') }}</p>
+
+      <div class="density-control">
+        <span class="density-end">{{
+          t('auth.profile.densityComfortable')
+        }}</span>
+        <mat-slider
+          class="density-slider"
+          [min]="densityMin"
+          [max]="densityMax"
+          step="1"
+          discrete
+        >
+          <input
+            matSliderThumb
+            [value]="displayDensity()"
+            (valueChange)="onDensityChange($event)"
+            aria-labelledby="density-label"
+          />
+        </mat-slider>
+        <span class="density-end">{{ t('auth.profile.densityDense') }}</span>
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>
