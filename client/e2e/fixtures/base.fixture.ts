@@ -243,6 +243,7 @@ export { defaultUser } from './mock-data';
 export {
   loginViaUi,
   loginViaUiKeepSse,
+  markOAuthRoundTripStarted,
   expectAuthRedirect,
   expectForbiddenRedirect,
   openedDialog,

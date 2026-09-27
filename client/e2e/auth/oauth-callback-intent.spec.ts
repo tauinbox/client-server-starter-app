@@ -1,4 +1,8 @@
-import { expect, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  markOAuthRoundTripStarted,
+  test
+} from '../fixtures/base.fixture';
 import type { UserResponse } from '@app/shared/types';
 import type { BrowserContext, Page } from '@playwright/test';
 import type { MockServerApi } from '../fixtures/base.fixture';
@@ -67,9 +71,7 @@ test.describe('OAuth callback that this tab did not start', () => {
     context
   }) => {
     await page.goto('/login');
-    await page.evaluate(() =>
-      sessionStorage.setItem('oauth_return_url', '/profile')
-    );
+    await markOAuthRoundTripStarted(page);
     // The provider refused, so the server sent the browser to /login.
     await page.goto('/login?oauth_error=oauth_cancelled');
     await holdOAuthData(page, context, _mockServer);

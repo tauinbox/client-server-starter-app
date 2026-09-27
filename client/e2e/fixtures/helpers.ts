@@ -4,6 +4,23 @@ import { expect } from '@playwright/test';
 import type { MockUser } from './mock-data';
 
 /**
+ * Stores what a click on a provider button stores just before the browser
+ * leaves for the provider. Call it on a page that has already bootstrapped:
+ * the app takes the value out of storage at bootstrap, so it must be written
+ * after that and read by the NEXT page load, which is why this is not an
+ * `addInitScript`.
+ */
+export async function markOAuthRoundTripStarted(
+  page: Page,
+  returnUrl = '/profile'
+): Promise<void> {
+  await page.evaluate(
+    (url) => sessionStorage.setItem('oauth_return_url', url),
+    returnUrl
+  );
+}
+
+/**
  * Wait for a freshly opened dialog to be visible AND for its CDK focus trap to
  * have moved focus inside it. Use instead of a bare
  * `expect(page.getByRole('dialog')).toBeVisible()` before typing into a dialog.

@@ -1,4 +1,8 @@
-import { expect, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  markOAuthRoundTripStarted,
+  test
+} from '../fixtures/base.fixture';
 import type { UserResponse } from '@app/shared/types';
 import type { Page, BrowserContext } from '@playwright/test';
 import type { MockServerApi } from '../fixtures/base.fixture';
@@ -28,11 +32,7 @@ async function arriveAtCallback(
   const { token } = await mockServer.issueOAuthData(admin!.id);
 
   await page.goto('/login');
-  // What the login page stores before handing the browser to the provider.
-  await page.evaluate(
-    (url) => sessionStorage.setItem('oauth_return_url', url),
-    returnUrl
-  );
+  await markOAuthRoundTripStarted(page, returnUrl);
 
   await context.addCookies([
     {
