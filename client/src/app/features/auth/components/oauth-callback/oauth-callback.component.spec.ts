@@ -13,7 +13,7 @@ import {
 } from '@angular/common/http/testing';
 import { createMongoAbility } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
-import { EMPTY, of, throwError } from 'rxjs';
+import { EMPTY, of, Subject, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { OAuthCallbackComponent } from './oauth-callback.component';
@@ -65,11 +65,7 @@ const mockAuthResponse: AuthResponse = {
 
 describe('OAuthCallbackComponent', () => {
   let fixture: ComponentFixture<OAuthCallbackComponent>;
-  let authStoreMock: {
-    saveAuthResponse: ReturnType<typeof vi.fn>;
-  };
   let authServiceMock: {
-    completeAuthentication: ReturnType<typeof vi.fn>;
     exchangeOAuthData: ReturnType<typeof vi.fn>;
     verifyMfa: ReturnType<typeof vi.fn>;
     verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
@@ -82,12 +78,7 @@ describe('OAuthCallbackComponent', () => {
   let router: Router;
 
   beforeEach(async () => {
-    authStoreMock = {
-      saveAuthResponse: vi.fn()
-    };
-
     authServiceMock = {
-      completeAuthentication: vi.fn().mockResolvedValue(undefined),
       exchangeOAuthData: vi.fn().mockReturnValue(of(mockAuthResponse)),
       verifyMfa: vi.fn().mockReturnValue(of(mockAuthResponse)),
       verifyMfaRecoveryCode: vi.fn().mockReturnValue(of(mockAuthResponse))
@@ -104,7 +95,6 @@ describe('OAuthCallbackComponent', () => {
       providers: [
         provideRouter([]),
         provideNoopAnimations(),
-        { provide: AuthStore, useValue: authStoreMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: SessionStorageService, useValue: sessionStorageMock }
       ]
@@ -117,16 +107,12 @@ describe('OAuthCallbackComponent', () => {
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
   });
 
-  it('should exchange OAuth data and save auth response', async () => {
+  it('should exchange OAuth data and navigate to the profile', async () => {
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
     await fixture.whenStable();
 
     expect(authServiceMock.exchangeOAuthData).toHaveBeenCalled();
-    expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(
-      mockAuthResponse
-    );
-    expect(authServiceMock.completeAuthentication).toHaveBeenCalled();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/profile', {
       replaceUrl: true
     });
@@ -148,13 +134,9 @@ describe('OAuthCallbackComponent', () => {
     });
   });
 
-  it('should not navigate until the post-authentication routine settles', async () => {
-    let release!: () => void;
-    authServiceMock.completeAuthentication.mockReturnValue(
-      new Promise<void>((resolve) => {
-        release = () => resolve();
-      })
-    );
+  it('should not navigate until the exchange has started the session', async () => {
+    const exchange$ = new Subject<AuthResponse>();
+    authServiceMock.exchangeOAuthData.mockReturnValue(exchange$);
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -162,7 +144,8 @@ describe('OAuthCallbackComponent', () => {
 
     expect(router.navigateByUrl).not.toHaveBeenCalled();
 
-    release();
+    exchange$.next(mockAuthResponse);
+    exchange$.complete();
     await fixture.whenStable();
 
     expect(router.navigateByUrl).toHaveBeenCalledWith('/profile', {
@@ -201,11 +184,9 @@ describe('OAuthCallbackComponent', () => {
       fixture.detectChanges();
     }
 
-    it('saves no session and asks for the code instead', async () => {
+    it('asks for the code instead of navigating', async () => {
       await reachChallenge();
 
-      expect(authStoreMock.saveAuthResponse).not.toHaveBeenCalled();
-      expect(authServiceMock.completeAuthentication).not.toHaveBeenCalled();
       expect(router.navigateByUrl).not.toHaveBeenCalled();
       expect(
         fixture.nativeElement.querySelector(
@@ -259,26 +240,6 @@ describe('OAuthCallbackComponent', () => {
     });
   });
 
-  it('should redirect to login when auth response is missing required fields', () => {
-    const incompleteResponse = {
-      tokens: {
-        access_token: 'token',
-        refresh_token: 'refresh',
-        expires_in: 3600
-      },
-      user: { id: '', email: '', firstName: 'Test', lastName: 'User' }
-    };
-    authServiceMock.exchangeOAuthData.mockReturnValue(of(incompleteResponse));
-
-    fixture = TestBed.createComponent(OAuthCallbackComponent);
-    fixture.detectChanges();
-
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { oauth_error: 'auth_failed' },
-      replaceUrl: true
-    });
-  });
-
   it('should reject a stored returnUrl that resolves off-origin', async () => {
     sessionStorageMock.getItem.mockReturnValue('//evil.com');
 
@@ -311,22 +272,6 @@ describe('OAuthCallbackComponent', () => {
     await fixture.whenStable();
 
     expect(router.navigateByUrl).toHaveBeenCalledWith('/admin/users?q=a//b', {
-      replaceUrl: true
-    });
-  });
-
-  it('should redirect to login when the post-authentication routine rejects', async () => {
-    authServiceMock.completeAuthentication.mockRejectedValue(
-      new Error('permissions unavailable')
-    );
-
-    fixture = TestBed.createComponent(OAuthCallbackComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    expect(router.navigateByUrl).not.toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { oauth_error: 'auth_failed' },
       replaceUrl: true
     });
   });
@@ -525,5 +470,39 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/profile', {
       replaceUrl: true
     });
+  });
+
+  it('saves nothing and redirects to login on an incomplete response', async () => {
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(OAuthCallbackComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(AuthApiEnum.OAuthExchange).flush({
+      ...liveAuthResponse,
+      user: { ...liveAuthResponse.user, email: '' }
+    });
+    await settle(fixture);
+
+    expect(TestBed.inject(AuthStore).isAuthenticated()).toBe(false);
+    httpMock.expectNone(AuthApiEnum.Permissions);
+    expect(notificationsMock.connect).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { oauth_error: 'auth_failed' },
+      replaceUrl: true
+    });
+  });
+
+  it('saves no session when the account answers with a challenge', async () => {
+    const fixture = TestBed.createComponent(OAuthCallbackComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(AuthApiEnum.OAuthExchange).flush({
+      mfaRequired: true,
+      mfaToken: 'pending-token',
+      expiresIn: 300
+    });
+    await settle(fixture);
+
+    expect(TestBed.inject(AuthStore).isAuthenticated()).toBe(false);
+    httpMock.expectNone(AuthApiEnum.Permissions);
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 });
