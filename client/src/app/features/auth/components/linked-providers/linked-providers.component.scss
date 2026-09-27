@@ -1,8 +1,8 @@
 @use 'abstracts/variables' as vars;
 @use 'abstracts/functions' as func;
 
-// The card is a cell of the profile grid, and it renders nothing when no
-// provider qualifies. A host box would hold an empty cell there.
+// The card is an item of a profile column, and it renders nothing when no
+// provider qualifies. A host box would add an empty gap there.
 :host {
   display: contents;
 

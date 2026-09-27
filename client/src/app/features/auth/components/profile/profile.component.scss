@@ -64,14 +64,24 @@
 
 // ── Content grid ─────────────────────────────────────────────────────────────
 
+// Two independent stacks, not one grid: in a shared grid a short card leaves a
+// hole beside a tall one, because both cells take the height of the row.
 .profile-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: vars.$spacing-lg;
+  align-items: start;
 
   @media (max-width: vars.$breakpoint-sm) {
     grid-template-columns: 1fr;
   }
+}
+
+.profile-column {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-lg;
+  min-width: 0;
 }
 
 // ── Edit profile form ─────────────────────────────────────────────────────────
