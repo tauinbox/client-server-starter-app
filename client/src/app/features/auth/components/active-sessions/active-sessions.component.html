@@ -59,6 +59,14 @@
                   }}</span>
                 }
               </p>
+              @if (session.ipAddress) {
+                <p class="sessions-meta sessions-origin">
+                  <span class="sessions-ip">{{ session.ipAddress }}</span>
+                  @if (session.location) {
+                    <span>{{ session.location }}</span>
+                  }
+                </p>
+              }
               <p class="sessions-meta">
                 {{
                   t('auth.sessions.startedAt', {
@@ -88,6 +96,13 @@
           </li>
         }
       </ul>
+
+      @if (showGeoAttribution()) {
+        <p class="sessions-attribution">
+          {{ t('auth.sessions.geoAttribution') }}
+          <a href="https://db-ip.com" target="_blank" rel="noopener">DB-IP</a>
+        </p>
+      }
 
       @if (cannotStepUp()) {
         <p class="sessions-note" role="note">

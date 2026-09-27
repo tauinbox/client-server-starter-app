@@ -1500,7 +1500,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/login` | None | Log in. Sets the `refresh_token` HttpOnly cookie and returns an access token |
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
 | POST | `/auth/logout` | Bearer | Log out this device. It ends the session the `refresh_token` cookie belongs to, leaves the other devices signed in, and cancels a started OAuth link. It answers `Clear-Site-Data` |
-| GET | `/auth/sessions` | Bearer | List the signed-in devices of the caller: session id, `current`, the User-Agent sent at sign-in, start time and last refresh |
+| GET | `/auth/sessions` | Bearer | List the signed-in devices of the caller: session id, `current`, the User-Agent sent at sign-in, the IP address of the latest sign-in or refresh with its country code and city (null without a GeoIP database), start time and last refresh |
 | DELETE | `/auth/sessions/:sessionId` | Bearer + step-up | End one other device. An unknown id and an id of another account both answer 404; the own session answers 400 |
 | DELETE | `/auth/sessions` | Bearer + step-up | End every device of the account except the caller |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |

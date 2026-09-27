@@ -540,8 +540,10 @@ mechanism and does not depend on the server revoking anything.
 
 **Signed-in devices.** `ActiveSessionsComponent` (`nxs-active-sessions`) on the profile page lists
 the sessions from `GET /auth/sessions`, names each device with `describeUserAgent` (the major
-browsers and systems, with the raw header as the fallback, rendered as text only) and ends one
-other device or all of them. It asks for the factor the account holds: the password, else a code
+browsers and systems, with the raw header as the fallback, rendered as text only), shows the IP
+address of the latest sign-in or refresh with its location (`describeLocation`: the city from the
+server and the country named in the UI language through `Intl.DisplayNames`), credits DB-IP when
+any location is shown (its CC BY 4.0 license demands it), and ends one other device or all of them. It asks for the factor the account holds: the password, else a code
 from the authenticator, else a provider round trip that the page starts and resumes through the
 `pending_reauth` session-storage key (one record for every step-up round trip on the page). After a sign-in method changes on the page, the card
 offers "Sign out all other devices"; it never signs anything out on its own.

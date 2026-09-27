@@ -13,6 +13,7 @@ import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { GeoIpService } from '../src/modules/auth/services/geo-ip.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
@@ -144,7 +145,8 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
   }
 
   async function signIn(times: number): Promise<void> {
-    for (let i = 0; i < times; i++) await auth.login(userRecord, null);
+    for (let i = 0; i < times; i++)
+      await auth.login(userRecord, { userAgent: null, ipAddress: null });
   }
 
   beforeEach(async () => {
@@ -190,6 +192,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
           }
         },
         RefreshTokenService,
+        GeoIpService,
         SessionIssuerService,
         SessionLimitService,
         EntitlementService,
@@ -272,7 +275,10 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
       (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
     )[0];
 
-    const result = await auth.login(userRecord, null);
+    const result = await auth.login(userRecord, {
+      userAgent: null,
+      ipAddress: null
+    });
 
     expect(typeof result.tokens.refresh_token).toBe('string');
     expect(activeTokenCount()).toBe(10);
@@ -301,7 +307,10 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
     customers.findOne.mockRejectedValue(new Error('billing database is down'));
 
     // A billing outage must never become a login outage.
-    const result = await auth.login(userRecord, null);
+    const result = await auth.login(userRecord, {
+      userAgent: null,
+      ipAddress: null
+    });
     expect(typeof result.tokens.access_token).toBe('string');
 
     await signIn(MAX_CONCURRENT_SESSIONS + 2);

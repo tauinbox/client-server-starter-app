@@ -92,6 +92,7 @@ describe('AuthService', () => {
     deleteBySessionId: jest.Mock;
     revokeToken: jest.Mock;
     pruneOldestTokens: jest.Mock;
+    rotatedDevice: jest.Mock;
   };
   let mockMailService: {
     sendPasswordChangedNotification: jest.Mock;
@@ -257,7 +258,15 @@ describe('AuthService', () => {
       deleteByUserId: jest.fn().mockResolvedValue(undefined),
       deleteBySessionId: jest.fn().mockResolvedValue(1),
       revokeToken: jest.fn().mockResolvedValue(undefined),
-      pruneOldestTokens: jest.fn().mockResolvedValue(undefined)
+      pruneOldestTokens: jest.fn().mockResolvedValue(undefined),
+      rotatedDevice: jest.fn((previous: RefreshToken, ip: string | null) =>
+        Promise.resolve({
+          userAgent: previous.userAgent,
+          ipAddress: ip ?? previous.ipAddress,
+          countryCode: previous.countryCode,
+          city: previous.city
+        })
+      )
     };
 
     mockMailService = {
@@ -793,7 +802,10 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should create a new session token and prune oldest beyond limit', async () => {
-      const result = await service.login(mockUser, 'Mozilla/5.0 Test');
+      const result = await service.login(mockUser, {
+        userAgent: 'Mozilla/5.0 Test',
+        ipAddress: null
+      });
 
       expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
@@ -801,7 +813,7 @@ describe('AuthService', () => {
         expect.any(String),
         604800,
         expect.any(String),
-        'Mozilla/5.0 Test'
+        { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
       );
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
         'user-1',
@@ -823,7 +835,7 @@ describe('AuthService', () => {
     it('prunes to the plan allowance when the plan carries a sessions limit', async () => {
       mockEntitlementService.limitFor.mockResolvedValue(10);
 
-      await service.login(mockUser, null);
+      await service.login(mockUser, { userAgent: null, ipAddress: null });
 
       expect(mockEntitlementService.limitFor).toHaveBeenCalledWith(
         'user-1',
@@ -841,7 +853,10 @@ describe('AuthService', () => {
       );
 
       // A billing outage must never become a login outage.
-      const result = await service.login(mockUser, null);
+      const result = await service.login(mockUser, {
+        userAgent: null,
+        ipAddress: null
+      });
 
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
@@ -855,13 +870,15 @@ describe('AuthService', () => {
         throw new Error(`Configuration key "${key}" does not exist`);
       });
 
-      await expect(service.login(mockUser, null)).rejects.toThrow(
+      await expect(
+        service.login(mockUser, { userAgent: null, ipAddress: null })
+      ).rejects.toThrow(
         'Configuration key "JWT_REFRESH_EXPIRATION" does not exist'
       );
     });
 
     it('should generate tokens with correct payload', async () => {
-      await service.login(mockUser, null);
+      await service.login(mockUser, { userAgent: null, ipAddress: null });
 
       // JWT payload keeps role names as string[] (CASL / storage contract),
       // even though the response body carries RoleResponse[] objects.
@@ -1536,7 +1553,7 @@ describe('AuthService', () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
       mockUsersService.findById.mockResolvedValue(mockUser);
 
-      const result = await service.refreshTokens('valid-refresh-token');
+      const result = await service.refreshTokens('valid-refresh-token', null);
 
       expect(mockRefreshTokenService.findByToken).toHaveBeenCalledWith(
         'valid-refresh-token'
@@ -1584,7 +1601,7 @@ describe('AuthService', () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
       mockUsersService.findById.mockResolvedValue(entity);
 
-      const result = await service.refreshTokens('valid-refresh-token');
+      const result = await service.refreshTokens('valid-refresh-token', null);
 
       expect(result.user).toBe(entity);
       expect(instanceToPlain(result.user)).not.toHaveProperty(
@@ -1595,18 +1612,18 @@ describe('AuthService', () => {
     it('should throw HttpException when token not found', async () => {
       mockRefreshTokenService.findByToken.mockResolvedValue(null);
 
-      await expect(service.refreshTokens('invalid-token')).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.refreshTokens('invalid-token', null)
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw HttpException when token is revoked', async () => {
       const revokedToken = { ...mockTokenDoc, revoked: true };
       mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
 
-      await expect(service.refreshTokens('revoked-token')).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.refreshTokens('revoked-token', null)
+      ).rejects.toThrow(HttpException);
     });
 
     describe('reuse detection', () => {
@@ -1620,9 +1637,9 @@ describe('AuthService', () => {
         };
         mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
 
-        await expect(service.refreshTokens('reused-token')).rejects.toThrow(
-          HttpException
-        );
+        await expect(
+          service.refreshTokens('reused-token', null)
+        ).rejects.toThrow(HttpException);
 
         expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
           'user-1'
@@ -1656,7 +1673,7 @@ describe('AuthService', () => {
         mockRefreshTokenService.isLostResponseReplay.mockResolvedValue(true);
 
         await expect(
-          service.refreshTokens('replayed-token')
+          service.refreshTokens('replayed-token', null)
         ).rejects.toMatchObject({
           status: HttpStatus.UNAUTHORIZED,
           response: { errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN }
@@ -1696,9 +1713,9 @@ describe('AuthService', () => {
         };
         mockRefreshTokenService.findByToken.mockResolvedValue(revokedExpired);
 
-        await expect(service.refreshTokens('stale-token')).rejects.toThrow(
-          HttpException
-        );
+        await expect(
+          service.refreshTokens('stale-token', null)
+        ).rejects.toThrow(HttpException);
 
         expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
         expect(mockUserRepository.update).not.toHaveBeenCalled();
@@ -1715,7 +1732,7 @@ describe('AuthService', () => {
         mockRefreshTokenService.findByToken.mockResolvedValueOnce(mockTokenDoc);
         mockUsersService.findById.mockResolvedValue(mockUser);
 
-        const first = await service.refreshTokens('original-token');
+        const first = await service.refreshTokens('original-token', null);
         expect(first.tokens.access_token).toBe('mock-access-token');
 
         // Second refresh with the SAME original token — service now sees it as
@@ -1727,9 +1744,9 @@ describe('AuthService', () => {
         };
         mockRefreshTokenService.findByToken.mockResolvedValueOnce(revokedNow);
 
-        await expect(service.refreshTokens('original-token')).rejects.toThrow(
-          HttpException
-        );
+        await expect(
+          service.refreshTokens('original-token', null)
+        ).rejects.toThrow(HttpException);
 
         expect(mockRefreshTokenService.deleteByUserId).toHaveBeenCalledWith(
           'user-1'
@@ -1746,9 +1763,9 @@ describe('AuthService', () => {
       const expiredToken = { ...mockTokenDoc, isExpired: () => true };
       mockRefreshTokenService.findByToken.mockResolvedValue(expiredToken);
 
-      await expect(service.refreshTokens('expired-token')).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.refreshTokens('expired-token', null)
+      ).rejects.toThrow(HttpException);
     });
 
     // A token path answers 401, never the 404 of the users API: the account
@@ -1758,7 +1775,7 @@ describe('AuthService', () => {
       mockUsersService.findById.mockResolvedValue(null);
 
       const error = await service
-        .refreshTokens('valid-refresh-token')
+        .refreshTokens('valid-refresh-token', null)
         .catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(HttpException);
@@ -1784,7 +1801,7 @@ describe('AuthService', () => {
       mockUsersService.findById.mockResolvedValue(inactiveUser);
 
       await expect(
-        service.refreshTokens('valid-refresh-token')
+        service.refreshTokens('valid-refresh-token', null)
       ).rejects.toMatchObject({
         status: HttpStatus.UNAUTHORIZED,
         response: {
@@ -1823,9 +1840,9 @@ describe('AuthService', () => {
         return config[key];
       });
 
-      await expect(service.refreshTokens('old-session-token')).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.refreshTokens('old-session-token', null)
+      ).rejects.toThrow(HttpException);
 
       expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
         'session-1'
@@ -1844,7 +1861,7 @@ describe('AuthService', () => {
       mockUsersService.findById.mockResolvedValue(mockUser);
 
       await expect(
-        service.refreshTokens('aged-session-token')
+        service.refreshTokens('aged-session-token', null)
       ).rejects.toMatchObject({
         status: HttpStatus.UNAUTHORIZED,
         response: { errorKey: ErrorKeys.AUTH.SESSION_EXPIRED }
@@ -1867,14 +1884,19 @@ describe('AuthService', () => {
       });
       mockUsersService.findById.mockResolvedValue(mockUser);
 
-      await service.refreshTokens('valid-refresh-token');
+      await service.refreshTokens('valid-refresh-token', '203.0.113.9');
 
+      expect(mockRefreshTokenService.rotatedDevice).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: 'session-1' }),
+        '203.0.113.9'
+      );
       expect(mockManager.save).toHaveBeenCalledWith(
         RefreshToken,
         expect.objectContaining({
           sessionId: 'session-1',
           sessionStartedAt: startedAt,
-          userAgent: 'Mozilla/5.0 Test'
+          userAgent: 'Mozilla/5.0 Test',
+          ipAddress: '203.0.113.9'
         })
       );
       expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
@@ -1899,7 +1921,7 @@ describe('AuthService', () => {
       });
       mockUsersService.findById.mockResolvedValue(mockUser);
 
-      const result = await service.refreshTokens('valid-refresh-token');
+      const result = await service.refreshTokens('valid-refresh-token', null);
 
       expect(result.tokens.access_token).toBe('mock-access-token');
       expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
@@ -1921,7 +1943,7 @@ describe('AuthService', () => {
         return config[key];
       });
 
-      const result = await service.refreshTokens('valid-refresh-token');
+      const result = await service.refreshTokens('valid-refresh-token', null);
 
       expect(result.tokens.access_token).toBe('mock-access-token');
     });

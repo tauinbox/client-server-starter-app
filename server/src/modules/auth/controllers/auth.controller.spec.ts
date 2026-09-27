@@ -494,7 +494,10 @@ describe('AuthController', () => {
 
       const result = await controller.refreshToken(req, res);
 
-      expect(authServiceMock.refreshTokens).toHaveBeenCalledWith('old-refresh');
+      expect(authServiceMock.refreshTokens).toHaveBeenCalledWith(
+        'old-refresh',
+        '127.0.0.1'
+      );
       expect(result.tokens).not.toHaveProperty('refresh_token');
       expect(res.cookie).toHaveBeenCalledWith(
         '__Host-refresh_token',
@@ -529,7 +532,8 @@ describe('AuthController', () => {
       await controller.refreshToken(req, res);
 
       expect(authServiceMock.refreshTokens).toHaveBeenCalledWith(
-        'current-refresh'
+        'current-refresh',
+        '127.0.0.1'
       );
     });
 

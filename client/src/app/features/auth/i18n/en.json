@@ -231,6 +231,7 @@
     "unknownDevice": "Unknown device",
     "startedAt": "Signed in {{ date }}",
     "lastActiveAt": "Last active {{ date }}",
+    "geoAttribution": "IP geolocation by",
     "end": "Sign out",
     "endOthers": "Sign out all other devices",
     "offerAfterChange": "You changed how you sign in. Devices that are already signed in stay signed in. Sign them out if you do not use them.",

@@ -228,7 +228,13 @@ describe('Auth response serialization (e2e)', () => {
               isExpired: () => false
             }),
             createRefreshToken: jest.fn(),
-            pruneOldestTokens: jest.fn()
+            pruneOldestTokens: jest.fn(),
+            rotatedDevice: jest.fn().mockResolvedValue({
+              userAgent: null,
+              ipAddress: null,
+              countryCode: null,
+              city: null
+            })
           }
         },
         {

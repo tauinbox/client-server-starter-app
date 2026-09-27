@@ -5,6 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
+import { TranslocoService } from '@jsverse/transloco';
 import type {
   ActiveSessionResponse,
   RoleResponse,
@@ -51,6 +52,9 @@ const SESSIONS: ActiveSessionResponse[] = [
     id: 'current-id',
     current: true,
     userAgent: CHROME_WINDOWS,
+    ipAddress: '203.0.113.7',
+    countryCode: 'DE',
+    city: 'Berlin',
     startedAt: '2026-09-01T10:00:00.000Z',
     lastActiveAt: '2026-09-20T10:00:00.000Z'
   },
@@ -58,6 +62,9 @@ const SESSIONS: ActiveSessionResponse[] = [
     id: 'other-id',
     current: false,
     userAgent: '<img src=x onerror=alert(1)>',
+    ipAddress: '198.51.100.4',
+    countryCode: null,
+    city: null,
     startedAt: '2026-09-02T10:00:00.000Z',
     lastActiveAt: '2026-09-19T10:00:00.000Z'
   },
@@ -65,6 +72,9 @@ const SESSIONS: ActiveSessionResponse[] = [
     id: 'legacy-id',
     current: false,
     userAgent: null,
+    ipAddress: null,
+    countryCode: null,
+    city: null,
     startedAt: '2026-09-03T10:00:00.000Z',
     lastActiveAt: '2026-09-18T10:00:00.000Z'
   }
@@ -138,6 +148,45 @@ describe('ActiveSessionsComponent', () => {
     expect(items[0].querySelector('.sessions-badge')).not.toBeNull();
     expect(items[0].querySelector('button')).toBeNull();
     expect(items[2].textContent).toContain('Unknown device');
+  });
+
+  it('shows the address and the location of each device that has one', async () => {
+    const host = await create();
+
+    const origins = Array.from(host.querySelectorAll('.sessions-item')).map(
+      (item) =>
+        Array.from(item.querySelectorAll('.sessions-origin span')).map((s) =>
+          s.textContent?.trim()
+        )
+    );
+    expect(origins).toEqual([
+      ['203.0.113.7', 'Berlin, Germany'],
+      ['198.51.100.4'],
+      []
+    ]);
+    expect(host.querySelector('.sessions-attribution a')?.textContent).toBe(
+      'DB-IP'
+    );
+  });
+
+  it('names the country in the language the user switches to', async () => {
+    const host = await create();
+
+    TestBed.inject(TranslocoService).setActiveLang('ru');
+    fixture.detectChanges();
+
+    expect(host.querySelector('.sessions-origin')?.textContent).toContain(
+      'Berlin, Германия'
+    );
+  });
+
+  it('credits no geolocation source when no location is known', async () => {
+    authServiceMock.getSessions.mockReturnValue(
+      of(SESSIONS.map((s) => ({ ...s, countryCode: null, city: null })))
+    );
+    const host = await create();
+
+    expect(host.querySelector('.sessions-attribution')).toBeNull();
   });
 
   it('renders a user agent as text, never as markup', async () => {

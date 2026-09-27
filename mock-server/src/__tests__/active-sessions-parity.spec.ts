@@ -104,16 +104,21 @@ function revokeAudits() {
 }
 
 describe('GET /api/v1/auth/sessions', () => {
-  it('lists every device, marks the caller and carries the user agent', async () => {
+  it('lists every device, marks the caller and carries the user agent and the address', async () => {
     const a = await signIn(EMAIL, 'Device-A');
     const b = await signIn(EMAIL, 'Device-B');
 
     const list = await sessions(a.token);
 
-    expect(list.find((s) => s.id === a.sessionId)).toMatchObject({
+    const mine = list.find((s) => s.id === a.sessionId);
+    expect(mine).toMatchObject({
       current: true,
-      userAgent: 'Device-A'
+      userAgent: 'Device-A',
+      countryCode: null,
+      city: null
     });
+    // A loopback request, unwrapped from its IPv4-mapped form.
+    expect(['127.0.0.1', '::1']).toContain(mine?.ipAddress);
     expect(list.find((s) => s.id === b.sessionId)).toMatchObject({
       current: false,
       userAgent: 'Device-B'

@@ -1,5 +1,6 @@
 import { Router, type Response } from 'express';
 import { completeSignIn } from '../helpers/sign-in.helpers';
+import { normalizeIpAddress } from '../utils/ip-address';
 import { v4 as uuidv4 } from 'uuid';
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
@@ -691,7 +692,12 @@ router.post('/refresh-token', (req, res) => {
   // The binding of the revoked ancestor stays: a session ends as a whole, and
   // `endSessionOfToken` needs the ancestors to clear the reuse-detection map
   // too. Liveness reads the active map only, so this keeps nothing alive.
-  registerSession(tokens.refresh_token, sessionId);
+  registerSession(
+    tokens.refresh_token,
+    sessionId,
+    null,
+    normalizeIpAddress(req.ip)
+  );
 
   const { refresh_token, ...publicTokens } = tokens;
   setRefreshTokenCookie(res, refresh_token);

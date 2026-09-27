@@ -61,6 +61,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     refreshSessions: state.refreshSessions.size,
     sessionStarts: state.sessionStarts.size,
     sessionUserAgents: state.sessionUserAgents.size,
+    sessionIps: state.sessionIps.size,
     sessionLastActive: state.sessionLastActive.size,
     revokedRefreshTokens: state.revokedRefreshTokens.size,
     rotatedTo: state.rotatedTo.size,

@@ -71,13 +71,10 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
   async function seedSession(): Promise<{ raw: string; sessionId: string }> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const sessionId = randomUUID();
-    await refreshTokenService.createRefreshToken(
-      userId,
-      raw,
-      3600,
-      sessionId,
-      null
-    );
+    await refreshTokenService.createRefreshToken(userId, raw, 3600, sessionId, {
+      userAgent: null,
+      ipAddress: null
+    });
     return { raw, sessionId };
   }
 
@@ -106,12 +103,12 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     const postRotation = await seedSession();
 
     expect(
-      await errorKeyOf(authService.refreshTokens(preRotation.raw))
+      await errorKeyOf(authService.refreshTokens(preRotation.raw, null))
     ).toEqual(
       expect.objectContaining({ errorKey: 'errors.auth.sessionInvalidated' })
     );
     expect(
-      await errorKeyOf(authService.refreshTokens(preRotation.raw))
+      await errorKeyOf(authService.refreshTokens(preRotation.raw, null))
     ).toEqual(
       expect.objectContaining({ errorKey: 'errors.auth.invalidRefreshToken' })
     );
@@ -126,7 +123,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
       AuditAction.TOKEN_REUSE_DETECTED
     );
 
-    const { tokens } = await authService.refreshTokens(postRotation.raw);
+    const { tokens } = await authService.refreshTokens(postRotation.raw, null);
     expect(tokens.refresh_token).toBeTruthy();
   }, 30000);
 });

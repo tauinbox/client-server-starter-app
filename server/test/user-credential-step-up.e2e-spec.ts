@@ -134,7 +134,10 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   // and the login route allows fewer requests a minute than this suite needs.
   async function tokenFor(email: string): Promise<string> {
     const user = await usersService.findOne(await userId(email));
-    const { tokens } = await authService.login(user, 'step-up-e2e');
+    const { tokens } = await authService.login(user, {
+      userAgent: 'step-up-e2e',
+      ipAddress: null
+    });
     return tokens.access_token;
   }
 

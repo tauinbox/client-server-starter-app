@@ -3,12 +3,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
+import type { SessionClient } from '../utils/session-client';
+import { GeoIpService } from './geo-ip.service';
+
+/** The device fields that each row of a session carries. */
+export type SessionDevice = Pick<
+  RefreshToken,
+  'userAgent' | 'ipAddress' | 'countryCode' | 'city'
+>;
 
 @Injectable()
 export class RefreshTokenService {
   constructor(
     @InjectRepository(RefreshToken)
-    private repository: Repository<RefreshToken>
+    private repository: Repository<RefreshToken>,
+    private readonly geoIp: GeoIpService
   ) {}
 
   async createRefreshToken(
@@ -16,18 +25,46 @@ export class RefreshTokenService {
     token: string,
     expiresIn: number,
     sessionId: string,
-    userAgent: string | null
+    client: SessionClient
   ): Promise<RefreshToken> {
+    const location = await this.geoIp.lookup(client.ipAddress);
     const refreshToken = this.repository.create({
       userId,
       sessionId,
       sessionStartedAt: new Date(),
-      userAgent,
+      userAgent: client.userAgent,
+      ipAddress: client.ipAddress,
+      countryCode: location.countryCode,
+      city: location.city,
       token: hashToken(token),
       expiresAt: new Date(Date.now() + expiresIn * 1000)
     });
 
     return this.repository.save(refreshToken);
+  }
+
+  /**
+   * The device fields of the row that replaces `previous` at rotation. The
+   * User-Agent carries over, because it names the device the session started
+   * on. The address is the one the refresh came from, so the list shows where
+   * the device was last active. The location is resolved again only when the
+   * address changed.
+   */
+  async rotatedDevice(
+    previous: RefreshToken,
+    ipAddress: string | null
+  ): Promise<SessionDevice> {
+    const address = ipAddress ?? previous.ipAddress;
+    const location =
+      address === previous.ipAddress
+        ? { countryCode: previous.countryCode, city: previous.city }
+        : await this.geoIp.lookup(address);
+
+    return {
+      userAgent: previous.userAgent,
+      ipAddress: address,
+      ...location
+    };
   }
 
   /**

@@ -182,7 +182,13 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
           useValue: {
             findByToken,
             createRefreshToken: jest.fn(),
-            pruneOldestTokens: jest.fn()
+            pruneOldestTokens: jest.fn(),
+            rotatedDevice: jest.fn().mockResolvedValue({
+              userAgent: null,
+              ipAddress: null,
+              countryCode: null,
+              city: null
+            })
           }
         },
         {

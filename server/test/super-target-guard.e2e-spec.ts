@@ -141,7 +141,10 @@ runWithInfra('User writes on a super target (e2e)', () => {
   // a minute than this suite needs.
   async function tokenFor(email: string): Promise<string> {
     const user = await usersService.findOne(await userId(email));
-    const { tokens } = await authService.login(user, 'super-target-e2e');
+    const { tokens } = await authService.login(user, {
+      userAgent: 'super-target-e2e',
+      ipAddress: null
+    });
     return tokens.access_token;
   }
 

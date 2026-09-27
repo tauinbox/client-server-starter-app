@@ -73,6 +73,9 @@ export class SessionsController {
       id: row.sessionId,
       current: row.sessionId === req.user.sessionId,
       userAgent: row.userAgent,
+      ipAddress: row.ipAddress,
+      countryCode: row.countryCode,
+      city: row.city,
       startedAt: row.sessionStartedAt.toISOString(),
       lastActiveAt: row.createdAt.toISOString()
     }));

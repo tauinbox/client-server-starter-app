@@ -6,8 +6,8 @@ import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
 import { AuthCookies } from '../utils/auth-cookies';
+import { sessionClientOf } from '../utils/session-client';
 import { AuthService } from './auth.service';
 
 /**
@@ -35,10 +35,7 @@ export class SignInCompletionService {
     // Before the new session exists, so the session limit prunes against a
     // count that no longer holds the session this browser is replacing.
     await this.authService.endPresentedSession(this.cookies.readRefresh(req));
-    const result = await this.authService.login(
-      user,
-      normalizeUserAgent(req.headers['user-agent'])
-    );
+    const result = await this.authService.login(user, sessionClientOf(req));
 
     await this.auditService.log({
       action: AuditAction.USER_LOGIN_SUCCESS,

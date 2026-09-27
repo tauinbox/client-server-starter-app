@@ -44,6 +44,9 @@ export type ActiveSessionResponse = {
   id: string;
   current: boolean;
   userAgent: string | null;
+  ipAddress: string | null;
+  countryCode: string | null;
+  city: string | null;
   startedAt: string;
   lastActiveAt: string;
 };

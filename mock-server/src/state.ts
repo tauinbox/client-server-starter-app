@@ -90,6 +90,7 @@ export function resetState(): void {
     refreshSessions: new Map(),
     sessionStarts: new Map(),
     sessionUserAgents: new Map(),
+    sessionIps: new Map(),
     sessionLastActive: new Map(),
     revokedRefreshTokens: new Map(),
     rotatedTo: new Map(),
@@ -138,10 +139,16 @@ export function getState(): State {
 export function registerSession(
   refreshToken: string,
   sessionId: string,
-  userAgent: string | null = null
+  userAgent: string | null = null,
+  ipAddress: string | null = null
 ): void {
   state.refreshSessions.set(refreshToken, sessionId);
   state.sessionLastActive.set(sessionId, Date.now());
+  // Every row records the address it was issued to, so the list shows the
+  // latest one. A refresh without an address keeps the previous one.
+  if (ipAddress !== null || !state.sessionIps.has(sessionId)) {
+    state.sessionIps.set(sessionId, ipAddress);
+  }
   // Only a session that is new gets a start and a device. Rotation calls this
   // with the id it replaces a token inside, and re-stamping there would restore
   // the sliding expiry the absolute cap ends.
@@ -223,6 +230,7 @@ function endSession(sessionId: string): boolean {
   }
   state.sessionStarts.delete(sessionId);
   state.sessionUserAgents.delete(sessionId);
+  state.sessionIps.delete(sessionId);
   state.sessionLastActive.delete(sessionId);
   return ended;
 }
@@ -305,6 +313,7 @@ export function rekeyUserSessions(userId: string): void {
       renamed.set(sid, next);
       moveKey(state.sessionStarts, sid, next);
       moveKey(state.sessionUserAgents, sid, next);
+      moveKey(state.sessionIps, sid, next);
       moveKey(state.sessionLastActive, sid, next);
     }
     state.refreshSessions.set(token, next);

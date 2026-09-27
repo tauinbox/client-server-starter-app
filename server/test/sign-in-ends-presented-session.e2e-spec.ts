@@ -128,10 +128,10 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
     const { id } = await dataSource
       .getRepository(User)
       .findOneByOrFail({ email });
-    const { tokens } = await authService.login(
-      await usersService.findOne(id),
-      'Previous-Device'
-    );
+    const { tokens } = await authService.login(await usersService.findOne(id), {
+      userAgent: 'Previous-Device',
+      ipAddress: null
+    });
     return `${refreshCookieName}=${tokens.refresh_token}`;
   }
 

@@ -19,16 +19,17 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { TranslocoDirective } from '@jsverse/transloco';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { ActiveSessionResponse, UserResponse } from '@app/shared/types';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '../../services/auth.service';
 import { describeUserAgent } from '../../utils/describe-user-agent';
+import { describeLocation } from '../../utils/describe-location';
 import {
   createStepUpFactorForm,
   stepUpFactorOf
@@ -42,6 +43,7 @@ import type {
 type SessionRow = ActiveSessionResponse & {
   browser: string | null;
   os: string | null;
+  location: string | null;
 };
 
 /**
@@ -73,6 +75,7 @@ export class ActiveSessionsComponent {
   readonly #authService = inject(AuthService);
   readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
+  readonly #transloco = inject(TranslocoService);
 
   readonly user = input<UserResponse | null>(null);
 
@@ -91,7 +94,24 @@ export class ActiveSessionsComponent {
   /** Asks the page to take an account with no password through its provider. */
   readonly reauthRequested = output<SessionRevokeTarget>();
 
-  protected readonly sessions = signal<SessionRow[]>([]);
+  readonly #sessions = signal<ActiveSessionResponse[]>([]);
+  readonly #lang = toSignal(this.#transloco.langChanges$, {
+    initialValue: this.#transloco.getActiveLang()
+  });
+
+  protected readonly sessions = computed<SessionRow[]>(() =>
+    this.#sessions().map((s) => ({
+      ...s,
+      ...describeUserAgent(s.userAgent),
+      location: describeLocation(s.countryCode, s.city, this.#lang())
+    }))
+  );
+
+  /** DB-IP Lite is CC BY 4.0: a page that shows its data credits it. */
+  protected readonly showGeoAttribution = computed(() =>
+    this.sessions().some((s) => s.location)
+  );
+
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
   protected readonly busy = signal(false);
@@ -150,9 +170,7 @@ export class ActiveSessionsComponent {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (sessions) => {
-          this.sessions.set(
-            sessions.map((s) => ({ ...s, ...describeUserAgent(s.userAgent) }))
-          );
+          this.#sessions.set(sessions);
           this.loading.set(false);
         },
         error: () => {

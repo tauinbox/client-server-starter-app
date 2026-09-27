@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { RefreshTokenService } from './refresh-token.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
+import { GeoIpService } from './geo-ip.service';
 
 describe('RefreshTokenService', () => {
   let service: RefreshTokenService;
@@ -23,6 +24,7 @@ describe('RefreshTokenService', () => {
     where: jest.Mock;
     execute: jest.Mock;
   };
+  let mockGeoIp: { lookup: jest.Mock };
 
   beforeEach(async () => {
     mockQueryBuilder = {
@@ -44,13 +46,18 @@ describe('RefreshTokenService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder)
     };
 
+    mockGeoIp = {
+      lookup: jest.fn().mockResolvedValue({ countryCode: null, city: null })
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RefreshTokenService,
         {
           provide: getRepositoryToken(RefreshToken),
           useValue: mockRepository
-        }
+        },
+        { provide: GeoIpService, useValue: mockGeoIp }
       ]
     }).compile();
 
@@ -120,7 +127,7 @@ describe('RefreshTokenService', () => {
         'raw-token',
         3600,
         'session-1',
-        null
+        { userAgent: null, ipAddress: null }
       );
 
       expect(mockRepository.create).toHaveBeenCalledWith({
@@ -128,11 +135,39 @@ describe('RefreshTokenService', () => {
         sessionId: 'session-1',
         sessionStartedAt: expect.any(Date) as Date,
         userAgent: null,
+        ipAddress: null,
+        countryCode: null,
+        city: null,
         token: hashToken('raw-token'),
         expiresAt: expect.any(Date) as Date
       });
       expect(mockRepository.save).toHaveBeenCalledWith(mockToken);
       expect(result).toEqual(mockToken);
+    });
+
+    it('stores the address and the location resolved from it', async () => {
+      mockRepository.create.mockImplementation(
+        (data: Partial<RefreshToken>) => data
+      );
+      mockRepository.save.mockImplementation((data: Partial<RefreshToken>) =>
+        Promise.resolve(data)
+      );
+      mockGeoIp.lookup.mockResolvedValue({ countryCode: 'DE', city: 'Berlin' });
+
+      await service.createRefreshToken('user-1', 'token', 3600, 'session-1', {
+        userAgent: 'UA',
+        ipAddress: '203.0.113.7'
+      });
+
+      expect(mockGeoIp.lookup).toHaveBeenCalledWith('203.0.113.7');
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userAgent: 'UA',
+          ipAddress: '203.0.113.7',
+          countryCode: 'DE',
+          city: 'Berlin'
+        })
+      );
     });
 
     it('anchors the session start at the moment of issue', async () => {
@@ -144,13 +179,10 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken(
-        'user-1',
-        'token',
-        3600,
-        'session-1',
-        null
-      );
+      await service.createRefreshToken('user-1', 'token', 3600, 'session-1', {
+        userAgent: null,
+        ipAddress: null
+      });
       const after = Date.now();
 
       const createArg = mockRepository.create.mock.calls[0] as [
@@ -171,13 +203,10 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken(
-        'user-1',
-        'token',
-        7200,
-        'session-1',
-        null
-      );
+      await service.createRefreshToken('user-1', 'token', 7200, 'session-1', {
+        userAgent: null,
+        ipAddress: null
+      });
       const after = Date.now();
 
       const createArg = mockRepository.create.mock.calls[0] as [
@@ -189,6 +218,51 @@ describe('RefreshTokenService', () => {
 
       expect(expiresAt.getTime()).toBeGreaterThanOrEqual(expectedMin);
       expect(expiresAt.getTime()).toBeLessThanOrEqual(expectedMax);
+    });
+  });
+
+  describe('rotatedDevice', () => {
+    const previous = Object.assign(new RefreshToken(), {
+      userAgent: 'UA',
+      ipAddress: '203.0.113.7',
+      countryCode: 'DE',
+      city: 'Berlin'
+    });
+
+    it('carries the location over without a lookup when the address is the same', async () => {
+      await expect(
+        service.rotatedDevice(previous, '203.0.113.7')
+      ).resolves.toEqual({
+        userAgent: 'UA',
+        ipAddress: '203.0.113.7',
+        countryCode: 'DE',
+        city: 'Berlin'
+      });
+      expect(mockGeoIp.lookup).not.toHaveBeenCalled();
+    });
+
+    it('records the new address and resolves its location again', async () => {
+      mockGeoIp.lookup.mockResolvedValue({ countryCode: 'FR', city: 'Paris' });
+
+      await expect(
+        service.rotatedDevice(previous, '198.51.100.4')
+      ).resolves.toEqual({
+        userAgent: 'UA',
+        ipAddress: '198.51.100.4',
+        countryCode: 'FR',
+        city: 'Paris'
+      });
+      expect(mockGeoIp.lookup).toHaveBeenCalledWith('198.51.100.4');
+    });
+
+    it('keeps the previous address when the refresh came with none', async () => {
+      await expect(service.rotatedDevice(previous, null)).resolves.toEqual({
+        userAgent: 'UA',
+        ipAddress: '203.0.113.7',
+        countryCode: 'DE',
+        city: 'Berlin'
+      });
+      expect(mockGeoIp.lookup).not.toHaveBeenCalled();
     });
   });
 

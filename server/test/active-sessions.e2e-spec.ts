@@ -92,7 +92,10 @@ runWithInfra('Active sessions (e2e)', () => {
       .getRepository(User)
       .findOneOrFail({ where: { email } });
     const user = await usersService.findOne(found.id);
-    const { tokens } = await authService.login(user, userAgent);
+    const { tokens } = await authService.login(user, {
+      userAgent,
+      ipAddress: '203.0.113.7'
+    });
 
     const list = await request(http())
       .get('/api/v1/auth/sessions')
@@ -112,7 +115,7 @@ runWithInfra('Active sessions (e2e)', () => {
     return res.status;
   }
 
-  it('lists every device, marks the caller and carries the user agent', async () => {
+  it('lists every device, marks the caller and carries the user agent and the address', async () => {
     const a = await signIn(ownerEmail, 'Device-A');
     const b = await signIn(ownerEmail, 'Device-B');
 
@@ -124,7 +127,14 @@ runWithInfra('Active sessions (e2e)', () => {
 
     const mine = sessions.find((s) => s.id === a.sessionId);
     const theirs = sessions.find((s) => s.id === b.sessionId);
-    expect(mine).toMatchObject({ current: true, userAgent: 'Device-A' });
+    expect(mine).toMatchObject({
+      current: true,
+      userAgent: 'Device-A',
+      ipAddress: '203.0.113.7',
+      // No GeoIP database is configured in the test environment.
+      countryCode: null,
+      city: null
+    });
     expect(theirs).toMatchObject({ current: false, userAgent: 'Device-B' });
     expect(Date.parse(theirs!.startedAt)).not.toBeNaN();
     expect(Date.parse(theirs!.lastActiveAt)).not.toBeNaN();
