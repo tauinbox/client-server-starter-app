@@ -121,6 +121,18 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     );
   });
 
+  it('opens RolePermissionsDialog with the flush-content panelClass that removes the content side padding', async () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+
+    const component = await setupComponent();
+    component.openPermissionsDialog(mockRole);
+
+    expect(dialogMock.open).toHaveBeenCalledWith(
+      RolePermissionsDialogComponent,
+      expect.objectContaining({ panelClass: 'app-dialog-flush-content' })
+    );
+  });
+
   it('opens RolePermissionsDialog with readonly: true when canUpdate() is false', async () => {
     authStoreMock.hasPermissions.mockReturnValue(false);
 

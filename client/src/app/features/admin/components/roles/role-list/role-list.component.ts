@@ -184,6 +184,7 @@ export class RoleListComponent implements OnInit {
     this.#dialog
       .open(RolePermissionsDialogComponent, {
         ...dialogSizeConfig(DialogSize.Wide),
+        panelClass: 'app-dialog-flush-content',
         data
       })
       .afterClosed()

@@ -65,6 +65,8 @@ fieldset {
 }
 
 // Remove animations for people who've turned them off
+// !important is required: the user preference must beat every component rule.
+/* stylelint-disable declaration-no-important */
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
@@ -73,6 +75,7 @@ fieldset {
     animation-iteration-count: 1 !important;
   }
 }
+/* stylelint-enable declaration-no-important */
 
 // Standardize focus styles
 :focus-visible {

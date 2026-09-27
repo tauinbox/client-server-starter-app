@@ -1723,7 +1723,7 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
 | - | The three configurations need `settings['import/parsers']` to map `.ts` to `@typescript-eslint/parser`. Without that map, `import/no-cycle` passes on everything silently | - |
 | ESLint | Shared rules for the workspaces. They include a `no-restricted-syntax` ban on an `as unknown as T` double cast. The client configuration adds two selectors: one bans the `'admin'` role literal, and one bans the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
 | Prettier | All workspaces (single quotes, no trailing commas) | `.prettierrc` |
-| Stylelint | Client SCSS (recess property order, no `px` unit outside a breakpoint) | `.stylelintrc.json` |
+| Stylelint | Client SCSS (recess property order, no `px` unit outside a breakpoint, no `!important`, no `--mat-dialog-*` token outside `_dialogs.scss`) | `.stylelintrc.json` |
 | Husky + lint-staged | Pre-commit hook (auto-fix the staged files) | `.lintstagedrc.mjs` |
 | Commitlint | Conventional Commits enforcement | `client/commitlint.config.mjs` |
 | commit-and-tag-version | Automated versioning and CHANGELOG | `client/.versionrc.json` |
@@ -1817,7 +1817,7 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2644 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 500 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 494 pass and 2 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1382 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1383 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 286 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 881 tests pass |
 

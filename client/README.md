@@ -876,6 +876,12 @@ The state and the HTTP calls are in `features/admin/{store,services}`:
   tokens of the app (`--app-*` for success, info, warning, text-tertiary and color-scheme).
 - **Stylelint** applies the recess property order. A `unit-disallowed-list` rule rejects a `px` unit.
   A breakpoint media feature is the exception.
+- **Stylelint** rejects `!important` (`declaration-no-important`). Override Angular Material with a
+  CSS variable, a `mat.<component>-overrides()` mixin, or matched specificity. The reduced-motion
+  block in `styles/base/_reset.scss` and `styles/utilities/_visibility.scss` are the exceptions.
+- **Stylelint** rejects a `--mat-dialog-*` token outside `styles/components/_dialogs.scss`
+  (`property-disallowed-list`). A dialog that needs other tokens gets an opt-in panelClass there,
+  for example `app-dialog-tall` or `app-dialog-flush-content`.
 
 ```
 src/styles/
@@ -1073,7 +1079,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 286 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1382 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1383 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

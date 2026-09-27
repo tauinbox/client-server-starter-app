@@ -56,5 +56,36 @@ export default defineConfig(
       '@typescript-eslint/no-misused-promises': 'error'
     }
   },
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      // Flat config replaces this rule's options, so the base selectors are
+      // appended to, not dropped.
+      'no-restricted-syntax': [
+        'error',
+        ...(
+          baseRules as {
+            'no-restricted-syntax': ['error', ...{ selector: string }[]];
+          }
+        )['no-restricted-syntax'].slice(1),
+        {
+          selector: "CallExpression[callee.name='forwardRef']",
+          message:
+            'Do not use forwardRef() across a module boundary. Emit an EventEmitter2 event and handle it in a listener of the target module.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['src/**/*.ts'],
+    // These two are CLI entry points (TypeORM CLI, container seed step) that
+    // run outside Nest, so there is no logger to use.
+    ignores: [
+      '**/*.spec.ts',
+      'src/postgres-data-source.ts',
+      'src/seed-admin.ts'
+    ],
+    rules: { 'no-console': 'error' }
+  },
   prettierConfig
 );

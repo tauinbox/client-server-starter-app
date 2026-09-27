@@ -2365,7 +2365,8 @@ Thus a burst of changes causes one synchronized refetch on the client, and not o
 change. One save in a dialog is such a burst, because it emits an update and a rules-replaced event.
 
 `UserRoleChangedEvent` and `UserDeletedEvent` invalidate the cache of the affected user only. The
-cross-module communication uses `EventEmitter2` and never `forwardRef`.
+cross-module communication uses `EventEmitter2` and never `forwardRef`. A `no-restricted-syntax`
+ESLint rule rejects a `forwardRef()` call in `src/`.
 
 **Anonymous bucketing.** `FeatureFlagResolverService.evaluateAnonymous` issues a new
 `nxs_anon_id` only when the caller holds no valid one and a public flag that is enabled in the
@@ -2510,6 +2511,10 @@ repository.
   `DataSource` and `Repository<T>`.
 
   A `no-restricted-syntax` ESLint rule bans an `as unknown as T` double cast.
+
+  The `no-console` ESLint rule applies to `src/`, except the spec files and the two CLI entry
+  points that run outside Nest (`postgres-data-source.ts`, `seed-admin.ts`). Runtime code uses the
+  logger.
 
   The reusable fakes for a context, a configuration and an Express object are in
   `src/common/testing/`. The production build excludes that directory.
