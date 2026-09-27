@@ -27,13 +27,12 @@ import { MatDivider } from '@angular/material/divider';
 import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { SessionStorageService } from '@core/services/session-storage.service';
+import { OAuthIntentService } from '../../services/oauth-intent.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
-import { OAUTH_RETURN_URL_KEY } from '../../constants/oauth-return-url.const';
 import {
   PASSWORD_CHANGED,
   PASSWORD_CHANGED_PARAM
@@ -97,7 +96,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #sessionStorage = inject(SessionStorageService);
+  readonly #oauthIntent = inject(OAuthIntentService);
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #translocoService = inject(TranslocoService);
   readonly #flagsStore = inject(FeatureFlagsStore);
@@ -211,7 +210,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   onOAuthLogin(provider: string): void {
     if (!isOAuthProvider(provider)) return;
 
-    this.#sessionStorage.setItem(OAUTH_RETURN_URL_KEY, this.#returnUrl());
+    this.#oauthIntent.start(this.#returnUrl());
     if (this.#window) {
       this.#window.location.href = this.oauthUrls[provider];
     }

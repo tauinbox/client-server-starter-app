@@ -135,6 +135,10 @@ management and theming.
   A canceled or failed **step-up** attempt does the same, and gives `oauth_error=reauth_failed` so
   the profile page can say that nothing was changed.
 
+  The callback page finishes only a round trip that this browser tab started with a click on a
+  provider button. A provider that already has consent returns with no screen, so without this rule
+  any page could send a browser through the provider and sign its owner in with no action from them.
+
   A provider proves one credential. An account that carries a second factor is therefore not signed
   in by the round trip: the callback page asks for a code, exactly as the login card does after a
   correct password, and no session exists until the code is accepted. The application never reads

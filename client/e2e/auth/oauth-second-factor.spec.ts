@@ -41,6 +41,10 @@ async function arriveAtCallback(
   const { token } = await mockServer.issueOAuthData(USER_ID);
 
   await page.goto('/login');
+  // What the login page stores before handing the browser to the provider.
+  await page.evaluate(() =>
+    sessionStorage.setItem('oauth_return_url', '/profile')
+  );
   await context.addCookies([
     {
       name: 'oauth_data',

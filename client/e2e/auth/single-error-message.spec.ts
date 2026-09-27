@@ -12,7 +12,12 @@ test.describe('A refused request shows one error message', () => {
     _mockServer,
     page
   }) => {
-    // No `oauth_data` cookie, so the exchange is refused.
+    // This tab started the round trip, but it holds no `oauth_data` cookie,
+    // so the exchange is refused.
+    await page.goto('/login');
+    await page.evaluate(() =>
+      sessionStorage.setItem('oauth_return_url', '/profile')
+    );
     await page.goto('/oauth/callback');
 
     await expect(page).toHaveURL(/\/login\?oauth_error=auth_failed/);

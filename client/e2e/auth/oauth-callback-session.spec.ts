@@ -17,7 +17,7 @@ async function arriveAtCallback(
   page: Page,
   context: BrowserContext,
   mockServer: MockServerApi,
-  returnUrl?: string
+  returnUrl = '/profile'
 ): Promise<void> {
   const state = await mockServer.getState();
   const admin = (state.users as UserResponse[]).find(
@@ -28,13 +28,11 @@ async function arriveAtCallback(
   const { token } = await mockServer.issueOAuthData(admin!.id);
 
   await page.goto('/login');
-  if (returnUrl) {
-    // What the login page stores before handing the browser to the provider.
-    await page.evaluate(
-      (url) => sessionStorage.setItem('oauth_return_url', JSON.stringify(url)),
-      returnUrl
-    );
-  }
+  // What the login page stores before handing the browser to the provider.
+  await page.evaluate(
+    (url) => sessionStorage.setItem('oauth_return_url', url),
+    returnUrl
+  );
 
   await context.addCookies([
     {
@@ -66,7 +64,6 @@ test.describe('OAuth sign-in — completed session', () => {
   }) => {
     await arriveAtCallback(page, context, _mockServer);
 
-    // No return URL stored — the callback falls back to /profile.
     await expect(page).toHaveURL(/\/profile/);
 
     // The sidenav entry is computed from the ability (canAccessAdminPanel), so

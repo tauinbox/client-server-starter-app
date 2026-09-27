@@ -15,11 +15,10 @@ import {
 } from '@angular/material/card';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
-import { SessionStorageService } from '@core/services/session-storage.service';
+import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { safeReturnUrl } from '../../utils/safe-return-url';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
-import { OAUTH_RETURN_URL_KEY } from '../../constants/oauth-return-url.const';
 import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component';
 import type { MfaRequiredResponse } from '../../models/auth.types';
 import { TranslocoDirective } from '@jsverse/transloco';
@@ -42,8 +41,9 @@ import { TranslocoDirective } from '@jsverse/transloco';
 export class OAuthCallbackComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #authService = inject(AuthService);
-  readonly #sessionStorage = inject(SessionStorageService);
+  readonly #oauthIntent = inject(OAuthIntentService);
   readonly #window = inject(DOCUMENT).defaultView;
+  #returnUrl: string | null = null;
 
   /**
    * The challenge the provider round trip bought on an account that carries a
@@ -53,6 +53,13 @@ export class OAuthCallbackComponent implements OnInit {
   protected readonly mfaChallenge = signal<MfaRequiredResponse | null>(null);
 
   ngOnInit(): void {
+    this.#returnUrl = this.#oauthIntent.take();
+    if (this.#returnUrl === null) {
+      // This tab did not start the round trip, so it signs nobody in.
+      this.#redirectToLogin('auth_failed');
+      return;
+    }
+
     this.#authService.exchangeOAuthData().subscribe({
       next: (response) => {
         // The provider proved one credential only. The sign-in finishes when a
@@ -90,12 +97,8 @@ export class OAuthCallbackComponent implements OnInit {
   }
 
   #navigateToReturnUrl(): void {
-    const returnUrl =
-      this.#sessionStorage.getItem<string>(OAUTH_RETURN_URL_KEY);
-    this.#sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
-
     const safeUrl =
-      safeReturnUrl(returnUrl, this.#window?.location.origin) ??
+      safeReturnUrl(this.#returnUrl, this.#window?.location.origin) ??
       `/${AppRouteSegmentEnum.Profile}`;
 
     void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });

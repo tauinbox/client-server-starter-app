@@ -86,6 +86,9 @@ src/app/
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService owns the HTTP calls, the refresh schedule and
 │   │   │                   # fetchPermissions(): Promise<void>. Also rbac-metadata.service.ts.
+│   │   │                   # OAuthIntentService holds the proof that this tab started a
+│   │   │                   # provider round trip, for one page load; the callback page
+│   │   │                   # exchanges nothing without it.
 │   │   └── store/          # AuthStore is an NgRx Signal Store. Its state holds accessToken (in
 │   │                       # memory), user (in localStorage as auth_user),
 │   │                       # ability: AppAbility | null and mfaMandatory (the server policy, read
