@@ -1,12 +1,12 @@
 # Stage 1: install production dependencies
-FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS deps
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS deps
 RUN apk upgrade --no-cache && apk add --no-cache python3 make g++
 WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
 
 # Stage 2: build
-FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS builder
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS builder
 RUN apk upgrade --no-cache && apk add --no-cache python3 make g++
 WORKDIR /app
 COPY server/package*.json ./server/
@@ -16,7 +16,7 @@ COPY server/ ./server/
 RUN cd server && npm run build
 
 # Stage 3: runtime
-FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS runner
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runner
 RUN apk upgrade --no-cache && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/bin/npm \
