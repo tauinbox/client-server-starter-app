@@ -121,7 +121,10 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
 
   async function tokenFor(email: string): Promise<string> {
     const user = await usersService.findOne(await userId(email));
-    const { tokens } = await authService.login(user, 'moderation-self-e2e');
+    const { tokens } = await authService.login(user, {
+      userAgent: 'moderation-self-e2e',
+      ipAddress: null
+    });
     return tokens.access_token;
   }
 

@@ -97,7 +97,7 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
       raw,
       3600,
       randomUUID(),
-      null
+      { userAgent: null, ipAddress: null }
     );
     return raw;
   }
@@ -107,8 +107,8 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
     await warmPool();
 
     const outcomes = await Promise.allSettled([
-      authService.refreshTokens(raw),
-      authService.refreshTokens(raw)
+      authService.refreshTokens(raw, null),
+      authService.refreshTokens(raw, null)
     ]);
 
     expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
@@ -142,7 +142,7 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
   it('still rotates normally when the same token is presented only once', async () => {
     const raw = await seedSession();
 
-    const { tokens } = await authService.refreshTokens(raw);
+    const { tokens } = await authService.refreshTokens(raw, null);
     expect(tokens.refresh_token).toBeTruthy();
 
     const repository = dataSource.getRepository(RefreshToken);

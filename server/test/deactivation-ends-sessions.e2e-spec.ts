@@ -68,7 +68,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
       raw,
       3600,
       randomUUID(),
-      null
+      { userAgent: null, ipAddress: null }
     );
     return raw;
   };
@@ -138,7 +138,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     await patch({ isActive: true });
 
     // Pre-fix the kept row minted a new access token here.
-    expect(await errorKeyOf(authService.refreshTokens(raw))).toBe(
+    expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
       ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
     );
   }, 30000);
@@ -149,6 +149,8 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     await patch({ firstName: 'Renamed' });
     await patch({ isActive: true });
 
-    expect(await errorKeyOf(authService.refreshTokens(raw))).toBe('RESOLVED');
+    expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
+      'RESOLVED'
+    );
   }, 30000);
 });

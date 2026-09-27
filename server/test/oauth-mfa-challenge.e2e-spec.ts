@@ -17,6 +17,7 @@ import { RoleService } from '../src/modules/auth/services/role.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { GeoIpService } from '../src/modules/auth/services/geo-ip.service';
 import { TokenGeneratorService } from '../src/modules/auth/services/token-generator.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -60,6 +61,7 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
         SessionIssuerService,
         SessionLimitService,
         RefreshTokenService,
+        GeoIpService,
         TokenGeneratorService,
         { provide: DataSource, useValue: ds },
         {

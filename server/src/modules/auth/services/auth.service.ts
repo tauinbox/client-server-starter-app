@@ -60,6 +60,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import { readJwtMinIat } from '../jwt-module-options.factory';
+import type { SessionClient } from '../utils/session-client';
 
 type ConfirmEmailChangeOutcome =
   | {
@@ -269,8 +270,8 @@ export class AuthService {
    * factors were checked: the password path and the second-factor path both
    * arrive here only once every gate the account carries has been passed.
    */
-  async login(user: LocalAuthRequest['user'], userAgent: string | null) {
-    return this.sessionIssuer.issueSession(user, userAgent);
+  async login(user: LocalAuthRequest['user'], client: SessionClient) {
+    return this.sessionIssuer.issueSession(user, client);
   }
 
   async register(
@@ -581,7 +582,7 @@ export class AuthService {
     return { message: 'Password has been reset successfully' };
   }
 
-  async refreshTokens(refreshToken: string) {
+  async refreshTokens(refreshToken: string, ipAddress: string | null) {
     const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
 
     // OAuth 2.0 Security BCP — refresh-token reuse detection.
@@ -701,6 +702,11 @@ export class AuthService {
       10
     );
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
+    // Outside the transaction: a location lookup may load the GeoIP file.
+    const device = await this.refreshTokenService.rotatedDevice(
+      tokenDoc,
+      ipAddress
+    );
 
     // Revoke old token and create new one atomically to prevent concurrent
     // requests from producing multiple valid sessions: under READ COMMITTED
@@ -727,7 +733,7 @@ export class AuthService {
         // Carried over, never re-stamped: re-stamping here restores the sliding
         // expiry the absolute cap above exists to end.
         sessionStartedAt: tokenDoc.sessionStartedAt,
-        userAgent: tokenDoc.userAgent,
+        ...device,
         token: hashToken(tokens.refresh_token),
         expiresAt
       });

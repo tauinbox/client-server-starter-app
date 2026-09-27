@@ -14,6 +14,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { GeoIpService } from '../src/modules/auth/services/geo-ip.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
@@ -224,6 +225,7 @@ describe('Refresh token reuse detection (e2e)', () => {
           }
         },
         RefreshTokenService,
+        GeoIpService,
         // Real resolver over a plan carrying no `sessions` limit, so pruning
         // falls back to MAX_CONCURRENT_SESSIONS exactly as Free tier does.
         SessionIssuerService,
@@ -304,14 +306,17 @@ describe('Refresh token reuse detection (e2e)', () => {
 
   it('revokes ALL sessions when the original token is replayed after its successor was used', async () => {
     // Login — issues an initial refresh token.
-    const loginResult = await auth.login(userRecord, null);
+    const loginResult = await auth.login(userRecord, {
+      userAgent: null,
+      ipAddress: null
+    });
     const originalToken = loginResult.tokens.refresh_token;
 
     expect(store.tokens.size).toBe(1);
 
     await nextMillisecond();
     // First refresh — original token rotates out, a fresh pair is issued.
-    const firstRefresh = await auth.refreshTokens(originalToken);
+    const firstRefresh = await auth.refreshTokens(originalToken, null);
     expect(firstRefresh.tokens.access_token).toBeDefined();
     expect(firstRefresh.tokens.refresh_token).not.toBe(originalToken);
 
@@ -325,13 +330,16 @@ describe('Refresh token reuse detection (e2e)', () => {
     // be a lost response: this is the theft shape.
     await nextMillisecond();
     const secondRefresh = await auth.refreshTokens(
-      firstRefresh.tokens.refresh_token
+      firstRefresh.tokens.refresh_token,
+      null
     );
 
     // Refresh with the SAME original token — reuse detection trips.
-    await expect(auth.refreshTokens(originalToken)).rejects.toMatchObject({
-      response: { errorKey: 'errors.auth.invalidRefreshToken' }
-    });
+    await expect(auth.refreshTokens(originalToken, null)).rejects.toMatchObject(
+      {
+        response: { errorKey: 'errors.auth.invalidRefreshToken' }
+      }
+    );
 
     // All refresh tokens for the user are gone (deleteByUserId), and the user
     // has tokenRevokedAt set so their access token is invalidated too.
@@ -352,20 +360,26 @@ describe('Refresh token reuse detection (e2e)', () => {
     // A subsequent attempt with the new (post-rotation) token now fails too
     // because all sessions were purged.
     await expect(
-      auth.refreshTokens(secondRefresh.tokens.refresh_token)
+      auth.refreshTokens(secondRefresh.tokens.refresh_token, null)
     ).rejects.toThrow(HttpException);
   });
 
   it('ends only its own session when a just-rotated token is replayed before its successor is used', async () => {
-    const deviceA = await auth.login(userRecord, null);
-    const deviceB = await auth.login(userRecord, null);
+    const deviceA = await auth.login(userRecord, {
+      userAgent: null,
+      ipAddress: null
+    });
+    const deviceB = await auth.login(userRecord, {
+      userAgent: null,
+      ipAddress: null
+    });
 
     await nextMillisecond();
     // Device A rotates, but the response never reaches its browser.
-    await auth.refreshTokens(deviceA.tokens.refresh_token);
+    await auth.refreshTokens(deviceA.tokens.refresh_token, null);
 
     await expect(
-      auth.refreshTokens(deviceA.tokens.refresh_token)
+      auth.refreshTokens(deviceA.tokens.refresh_token, null)
     ).rejects.toMatchObject({
       response: { errorKey: 'errors.auth.invalidRefreshToken' }
     });
@@ -387,14 +401,20 @@ describe('Refresh token reuse detection (e2e)', () => {
     );
     expect(recordAuthEvent).not.toHaveBeenCalledWith('token_reuse_detected');
 
-    const refreshedB = await auth.refreshTokens(deviceB.tokens.refresh_token);
+    const refreshedB = await auth.refreshTokens(
+      deviceB.tokens.refresh_token,
+      null
+    );
     expect(refreshedB.tokens.access_token).toBeDefined();
   });
 
   it('keeps the full purge for a replay once the grace window has passed', async () => {
-    const loginResult = await auth.login(userRecord, null);
+    const loginResult = await auth.login(userRecord, {
+      userAgent: null,
+      ipAddress: null
+    });
     await nextMillisecond();
-    await auth.refreshTokens(loginResult.tokens.refresh_token);
+    await auth.refreshTokens(loginResult.tokens.refresh_token, null);
 
     for (const row of store.tokens.values()) {
       row.createdAt = new Date(
@@ -403,7 +423,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     }
 
     await expect(
-      auth.refreshTokens(loginResult.tokens.refresh_token)
+      auth.refreshTokens(loginResult.tokens.refresh_token, null)
     ).rejects.toThrow(HttpException);
 
     expect(store.tokens.size).toBe(0);
@@ -412,7 +432,7 @@ describe('Refresh token reuse detection (e2e)', () => {
   });
 
   it('returns plain 401 (no panic-revoke) for revoked-AND-expired tokens', async () => {
-    await auth.login(userRecord, null);
+    await auth.login(userRecord, { userAgent: null, ipAddress: null });
     const allRows = Array.from(store.tokens.values());
     const row = allRows[0];
     row.revoked = true;
@@ -428,7 +448,7 @@ describe('Refresh token reuse detection (e2e)', () => {
 
     let caught: unknown;
     try {
-      await auth.refreshTokens(raw);
+      await auth.refreshTokens(raw, null);
     } catch (err) {
       caught = err;
     }
@@ -453,7 +473,10 @@ describe('Refresh token reuse detection (e2e)', () => {
     }
 
     it('stamps the session start at login and carries it over a rotation', async () => {
-      const loginResult = await auth.login(userRecord, null);
+      const loginResult = await auth.login(userRecord, {
+        userAgent: null,
+        ipAddress: null
+      });
       const startedAt = Array.from(store.tokens.values())[0].sessionStartedAt;
 
       expect(startedAt).toBeInstanceOf(Date);
@@ -462,7 +485,8 @@ describe('Refresh token reuse detection (e2e)', () => {
       const aged = Array.from(store.tokens.values())[0].sessionStartedAt;
 
       const refreshed = await auth.refreshTokens(
-        loginResult.tokens.refresh_token
+        loginResult.tokens.refresh_token,
+        null
       );
       expect(refreshed.tokens.access_token).toBeDefined();
 
@@ -473,18 +497,22 @@ describe('Refresh token reuse detection (e2e)', () => {
     });
 
     it('refuses a refresh past the cap and deletes the whole session', async () => {
-      const loginResult = await auth.login(userRecord, null);
+      const loginResult = await auth.login(userRecord, {
+        userAgent: null,
+        ipAddress: null
+      });
       const sessionId = Array.from(store.tokens.values())[0].sessionId;
 
       const firstRefresh = await auth.refreshTokens(
-        loginResult.tokens.refresh_token
+        loginResult.tokens.refresh_token,
+        null
       );
       expect(store.tokens.size).toBe(2);
 
       ageSession(absoluteMaxMs);
 
       await expect(
-        auth.refreshTokens(firstRefresh.tokens.refresh_token)
+        auth.refreshTokens(firstRefresh.tokens.refresh_token, null)
       ).rejects.toMatchObject({
         status: HttpStatus.UNAUTHORIZED,
         response: { errorKey: 'errors.auth.sessionExpired' }
@@ -512,11 +540,15 @@ describe('Refresh token reuse detection (e2e)', () => {
     it('rotates an aged session when the cap is disabled with 0', async () => {
       absoluteMaxMs = 0;
 
-      const loginResult = await auth.login(userRecord, null);
+      const loginResult = await auth.login(userRecord, {
+        userAgent: null,
+        ipAddress: null
+      });
       ageSession(DEFAULT_SESSION_ABSOLUTE_MAX_MS * 4);
 
       const refreshed = await auth.refreshTokens(
-        loginResult.tokens.refresh_token
+        loginResult.tokens.refresh_token,
+        null
       );
 
       expect(refreshed.tokens.access_token).toBeDefined();

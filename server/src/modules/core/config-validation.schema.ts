@@ -90,6 +90,7 @@ export const configValidationSchema = Joi.object({
   DB_POOL_IDLE_TIMEOUT: Joi.number().min(0).default(30000),
   DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000),
   TRUSTED_PROXIES: Joi.string().optional().allow(''),
+  GEOIP_DB_PATH: Joi.string().optional().allow(''),
   TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
   TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
   SMTP_SECURE: Joi.string().valid('true', 'false').optional().allow(''),

@@ -23,6 +23,7 @@ import { Permission } from './entities/permission.entity';
 import { RolePermission } from './entities/role-permission.entity';
 import { TokenCleanupService } from './services/token-cleanup.service';
 import { RefreshTokenService } from './services/refresh-token.service';
+import { GeoIpService } from './services/geo-ip.service';
 import { OAuthAccountService } from './services/oauth-account.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
@@ -107,6 +108,7 @@ function conditionalProvider(
     LocalStrategy,
     JwtStrategy,
     RefreshTokenService,
+    GeoIpService,
     SessionLimitService,
     SessionIssuerService,
     SignInCompletionService,

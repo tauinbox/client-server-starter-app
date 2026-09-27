@@ -89,6 +89,10 @@ router.get('/', authGuard, (req, res) => {
       id,
       current: id === sessionId,
       userAgent: state.sessionUserAgents.get(id) ?? null,
+      ipAddress: state.sessionIps.get(id) ?? null,
+      // The mock has no GeoIP database, as the server without GEOIP_DB_PATH.
+      countryCode: null,
+      city: null,
       startedAt: new Date(state.sessionStarts.get(id) ?? 0).toISOString(),
       lastActiveAt: new Date(state.sessionLastActive.get(id) ?? 0).toISOString()
     })

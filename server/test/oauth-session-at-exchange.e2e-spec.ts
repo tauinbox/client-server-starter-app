@@ -140,7 +140,7 @@ runWithInfra(
       for (let i = 0; i < limit; i++) {
         const { tokens } = await authService.login(
           await usersService.findOne(user.id),
-          `Device-${i}`
+          { userAgent: `Device-${i}`, ipAddress: null }
         );
         cookies.push(`${refreshCookieName}=${tokens.refresh_token}`);
       }

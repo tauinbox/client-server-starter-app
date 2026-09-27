@@ -149,6 +149,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency of a new customer: `USD` or `RUB`. The billing UI stays hidden until a person configures a minimum of one provider |
 | `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline of one provider API call. Neither SDK sets a transport timeout. Without this deadline, a stalled socket blocks the sequential renewal scan and holds a webhook delivery open with no end. The deadline bounds our call and not the request of the provider |
+| `GEOIP_DB_PATH` | - (local), `/app/server/geoip/dbip-city-lite.mmdb` (Docker image) | Path of the DB-IP Lite city database (MMDB) that resolves the location of a session from its IP address. Without it, the session list shows the address with no location. Refer to "Active sessions" |
 | `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | IPs and CIDRs that can call `/billing/webhooks/*`, separated by commas. Each other source gets a `403` before any webhook processing. An empty value disables the check. A malformed entry stops the startup. Behind a reverse proxy the check needs `TRUSTED_PROXIES`. Refer to [Billing webhook source-IP allowlist](#billing-webhook-source-ip-allowlist) |
 | `BILLING_WEBHOOK_RETENTION_DAYS` | `90` | The age, from `received_at`, at which the daily sweep deletes a settled webhook delivery from the idempotency ledger. The sweep never deletes a `received` row or a `dead_letter` row. The sweep is a queue job, thus it runs only with `REDIS_URL` set |
 | `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` | `7` | The age at which the sweep clears the stored event of a settled delivery, before it deletes the row. The system never replays a `processed` row, thus it keeps the payload for this time for triage only. Set this value below `BILLING_WEBHOOK_RETENTION_DAYS`. If not, the sweep deletes the row before it clears the payload |
@@ -333,7 +334,7 @@ cookie, because the provider redirect carries no refresh cookie and cannot end t
 browser replaces. The exchange loads the account again and refuses a deactivated or deleted account
 with the same 400 `INVALID_OAUTH_DATA` that a bad cookie gets.
 
-`SessionIssuerService.issueSession(user, userAgent)` is the single place where a sign-in becomes a session. It
+`SessionIssuerService.issueSession(user, client)` is the single place where a sign-in becomes a session. It
 generates the tokens, persists the refresh token, and then prunes the sessions to the resolved
 allowance. `AuthService.login` delegates to it and holds no session logic, and every sign-in reaches
 `AuthService.login` through `SignInCompletionService.complete`. Thus the paths cannot diverge.
@@ -1103,7 +1104,23 @@ a session issued there would be counted before the replaced one ends.
 
 **Active sessions.** Each sign-in stores the `User-Agent` header of the device on the refresh row
 (`user_agent`, cut to 512 characters with control characters removed by `normalizeUserAgent`), and
-rotation copies it. `SessionsController` (`/auth/sessions`) lists the live session of each device
+rotation copies it. Each row also stores the client address (`ip_address`, from `req.ip`, so it
+needs `TRUSTED_PROXIES` behind a proxy; an IPv4-mapped IPv6 address is unwrapped) and the location
+resolved from it (`country_code` as ISO 3166-1 alpha-2, `city` in English). Sign-in and every
+rotation write the address of that request, so the list shows where the device was last active. A
+rotation from the same address copies the location; a new address is resolved again.
+
+`GeoIpService` resolves the location from a local DB-IP Lite city database (MMDB, CC BY 4.0) at
+`GEOIP_DB_PATH`. No address leaves the server. The file is about 130 MB and is read whole, so it is
+loaded on demand and its reference is dropped after 60 s without a lookup; V8 frees the memory at
+the next major GC. Measured in the production image with a 384 MiB cap: 93 MiB after boot, a peak
+of 223 MiB after a sign-in. With no path, or with a file that cannot be read, the location stays
+null and the sign-in is not affected. The Docker image downloads the database at build time (the
+current month, else the previous one), so the weekly scheduled rebuild keeps it current. A failed
+download leaves the image without a database instead of failing the build. The client shows the
+required DB-IP credit next to the list.
+
+`SessionsController` (`/auth/sessions`) lists the live session of each device
 and ends one other session or every other session. Both deletes demand a step-up with the
 operation `session_revoke` and name the user id beside the session id
 (`RefreshTokenService.deleteUserSession` and `deleteOtherSessions`), so an id of another account

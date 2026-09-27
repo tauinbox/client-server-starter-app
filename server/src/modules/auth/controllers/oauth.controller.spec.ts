@@ -1051,10 +1051,10 @@ describe('OAuthController', () => {
         })
       );
       expect(usersServiceMock.findById).toHaveBeenCalledWith('1');
-      expect(authServiceMock.login).toHaveBeenCalledWith(
-        OAUTH_USER,
-        'Mozilla/5.0 Test'
-      );
+      expect(authServiceMock.login).toHaveBeenCalledWith(OAUTH_USER, {
+        userAgent: 'Mozilla/5.0 Test',
+        ipAddress: '127.0.0.1'
+      });
       expect(result).toEqual({
         tokens: { access_token: 'token', expires_in: 3600 },
         user: OAUTH_USER

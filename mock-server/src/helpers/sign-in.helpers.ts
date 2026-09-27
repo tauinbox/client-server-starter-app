@@ -8,6 +8,7 @@ import {
 import { generateSessionId, generateTokens } from '../jwt.utils';
 import { getState, logAudit, registerSession, toUserResponse } from '../state';
 import { normalizeUserAgent } from '../utils/user-agent';
+import { normalizeIpAddress } from '../utils/ip-address';
 import { resolveEntitlementLimit } from '../middleware/billing.middleware';
 import type { MockUser } from '../types';
 
@@ -31,7 +32,8 @@ export function completeSignIn(
   registerSession(
     tokens.refresh_token,
     sessionId,
-    normalizeUserAgent(req.headers['user-agent'])
+    normalizeUserAgent(req.headers['user-agent']),
+    normalizeIpAddress(req.ip)
   );
   // Concurrent-session allowance is plan-driven; a plan carrying no `sessions`
   // limit (Free, usage) keeps the constant, exactly as the server resolves it.

@@ -68,6 +68,7 @@ import { Request as ExpressRequest } from 'express';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
 import { AuthCookies } from '../utils/auth-cookies';
+import { normalizeIpAddress } from '../utils/session-client';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
 
 @ApiTags('Auth API')
@@ -179,7 +180,10 @@ export class AuthController {
       throw new UnauthorizedException('Refresh token is required');
     }
 
-    const result = await this.authService.refreshTokens(cookieToken);
+    const result = await this.authService.refreshTokens(
+      cookieToken,
+      normalizeIpAddress(req.ip)
+    );
     const { refresh_token, ...publicTokens } = result.tokens;
     this.cookies.setRefresh(res, refresh_token);
     return { tokens: publicTokens, user: result.user };

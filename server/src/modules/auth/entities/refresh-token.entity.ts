@@ -44,6 +44,23 @@ export class RefreshToken {
   @Column({ name: 'user_agent', type: 'varchar', length: 512, nullable: true })
   userAgent: string | null;
 
+  /**
+   * The address the device used when this row was issued: at sign-in, then at
+   * each rotation. The live row therefore holds the latest address, which
+   * matches the "last active" time the list shows. Null for a row issued
+   * before the column existed.
+   */
+  @Column({ name: 'ip_address', type: 'varchar', length: 45, nullable: true })
+  ipAddress: string | null;
+
+  /** ISO 3166-1 alpha-2 code resolved from `ipAddress` when the row was issued. */
+  @Column({ name: 'country_code', type: 'varchar', length: 2, nullable: true })
+  countryCode: string | null;
+
+  /** City name (English) resolved from `ipAddress` when the row was issued. */
+  @Column({ name: 'city', type: 'varchar', length: 128, nullable: true })
+  city: string | null;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

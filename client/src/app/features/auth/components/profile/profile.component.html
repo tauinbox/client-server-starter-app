@@ -53,136 +53,142 @@
       </mat-card>
 
       <div class="profile-grid">
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>{{ t('auth.profile.updateCard') }}</mat-card-title>
-          </mat-card-header>
+        <div class="profile-column">
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>{{
+                t('auth.profile.updateCard')
+              }}</mat-card-title>
+            </mat-card-header>
 
-          <mat-card-content>
-            <form (submit)="$event.preventDefault(); onSubmit()">
-              <div class="form-name-row">
-                <nxs-form-field
-                  [field]="profileForm.firstName"
-                  label="auth.profile.firstName"
-                  prefixIcon="person"
-                  autocomplete="given-name"
-                />
+            <mat-card-content>
+              <form (submit)="$event.preventDefault(); onSubmit()">
+                <div class="form-name-row">
+                  <nxs-form-field
+                    [field]="profileForm.firstName"
+                    label="auth.profile.firstName"
+                    prefixIcon="person"
+                    autocomplete="given-name"
+                  />
 
-                <nxs-form-field
-                  [field]="profileForm.lastName"
-                  label="auth.profile.lastName"
-                  prefixIcon="person"
-                  autocomplete="family-name"
-                />
-              </div>
-
-              <nxs-form-field
-                [field]="profileForm.email"
-                label="auth.profile.email"
-                type="email"
-                prefixIcon="email"
-                autocomplete="email"
-              />
-
-              <nxs-form-field
-                [field]="profileForm.password"
-                label="auth.profile.newPassword"
-                [type]="pwdToggle.show() ? 'text' : 'password'"
-                prefixIcon="lock"
-                autocomplete="new-password"
-              >
-                <nxs-password-toggle formFieldSuffix #pwdToggle />
-              </nxs-form-field>
-
-              <nxs-password-strength [password]="profileModel().password" />
-
-              @if (reauthNoticeKey(); as noticeKey) {
-                <div class="reauth-notice" role="note">
-                  {{ t(noticeKey, { provider: reauthProviderLabel() }) }}
+                  <nxs-form-field
+                    [field]="profileForm.lastName"
+                    label="auth.profile.lastName"
+                    prefixIcon="person"
+                    autocomplete="family-name"
+                  />
                 </div>
-              }
 
-              @if (requiresCurrentPassword()) {
                 <nxs-form-field
-                  [field]="profileForm.currentPassword"
-                  label="auth.profile.currentPassword"
-                  [type]="currentPwdToggle.show() ? 'text' : 'password'"
-                  prefixIcon="lock"
-                  autocomplete="current-password"
-                >
-                  <nxs-password-toggle formFieldSuffix #currentPwdToggle />
-                </nxs-form-field>
-              }
+                  [field]="profileForm.email"
+                  label="auth.profile.email"
+                  type="email"
+                  prefixIcon="email"
+                  autocomplete="email"
+                />
 
-              @if (passwordTyped()) {
                 <nxs-form-field
-                  [field]="profileForm.confirmPassword"
-                  label="auth.profile.confirmPassword"
-                  [type]="confirmPwdToggle.show() ? 'text' : 'password'"
+                  [field]="profileForm.password"
+                  label="auth.profile.newPassword"
+                  [type]="pwdToggle.show() ? 'text' : 'password'"
                   prefixIcon="lock"
                   autocomplete="new-password"
                 >
-                  <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
+                  <nxs-password-toggle formFieldSuffix #pwdToggle />
                 </nxs-form-field>
-              }
 
-              @if (error()) {
-                <div class="error-message" role="alert">{{ error() }}</div>
-              }
+                <nxs-password-strength [password]="profileModel().password" />
 
-              <div class="form-actions">
-                <button
-                  matButton="filled"
-                  type="submit"
-                  [disabled]="
-                    profileForm().invalid() ||
-                    saving() ||
-                    !profileForm().dirty()
-                  "
-                >
-                  @if (saving()) {
-                    <span class="app-btn-loading">
-                      <mat-spinner
-                        [attr.aria-label]="t('common.loading')"
-                        diameter="24"
-                      ></mat-spinner>
-                      {{ t('auth.profile.saving') }}
-                    </span>
-                  } @else {
-                    {{ t('common.save') }}
-                  }
-                </button>
-              </div>
-            </form>
-          </mat-card-content>
-        </mat-card>
+                @if (reauthNoticeKey(); as noticeKey) {
+                  <div class="reauth-notice" role="note">
+                    {{ t(noticeKey, { provider: reauthProviderLabel() }) }}
+                  </div>
+                }
 
-        <nxs-linked-providers
-          [accounts]="oauthAccounts()"
-          [hasPassword]="accountHasPassword()"
-          [resumeChange]="resumeProviderChange()"
-          [(busy)]="providersBusy"
-          (reauthRequested)="startProviderReauth($event)"
-          (unlinked)="onProviderUnlinked($event)"
-        />
+                @if (requiresCurrentPassword()) {
+                  <nxs-form-field
+                    [field]="profileForm.currentPassword"
+                    label="auth.profile.currentPassword"
+                    [type]="currentPwdToggle.show() ? 'text' : 'password'"
+                    prefixIcon="lock"
+                    autocomplete="current-password"
+                  >
+                    <nxs-password-toggle formFieldSuffix #currentPwdToggle />
+                  </nxs-form-field>
+                }
 
-        <nxs-two-factor
-          [user]="u"
-          [reauthProviderLabel]="reauthProviderLabel()"
-          [resumeSetup]="resumeMfaSetup()"
-          (changed)="onTwoFactorChanged()"
-          (reauthRequested)="startMfaReauth()"
-        />
+                @if (passwordTyped()) {
+                  <nxs-form-field
+                    [field]="profileForm.confirmPassword"
+                    label="auth.profile.confirmPassword"
+                    [type]="confirmPwdToggle.show() ? 'text' : 'password'"
+                    prefixIcon="lock"
+                    autocomplete="new-password"
+                  >
+                    <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
+                  </nxs-form-field>
+                }
 
-        <nxs-active-sessions
-          [user]="u"
-          [reauthProviderLabel]="reauthProviderLabel()"
-          [resumeRevoke]="resumeSessionRevoke()"
-          [offerSignOutOthers]="offerSignOutOthers()"
-          (reauthRequested)="startSessionsReauth($event)"
-        />
+                @if (error()) {
+                  <div class="error-message" role="alert">{{ error() }}</div>
+                }
 
-        <nxs-preferences-card [user]="u" (userUpdated)="user.set($event)" />
+                <div class="form-actions">
+                  <button
+                    matButton="filled"
+                    type="submit"
+                    [disabled]="
+                      profileForm().invalid() ||
+                      saving() ||
+                      !profileForm().dirty()
+                    "
+                  >
+                    @if (saving()) {
+                      <span class="app-btn-loading">
+                        <mat-spinner
+                          [attr.aria-label]="t('common.loading')"
+                          diameter="24"
+                        ></mat-spinner>
+                        {{ t('auth.profile.saving') }}
+                      </span>
+                    } @else {
+                      {{ t('common.save') }}
+                    }
+                  </button>
+                </div>
+              </form>
+            </mat-card-content>
+          </mat-card>
+
+          <nxs-active-sessions
+            [user]="u"
+            [reauthProviderLabel]="reauthProviderLabel()"
+            [resumeRevoke]="resumeSessionRevoke()"
+            [offerSignOutOthers]="offerSignOutOthers()"
+            (reauthRequested)="startSessionsReauth($event)"
+          />
+        </div>
+
+        <div class="profile-column">
+          <nxs-linked-providers
+            [accounts]="oauthAccounts()"
+            [hasPassword]="accountHasPassword()"
+            [resumeChange]="resumeProviderChange()"
+            [(busy)]="providersBusy"
+            (reauthRequested)="startProviderReauth($event)"
+            (unlinked)="onProviderUnlinked($event)"
+          />
+
+          <nxs-two-factor
+            [user]="u"
+            [reauthProviderLabel]="reauthProviderLabel()"
+            [resumeSetup]="resumeMfaSetup()"
+            (changed)="onTwoFactorChanged()"
+            (reauthRequested)="startMfaReauth()"
+          />
+
+          <nxs-preferences-card [user]="u" (userUpdated)="user.set($event)" />
+        </div>
       </div>
     }
   }

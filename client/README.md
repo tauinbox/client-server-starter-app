@@ -540,8 +540,10 @@ mechanism and does not depend on the server revoking anything.
 
 **Signed-in devices.** `ActiveSessionsComponent` (`nxs-active-sessions`) on the profile page lists
 the sessions from `GET /auth/sessions`, names each device with `describeUserAgent` (the major
-browsers and systems, with the raw header as the fallback, rendered as text only) and ends one
-other device or all of them. It asks for the factor the account holds: the password, else a code
+browsers and systems, with the raw header as the fallback, rendered as text only), shows the IP
+address of the latest sign-in or refresh with its location (`describeLocation`: the city from the
+server and the country named in the UI language through `Intl.DisplayNames`), credits DB-IP when
+any location is shown (its CC BY 4.0 license demands it), and ends one other device or all of them. It asks for the factor the account holds: the password, else a code
 from the authenticator, else a provider round trip that the page starts and resumes through the
 `pending_reauth` session-storage key (one record for every step-up round trip on the page). After a sign-in method changes on the page, the card
 offers "Sign out all other devices"; it never signs anything out on its own.
@@ -1082,7 +1084,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 286 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1383 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1406 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

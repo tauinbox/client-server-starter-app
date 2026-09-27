@@ -375,6 +375,9 @@ export interface State {
   // Session id -> the User-Agent the device sent when it signed in. Mirrors the
   // `user_agent` column the real server keeps on `refresh_tokens`.
   sessionUserAgents: Map<string, string | null>;
+  // Session id -> the address of its latest refresh token. Mirrors the
+  // `ip_address` column the real server keeps on `refresh_tokens`.
+  sessionIps: Map<string, string | null>;
   // Session id -> the epoch milliseconds of its latest refresh token. Mirrors
   // the `created_at` of the live row, which the server reports as last active.
   sessionLastActive: Map<string, number>;

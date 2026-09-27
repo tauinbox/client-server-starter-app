@@ -125,7 +125,10 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     email: string
   ): Promise<{ access: string; refresh: string }> {
     const user = await usersService.findOne(await userId(email));
-    const { tokens } = await authService.login(user, 'session-revoke-e2e');
+    const { tokens } = await authService.login(user, {
+      userAgent: 'session-revoke-e2e',
+      ipAddress: null
+    });
     return { access: tokens.access_token, refresh: tokens.refresh_token };
   }
 
@@ -150,7 +153,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
 
   async function refreshErrorKey(raw: string): Promise<string> {
     try {
-      await authService.refreshTokens(raw);
+      await authService.refreshTokens(raw, null);
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {

@@ -1500,7 +1500,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/login` | None | Log in. Sets the `refresh_token` HttpOnly cookie and returns an access token |
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
 | POST | `/auth/logout` | Bearer | Log out this device. It ends the session the `refresh_token` cookie belongs to, leaves the other devices signed in, and cancels a started OAuth link. It answers `Clear-Site-Data` |
-| GET | `/auth/sessions` | Bearer | List the signed-in devices of the caller: session id, `current`, the User-Agent sent at sign-in, start time and last refresh |
+| GET | `/auth/sessions` | Bearer | List the signed-in devices of the caller: session id, `current`, the User-Agent sent at sign-in, the IP address of the latest sign-in or refresh with its country code and city (null without a GeoIP database), start time and last refresh |
 | DELETE | `/auth/sessions/:sessionId` | Bearer + step-up | End one other device. An unknown id and an id of another account both answer 404; the own session answers 400 |
 | DELETE | `/auth/sessions` | Bearer + step-up | End every device of the account except the caller |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
@@ -1815,9 +1815,9 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2644 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2663 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 500 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 494 pass and 2 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1399 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1406 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 286 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 883 tests pass |
 

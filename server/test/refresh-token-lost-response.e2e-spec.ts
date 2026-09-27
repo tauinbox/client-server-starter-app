@@ -71,13 +71,10 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
   async function seedSession(): Promise<{ raw: string; sessionId: string }> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const sessionId = randomUUID();
-    await refreshTokenService.createRefreshToken(
-      userId,
-      raw,
-      3600,
-      sessionId,
-      null
-    );
+    await refreshTokenService.createRefreshToken(userId, raw, 3600, sessionId, {
+      userAgent: null,
+      ipAddress: null
+    });
     return { raw, sessionId };
   }
 
@@ -111,9 +108,11 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
 
-    await authService.refreshTokens(deviceA.raw);
+    await authService.refreshTokens(deviceA.raw, null);
 
-    expect(await errorKeyOf(authService.refreshTokens(deviceA.raw))).toEqual(
+    expect(
+      await errorKeyOf(authService.refreshTokens(deviceA.raw, null))
+    ).toEqual(
       expect.objectContaining({ errorKey: 'errors.auth.invalidRefreshToken' })
     );
 
@@ -128,7 +127,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     );
     expect(auditActions()).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
 
-    const { tokens } = await authService.refreshTokens(deviceB.raw);
+    const { tokens } = await authService.refreshTokens(deviceB.raw, null);
     expect(tokens.refresh_token).toBeTruthy();
   }, 30000);
 
@@ -136,14 +135,14 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
 
-    await authService.refreshTokens(deviceA.raw);
+    await authService.refreshTokens(deviceA.raw, null);
     // Both rows of the chain move back together, so their order is kept.
     await dataSource.query(
       `UPDATE refresh_tokens SET created_at = created_at - ($1 * INTERVAL '1 millisecond') WHERE session_id = $2`,
       [REFRESH_REUSE_GRACE_MS + 1000, deviceA.sessionId]
     );
 
-    await errorKeyOf(authService.refreshTokens(deviceA.raw));
+    await errorKeyOf(authService.refreshTokens(deviceA.raw, null));
 
     expect(await rowsOf(deviceA.sessionId)).toBe(0);
     expect(await rowsOf(deviceB.sessionId)).toBe(0);
@@ -155,10 +154,10 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
 
-    const first = await authService.refreshTokens(deviceA.raw);
-    await authService.refreshTokens(first.tokens.refresh_token);
+    const first = await authService.refreshTokens(deviceA.raw, null);
+    await authService.refreshTokens(first.tokens.refresh_token, null);
 
-    await errorKeyOf(authService.refreshTokens(deviceA.raw));
+    await errorKeyOf(authService.refreshTokens(deviceA.raw, null));
 
     expect(await rowsOf(deviceA.sessionId)).toBe(0);
     expect(await rowsOf(deviceB.sessionId)).toBe(0);
@@ -175,7 +174,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
       .getRepository(RefreshToken)
       .update({ sessionId: deviceA.sessionId }, { revoked: true });
 
-    await errorKeyOf(authService.refreshTokens(deviceA.raw));
+    await errorKeyOf(authService.refreshTokens(deviceA.raw, null));
 
     expect(await rowsOf(deviceB.sessionId)).toBe(0);
     expect(await tokenRevokedAt()).toBeInstanceOf(Date);

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { User } from '../../users/entities/user.entity';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
+import type { SessionClient } from '../utils/session-client';
 import { RefreshTokenService } from './refresh-token.service';
 import { SessionLimitService } from './session-limit.service';
 import { TokenGeneratorService } from './token-generator.service';
@@ -41,7 +42,7 @@ export class SessionIssuerService {
    */
   async issueSession(
     user: User,
-    userAgent: string | null
+    client: SessionClient
   ): Promise<{ tokens: TokensResponseDto; user: User }> {
     const roleNames = user.roles.map((r) => r.name);
     const sessionId = randomUUID();
@@ -61,7 +62,7 @@ export class SessionIssuerService {
       tokens.refresh_token,
       expiresIn,
       sessionId,
-      userAgent
+      client
     );
     await this.refreshTokenService.pruneOldestTokens(
       user.id,

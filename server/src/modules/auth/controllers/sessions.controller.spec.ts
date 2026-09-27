@@ -84,12 +84,18 @@ describe('SessionsController', () => {
         {
           sessionId: 'current-session',
           userAgent: 'Device-A',
+          ipAddress: '203.0.113.7',
+          countryCode: 'DE',
+          city: 'Berlin',
           sessionStartedAt: startedAt,
           createdAt
         },
         {
           sessionId: 'other-session',
           userAgent: null,
+          ipAddress: null,
+          countryCode: null,
+          city: null,
           sessionStartedAt: startedAt,
           createdAt
         }
@@ -105,6 +111,9 @@ describe('SessionsController', () => {
           id: 'current-session',
           current: true,
           userAgent: 'Device-A',
+          ipAddress: '203.0.113.7',
+          countryCode: 'DE',
+          city: 'Berlin',
           startedAt: '2026-09-01T10:00:00.000Z',
           lastActiveAt: '2026-09-20T08:30:00.000Z'
         },
@@ -112,6 +121,9 @@ describe('SessionsController', () => {
           id: 'other-session',
           current: false,
           userAgent: null,
+          ipAddress: null,
+          countryCode: null,
+          city: null,
           startedAt: '2026-09-01T10:00:00.000Z',
           lastActiveAt: '2026-09-20T08:30:00.000Z'
         }

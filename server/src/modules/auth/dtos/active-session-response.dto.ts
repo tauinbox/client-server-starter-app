@@ -19,6 +19,34 @@ export class ActiveSessionResponseDto implements ActiveSessionResponse {
   })
   userAgent: string | null;
 
+  @ApiProperty({
+    description:
+      'IP address of the last sign-in or token refresh of the session. Null ' +
+      'when none was recorded.',
+    type: String,
+    nullable: true
+  })
+  ipAddress: string | null;
+
+  @ApiProperty({
+    description:
+      'ISO 3166-1 alpha-2 country resolved from the IP address. Null when ' +
+      'it is unknown.',
+    type: String,
+    nullable: true,
+    example: 'DE'
+  })
+  countryCode: string | null;
+
+  @ApiProperty({
+    description:
+      'City (English name) resolved from the IP address. Null when it is ' +
+      'unknown.',
+    type: String,
+    nullable: true
+  })
+  city: string | null;
+
   @ApiProperty({ description: 'When the session started', format: 'date-time' })
   startedAt: string;
 
