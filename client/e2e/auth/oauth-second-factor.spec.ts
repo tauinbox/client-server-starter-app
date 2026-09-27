@@ -1,4 +1,8 @@
-import { expect, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  markOAuthRoundTripStarted,
+  test
+} from '../fixtures/base.fixture';
 import { createMockUser, createOAuthAccount } from '../fixtures/mock-data';
 import { mockId } from '../fixtures/ids';
 import { MOCK_TOTP_CODE } from '../../../mock-server/src/constants';
@@ -41,6 +45,7 @@ async function arriveAtCallback(
   const { token } = await mockServer.issueOAuthData(USER_ID);
 
   await page.goto('/login');
+  await markOAuthRoundTripStarted(page);
   await context.addCookies([
     {
       name: 'oauth_data',

@@ -86,6 +86,9 @@ src/app/
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService owns the HTTP calls, the refresh schedule and
 │   │   │                   # fetchPermissions(): Promise<void>. Also rbac-metadata.service.ts.
+│   │   │                   # OAuthIntentService holds the proof that this tab started a
+│   │   │                   # provider round trip, for one page load; the callback page
+│   │   │                   # exchanges nothing without it.
 │   │   └── store/          # AuthStore is an NgRx Signal Store. Its state holds accessToken (in
 │   │                       # memory), user (in localStorage as auth_user),
 │   │                       # ability: AppAbility | null and mfaMandatory (the server policy, read
@@ -1083,8 +1086,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 286 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1406 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 288 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1413 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

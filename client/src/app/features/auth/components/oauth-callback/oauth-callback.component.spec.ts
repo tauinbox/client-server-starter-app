@@ -27,6 +27,7 @@ import { AuthApiEnum } from '../../constants/auth-api.const';
 import { OAUTH_ERROR_CANCELLED } from '../../constants/oauth-error.const';
 import type { AppAbility } from '../../casl/app-ability';
 import { SessionStorageService } from '@core/services/session-storage.service';
+import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import { NotificationsService } from '@core/services/notifications.service';
 import { FeatureFlagsStore } from '../../../feature-flags/store/feature-flags.store';
@@ -70,11 +71,7 @@ describe('OAuthCallbackComponent', () => {
     verifyMfa: ReturnType<typeof vi.fn>;
     verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
   };
-  let sessionStorageMock: {
-    getItem: ReturnType<typeof vi.fn>;
-    setItem: ReturnType<typeof vi.fn>;
-    removeItem: ReturnType<typeof vi.fn>;
-  };
+  let oauthIntentMock: { take: ReturnType<typeof vi.fn> };
   let router: Router;
 
   beforeEach(async () => {
@@ -84,11 +81,7 @@ describe('OAuthCallbackComponent', () => {
       verifyMfaRecoveryCode: vi.fn().mockReturnValue(of(mockAuthResponse))
     };
 
-    sessionStorageMock = {
-      getItem: vi.fn().mockReturnValue(null),
-      setItem: vi.fn(),
-      removeItem: vi.fn()
-    };
+    oauthIntentMock = { take: vi.fn().mockReturnValue('/profile') };
 
     await TestBed.configureTestingModule({
       imports: [OAuthCallbackComponent, TranslocoTestingModuleWithLangs],
@@ -96,7 +89,7 @@ describe('OAuthCallbackComponent', () => {
         provideRouter([]),
         provideNoopAnimations(),
         { provide: AuthService, useValue: authServiceMock },
-        { provide: SessionStorageService, useValue: sessionStorageMock }
+        { provide: OAuthIntentService, useValue: oauthIntentMock }
       ]
     }).compileComponents();
 
@@ -118,18 +111,29 @@ describe('OAuthCallbackComponent', () => {
     });
   });
 
-  it('should navigate to returnUrl from sessionStorage', async () => {
-    sessionStorageMock.getItem.mockReturnValue('/dashboard');
+  it('should navigate to the return url that this tab stored', async () => {
+    oauthIntentMock.take.mockReturnValue('/dashboard');
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
     await fixture.whenStable();
 
-    expect(sessionStorageMock.getItem).toHaveBeenCalledWith('oauth_return_url');
-    expect(sessionStorageMock.removeItem).toHaveBeenCalledWith(
-      'oauth_return_url'
-    );
+    expect(oauthIntentMock.take).toHaveBeenCalledTimes(1);
     expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard', {
+      replaceUrl: true
+    });
+  });
+
+  it('exchanges nothing when this tab did not start the round trip', () => {
+    oauthIntentMock.take.mockReturnValue(null);
+
+    fixture = TestBed.createComponent(OAuthCallbackComponent);
+    fixture.detectChanges();
+
+    expect(authServiceMock.exchangeOAuthData).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { oauth_error: 'auth_failed' },
       replaceUrl: true
     });
   });
@@ -196,7 +200,7 @@ describe('OAuthCallbackComponent', () => {
     });
 
     it('navigates to the return url once the code is accepted', async () => {
-      sessionStorageMock.getItem.mockReturnValue('/dashboard');
+      oauthIntentMock.take.mockReturnValue('/dashboard');
       await reachChallenge();
 
       await submitCode('123456');
@@ -241,7 +245,7 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should reject a stored returnUrl that resolves off-origin', async () => {
-    sessionStorageMock.getItem.mockReturnValue('//evil.com');
+    oauthIntentMock.take.mockReturnValue('//evil.com');
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -253,7 +257,7 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should reject a stored returnUrl that forms an authority with a backslash', async () => {
-    sessionStorageMock.getItem.mockReturnValue('/\\evil.com');
+    oauthIntentMock.take.mockReturnValue('/\\evil.com');
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -265,7 +269,7 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should follow a stored returnUrl that carries a double slash in the query', async () => {
-    sessionStorageMock.getItem.mockReturnValue('/admin/users?q=a//b');
+    oauthIntentMock.take.mockReturnValue('/admin/users?q=a//b');
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -395,6 +399,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
             clear: vi.fn()
           }
         },
+        { provide: OAuthIntentService, useValue: { take: () => '/profile' } },
         { provide: NotificationsService, useValue: notificationsMock },
         { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock },
         { provide: EntitlementsStore, useValue: entitlementsStoreMock }

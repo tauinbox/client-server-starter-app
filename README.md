@@ -135,6 +135,10 @@ management and theming.
   A canceled or failed **step-up** attempt does the same, and gives `oauth_error=reauth_failed` so
   the profile page can say that nothing was changed.
 
+  The callback page finishes only a round trip that this browser tab started with a click on a
+  provider button. A provider that already has consent returns with no screen, so without this rule
+  any page could send a browser through the provider and sign its owner in with no action from them.
+
   A provider proves one credential. An account that carries a second factor is therefore not signed
   in by the round trip: the callback page asks for a code, exactly as the login card does after a
   correct password, and no session exists until the code is accepted. The application never reads
@@ -1817,8 +1821,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2663 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 500 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 494 pass and 2 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1406 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 286 tests |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1413 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 288 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 883 tests pass |
 
 ## CI/CD

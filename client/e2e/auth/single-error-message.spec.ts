@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  loginViaUi,
+  markOAuthRoundTripStarted,
+  test
+} from '../fixtures/base.fixture';
 
 /**
  * Regression: these pages show a refused request themselves, and the global
@@ -12,7 +17,10 @@ test.describe('A refused request shows one error message', () => {
     _mockServer,
     page
   }) => {
-    // No `oauth_data` cookie, so the exchange is refused.
+    // This tab started the round trip, but it holds no `oauth_data` cookie,
+    // so the exchange is refused.
+    await page.goto('/login');
+    await markOAuthRoundTripStarted(page);
     await page.goto('/oauth/callback');
 
     await expect(page).toHaveURL(/\/login\?oauth_error=auth_failed/);

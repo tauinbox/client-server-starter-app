@@ -19,7 +19,7 @@ import type {
 import { ErrorKeys } from '@app/shared/constants';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { FeatureFlagService } from '@features/feature-flags/services/feature-flag.service';
-import { SessionStorageService } from '@core/services/session-storage.service';
+import { OAuthIntentService } from '../../services/oauth-intent.service';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -788,13 +788,12 @@ describe('LoginComponent', () => {
     });
 
     it('ignores a provider that is not a known OAuth provider', () => {
-      const sessionStorage = TestBed.inject(SessionStorageService);
-      const setItem = vi.spyOn(sessionStorage, 'setItem');
+      const start = vi.spyOn(TestBed.inject(OAuthIntentService), 'start');
 
       component.onOAuthLogin('constructor');
       component.onOAuthLogin('twitter');
 
-      expect(setItem).not.toHaveBeenCalled();
+      expect(start).not.toHaveBeenCalled();
     });
   });
 });

@@ -27,7 +27,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { OAUTH_PROVIDER_FLAGS, STEP_UP_OPERATION } from '@app/shared/constants';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
-import { SessionStorageService } from '@core/services/session-storage.service';
+import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { AuthService } from '../../services/auth.service';
@@ -37,7 +37,6 @@ import {
   OAUTH_URLS,
   type OAuthProvider
 } from '../../constants/auth-api.const';
-import { OAUTH_RETURN_URL_KEY } from '../../constants/oauth-return-url.const';
 
 export type LinkedAccount = {
   provider: string;
@@ -76,7 +75,7 @@ export class LinkedProvidersComponent {
   readonly #authService = inject(AuthService);
   readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #sessionStorage = inject(SessionStorageService);
+  readonly #oauthIntent = inject(OAuthIntentService);
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #transloco = inject(TranslocoService);
   readonly #flagsStore = inject(FeatureFlagsStore);
@@ -242,7 +241,7 @@ export class LinkedProvidersComponent {
       .subscribe({
         next: () => {
           this.#closeStepUpPrompt();
-          this.#sessionStorage.setItem(OAUTH_RETURN_URL_KEY, '/profile');
+          this.#oauthIntent.start('/profile');
           if (this.#window) {
             this.#window.location.href = OAUTH_URLS[provider];
           }

@@ -19,6 +19,7 @@ import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
 import { restoreSession } from '@features/auth/utils/restore-session';
+import { OAuthIntentService } from '@features/auth/services/oauth-intent.service';
 import { TranslocoHttpLoader } from '@core/transloco-loader';
 import { LanguageService } from '@core/services/language.service';
 import { DisplayPreferencesService } from '@core/services/display-preferences.service';
@@ -43,6 +44,10 @@ export const appConfig: ApplicationConfig = {
           )
         );
       }
+    }),
+    // Before any route renders: the OAuth proof is good for this one page load.
+    provideAppInitializer(() => {
+      inject(OAuthIntentService);
     }),
     provideAppInitializer(restoreSession),
     provideTransloco({
