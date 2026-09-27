@@ -14,7 +14,6 @@ import {
   MatCardTitle
 } from '@angular/material/card';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
@@ -42,7 +41,6 @@ import { TranslocoDirective } from '@jsverse/transloco';
 })
 export class OAuthCallbackComponent implements OnInit {
   readonly #router = inject(Router);
-  readonly #authStore = inject(AuthStore);
   readonly #authService = inject(AuthService);
   readonly #sessionStorage = inject(SessionStorageService);
   readonly #window = inject(DOCUMENT).defaultView;
@@ -64,26 +62,10 @@ export class OAuthCallbackComponent implements OnInit {
           return;
         }
 
-        if (
-          !response.tokens?.access_token ||
-          !response.user?.id ||
-          !response.user?.email
-        ) {
-          this.#redirectToLogin('auth_failed');
-          return;
-        }
-
-        this.#authStore.saveAuthResponse(response);
-
-        // Navigate only once the permissions are in: a guarded destination
-        // evaluates its guard against the ability this call populates.
-        void this.#authService
-          .completeAuthentication()
-          .then(() => this.#navigateToReturnUrl())
-          // The spinner is this component's only state, so an unhandled
-          // rejection would leave the user on it forever.
-          .catch(() => this.#redirectToLogin('auth_failed'));
+        this.#navigateToReturnUrl();
       },
+      // The spinner is this component's only state, so every failure,
+      // including an incomplete response, must leave it for /login.
       error: () => {
         this.#redirectToLogin('auth_failed');
       }

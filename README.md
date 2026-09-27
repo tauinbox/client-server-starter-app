@@ -153,8 +153,8 @@ management and theming.
 - One session lives 30 days at most. A refresh keeps the session and writes a new 7-day expiry, thus
   the refresh window alone never ends a device that refreshes on schedule. `SESSION_ABSOLUTE_MAX_MS`
   is that upper bound, and the person signs in again when a session reaches it.
-- The app restores the session after a page reload. `provideAppInitializer` does a cookie refresh
-  before the route guards run.
+- The app restores the session after a page reload. `provideAppInitializer` runs `restoreSession`,
+  which does a cookie refresh and then the post-login routine before the route guards run.
 - The client refreshes the token automatically 60 seconds before the expiry. It discards a response
   that arrives after the teardown of the session, and it does not restore the session.
 
@@ -1817,7 +1817,7 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2644 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 500 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 494 pass and 2 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1378 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1382 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 286 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 881 tests pass |
 

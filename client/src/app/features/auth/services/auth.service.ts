@@ -4,7 +4,15 @@ import { DOCUMENT } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { EMPTY, finalize, firstValueFrom, from, switchMap, tap } from 'rxjs';
+import {
+  EMPTY,
+  finalize,
+  firstValueFrom,
+  from,
+  switchMap,
+  tap,
+  throwError
+} from 'rxjs';
 import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
 import type {
@@ -257,23 +265,26 @@ export class AuthService {
   }
 
   /**
-   * Everything a session needs after `saveAuthResponse`. Shared by the password
-   * login and the OAuth callback: skipping it leaves the CASL ability null, so
-   * every permission-guarded route denies without issuing a request.
+   * Everything a session needs after `saveAuthResponse`. Shared by every
+   * sign-in and by the bootstrap restore: skipping it leaves the CASL ability
+   * null, so every permission-guarded route denies without issuing a request.
+   * It resolves once the flags, the permissions and the RBAC metadata are in,
+   * so a caller that navigates next lands on a fully evaluated page.
    */
-  completeAuthentication(): Promise<void> {
-    this.scheduleTokenRefresh();
+  async completeAuthentication(): Promise<void> {
+    this.#tokenService.scheduleTokenRefresh();
     this.#idleTimeout.start();
-    // reload(), not load(): flags may already be loaded from the
-    // anonymous bootstrap and the authenticated set can differ.
-    void this.#featureFlagsStore.reload();
     // Drop any mirror left by a previous session rather than re-fetching:
     // the store is lazy, so the next gated surface loads it for this user.
     this.#entitlementsStore.clear();
-    return this.fetchPermissions().then(() => {
-      void this.fetchRbacMetadata();
-      this.#notificationsService.connect();
-    });
+    await Promise.all([
+      // reload(), not load(): flags may already be loaded from the
+      // anonymous bootstrap and the authenticated set can differ.
+      this.#featureFlagsStore.reload(),
+      // The metadata fetch is permission-gated, so it waits for the rules.
+      this.fetchPermissions().then(() => this.fetchRbacMetadata())
+    ]);
+    this.#notificationsService.connect();
   }
 
   register(
@@ -374,15 +385,6 @@ export class AuthService {
     return this.#tokenService.refreshTokens();
   }
 
-  scheduleTokenRefresh(): void {
-    this.#tokenService.scheduleTokenRefresh();
-  }
-
-  /** For the bootstrap initializer, which restores a session without a sign-in. */
-  startIdleTimeout(): void {
-    this.#idleTimeout.start();
-  }
-
   cancelRefresh(): void {
     this.#tokenService.cancelRefresh();
   }
@@ -411,11 +413,29 @@ export class AuthService {
    * route does, and no session exists until a code is presented.
    */
   exchangeOAuthData(): Observable<LoginResponse> {
-    return this.#http.post<LoginResponse>(
-      AuthApiEnum.OAuthExchange,
-      {},
-      { context: silentContext(), withCredentials: true }
-    );
+    return this.#http
+      .post<LoginResponse>(
+        AuthApiEnum.OAuthExchange,
+        {},
+        { context: silentContext(), withCredentials: true }
+      )
+      .pipe(
+        switchMap((response) => {
+          if ('mfaRequired' in response) {
+            return [response];
+          }
+          // Checked before anything is saved: a partial response must not
+          // leave a half-written session behind the redirect to /login.
+          if (
+            !response.tokens?.access_token ||
+            !response.user?.id ||
+            !response.user?.email
+          ) {
+            return throwError(() => new Error('Incomplete OAuth response'));
+          }
+          return this.startSession(response);
+        })
+      );
   }
 
   /**

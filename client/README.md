@@ -511,8 +511,7 @@ at most once in 30 s, thus input in one tab keeps all tabs alive. It compares th
 clock each 60 s and when the tab becomes visible, because a hidden tab runs about one timer each
 minute and a frozen tab runs none. On a timeout it emits `timedOut$`, and `AuthService` calls
 `logout()` with the `session_ended=idle` marker. The logout revokes the session on the server, and
-the removal of `auth_user` signs out the other tabs. `completeAuthentication()` and the bootstrap
-initializer start the service, and the session teardown stops it. A start counts as input. Thus a
+the removal of `auth_user` signs out the other tabs. `completeAuthentication()` starts the service, and the session teardown stops it. A start counts as input. Thus a
 browser that opens again inside the refresh window is not signed out at once: a closed browser is
 bound by `JWT_REFRESH_EXPIRATION` only. `idle-timeout.spec.ts` drives the three cases with
 `page.clock`.
@@ -524,7 +523,7 @@ disconnects the SSE stream. It also clears the session, the cached RBAC metadata
 and the entitlements.
 
 Four exit paths never reach `logout()`: `ensureAuthenticated` and `guestGuard` after a failed
-refresh, the `catch` block in `provideAppInitializer`, and `ProfileComponent` after a successful
+refresh, the `catch` block in `restoreSession` (the bootstrap initializer), and `ProfileComponent` after a successful
 password change. They run the same routine through the public `clearSession()` delegate. The
 profile path cannot call `logout()`: the server already revoked every session, so
 `POST /auth/logout` would get a 401. It opens `/login?password_changed=1` (or `=email-pending`
@@ -564,9 +563,12 @@ The listener is intentionally narrow. It reacts only when that one key in `local
 operations *write* the key. A change to another persisted key also does not disturb it. A tab with no
 session stays where it is and does not go to `/login`.
 
-`provideAppInitializer` waits for `fetchPermissions().then(() => fetchRbacMetadata())` for an
-authenticated user. If `hasPersistedUser()` is true, it tries a cookie refresh first. This is the
-state after a page reload with no in-memory token.
+The bootstrap initializer (`features/auth/utils/restore-session.ts`) runs only for a page reload,
+because the access token lives in memory and a bootstrap never holds one. If `hasPersistedUser()` is
+true, it does a cookie refresh and then awaits `completeAuthentication()`. That is the one
+session-start routine: every sign-in (password, second factor, provider) and the restore run it. It
+awaits the feature flags and `fetchPermissions().then(() => fetchRbacMetadata())` together, so a
+caller that navigates next lands on a fully evaluated page.
 
 A failed `fetchPermissions()` resolves and does not reject, because the callers chain
 `fetchRbacMetadata()` on it. The failure is not silent. The app reports it through
@@ -790,9 +792,9 @@ To gate an attribute binding, disable an action while the flag is off:
 
 ### Lifecycle
 
-`FeatureFlagsStore.load()` runs at bootstrap through `provideAppInitializer`. It runs for an
-authenticated caller, together with `fetchPermissions()` and `fetchRbacMetadata()`. It also runs for
-an anonymous visitor. For an anonymous visitor the load does not block, thus a public flag can gate a
+At bootstrap, a restored session reloads the flags through `completeAuthentication()`, together with
+`fetchPermissions()` and `fetchRbacMetadata()`. `FeatureFlagsStore.load()` runs for an anonymous
+visitor. For an anonymous visitor the load does not block, thus a public flag can gate a
 placeholder in the first paint. On logout the app calls `clear()` on the store.
 
 The flags stay live. `NotificationsService.featureFlagsUpdated$` is a filter on the SSE stream. It
@@ -1071,7 +1073,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 286 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1378 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1382 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

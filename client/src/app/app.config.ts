@@ -15,14 +15,10 @@ import { MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { MAT_TOOLTIP_DEFAULT_OPTIONS } from '@angular/material/tooltip';
 import { MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
-import { firstValueFrom } from 'rxjs';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
-import { AuthService } from '@features/auth/services/auth.service';
-import { AuthStore } from '@features/auth/store/auth.store';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
-import { NotificationsService } from '@core/services/notifications.service';
-import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
+import { restoreSession } from '@features/auth/utils/restore-session';
 import { TranslocoHttpLoader } from '@core/transloco-loader';
 import { LanguageService } from '@core/services/language.service';
 import { DisplayPreferencesService } from '@core/services/display-preferences.service';
@@ -48,44 +44,7 @@ export const appConfig: ApplicationConfig = {
         );
       }
     }),
-    provideAppInitializer(async () => {
-      const authService = inject(AuthService);
-      const authStore = inject(AuthStore);
-      const notificationsService = inject(NotificationsService);
-      const featureFlagsStore = inject(FeatureFlagsStore);
-      if (authService.isAuthenticated()) {
-        authService.scheduleTokenRefresh();
-        await Promise.all([
-          // Metadata fetch is permission-gated, so it must run after the
-          // permission rules have been loaded.
-          authService
-            .fetchPermissions()
-            .then(() => authService.fetchRbacMetadata()),
-          featureFlagsStore.load()
-        ]);
-        authService.startIdleTimeout();
-        notificationsService.connect();
-      } else if (authStore.hasPersistedUser()) {
-        // Page reload: access token gone from memory, try to restore via refresh cookie
-        try {
-          await firstValueFrom(authService.refreshTokens());
-          await Promise.all([
-            authService
-              .fetchPermissions()
-              .then(() => authService.fetchRbacMetadata()),
-            featureFlagsStore.load()
-          ]);
-          authService.startIdleTimeout();
-          notificationsService.connect();
-        } catch {
-          authService.clearSession();
-        }
-      } else {
-        // Anonymous bootstrap — still load public flags so the landing page
-        // can render `*nxsHasFeature` placeholders for public previews.
-        void featureFlagsStore.load();
-      }
-    }),
+    provideAppInitializer(restoreSession),
     provideTransloco({
       config: {
         availableLangs: ['en', 'ru'],
