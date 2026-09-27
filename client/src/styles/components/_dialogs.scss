@@ -48,7 +48,7 @@
 }
 
 // Opt-in panelClass for dialogs whose panels pad themselves; padding-top still
-// comes from the Angular Material bug #26352 workaround above.
+// comes from the title + content rule in the Content section above.
 .app-dialog-flush-content .mat-mdc-dialog-content {
   --mat-dialog-content-padding: 0;
   --mat-dialog-with-actions-content-padding: 0;
