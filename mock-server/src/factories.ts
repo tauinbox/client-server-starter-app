@@ -25,7 +25,10 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
     // `??` would turn an explicit null into the default, and null is exactly
     // what an account created through a provider holds.
     password: 'password' in options ? (options.password ?? null) : 'Password1',
-    isActive: options.isActive ?? faker.datatype.boolean({ probability: 0.8 }),
+    // Not random: a test that omits the field expects an account that can
+    // sign in. A random default made such a test fail only on the rare draws
+    // that the order of earlier faker calls in the worker happened to produce.
+    isActive: options.isActive ?? true,
     roles: options.roles ?? ['user'],
     isEmailVerified: options.isEmailVerified ?? true,
     locale: options.locale ?? 'en',
