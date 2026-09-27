@@ -51,6 +51,9 @@ src/app/
 ├── features/
 │   ├── auth/               # Login, register, profile, OAuth callback, verify-email,
 │   │                       # forgot-password, reset-password, forbidden,
+│   │                       # linked-providers and preferences-card (two more cards
+│   │                       # of the profile page: provider link and unlink, and the
+│   │                       # language and density settings),
 │   │                       # two-factor (the enrolment card on the profile page,
 │   │                       # which also replaces the recovery set;
 │   │                       # components/mfa-challenge holds the code step, and the login

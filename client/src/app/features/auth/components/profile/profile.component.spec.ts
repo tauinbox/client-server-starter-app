@@ -3,14 +3,16 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { ProfileComponent } from './profile.component';
+import { LinkedProvidersComponent } from '../linked-providers/linked-providers.component';
 import { AuthService } from '../../services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -19,7 +21,6 @@ import type {
   RoleResponse,
   UserResponse
 } from '@app/shared/types';
-import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { FeatureFlagService } from '@features/feature-flags/services/feature-flag.service';
 
 const mockUserRole: RoleResponse = {
@@ -150,6 +151,11 @@ describe('ProfileComponent', () => {
     fixture = TestBed.createComponent(ProfileComponent);
     component = fixture.componentInstance;
   });
+
+  function providersCard(): LinkedProvidersComponent {
+    return fixture.debugElement.query(By.directive(LinkedProvidersComponent))
+      .componentInstance;
+  }
 
   it('should create', () => {
     fixture.detectChanges();
@@ -925,52 +931,28 @@ describe('ProfileComponent', () => {
     });
   });
 
-  describe('OAuth connected-accounts visibility', () => {
-    async function loadFlags(flags: Record<string, boolean>): Promise<void> {
-      featureFlagServiceMock.getEvaluatedFlags.mockReturnValue(
-        of<EvaluatedFeatureFlagsResponse>({ flags, evaluatedAt: '' })
-      );
-      await TestBed.inject(FeatureFlagsStore).load();
-      fixture.detectChanges();
-      await fixture.whenStable();
-    }
-
-    function providerRowCount(): number {
-      return fixture.nativeElement.querySelectorAll('.oauth-provider-row')
-        .length;
-    }
-
-    it('hides the card when no provider is configured and none are linked', () => {
-      fixture.detectChanges();
-      expect(providerRowCount()).toBe(0);
-      expect(component['visibleProviders']()).toEqual([]);
-    });
-
-    it('shows a row per provider when all flags are enabled', async () => {
-      fixture.detectChanges();
-      await loadFlags({
-        'oauth-google': true,
-        'oauth-facebook': true,
-        'oauth-vk': true
-      });
-      expect(providerRowCount()).toBe(3);
-    });
-
-    it('shows only the configured subset of providers', async () => {
-      fixture.detectChanges();
-      await loadFlags({ 'oauth-google': true, 'oauth-facebook': true });
-      expect(component['visibleProviders']()).toEqual(['google', 'facebook']);
-      expect(providerRowCount()).toBe(2);
-    });
-
-    it('keeps a linked provider visible even when its flag is off', async () => {
+  describe('the providers card', () => {
+    it('receives the accounts the page loaded', async () => {
       authServiceMock.getOAuthAccounts.mockReturnValue(
         of([{ provider: 'vk', createdAt: '2025-01-01T00:00:00.000Z' }])
       );
       fixture.detectChanges();
-      await loadFlags({ 'oauth-google': true });
-      expect(component['visibleProviders']()).toEqual(['google', 'vk']);
-      expect(providerRowCount()).toBe(2);
+      await fixture.whenStable();
+
+      expect(providersCard().accounts()).toEqual([
+        { provider: 'vk', createdAt: '2025-01-01T00:00:00.000Z' }
+      ]);
+    });
+
+    // The card is a cell of the profile grid, so a host box would hold an
+    // empty cell there when no provider qualifies.
+    it('leaves no grid cell behind when no provider qualifies', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const host = fixture.nativeElement.querySelector('nxs-linked-providers');
+      expect(host.querySelector('mat-card')).toBeNull();
+      expect(getComputedStyle(host).display).toBe('contents');
     });
   });
 
@@ -1019,41 +1001,7 @@ describe('ProfileComponent', () => {
 
   // A linked provider signs the account in and no recovery path removes it, so
   // a stolen session must not be able to plant one.
-  describe('connectProvider', () => {
-    it('ignores a provider name it does not know', () => {
-      fixture.detectChanges();
-
-      component.connectProvider('unknown-provider');
-
-      expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
-      expect(component['stepUpPrompt']()).toBeNull();
-    });
-
-    it('asks an account that holds a password for it, and mints nothing yet', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      component.connectProvider('google');
-
-      expect(component['stepUpPrompt']()).toEqual({
-        provider: 'google',
-        mode: 'link'
-      });
-      expect(authServiceMock.initOAuthLink).not.toHaveBeenCalled();
-    });
-
-    it('sends the password with the link request', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      component.connectProvider('google');
-      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
-      await fixture.whenStable();
-      component['confirmStepUp']();
-
-      expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith('Password1');
-    });
-
+  describe('linking a provider', () => {
     describe('on an account created through a provider', () => {
       const oauthOnlyUser = { ...mockUser, hasPassword: false };
 
@@ -1064,11 +1012,11 @@ describe('ProfileComponent', () => {
         );
       });
 
-      it('takes a round trip bound to the link instead of asking', async () => {
+      it('takes a round trip bound to the link when the card asks', async () => {
         fixture.detectChanges();
         await fixture.whenStable();
 
-        component.connectProvider('facebook');
+        providersCard().connectProvider('facebook');
 
         expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
           STEP_UP_OPERATION.OAUTH_LINK
@@ -1078,7 +1026,28 @@ describe('ProfileComponent', () => {
           operation: STEP_UP_OPERATION.OAUTH_LINK,
           provider: 'facebook'
         });
-        expect(component['stepUpPrompt']()).toBeNull();
+        // The trip leaves the app, so the card stays disabled until it does.
+        fixture.detectChanges();
+        expect(providersCard().busy()).toBe(true);
+      });
+
+      it('enables the card again when the round trip cannot start', async () => {
+        const httpError = new HttpErrorResponse({ status: 500 });
+        authServiceMock.initOAuthReauth.mockReturnValue(
+          throwError(() => httpError)
+        );
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        providersCard().connectProvider('facebook');
+        fixture.detectChanges();
+
+        expect(component['providersBusy']()).toBe(false);
+        expect(providersCard().busy()).toBe(false);
+        expect(notifyMock.error).toHaveBeenCalledWith(
+          httpError,
+          'auth.profile.errorReauthFailed'
+        );
       });
 
       it('links on the load that follows the round trip', async () => {
@@ -1130,6 +1099,7 @@ describe('ProfileComponent', () => {
         expect(authServiceMock.initiateEmailChange).not.toHaveBeenCalled();
         expect(component['resumeMfaSetup']()).toBe(false);
         expect(component['resumeSessionRevoke']()).toBeNull();
+        expect(component['resumeProviderChange']()).toBeNull();
         expect(sessionStorage.getItem('pending_reauth')).toBeNull();
       });
     });
@@ -1137,46 +1107,24 @@ describe('ProfileComponent', () => {
 
   // The row an unlink deletes is a sign-in credential, so removing one costs
   // the same factor that adding one costs.
-  describe('disconnectProvider', () => {
-    it('ignores a provider name it does not know', () => {
-      fixture.detectChanges();
-
-      component.disconnectProvider('unknown-provider');
-
-      expect(authServiceMock.unlinkOAuthAccount).not.toHaveBeenCalled();
-      expect(component['oauthLoading']()).toBe(false);
-    });
-
-    it('asks an account that holds a password for it, and removes nothing yet', async () => {
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      component.disconnectProvider('google');
-
-      expect(component['stepUpPrompt']()).toEqual({
-        provider: 'google',
-        mode: 'unlink'
-      });
-      expect(authServiceMock.unlinkOAuthAccount).not.toHaveBeenCalled();
-    });
-
-    it('sends the password with the unlink request', async () => {
+  describe('unlinking a provider', () => {
+    it('drops the provider and offers to sign out other devices', async () => {
+      authServiceMock.getOAuthAccounts.mockReturnValue(
+        of([{ provider: 'google', createdAt: '2025-01-01T00:00:00.000Z' }])
+      );
       authServiceMock.unlinkOAuthAccount.mockReturnValue(
         of({ message: 'Unlinked' })
       );
       fixture.detectChanges();
       await fixture.whenStable();
 
-      component.disconnectProvider('google');
-      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
+      providersCard().disconnectProvider('google');
+      providersCard().stepUpPasswordModel.set({ currentPassword: 'Password1' });
       await fixture.whenStable();
-      component['confirmStepUp']();
+      providersCard()['confirmStepUp']();
 
-      expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith(
-        'google',
-        'Password1'
-      );
-      expect(component['stepUpPrompt']()).toBeNull();
+      expect(component['oauthAccounts']()).toEqual([]);
+      expect(component['offerSignOutOthers']()).toBe(true);
     });
 
     describe('on an account created through a provider', () => {
@@ -1192,11 +1140,11 @@ describe('ProfileComponent', () => {
         );
       });
 
-      it('takes a round trip bound to the unlink instead of asking', async () => {
+      it('takes a round trip bound to the unlink when the card asks', async () => {
         fixture.detectChanges();
         await fixture.whenStable();
 
-        component.disconnectProvider('facebook');
+        providersCard().disconnectProvider('facebook');
 
         expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
           STEP_UP_OPERATION.OAUTH_UNLINK
@@ -1206,7 +1154,6 @@ describe('ProfileComponent', () => {
           operation: STEP_UP_OPERATION.OAUTH_UNLINK,
           provider: 'facebook'
         });
-        expect(component['stepUpPrompt']()).toBeNull();
       });
 
       it('unlinks on the load that follows the round trip', async () => {
@@ -1227,6 +1174,34 @@ describe('ProfileComponent', () => {
           undefined
         );
         expect(sessionStorage.getItem('pending_reauth')).toBeNull();
+      });
+
+      // A reload builds a new card, which must not spend the proof twice.
+      it('does not unlink again when the profile reloads', async () => {
+        authServiceMock.unlinkOAuthAccount.mockReturnValue(
+          of({ message: 'Unlinked' })
+        );
+        storePendingReauth({
+          operation: STEP_UP_OPERATION.OAUTH_UNLINK,
+          provider: 'facebook'
+        });
+        activatedRouteMock.snapshot.queryParamMap.set('reauth', 'ok');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledTimes(1);
+
+        // The reload answers later, so the spinner replaces the card first.
+        const reload = new Subject<UserResponse>();
+        authServiceMock.getProfile.mockReturnValue(reload);
+        component['onTwoFactorChanged']();
+        fixture.detectChanges();
+        reload.next(oauthOnlyUser);
+        reload.complete();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(providersCard()).toBeTruthy();
+        expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledTimes(1);
       });
 
       it('does not unlink on a round trip taken for the link', async () => {
