@@ -1,5 +1,5 @@
 import type { Server } from 'http';
-import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
+import { ErrorKeys, MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
@@ -113,6 +113,22 @@ describe('lockout recovery', () => {
     const body = (await res.json()) as { retryAfter: number };
     expect(body.retryAfter).toBeGreaterThan(0);
     expect(res.headers.get('retry-after')).toBe(String(body.retryAfter));
+  });
+
+  // The server exception filter writes statusCode into every error body.
+  it('answers the 423 with the envelope of the server', async () => {
+    await lockAccount();
+
+    const res = await postJson('login', { email, password });
+
+    expect(await res.json()).toEqual({
+      message:
+        'Account is temporarily locked due to too many failed login attempts',
+      statusCode: 423,
+      errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
+      lockedUntil: findUserByEmail(email)?.lockedUntil,
+      retryAfter: expect.any(Number) as unknown
+    });
   });
 
   // A 401 here and a 423 for the right password would tell the caller which

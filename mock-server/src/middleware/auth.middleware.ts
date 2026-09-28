@@ -74,28 +74,21 @@ import {
 import {
   clearReauthProofCookie,
   isValidReauthProof,
+  lockedEnvelope,
   logStepUpFailure,
   sendWithRetryAfter,
   stepUpPasswordError
 } from '../helpers/reauth.helpers';
 
-/**
- * The 423 answer. It carries the standard Retry-After header, which the
- * server sets from the same value in its exception filter.
- */
 function respondLocked(res: Response, lockedUntil: string): void {
-  const retryAfter = Math.max(
-    0,
-    Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 1000)
-  );
-  res.setHeader('Retry-After', String(retryAfter));
-  res.status(423).json({
-    message:
+  sendWithRetryAfter(
+    res,
+    lockedEnvelope(
       'Account is temporarily locked due to too many failed login attempts',
-    lockedUntil,
-    retryAfter,
-    errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED
-  });
+      ErrorKeys.AUTH.ACCOUNT_LOCKED,
+      new Date(lockedUntil)
+    )
+  );
 }
 
 function respondInvalidCredentials(

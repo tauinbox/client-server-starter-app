@@ -16,11 +16,13 @@ import {
   consumeTotpCode,
   isValidCodeShape,
   isValidPasswordShape,
+  lockedEnvelope,
   normalize,
   readFailures,
   recordFailure,
   sendWithRetryAfter,
-  stepUpError
+  stepUpError,
+  type StepUpErrorEnvelope
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import { decodeToken } from '../jwt.utils';
@@ -73,21 +75,12 @@ function clearChallengeFailures(userId: string): void {
   clearFailures(getState().mfaChallengeFailures, userId);
 }
 
-function challengeLockedEnvelope(remainingMs: number): {
-  message: string;
-  statusCode: number;
-  errorKey: string;
-  lockedUntil: string;
-  retryAfter: number;
-} {
-  return {
-    message:
-      'Too many incorrect verification codes. Use a recovery code or try again later',
-    statusCode: 423,
-    errorKey: ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
-    lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
-    retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
-  };
+function challengeLockedEnvelope(remainingMs: number): StepUpErrorEnvelope {
+  return lockedEnvelope(
+    'Too many incorrect verification codes. Use a recovery code or try again later',
+    ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
+    new Date(Date.now() + remainingMs)
+  );
 }
 
 /** Resolves the account behind an mfa-pending token, or null. */

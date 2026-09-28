@@ -44,6 +44,7 @@ import {
   digestsMatch
 } from '../../../common/crypto/secret-encryption.service';
 import { hashToken } from '../../../common/utils/hash-token';
+import { lockedException } from '../../../common/utils/locked-exception';
 import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 
@@ -650,16 +651,10 @@ export class MfaService {
    * holds only the password deny the owner their own account.
    */
   private challengeLockedException(remainingMs: number): HttpException {
-    const retryAfter = Math.max(1, Math.ceil(remainingMs / 1000));
-    return new HttpException(
-      {
-        message:
-          'Too many incorrect verification codes. Use a recovery code or try again later',
-        errorKey: ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
-        lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
-        retryAfter
-      },
-      HttpStatus.LOCKED
+    return lockedException(
+      'Too many incorrect verification codes. Use a recovery code or try again later',
+      ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
+      new Date(Date.now() + remainingMs)
     );
   }
 
@@ -669,15 +664,10 @@ export class MfaService {
    * step-up.
    */
   private stepUpLockedException(remainingMs: number): HttpException {
-    const retryAfter = Math.max(1, Math.ceil(remainingMs / 1000));
-    return new HttpException(
-      {
-        message: 'Too many incorrect verification codes. Try again later',
-        errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
-        lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
-        retryAfter
-      },
-      HttpStatus.LOCKED
+    return lockedException(
+      'Too many incorrect verification codes. Try again later',
+      ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
+      new Date(Date.now() + remainingMs)
     );
   }
 
