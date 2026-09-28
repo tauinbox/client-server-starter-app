@@ -59,6 +59,16 @@ export class Subscription {
   @Exclude()
   billingAnchorAt: Date | null;
 
+  /**
+   * Where the metered window of the current period starts, when a switch of
+   * billing mode moved it past `current_period_start`: units before this moment
+   * were billed at the switch, or were consumed on a fixed plan. Null when the
+   * window is the whole period.
+   */
+  @Column({ name: 'metered_from', type: 'timestamptz', nullable: true })
+  @Exclude()
+  meteredFrom: Date | null;
+
   @Column({ name: 'cancel_at_period_end', default: false })
   cancelAtPeriodEnd: boolean;
 

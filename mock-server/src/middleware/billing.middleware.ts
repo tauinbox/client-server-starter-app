@@ -31,6 +31,7 @@ import {
 import { authGuard, permissionGuard } from '../helpers/auth.helpers';
 import {
   billClosingUsagePeriod,
+  meteredWindowStart,
   sumPlanMeterUnits
 } from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
@@ -367,10 +368,11 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
     return;
   }
 
+  const windowStart = meteredWindowStart(sub);
   const totalUnits = sumPlanMeterUnits(
     plan,
     sub.id,
-    sub.currentPeriodStart,
+    windowStart,
     sub.currentPeriodEnd
   );
 
@@ -380,7 +382,7 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
   const summary: UsageSummaryResponse = {
     subscriptionId: sub.id,
     meterKey: plan.meterKey,
-    periodStart: sub.currentPeriodStart,
+    periodStart: windowStart,
     periodEnd: sub.currentPeriodEnd,
     totalUnits,
     includedUnits,
@@ -825,8 +827,15 @@ billingRouter.post(
     const { customer, sub, fromPlan, toPlan } = ctx;
     const now = new Date();
     const nowIso = now.toISOString();
+    const modeChanges = toPlan.billingMode !== sub.billingMode;
 
-    // Trial moves no money; a paid period settles the charge + refund legs.
+    // Units metered before the switch are billed under the outgoing plan. The
+    // server charges a Paddle window after the switch; the mock settles now.
+    if (modeChanges && sub.billingMode === 'usage') {
+      billClosingUsagePeriod(sub, now);
+    }
+
+    // Trial moves no fixed money; a paid period settles the charge + refund legs.
     if (sub.status !== 'trialing') {
       const quote = prorationQuote(fromPlan, toPlan, sub.provider, sub, now);
       const state = getState();
@@ -902,6 +911,7 @@ billingRouter.post(
 
     sub.planKey = toPlan.key;
     sub.billingMode = toPlan.billingMode;
+    if (modeChanges) sub.meteredFrom = nowIso;
     sub.updatedAt = nowIso;
     notifyEntitlementsChanged(customer.userId);
     res.json(toSubscriptionResponse(sub));

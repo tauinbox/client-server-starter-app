@@ -20,12 +20,12 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import { CreditService } from './credit.service';
 
 /**
- * Invoices a closed usage period of a provider-managed (Paddle) subscription
- * (postpaid at the billing-cycle boundary). The flow is
- * exactly-once by construction: a pending `Invoice` keyed by the unique
- * `usage:{subscriptionId}:{periodEnd}` is inserted BEFORE the provider charge,
+ * Invoices a closed metered window of a provider-managed (Paddle) subscription
+ * (postpaid at the billing-cycle boundary, or at a switch to a fixed plan). The
+ * flow is exactly-once by construction: a pending `Invoice` keyed by the unique
+ * `usage:{subscriptionId}:{windowEnd}` is inserted BEFORE the provider charge,
  * so a duplicate close (replayed/raced webhook) loses the insert and never
- * double-charges. The charge's `transaction.completed` webhook carries the key
+ * double-charges, while a switch and the later period end get distinct keys. The charge's `transaction.completed` webhook carries the key
  * back and the reducer settles the pending row; `payment.failed` marks it
  * failed (dunning for provider-managed subscriptions stays with the provider).
  * Prepaid credits offset billable units first — they are deducted in the same
@@ -78,7 +78,7 @@ export class UsageInvoicingService {
       where: { id: subscription.customerId }
     });
     const plan = await this.plans.findOne({
-      where: { key: subscription.planKey }
+      where: { key: event.planKey ?? subscription.planKey }
     });
     const provider = this.providers.find((p) => p.id === subscription.provider);
     if (!customer || !plan || !provider) {

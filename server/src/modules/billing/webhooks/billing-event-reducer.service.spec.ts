@@ -246,7 +246,8 @@ describe('BillingEventReducer', () => {
       const existing = {
         id: 'sub-1',
         status: 'active',
-        providerSubscriptionId: 'sub_123'
+        providerSubscriptionId: 'sub_123',
+        currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
       } as Subscription;
       const { reducer, manager, emit } = await build({
         subscription: existing
@@ -277,7 +278,8 @@ describe('BillingEventReducer', () => {
     it('emits SubscriptionCanceled on cancellation', async () => {
       const existing = {
         id: 'sub-1',
-        providerSubscriptionId: 'sub_123'
+        providerSubscriptionId: 'sub_123',
+        currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
       } as Subscription;
       const { reducer, emit } = await build({ subscription: existing });
 
@@ -341,8 +343,82 @@ describe('BillingEventReducer', () => {
         lifecycleOwner: 'provider',
         providerSubscriptionId: 'sub_123',
         currentPeriodStart: new Date('2026-05-01T00:00:00Z'),
-        currentPeriodEnd: new Date('2026-06-01T00:00:00Z')
+        currentPeriodEnd: new Date('2026-06-01T00:00:00Z'),
+        meteredFrom: null
       }) as Subscription;
+    const rollover = () =>
+      event(
+        'subscription.renewed',
+        subPayload({
+          currentPeriodStart: '2026-06-01T00:00:00Z',
+          currentPeriodEnd: '2026-07-01T00:00:00Z'
+        })
+      );
+
+    it('closes only the window after a switch to the usage plan, and resets it', async () => {
+      const switchedAt = new Date('2026-05-11T00:00:00Z');
+      const { reducer, manager, emit } = await build({
+        subscription: { ...usageSub(), meteredFrom: switchedAt }
+      });
+
+      await reducer.reduce(rollover());
+
+      expect(emit).toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.objectContaining({
+          periodStart: switchedAt,
+          periodEnd: new Date('2026-06-01T00:00:00Z')
+        })
+      );
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1' },
+        expect.objectContaining({ meteredFrom: null })
+      );
+    });
+
+    it('resets the window of a fixed-mode row at rollover', async () => {
+      const { reducer, manager } = await build({
+        subscription: {
+          ...usageSub(),
+          billingMode: 'fixed',
+          meteredFrom: new Date('2026-05-11T00:00:00Z')
+        }
+      });
+
+      await reducer.reduce(rollover());
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1' },
+        expect.objectContaining({ meteredFrom: null })
+      );
+    });
+
+    it('keeps the window when the snapshot stays inside the stored period', async () => {
+      const { reducer, manager } = await build({
+        subscription: {
+          ...usageSub(),
+          meteredFrom: new Date('2026-05-11T00:00:00Z')
+        }
+      });
+
+      await reducer.reduce(
+        event(
+          'subscription.renewed',
+          subPayload({
+            currentPeriodStart: '2026-05-01T00:00:00Z',
+            currentPeriodEnd: '2026-06-01T00:00:00Z'
+          })
+        )
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1' },
+        expect.not.objectContaining({ meteredFrom: null })
+      );
+    });
 
     it('emits UsagePeriodClosed with the closed period when the snapshot starts a new one', async () => {
       const { reducer, emit } = await build({ subscription: usageSub() });

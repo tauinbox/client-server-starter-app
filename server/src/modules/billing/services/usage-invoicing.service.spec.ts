@@ -75,6 +75,9 @@ async function build(options: {
     ...options.summary
   });
   const chargeUsage = jest.fn().mockResolvedValue(undefined);
+  const findPlan = jest
+    .fn()
+    .mockResolvedValue({ key: 'usage', name: 'Pay as you go' });
   const emit = jest.fn();
   const capturedValues: { value?: Record<string, unknown> } = {};
   const manager = {
@@ -123,11 +126,7 @@ async function build(options: {
       },
       {
         provide: getRepositoryToken(Plan),
-        useValue: {
-          findOne: jest
-            .fn()
-            .mockResolvedValue({ key: 'usage', name: 'Pay as you go' })
-        }
+        useValue: { findOne: findPlan }
       },
       { provide: getDataSourceToken(), useValue: dataSource },
       {
@@ -143,6 +142,7 @@ async function build(options: {
   return {
     service: moduleRef.get(UsageInvoicingService),
     chargeUsage,
+    findPlan,
     summarizeForPeriodWithCredits,
     credits,
     emit,
@@ -189,6 +189,34 @@ describe('UsageInvoicingService', () => {
     );
     // The paid event comes from the provider webhook, never optimistically here.
     expect(emit).not.toHaveBeenCalled();
+  });
+
+  it('rates a switch close under the plan the event names, not the one on the row', async () => {
+    const switchedAt = new Date('2026-05-20T00:00:00Z');
+    const { service, findPlan, capturedValues } = await build({
+      subscription: makeSubscription({
+        planKey: 'business',
+        billingMode: 'fixed'
+      })
+    });
+
+    await service.handlePeriodClosed(
+      new UsagePeriodClosedEvent(
+        'user-1',
+        'sub-1',
+        PERIOD_START,
+        switchedAt,
+        'usage'
+      )
+    );
+
+    expect(findPlan).toHaveBeenCalledWith({ where: { key: 'usage' } });
+    expect(capturedValues.value).toMatchObject({
+      providerEventId: `usage:sub-1:${switchedAt.getTime()}`,
+      billingMode: 'usage',
+      periodStart: PERIOD_START,
+      periodEnd: switchedAt
+    });
   });
 
   it('records a zero-usage close as a paid zero invoice without charging', async () => {

@@ -732,8 +732,8 @@ the same permission both apply.
   and the invoice history. The invoice history is cursor-paginated. It is a table on a desktop and
   stacked cards on a handset, and the two layouts have an infinite scroll.
 - **Pay-as-you-go tier.** The metered `usage` plan is active in the catalog. The pricing page shows
-  its price for each unit. `GET /api/v1/billing/usage` returns the meter of the current period for the
-  caller. It gives the total units, the included units, the billable units and the accrued amount.
+  its price for each unit. `GET /api/v1/billing/usage` returns the meter of the metered window of the current
+  period for the caller. After a switch of billing mode, the window starts at the switch. It gives the total units, the included units, the billable units and the accrued amount.
 - **Usage meter.** The billing settings page shows a usage card for the current period of a usage-mode
   subscription. It has a large unit readout. It has a quota gauge when the plan includes units, where
   the used quota is in the primary tone and the overage is in the error tone. It ends with a money
@@ -1819,11 +1819,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2663 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 500 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 494 pass and 2 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2678 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 504 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 502 pass and 2 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1409 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 288 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 885 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 887 tests pass |
 
 ## CI/CD
 

@@ -28,7 +28,8 @@ import { Subscription } from '../entities/subscription.entity';
 import {
   InvoicePaidEvent,
   PlanChangedEvent,
-  SubscriptionCanceledEvent
+  SubscriptionCanceledEvent,
+  UsagePeriodClosedEvent
 } from '../events/billing.events';
 import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
@@ -1434,6 +1435,154 @@ describe('BillingUserService', () => {
       expect(result.billingMode).toBe('usage');
     });
 
+    it('fixed → usage starts the metered window at the switch and bills nothing for it', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      const result = await ctx.service.changePlan('user-1', 'usage');
+
+      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
+        Subscription,
+        expect.objectContaining({ id: 'sub-1' }),
+        { planKey: 'usage', billingMode: 'usage', meteredFrom: frozenNow }
+      );
+      expect(result.meteredFrom).toEqual(frozenNow);
+      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
+    });
+
+    it('usage → fixed bills the closing window under the outgoing plan, then moves it', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ planKey: 'usage', billingMode: 'usage' })
+      );
+      const planAtClose: string[] = [];
+      ctx.renewals.billClosingUsagePeriod.mockImplementation(
+        (sub: Subscription) => {
+          planAtClose.push(sub.planKey);
+          return Promise.resolve();
+        }
+      );
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      const result = await ctx.service.changePlan('user-1', 'pro');
+
+      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'sub-1' }),
+        frozenNow
+      );
+      expect(planAtClose).toEqual(['usage']);
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-1' },
+        { meteredFrom: frozenNow }
+      );
+      expect(result).toMatchObject({ planKey: 'pro', billingMode: 'fixed' });
+    });
+
+    it('usage → fixed bills nothing when the prorated charge is declined', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ planKey: 'usage', billingMode: 'usage' })
+      );
+      const yoo = provider('yookassa', false);
+      yoo.chargeOffSession.mockRejectedValue(new Error('declined'));
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
+        'declined'
+      );
+
+      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
+    });
+
+    it('usage → fixed on a provider-managed row closes the window with the outgoing plan', async () => {
+      const ctx = await build();
+      const paddleUsage = makePlan({
+        ...usagePlan,
+        prices: {
+          paddle: {
+            currency: 'USD',
+            amountMinor: 0,
+            unitPriceMinor: 2,
+            providerPriceId: 'pri_usage'
+          }
+        }
+      });
+      ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
+        Promise.resolve(
+          opts.where.key === 'usage'
+            ? paddleUsage
+            : opts.where.key === 'business'
+              ? businessPlan
+              : null
+        )
+      );
+      ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
+      const switchedIn = new Date('2026-06-05T00:00:00Z');
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({
+          planKey: 'usage',
+          billingMode: 'usage',
+          provider: 'paddle',
+          lifecycleOwner: 'provider',
+          providerSubscriptionId: 'sub_ext',
+          meteredFrom: switchedIn
+        })
+      );
+      ctx.billing.getProviderById.mockReturnValue(provider('paddle', true));
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      expect(ctx.emit).toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.objectContaining({
+          userId: 'user-1',
+          subscriptionId: 'sub-1',
+          periodStart: switchedIn,
+          periodEnd: frozenNow,
+          planKey: 'usage'
+        })
+      );
+      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
+        Subscription,
+        expect.objectContaining({ id: 'sub-1' }),
+        { planKey: 'business', billingMode: 'fixed', meteredFrom: frozenNow }
+      );
+    });
+
+    it('a switch that keeps the billing mode leaves the metered window alone', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({
+          provider: 'paddle',
+          lifecycleOwner: 'provider',
+          providerSubscriptionId: 'sub_ext'
+        })
+      );
+      ctx.billing.getProviderById.mockReturnValue(provider('paddle', true));
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
+        Subscription,
+        expect.objectContaining({ id: 'sub-1' }),
+        { planKey: 'business', billingMode: 'fixed' }
+      );
+      expect(ctx.emit).not.toHaveBeenCalledWith(
+        UsagePeriodClosedEvent.name,
+        expect.anything()
+      );
+    });
+
     it('moves no money on a trial switch', async () => {
       const ctx = await build();
       plansByKey(ctx);
@@ -2125,6 +2274,34 @@ describe('BillingUserService', () => {
         amountMinor: 8400,
         currency: 'RUB'
       });
+    });
+
+    it('rates and reports only the window a switch to the usage plan opened', async () => {
+      const ctx = await build();
+      const switchedAt = new Date('2026-06-11T00:00:00Z');
+      const sub = { ...usageSub, meteredFrom: switchedAt };
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue(sub);
+      const plan = makePlan({ key: 'usage', billingMode: 'usage' });
+      ctx.plans.findOne.mockResolvedValue(plan);
+      ctx.usageRating.summarizeForPeriod.mockResolvedValue({
+        totalUnits: 0,
+        includedUnits: 0,
+        billableUnits: 0,
+        unitPriceMinor: 200,
+        amountMinor: 0,
+        currency: 'RUB',
+        receiptItems: []
+      });
+
+      const summary = await ctx.service.getUsageSummary('user-1');
+
+      expect(ctx.usageRating.summarizeForPeriod).toHaveBeenCalledWith(
+        sub,
+        plan,
+        { start: switchedAt, end: usageSub.currentPeriodEnd }
+      );
+      expect(summary?.periodStart).toBe(switchedAt);
     });
   });
 

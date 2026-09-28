@@ -38,7 +38,11 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { InvoicePaidEvent, PlanChangedEvent } from '../events/billing.events';
+import {
+  InvoicePaidEvent,
+  PlanChangedEvent,
+  UsagePeriodClosedEvent
+} from '../events/billing.events';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import type {
   CancelMode,
@@ -48,7 +52,7 @@ import type {
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
-import { addInterval } from '../utils/period.util';
+import { addInterval, meteredWindowStart } from '../utils/period.util';
 import { changeChargeKey, changeRefundKey } from '../utils/charge-keys.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
@@ -102,6 +106,14 @@ function sanitizeReceiptText(text: string): string {
       .replace(/[<>\u0000-\u001f\u007f]/g, '')
       .trim()
   );
+}
+
+/** A switch from a usage plan to a fixed one ends the metered window. */
+function closesMeteredWindow(
+  subscription: Subscription,
+  toPlan: Plan
+): boolean {
+  return subscription.billingMode === 'usage' && toPlan.billingMode !== 'usage';
 }
 
 /** Region selector ⇄ provider override. */
@@ -202,18 +214,16 @@ export class BillingUserService {
     });
     if (!plan) return null;
 
+    const windowStart = meteredWindowStart(subscription);
     const summary = await this.usageRating.summarizeForPeriod(
       subscription,
       plan,
-      {
-        start: subscription.currentPeriodStart,
-        end: subscription.currentPeriodEnd
-      }
+      { start: windowStart, end: subscription.currentPeriodEnd }
     );
     return {
       subscriptionId: subscription.id,
       meterKey: plan.meterKey,
-      periodStart: subscription.currentPeriodStart,
+      periodStart: windowStart,
       periodEnd: subscription.currentPeriodEnd,
       totalUnits: summary.totalUnits,
       includedUnits: summary.includedUnits,
@@ -569,10 +579,16 @@ export class BillingUserService {
    * fiscal document and its own local invoice row. A refund failure after a
    * successful charge is logged and the switch proceeds — the admin console can
    * re-issue the refund, while reverting would double-tangle the money.
+   *
+   * A switch of billing mode starts a new metered window at the switch, on both
+   * providers. A switch from a usage plan bills the units of the closing window
+   * under the outgoing plan; a switch to one never rates the units consumed on
+   * the fixed plan before it.
    */
   async changePlan(userId: string, planKey: string): Promise<Subscription> {
     const ctx = await this.resolveChangeContext(userId, planKey);
     const { customer, subscription, fromPlan, toPlan, provider } = ctx;
+    const now = new Date();
 
     if (provider.managesLifecycle) {
       if (!subscription.providerSubscriptionId) {
@@ -587,10 +603,10 @@ export class BillingUserService {
         customer,
         toPlan
       );
-      return this.applyPlanChange(ctx);
+      return this.applyPlanChange(ctx, now);
     }
 
-    // Trial: nothing has been charged yet, so a switch moves no money.
+    // Trial: nothing has been charged yet, so a switch moves no fixed money.
     const quote =
       subscription.status === 'trialing'
         ? null
@@ -600,7 +616,7 @@ export class BillingUserService {
             provider: provider.id,
             periodStart: subscription.currentPeriodStart,
             periodEnd: subscription.currentPeriodEnd,
-            now: new Date()
+            now
           });
 
     // Claim the change before any money moves: a concurrent change to a
@@ -644,6 +660,18 @@ export class BillingUserService {
       // Uncaptured (payment-after-receipt) stays pending for the webhook.
       chargeCaptured = charge.status === 'captured';
       await this.recordChargeRef(chargeKey, chargeRef);
+    }
+
+    // The fixed plan must not absorb units metered before the switch: they are
+    // billed now under the outgoing plan. The window moves in its own write, so
+    // a guard miss below cannot leave the billed units for the renewal to bill
+    // again.
+    if (closesMeteredWindow(subscription, toPlan)) {
+      await this.renewals.billClosingUsagePeriod(subscription, now);
+      await this.subscriptions.update(
+        { id: subscription.id },
+        { meteredFrom: now }
+      );
     }
 
     // Reserved after the charge, since a charge failure aborts the switch and
@@ -701,7 +729,8 @@ export class BillingUserService {
         const saved = await this.commitPlanChange(
           manager,
           subscription,
-          toPlan
+          toPlan,
+          now
         );
         return { saved, chargeSettled };
       }
@@ -735,18 +764,21 @@ export class BillingUserService {
   }
 
   /**
-   * Writes the two columns the change owns, and only while the row still looks
+   * Writes the columns the change owns, and only while the row still looks
    * like the one the change was claimed against. The entity was loaded before
    * the provider round-trip, so committing it whole would write back every
    * column as it looked then — reverting whatever landed during that window (a
-   * cancellation, a dunning write, a period advance). Returns the re-read row,
-   * or `null` when the guard missed and the caller must refuse the switch.
+   * cancellation, a dunning write, a period advance). A switch of billing mode
+   * also starts a new metered window at `now`. Returns the re-read row, or
+   * `null` when the guard missed and the caller must refuse the switch.
    */
   private async commitPlanChange(
     manager: EntityManager,
     subscription: Subscription,
-    toPlan: Plan
+    toPlan: Plan,
+    now: Date
   ): Promise<Subscription | null> {
+    const modeChanges = toPlan.billingMode !== subscription.billingMode;
     const applied = await manager.update(
       Subscription,
       {
@@ -755,12 +787,19 @@ export class BillingUserService {
         status: In([...CHANGEABLE_SUBSCRIPTION_STATUSES]),
         cancelAtPeriodEnd: false
       },
-      { planKey: toPlan.key, billingMode: toPlan.billingMode }
+      {
+        planKey: toPlan.key,
+        billingMode: toPlan.billingMode,
+        ...(modeChanges ? { meteredFrom: now } : {})
+      }
     );
     if (applied.affected !== 1) return null;
 
     subscription.planKey = toPlan.key;
     subscription.billingMode = toPlan.billingMode;
+    if (modeChanges) {
+      subscription.meteredFrom = now;
+    }
     const fresh = await manager.findOne(Subscription, {
       where: { id: subscription.id }
     });
@@ -982,13 +1021,22 @@ export class BillingUserService {
    * Persists the new plan on the local row and publishes the change. A row that
    * moved while the provider was applying the change is left alone: the
    * provider's own webhook reconciles the local row from its snapshot.
+   *
+   * A switch from a usage plan closes its metered window here. The listener
+   * runs after this commit, so the event names the outgoing plan to rate under.
    */
-  private async applyPlanChange(ctx: ChangeContext): Promise<Subscription> {
+  private async applyPlanChange(
+    ctx: ChangeContext,
+    now: Date
+  ): Promise<Subscription> {
     const { customer, subscription, fromPlan, toPlan } = ctx;
+    const closesWindow = closesMeteredWindow(subscription, toPlan);
+    const windowStart = meteredWindowStart(subscription);
     const saved = await this.commitPlanChange(
       this.dataSource.manager,
       subscription,
-      toPlan
+      toPlan,
+      now
     );
     if (!saved) {
       throw new ConflictException(
@@ -999,6 +1047,18 @@ export class BillingUserService {
       PlanChangedEvent.name,
       new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
     );
+    if (closesWindow) {
+      this.events.emit(
+        UsagePeriodClosedEvent.name,
+        new UsagePeriodClosedEvent(
+          customer.userId,
+          saved.id,
+          windowStart,
+          now,
+          fromPlan.key
+        )
+      );
+    }
     return saved;
   }
 
