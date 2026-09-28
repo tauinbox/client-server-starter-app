@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
+import { MAX_EMAIL_LENGTH } from '@app/shared/constants';
 
 export class ForgotPasswordDto {
   @ApiProperty({
@@ -10,7 +11,7 @@ export class ForgotPasswordDto {
   })
   @Transform(({ value }: { value: unknown }) => normalizeEmail(value) ?? value)
   @IsEmail()
-  @MaxLength(255)
+  @MaxLength(MAX_EMAIL_LENGTH)
   email: string;
 
   @ApiPropertyOptional({

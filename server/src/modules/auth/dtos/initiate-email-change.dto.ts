@@ -8,7 +8,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
-import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
+import { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class InitiateEmailChangeDto {
@@ -18,7 +18,7 @@ export class InitiateEmailChangeDto {
   })
   @Transform(({ value }: { value: unknown }) => normalizeEmail(value) ?? value)
   @IsEmail()
-  @MaxLength(255)
+  @MaxLength(MAX_EMAIL_LENGTH)
   newEmail: string;
 
   @ApiPropertyOptional({

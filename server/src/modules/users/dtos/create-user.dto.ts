@@ -10,6 +10,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
+  MAX_EMAIL_LENGTH,
+  MAX_NAME_LENGTH,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
@@ -23,7 +25,7 @@ export class CreateUserDto {
   })
   @Transform(({ value }: { value: unknown }) => normalizeEmail(value) ?? value)
   @IsEmail()
-  @MaxLength(255)
+  @MaxLength(MAX_EMAIL_LENGTH)
   email: string;
 
   @ApiProperty({
@@ -31,7 +33,7 @@ export class CreateUserDto {
     example: 'John'
   })
   @IsNotEmpty()
-  @MaxLength(255)
+  @MaxLength(MAX_NAME_LENGTH)
   firstName: string;
 
   @ApiProperty({
@@ -39,7 +41,7 @@ export class CreateUserDto {
     example: 'Doe'
   })
   @IsNotEmpty()
-  @MaxLength(255)
+  @MaxLength(MAX_NAME_LENGTH)
   lastName: string;
 
   @ApiProperty({

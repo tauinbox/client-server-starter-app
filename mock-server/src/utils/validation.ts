@@ -1,13 +1,11 @@
 import {
+  MAX_EMAIL_LENGTH,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import isEmail from 'validator/lib/isEmail';
-
-/** Every address field on the server carries the same `@MaxLength`. */
-export const EMAIL_MAX_LENGTH = 255;
 
 /**
  * Mirrors `@IsEmail()`, which is `typeof value === 'string' && isEmail(value)`
@@ -160,11 +158,11 @@ export function stringErrors(
 }
 
 /**
- * Mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(255)`, the chain
- * every address field on the server carries. Both validators run on every body,
- * so a value that fails both is reported MaxLength, IsEmail - a route that
- * answers with the first failure it finds sends one message where the server
- * sends two.
+ * Mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(MAX_EMAIL_LENGTH)`,
+ * the chain every address field on the server carries. Both validators run on
+ * every body, so a value that fails both is reported MaxLength, IsEmail - a
+ * route that answers with the first failure it finds sends one message where
+ * the server sends two.
  *
  * Measured against the application's own `ValidationPipe` options: an absent
  * field, a null and any non-string fail the length cap as well and give two
@@ -180,7 +178,7 @@ export function emailErrors(
 
   const transformed = normalizeEmail(value) ?? value;
   const errors: string[] = [];
-  const tooLong = validateMaxLength(transformed, EMAIL_MAX_LENGTH, field);
+  const tooLong = validateMaxLength(transformed, MAX_EMAIL_LENGTH, field);
   if (tooLong) errors.push(tooLong);
   if (!isValidEmail(transformed)) errors.push(`${field} must be an email`);
   return errors;

@@ -1,5 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  MAX_EMAIL_LENGTH,
+  MAX_NAME_LENGTH
+} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
@@ -71,9 +75,9 @@ export function validateCreateUserDto(
   }
 
   const lengthErr =
-    validateMaxLength(email, 255, 'email') ||
-    validateMaxLength(firstName, 255, 'firstName') ||
-    validateMaxLength(lastName, 255, 'lastName') ||
+    validateMaxLength(email, MAX_EMAIL_LENGTH, 'email') ||
+    validateMaxLength(firstName, MAX_NAME_LENGTH, 'firstName') ||
+    validateMaxLength(lastName, MAX_NAME_LENGTH, 'lastName') ||
     passwordLengthError(password);
   if (lengthErr) {
     return { ok: false, status: 400, body: validationError(lengthErr) };

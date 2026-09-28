@@ -7,7 +7,9 @@ import {
   EMAIL_CHANGE_TOKEN_EXPIRY_MS,
   ErrorKeys,
   LOCKOUT_DURATION_MS,
+  MAX_EMAIL_LENGTH,
   MAX_FAILED_ATTEMPTS,
+  MAX_NAME_LENGTH,
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   REFRESH_REUSE_GRACE_MS,
@@ -18,7 +20,6 @@ import {
 import isLength from 'validator/lib/isLength';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
-  EMAIL_MAX_LENGTH,
   emailErrors,
   passwordLengthError,
   validateLocale,
@@ -191,7 +192,7 @@ router.post('/login', (req, res) => {
   // `LoginDto` caps collapse to '' exactly like the server's LocalStrategy, so
   // the audit row never carries an oversized address.
   const rawEmail = normalizeEmail(req.body.email) ?? '';
-  const email = isLength(rawEmail, { max: EMAIL_MAX_LENGTH }) ? rawEmail : '';
+  const email = isLength(rawEmail, { max: MAX_EMAIL_LENGTH }) ? rawEmail : '';
   const password =
     typeof req.body.password === 'string' &&
     isLength(req.body.password, { max: MAX_PASSWORD_LENGTH })
@@ -751,14 +752,14 @@ router.get('/permissions', authGuard, (req, res) => {
 });
 
 /**
- * Mirrors `@ValidateIf(propertyIsDefined) @IsNotEmpty() @MaxLength(255)` on
- * `UpdateProfileDto`. An omitted field is skipped, an explicit null is not.
+ * Mirrors `@ValidateIf(propertyIsDefined) @IsNotEmpty()
+ * @MaxLength(MAX_NAME_LENGTH)` on `UpdateProfileDto`. An omitted field is skipped, an explicit null is not.
  * Decorators apply bottom-up, so MaxLength is reported before IsNotEmpty.
  */
 function profileNameErrors(field: string, value: unknown): string[] {
   if (value === undefined) return [];
   const errors: string[] = [];
-  const tooLong = validateMaxLength(value, 255, field);
+  const tooLong = validateMaxLength(value, MAX_NAME_LENGTH, field);
   if (tooLong) errors.push(tooLong);
   if (value === '' || value === null) {
     errors.push(`${field} should not be empty`);

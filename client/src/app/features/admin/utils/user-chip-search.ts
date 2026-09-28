@@ -15,7 +15,7 @@ export const USER_SEARCH_MIN_CHARS = 3;
 /**
  * Whether a typed term is worth a request: long enough to narrow the list, and
  * within the filter cap the search endpoint validates against (a longer term is
- * a 400 there, and could not match a varchar(255) column anyway).
+ * a 400 there, and could not match a value capped at 255 on write anyway).
  */
 export function isSearchableTerm(term: string): boolean {
   return (

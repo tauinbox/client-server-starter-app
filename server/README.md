@@ -1070,7 +1070,7 @@ An unknown error becomes a generic 500.
 For that reason the strategy is the single place that canonicalizes the raw credentials. The address
 goes through the shared `normalizeEmail` function (`shared/src/utils/email.ts`). A credential that is
 not a string becomes an empty string. The strategy also applies the two caps that `LoginDto` declares:
-an address over 255 characters and a password over `MAX_PASSWORD_LENGTH` (128) become an empty string
+an address over `MAX_EMAIL_LENGTH` (255) and a password over `MAX_PASSWORD_LENGTH` (128) become an empty string
 too. It counts length with the `maxLength` function of `class-validator`, which `@MaxLength` uses.
 Thus a login answers 401 and never 400, and the lookup and the audit row never get an over-long value.
 

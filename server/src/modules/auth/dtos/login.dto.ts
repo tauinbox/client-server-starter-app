@@ -2,7 +2,7 @@ import { IsEmail, IsNotEmpty, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { normalizeEmail } from '@app/shared/utils/email';
-import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
+import { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 
 export class LoginDto {
   @ApiProperty({
@@ -11,7 +11,7 @@ export class LoginDto {
   })
   @Transform(({ value }: { value: unknown }) => normalizeEmail(value) ?? value)
   @IsEmail()
-  @MaxLength(255)
+  @MaxLength(MAX_EMAIL_LENGTH)
   email: string;
 
   @ApiProperty({

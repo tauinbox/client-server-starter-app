@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   ALLOWED_USER_SORT_COLUMNS,
   ErrorKeys,
+  MAX_NAME_LENGTH,
   MAX_USER_FILTER_LENGTH,
   STEP_UP_OPERATION,
   TOTP_DIGITS
@@ -317,7 +318,11 @@ router.patch(
     }
 
     if (firstName !== undefined) {
-      const fnMaxErr = validateMaxLength(firstName, 255, 'firstName');
+      const fnMaxErr = validateMaxLength(
+        firstName,
+        MAX_NAME_LENGTH,
+        'firstName'
+      );
       if (fnMaxErr) {
         res.status(400).json(validationError(fnMaxErr));
         return;
@@ -325,7 +330,7 @@ router.patch(
     }
 
     if (lastName !== undefined) {
-      const lnMaxErr = validateMaxLength(lastName, 255, 'lastName');
+      const lnMaxErr = validateMaxLength(lastName, MAX_NAME_LENGTH, 'lastName');
       if (lnMaxErr) {
         res.status(400).json(validationError(lnMaxErr));
         return;

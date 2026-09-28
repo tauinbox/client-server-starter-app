@@ -46,6 +46,8 @@ export {
 
 export {
   ALLOWED_USER_SORT_COLUMNS,
+  MAX_EMAIL_LENGTH,
+  MAX_NAME_LENGTH,
   MAX_USER_FILTER_LENGTH,
   type UserSortColumn
 } from './user.constants';
