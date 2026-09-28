@@ -877,6 +877,22 @@ describe('AuthController', () => {
       });
     });
 
+    it('clears each cookie once on a password change', async () => {
+      const req = mockJwtRequest(
+        'user-1',
+        'admin@example.com'
+      ) as JwtAuthRequest;
+      const res = mockResponse();
+
+      await controller.updateProfile(req, { password: 'NewPassword1' }, res);
+
+      const cleared = res.clearCookie.mock.calls.map(
+        ([name]: [string]) => name
+      );
+      expect(cleared).toEqual([...new Set(cleared)]);
+      expect(cleared).toContain('__Host-reauth_proof');
+    });
+
     it('keeps the proof cookie when the step-up refuses the request', async () => {
       const req = mockJwtRequest('user-1', 'admin@example.com', {
         '__Host-reauth_proof': 'proof'

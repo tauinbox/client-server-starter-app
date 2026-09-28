@@ -18,6 +18,7 @@ import * as request from 'supertest';
 import { createOAuthProviderGuard } from './oauth-provider.guard';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 import { CLIENT_URL } from '../providers/client-url.provider';
+import { AuthCookies } from '../utils/auth-cookies';
 
 const CLIENT = 'http://localhost:4200';
 
@@ -99,6 +100,7 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
       controllers: [ScriptedOAuthController],
       providers: [
         OAuthAuthenticationExceptionFilter,
+        AuthCookies,
         { provide: CLIENT_URL, useValue: CLIENT },
         { provide: ConfigService, useValue: { get: () => 'production' } }
       ]

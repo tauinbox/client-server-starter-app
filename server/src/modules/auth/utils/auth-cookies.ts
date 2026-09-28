@@ -9,18 +9,17 @@ import {
 } from '../constants/oauth.constants';
 import {
   clearHostCookie,
-  readHostCookie
+  readHostCookie,
+  setHostCookie
 } from '../../../common/utils/host-cookie';
-import {
-  clearRefreshTokenCookie,
-  readRefreshTokenCookie,
-  setRefreshTokenCookie
-} from './refresh-token-cookie';
+
+const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
 /**
- * The cookies the auth controllers share, bound to the environment once. It
- * adds no cookie rule of its own: every flag comes from `host-cookie` and
- * `refresh-token-cookie`, so one route cannot drift from the others.
+ * The auth cookies, bound to the environment once. Every flag comes from
+ * `host-cookie`; this class adds only the `SameSite` value of each cookie:
+ * `strict` for the refresh token, `lax` for the cookies that must survive the
+ * provider redirect.
  */
 @Injectable()
 export class AuthCookies {
@@ -46,19 +45,44 @@ export class AuthCookies {
     token: string,
     maxAge: number = this.refreshMaxAge
   ): void {
-    setRefreshTokenCookie(res, token, maxAge, this.secure);
+    setHostCookie(res, REFRESH_TOKEN_COOKIE, token, this.secure, {
+      httpOnly: true,
+      sameSite: 'strict',
+      maxAge
+    });
   }
 
   clearRefresh(res: Response): void {
-    clearRefreshTokenCookie(res, this.secure);
+    this.clear(res, REFRESH_TOKEN_COOKIE);
   }
 
   readRefresh(req: Pick<Request, 'cookies'>): string | undefined {
-    return readRefreshTokenCookie(req, this.secure);
+    return this.read(req, REFRESH_TOKEN_COOKIE);
+  }
+
+  setShortLived(
+    res: Response,
+    base: string,
+    value: string,
+    maxAgeSeconds: number
+  ): void {
+    setHostCookie(res, base, value, this.secure, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: maxAgeSeconds * 1000
+    });
+  }
+
+  read(req: Pick<Request, 'cookies'>, base: string): string | undefined {
+    return readHostCookie(req, base, this.secure);
+  }
+
+  clear(res: Response, base: string): void {
+    clearHostCookie(res, base, this.secure);
   }
 
   readReauthProof(req: Pick<Request, 'cookies'>): string | undefined {
-    return readHostCookie(req, REAUTH_PROOF_COOKIE, this.secure);
+    return this.read(req, REAUTH_PROOF_COOKIE);
   }
 
   /**
@@ -67,7 +91,7 @@ export class AuthCookies {
    * value; this stops the browser from holding a credential that is spent.
    */
   clearReauthProof(res: Response): void {
-    clearHostCookie(res, REAUTH_PROOF_COOKIE, this.secure);
+    this.clear(res, REAUTH_PROOF_COOKIE);
   }
 
   /**
@@ -76,8 +100,8 @@ export class AuthCookies {
    * next.
    */
   clearIntents(res: Response): void {
-    clearHostCookie(res, OAUTH_LINK_COOKIE, this.secure);
-    clearHostCookie(res, OAUTH_REAUTH_COOKIE, this.secure);
+    this.clear(res, OAUTH_LINK_COOKIE);
+    this.clear(res, OAUTH_REAUTH_COOKIE);
     this.clearReauthProof(res);
   }
 }

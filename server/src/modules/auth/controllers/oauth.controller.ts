@@ -60,11 +60,6 @@ import {
   OAUTH_REAUTH_COOKIE,
   REAUTH_PROOF_COOKIE
 } from '../constants/oauth.constants';
-import {
-  clearHostCookie,
-  readHostCookie,
-  setHostCookie
-} from '../../../common/utils/host-cookie';
 import { AuthCookies } from '../utils/auth-cookies';
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
@@ -165,11 +160,12 @@ export class OAuthController {
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
-    setHostCookie(res, OAUTH_LINK_COOKIE, linkToken, this.cookies.secure, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
-    });
+    this.cookies.setShortLived(
+      res,
+      OAUTH_LINK_COOKIE,
+      linkToken,
+      OAuthController.OAUTH_LINK_MAX_AGE_SECONDS
+    );
 
     // Cleared only now, so a rejected attempt keeps its remaining proof
     // window. The ledger already refuses a second use of the value.
@@ -208,11 +204,12 @@ export class OAuthController {
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
-    setHostCookie(res, OAUTH_REAUTH_COOKIE, reauthToken, this.cookies.secure, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS * 1000
-    });
+    this.cookies.setShortLived(
+      res,
+      OAUTH_REAUTH_COOKIE,
+      reauthToken,
+      OAuthController.OAUTH_LINK_MAX_AGE_SECONDS
+    );
 
     return { message: 'Re-authentication initiated' };
   }
@@ -383,9 +380,9 @@ export class OAuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response
   ) {
-    const cookie = readHostCookie(req, OAUTH_DATA_COOKIE, this.cookies.secure);
+    const cookie = this.cookies.read(req, OAUTH_DATA_COOKIE);
 
-    clearHostCookie(res, OAUTH_DATA_COOKIE, this.cookies.secure);
+    this.cookies.clear(res, OAUTH_DATA_COOKIE);
 
     if (!cookie) {
       throw new HttpException(
@@ -459,11 +456,7 @@ export class OAuthController {
       // this callback a plain sign-in. Neither is cleared here: each stays
       // consumable by its own flow, which may still finish. Re-authentication
       // wins a tie because it links nothing.
-      const reauthIntent = readHostCookie(
-        req,
-        OAUTH_REAUTH_COOKIE,
-        this.cookies.secure
-      );
+      const reauthIntent = this.cookies.read(req, OAUTH_REAUTH_COOKIE);
       const reauthToken = reauthIntent
         ? readIntentForFlow(reauthIntent, flowState)
         : null;
@@ -472,11 +465,7 @@ export class OAuthController {
         return this.handleOAuthReauth(reauthToken, profile, res);
       }
 
-      const linkIntent = readHostCookie(
-        req,
-        OAUTH_LINK_COOKIE,
-        this.cookies.secure
-      );
+      const linkIntent = this.cookies.read(req, OAUTH_LINK_COOKIE);
       const linkToken = linkIntent
         ? readIntentForFlow(linkIntent, flowState)
         : null;
@@ -505,11 +494,12 @@ export class OAuthController {
         { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
       );
 
-      setHostCookie(res, OAUTH_DATA_COOKIE, signedData, this.cookies.secure, {
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS * 1000
-      });
+      this.cookies.setShortLived(
+        res,
+        OAUTH_DATA_COOKIE,
+        signedData,
+        OAuthController.OAUTH_DATA_MAX_AGE_SECONDS
+      );
 
       res.redirect(`${this.clientUrl}/oauth/callback`);
     } catch (error) {
@@ -564,7 +554,7 @@ export class OAuthController {
     profile: OAuthUserProfile,
     res: Response
   ): Promise<void> {
-    clearHostCookie(res, OAUTH_REAUTH_COOKIE, this.cookies.secure);
+    this.cookies.clear(res, OAUTH_REAUTH_COOKIE);
 
     try {
       const payload = this.jwtService.verify<{
@@ -604,11 +594,12 @@ export class OAuthController {
         { expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS }
       );
 
-      setHostCookie(res, REAUTH_PROOF_COOKIE, proof, this.cookies.secure, {
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: REAUTH_PROOF_MAX_AGE_SECONDS * 1000
-      });
+      this.cookies.setShortLived(
+        res,
+        REAUTH_PROOF_COOKIE,
+        proof,
+        REAUTH_PROOF_MAX_AGE_SECONDS
+      );
 
       res.redirect(`${this.clientUrl}/profile?reauth=ok`);
     } catch (error) {
@@ -625,7 +616,7 @@ export class OAuthController {
     req: ExpressRequest,
     res: Response
   ): Promise<void> {
-    clearHostCookie(res, OAUTH_LINK_COOKIE, this.cookies.secure);
+    this.cookies.clear(res, OAUTH_LINK_COOKIE);
 
     try {
       const payload = this.jwtService.verify<{
