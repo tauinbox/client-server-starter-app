@@ -549,8 +549,8 @@ returns the active plans with the price of each provider.
 are:
 
 - `GET subscription`, `GET invoices` (cursor-paginated) and `GET payment-method`.
-- `GET usage` returns the metered-usage summary of the current period for a usage-mode subscription
-  of the caller. It returns null for each other condition.
+- `GET usage` returns the metered-usage summary of the metered window of the current period for a
+  usage-mode subscription of the caller. `periodStart` is the window start. It returns null for each other condition.
 - `POST checkout` makes the local incomplete subscription for the self-managed provider, and then it
   redirects. It reuses an unpaid row that stays from an earlier attempt, through a conditional write
   that matches only while the row is `incomplete`. Thus a first-payment webhook that activates the
@@ -607,7 +607,7 @@ routes are:
 
 - It gets or makes the customer. The geography comes from the registration locale.
 - It does the checkout and the cancel.
-- It makes the usage summary, with `UsageRating` over the current period.
+- It makes the usage summary, with `UsageRating` over the metered window of the current period.
 - It reads and sets the region, with the guard against a cross-provider migration.
 - It lists the one-time catalog (`listProducts`) and does a purchase. The purchase calls
   `resolveProvider` and then `createOneTimePayment`. The product id travels through the custom data
