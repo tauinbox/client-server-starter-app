@@ -971,24 +971,35 @@ describe('BillingUserService', () => {
   describe('startPaymentMethodUpdate', () => {
     it("starts the provider's method-update flow returning to the settings page", async () => {
       const ctx = await build();
-      const customer = { id: 'cust-1', userId: 'user-1' };
+      // A locale currency unlike the RUB price: the re-bind takes the price's.
+      const customer = { id: 'cust-1', userId: 'user-1', currency: 'USD' };
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
+        planKey: 'pro',
         provider: 'yookassa' as const,
         providerSubscriptionId: null,
         status: 'active'
       });
+      ctx.plans.findOne.mockResolvedValue(makePlan());
       const yoo = provider('yookassa', false);
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const result = await ctx.service.startPaymentMethodUpdate('user-1');
 
       expect(ctx.billing.getProviderById).toHaveBeenCalledWith('yookassa');
-      expect(yoo.updatePaymentMethod).toHaveBeenCalledWith(null, customer, {
-        successUrl: 'http://localhost:4200/billing/settings',
-        cancelUrl: 'http://localhost:4200/billing/settings'
+      expect(ctx.plans.findOne).toHaveBeenCalledWith({
+        where: { key: 'pro' }
       });
+      expect(yoo.updatePaymentMethod).toHaveBeenCalledWith(
+        null,
+        customer,
+        'RUB',
+        {
+          successUrl: 'http://localhost:4200/billing/settings',
+          cancelUrl: 'http://localhost:4200/billing/settings'
+        }
+      );
       expect(result).toEqual({
         provider: 'yookassa',
         url: 'https://method/x',
@@ -1004,10 +1015,14 @@ describe('BillingUserService', () => {
       });
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
+        planKey: 'pro',
         provider: 'paddle' as const,
         providerSubscriptionId: 'sub_ext',
         status: 'active'
       });
+      ctx.plans.findOne.mockResolvedValue(
+        makePlan({ prices: { paddle: { currency: 'USD', amountMinor: 1200 } } })
+      );
       const paddle = provider('paddle', true);
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
@@ -1016,8 +1031,32 @@ describe('BillingUserService', () => {
       expect(paddle.updatePaymentMethod).toHaveBeenCalledWith(
         'sub_ext',
         expect.objectContaining({ id: 'cust-1' }),
+        'USD',
         expect.anything()
       );
+    });
+
+    it('refuses the re-bind when the plan of the subscription has no price for its provider', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1'
+      });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        planKey: 'gone',
+        provider: 'yookassa' as const,
+        providerSubscriptionId: null,
+        status: 'active'
+      });
+      ctx.plans.findOne.mockResolvedValue(null);
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(
+        ctx.service.startPaymentMethodUpdate('user-1')
+      ).rejects.toThrow(ServiceUnavailableException);
+      expect(yoo.updatePaymentMethod).not.toHaveBeenCalled();
     });
 
     it('throws when there is no subscription to update the method for', async () => {
@@ -1203,6 +1242,7 @@ describe('BillingUserService', () => {
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(
         customer,
         116000,
+        'RUB',
         expect.arrayContaining([
           expect.objectContaining({ amountMinor: 116000 })
         ]),
@@ -1299,9 +1339,71 @@ describe('BillingUserService', () => {
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(
         customer,
         39600,
+        'RUB',
         expect.any(Array),
         expect.any(String)
       );
+    });
+
+    it('charges and records both legs in the currency of the price, not the locale currency of the customer', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      // A non-Russian locale that chose the region "Russia": USD on the
+      // customer row, RUB on every YooKassa price.
+      ctx.customers.findOne.mockResolvedValue({
+        ...customer,
+        country: 'US',
+        currency: 'USD',
+        providerOverride: 'yookassa'
+      });
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      expect(yoo.chargeOffSession).toHaveBeenCalledWith(
+        expect.objectContaining({ currency: 'USD' }),
+        116000,
+        'RUB',
+        expect.any(Array),
+        expect.any(String)
+      );
+      expect(ctx.insertedInvoices).toHaveLength(2);
+      expect(ctx.insertedInvoices[0]).toMatchObject({
+        status: 'paid',
+        currency: 'RUB'
+      });
+      expect(ctx.insertedInvoices[1]).toMatchObject({
+        status: 'refunded',
+        currency: 'RUB'
+      });
+    });
+
+    it('previews a trial switch in the currency of the target price', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue({
+        ...customer,
+        currency: 'USD'
+      });
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ status: 'trialing' })
+      );
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      const preview = await ctx.service.previewChange('user-1', 'business');
+
+      expect(preview).toMatchObject({ currency: 'RUB', dueNowMinor: 0 });
     });
 
     it('fixed → usage refunds the remainder without charging', async () => {

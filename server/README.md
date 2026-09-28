@@ -791,7 +791,8 @@ verify, and the answer is a 400.
 
 - `startCheckout` calls `createPayment` with `save_payment_method` and a redirect. A trial uses a
   zero-amount binding.
-- `chargeOffSession` charges with the saved `PaymentMethod` token. It attaches the 54-FZ receipt and
+- `chargeOffSession` charges with the saved `PaymentMethod` token, in the currency of the price that
+  the caller passes (never `Customer.currency`). It attaches the 54-FZ receipt and
   an `Idempotence-Key`. It reports `captured` only for a `succeeded` payment. It reports a
   payment-after-receipt in the `pending` or `waiting_for_capture` state as uncaptured, thus the core
   records the invoice as pending and does not give the period. A `canceled` payment throws an error.
@@ -805,7 +806,8 @@ verify, and the answer is a 400.
   report that there is no charge.
 - `createOneTimePayment` calls `createPayment` with a receipt and a redirect. The metadata carries
   `purpose:one_time`. The provider does NOT save the card.
-- `updatePaymentMethod` does a zero-amount re-bind with `purpose:method_update`. The success webhook
+- `updatePaymentMethod` does a zero-amount re-bind with `purpose:method_update`, in the currency of
+  the price of the current plan. The success webhook
   becomes `payment_method.updated`. The provider ignores an abandoned re-bind.
 - `refund` sends a refund receipt and an `Idempotence-Key`. The header deduplicates only inside the
   key store of YooKassa, which lives approximately 24 h. Thus the refund key of the caller also

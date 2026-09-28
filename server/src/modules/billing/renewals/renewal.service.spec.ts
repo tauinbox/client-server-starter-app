@@ -422,6 +422,7 @@ describe('RenewalService', () => {
     expect(charge).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'cust-1' }),
       99000,
+      'RUB',
       [{ description: 'Pro', amountMinor: 99000, quantity: 1 }],
       'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
     );
@@ -444,6 +445,85 @@ describe('RenewalService', () => {
       SubscriptionRenewedEvent.name,
       expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
     );
+  });
+
+  it.each([
+    ['captured', 'paid'],
+    ['pending', 'pending'],
+    ['declined', 'failed']
+  ] as const)(
+    'charges and books a %s renewal in the currency of the price, not the locale currency of the customer',
+    async (outcome, status) => {
+      const sub = makeSub();
+      const store = baseStore(sub);
+      // A non-Russian locale that chose the region "Russia".
+      Object.assign(store.customers[0], {
+        country: 'US',
+        currency: 'USD',
+        providerOverride: 'yookassa'
+      });
+      const charge = jest.fn(() =>
+        outcome === 'declined'
+          ? Promise.reject(new Error('declined'))
+          : Promise.resolve({ providerInvoiceRef: 'pay_1', status: outcome })
+      );
+      const { service } = await build(store, charge);
+
+      await service.runDueRenewals(NOW);
+
+      expect(charge).toHaveBeenCalledWith(
+        expect.objectContaining({ currency: 'USD' }),
+        99000,
+        'RUB',
+        expect.any(Array),
+        expect.any(String)
+      );
+      expect(store.invoices).toHaveLength(1);
+      expect(store.invoices[0]).toMatchObject({ status, currency: 'RUB' });
+    }
+  );
+
+  it('books the closing charge of an immediate usage cancel in the currency of the price', async () => {
+    const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
+    const store = baseStore(sub);
+    store.customers[0].currency = 'USD';
+    store.plans.push(
+      Object.assign(makePlan(), {
+        key: 'usage',
+        billingMode: 'usage',
+        meterKey: 'api_calls',
+        prices: {
+          yookassa: {
+            currency: 'RUB',
+            amountMinor: 0,
+            unitPriceMinor: 200,
+            includedUnits: 0
+          }
+        }
+      })
+    );
+    const charge = jest
+      .fn()
+      .mockResolvedValue({ providerInvoiceRef: 'pay_c', status: 'captured' });
+    const { service } = await build(
+      store,
+      charge,
+      jest.fn().mockResolvedValue(3)
+    );
+
+    await service.billClosingUsagePeriod(sub, NOW);
+
+    expect(charge).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'USD' }),
+      600,
+      'RUB',
+      expect.any(Array),
+      expect.any(String)
+    );
+    expect(store.invoices[0]).toMatchObject({
+      status: 'paid',
+      currency: 'RUB'
+    });
   });
 
   it('bounds a stalled provider call and still renews the next due subscription', async () => {
@@ -684,7 +764,7 @@ describe('RenewalService', () => {
       );
 
       expect(charge).toHaveBeenCalledTimes(2);
-      const keys = charge.mock.calls.map((call: unknown[]) => call[3]);
+      const keys = charge.mock.calls.map((call: unknown[]) => call[4]);
       expect(keys[1]).toBe(keys[0]);
       expect(sub.status).toBe('active');
     });
@@ -992,6 +1072,7 @@ describe('RenewalService', () => {
       expect(charge).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'cust-1' }),
         8400,
+        'RUB',
         [
           {
             description: 'Pay as you go: api_calls × 42',
@@ -1076,6 +1157,7 @@ describe('RenewalService', () => {
       expect(charge).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'cust-1' }),
         6400,
+        'RUB',
         [
           {
             description: 'Pay as you go: api_calls × 32',
@@ -1188,6 +1270,7 @@ describe('RenewalService', () => {
         expect(charge).toHaveBeenCalledWith(
           expect.objectContaining({ id: 'cust-1' }),
           8400,
+          'RUB',
           expect.anything(),
           'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
         );
@@ -1286,6 +1369,7 @@ describe('RenewalService', () => {
         expect(charge).toHaveBeenCalledWith(
           expect.objectContaining({ id: 'cust-1' }),
           8400,
+          'RUB',
           expect.anything(),
           'cancel:sub-1:' + new Date('2026-05-01T00:00:00Z').getTime()
         );

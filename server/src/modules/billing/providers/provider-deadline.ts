@@ -85,6 +85,7 @@ export class DeadlineBoundProvider implements PaymentProvider {
   chargeOffSession(
     customer: Customer,
     amountMinor: number,
+    currency: string,
     receiptItems: ReceiptItem[],
     idempotencyKey?: string
   ): Promise<ChargeResult> {
@@ -92,6 +93,7 @@ export class DeadlineBoundProvider implements PaymentProvider {
       this.inner.chargeOffSession(
         customer,
         amountMinor,
+        currency,
         receiptItems,
         idempotencyKey
       )
@@ -165,10 +167,16 @@ export class DeadlineBoundProvider implements PaymentProvider {
   updatePaymentMethod(
     providerSubscriptionId: string | null,
     customer: Customer,
+    currency: string,
     urls: CheckoutUrls
   ): Promise<CheckoutSession> {
     return this.bound('updatePaymentMethod', () =>
-      this.inner.updatePaymentMethod(providerSubscriptionId, customer, urls)
+      this.inner.updatePaymentMethod(
+        providerSubscriptionId,
+        customer,
+        currency,
+        urls
+      )
     );
   }
 

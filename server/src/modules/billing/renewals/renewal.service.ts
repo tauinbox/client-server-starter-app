@@ -188,6 +188,7 @@ export class RenewalService {
         charge = await provider.chargeOffSession(
           customer,
           rated.amountMinor,
+          rated.currency,
           rated.receiptItems,
           idempotencyKey
         );
@@ -197,7 +198,6 @@ export class RenewalService {
         );
         await this.recordUnpaidCharge(
           subscription,
-          customer,
           plan,
           rated,
           rated.creditUnitsApplied,
@@ -211,7 +211,6 @@ export class RenewalService {
     if (charge.status === 'pending') {
       await this.recordPendingCharge(
         subscription,
-        customer,
         plan,
         rated,
         rated.creditUnitsApplied,
@@ -226,7 +225,6 @@ export class RenewalService {
       this.settlePeriodInvoice(
         manager,
         subscription,
-        customer,
         plan,
         rated,
         rated.creditUnitsApplied,
@@ -526,7 +524,6 @@ export class RenewalService {
     if (prior) {
       await this.recordPendingCharge(
         subscription,
-        customer,
         plan,
         rated,
         creditUnitsApplied,
@@ -554,6 +551,7 @@ export class RenewalService {
       result = await provider.chargeOffSession(
         customer,
         rated.amountMinor,
+        rated.currency,
         rated.receiptItems,
         idempotencyKey
       );
@@ -566,7 +564,6 @@ export class RenewalService {
       // reference back onto a row that already exists, so record it here too.
       await this.recordUnpaidCharge(
         subscription,
-        customer,
         plan,
         rated,
         creditUnitsApplied,
@@ -582,7 +579,6 @@ export class RenewalService {
     if (result.status === 'pending') {
       await this.recordPendingCharge(
         subscription,
-        customer,
         plan,
         rated,
         creditUnitsApplied,
@@ -648,7 +644,6 @@ export class RenewalService {
    */
   private async recordPendingCharge(
     subscription: Subscription,
-    customer: Customer,
     plan: Plan,
     rated: RatedAmount,
     creditUnitsApplied: number,
@@ -670,7 +665,7 @@ export class RenewalService {
           providerEventId: idempotencyKey,
           providerInvoiceRef,
           amountMinor: Money.fromMinor(rated.amountMinor),
-          currency: customer.currency,
+          currency: rated.currency,
           status: 'pending',
           billingMode: subscription.billingMode,
           periodStart: period.start,
@@ -716,7 +711,6 @@ export class RenewalService {
    */
   private async recordUnpaidCharge(
     subscription: Subscription,
-    customer: Customer,
     plan: Plan,
     rated: RatedAmount,
     creditUnitsApplied: number,
@@ -736,7 +730,7 @@ export class RenewalService {
         providerEventId: idempotencyKey,
         providerInvoiceRef: '',
         amountMinor: Money.fromMinor(rated.amountMinor),
-        currency: customer.currency,
+        currency: rated.currency,
         status: 'failed',
         billingMode: subscription.billingMode,
         periodStart: period.start,
@@ -773,7 +767,6 @@ export class RenewalService {
       const paidInvoiceId = await this.settlePeriodInvoice(
         manager,
         subscription,
-        customer,
         plan,
         rated,
         creditUnitsApplied,
@@ -865,7 +858,6 @@ export class RenewalService {
   private async settlePeriodInvoice(
     manager: EntityManager,
     subscription: Subscription,
-    customer: Customer,
     plan: Plan,
     rated: RatedAmount,
     creditUnitsApplied: number,
@@ -887,7 +879,7 @@ export class RenewalService {
         providerEventId: idempotencyKey,
         providerInvoiceRef: charge.providerInvoiceRef,
         amountMinor: Money.fromMinor(rated.amountMinor),
-        currency: customer.currency,
+        currency: rated.currency,
         status: 'paid',
         billingMode: subscription.billingMode,
         periodStart: invoicePeriod.start,

@@ -20,6 +20,7 @@ export class FixedRating implements RatingStrategy {
     }
     return {
       amountMinor: price.amountMinor,
+      currency: price.currency,
       receiptItems: [
         { description: plan.name, amountMinor: price.amountMinor, quantity: 1 }
       ]

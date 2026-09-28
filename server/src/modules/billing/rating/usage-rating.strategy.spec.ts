@@ -220,6 +220,7 @@ describe('UsageRating', () => {
 
     expect(rated).toEqual({
       amountMinor: 8400,
+      currency: 'RUB',
       receiptItems: [
         {
           description: 'Pay as you go: api_calls × 42',

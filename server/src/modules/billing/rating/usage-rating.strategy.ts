@@ -17,7 +17,6 @@ export interface UsagePeriodSummary extends RatedAmount {
   includedUnits: number;
   billableUnits: number;
   unitPriceMinor: number;
-  currency: string;
 }
 
 /**
@@ -54,6 +53,7 @@ export class UsageRating implements RatingStrategy {
     const summary = await this.summarizeForPeriod(subscription, plan, period);
     return {
       amountMinor: summary.amountMinor,
+      currency: summary.currency,
       receiptItems: summary.receiptItems
     };
   }

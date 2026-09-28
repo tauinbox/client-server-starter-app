@@ -64,11 +64,12 @@ describe('withProviderDeadline', () => {
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
     const items = [{ description: 'Pro', amountMinor: 1000, quantity: 1 }];
 
-    await provider.chargeOffSession(customer, 1000, items, 'renewal:1');
+    await provider.chargeOffSession(customer, 1000, 'RUB', items, 'renewal:1');
 
     expect(inner.chargeOffSession).toHaveBeenCalledWith(
       customer,
       1000,
+      'RUB',
       items,
       'renewal:1'
     );
@@ -96,9 +97,9 @@ describe('withProviderDeadline', () => {
     inner.chargeOffSession.mockRejectedValue(failure);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
-    await expect(provider.chargeOffSession(customer, 1000, [])).rejects.toBe(
-      failure
-    );
+    await expect(
+      provider.chargeOffSession(customer, 1000, 'RUB', [])
+    ).rejects.toBe(failure);
   });
 
   it('propagates a synchronous throw as a rejection', async () => {

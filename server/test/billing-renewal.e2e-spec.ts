@@ -374,6 +374,7 @@ describe('Billing renewal scheduler (e2e)', () => {
     expect(chargeOffSession).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'cust-1' }),
       8400,
+      'RUB',
       [
         {
           description: 'Pay as you go: api_calls × 42',
