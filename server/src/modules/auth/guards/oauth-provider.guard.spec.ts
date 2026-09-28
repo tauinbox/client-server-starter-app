@@ -23,6 +23,7 @@ import { FacebookOAuthGuard } from './facebook-oauth.guard';
 import { VkOAuthGuard } from './vk-oauth.guard';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { OAUTH_ERROR } from '@app/shared/constants';
+import { AuthCookies } from '../utils/auth-cookies';
 
 const context = {} as ExecutionContext;
 
@@ -53,10 +54,11 @@ describe.each([
 ])('%s', (_name, GuardClass, strategy, providerName) => {
   let environment: string;
 
-  // Nest injects ConfigService as a property; a bare `new` leaves it unset.
+  // Nest injects AuthCookies as a property; a bare `new` leaves it unset.
   const createGuard = () =>
     Object.assign(new GuardClass(), {
-      configService: { get: () => environment }
+      // @ts-expect-error - partial mock: AuthCookies only reads ConfigService.get here
+      cookies: new AuthCookies({ get: () => environment })
     });
 
   beforeEach(() => {

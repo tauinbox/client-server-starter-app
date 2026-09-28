@@ -72,6 +72,7 @@ import {
   setRefreshTokenCookie
 } from '../helpers/refresh-cookie.helpers';
 import {
+  clearReauthProofCookie,
   isValidReauthProof,
   logStepUpFailure,
   sendWithRetryAfter,
@@ -704,12 +705,12 @@ router.post('/refresh-token', (req, res) => {
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
 
-// Mirrors `clearOAuthLinkCookie` on the server: an abandoned provider link or
-// step-up must not outlive the session that started it.
+// Mirrors `AuthCookies.clearIntents` on the server: an abandoned provider link
+// or step-up must not outlive the session that started it.
 function clearOAuthIntentCookies(res: Response): void {
   res.clearCookie(OAUTH_LINK_COOKIE, { path: AUTH_COOKIE_PATH });
   res.clearCookie(OAUTH_REAUTH_COOKIE, { path: AUTH_COOKIE_PATH });
-  res.clearCookie(REAUTH_PROOF_COOKIE, { path: AUTH_COOKIE_PATH });
+  clearReauthProofCookie(res);
 }
 
 // POST /api/v1/auth/logout
@@ -879,8 +880,6 @@ router.patch(
       revokeUserSessions(user.id);
       clearRefreshTokenCookie(res);
       clearOAuthIntentCookies(res);
-      // Cleared only now, so a rejected attempt keeps its remaining proof window.
-      res.clearCookie(REAUTH_PROOF_COOKIE, { path: AUTH_COOKIE_PATH });
     }
     user.updatedAt = new Date().toISOString();
 
@@ -960,7 +959,7 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
 
   // The server clears the proof once the change is accepted, so a rejected
   // attempt keeps its remaining window. Everything above this line rejects.
-  res.clearCookie(REAUTH_PROOF_COOKIE, { path: AUTH_COOKIE_PATH });
+  clearReauthProofCookie(res);
 
   // Uniqueness check: primary email OR pending email on any OTHER user.
   let conflict = false;

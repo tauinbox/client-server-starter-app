@@ -1,22 +1,17 @@
 import type { ExecutionContext, Type } from '@nestjs/common';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { IAuthGuard } from '@nestjs/passport';
 import { AuthGuard } from '@nestjs/passport';
 import { firstValueFrom, isObservable } from 'rxjs';
 import type { Request as ExpressRequest } from 'express';
 import type { OAuthFailureRedirect } from '../exceptions/oauth-authentication-failed.exception';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
-import {
-  OAUTH_ERROR,
-  requiresSecureCookies,
-  type OAuthError
-} from '@app/shared/constants';
+import { OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
 import {
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE
 } from '../constants/oauth.constants';
-import { readHostCookie } from '../../../common/utils/host-cookie';
+import { AuthCookies } from '../utils/auth-cookies';
 
 // Passport rejects with this message only when the provider's credentials
 // are absent and conditionalProvider skipped registering the strategy.
@@ -34,7 +29,7 @@ export function createOAuthProviderGuard(
   @Injectable()
   class OAuthProviderGuard extends AuthGuard(strategy) {
     // A property, so the Passport base constructor keeps its own injection.
-    @Inject(ConfigService) private readonly configService: ConfigService;
+    @Inject(AuthCookies) private readonly cookies: AuthCookies;
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
       try {
@@ -74,10 +69,7 @@ export function createOAuthProviderGuard(
     ): TUser {
       if (err || !user) {
         const request = context.switchToHttp().getRequest<ExpressRequest>();
-        const intents = intentCookies(
-          request,
-          requiresSecureCookies(this.configService.get<string>('ENVIRONMENT'))
-        );
+        const intents = intentCookies(request, this.cookies);
         throw new OAuthAuthenticationFailedException(
           resolveErrorKey(request, intents),
           err,
@@ -97,11 +89,11 @@ interface IntentCookies {
 
 function intentCookies(
   request: ExpressRequest,
-  secure: boolean
+  cookies: AuthCookies
 ): IntentCookies {
   return {
-    link: readHostCookie(request, OAUTH_LINK_COOKIE, secure) !== undefined,
-    reauth: readHostCookie(request, OAUTH_REAUTH_COOKIE, secure) !== undefined
+    link: cookies.read(request, OAUTH_LINK_COOKIE) !== undefined,
+    reauth: cookies.read(request, OAUTH_REAUTH_COOKIE) !== undefined
   };
 }
 

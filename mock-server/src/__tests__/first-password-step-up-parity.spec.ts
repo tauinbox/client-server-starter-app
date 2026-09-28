@@ -163,7 +163,10 @@ describe('PATCH /api/v1/auth/profile demands a step-up for a first password', ()
     );
 
     expect(res.status).toBe(200);
-    expect(res.headers.get('set-cookie')).toContain('reauth_proof=;');
+    const proofClears = res.headers
+      .getSetCookie()
+      .filter((cookie) => cookie.startsWith('reauth_proof=;'));
+    expect(proofClears).toHaveLength(1);
   });
 
   it('leaves an account that holds a password on the current-password rule', async () => {

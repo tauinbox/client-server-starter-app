@@ -2,6 +2,7 @@ import { ArgumentsHost, Logger } from '@nestjs/common';
 import { OAuthAuthenticationExceptionFilter } from './oauth-authentication-exception.filter';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { OAUTH_ERROR } from '@app/shared/constants';
+import { AuthCookies } from '../utils/auth-cookies';
 
 describe('OAuthAuthenticationExceptionFilter', () => {
   const clientUrl = 'http://localhost:4200';
@@ -16,8 +17,9 @@ describe('OAuthAuthenticationExceptionFilter', () => {
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     environment = 'production';
     const configService = { get: jest.fn(() => environment) };
-    // @ts-expect-error - partial mock: the filter only reads ConfigService.get
-    filter = new OAuthAuthenticationExceptionFilter(clientUrl, configService);
+    // @ts-expect-error - partial mock: AuthCookies only reads ConfigService.get here
+    const cookies = new AuthCookies(configService);
+    filter = new OAuthAuthenticationExceptionFilter(clientUrl, cookies);
     redirect = jest.fn();
     clearCookie = jest.fn();
     const mockResponse = { redirect, clearCookie };

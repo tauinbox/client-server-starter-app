@@ -290,9 +290,6 @@ export class AuthController {
       await this.authService.revokeAllUserSessions(req.user.userId);
       this.cookies.clearRefresh(res);
       this.cookies.clearIntents(res);
-      // Cleared only now, so a rejected attempt keeps its remaining proof
-      // window. The revocation above already ends the session that carried it.
-      this.cookies.clearReauthProof(res);
       await this.auditService.log({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,

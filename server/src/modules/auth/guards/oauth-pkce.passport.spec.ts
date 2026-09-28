@@ -23,6 +23,7 @@ import { createOAuthProviderGuard } from './oauth-provider.guard';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { CookieStateStore } from '../utils/cookie-state-store';
+import { AuthCookies } from '../utils/auth-cookies';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 
 const CLIENT = 'http://localhost:4200';
@@ -154,6 +155,7 @@ describe('OAuth PKCE (real passport-oauth2 against an enforcing provider)', () =
       controllers: [PkceOAuthController],
       providers: [
         OAuthAuthenticationExceptionFilter,
+        AuthCookies,
         { provide: CLIENT_URL, useValue: CLIENT },
         { provide: ConfigService, useValue: { get: () => 'production' } }
       ]

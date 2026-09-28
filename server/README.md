@@ -320,10 +320,13 @@ succeeding and no error rate moves. That counter is the only place the gap shows
 `SessionIssuerService`, `SignInCompletionService`, `SessionLimitService`, `OAuthAccountService`,
 `TokenCleanupService`, `ResourceService`, `ActionService` and `ResourceSyncService`.
 
-`utils/auth-cookies.ts` holds `AuthCookies`, the one owner of the cookies that the auth controllers
-share: the `Secure` decision, the refresh cookie and its lifetime, the re-authentication proof, and
-the link and re-authentication intents. It adds no cookie rule. It calls `refresh-token-cookie.ts`
-and `common/utils/host-cookie.ts`.
+`utils/auth-cookies.ts` holds `AuthCookies`, the one owner of the auth cookies: the `Secure`
+decision, the refresh cookie (`SameSite=strict`) and its lifetime, and the short-lived cookies
+(`SameSite=lax`) that the OAuth flows write: `oauth_data`, the link and re-authentication intents
+and the re-authentication proof. The auth controllers, the OAuth provider guard and the OAuth
+exception filter use it. It calls `common/utils/host-cookie.ts`. In the auth module, only the OAuth state store
+(`cookie-state-store.ts`) calls `host-cookie.ts` directly, because the strategies construct it
+without dependency injection.
 
 `SignInCompletionService.complete` is the last step of each sign-in: the password sign-in, the
 second-factor sign-in and `POST /auth/oauth/exchange`. It ends the session that the browser presents,
