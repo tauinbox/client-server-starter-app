@@ -341,21 +341,6 @@ describe('RefreshTokenService', () => {
     });
   });
 
-  describe('removeRevokedAndExpiredTokens', () => {
-    it('should delete tokens that are both revoked and expired', async () => {
-      mockRepository.delete.mockResolvedValue({ affected: 10 });
-
-      await service.removeRevokedAndExpiredTokens();
-
-      expect(mockRepository.delete).toHaveBeenCalledWith({
-        revoked: true,
-        expiresAt: expect.objectContaining({
-          _type: 'lessThan'
-        }) as Date
-      });
-    });
-  });
-
   describe('pruneOldestTokens', () => {
     it('should do nothing when token count is within limit', async () => {
       mockRepository.count.mockResolvedValue(2);
@@ -401,40 +386,6 @@ describe('RefreshTokenService', () => {
       await service.pruneOldestTokens('user-1', 5);
 
       expect(mockRepository.createQueryBuilder).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('getTokenStatistics', () => {
-    it('should return counts for active, expired, and revoked tokens', async () => {
-      mockRepository.count
-        .mockResolvedValueOnce(10) // totalActive
-        .mockResolvedValueOnce(5) // totalExpired
-        .mockResolvedValueOnce(3); // totalRevoked
-
-      const result = await service.getTokenStatistics();
-
-      expect(result).toEqual({
-        totalActive: 10,
-        totalExpired: 5,
-        totalRevoked: 3
-      });
-      expect(mockRepository.count).toHaveBeenCalledTimes(3);
-    });
-
-    it('should query active tokens with non-expired and non-revoked criteria', async () => {
-      mockRepository.count.mockResolvedValue(0);
-
-      await service.getTokenStatistics();
-
-      // First call: active tokens (not expired, not revoked)
-      expect(mockRepository.count).toHaveBeenNthCalledWith(1, {
-        where: {
-          expiresAt: expect.objectContaining({
-            _type: 'moreThan'
-          }) as Date,
-          revoked: false
-        }
-      });
     });
   });
 

@@ -21,19 +21,4 @@ export class TokenCleanupService {
       this.logger.error('Error during token cleanup:', error);
     }
   }
-
-  // Additional cleanup during light load hours to keep the database optimized
-  // Runs every Sunday at 2:00 AM
-  @Cron('0 2 * * 0', { timeZone: 'UTC' })
-  async handleWeeklyMaintenance() {
-    this.logger.log('Starting weekly token maintenance task');
-
-    try {
-      await this.refreshTokenService.removeRevokedAndExpiredTokens();
-
-      this.logger.log('Weekly token maintenance completed successfully');
-    } catch (error) {
-      this.logger.error('Error during weekly token maintenance:', error);
-    }
-  }
 }

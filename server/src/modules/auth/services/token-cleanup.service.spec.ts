@@ -6,13 +6,11 @@ describe('TokenCleanupService', () => {
   let service: TokenCleanupService;
   let refreshTokenService: {
     removeExpiredTokens: jest.Mock;
-    removeRevokedAndExpiredTokens: jest.Mock;
   };
 
   beforeEach(async () => {
     refreshTokenService = {
-      removeExpiredTokens: jest.fn(),
-      removeRevokedAndExpiredTokens: jest.fn()
+      removeExpiredTokens: jest.fn()
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -33,8 +31,8 @@ describe('TokenCleanupService', () => {
   });
 
   describe('cron schedule', () => {
-    // The cleanup crons fire at fixed wall-clock times (midnight, Sunday 02:00).
-    // Pinning the job timezone to UTC keeps them zone-independent regardless of
+    // The cleanup cron fires at a fixed wall-clock time (midnight).
+    // Pinning the job timezone to UTC keeps it zone-independent regardless of
     // the host's TZ, so the schedule never silently shifts across deployments.
     const getCronTimeZone = (methodName: keyof TokenCleanupService) => {
       const method = Object.getOwnPropertyDescriptor(
@@ -49,10 +47,6 @@ describe('TokenCleanupService', () => {
 
     it('runs the daily token cleanup in UTC', () => {
       expect(getCronTimeZone('handleDailyTokenCleanup')).toBe('UTC');
-    });
-
-    it('runs the weekly maintenance in UTC', () => {
-      expect(getCronTimeZone('handleWeeklyMaintenance')).toBe('UTC');
     });
   });
 
@@ -98,59 +92,6 @@ describe('TokenCleanupService', () => {
         'Error during token cleanup:',
         error
       );
-    });
-  });
-
-  describe('handleWeeklyMaintenance', () => {
-    it('should remove revoked and expired tokens', async () => {
-      refreshTokenService.removeRevokedAndExpiredTokens.mockResolvedValue(
-        undefined
-      );
-
-      await service.handleWeeklyMaintenance();
-
-      expect(
-        refreshTokenService.removeRevokedAndExpiredTokens
-      ).toHaveBeenCalled();
-    });
-
-    it('should log start and completion messages', async () => {
-      refreshTokenService.removeRevokedAndExpiredTokens.mockResolvedValue(
-        undefined
-      );
-      const logSpy = jest.spyOn(service['logger'], 'log');
-
-      await service.handleWeeklyMaintenance();
-
-      expect(logSpy).toHaveBeenCalledWith(
-        'Starting weekly token maintenance task'
-      );
-      expect(logSpy).toHaveBeenCalledWith(
-        'Weekly token maintenance completed successfully'
-      );
-    });
-
-    it('should catch and log errors', async () => {
-      const error = new Error('Maintenance failed');
-      refreshTokenService.removeRevokedAndExpiredTokens.mockRejectedValue(
-        error
-      );
-      const errorSpy = jest.spyOn(service['logger'], 'error');
-
-      await service.handleWeeklyMaintenance();
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Error during weekly token maintenance:',
-        error
-      );
-    });
-
-    it('should not throw when an error occurs', async () => {
-      refreshTokenService.removeRevokedAndExpiredTokens.mockRejectedValue(
-        new Error('fail')
-      );
-
-      await expect(service.handleWeeklyMaintenance()).resolves.toBeUndefined();
     });
   });
 });
