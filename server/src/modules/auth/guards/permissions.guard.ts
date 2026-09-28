@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
-import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
@@ -19,7 +18,6 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService
@@ -41,15 +39,8 @@ export class PermissionsGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
-    const [roles, userPermissions] = await Promise.all([
-      this.permissionService.getRolesForUser(user.userId),
-      this.permissionService.getPermissionsForUser(user.userId)
-    ]);
-
-    const ability = await this.caslAbilityFactory.createForUser(
-      user.userId,
-      roles,
-      userPermissions
+    const { ability } = await this.caslAbilityFactory.resolveForUser(
+      user.userId
     );
 
     // Attach for downstream instance-level checks via @CurrentAbility()

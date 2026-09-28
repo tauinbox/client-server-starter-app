@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { CaslAbilityFactory, RoleInfo } from './casl-ability.factory';
+import { CaslAbilityFactory } from './casl-ability.factory';
+import type { RoleInfo } from '../services/permission.service';
 import { ResolvedPermission } from '@app/shared/types';
 
 const MOCK_SUBJECT_MAP: Record<string, string> = {
@@ -18,6 +19,10 @@ const MOCK_ORPHANED_SUBJECT_MAP: Record<string, string> = {
 describe('CaslAbilityFactory', () => {
   let factory: CaslAbilityFactory;
   let resourceService: { getSubjectMaps: jest.Mock };
+  let permissionService: {
+    getRolesForUser: jest.Mock;
+    getPermissionsForUser: jest.Mock;
+  };
 
   beforeEach(() => {
     resourceService = {
@@ -26,10 +31,53 @@ describe('CaslAbilityFactory', () => {
         orphaned: MOCK_ORPHANED_SUBJECT_MAP
       })
     };
+    permissionService = {
+      getRolesForUser: jest.fn().mockResolvedValue([]),
+      getPermissionsForUser: jest.fn().mockResolvedValue([])
+    };
     factory = new CaslAbilityFactory(
-      // @ts-expect-error testing mock — only getSubjectMaps is needed
-      resourceService
+      // @ts-expect-error testing mocks — only getSubjectMaps and the two loads are needed
+      resourceService,
+      permissionService
     );
+  });
+
+  describe('resolveForUser', () => {
+    it('should build the ability from the roles and permissions of the user', async () => {
+      const roles: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+      const permissions: ResolvedPermission[] = [
+        {
+          resource: 'users',
+          action: 'read',
+          permission: 'users:read',
+          conditions: null
+        }
+      ];
+      permissionService.getRolesForUser.mockResolvedValue(roles);
+      permissionService.getPermissionsForUser.mockResolvedValue(permissions);
+
+      const resolved = await factory.resolveForUser('user-1');
+
+      expect(permissionService.getRolesForUser).toHaveBeenCalledWith('user-1');
+      expect(permissionService.getPermissionsForUser).toHaveBeenCalledWith(
+        'user-1'
+      );
+      expect(resolved.roles).toBe(roles);
+      expect(resolved.permissions).toBe(permissions);
+      expect(resolved.ability.can('read', 'User')).toBe(true);
+      expect(resolved.ability.can('delete', 'User')).toBe(false);
+    });
+
+    it('should grant full access when a role of the user is super', async () => {
+      permissionService.getRolesForUser.mockResolvedValue([
+        { name: 'admin', isSuper: true }
+      ]);
+
+      const { ability } = await factory.resolveForUser('user-1');
+
+      expect(ability.can('manage', 'all')).toBe(true);
+      expect(resourceService.getSubjectMaps).not.toHaveBeenCalled();
+    });
   });
 
   it('should grant super role full access to all subjects', async () => {

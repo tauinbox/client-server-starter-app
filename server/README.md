@@ -1252,8 +1252,10 @@ list makes `PermissionsGuard` return `true`. Also, the guard reads the metadata 
 the guard. Thus it looks protective and enforces nothing.
 
 **CaslAbilityFactory** builds an `AppAbility` object from the roles and the permissions of the user.
-`AuthController` uses it to return the packed CASL rules from `GET /permissions`, through
-`packRules()`.
+`resolveForUser(userId)` loads both lists through `PermissionService` and returns them with the
+ability. It is the one entry point for `PermissionsGuard`, `AuthController`, `UsersController` and
+`NotificationsService`. `AuthController` uses it to return the packed CASL rules from
+`GET /permissions`, through `packRules()`.
 
 The factory puts the allow rules first and the deny rules last. Thus a permission with
 `conditions.effect === 'deny'` becomes a CASL `cannot()` rule. Such a rule reliably overrides an

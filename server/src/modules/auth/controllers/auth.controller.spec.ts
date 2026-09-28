@@ -8,7 +8,6 @@ import { MfaService } from '../services/mfa.service';
 import { AuthService } from '../services/auth.service';
 import { UsersService } from '../../users/services/users.service';
 import { MailService } from '../../mail/mail.service';
-import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { MfaPolicyService } from '../services/mfa-policy.service';
 import { AuditService } from '../../audit/audit.service';
@@ -142,12 +141,8 @@ describe('AuthController', () => {
     findOne: jest.Mock;
     update: jest.Mock;
   };
-  let permissionServiceMock: {
-    getRolesForUser: jest.Mock;
-    getPermissionsForUser: jest.Mock;
-  };
   let caslAbilityFactoryMock: {
-    createForUser: jest.Mock;
+    resolveForUser: jest.Mock;
   };
   let mfaPolicyMock: {
     appliesTo: jest.Mock;
@@ -213,13 +208,12 @@ describe('AuthController', () => {
         .mockResolvedValue({ id: 'user-1', email: 'admin@example.com' })
     };
 
-    permissionServiceMock = {
-      getRolesForUser: jest.fn().mockResolvedValue([{ name: 'admin' }]),
-      getPermissionsForUser: jest.fn().mockResolvedValue([])
-    };
-
     caslAbilityFactoryMock = {
-      createForUser: jest.fn().mockResolvedValue({ rules: [] })
+      resolveForUser: jest.fn().mockResolvedValue({
+        ability: { rules: [] },
+        roles: [{ name: 'admin' }],
+        permissions: []
+      })
     };
 
     mfaPolicyMock = {
@@ -247,7 +241,6 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authServiceMock },
         { provide: MfaService, useValue: mfaServiceMock },
         { provide: UsersService, useValue: userServiceMock },
-        { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
         { provide: MfaPolicyService, useValue: mfaPolicyMock },
         { provide: AuditService, useValue: auditServiceMock },
@@ -918,16 +911,8 @@ describe('AuthController', () => {
 
       const result = await controller.getPermissions(req);
 
-      expect(permissionServiceMock.getRolesForUser).toHaveBeenCalledWith(
+      expect(caslAbilityFactoryMock.resolveForUser).toHaveBeenCalledWith(
         'user-1'
-      );
-      expect(permissionServiceMock.getPermissionsForUser).toHaveBeenCalledWith(
-        'user-1'
-      );
-      expect(caslAbilityFactoryMock.createForUser).toHaveBeenCalledWith(
-        'user-1',
-        [{ name: 'admin' }],
-        []
       );
       expect(result).toEqual({
         roles: ['admin'],

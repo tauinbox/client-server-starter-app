@@ -6,7 +6,6 @@ import {
   SSE_CONNECTIONS_REF,
   type SseConnectionsRef
 } from '../core/metrics/metrics.module';
-import { PermissionService } from '../auth/services/permission.service';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
 import type { PermissionCheck } from '../auth/casl/app-ability';
 
@@ -17,7 +16,6 @@ export class NotificationsService {
 
   constructor(
     @Inject(SSE_CONNECTIONS_REF) private readonly sseRef: SseConnectionsRef,
-    private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory
   ) {
     this.sseRef.getCount = () => this.#countConnections();
@@ -95,15 +93,7 @@ export class NotificationsService {
     [action, subject]: PermissionCheck
   ): Promise<boolean> {
     try {
-      const [roles, permissions] = await Promise.all([
-        this.permissionService.getRolesForUser(userId),
-        this.permissionService.getPermissionsForUser(userId)
-      ]);
-      const ability = await this.caslAbilityFactory.createForUser(
-        userId,
-        roles,
-        permissions
-      );
+      const { ability } = await this.caslAbilityFactory.resolveForUser(userId);
       return ability.can(action, subject);
     } catch (error) {
       // Fail closed: an unresolvable ability must not widen the audience

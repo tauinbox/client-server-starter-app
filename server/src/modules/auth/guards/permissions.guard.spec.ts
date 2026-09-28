@@ -14,11 +14,7 @@ import type { MetricsService } from '../../core/metrics/metrics.service';
 describe('PermissionsGuard', () => {
   let guard: PermissionsGuard;
   let reflector: Reflector;
-  let permissionService: {
-    getPermissionsForUser: jest.Mock;
-    getRolesForUser: jest.Mock;
-  };
-  let caslAbilityFactory: { createForUser: jest.Mock };
+  let caslAbilityFactory: { resolveForUser: jest.Mock };
   let auditService: Pick<AuditService, 'logFireAndForget'>;
   let metricsService: Pick<MetricsService, 'recordPermissionDenied'>;
 
@@ -61,14 +57,18 @@ describe('PermissionsGuard', () => {
     ]);
   }
 
+  function resolveTo(ability: AppAbility): void {
+    caslAbilityFactory.resolveForUser.mockResolvedValue({
+      ability,
+      roles: [],
+      permissions: []
+    });
+  }
+
   beforeEach(() => {
     reflector = new Reflector();
-    permissionService = {
-      getPermissionsForUser: jest.fn(),
-      getRolesForUser: jest.fn()
-    };
     caslAbilityFactory = {
-      createForUser: jest.fn()
+      resolveForUser: jest.fn()
     };
     auditService = { logFireAndForget: jest.fn() };
     metricsService = { recordPermissionDenied: jest.fn() };
@@ -76,7 +76,6 @@ describe('PermissionsGuard', () => {
     guard = new PermissionsGuard(
       reflector,
       // @ts-expect-error testing mock
-      permissionService,
       caslAbilityFactory,
       auditService as AuditService,
       metricsService as MetricsService
@@ -102,42 +101,21 @@ describe('PermissionsGuard', () => {
     jest
       .spyOn(reflector, 'getAllAndOverride')
       .mockReturnValue([['delete', 'User']]);
-    permissionService.getRolesForUser.mockResolvedValue([
-      { name: 'admin', isSuper: true }
-    ]);
-    permissionService.getPermissionsForUser.mockResolvedValue([]);
-    caslAbilityFactory.createForUser.mockResolvedValue(buildManageAllAbility());
+    resolveTo(buildManageAllAbility());
     const { context } = createMockContext({
       userId: 'user-1'
     });
 
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
-    expect(caslAbilityFactory.createForUser).toHaveBeenCalledWith(
-      'user-1',
-      [{ name: 'admin', isSuper: true }],
-      []
-    );
+    expect(caslAbilityFactory.resolveForUser).toHaveBeenCalledWith('user-1');
   });
 
   it('should pass when user has all required permissions', async () => {
     jest
       .spyOn(reflector, 'getAllAndOverride')
       .mockReturnValue([['read', 'User']]);
-    permissionService.getRolesForUser.mockResolvedValue([
-      { name: 'user', isSuper: false }
-    ]);
-    permissionService.getPermissionsForUser.mockResolvedValue([
-      {
-        permission: 'users:read',
-        resource: 'users',
-        action: 'read',
-        conditions: null
-      }
-    ]);
-    caslAbilityFactory.createForUser.mockResolvedValue(
-      buildAbilityWith('users:read')
-    );
+    resolveTo(buildAbilityWith('users:read'));
     const { context } = createMockContext({
       userId: 'user-1'
     });
@@ -150,12 +128,8 @@ describe('PermissionsGuard', () => {
     jest
       .spyOn(reflector, 'getAllAndOverride')
       .mockReturnValue([['read', 'User']]);
-    permissionService.getRolesForUser.mockResolvedValue([
-      { name: 'user', isSuper: false }
-    ]);
-    permissionService.getPermissionsForUser.mockResolvedValue([]);
     const ability = buildAbilityWith('users:read');
-    caslAbilityFactory.createForUser.mockResolvedValue(ability);
+    resolveTo(ability);
     const { context, req } = createMockContext({
       userId: 'user-1'
     });
@@ -168,20 +142,7 @@ describe('PermissionsGuard', () => {
     jest
       .spyOn(reflector, 'getAllAndOverride')
       .mockReturnValue([['delete', 'User']]);
-    permissionService.getRolesForUser.mockResolvedValue([
-      { name: 'user', isSuper: false }
-    ]);
-    permissionService.getPermissionsForUser.mockResolvedValue([
-      {
-        permission: 'users:read',
-        resource: 'users',
-        action: 'read',
-        conditions: null
-      }
-    ]);
-    caslAbilityFactory.createForUser.mockResolvedValue(
-      buildAbilityWith('users:read')
-    );
+    resolveTo(buildAbilityWith('users:read'));
     const { context } = createMockContext({
       userId: 'user-1'
     });
@@ -215,8 +176,7 @@ describe('PermissionsGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow(
       UnauthorizedException
     );
-    expect(permissionService.getRolesForUser).not.toHaveBeenCalled();
-    expect(permissionService.getPermissionsForUser).not.toHaveBeenCalled();
+    expect(caslAbilityFactory.resolveForUser).not.toHaveBeenCalled();
   });
 
   it('should require ALL permissions when multiple are specified', async () => {
@@ -224,20 +184,7 @@ describe('PermissionsGuard', () => {
       ['read', 'User'],
       ['update', 'User']
     ]);
-    permissionService.getRolesForUser.mockResolvedValue([
-      { name: 'user', isSuper: false }
-    ]);
-    permissionService.getPermissionsForUser.mockResolvedValue([
-      {
-        permission: 'users:read',
-        resource: 'users',
-        action: 'read',
-        conditions: null
-      }
-    ]);
-    caslAbilityFactory.createForUser.mockResolvedValue(
-      buildAbilityWith('users:read')
-    );
+    resolveTo(buildAbilityWith('users:read'));
     const { context } = createMockContext({
       userId: 'user-1'
     });

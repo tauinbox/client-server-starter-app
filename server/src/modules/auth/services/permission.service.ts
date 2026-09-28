@@ -5,12 +5,16 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
 import { ResolvedPermission } from '@app/shared/types';
-import type { RoleInfo } from '../casl/casl-ability.factory';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
 const CACHE_TTL = 120_000; // 2 minutes
 const CACHE_PREFIX = 'permissions:';
 const ROLES_CACHE_PREFIX = 'roles:';
+
+export interface RoleInfo {
+  name: string;
+  isSuper: boolean;
+}
 
 @Injectable()
 export class PermissionService {

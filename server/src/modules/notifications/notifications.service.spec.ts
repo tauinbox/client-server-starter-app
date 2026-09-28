@@ -4,18 +4,13 @@ import {
   type SseConnectionsRef
 } from '../core/metrics/metrics.module';
 import { NotificationsService } from './notifications.service';
-import { PermissionService } from '../auth/services/permission.service';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
 
 const mockSseRef: SseConnectionsRef = { getCount: () => 0 };
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
-  let permissionService: {
-    getRolesForUser: jest.Mock;
-    getPermissionsForUser: jest.Mock;
-  };
-  let caslAbilityFactory: { createForUser: jest.Mock };
+  let caslAbilityFactory: { resolveForUser: jest.Mock };
   /** userIds the mocked ability grants search:User to */
   let usersWithListAccess: Set<string>;
 
@@ -23,23 +18,20 @@ describe('NotificationsService', () => {
     mockSseRef.getCount = () => 0;
     usersWithListAccess = new Set<string>();
 
-    permissionService = {
-      getRolesForUser: jest.fn().mockResolvedValue([]),
-      getPermissionsForUser: jest.fn().mockResolvedValue([])
-    };
     caslAbilityFactory = {
-      createForUser: jest
-        .fn()
-        .mockImplementation((userId: string) =>
-          Promise.resolve({ can: () => usersWithListAccess.has(userId) })
-        )
+      resolveForUser: jest.fn().mockImplementation((userId: string) =>
+        Promise.resolve({
+          ability: { can: () => usersWithListAccess.has(userId) },
+          roles: [],
+          permissions: []
+        })
+      )
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
         { provide: SSE_CONNECTIONS_REF, useValue: mockSseRef },
-        { provide: PermissionService, useValue: permissionService },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactory }
       ]
     }).compile();
@@ -136,7 +128,7 @@ describe('NotificationsService', () => {
     it('should fail closed when ability resolution throws', async () => {
       const subject = service.createStream('admin-2', 'conn-1');
       usersWithListAccess.add('admin-2');
-      caslAbilityFactory.createForUser.mockRejectedValue(new Error('db down'));
+      caslAbilityFactory.resolveForUser.mockRejectedValue(new Error('db down'));
 
       const received: unknown[] = [];
       subject.subscribe((e) => received.push(e));
