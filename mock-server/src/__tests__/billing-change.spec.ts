@@ -166,3 +166,24 @@ describe('POST /billing/subscription/change/preview', () => {
     expect(getState().billingInvoices.size).toBe(invoicesBefore);
   });
 });
+
+describe('POST /billing/payment-method', () => {
+  it('refuses the re-bind when the plan of the subscription is missing from the catalog', async () => {
+    const token = await login('user@example.com');
+    await activateSubscription('pro');
+    const plans = getState().plans;
+    for (const [id, plan] of plans) {
+      if (plan.key === 'pro') plans.delete(id);
+    }
+    const methodsBefore = getState().billingPaymentMethods.size;
+
+    const res = await post(token, 'payment-method', {});
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      message: 'The current plan is missing from the catalog',
+      statusCode: 503
+    });
+    expect(getState().billingPaymentMethods.size).toBe(methodsBefore);
+  });
+});

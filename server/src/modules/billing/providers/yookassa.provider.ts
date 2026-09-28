@@ -332,14 +332,12 @@ export class YooKassaProvider implements PaymentProvider {
   async updatePaymentMethod(
     _providerSubscriptionId: string | null,
     customer: Customer,
+    currency: string,
     urls: CheckoutUrls
   ): Promise<CheckoutSession> {
     const yoo = this.requireClient();
     const payload: ICreatePayment = {
-      amount: {
-        value: toAmountValue(0, customer.currency),
-        currency: customer.currency
-      },
+      amount: { value: toAmountValue(0, currency), currency },
       capture: true,
       save_payment_method: true,
       confirmation: { type: 'redirect', return_url: urls.successUrl },
@@ -365,6 +363,7 @@ export class YooKassaProvider implements PaymentProvider {
   async chargeOffSession(
     customer: Customer,
     amountMinor: number,
+    currency: string,
     receiptItems: ReceiptItem[],
     idempotencyKey?: string
   ): Promise<ChargeResult> {
@@ -372,10 +371,7 @@ export class YooKassaProvider implements PaymentProvider {
     const token = await this.resolveSavedMethodRef(customer);
 
     const payload: ICreatePayment = {
-      amount: {
-        value: toAmountValue(amountMinor, customer.currency),
-        currency: customer.currency
-      },
+      amount: { value: toAmountValue(amountMinor, currency), currency },
       capture: true,
       payment_method_id: token,
       description: receiptItems[0]?.description ?? 'Subscription charge',
@@ -389,11 +385,7 @@ export class YooKassaProvider implements PaymentProvider {
           : {})
       },
       merchant_customer_id: customer.id,
-      receipt: await this.buildReceipt(
-        customer.userId,
-        receiptItems,
-        customer.currency
-      )
+      receipt: await this.buildReceipt(customer.userId, receiptItems, currency)
     };
 
     const payment = await yoo.createPayment(

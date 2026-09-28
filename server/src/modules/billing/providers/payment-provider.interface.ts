@@ -250,6 +250,7 @@ export interface PaymentProvider {
   chargeOffSession(
     customer: Customer,
     amountMinor: number,
+    currency: string,
     receiptItems: ReceiptItem[],
     idempotencyKey?: string
   ): Promise<ChargeResult>;
@@ -340,6 +341,7 @@ export interface PaymentProvider {
   updatePaymentMethod(
     providerSubscriptionId: string | null,
     customer: Customer,
+    currency: string,
     urls: CheckoutUrls
   ): Promise<CheckoutSession>;
   cancel(providerSubscriptionId: string, mode: CancelMode): Promise<void>;

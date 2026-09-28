@@ -21,6 +21,7 @@ import type {
   BillingProviderId,
   BillingRegion,
   CheckoutSessionResponse,
+  PlanPrice,
   ProductPrice,
   ProrationPreviewResponse,
   PurchaseSessionResponse
@@ -70,6 +71,8 @@ interface ChangeContext {
   subscription: Subscription;
   fromPlan: Plan;
   toPlan: Plan;
+  /** The price of `toPlan` for the provider of the subscription. */
+  toPrice: PlanPrice;
   provider: PaymentProvider;
 }
 
@@ -509,10 +512,20 @@ export class BillingUserService {
         'The subscription is not linked to the provider yet. Try again shortly.'
       );
     }
+    const plan = await this.plans.findOne({
+      where: { key: subscription.planKey }
+    });
+    const price = plan?.prices[subscription.provider];
+    if (!price) {
+      throw new ServiceUnavailableException(
+        'The current plan is missing from the catalog'
+      );
+    }
 
     const session = await provider.updatePaymentMethod(
       subscription.providerSubscriptionId,
       customer,
+      price.currency,
       {
         successUrl: this.settingsUrl(),
         cancelUrl: this.settingsUrl()
@@ -609,9 +622,9 @@ export class BillingUserService {
     if (quote && quote.chargeMinor > 0) {
       chargeInvoiceId = await this.plantChangeCharge({
         subscription,
-        customer,
         providerEventId: chargeKey,
         amountMinor: chargeAmount,
+        currency: quote.currency,
         billingMode: toPlan.billingMode
       });
       let charge: ChargeResult;
@@ -619,6 +632,7 @@ export class BillingUserService {
         charge = await provider.chargeOffSession(
           customer,
           quote.chargeMinor,
+          quote.currency,
           quote.chargeItems,
           chargeKey
         );
@@ -676,10 +690,10 @@ export class BillingUserService {
         if (refundIssued && refund) {
           await this.insertChangeInvoice(manager, {
             subscription,
-            customer,
             providerEventId: refundKey,
             providerInvoiceRef: refund.source.providerInvoiceRef,
             amountMinor: refund.minor,
+            currency: refund.source.currency,
             status: 'refunded',
             billingMode: 'fixed'
           });
@@ -815,11 +829,9 @@ export class BillingUserService {
     }
 
     if (subscription.status === 'trialing') {
-      const currency =
-        toPlan.prices[provider.id]?.currency ?? ctx.customer.currency;
       return {
         ...base,
-        currency,
+        currency: ctx.toPrice.currency,
         creditMinor: 0,
         chargeMinor: 0,
         dueNowMinor: 0
@@ -870,7 +882,8 @@ export class BillingUserService {
     if (toPlan.key === subscription.planKey) {
       throw new ConflictException('You are already on this plan.');
     }
-    if (!toPlan.prices[subscription.provider]) {
+    const toPrice = toPlan.prices[subscription.provider];
+    if (!toPrice) {
       throw new ConflictException(
         `Plan "${toPlan.key}" is not available for your billing provider.`
       );
@@ -892,7 +905,7 @@ export class BillingUserService {
       );
     }
 
-    return { customer, subscription, fromPlan, toPlan, provider };
+    return { customer, subscription, fromPlan, toPlan, toPrice, provider };
   }
 
   /**
@@ -1005,9 +1018,9 @@ export class BillingUserService {
    */
   private async plantChangeCharge(args: {
     subscription: Subscription;
-    customer: Customer;
     providerEventId: string;
     amountMinor: number;
+    currency: string;
     billingMode: Plan['billingMode'];
   }): Promise<string | null> {
     const planted = await this.insertChangeInvoice(this.dataSource.manager, {
@@ -1099,15 +1112,15 @@ export class BillingUserService {
     manager: EntityManager,
     args: {
       subscription: Subscription;
-      customer: Customer;
       providerEventId: string;
       providerInvoiceRef: string;
       amountMinor: number;
+      currency: string;
       status: 'paid' | 'refunded' | 'pending';
       billingMode: Plan['billingMode'];
     }
   ): Promise<string | null> {
-    const { subscription, customer } = args;
+    const { subscription } = args;
     const now = new Date();
     const insert = await manager
       .createQueryBuilder()
@@ -1120,7 +1133,7 @@ export class BillingUserService {
         providerEventId: args.providerEventId,
         providerInvoiceRef: args.providerInvoiceRef,
         amountMinor: Money.fromMinor(args.amountMinor),
-        currency: customer.currency,
+        currency: args.currency,
         status: args.status,
         billingMode: args.billingMode,
         periodStart: now,

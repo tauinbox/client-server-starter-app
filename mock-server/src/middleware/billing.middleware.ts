@@ -412,6 +412,14 @@ billingRouter.post(
       });
       return;
     }
+    // The server re-binds in the currency of the price of the current plan.
+    if (!findPlanByKey(sub.planKey)?.prices[sub.provider]) {
+      res.status(503).json({
+        message: 'The current plan is missing from the catalog',
+        statusCode: 503
+      });
+      return;
+    }
 
     const state = getState();
     const nowIso = new Date().toISOString();

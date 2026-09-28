@@ -84,10 +84,12 @@ async function build(
   };
 }
 
+// The locale currency differs from the RUB prices on purpose: every charge must
+// take the currency of the price, never the one of the customer.
 const customer = {
   id: 'cust-1',
   userId: 'user-1',
-  currency: 'RUB',
+  currency: 'USD',
   providerCustomerId: null
 } as Customer;
 
@@ -244,7 +246,12 @@ describe('YooKassaProvider', () => {
         confirmation: { confirmation_url: 'https://yoomoney/checkout/pay-mu' }
       });
 
-      const session = await provider.updatePaymentMethod(null, customer, urls);
+      const session = await provider.updatePaymentMethod(
+        null,
+        customer,
+        'RUB',
+        urls
+      );
 
       const [payload, idempotencyKey] = client!.createPayment.mock.calls[0] as [
         ICreatePayment,
@@ -277,14 +284,14 @@ describe('YooKassaProvider', () => {
         confirmation: {}
       });
       await expect(
-        provider.updatePaymentMethod(null, customer, urls)
+        provider.updatePaymentMethod(null, customer, 'RUB', urls)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
       await expect(
-        provider.updatePaymentMethod(null, customer, urls)
+        provider.updatePaymentMethod(null, customer, 'RUB', urls)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
@@ -380,7 +387,13 @@ describe('YooKassaProvider', () => {
       const bounded = withProviderDeadline(provider, 20);
 
       await expect(
-        bounded.chargeOffSession(savedCustomer, 99000, items, 'idem-hung')
+        bounded.chargeOffSession(
+          savedCustomer,
+          99000,
+          'RUB',
+          items,
+          'idem-hung'
+        )
       ).rejects.toBeInstanceOf(ProviderTimeoutError);
     });
 
@@ -394,6 +407,7 @@ describe('YooKassaProvider', () => {
       const result = await provider.chargeOffSession(
         savedCustomer,
         99000,
+        'RUB',
         items,
         'idem-key-1'
       );
@@ -436,6 +450,7 @@ describe('YooKassaProvider', () => {
       await provider.chargeOffSession(
         savedCustomer,
         2_500_000_000,
+        'RUB',
         [{ description: 'Bulk', amountMinor: 2_500_000_000, quantity: 1 }],
         'idem-big'
       );
@@ -455,8 +470,9 @@ describe('YooKassaProvider', () => {
       // JPY has no minor unit: 1500 minor is 1500 yen. A hardcoded scale of 2
       // would send '15.00' and undercharge by two orders of magnitude.
       await provider.chargeOffSession(
-        { ...savedCustomer, currency: 'JPY' },
+        savedCustomer,
         1500,
+        'JPY',
         [{ description: 'Pro renewal', amountMinor: 1500, quantity: 1 }],
         'idem-jpy'
       );
@@ -477,7 +493,7 @@ describe('YooKassaProvider', () => {
       });
 
       await expect(
-        provider.chargeOffSession(savedCustomer, 99000, items)
+        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items)
       ).resolves.toEqual({ providerInvoiceRef: 'pay-5', status: 'pending' });
     });
 
@@ -489,7 +505,7 @@ describe('YooKassaProvider', () => {
       });
 
       await expect(
-        provider.chargeOffSession(savedCustomer, 99000, items)
+        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
@@ -500,7 +516,7 @@ describe('YooKassaProvider', () => {
         status: 'succeeded'
       });
 
-      await provider.chargeOffSession(savedCustomer, 99000, items);
+      await provider.chargeOffSession(savedCustomer, 99000, 'RUB', items);
 
       const [, idempotencyKey] = client!.createPayment.mock.calls[0] as [
         ICreatePayment,
@@ -513,7 +529,7 @@ describe('YooKassaProvider', () => {
     it('throws when the customer has no saved payment method', async () => {
       const { provider } = await build();
       await expect(
-        provider.chargeOffSession(customer, 99000, items)
+        provider.chargeOffSession(customer, 99000, 'RUB', items)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
@@ -521,7 +537,7 @@ describe('YooKassaProvider', () => {
       const { provider, paymentMethods } = await build();
       paymentMethods.findOne.mockResolvedValue(null);
       await expect(
-        provider.chargeOffSession(savedCustomer, 99000, items)
+        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
@@ -550,7 +566,7 @@ describe('YooKassaProvider', () => {
       );
 
       await expect(
-        provider.chargeOffSession(savedCustomer, 99000, items)
+        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
       expect(client!.createPayment).not.toHaveBeenCalled();
     });
@@ -565,6 +581,7 @@ describe('YooKassaProvider', () => {
       await provider.chargeOffSession(
         savedCustomer,
         99000,
+        'RUB',
         items,
         'renewal:sub-1:123'
       );
@@ -585,7 +602,7 @@ describe('YooKassaProvider', () => {
         status: 'succeeded'
       });
 
-      await provider.chargeOffSession(savedCustomer, 99000, items);
+      await provider.chargeOffSession(savedCustomer, 99000, 'RUB', items);
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
       expect(payload.metadata).not.toHaveProperty('purpose');
