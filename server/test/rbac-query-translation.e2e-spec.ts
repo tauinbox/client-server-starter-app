@@ -6,10 +6,8 @@ import { Logger } from '@nestjs/common';
 import type { ResolvedPermission } from '@app/shared/types';
 import { subject } from '@casl/ability';
 import type { SelectQueryBuilder } from 'typeorm';
-import {
-  CaslAbilityFactory,
-  RoleInfo
-} from '../src/modules/auth/casl/casl-ability.factory';
+import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
+import type { RoleInfo } from '../src/modules/auth/services/permission.service';
 import type { User } from '../src/modules/users/entities/user.entity';
 import { applyAbilityToUserQuery } from '../src/modules/users/utils/apply-ability.util';
 
@@ -138,12 +136,13 @@ function matches(
 
 function buildFactory(): CaslAbilityFactory {
   return new CaslAbilityFactory(
-    // @ts-expect-error partial mock — only getSubjectMaps exercised
+    // @ts-expect-error partial mocks — only getSubjectMaps exercised
     {
       getSubjectMaps: jest
         .fn()
         .mockResolvedValue({ active: SUBJECT_MAP, orphaned: {} })
-    }
+    },
+    {}
   );
 }
 

@@ -7,7 +7,6 @@ import { MailService } from '../../mail/mail.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
-import { PermissionService } from '../../auth/services/permission.service';
 import { CaslAbilityFactory } from '../../auth/casl/casl-ability.factory';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
@@ -62,11 +61,7 @@ describe('UsersController', () => {
   let eventEmitterMock: { emit: jest.Mock; emitAsync: jest.Mock };
   let auditServiceMock: { log: jest.Mock; logFireAndForget: jest.Mock };
   let metricsServiceMock: { recordPermissionDenied: jest.Mock };
-  let permissionServiceMock: {
-    getRolesForUser: jest.Mock;
-    getPermissionsForUser: jest.Mock;
-  };
-  let caslAbilityFactoryMock: { createForUser: jest.Mock };
+  let caslAbilityFactoryMock: { resolveForUser: jest.Mock };
   let mailServiceMock: {
     sendPasswordChangedNotification: jest.Mock;
     sendEmailChangeCompletedNotification: jest.Mock;
@@ -101,12 +96,7 @@ describe('UsersController', () => {
 
     metricsServiceMock = { recordPermissionDenied: jest.fn() };
 
-    permissionServiceMock = {
-      getRolesForUser: jest.fn(),
-      getPermissionsForUser: jest.fn()
-    };
-
-    caslAbilityFactoryMock = { createForUser: jest.fn() };
+    caslAbilityFactoryMock = { resolveForUser: jest.fn() };
 
     mailServiceMock = {
       sendPasswordChangedNotification: jest.fn().mockResolvedValue(undefined),
@@ -126,7 +116,6 @@ describe('UsersController', () => {
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MetricsService, useValue: metricsServiceMock },
-        { provide: PermissionService, useValue: permissionServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
         { provide: MailService, useValue: mailServiceMock },
         { provide: AuthService, useValue: authServiceMock },
@@ -1452,11 +1441,11 @@ describe('UsersController', () => {
       };
 
       usersServiceMock.findOne.mockResolvedValue(user);
-      permissionServiceMock.getRolesForUser.mockResolvedValue(roleInfos);
-      permissionServiceMock.getPermissionsForUser.mockResolvedValue(
+      caslAbilityFactoryMock.resolveForUser.mockResolvedValue({
+        ability,
+        roles: roleInfos,
         permissions
-      );
-      caslAbilityFactoryMock.createForUser.mockResolvedValue(ability);
+      });
       const req = mockJwtRequest() as JwtAuthRequest;
 
       const result = await controller.getPermissions(
@@ -1466,16 +1455,8 @@ describe('UsersController', () => {
       );
 
       expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-12');
-      expect(permissionServiceMock.getRolesForUser).toHaveBeenCalledWith(
+      expect(caslAbilityFactoryMock.resolveForUser).toHaveBeenCalledWith(
         'user-12'
-      );
-      expect(permissionServiceMock.getPermissionsForUser).toHaveBeenCalledWith(
-        'user-12'
-      );
-      expect(caslAbilityFactoryMock.createForUser).toHaveBeenCalledWith(
-        'user-12',
-        roleInfos,
-        permissions
       );
       expect(result.roles).toBe(user.roles);
       expect(result.permissions).toBe(permissions);
@@ -1490,10 +1471,7 @@ describe('UsersController', () => {
       await expect(
         controller.getPermissions('missing', req, mockAbility)
       ).rejects.toThrow('User not found');
-      expect(permissionServiceMock.getRolesForUser).not.toHaveBeenCalled();
-      expect(
-        permissionServiceMock.getPermissionsForUser
-      ).not.toHaveBeenCalled();
+      expect(caslAbilityFactoryMock.resolveForUser).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException before reading roles/permissions when ability denies', async () => {
@@ -1508,10 +1486,7 @@ describe('UsersController', () => {
       await expect(
         controller.getPermissions('user-12', req, denyAbility)
       ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(permissionServiceMock.getRolesForUser).not.toHaveBeenCalled();
-      expect(
-        permissionServiceMock.getPermissionsForUser
-      ).not.toHaveBeenCalled();
+      expect(caslAbilityFactoryMock.resolveForUser).not.toHaveBeenCalled();
       expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.PERMISSION_CHECK_FAILURE,

@@ -24,7 +24,6 @@ import { MailService } from '../../mail/mail.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
-import { PermissionService } from '../../auth/services/permission.service';
 import { CaslAbilityFactory } from '../../auth/casl/casl-ability.factory';
 import {
   ApiBearerAuth,
@@ -84,7 +83,6 @@ export class UsersController {
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService,
-    private readonly permissionService: PermissionService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly authService: AuthService,
     private readonly mfaService: MfaService
@@ -230,15 +228,8 @@ export class UsersController {
       { actorId: req.user.userId, targetId: id, targetType: 'User' },
       this.metricsService
     );
-    const [roleInfos, permissions] = await Promise.all([
-      this.permissionService.getRolesForUser(id),
-      this.permissionService.getPermissionsForUser(id)
-    ]);
-    const ability = await this.caslAbilityFactory.createForUser(
-      id,
-      roleInfos,
-      permissions
-    );
+    const { ability, permissions } =
+      await this.caslAbilityFactory.resolveForUser(id);
     return {
       roles: user.roles,
       permissions,
