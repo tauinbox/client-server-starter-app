@@ -70,15 +70,8 @@ export const AuthStore = signalStore(
     }
 
     function isAccessTokenExpired(): boolean {
-      const token = getAccessToken();
-      if (!token) return true;
-
-      try {
-        const decoded = jwtDecode<CustomJwtPayload>(token);
-        return decoded.exp ? decoded.exp < Date.now() / 1000 : true;
-      } catch {
-        return true;
-      }
+      const expiryTime = getTokenExpiryTime();
+      return expiryTime === null || expiryTime < Date.now();
     }
 
     function getTokenExpiryTime(): number | null {

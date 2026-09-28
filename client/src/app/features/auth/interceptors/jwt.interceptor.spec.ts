@@ -2,6 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import type { HttpErrorResponse } from '@angular/common/http';
 import {
   HttpClient,
+  HttpRequest,
+  HttpResponse,
   provideHttpClient,
   withInterceptors
 } from '@angular/common/http';
@@ -67,6 +69,26 @@ describe('jwtInterceptor', () => {
       'Bearer my-access-token'
     );
     req.flush([]);
+  });
+
+  it('should keep method and body and leave the original request unchanged', () => {
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
+    let sent: HttpRequest<unknown> | null = null;
+    const original = new HttpRequest('POST', '/api/v1/submit', {
+      data: 'test'
+    });
+
+    TestBed.runInInjectionContext(() =>
+      jwtInterceptor(original, (req) => {
+        sent = req;
+        return of(new HttpResponse());
+      })
+    ).subscribe();
+
+    expect(sent!.headers.get('Authorization')).toBe('Bearer my-access-token');
+    expect(sent!.method).toBe('POST');
+    expect(sent!.body).toEqual({ data: 'test' });
+    expect(original.headers.has('Authorization')).toBe(false);
   });
 
   it('should skip token for excluded URLs (login)', () => {
@@ -257,7 +279,11 @@ describe('jwtInterceptor', () => {
     expect(tokenServiceMock.forceLogout).toHaveBeenCalledWith('/settings');
   });
 
-  it('should pass non-401 errors through without refresh', () => {
+  it.each([
+    [403, 'Forbidden'],
+    [500, 'Internal Server Error'],
+    [0, 'Unknown Error']
+  ])('should pass a %i error through without refresh', (status, statusText) => {
     authStoreMock.getAccessToken.mockReturnValue('valid-token');
     let caughtError: HttpErrorResponse | null = null;
 
@@ -266,12 +292,28 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/users');
-    req.flush(
-      { message: 'Forbidden' },
-      { status: 403, statusText: 'Forbidden' }
-    );
+    req.flush({ message: statusText }, { status, statusText });
 
-    expect(caughtError!.status).toBe(403);
+    expect(caughtError!.status).toBe(status);
     expect(tokenServiceMock.refreshTokens).not.toHaveBeenCalled();
+  });
+
+  it('should pass 401 through for the logout URL and keep the header', () => {
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
+    let caughtError: HttpErrorResponse | null = null;
+
+    http.post('/api/v1/auth/logout', {}).subscribe({
+      error: (err) => (caughtError = err)
+    });
+
+    const req = httpMock.expectOne('/api/v1/auth/logout');
+    expect(req.request.headers.get('Authorization')).toBe(
+      'Bearer my-access-token'
+    );
+    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(caughtError!.status).toBe(401);
+    expect(tokenServiceMock.refreshTokens).not.toHaveBeenCalled();
+    expect(tokenServiceMock.forceLogout).not.toHaveBeenCalled();
   });
 });
