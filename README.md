@@ -915,7 +915,7 @@ fullstack-starter-app/
 │       │                   # RoleResponse (public) / RoleAdminResponse (with isSystem/isSuper),
 │       │                   # PermissionResponse, UserPermissionsResponse, etc.
 │       ├── constants/      # MIN/MAX_PASSWORD_LENGTH, cursor page size, SYSTEM_ROLES,
-│       │                   # MAX_CONCURRENT_SESSIONS,
+│       │                   # MAX_CONCURRENT_SESSIONS, MAX_EMAIL_LENGTH, MAX_NAME_LENGTH,
 │       │                   # ENTITLED/OPEN/CHANGEABLE_SUBSCRIPTION_STATUSES (one definition each), etc.
 │       ├── utils/          # feature-flag-evaluator (needs node:crypto, server + mock only),
 │       │                   # feature-flag-attribute-value + feature-flag-timestamp (also imported by
@@ -996,7 +996,7 @@ undefined as empty. Thus a number fails `@IsString()` alone, and a whitespace-on
 after a `@Transform(trim)` makes it empty. They use
 the message text and the order of the true validator. A value that fails more than one constraint
 gives more than one message, thus a handler must collect them and must not answer with the first
-failure. `emailErrors` mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(255)`, so an
+failure. `emailErrors` mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(MAX_EMAIL_LENGTH)`, so an
 absent, null or non-string address gives two messages, and a malformed string gives one. The
 format itself comes from `validator.isEmail` with the default options, the function `@IsEmail()`
 calls, because a regular expression here accepted thirteen shapes that the server answers with 400. That order puts the

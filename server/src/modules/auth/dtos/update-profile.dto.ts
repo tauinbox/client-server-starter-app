@@ -8,6 +8,7 @@ import {
   ValidateIf
 } from 'class-validator';
 import {
+  MAX_NAME_LENGTH,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
@@ -21,7 +22,7 @@ export class UpdateProfileDto {
   })
   @ValidateIf(propertyIsDefined)
   @IsNotEmpty()
-  @MaxLength(255)
+  @MaxLength(MAX_NAME_LENGTH)
   firstName?: string;
 
   @ApiPropertyOptional({
@@ -30,7 +31,7 @@ export class UpdateProfileDto {
   })
   @ValidateIf(propertyIsDefined)
   @IsNotEmpty()
-  @MaxLength(255)
+  @MaxLength(MAX_NAME_LENGTH)
   lastName?: string;
 
   @ApiPropertyOptional({

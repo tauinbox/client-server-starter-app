@@ -3,13 +3,9 @@ import { PassportStrategy } from '@nestjs/passport';
 import { maxLength } from 'class-validator';
 import { Strategy } from 'passport-local';
 import { normalizeEmail } from '@app/shared/utils/email';
-import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
+import { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 import { AuthService } from '../services/auth.service';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
-
-// The caps `LoginDto` declares. That class only documents the route, so the
-// pipe never applies them.
-const MAX_EMAIL_LENGTH = 255;
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
