@@ -364,12 +364,12 @@ because a billing outage must never become a login outage.
 `guards/` holds `LocalAuthGuard`, `JwtAuthGuard`, and the Google, Facebook and VK OAuth guards. The
 `createOAuthProviderGuard` factory makes the three OAuth guards.
 
-`listeners/` holds three listeners. `SessionRevocationListener` reacts to
+`listeners/` holds two listeners. `SessionRevocationListener` reacts to
 `UserSessionRevocationRequiredEvent`. It deletes the refresh tokens and stamps `tokenRevokedAt`. It
 registers with `suppressErrors:false`, and the caller emits it with `emitAsync`. Thus a failed
 revocation fails the request of the caller.
 
-`UserDeletedListener` cleans up a pending email change. `UserRoleChangedListener` does the revocation
+`UserRoleChangedListener` does the revocation
 and the permission-cache invalidation after a role change. It uses the same two halves as
 `SessionRevocationListener`: it registers with `suppressErrors:false`, and `RolesController` emits
 `UserRoleChangedEvent` with `emitAsync` and awaits it. Thus a failed revocation fails the role
