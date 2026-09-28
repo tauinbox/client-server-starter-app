@@ -42,7 +42,6 @@ import { RolesController } from './controllers/roles.controller';
 import { RbacController } from './controllers/rbac.controller';
 import { Resource } from './entities/resource.entity';
 import { Action } from './entities/action.entity';
-import { UserDeletedListener } from './listeners/user-deleted.listener';
 import { UserRoleChangedListener } from './listeners/user-role-changed.listener';
 import { SessionRevocationListener } from './listeners/session-revocation.listener';
 import { clientUrlProvider } from './providers/client-url.provider';
@@ -119,7 +118,6 @@ function conditionalProvider(
     conditionalProvider('GOOGLE_CLIENT_ID', GoogleStrategy),
     conditionalProvider('FACEBOOK_CLIENT_ID', FacebookStrategy),
     conditionalProvider('VK_CLIENT_ID', VkStrategy),
-    UserDeletedListener,
     UserRoleChangedListener,
     SessionRevocationListener,
     clientUrlProvider,
