@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, MoreThan, Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
 import type { SessionClient } from '../utils/session-client';
@@ -229,46 +229,5 @@ export class RefreshTokenService {
       .where('expires_at < :now', { now: new Date() })
       .execute();
     return result.affected ?? 0;
-  }
-
-  async removeRevokedAndExpiredTokens(): Promise<void> {
-    const now = new Date();
-    await this.repository.delete({
-      revoked: true,
-      expiresAt: LessThan(now)
-    });
-  }
-
-  async getTokenStatistics(): Promise<{
-    totalActive: number;
-    totalExpired: number;
-    totalRevoked: number;
-  }> {
-    const now = new Date();
-
-    const totalActive = await this.repository.count({
-      where: {
-        expiresAt: MoreThan(now),
-        revoked: false
-      }
-    });
-
-    const totalExpired = await this.repository.count({
-      where: {
-        expiresAt: LessThan(now)
-      }
-    });
-
-    const totalRevoked = await this.repository.count({
-      where: {
-        revoked: true
-      }
-    });
-
-    return {
-      totalActive,
-      totalExpired,
-      totalRevoked
-    };
   }
 }

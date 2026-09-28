@@ -1438,8 +1438,8 @@ second presentation of the same cookie is therefore an unknown token, and it doe
 sessions that the user started after the key rotation.
 
 The column is real and not derived. `MIN(created_at)` of a session looks sufficient, because a
-rotation revokes an ancestor instead of deleting it, but `removeRevokedAndExpiredTokens` deletes each
-revoked row once it is past its own expiry. The oldest row of a long session is therefore gone well
+rotation revokes an ancestor instead of deleting it, but `removeExpiredTokens` deletes each row,
+revoked or not, once it is past its own expiry. The oldest row of a long session is therefore gone well
 before a 30-day cap would read it.
 
 **Reuse detection** follows the OAuth 2.0 BCP and RFC 6819. When `refreshTokens()` sees a token where
@@ -1593,8 +1593,7 @@ flow that it does not own.
 A flow that starts on a request with no response object fails there. It does not make a state that
 nothing persisted.
 
-**Token cleanup.** A daily cron job removes the expired tokens. A weekly cron job removes the tokens
-that are revoked and expired.
+**Token cleanup.** A daily cron job at 00:00 UTC removes the expired tokens, revoked or not.
 
 **Account lockout.** 5 failed logins lock the account for 15 minutes, and the answer is HTTP 423 with
 `lockedUntil`, `retryAfter` and the standard `Retry-After` header. An open lock answers 423 before

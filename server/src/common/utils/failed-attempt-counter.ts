@@ -93,29 +93,6 @@ export class FailedAttemptCounter {
     return { count: entry.count, remainingMs: entry.expiresAt - now };
   }
 
-  /** Reports the open window for `id` without counting anything. */
-  async read(id: string): Promise<AttemptWindow> {
-    const key = this.#key(id);
-    const redis = redisClientOf(this.#cache);
-
-    if (redis) {
-      try {
-        const raw = await redis.get(key);
-        const count = raw === null ? 0 : Number(raw);
-        if (!Number.isFinite(count) || count <= 0) return NO_WINDOW;
-        return { count, remainingMs: await this.#remainingMs(redis, key) };
-      } catch (error: unknown) {
-        this.#failureLog.log(error);
-        return NO_WINDOW;
-      }
-    }
-
-    const now = Date.now();
-    const open = this.#local.get(key);
-    if (!open || open.expiresAt <= now) return NO_WINDOW;
-    return { count: open.count, remainingMs: open.expiresAt - now };
-  }
-
   /** Closes the window for `id`, which a caller does once the subject passes. */
   async clear(id: string): Promise<void> {
     const key = this.#key(id);

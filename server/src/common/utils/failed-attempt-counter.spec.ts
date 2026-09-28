@@ -49,23 +49,6 @@ describe('FailedAttemptCounter', () => {
       expect(Math.max(...windows.map((w) => w.count))).toBe(25);
     });
 
-    it('reads the open window without counting anything', async () => {
-      const counter = new FailedAttemptCounter(createMockCache(), 'p:', logger);
-
-      await counter.record('id-1', 1000);
-      await expect(counter.read('id-1')).resolves.toMatchObject({ count: 1 });
-      await expect(counter.read('id-1')).resolves.toMatchObject({ count: 1 });
-    });
-
-    it('reports no window for a subject that never failed', async () => {
-      const counter = new FailedAttemptCounter(createMockCache(), 'p:', logger);
-
-      await expect(counter.read('id-1')).resolves.toEqual({
-        count: 0,
-        remainingMs: 0
-      });
-    });
-
     it('starts a new window once the old one elapses', async () => {
       const counter = new FailedAttemptCounter(createMockCache(), 'p:', logger);
 
@@ -73,7 +56,6 @@ describe('FailedAttemptCounter', () => {
       await counter.record('id-1', 20);
       await new Promise((resolve) => setTimeout(resolve, 40));
 
-      await expect(counter.read('id-1')).resolves.toMatchObject({ count: 0 });
       await expect(counter.record('id-1', 20)).resolves.toMatchObject({
         count: 1
       });
@@ -96,7 +78,9 @@ describe('FailedAttemptCounter', () => {
       await counter.record('id-1', 1000);
       await counter.clear('id-1');
 
-      await expect(counter.read('id-1')).resolves.toMatchObject({ count: 0 });
+      await expect(counter.record('id-1', 1000)).resolves.toMatchObject({
+        count: 1
+      });
     });
   });
 
@@ -135,27 +119,11 @@ describe('FailedAttemptCounter', () => {
       expect(client.incr).toHaveBeenCalledWith('p:id-1');
     });
 
-    it('reads the count and the time left without counting', async () => {
-      const client = {
-        get: jest.fn().mockResolvedValue('4'),
-        pTTL: jest.fn().mockResolvedValue(12_000)
-      };
-      const counter = new FailedAttemptCounter(
-        cacheWithRedis(client),
-        'p:',
-        logger
-      );
-
-      await expect(counter.read('id-1')).resolves.toEqual({
-        count: 4,
-        remainingMs: 12_000
-      });
-    });
-
     // -1 is a key with no expiry and -2 a key that is gone. Neither is a window.
     it('reports no time left when the key carries no expiry', async () => {
       const client = {
-        get: jest.fn().mockResolvedValue('4'),
+        set: jest.fn().mockResolvedValue(null),
+        incr: jest.fn().mockResolvedValue(4),
         pTTL: jest.fn().mockResolvedValue(-1)
       };
       const counter = new FailedAttemptCounter(
@@ -164,7 +132,7 @@ describe('FailedAttemptCounter', () => {
         logger
       );
 
-      await expect(counter.read('id-1')).resolves.toEqual({
+      await expect(counter.record('id-1', 60_000)).resolves.toEqual({
         count: 4,
         remainingMs: 0
       });
@@ -173,7 +141,6 @@ describe('FailedAttemptCounter', () => {
     it('fails open and warns when Redis throws', async () => {
       const client = {
         set: jest.fn().mockRejectedValue(new Error('redis down')),
-        get: jest.fn().mockRejectedValue(new Error('redis down')),
         incr: jest.fn(),
         pTTL: jest.fn()
       };
@@ -184,10 +151,6 @@ describe('FailedAttemptCounter', () => {
       );
 
       await expect(counter.record('id-1', 60_000)).resolves.toEqual({
-        count: 0,
-        remainingMs: 0
-      });
-      await expect(counter.read('id-1')).resolves.toEqual({
         count: 0,
         remainingMs: 0
       });
