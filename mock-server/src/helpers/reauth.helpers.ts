@@ -230,19 +230,35 @@ function stepUpCodeError(
   return null;
 }
 
+/** The 423 answer of every per-account brake, as the server `lockedException`. */
+export function lockedEnvelope(
+  message: string,
+  errorKey: string,
+  lockedUntil: Date
+): StepUpErrorEnvelope {
+  return {
+    message,
+    statusCode: 423,
+    errorKey,
+    lockedUntil: lockedUntil.toISOString(),
+    retryAfter: Math.max(
+      1,
+      Math.ceil((lockedUntil.getTime() - Date.now()) / 1000)
+    )
+  };
+}
+
 /**
  * The step-up code is shut for the rest of the window. The message names no
  * recovery code: that route answers a sign-in challenge, and it opens no
  * step-up.
  */
 function stepUpLockedEnvelope(remainingMs: number): StepUpErrorEnvelope {
-  return {
-    message: 'Too many incorrect verification codes. Try again later',
-    statusCode: 423,
-    errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
-    lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
-    retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
-  };
+  return lockedEnvelope(
+    'Too many incorrect verification codes. Try again later',
+    ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
+    new Date(Date.now() + remainingMs)
+  );
 }
 
 /**
@@ -253,13 +269,11 @@ function stepUpLockedEnvelope(remainingMs: number): StepUpErrorEnvelope {
 function stepUpPasswordLockedEnvelope(
   remainingMs: number
 ): StepUpErrorEnvelope {
-  return {
-    message: 'Too many incorrect passwords. Try again later',
-    statusCode: 423,
-    errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED,
-    lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
-    retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
-  };
+  return lockedEnvelope(
+    'Too many incorrect passwords. Try again later',
+    ErrorKeys.AUTH.STEP_UP_LOCKED,
+    new Date(Date.now() + remainingMs)
+  );
 }
 
 function invalidCurrentPasswordEnvelope(): StepUpErrorEnvelope {

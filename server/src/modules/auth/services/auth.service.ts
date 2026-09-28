@@ -31,6 +31,7 @@ import { BreachedPasswordService } from '../breached-password/breached-password.
 import { MfaService } from './mfa.service';
 import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { hashToken } from '../../../common/utils/hash-token';
+import { lockedException } from '../../../common/utils/locked-exception';
 import {
   hashPassword,
   PasswordHashVersion,
@@ -1124,14 +1125,10 @@ export class AuthService {
    * one, and no step-up route has a sign-in to count down to.
    */
   private stepUpPasswordLockedException(remainingMs: number): HttpException {
-    return new HttpException(
-      {
-        message: 'Too many incorrect passwords. Try again later',
-        errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED,
-        lockedUntil: new Date(Date.now() + remainingMs).toISOString(),
-        retryAfter: Math.max(1, Math.ceil(remainingMs / 1000))
-      },
-      HttpStatus.LOCKED
+    return lockedException(
+      'Too many incorrect passwords. Try again later',
+      ErrorKeys.AUTH.STEP_UP_LOCKED,
+      new Date(Date.now() + remainingMs)
     );
   }
 
@@ -1324,16 +1321,10 @@ export class AuthService {
       targetType: 'User',
       details
     });
-    const retryAfter = Math.ceil((lockedUntil.getTime() - Date.now()) / 1000);
-    return new HttpException(
-      {
-        message:
-          'Account is temporarily locked due to too many failed login attempts',
-        errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
-        lockedUntil: lockedUntil.toISOString(),
-        retryAfter
-      },
-      HttpStatus.LOCKED
+    return lockedException(
+      'Account is temporarily locked due to too many failed login attempts',
+      ErrorKeys.AUTH.ACCOUNT_LOCKED,
+      lockedUntil
     );
   }
 }
