@@ -1,4 +1,4 @@
-import { addInterval, nextPeriodEnd } from './period.util';
+import { addInterval, meteredWindowStart, nextPeriodEnd } from './period.util';
 
 /** UTC [year, month-1, day] for a Date - addInterval operates on the UTC wall-clock. */
 function ymd(date: Date): [number, number, number] {
@@ -241,5 +241,34 @@ describe('nextPeriodEnd', () => {
     } finally {
       process.env['TZ'] = originalTz;
     }
+  });
+});
+
+describe('meteredWindowStart', () => {
+  const periodStart = utc(2026, 8, 1);
+
+  it('is the period start when no switch moved the window', () => {
+    expect(
+      meteredWindowStart({ currentPeriodStart: periodStart, meteredFrom: null })
+    ).toBe(periodStart);
+  });
+
+  it('is the switch moment when a switch moved the window inside the period', () => {
+    const switchedAt = utc(2026, 8, 11);
+    expect(
+      meteredWindowStart({
+        currentPeriodStart: periodStart,
+        meteredFrom: switchedAt
+      })
+    ).toBe(switchedAt);
+  });
+
+  it('ignores a switch moment left over from an earlier period', () => {
+    expect(
+      meteredWindowStart({
+        currentPeriodStart: periodStart,
+        meteredFrom: utc(2026, 7, 20)
+      })
+    ).toBe(periodStart);
   });
 });

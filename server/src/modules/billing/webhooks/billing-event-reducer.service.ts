@@ -20,6 +20,7 @@ import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { isPlantedBeforeCharge } from '../utils/charge-keys.util';
+import { meteredWindowStart } from '../utils/period.util';
 import { CreditService } from '../services/credit.service';
 import {
   InvoicePaidEvent,
@@ -204,6 +205,10 @@ export class BillingEventReducer {
       const incomingStart = payload.currentPeriodStart
         ? new Date(payload.currentPeriodStart)
         : null;
+      const rollsOver =
+        incomingStart !== null &&
+        !Number.isNaN(incomingStart.getTime()) &&
+        incomingStart.getTime() >= subscription.currentPeriodEnd.getTime();
       // A provider-managed metered period closes either way: the snapshot
       // starts a new one at/after the stored boundary, or it cancels the
       // subscription - a case the rollover predicate never matches. Keyed on
@@ -211,14 +216,10 @@ export class BillingEventReducer {
       const closesPeriod =
         subscription.billingMode === 'usage' &&
         subscription.lifecycleOwner === 'provider' &&
-        (type === 'subscription.canceled' ||
-          (incomingStart !== null &&
-            !Number.isNaN(incomingStart.getTime()) &&
-            incomingStart.getTime() >=
-              subscription.currentPeriodEnd.getTime()));
+        (type === 'subscription.canceled' || rollsOver);
       const closedPeriod = closesPeriod
         ? {
-            start: subscription.currentPeriodStart,
+            start: meteredWindowStart(subscription),
             end: subscription.currentPeriodEnd
           }
         : null;
@@ -239,6 +240,9 @@ export class BillingEventReducer {
       }
       if (payload.currentPeriodEnd) {
         snapshot.currentPeriodEnd = new Date(payload.currentPeriodEnd);
+      }
+      if (rollsOver) {
+        snapshot.meteredFrom = null;
       }
       await manager.update(Subscription, { id: subscription.id }, snapshot);
       return { subscriptionId: subscription.id, userId, closedPeriod };

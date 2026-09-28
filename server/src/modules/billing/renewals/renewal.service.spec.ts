@@ -1118,6 +1118,34 @@ describe('RenewalService', () => {
       expect(sum).toHaveBeenCalled();
     });
 
+    it('invoices only the metered window a mode switch opened, then resets it', async () => {
+      const switchedAt = new Date('2026-05-11T00:00:00Z');
+      const sub = makeSub({
+        planKey: 'usage',
+        billingMode: 'usage' as const,
+        meteredFrom: switchedAt
+      });
+      const store = usageStore(sub);
+      const { service } = await build(
+        store,
+        jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_u',
+          status: 'captured'
+        }),
+        jest.fn().mockResolvedValue(142)
+      );
+
+      await service.runDueRenewals(NOW);
+
+      expect(store.invoices[0]).toMatchObject({
+        billingMode: 'usage',
+        periodStart: switchedAt,
+        periodEnd: new Date('2026-06-01T00:00:00Z')
+      });
+      expect(sub.meteredFrom).toBeNull();
+      expect(sub.currentPeriodStart).toEqual(new Date('2026-06-01T00:00:00Z'));
+    });
+
     it('closes a zero-usage period without a provider charge via a zero invoice', async () => {
       const sub = usageSub();
       const store = usageStore(sub);
@@ -1385,6 +1413,39 @@ describe('RenewalService', () => {
           InvoicePaidEvent.name,
           expect.objectContaining({ userId: 'user-1' })
         );
+      });
+
+      it('charges a window a mode switch moved under a key of its own', async () => {
+        const switchedAt = new Date('2026-05-11T00:00:00Z');
+        const sub = makeSub({
+          planKey: 'usage',
+          billingMode: 'usage' as const,
+          meteredFrom: switchedAt
+        });
+        const store = usageStore(sub);
+        const charge = jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_now',
+          status: 'captured'
+        });
+        const { service } = await build(
+          store,
+          charge,
+          jest.fn().mockResolvedValue(142)
+        );
+
+        await service.billClosingUsagePeriod(sub, NOW);
+
+        expect(charge).toHaveBeenCalledWith(
+          expect.anything(),
+          8400,
+          'RUB',
+          expect.anything(),
+          `cancel:sub-1:${switchedAt.getTime()}`
+        );
+        expect(store.invoices[0]).toMatchObject({
+          periodStart: switchedAt,
+          periodEnd: NOW
+        });
       });
 
       it('books the period unpaid when the charge is declined, without throwing', async () => {

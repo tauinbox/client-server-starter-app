@@ -28,11 +28,24 @@ export function sumPlanMeterUnits(
 }
 
 /**
- * Rates and invoices the open metered period a cancellation closes, mirroring
- * the server: a `usage` plan is postpaid, so the units consumed inside
- * `[currentPeriodStart, now)` are owed whether or not the customer stays.
- * Included units and prepaid credits offset the total exactly as the renewal
- * simulation does. Fixed plans prepaid their period and are left alone.
+ * The start of the metered window of the current period, as the server's
+ * `meteredWindowStart`: the later of the period start and `meteredFrom`.
+ */
+export function meteredWindowStart(subscription: MockSubscription): string {
+  const { currentPeriodStart, meteredFrom } = subscription;
+  return meteredFrom &&
+    new Date(meteredFrom).getTime() > new Date(currentPeriodStart).getTime()
+    ? meteredFrom
+    : currentPeriodStart;
+}
+
+/**
+ * Rates and invoices the open metered window that a cancellation or a switch
+ * to a fixed plan closes, mirroring the server: a `usage` plan is postpaid, so
+ * the units consumed inside `[windowStart, now)` are owed whether or not the
+ * customer stays. Included units and prepaid credits offset the total exactly
+ * as the renewal simulation does. Fixed plans prepaid their period and are
+ * left alone.
  */
 export function billClosingUsagePeriod(
   subscription: MockSubscription,
@@ -48,8 +61,8 @@ export function billClosingUsagePeriod(
   if (!plan || !price) return null;
 
   const nowIso = now.toISOString();
-  const closedStart = subscription.currentPeriodStart;
-  if (nowIso <= closedStart) return null;
+  const closedStart = meteredWindowStart(subscription);
+  if (now.getTime() <= new Date(closedStart).getTime()) return null;
 
   const totalUnits = sumPlanMeterUnits(
     plan,

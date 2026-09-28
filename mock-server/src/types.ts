@@ -195,6 +195,12 @@ export interface MockSubscription {
    * on provider-managed rows, whose boundaries come from the provider.
    */
   billingAnchorAt?: string;
+  /**
+   * Where the metered window of the current period starts after a switch of
+   * billing mode - mirrors the server's @Exclude'd `metered_from` and is never
+   * serialized on the wire. Absent when the window is the whole period.
+   */
+  meteredFrom?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -38,6 +38,7 @@ import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { generateMfaPendingToken } from './jwt.utils';
 import {
   billClosingUsagePeriod,
+  meteredWindowStart,
   sumPlanMeterUnits
 } from './helpers/billing.helpers';
 import type { BillingProviderId } from '@app/shared/types';
@@ -722,20 +723,19 @@ router.post('/billing/seed-usage', (req, res) => {
     return;
   }
 
-  // The default is the start of the open period, not the clock. The period
-  // closes at [start, now), so a record stamped "now" and a renewal advanced
-  // in the same millisecond drop the record from the period it was seeded for.
+  // The default is the start of the open metered window, not the clock. The
+  // window closes at [start, now), so a record stamped "now" and a renewal
+  // advanced in the same millisecond drop the record from the window it was
+  // seeded for.
   const now = new Date().toISOString();
+  const seededFor = state.billingSubscriptions.get(subId);
   const record: MockUsageRecord = {
     id: randomUUID(),
     customerId,
     subscriptionId: subId,
     meterKey,
     quantity,
-    occurredAt:
-      occurredAt ??
-      state.billingSubscriptions.get(subId)?.currentPeriodStart ??
-      now,
+    occurredAt: occurredAt ?? (seededFor ? meteredWindowStart(seededFor) : now),
     idempotencyKey: idempotencyKey ?? `seed-${randomUUID()}`,
     recordedAt: now
   };
@@ -936,10 +936,10 @@ router.post('/billing/advance-renewal', (req, res) => {
     return;
   }
 
-  // The clock advance anchors the boundary at NOW: the closed period is
-  // [currentPeriodStart, now) and the new one [now, now + interval). The new
+  // The clock advance anchors the boundary at NOW: the closed window is
+  // [windowStart, now) and the new period [now, now + interval). The new
   // end still lands on the billing day, as the server's renewal does.
-  const closedStart = subscription.currentPeriodStart;
+  const closedStart = meteredWindowStart(subscription);
   // A trial converts into its first paid period, which re-anchors the billing
   // day there - the same rule the server's renewal applies at trial_end.
   const billingAnchor =
@@ -1007,6 +1007,7 @@ router.post('/billing/advance-renewal', (req, res) => {
   subscription.currentPeriodStart = nowIso;
   subscription.currentPeriodEnd = newEnd.toISOString();
   subscription.billingAnchorAt = billingAnchor.toISOString();
+  delete subscription.meteredFrom;
   subscription.updatedAt = nowIso;
   notifyEntitlementsChanged(subscription.customerId);
   res.json(toSubscriptionResponse(subscription));

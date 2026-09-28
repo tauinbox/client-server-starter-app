@@ -34,7 +34,7 @@ import { FixedRating } from '../rating/fixed-rating.strategy';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { RatedAmount } from '../rating/rating-strategy.interface';
 import { CreditService } from '../services/credit.service';
-import { nextPeriodEnd } from '../utils/period.util';
+import { meteredWindowStart, nextPeriodEnd } from '../utils/period.util';
 import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS,
@@ -103,12 +103,13 @@ export class RenewalService {
   }
 
   /**
-   * Rates and charges the metered period a self-managed subscription is closing
-   * mid-flight, for the immediate cancellations that end it outside the renewal
-   * scan. Postpaid units already consumed are owed whether or not the customer
-   * stays, but a decline must never trap them in a subscription they asked to
-   * leave: this never throws, and an uncollected period is booked as an unpaid
-   * invoice the customer and the admin list both still see.
+   * Rates and charges the metered window a self-managed subscription is closing
+   * mid-flight, outside the renewal scan: an immediate cancellation, or a switch
+   * from a usage plan to a fixed one. Postpaid units already consumed are owed
+   * whether or not the customer stays, but a decline must never trap them in a
+   * subscription they asked to leave or change: this never throws, and an
+   * uncollected window is booked as an unpaid invoice the customer and the admin
+   * list both still see.
    *
    * Provider-managed rows are skipped - Paddle's `subscription.canceled` webhook
    * closes their period through `UsagePeriodClosedEvent` instead.
@@ -120,7 +121,7 @@ export class RenewalService {
     if (
       subscription.billingMode !== 'usage' ||
       subscription.lifecycleOwner !== 'self' ||
-      now.getTime() <= subscription.currentPeriodStart.getTime()
+      now.getTime() <= meteredWindowStart(subscription).getTime()
     ) {
       return;
     }
@@ -171,14 +172,16 @@ export class RenewalService {
       return;
     }
 
+    const windowStart = meteredWindowStart(subscription);
     const rated = await this.usageRating.summarizeForPeriodWithCredits(
       subscription,
       plan,
-      { start: subscription.currentPeriodStart, end: now },
+      { start: windowStart, end: now },
       await this.credits.availableUnits(subscription.customerId)
     );
-    // Stable per (subscription, period) so two racing cancels charge once.
-    const idempotencyKey = `cancel:${subscription.id}:${subscription.currentPeriodStart.getTime()}`;
+    // Stable per (subscription, window) so two racing closes charge once, while
+    // a later window of the same period gets a key of its own.
+    const idempotencyKey = `cancel:${subscription.id}:${windowStart.getTime()}`;
 
     let charge: ChargeResult;
     if (rated.amountMinor === 0) {
@@ -337,17 +340,15 @@ export class RenewalService {
       subscription.status === 'trialing' && subscription.trialEnd
         ? subscription.trialEnd
         : subscription.currentPeriodEnd;
-    // Fixed prepays the upcoming period; usage postpays the one ending at the
-    // anchor, rated over [currentPeriodStart, anchor) with prepaid credits
-    // offsetting billable units before money is charged — the balance is read
-    // here and deducted only when the invoice insert wins. The rated receipt
-    // items ride into the provider's 54-FZ receipt unchanged.
+    // Fixed prepays the upcoming period; usage postpays the metered window
+    // ending at the anchor, with prepaid credits offsetting billable units - the
+    // balance is read here and deducted only when the invoice insert wins.
     const usageSummary =
       subscription.billingMode === 'usage'
         ? await this.usageRating.summarizeForPeriodWithCredits(
             subscription,
             plan,
-            { start: subscription.currentPeriodStart, end: anchor },
+            { start: meteredWindowStart(subscription), end: anchor },
             await this.credits.availableUnits(subscription.customerId)
           )
         : null;
@@ -602,7 +603,7 @@ export class RenewalService {
 
   /**
    * A fixed invoice covers the period being prepaid; a usage invoice covers
-   * the metered period that just closed.
+   * the metered window that just closed.
    */
   private invoicePeriodFor(
     subscription: Subscription,
@@ -610,7 +611,7 @@ export class RenewalService {
     anchor: Date
   ): { start: Date; end: Date } {
     return subscription.billingMode === 'usage'
-      ? { start: subscription.currentPeriodStart, end: anchor }
+      ? { start: meteredWindowStart(subscription), end: anchor }
       : {
           start: anchor,
           end: nextPeriodEnd(
@@ -799,6 +800,7 @@ export class RenewalService {
                 plan.interval
               ),
               billingAnchorAt: billingAnchor,
+              meteredFrom: null,
               trialEnd: null,
               dunningAttempts: 0,
               nextRenewalAttemptAt: null

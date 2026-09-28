@@ -135,6 +135,92 @@ describe('POST /billing/subscription/change', () => {
   });
 });
 
+describe('POST /billing/subscription/change - metered window', () => {
+  const DAY_MS = 86_400_000;
+
+  // Moves the period ten days back so the seeded units and the switch cannot
+  // land on the same millisecond as the period start.
+  function backdatePeriod(subId: string): void {
+    const sub = getState().billingSubscriptions.get(subId);
+    if (!sub) throw new Error('subscription not seeded');
+    sub.currentPeriodStart = new Date(Date.now() - 10 * DAY_MS).toISOString();
+  }
+
+  async function seedUsage(subId: string): Promise<void> {
+    const sub = getState().billingSubscriptions.get(subId);
+    const res = await fetch(`${baseUrl}/__control/billing/seed-usage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        customerId: sub?.customerId,
+        subscriptionId: subId,
+        quantity: 100,
+        occurredAt: new Date(Date.now() - 5 * DAY_MS).toISOString()
+      })
+    });
+    expect(res.status).toBe(200);
+  }
+
+  function usageInvoices(subId: string) {
+    return [...getState().billingInvoices.values()].filter(
+      (i) => i.subscriptionId === subId && i.billingMode === 'usage'
+    );
+  }
+
+  it('fixed → usage never rates the units consumed on the fixed plan', async () => {
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    backdatePeriod(subId);
+    await seedUsage(subId);
+
+    const res = await post(token, 'subscription/change', { planKey: 'usage' });
+    expect(res.status).toBe(200);
+
+    const usage = await fetch(`${baseUrl}/api/v1/billing/usage`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const summary = (await usage.json()) as {
+      totalUnits: number;
+      periodStart: string;
+    };
+    expect(summary.totalUnits).toBe(0);
+    expect(summary.periodStart).toBe(
+      getState().billingSubscriptions.get(subId)?.meteredFrom
+    );
+
+    const renewal = await fetch(
+      `${baseUrl}/__control/billing/advance-renewal`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subscriptionId: subId, outcome: 'success' })
+      }
+    );
+    expect(renewal.status).toBe(200);
+    const [closed] = usageInvoices(subId);
+    expect(closed.amountMinor).toBe(0);
+    expect(getState().billingSubscriptions.get(subId)?.meteredFrom).toBe(
+      undefined
+    );
+  });
+
+  it('usage → fixed bills the closing window under the usage plan', async () => {
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('usage');
+    backdatePeriod(subId);
+    await seedUsage(subId);
+    const before = new Set(usageInvoices(subId).map((i) => i.id));
+
+    const res = await post(token, 'subscription/change', { planKey: 'pro' });
+    expect(res.status).toBe(200);
+
+    const added = usageInvoices(subId).filter((i) => !before.has(i.id));
+    expect(added).toHaveLength(1);
+    // 100 units at the Paddle unit price of 2 minor.
+    expect(added[0]).toMatchObject({ amountMinor: 200, status: 'paid' });
+  });
+});
+
 describe('POST /billing/subscription/change/preview', () => {
   it('returns the delegated net for a provider-managed subscription', async () => {
     const token = await login('user@example.com');

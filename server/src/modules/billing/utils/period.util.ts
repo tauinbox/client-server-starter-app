@@ -45,6 +45,23 @@ export function nextPeriodEnd(
   return new Date(restored.epochMilliseconds);
 }
 
+/**
+ * The start of the metered window of the current period: the later of the
+ * period start and `meteredFrom`. A switch of billing mode moves `meteredFrom`
+ * forward so that units consumed before the switch are never rated under the
+ * plan that follows it. A stale `meteredFrom` from an earlier period loses to
+ * the period start.
+ */
+export function meteredWindowStart(subscription: {
+  currentPeriodStart: Date;
+  meteredFrom: Date | null;
+}): Date {
+  const { currentPeriodStart, meteredFrom } = subscription;
+  return meteredFrom && meteredFrom.getTime() > currentPeriodStart.getTime()
+    ? meteredFrom
+    : currentPeriodStart;
+}
+
 /** The UTC wall-clock of `date` - the frame all boundary arithmetic runs in. */
 function utc(date: Date): Temporal.ZonedDateTime {
   return Temporal.Instant.fromEpochMilliseconds(

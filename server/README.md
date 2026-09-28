@@ -884,9 +884,16 @@ A **usage** subscription with `cancel_at_period_end` that reaches its boundary r
 metered period that it closes. It uses the same renewal key. The invoice and the cancel CAS commit in
 one transaction, and the period does NOT advance.
 
-`billClosingUsagePeriod()` does the same for an immediate cancel, over `[currentPeriodStart, now)`,
-under the key `cancel:{subId}:{periodStartMs}`. Neither path walks dunning. Thus a decline books the
-period as `failed` and the cancellation still completes.
+`billClosingUsagePeriod()` does the same for an immediate cancel and for a switch from a usage plan
+to a fixed plan, over `[windowStart, now)`, under the key `cancel:{subId}:{windowStartMs}`. Neither
+path walks dunning. Thus a decline books the window as `failed` and the cancellation or the switch
+still completes.
+
+Every usage rating reads the metered window `[max(current_period_start, metered_from), end)`
+(`meteredWindowStart` in `utils/period.util.ts`). A switch of billing mode sets `metered_from` to the
+moment of the switch, and a new period resets it to NULL. Thus a usage plan never rates the units
+that a fixed plan already covered, and a switch away from usage bills its units at the switch. On
+Paddle that switch emits `UsagePeriodClosedEvent` with the outgoing `planKey`.
 
 The service advances the period and converts a trial. The new boundary is
 `nextPeriodEnd(billing_anchor_at, boundary, interval)`. That helper steps one interval and restores
@@ -1813,7 +1820,7 @@ a currency with zero decimals and a currency with three decimals correctly.
 | `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits? }` for each provider |
 | `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL) |
 | `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default`. A partial unique index on `customer_id WHERE is_default` permits a maximum of one default for each customer |
-| `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL |
+| `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `metered_from`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL. `metered_from` is nullable. It is the start of the metered window after a switch of billing mode, and a new period resets it |
 | `billing_invoices` | UUID PK, `customer_id` (FK, RESTRICT), `subscription_id` (FK, SET NULL), `provider`. The FK to the customer uses RESTRICT, because a financial record must survive the deletion of a customer. Also `provider_event_id` (unique, for the webhook idempotency), `provider_invoice_ref`, `amount_minor`, `refunded_minor`, `currency`, `status` and `billing_mode`. Also `kind` (`subscription` or `one_time`) and `product_id` (FK to `billing_products`, SET NULL), which a one-time purchase uses. Also the period bounds, `paid_at` and `receipt_ref` (54-FZ). `refunded_minor` holds the cumulative refunded units. A refund is full when `refunded_minor` is equal to `amount_minor`, and partial when it is less. `@Exclude` keeps it off the wire |
 | `billing_products` | UUID PK, unique `key`, `name`, description, `type` (`sku`, `credits` or `custom`), `prices jsonb`, `grant jsonb`, `active`. A fixed price holds `{ currency, amountMinor?, paddlePriceId? }` for each provider. A custom price holds `{ currency, minAmountMinor, maxAmountMinor }`. The grant holds `{ credits }` or `{ entitlement, durationDays? }`, and it is null for a custom product |
 | `billing_customer_grants` | UUID PK, `customer_id` (FK, CASCADE, indexed), `entitlement`, `source_invoice_id` (FK to `billing_invoices`, CASCADE, for the idempotency and the refund revocation), `expires_at`, `revoked_at` |
