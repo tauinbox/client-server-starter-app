@@ -9,11 +9,18 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { AuthStore } from '../store/auth.store';
 import { TokenService } from '../services/token.service';
-import { isAuthExcludedUrl } from '@features/auth/utils/is-auth-excluded-urls';
-import { isTokenRefreshExcludedUrl } from '@features/auth/utils/is-token-refresh-excluded-urls';
-import { shouldAttemptTokenRefresh } from '@features/auth/utils/should-attempt-token-refresh';
-import { addTokenToRequest } from '@features/auth/utils/add-token-to-request';
+import {
+  AUTH_EXCLUDED_URLS,
+  matchesAnyPath,
+  TOKEN_REFRESH_EXCLUDED_URLS
+} from '@features/auth/utils/auth-url-lists';
 import { isSameOriginUrl } from '@features/auth/utils/is-same-origin-url';
+
+const withBearer = (
+  request: HttpRequest<unknown>,
+  token: string
+): HttpRequest<unknown> =>
+  request.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
 
 export const jwtInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
@@ -25,21 +32,19 @@ export const jwtInterceptor: HttpInterceptorFn = (
   const token = authStore.getAccessToken();
   const baseOrigin = inject(DOCUMENT).defaultView?.location.origin ?? '';
   const isCrossOrigin = !isSameOriginUrl(request, baseOrigin);
-  const isAuthExcluded = isAuthExcludedUrl(request);
-  const isTokenRefreshExcluded = isTokenRefreshExcludedUrl(request);
+  const isAuthExcluded = matchesAnyPath(request, AUTH_EXCLUDED_URLS);
+  const skipsRefresh =
+    isAuthExcluded ||
+    isCrossOrigin ||
+    matchesAnyPath(request, TOKEN_REFRESH_EXCLUDED_URLS);
 
   if (token && !isAuthExcluded && !isCrossOrigin) {
-    request = addTokenToRequest(request, token);
+    request = withBearer(request, token);
   }
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (
-        shouldAttemptTokenRefresh(
-          error,
-          isAuthExcluded || isTokenRefreshExcluded || isCrossOrigin
-        )
-      ) {
+      if (error.status === 401 && !skipsRefresh) {
         const handleError = () => {
           tokenService.forceLogout(router.url);
           return throwError(() => error);
@@ -52,7 +57,7 @@ export const jwtInterceptor: HttpInterceptorFn = (
               return handleError();
             }
 
-            return next(addTokenToRequest(request, tokens.access_token));
+            return next(withBearer(request, tokens.access_token));
           })
         );
       }
