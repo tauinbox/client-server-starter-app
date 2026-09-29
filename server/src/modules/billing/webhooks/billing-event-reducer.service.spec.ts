@@ -46,7 +46,10 @@ function buildManager(stubs: ManagerStubs) {
   );
   const create = jest.fn((_entity: unknown, data: object) => ({ ...data }));
   const update = jest
-    .fn()
+    .fn<
+      Promise<{ affected: number }>,
+      [unknown, unknown, Record<string, unknown>]
+    >()
     .mockResolvedValue({ affected: stubs.updateAffected });
   const findOne = jest.fn((entity: unknown, _opts: unknown) => {
     if (entity === Subscription) return Promise.resolve(stubs.subscription);
@@ -526,6 +529,126 @@ describe('BillingEventReducer', () => {
         UsagePeriodClosedEvent.name,
         expect.anything()
       );
+    });
+
+    describe('plan change from the snapshot', () => {
+      const withPlan = (billingMode: Plan['billingMode']) =>
+        ({ key: 'pro', billingMode }) as Plan;
+      const inPeriod = () =>
+        event(
+          'subscription.renewed',
+          subPayload({
+            planKey: 'pro',
+            currentPeriodStart: '2026-05-01T00:00:00Z',
+            currentPeriodEnd: '2026-06-01T00:00:00Z'
+          })
+        );
+
+      it('switches usage -> fixed: writes the mode and a new window, and closes the old one under the stored plan', async () => {
+        const { reducer, manager, emit } = await build({
+          subscription: { ...usageSub(), planKey: 'metered' },
+          plan: withPlan('fixed')
+        });
+
+        await reducer.reduce(inPeriod());
+
+        const [, where, fields] = manager.update.mock.calls[0];
+        expect(where).toEqual({ id: 'sub-1' });
+        expect(fields).toMatchObject({ planKey: 'pro', billingMode: 'fixed' });
+        const switchedAt = fields['meteredFrom'];
+        expect(switchedAt).toBeInstanceOf(Date);
+        expect(emit).toHaveBeenCalledWith(
+          UsagePeriodClosedEvent.name,
+          new UsagePeriodClosedEvent(
+            'user-1',
+            'sub-1',
+            new Date('2026-05-01T00:00:00Z'),
+            switchedAt as Date,
+            'metered'
+          )
+        );
+      });
+
+      it('switches fixed -> usage: writes the mode and a new window, and closes nothing', async () => {
+        const { reducer, manager, emit } = await build({
+          subscription: {
+            ...usageSub(),
+            planKey: 'basic',
+            billingMode: 'fixed'
+          },
+          plan: withPlan('usage')
+        });
+
+        await reducer.reduce(inPeriod());
+
+        const [, where, fields] = manager.update.mock.calls[0];
+        expect(where).toEqual({ id: 'sub-1' });
+        expect(fields).toMatchObject({ billingMode: 'usage' });
+        expect(fields['meteredFrom']).toBeInstanceOf(Date);
+        expect(emit).not.toHaveBeenCalledWith(
+          UsagePeriodClosedEvent.name,
+          expect.anything()
+        );
+      });
+
+      it('writes neither the mode nor the window for a plan change in the same mode', async () => {
+        const { reducer, manager, emit } = await build({
+          subscription: { ...usageSub(), planKey: 'metered' },
+          plan: withPlan('usage')
+        });
+
+        await reducer.reduce(inPeriod());
+
+        const fields = manager.update.mock.calls[0][2];
+        expect(fields).not.toHaveProperty('billingMode');
+        expect(fields).not.toHaveProperty('meteredFrom');
+        expect(emit).not.toHaveBeenCalledWith(
+          UsagePeriodClosedEvent.name,
+          expect.anything()
+        );
+      });
+
+      it('does not look the plan up when the snapshot keeps the stored plan', async () => {
+        const { reducer, manager } = await build({
+          subscription: { ...usageSub(), planKey: 'pro' },
+          plan: withPlan('fixed')
+        });
+
+        await reducer.reduce(inPeriod());
+
+        expect(manager.findOne).not.toHaveBeenCalledWith(
+          Plan,
+          expect.anything()
+        );
+        expect(manager.update.mock.calls[0][2]).not.toHaveProperty(
+          'billingMode'
+        );
+      });
+
+      it('keeps the rollover rule when the switch arrives with a new period', async () => {
+        const { reducer, manager, emit } = await build({
+          subscription: { ...usageSub(), planKey: 'metered' },
+          plan: withPlan('fixed')
+        });
+
+        await reducer.reduce(rollover());
+
+        expect(manager.update).toHaveBeenCalledWith(
+          Subscription,
+          { id: 'sub-1' },
+          expect.objectContaining({ billingMode: 'fixed', meteredFrom: null })
+        );
+        expect(emit).toHaveBeenCalledWith(
+          UsagePeriodClosedEvent.name,
+          new UsagePeriodClosedEvent(
+            'user-1',
+            'sub-1',
+            new Date('2026-05-01T00:00:00Z'),
+            new Date('2026-06-01T00:00:00Z'),
+            'metered'
+          )
+        );
+      });
     });
 
     it('does not emit on cancel for a self-managed subscription', async () => {

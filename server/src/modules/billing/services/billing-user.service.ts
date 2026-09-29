@@ -772,9 +772,10 @@ export class BillingUserService {
    * like the one the change was claimed against. The entity was loaded before
    * the provider round-trip, so committing it whole would write back every
    * column as it looked then — reverting whatever landed during that window (a
-   * cancellation, a dunning write, a period advance). A switch of billing mode
-   * also starts a new metered window at `now`. Returns the re-read row, or
-   * `null` when the guard missed and the caller must refuse the switch.
+   * cancellation, a dunning write, a period advance, or a mode switch that the
+   * provider's webhook already applied and closed the window for). A switch of
+   * billing mode also starts a new metered window at `now`. Returns the re-read
+   * row, or `null` when the guard missed and the caller must refuse the switch.
    */
   private async commitPlanChange(
     manager: EntityManager,
@@ -788,6 +789,7 @@ export class BillingUserService {
       {
         id: subscription.id,
         version: subscription.version,
+        billingMode: subscription.billingMode,
         status: In([...CHANGEABLE_SUBSCRIPTION_STATUSES]),
         cancelAtPeriodEnd: false
       },

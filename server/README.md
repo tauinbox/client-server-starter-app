@@ -901,7 +901,10 @@ Every usage rating reads the metered window `[max(current_period_start, metered_
 (`meteredWindowStart` in `utils/period.util.ts`). A switch of billing mode sets `metered_from` to the
 moment of the switch, and a new period resets it to NULL. Thus a usage plan never rates the units
 that a fixed plan already covered, and a switch away from usage bills its units at the switch. On
-Paddle that switch emits `UsagePeriodClosedEvent` with the outgoing `planKey`.
+Paddle that switch emits `UsagePeriodClosedEvent` with the outgoing `planKey`. When Paddle applies a
+switch that the local write did not record, the webhook snapshot writes the new `billing_mode` and
+`metered_from`, and closes the usage window. The local write also compares `billing_mode`, thus a
+webhook that applied the switch first makes it answer 409 and the units bill once.
 
 The service advances the period and converts a trial. The new boundary is
 `nextPeriodEnd(billing_anchor_at, boundary, interval)`. That helper steps one interval and restores

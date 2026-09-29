@@ -46,6 +46,7 @@ const USAGE_KEY = 'metered-window-usage';
 type FakeProvider = PaymentProvider & {
   chargeOffSession: jest.Mock;
   chargeUsage: jest.Mock;
+  changePlan: jest.Mock;
 };
 
 function fakeProvider(id: BillingProviderId): FakeProvider {
@@ -326,6 +327,25 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     });
   }
 
+  /** A Paddle snapshot inside the stored period that reports `planKey`. */
+  async function planSnapshotAtProvider(planKey: string): Promise<void> {
+    await reducer.reduce({
+      provider: 'paddle',
+      providerEventId: `evt-plan-${subscriptionId}`,
+      type: 'subscription.renewed',
+      payload: {
+        ref: { customerId, userId },
+        providerSubscriptionId: providerSubscriptionRef,
+        status: 'active',
+        planKey,
+        currentPeriodStart: periodStart.toISOString(),
+        currentPeriodEnd: periodEnd.toISOString(),
+        cancelAtPeriodEnd: false,
+        trialEnd: null
+      }
+    });
+  }
+
   it('YooKassa fixed -> usage: the renewal bills nothing for units consumed on the fixed plan', async () => {
     await build('yookassa');
     await seed('yookassa', FIXED_KEY);
@@ -438,5 +458,69 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     expect(invoices).toHaveLength(1);
     expect(invoices[0].status).toBe('pending');
     expect(invoices[0].amountMinor.toNumber()).toBe(200);
+  }, 30000);
+
+  it('Paddle usage -> fixed with a missed local write: the snapshot switches the mode and charges the units', async () => {
+    await build('paddle');
+    await seed('paddle', USAGE_KEY);
+    // A webhook that commits during the provider call moves the row off the
+    // guard of the local write.
+    provider.changePlan.mockImplementation(async () => {
+      await ds
+        .getRepository(Subscription)
+        .update({ id: subscriptionId }, { status: 'past_due' });
+    });
+
+    await expect(
+      users.changePlan(userId as string, FIXED_KEY)
+    ).rejects.toMatchObject({ status: 409 });
+    await planSnapshotAtProvider(FIXED_KEY);
+
+    const row = await ds
+      .getRepository(Subscription)
+      .findOneByOrFail({ id: subscriptionId });
+    expect(row).toMatchObject({ planKey: FIXED_KEY, billingMode: 'fixed' });
+    expect(row.meteredFrom).not.toBeNull();
+
+    await deliverUsageCloses();
+    await rollOverAtProvider();
+    await deliverUsageCloses();
+
+    expect(provider.chargeUsage).toHaveBeenCalledTimes(1);
+    expect(provider.chargeUsage).toHaveBeenCalledWith(
+      providerSubscriptionRef,
+      200,
+      'USD',
+      expect.any(String),
+      expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
+    );
+    const invoices = await usageInvoices();
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0].amountMinor.toNumber()).toBe(200);
+  }, 30000);
+
+  it('Paddle usage -> fixed whose webhook lands before the local write: the units are charged once', async () => {
+    await build('paddle');
+    await seed('paddle', USAGE_KEY);
+    provider.changePlan.mockImplementation(() =>
+      planSnapshotAtProvider(FIXED_KEY)
+    );
+
+    await expect(
+      users.changePlan(userId as string, FIXED_KEY)
+    ).rejects.toMatchObject({ status: 409 });
+    await deliverUsageCloses();
+    await rollOverAtProvider();
+    await deliverUsageCloses();
+
+    expect(provider.chargeUsage).toHaveBeenCalledTimes(1);
+    const invoices = await usageInvoices();
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0].amountMinor.toNumber()).toBe(200);
+    expect(
+      await ds.getRepository(Subscription).findOneByOrFail({
+        id: subscriptionId
+      })
+    ).toMatchObject({ planKey: FIXED_KEY, billingMode: 'fixed' });
   }, 30000);
 });

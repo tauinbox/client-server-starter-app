@@ -1934,12 +1934,13 @@ describe('BillingUserService', () => {
 
       // Nothing the concurrent writer owns (status, period, dunning, cancel
       // flag) may appear in the write set, and the guard carries the claimed
-      // version so a row that moved during the charge loses.
+      // version and mode so a row that moved during the charge loses.
       expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
         Subscription,
         {
           id: 'sub-1',
           version: 2,
+          billingMode: 'fixed',
           status: In(['trialing', 'active']),
           cancelAtPeriodEnd: false
         },
