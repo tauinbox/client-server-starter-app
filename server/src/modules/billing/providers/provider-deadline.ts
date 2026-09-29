@@ -22,6 +22,13 @@ import type {
  */
 export const DEFAULT_BILLING_PROVIDER_TIMEOUT_MS = 20_000;
 
+/**
+ * Largest deadline `BILLING_PROVIDER_TIMEOUT_MS` accepts. The lease of a plan
+ * change is sized from it (`PLAN_CHANGE_LEASE_MS`), so a larger deadline would
+ * let a live change outlast its lease and race the renewal scan.
+ */
+export const MAX_BILLING_PROVIDER_TIMEOUT_MS = 120_000;
+
 /** Raised when a provider call outlives its deadline. */
 export class ProviderTimeoutError extends Error {
   constructor(

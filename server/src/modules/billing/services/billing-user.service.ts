@@ -9,7 +9,16 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  In,
+  IsNull,
+  LessThanOrEqual,
+  Not,
+  Or,
+  Repository
+} from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import {
@@ -49,7 +58,10 @@ import type {
   ChargeResult,
   PaymentProvider
 } from '../providers/payment-provider.interface';
-import { ProrationCalculator } from '../rating/proration-calculator';
+import {
+  ProrationCalculator,
+  type ProrationQuote
+} from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import {
@@ -66,6 +78,7 @@ import {
 } from '../utils/refund-reservation.util';
 import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
+import { PLAN_CHANGE_LEASE_MS } from '../renewals/renewal-queue.constants';
 import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
@@ -595,19 +608,17 @@ export class BillingUserService {
     const now = new Date();
 
     if (provider.managesLifecycle) {
-      if (!subscription.providerSubscriptionId) {
+      const providerSubscriptionId = subscription.providerSubscriptionId;
+      if (!providerSubscriptionId) {
         throw new ConflictException(
           'The subscription is not linked to the provider yet. Try again shortly.'
         );
       }
       // Serialize against a concurrent change on the same row before delegating.
-      await this.claimChange(subscription);
-      await provider.changePlan(
-        subscription.providerSubscriptionId,
-        customer,
-        toPlan
-      );
-      return this.applyPlanChange(ctx, now);
+      return this.whileClaimed(subscription, async () => {
+        await provider.changePlan(providerSubscriptionId, customer, toPlan);
+        return this.applyPlanChange(ctx, now);
+      });
     }
 
     // Trial: nothing has been charged yet, so a switch moves no fixed money.
@@ -623,11 +634,24 @@ export class BillingUserService {
             now
           });
 
-    // Claim the change before any money moves: a concurrent change to a
-    // different plan loses this compare-and-swap and is rejected here, so the
-    // provider is never asked for a second, conflicting charge.
-    await this.claimChange(subscription);
+    // Claim the change before any money moves: a concurrent change or a
+    // renewal scan is kept off the row until it is released, so the provider
+    // is never asked for a second, conflicting charge.
+    return this.whileClaimed(subscription, () =>
+      this.applySelfManagedChange(ctx, quote, now)
+    );
+  }
 
+  /**
+   * The money legs and the commit of a self-managed switch, run under the
+   * claim of the row.
+   */
+  private async applySelfManagedChange(
+    ctx: ChangeContext,
+    quote: ProrationQuote | null,
+    now: Date
+  ): Promise<Subscription> {
+    const { customer, subscription, fromPlan, toPlan, provider } = ctx;
     const periodEndMs = subscription.currentPeriodEnd.getTime();
     const chargeKey = changeChargeKey(subscription.id, toPlan.key, periodEndMs);
     const refundKey = changeRefundKey(subscription.id, toPlan.key, periodEndMs);
@@ -756,7 +780,7 @@ export class BillingUserService {
     if (chargeInvoiceId && chargeSettled) {
       this.events.emit(
         InvoicePaidEvent.name,
-        new InvoicePaidEvent(userId, chargeInvoiceId)
+        new InvoicePaidEvent(customer.userId, chargeInvoiceId)
       );
     }
     if (!saved) {
@@ -768,14 +792,32 @@ export class BillingUserService {
   }
 
   /**
+   * Runs `change` under the claim of the row and releases the claim however
+   * the change ends, so the renewal scan does not wait for the lease to expire.
+   */
+  private async whileClaimed<T>(
+    subscription: Subscription,
+    change: () => Promise<T>
+  ): Promise<T> {
+    const lease = await this.claimChange(subscription);
+    try {
+      return await change();
+    } finally {
+      await this.releaseChange(subscription.id, lease);
+    }
+  }
+
+  /**
    * Writes the columns the change owns, and only while the row still looks
    * like the one the change was claimed against. The entity was loaded before
    * the provider round-trip, so committing it whole would write back every
    * column as it looked then — reverting whatever landed during that window (a
    * cancellation, a dunning write, a period advance, or a mode switch that the
    * provider's webhook already applied and closed the window for). A switch of
-   * billing mode also starts a new metered window at `now`. Returns the re-read
-   * row, or `null` when the guard missed and the caller must refuse the switch.
+   * billing mode also starts a new metered window at `now`. A self-managed
+   * period that a renewal advanced past an expired lease is not the one the
+   * switch priced. Returns the re-read row, or `null` when the guard missed
+   * and the caller must refuse the switch.
    */
   private async commitPlanChange(
     manager: EntityManager,
@@ -791,7 +833,10 @@ export class BillingUserService {
         version: subscription.version,
         billingMode: subscription.billingMode,
         status: In([...CHANGEABLE_SUBSCRIPTION_STATUSES]),
-        cancelAtPeriodEnd: false
+        cancelAtPeriodEnd: false,
+        ...(subscription.lifecycleOwner === 'self'
+          ? { currentPeriodEnd: subscription.currentPeriodEnd }
+          : {})
       },
       {
         planKey: toPlan.key,
@@ -813,20 +858,30 @@ export class BillingUserService {
   }
 
   /**
-   * Compare-and-swap claim on the subscription's version: the first change to
-   * land bumps it; a concurrent change that read the same version loses the CAS
-   * and is rejected before any money moves. Stays out of the DB transaction so
-   * no row lock is held across the provider HTTP call.
+   * Compare-and-swap claim on the subscription's version and its change lease:
+   * the first change to land bumps the version and takes the lease. A change
+   * that read the same version, or that starts while the lease is live, loses
+   * the CAS and is rejected before any money moves, and the renewal scan skips
+   * a row with a live lease. Stays out of the DB transaction so no row lock is
+   * held across the provider HTTP call. Returns the lease.
    */
-  private async claimChange(subscription: Subscription): Promise<void> {
+  private async claimChange(subscription: Subscription): Promise<Date> {
+    const claimedAt = new Date();
+    // The entry guard ran before the catalog reads. A renewal scan that started
+    // since then is charging this period, and the lease cannot stop it.
+    this.assertBeforeRenewal(subscription, claimedAt);
     const result = await this.subscriptions.update(
       {
         id: subscription.id,
         version: subscription.version,
         status: In([...CHANGEABLE_SUBSCRIPTION_STATUSES]),
-        cancelAtPeriodEnd: false
+        cancelAtPeriodEnd: false,
+        planChangeStartedAt: Or(
+          IsNull(),
+          LessThanOrEqual(new Date(claimedAt.getTime() - PLAN_CHANGE_LEASE_MS))
+        )
       },
-      { version: subscription.version + 1 }
+      { version: subscription.version + 1, planChangeStartedAt: claimedAt }
     );
     if (result.affected !== 1) {
       throw new ConflictException(
@@ -834,6 +889,37 @@ export class BillingUserService {
       );
     }
     subscription.version += 1;
+    return claimedAt;
+  }
+
+  /** Releases the lease; a lease that stays set expires on its own. */
+  private async releaseChange(id: string, lease: Date): Promise<void> {
+    try {
+      await this.subscriptions.update(
+        { id, planChangeStartedAt: lease },
+        { planChangeStartedAt: null }
+      );
+    } catch (error) {
+      this.logger.error(
+        `Plan change lease of subscription ${id} was not released: ${(error as Error).message}`
+      );
+    }
+  }
+
+  /**
+   * A self-managed period past its due moment belongs to the renewal scan: a
+   * switch now races that charge, or bills usage for time the next fixed
+   * period also prepays.
+   */
+  private assertBeforeRenewal(subscription: Subscription, at: Date): void {
+    if (
+      subscription.lifecycleOwner === 'self' &&
+      renewalAnchor(subscription).getTime() <= at.getTime()
+    ) {
+      throw new ConflictException(
+        'The billing period has ended and its renewal is in progress. Try again shortly.'
+      );
+    }
   }
 
   /**
@@ -919,17 +1005,7 @@ export class BillingUserService {
         'A cancellation is scheduled for this subscription; it can no longer change plans.'
       );
     }
-    // A self-managed period past its due moment belongs to the renewal scan: a
-    // switch now races that charge, or bills usage for time the next fixed
-    // period also prepays.
-    if (
-      subscription.lifecycleOwner === 'self' &&
-      renewalAnchor(subscription).getTime() <= Date.now()
-    ) {
-      throw new ConflictException(
-        'The billing period has ended and its renewal is in progress. Try again shortly.'
-      );
-    }
+    this.assertBeforeRenewal(subscription, new Date());
 
     const toPlan = await this.plans.findOne({ where: { key: planKey } });
     if (!toPlan || !toPlan.active) {

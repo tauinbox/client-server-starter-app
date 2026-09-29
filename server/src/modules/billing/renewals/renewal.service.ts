@@ -42,6 +42,7 @@ import {
 import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS,
+  PLAN_CHANGE_LEASE_MS,
   RENEWAL_SCAN_MAX_PER_RUN
 } from './renewal-queue.constants';
 
@@ -319,6 +320,10 @@ export class RenewalService {
    * listener cancels them locally, and the join guards any path that still
    * leaves a live row so a deleted user's saved method is never charged.
    *
+   * A row with a live plan change lease is excluded too: the change prices
+   * and charges the period this scan would renew, so a later scan renews it
+   * under the plan the change leaves.
+   *
    * Capped at `RENEWAL_SCAN_MAX_PER_RUN` and served oldest-due-first, so a
    * backlog drains in due order across successive scans: `processSubscription`
    * re-reads the row and re-checks the due moment, the provider charge is keyed
@@ -340,8 +345,12 @@ export class RenewalService {
             );
         })
       )
+      .andWhere(
+        '(s.planChangeStartedAt IS NULL OR s.planChangeStartedAt <= :leaseExpiry)'
+      )
       .setParameters({
         now,
+        leaseExpiry: new Date(now.getTime() - PLAN_CHANGE_LEASE_MS),
         trialing: 'trialing',
         active: 'active',
         pastDue: 'past_due'
@@ -358,6 +367,14 @@ export class RenewalService {
     const dueAt = this.dueAt(subscription);
     if (!dueAt || dueAt.getTime() > now.getTime()) {
       // Another instance already advanced it, or it is no longer due.
+      return;
+    }
+    if (
+      subscription.planChangeStartedAt &&
+      subscription.planChangeStartedAt.getTime() >
+        now.getTime() - PLAN_CHANGE_LEASE_MS
+    ) {
+      // A plan change claimed the row after the due list was read.
       return;
     }
 

@@ -1089,7 +1089,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency of a new customer: `USD` or `RUB` |
-| `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline of one provider API call, in milliseconds. Neither provider SDK sets a transport timeout. Without this deadline, a stalled socket blocks the sequential renewal scan |
+| `BILLING_PROVIDER_TIMEOUT_MS` | `20000` | Deadline of one provider API call, in milliseconds. Neither provider SDK sets a transport timeout. Without this deadline, a stalled socket blocks the sequential renewal scan. Maximum `120000`, because the lease of a plan change is sized from it |
 | `BILLING_WEBHOOK_IP_ALLOWLIST` | - (local), provider egress ranges (docker-compose) | IPs and CIDRs that can call the billing webhook receivers (`/api/v1/billing/webhooks/*`), separated by commas. Each other source gets a `403` before any webhook processing. An empty value disables the check. A malformed entry stops the startup. `docker-compose.yml` defaults it to the published egress ranges of Paddle and YooKassa. Refer to ["Billing webhook source-IP allowlist" in `server/README.md`](server/README.md#billing-webhook-source-ip-allowlist) |
 | `BILLING_WEBHOOK_RETENTION_DAYS` | `90` | The age at which the daily retention sweep deletes a settled webhook delivery from the idempotency ledger. The sweep never deletes an unfinished delivery or a dead-lettered delivery |
 | `BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS` | `7` | The age at which the sweep clears the stored event of a settled delivery, before it deletes the row. Keep this value below `BILLING_WEBHOOK_RETENTION_DAYS` |
@@ -1819,8 +1819,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2689 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 508 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink. With Postgres and Redis and no mail sink, 506 pass and 2 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2692 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 515 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 505 pass and 10 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1409 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 288 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 889 tests pass |

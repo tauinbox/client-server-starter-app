@@ -3,7 +3,8 @@ import type { SubscriptionResponse, _AssertNever } from '@app/shared/types';
 
 /**
  * Provider reference, internal dunning state, the billing anchor, the start of
- * the metered window, and the concurrency token, all @Exclude()-d from the wire.
+ * the metered window, and the concurrency token and lease, all @Exclude()-d
+ * from the wire.
  */
 type _ExcludedFields =
   | 'providerSubscriptionId'
@@ -11,7 +12,8 @@ type _ExcludedFields =
   | 'nextRenewalAttemptAt'
   | 'billingAnchorAt'
   | 'meteredFrom'
-  | 'version';
+  | 'version'
+  | 'planChangeStartedAt';
 
 type _EntityFieldCoverage = _AssertNever<
   Exclude<keyof Subscription, keyof SubscriptionResponse | _ExcludedFields>

@@ -99,6 +99,20 @@ export class Subscription {
   @Exclude()
   version: number;
 
+  /**
+   * When the self-service plan change now in flight claimed the row, or null.
+   * The renewal scan leaves a row with a live lease alone, so the change and
+   * the renewal never charge the same period in parallel; a lease older than
+   * `PLAN_CHANGE_LEASE_MS` belongs to a change that died and is ignored.
+   */
+  @Column({
+    name: 'plan_change_started_at',
+    type: 'timestamptz',
+    nullable: true
+  })
+  @Exclude()
+  planChangeStartedAt: Date | null;
+
   /** Consecutive failed self-managed charges; resets to 0 on a successful one. */
   @Column({ name: 'dunning_attempts', type: 'integer', default: 0 })
   @Exclude()
