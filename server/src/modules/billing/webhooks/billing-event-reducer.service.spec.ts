@@ -59,6 +59,12 @@ function buildManager(stubs: ManagerStubs) {
     if (entity === Product) return Promise.resolve(stubs.product);
     return Promise.resolve(null);
   });
+  const find = jest.fn<Promise<unknown[]>, [unknown]>((entity) => {
+    if (entity === Plan) return Promise.resolve(stubs.plan ? [stubs.plan] : []);
+    if (entity === Product)
+      return Promise.resolve(stubs.product ? [stubs.product] : []);
+    return Promise.resolve([]);
+  });
   const execute = jest.fn().mockResolvedValue({ raw: stubs.invoiceInsertRows });
   const insertValues = jest.fn();
   interface InsertBuilder {
@@ -88,6 +94,7 @@ function buildManager(stubs: ManagerStubs) {
     create,
     update,
     findOne,
+    find,
     createQueryBuilder,
     execute,
     insertValues
@@ -156,13 +163,32 @@ const subPayload = (
   ref: { customerId: 'cust-1', userId: 'user-1' },
   providerSubscriptionId: 'sub_123',
   status: 'active',
-  planKey: 'pro',
+  providerPriceIds: ['pri_pro'],
   currentPeriodStart: '2026-06-01T00:00:00Z',
   currentPeriodEnd: '2026-07-01T00:00:00Z',
   cancelAtPeriodEnd: false,
   trialEnd: null,
   ...overrides
 });
+
+/** A plan whose catalog price id is `pri_<key>` on both providers. */
+const planRow = (key: string, billingMode: Plan['billingMode'] = 'fixed') =>
+  ({
+    key,
+    billingMode,
+    prices: {
+      paddle: {
+        currency: 'USD',
+        amountMinor: 1200,
+        providerPriceId: `pri_${key}`
+      },
+      yookassa: {
+        currency: 'RUB',
+        amountMinor: 99000,
+        providerPriceId: `pri_${key}`
+      }
+    }
+  }) as Plan;
 
 const event = (
   type: NormalizedEvent['type'],
@@ -179,7 +205,7 @@ describe('BillingEventReducer', () => {
   describe('subscription events', () => {
     it('creates a new subscription on activation and emits SubscriptionActivated', async () => {
       const { reducer, manager, emit } = await build({
-        plan: { billingMode: 'fixed' } as Plan
+        plan: planRow('pro')
       });
 
       await reducer.reduce(event('subscription.activated', subPayload()));
@@ -202,7 +228,7 @@ describe('BillingEventReducer', () => {
     });
 
     it('skips creating a second subscription when the customer already has an open one', async () => {
-      const { reducer, manager, emit } = await build();
+      const { reducer, manager, emit } = await build({ plan: planRow('pro') });
       // First Subscription lookup (by providerSubscriptionId) misses, so the
       // create branch runs; the second (open-subscription guard) finds a conflict.
       let subLookups = 0;
@@ -215,8 +241,6 @@ describe('BillingEventReducer', () => {
               : ({ id: 'sub-open', status: 'active' } as Subscription)
           );
         }
-        if (entity === Plan)
-          return Promise.resolve({ billingMode: 'fixed' } as Plan);
         return Promise.resolve(null);
       });
 
@@ -228,9 +252,7 @@ describe('BillingEventReducer', () => {
     });
 
     it('stamps the event provider and derives the lifecycle owner (YooKassa = self)', async () => {
-      const { reducer, manager } = await build({
-        plan: { billingMode: 'fixed' } as Plan
-      });
+      const { reducer, manager } = await build({ plan: planRow('pro') });
 
       await reducer.reduce(
         event('subscription.activated', subPayload(), 'yookassa')
@@ -307,20 +329,62 @@ describe('BillingEventReducer', () => {
       expect(emit).not.toHaveBeenCalled();
     });
 
-    it('skips creating a subscription when no plan key is known', async () => {
-      const { reducer, manager, emit } = await build({ subscription: null });
+    it('creates the subscription on the plan whose price was charged', async () => {
+      const { reducer, manager } = await build();
+      manager.find.mockResolvedValue([planRow('business'), planRow('pro')]);
 
       await reducer.reduce(
-        event('subscription.activated', subPayload({ planKey: null }))
+        event(
+          'subscription.activated',
+          subPayload({ providerPriceIds: ['pri_pro'] })
+        )
+      );
+
+      expect(manager.create).toHaveBeenCalledWith(
+        Subscription,
+        expect.objectContaining({ planKey: 'pro' })
+      );
+    });
+
+    it('skips creating a subscription when no plan has the charged price', async () => {
+      const { reducer, manager, emit } = await build({ plan: planRow('pro') });
+
+      await reducer.reduce(
+        event(
+          'subscription.activated',
+          subPayload({ providerPriceIds: ['pri_unknown'] })
+        )
       );
 
       expect(manager.save).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
     });
 
+    it('keeps the stored plan when no plan has the charged price', async () => {
+      const { reducer, manager } = await build({
+        subscription: {
+          id: 'sub-1',
+          planKey: 'pro',
+          billingMode: 'fixed',
+          lifecycleOwner: 'provider',
+          currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
+        } as Subscription,
+        plan: planRow('pro')
+      });
+
+      await reducer.reduce(
+        event(
+          'subscription.renewed',
+          subPayload({ providerPriceIds: ['pri_unknown'] })
+        )
+      );
+
+      expect(manager.update.mock.calls[0][2]).not.toHaveProperty('planKey');
+    });
+
     it('resolves the user id via the customer when the event omits it', async () => {
       const { reducer, emit } = await build({
-        plan: { billingMode: 'fixed' } as Plan,
+        plan: planRow('pro'),
         customer: { userId: 'user-from-db' } as Customer
       });
 
@@ -533,12 +597,11 @@ describe('BillingEventReducer', () => {
 
     describe('plan change from the snapshot', () => {
       const withPlan = (billingMode: Plan['billingMode']) =>
-        ({ key: 'pro', billingMode }) as Plan;
+        planRow('pro', billingMode);
       const inPeriod = () =>
         event(
           'subscription.renewed',
           subPayload({
-            planKey: 'pro',
             currentPeriodStart: '2026-05-01T00:00:00Z',
             currentPeriodEnd: '2026-06-01T00:00:00Z'
           })
@@ -608,7 +671,7 @@ describe('BillingEventReducer', () => {
         );
       });
 
-      it('does not look the plan up when the snapshot keeps the stored plan', async () => {
+      it('writes neither the plan nor the mode when the snapshot keeps the stored plan', async () => {
         const { reducer, manager } = await build({
           subscription: { ...usageSub(), planKey: 'pro' },
           plan: withPlan('fixed')
@@ -616,13 +679,9 @@ describe('BillingEventReducer', () => {
 
         await reducer.reduce(inPeriod());
 
-        expect(manager.findOne).not.toHaveBeenCalledWith(
-          Plan,
-          expect.anything()
-        );
-        expect(manager.update.mock.calls[0][2]).not.toHaveProperty(
-          'billingMode'
-        );
+        const fields = manager.update.mock.calls[0][2];
+        expect(fields).not.toHaveProperty('planKey');
+        expect(fields).not.toHaveProperty('billingMode');
       });
 
       it('keeps the rollover rule when the switch arrives with a new period', async () => {
@@ -1235,6 +1294,73 @@ describe('BillingEventReducer', () => {
       );
 
       expect(credits.addPurchase).not.toHaveBeenCalled();
+    });
+
+    describe('matched by the paid catalog price', () => {
+      const pack = (id: string, units: number) =>
+        ({
+          id,
+          type: 'credits',
+          grant: { credits: units },
+          prices: {
+            paddle: {
+              currency: 'USD',
+              amountMinor: units,
+              paddlePriceId: `pri_${id}`
+            }
+          }
+        }) as Product;
+      const paddlePayload = (priceIds: string[]): NormalizedInvoicePayload => ({
+        ...oneTimePayload,
+        currency: 'USD',
+        productId: null,
+        providerPriceIds: priceIds
+      });
+
+      it('grants the pack whose price was paid', async () => {
+        const { reducer, manager, credits } = await build({
+          invoiceInsertRows: [{ id: 'inv-cr' }]
+        });
+        manager.find.mockResolvedValue([
+          pack('cr-5000', 5000),
+          pack('cr-500', 500)
+        ]);
+
+        await reducer.reduce(
+          event('invoice.paid', paddlePayload(['pri_cr-500']))
+        );
+
+        expect(manager.insertValues).toHaveBeenCalledWith(
+          expect.objectContaining({ productId: 'cr-500' })
+        );
+        expect(credits.addPurchase).toHaveBeenCalledWith(
+          expect.anything(),
+          'cust-1',
+          'inv-cr',
+          500
+        );
+      });
+
+      it('records the payment and grants nothing when no product has the paid price', async () => {
+        const { reducer, manager, credits, emit } = await build({
+          invoiceInsertRows: [{ id: 'inv-x' }]
+        });
+        manager.find.mockResolvedValue([pack('cr-500', 500)]);
+
+        await reducer.reduce(
+          event('invoice.paid', paddlePayload(['pri_inline']))
+        );
+
+        expect(manager.insertValues).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'one_time', productId: null })
+        );
+        expect(credits.addPurchase).not.toHaveBeenCalled();
+        expect(manager.save).not.toHaveBeenCalled();
+        expect(emit).toHaveBeenCalledWith(
+          InvoicePaidEvent.name,
+          expect.objectContaining({ invoiceId: 'inv-x' })
+        );
+      });
     });
 
     it('never links or activates an open self-managed subscription on a one-time payment', async () => {

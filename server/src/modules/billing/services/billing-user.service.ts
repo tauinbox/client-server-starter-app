@@ -293,11 +293,10 @@ export class BillingUserService {
   /**
    * Starts a standalone one-time purchase: resolves the
    * provider (availability-asserting, like checkout) and opens the provider's
-   * one-time payment with the product id round-tripped through custom data so
-   * the paid webhook reduces onto a `kind 'one_time'` invoice and applies the
-   * grant. The server is price-authoritative for fixed-price products — a
-   * client-sent amount is ignored; `custom` amounts are validated against the
-   * product's bounds.
+   * one-time payment, so the paid webhook reduces onto a `kind 'one_time'`
+   * invoice and applies the grant. The server is price-authoritative for
+   * fixed-price products: a client-sent amount is ignored; `custom` amounts
+   * are validated against the product's bounds.
    */
   async purchase(
     userId: string,
@@ -327,6 +326,17 @@ export class BillingUserService {
       price,
       request.amountMinor
     );
+    // The Paddle webhook grants the product it finds by the paid catalog
+    // price id; an inline price would pay for a grant it cannot match.
+    if (
+      provider.id === 'paddle' &&
+      product.type !== 'custom' &&
+      !price.paddlePriceId
+    ) {
+      throw new ServiceUnavailableException(
+        `Product "${product.key}" has no Paddle price configured`
+      );
+    }
     const description = this.purchaseDescription(product, request.description);
 
     const session = await provider.createOneTimePayment(customer, {

@@ -164,7 +164,7 @@ describe('Billing webhook throttle exemption (e2e)', () => {
       ref: { customerId: 'cust-1', userId: 'user-1' },
       providerSubscriptionId: 'sub_paddle_1',
       status: 'active',
-      planKey: 'pro',
+      providerPriceIds: ['pri_pro'],
       currentPeriodStart: '2026-06-01T00:00:00Z',
       currentPeriodEnd: '2026-07-01T00:00:00Z',
       cancelAtPeriodEnd: false,

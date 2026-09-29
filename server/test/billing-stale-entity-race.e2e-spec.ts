@@ -326,7 +326,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
       ref: { customerId, userId },
       providerSubscriptionId: providerSubscriptionRef,
       status: 'active',
-      planKey: PLAN_KEY,
+      providerPriceIds: [`pri_${PLAN_KEY}`],
       currentPeriodStart: periodStart.toISOString(),
       currentPeriodEnd: periodEnd.toISOString(),
       cancelAtPeriodEnd: false,

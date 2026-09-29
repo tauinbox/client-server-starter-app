@@ -88,15 +88,31 @@ function usageChargeKeyFrom(txn: TransactionNotification): string | null {
   return null;
 }
 
-/** Reads the one-time purchase marker + product id echoed via custom data. */
-function oneTimeFromCustomData(
+/** Reads the one-time purchase marker echoed via custom data. */
+function isOneTime(
   customData: Record<string, unknown> | null | undefined
-): { productId: string | null } | null {
-  if (customData?.['kind'] !== ONE_TIME_KIND) {
-    return null;
+): boolean {
+  return customData?.['kind'] === ONE_TIME_KIND;
+}
+
+/**
+ * Reads the product id that `createOneTimePayment` planted in the custom data
+ * of an inline price. The browser cannot create an inline price, so unlike
+ * the transaction custom data this field is ours.
+ */
+function inlinePriceProductIdFrom(txn: TransactionNotification): string | null {
+  for (const item of txn.items ?? []) {
+    const productId: unknown = item.price?.customData?.['productId'];
+    if (typeof productId === 'string') {
+      return productId;
+    }
   }
-  const productId = customData['productId'];
-  return { productId: typeof productId === 'string' ? productId : null };
+  return null;
+}
+
+/** The catalog price ids of the items: the one field Paddle itself sets. */
+function priceIdsOf(items: ReadonlyArray<{ price: { id: string } | null }>) {
+  return items.flatMap((item) => (item.price ? [item.price.id] : []));
 }
 
 /** Reads our `customerId`/`userId` echoed back through Paddle custom data. */
@@ -171,11 +187,7 @@ export class PaddleProvider implements PaymentProvider {
       ...(customer.providerCustomerId
         ? { customerId: customer.providerCustomerId }
         : {}),
-      customData: {
-        customerId: customer.id,
-        userId: customer.userId,
-        planKey: plan.key
-      },
+      customData: { customerId: customer.id, userId: customer.userId },
       checkout: { url: urls.successUrl }
     });
 
@@ -191,10 +203,11 @@ export class PaddleProvider implements PaymentProvider {
   /**
    * Standalone one-time purchase: a Paddle transaction with the
    * product's catalog price (`paddlePriceId`) or, for a custom amount, an
-   * inline non-catalog price. The one-time marker + `productId` ride in custom
-   * data so the `transaction.completed` webhook reduces onto a `one_time`
-   * invoice. The buyer completes on the hosted checkout URL when Paddle
-   * returns one, else client-side via Paddle.js with the transaction id.
+   * inline non-catalog price. The one-time marker rides in custom data so the
+   * `transaction.completed` webhook reduces onto a `one_time` invoice; the
+   * product comes from the catalog price id, or from the inline price's custom
+   * data. The buyer completes on the hosted checkout URL when Paddle returns
+   * one, else client-side via Paddle.js with the transaction id.
    */
   async createOneTimePayment(
     customer: Customer,
@@ -213,7 +226,8 @@ export class PaddleProvider implements PaymentProvider {
                   amount: String(params.amountMinor),
                   currencyCode: params.currency as CurrencyCode
                 },
-                product: { name: params.description, taxCategory: 'standard' }
+                product: { name: params.description, taxCategory: 'standard' },
+                customData: { productId: params.productId }
               }
             }
       ],
@@ -223,8 +237,7 @@ export class PaddleProvider implements PaymentProvider {
       customData: {
         customerId: customer.id,
         userId: customer.userId,
-        kind: ONE_TIME_KIND,
-        productId: params.productId
+        kind: ONE_TIME_KIND
       },
       checkout: { url: params.urls.successUrl }
     });
@@ -306,9 +319,9 @@ export class PaddleProvider implements PaymentProvider {
    * plan's catalog price with `prorated_immediately` — Paddle computes the
    * credit/charge, bills the difference and emits `subscription.updated` +
    * `transaction.completed` webhooks that reconcile our rows. Custom data is
-   * re-planted wholesale (the update replaces it): the customer identifiers the
-   * reducer correlates by, and the NEW plan key so the webhook does not revert
-   * the local plan to the stale checkout-time key.
+   * re-planted wholesale (the update replaces it) with the customer
+   * identifiers the reducer correlates by; the webhook takes the new plan from
+   * the new price id.
    */
   async changePlan(
     providerSubscriptionId: string,
@@ -319,11 +332,7 @@ export class PaddleProvider implements PaymentProvider {
     await paddle.subscriptions.update(providerSubscriptionId, {
       items: [{ priceId: this.requirePriceId(plan), quantity: 1 }],
       prorationBillingMode: 'prorated_immediately',
-      customData: {
-        customerId: customer.id,
-        userId: customer.userId,
-        planKey: plan.key
-      }
+      customData: { customerId: customer.id, userId: customer.userId }
     });
   }
 
@@ -561,7 +570,7 @@ export class PaddleProvider implements PaymentProvider {
         // and a subscription payment-failed event would be wrong.
         if (
           txn.origin === 'subscription_payment_method_change' ||
-          oneTimeFromCustomData(txn.customData)
+          isOneTime(txn.customData)
         ) {
           return WEBHOOK_IGNORED;
         }
@@ -581,12 +590,11 @@ export class PaddleProvider implements PaymentProvider {
   private subscriptionPayload(
     sub: SubscriptionNotification
   ): NormalizedSubscriptionPayload {
-    const planKey: unknown = sub.customData?.['planKey'];
     return {
       ref: refFromCustomData(sub.customData),
       providerSubscriptionId: sub.id,
       status: mapSubscriptionStatus(sub.status),
-      planKey: typeof planKey === 'string' ? planKey : null,
+      providerPriceIds: priceIdsOf(sub.items),
       currentPeriodStart: sub.currentBillingPeriod?.startsAt ?? null,
       currentPeriodEnd: sub.currentBillingPeriod?.endsAt ?? null,
       cancelAtPeriodEnd: sub.scheduledChange?.action === 'cancel',
@@ -598,7 +606,6 @@ export class PaddleProvider implements PaymentProvider {
   private invoicePayload(
     txn: TransactionNotification
   ): NormalizedInvoicePayload {
-    const oneTime = oneTimeFromCustomData(txn.customData);
     return {
       ref: refFromCustomData(txn.customData),
       providerInvoiceRef: txn.id,
@@ -609,7 +616,13 @@ export class PaddleProvider implements PaymentProvider {
       periodEnd: txn.billingPeriod?.endsAt ?? null,
       paidAt: txn.billedAt,
       usageChargeKey: usageChargeKeyFrom(txn),
-      ...(oneTime ? { kind: 'one_time', productId: oneTime.productId } : {})
+      ...(isOneTime(txn.customData)
+        ? {
+            kind: 'one_time',
+            productId: inlinePriceProductIdFrom(txn),
+            providerPriceIds: priceIdsOf(txn.items ?? [])
+          }
+        : {})
     };
   }
 }

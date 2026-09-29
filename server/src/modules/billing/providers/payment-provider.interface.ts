@@ -61,7 +61,13 @@ export interface NormalizedSubscriptionPayload {
   ref: NormalizedCustomerRef;
   providerSubscriptionId: string;
   status: SubscriptionStatus;
-  planKey: string | null;
+  /**
+   * The provider's catalog price ids of the subscription items. The reducer
+   * resolves the plan from them, never from custom data: a Paddle checkout
+   * opened from the browser can write any custom data, but only Paddle sets
+   * the price that was charged.
+   */
+  providerPriceIds: string[];
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
@@ -119,8 +125,16 @@ export interface NormalizedInvoicePayload {
    * activating anything. Absent/`'subscription'` for recurring invoices.
    */
   kind?: InvoiceKind;
-  /** The purchased `Product` id echoed back on a one-time payment. */
+  /**
+   * The purchased `Product` id, from a field that only our server writes
+   * (YooKassa metadata, the custom data of a Paddle inline price).
+   */
   productId?: string | null;
+  /**
+   * The provider's catalog price ids of the paid items. With no `productId`,
+   * the reducer resolves the product of a one-time payment from them.
+   */
+  providerPriceIds?: string[];
 }
 
 /**
@@ -168,11 +182,11 @@ export interface ReceiptItem {
 }
 
 /**
- * A standalone one-time purchase. `productId` is echoed through
- * the provider's custom data/metadata so the paid webhook reduces onto an
- * `Invoice` with the product reference; `paddlePriceId` selects the Paddle
- * catalog price for fixed-price products — absent for `custom` amounts, which
- * are charged via an inline (non-catalog) price.
+ * A standalone one-time purchase. `paddlePriceId` selects the Paddle catalog
+ * price for fixed-price products, and the paid webhook resolves the product
+ * from it. A `custom` amount has no catalog price: it is charged via an
+ * inline (non-catalog) price, and `productId` rides in that price's custom
+ * data. YooKassa echoes `productId` through the payment metadata.
  */
 export interface OneTimePaymentParams {
   amountMinor: number;

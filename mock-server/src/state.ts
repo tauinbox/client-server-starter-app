@@ -114,8 +114,12 @@ export function resetState(): void {
       ...r,
       payload: { ...r.payload }
     })),
-    plans: new Map(seedPlans.map((p) => [p.id, { ...p }])),
-    billingProducts: new Map(seedProducts.map((p) => [p.id, { ...p }])),
+    // Deep copies: `prices` is nested, and a shallow copy lets an edit of it
+    // leak into the seed and survive the next reset.
+    plans: new Map(seedPlans.map((p) => [p.id, structuredClone(p)])),
+    billingProducts: new Map(
+      seedProducts.map((p) => [p.id, structuredClone(p)])
+    ),
     billingCustomers: new Map(),
     billingSubscriptions: new Map(),
     billingUsageRecords: new Map(),

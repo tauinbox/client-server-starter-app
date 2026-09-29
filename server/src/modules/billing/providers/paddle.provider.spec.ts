@@ -83,13 +83,13 @@ async function build(opts: {
 const subscriptionData = {
   id: 'sub_123',
   status: 'active',
-  customData: { customerId: 'cust-1', userId: 'user-1', planKey: 'pro' },
+  customData: { customerId: 'cust-1', userId: 'user-1' },
   currentBillingPeriod: {
     startsAt: '2026-06-01T00:00:00Z',
     endsAt: '2026-07-01T00:00:00Z'
   },
   scheduledChange: null,
-  items: [{ trialDates: null }]
+  items: [{ trialDates: null, price: { id: 'pri_pro' } }]
 };
 
 const transactionData = {
@@ -183,11 +183,36 @@ describe('PaddleProvider', () => {
         ref: { customerId: 'cust-1', userId: 'user-1' },
         providerSubscriptionId: 'sub_123',
         status: 'active',
-        planKey: 'pro',
+        providerPriceIds: ['pri_pro'],
         currentPeriodStart: '2026-06-01T00:00:00Z',
         currentPeriodEnd: '2026-07-01T00:00:00Z',
         cancelAtPeriodEnd: false
       });
+    });
+
+    it('reports the charged price ids and drops a plan key set in custom data', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_1',
+        eventType: EventName.SubscriptionCreated,
+        data: {
+          ...subscriptionData,
+          customData: {
+            customerId: 'cust-1',
+            userId: 'user-1',
+            planKey: 'business'
+          }
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      const payload = reducible(result)
+        .payload as NormalizedSubscriptionPayload;
+      expect(payload.providerPriceIds).toEqual(['pri_pro']);
+      expect(payload).not.toHaveProperty('planKey');
     });
 
     it('flags cancelAtPeriodEnd from a scheduled cancel', async () => {
@@ -307,7 +332,7 @@ describe('PaddleProvider', () => {
       expect(result).toBe(WEBHOOK_IGNORED);
     });
 
-    it('maps a one-time purchase transaction to invoice.paid with kind + product id', async () => {
+    it('maps a one-time catalog purchase to invoice.paid with the paid price ids, ignoring a custom-data product id', async () => {
       const { provider, client } = await build({});
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_ot_1',
@@ -319,8 +344,9 @@ describe('PaddleProvider', () => {
             customerId: 'cust-1',
             userId: 'user-1',
             kind: 'one_time',
-            productId: 'prod-1'
-          }
+            productId: 'prod-5000'
+          },
+          items: [{ price: { id: 'pri_500', customData: null } }]
         }
       });
 
@@ -333,10 +359,44 @@ describe('PaddleProvider', () => {
         reducible(result).payload as NormalizedInvoicePayload
       ).toMatchObject({
         kind: 'one_time',
-        productId: 'prod-1',
+        productId: null,
+        providerPriceIds: ['pri_500'],
         providerSubscriptionId: null,
         amountMinor: 1200
       });
+    });
+
+    it('takes the product id of a custom-amount purchase from the inline price', async () => {
+      const { provider, client } = await build({});
+      client!.webhooks.unmarshal.mockResolvedValue({
+        eventId: 'evt_ot_3',
+        eventType: EventName.TransactionCompleted,
+        data: {
+          ...transactionData,
+          subscriptionId: null,
+          customData: {
+            customerId: 'cust-1',
+            userId: 'user-1',
+            kind: 'one_time'
+          },
+          items: [
+            {
+              price: {
+                id: 'pri_inline',
+                customData: { productId: 'prod-custom' }
+              }
+            }
+          ]
+        }
+      });
+
+      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
+        'paddle-signature': 'sig'
+      });
+
+      expect(
+        reducible(result).payload as NormalizedInvoicePayload
+      ).toMatchObject({ kind: 'one_time', productId: 'prod-custom' });
     });
 
     it('ignores a failed one-time purchase transaction (nothing pending to fail)', async () => {
@@ -442,7 +502,7 @@ describe('PaddleProvider', () => {
       expect(client!.transactions.create).toHaveBeenCalledWith(
         expect.objectContaining({
           items: [{ priceId: 'pri_1', quantity: 1 }],
-          customData: { customerId: 'cust-1', userId: 'user-1', planKey: 'pro' }
+          customData: { customerId: 'cust-1', userId: 'user-1' }
         })
       );
       expect(session).toEqual({
@@ -498,8 +558,7 @@ describe('PaddleProvider', () => {
         customData: {
           customerId: 'cust-1',
           userId: 'user-1',
-          kind: 'one_time',
-          productId: 'prod-1'
+          kind: 'one_time'
         },
         checkout: { url: 'https://app/return' }
       });
@@ -535,7 +594,8 @@ describe('PaddleProvider', () => {
               price: {
                 description: 'Donation',
                 unitPrice: { amount: '1500', currencyCode: 'USD' },
-                product: { name: 'Donation', taxCategory: 'standard' }
+                product: { name: 'Donation', taxCategory: 'standard' },
+                customData: { productId: 'prod-custom' }
               }
             }
           ]
@@ -651,11 +711,7 @@ describe('PaddleProvider', () => {
       expect(client!.subscriptions.update).toHaveBeenCalledWith('sub_ext', {
         items: [{ priceId: 'pri_biz', quantity: 1 }],
         prorationBillingMode: 'prorated_immediately',
-        customData: {
-          customerId: 'cust-1',
-          userId: 'user-1',
-          planKey: 'business'
-        }
+        customData: { customerId: 'cust-1', userId: 'user-1' }
       });
     });
 
