@@ -39,6 +39,10 @@ import type {
   NormalizedPaymentMethodPayload,
   NormalizedSubscriptionPayload
 } from '../src/modules/billing/providers/payment-provider.interface';
+import {
+  BILLING_DB_LOCK_TIMEOUT_MS,
+  holdBillingDbLock
+} from './billing-db-lock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -48,6 +52,7 @@ const PLAN_KEY = 'stale-race-pro';
 
 runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
   let ds: DataSource;
+  let releaseDbLock: (() => Promise<void>) | undefined;
   let userId: string | undefined;
   let customerId: string | undefined;
   let subscriptionId: string;
@@ -60,6 +65,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
+    releaseDbLock = await holdBillingDbLock(ds);
     await ds.getRepository(Plan).save(
       ds.getRepository(Plan).create({
         key: PLAN_KEY,
@@ -82,7 +88,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         }
       })
     );
-  }, 30000);
+  }, BILLING_DB_LOCK_TIMEOUT_MS);
 
   beforeEach(async () => {
     emit = jest.fn();
@@ -112,6 +118,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
 
   afterAll(async () => {
     await ds?.getRepository(Plan).delete({ key: PLAN_KEY });
+    await releaseDbLock?.();
     await ds?.destroy();
   });
 
@@ -347,8 +354,10 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     );
     const renewedEnd = new Date(periodEnd.getTime() + 30 * DAY_MS);
 
+    // Only Paddle sends subscription snapshots; the plan is found by its
+    // Paddle price id.
     await reducer.reduce({
-      provider: 'yookassa',
+      provider: 'paddle',
       providerEventId: `evt-renew-${subscriptionId}`,
       type: 'subscription.renewed',
       payload: subscriptionPayload({

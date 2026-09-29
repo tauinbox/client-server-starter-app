@@ -26,6 +26,10 @@ import { CreditService } from '../src/modules/billing/services/credit.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
+import {
+  BILLING_DB_LOCK_TIMEOUT_MS,
+  holdBillingDbLock
+} from './billing-db-lock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -38,6 +42,7 @@ runWithInfra(
   'Immediate cancel vs. the renewal of a due usage period (e2e)',
   () => {
     let ds: DataSource;
+    let releaseDbLock: (() => Promise<void>) | undefined;
     let userId: string | undefined;
     let customerId: string | undefined;
     let subscription: Subscription;
@@ -45,6 +50,7 @@ runWithInfra(
     beforeAll(async () => {
       ds = new DataSource({ ...postgresConfig(), logging: false });
       await ds.initialize();
+      releaseDbLock = await holdBillingDbLock(ds);
       await ds.getRepository(Plan).save(
         ds.getRepository(Plan).create({
           key: PLAN_KEY,
@@ -67,7 +73,7 @@ runWithInfra(
           }
         })
       );
-    }, 30000);
+    }, BILLING_DB_LOCK_TIMEOUT_MS);
 
     beforeEach(async () => {
       await seed();
@@ -96,6 +102,7 @@ runWithInfra(
 
     afterAll(async () => {
       await ds?.getRepository(Plan).delete({ key: PLAN_KEY });
+      await releaseDbLock?.();
       await ds?.destroy();
     });
 

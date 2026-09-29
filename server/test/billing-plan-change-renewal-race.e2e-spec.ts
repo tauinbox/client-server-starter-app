@@ -33,6 +33,10 @@ import { PLAN_CHANGE_LEASE_MS } from '../src/modules/billing/renewals/renewal-qu
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
+import {
+  BILLING_DB_LOCK_TIMEOUT_MS,
+  holdBillingDbLock
+} from './billing-db-lock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -74,6 +78,7 @@ async function waitPast(moment: Date): Promise<void> {
 
 runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   let ds: DataSource;
+  let releaseDbLock: (() => Promise<void>) | undefined;
   let userId: string | undefined;
   let customerId: string | undefined;
   let subscriptionId: string;
@@ -87,6 +92,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
+    releaseDbLock = await holdBillingDbLock(ds);
     const plans = ds.getRepository(Plan);
     await plans.save([
       plans.create({
@@ -123,7 +129,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         }
       })
     ]);
-  }, 30000);
+  }, BILLING_DB_LOCK_TIMEOUT_MS);
 
   afterEach(async () => {
     jest.restoreAllMocks();
@@ -142,6 +148,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   afterAll(async () => {
     await ds?.getRepository(Plan).delete({ key: FIXED_KEY });
     await ds?.getRepository(Plan).delete({ key: USAGE_KEY });
+    await releaseDbLock?.();
     await ds?.destroy();
   });
 

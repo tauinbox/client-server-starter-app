@@ -40,6 +40,10 @@ import {
   SubscriptionCanceledEvent,
   UsagePeriodClosedEvent
 } from '../src/modules/billing/events/billing.events';
+import {
+  BILLING_DB_LOCK_TIMEOUT_MS,
+  holdBillingDbLock
+} from './billing-db-lock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -54,6 +58,7 @@ const ALT_METER = 'wp-alt-meter';
 
 runWithInfra('billing write paths (e2e)', () => {
   let ds: DataSource;
+  let releaseDbLock: (() => Promise<void>) | undefined;
   let userId: string;
   let customerId: string;
   let subscriptionId: string;
@@ -77,12 +82,14 @@ runWithInfra('billing write paths (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
+    releaseDbLock = await holdBillingDbLock(ds);
     provider = makeProvider();
     await seedTenant();
-  }, 60000);
+  }, BILLING_DB_LOCK_TIMEOUT_MS);
 
   afterAll(async () => {
     await purge();
+    await releaseDbLock?.();
     await ds?.destroy();
   });
 

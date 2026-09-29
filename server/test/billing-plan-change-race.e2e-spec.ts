@@ -25,6 +25,10 @@ import { RenewalService } from '../src/modules/billing/renewals/renewal.service'
 import { ChargeDeclinedError } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
+import {
+  BILLING_DB_LOCK_TIMEOUT_MS,
+  holdBillingDbLock
+} from './billing-db-lock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -34,6 +38,7 @@ type ConcurrentWrite = (subscriptionId: string) => Promise<unknown>;
 
 runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   let ds: DataSource;
+  let releaseDbLock: (() => Promise<void>) | undefined;
   let service: BillingUserService;
   let userId: string | undefined;
   let customerId: string | undefined;
@@ -48,7 +53,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
-  }, 30000);
+    releaseDbLock = await holdBillingDbLock(ds);
+  }, BILLING_DB_LOCK_TIMEOUT_MS);
 
   afterEach(async () => {
     jest.restoreAllMocks();
@@ -69,6 +75,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   });
 
   afterAll(async () => {
+    await releaseDbLock?.();
     await ds?.destroy();
   });
 

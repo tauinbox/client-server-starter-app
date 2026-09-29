@@ -35,6 +35,10 @@ import { CreditService } from '../src/modules/billing/services/credit.service';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import {
+  BILLING_DB_LOCK_TIMEOUT_MS,
+  holdBillingDbLock
+} from './billing-db-lock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -76,6 +80,7 @@ function fakeProvider(id: BillingProviderId): FakeProvider {
 
 runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
   let ds: DataSource;
+  let releaseDbLock: (() => Promise<void>) | undefined;
   let userId: string | undefined;
   let customerId: string | undefined;
   let subscriptionId: string;
@@ -94,6 +99,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
+    releaseDbLock = await holdBillingDbLock(ds);
     const plans = ds.getRepository(Plan);
     await plans.save([
       plans.create({
@@ -144,7 +150,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         }
       })
     ]);
-  }, 30000);
+  }, BILLING_DB_LOCK_TIMEOUT_MS);
 
   afterEach(async () => {
     if (customerId) {
@@ -162,6 +168,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
   afterAll(async () => {
     await ds?.getRepository(Plan).delete({ key: FIXED_KEY });
     await ds?.getRepository(Plan).delete({ key: USAGE_KEY });
+    await releaseDbLock?.();
     await ds?.destroy();
   });
 
