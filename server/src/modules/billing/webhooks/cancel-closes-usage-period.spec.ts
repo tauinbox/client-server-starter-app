@@ -34,6 +34,13 @@ async function build() {
     currentPeriodStart: PERIOD_START,
     currentPeriodEnd: PERIOD_END
   } as Subscription;
+  const usagePlan = {
+    key: 'usage',
+    billingMode: 'usage',
+    prices: {
+      paddle: { currency: 'USD', amountMinor: 0, providerPriceId: 'pri_usage' }
+    }
+  } as Plan;
 
   const insertedInvoices: Array<Record<string, unknown>> = [];
   const manager = {
@@ -42,6 +49,9 @@ async function build() {
     update: jest.fn().mockResolvedValue({ affected: 1 }),
     findOne: jest.fn((entity: unknown) =>
       Promise.resolve(entity === Subscription ? storedSubscription : null)
+    ),
+    find: jest.fn((entity: unknown) =>
+      Promise.resolve(entity === Plan ? [usagePlan] : [])
     ),
     createQueryBuilder: () => {
       const builder = {
@@ -140,7 +150,7 @@ const canceledEvent: NormalizedEvent = {
     ref: { customerId: 'cust-1', userId: 'user-1' },
     providerSubscriptionId: 'psub_1',
     status: 'canceled',
-    planKey: 'usage',
+    providerPriceIds: ['pri_usage'],
     currentPeriodStart: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,

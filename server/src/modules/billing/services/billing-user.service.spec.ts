@@ -484,6 +484,62 @@ describe('BillingUserService', () => {
       ).rejects.toThrow(ServiceUnavailableException);
     });
 
+    describe('on Paddle', () => {
+      function setupPaddle(product: Product) {
+        return build().then((ctx) => {
+          ctx.products.findOne.mockResolvedValue(product);
+          ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+          const paddle = provider('paddle', true);
+          ctx.billing.resolveProvider.mockResolvedValue(paddle);
+          return { ctx, paddle };
+        });
+      }
+
+      it.each(['sku', 'credits'] as const)(
+        'rejects a %s product with no Paddle catalog price with 503',
+        async (type) => {
+          const { ctx, paddle } = await setupPaddle(
+            makeProduct({
+              type,
+              prices: { paddle: { currency: 'USD', amountMinor: 500 } }
+            })
+          );
+
+          await expect(
+            ctx.service.purchase('user-1', { productKey: 'report-pack' })
+          ).rejects.toThrow(ServiceUnavailableException);
+          expect(paddle.createOneTimePayment).not.toHaveBeenCalled();
+        }
+      );
+
+      it('opens a custom-amount purchase with no catalog price', async () => {
+        const { ctx, paddle } = await setupPaddle(
+          makeDonation({
+            prices: {
+              paddle: {
+                currency: 'USD',
+                minAmountMinor: 100,
+                maxAmountMinor: 50000
+              }
+            }
+          })
+        );
+
+        await ctx.service.purchase('user-1', {
+          productKey: 'donation',
+          amountMinor: 1500
+        });
+
+        expect(paddle.createOneTimePayment).toHaveBeenCalledWith(
+          RU_CUSTOMER,
+          expect.objectContaining({
+            amountMinor: 1500,
+            paddlePriceId: undefined
+          })
+        );
+      });
+    });
+
     it('requires an amount for a custom product', async () => {
       const { ctx } = await setupPurchase(makeDonation());
 

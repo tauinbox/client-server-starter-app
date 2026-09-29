@@ -610,8 +610,9 @@ routes are:
 - It makes the usage summary, with `UsageRating` over the metered window of the current period.
 - It reads and sets the region, with the guard against a cross-provider migration.
 - It lists the one-time catalog (`listProducts`) and does a purchase. The purchase calls
-  `resolveProvider` and then `createOneTimePayment`. The product id travels through the custom data
-  of the provider. The service answers `{ provider, url|null, sessionRef }` to the client.
+  `resolveProvider` and then `createOneTimePayment`. On Paddle, an `sku` or a `credits` product with
+  no `paddlePriceId` gets a 503, because the webhook finds the product by the paid catalog price. The
+  service answers `{ provider, url|null, sessionRef }` to the client.
 - It starts a payment-method update. The dispatch uses the provider of the subscription, as the
   cancel does. It returns the hosted session, and the return URL is the billing settings page.
 - It does the plan change and the proration preview. The next paragraphs describe that flow.
@@ -621,7 +622,7 @@ change before any money moves. A concurrent change loses the CAS and gets a 409.
 never asks the provider for a second conflicting charge. The CAS stays outside the DB transaction,
 thus no row lock is held across the HTTP call to the provider.
 
-Paddle delegates the change. The new plan key goes into the custom data again.
+Paddle delegates the change. The webhook takes the new plan from the new price id.
 
 YooKassa records the charge leg as a `pending` invoice BEFORE the call to the provider. A plan change
 is user-driven and runs one time, thus no later scan reconciles it, unlike a renewal. Without the
@@ -770,13 +771,15 @@ verify, and the answer is a 400.
 
 - `verifyAndParseWebhook` uses `webhooks.unmarshal` for the HMAC verification, and it makes a
   `NormalizedEvent` object. The event includes the usage charge key, which travels through the price
-  custom data.
+  custom data. A subscription event and a one-time transaction carry the paid `items[].price.id`
+  values as `providerPriceIds`. The reducer finds the plan or the product from them, never from the
+  transaction custom data, which a Paddle.js checkout in the browser can set.
 - `startCheckout` opens a hosted checkout.
 - `chargeUsage` calls `createOneTimeCharge` at the cycle boundary.
 - `createOneTimePayment` calls `transactions.create`. It uses the catalog `paddlePriceId`, or an
-  inline non-catalog price for a custom amount. The one-time marker and the `productId` go into the
-  custom data. The `url` value is optional, because Paddle.js can complete the payment with the
-  transaction id.
+  inline non-catalog price for a custom amount. The one-time marker goes into the custom data of the
+  transaction. For a custom amount, the `productId` goes into the custom data of the inline price.
+  The `url` value is optional, because Paddle.js can complete the payment with the transaction id.
 - `changePlan` and `previewChangePlan` call `subscriptions.update` and `previewUpdate` with
   `prorated_immediately`.
 - `updatePaymentMethod` calls `getPaymentMethodChangeTransaction` for the hosted checkout. The
@@ -786,6 +789,21 @@ verify, and the answer is a 400.
 - `refund` makes an adjustment. The Paddle API has no idempotency key from the client. Thus the
   refund key of the caller goes into the reason of the adjustment. A retry finds the existing
   adjustment through `adjustments.list` and does nothing. Thus there is no double refund.
+
+**Paddle needs catalog price ids, and the seeders do not write them.** A Paddle price id belongs to
+one Paddle account, thus `billing-plans.seeder.ts` and `billing-products.seeder.ts` leave it out.
+Before you turn Paddle on, create the prices in the Paddle dashboard and write their ids into the
+database:
+
+- each paid plan: `plans.prices -> paddle -> providerPriceId`;
+- each `sku` and `credits` product: `billing_products.prices -> paddle -> paddlePriceId`.
+
+No API edits these fields, and the seeders create rows but do not update them. Thus the operator
+writes them with SQL, for example
+`UPDATE plans SET prices = jsonb_set(prices, '{paddle,providerPriceId}', '"pri_..."') WHERE key = 'pro';`.
+Without a price id, Paddle checkout, plan change, plan-change preview and the purchase of that
+product answer 503. A `custom` product needs no price id. The mock seed carries placeholder
+`paddlePriceId` values on its products so that the mock purchase flows work.
 
 `YooKassaProvider` is the true YooKassa client, and it is self-managed:
 
@@ -992,9 +1010,11 @@ recorded that invoice:
 - A canceled event comes from a pending charge that the provider declined at capture. The reducer
   flips the pending row to failed silently. The renewal scan sees that and owns the dunning ladder.
 
-A paid one-time purchase carries `kind one_time` and the `productId`, through the custom data or the
-metadata. The reducer applies it onto an invoice with `kind 'one_time'`, `subscription_id NULL` and
-the `product_id` value. It applies the effect of the product one time for each paid invoice. An `sku`
+A paid one-time purchase carries `kind one_time`. The product comes from the YooKassa metadata, from
+the custom data of a Paddle inline price, or from the paid Paddle catalog price id. Our server
+writes the first two, and Paddle sets the third. The reducer applies it onto an invoice with
+`kind 'one_time'`, `subscription_id NULL` and the `product_id` value. A payment that matches no
+product is recorded with `product_id NULL` and grants nothing. It applies the effect of the product one time for each paid invoice. An `sku`
 makes a `CustomerGrant` row, with the expiry from `grant.durationDays`, or permanent with no such
 value. A `credits` product adds to the prepaid balance and writes a ledger entry. A `custom` product
 gives no grant.
@@ -1828,7 +1848,7 @@ a currency with zero decimals and a currency with three decimals correctly.
 
 | Table | Description |
 |-------|-------------|
-| `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits? }` for each provider |
+| `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits?, providerPriceId? }` for each provider. Paddle needs `providerPriceId`, and the seeder does not write it (refer to the Paddle price ids note under Billing) |
 | `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL) |
 | `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default`. A partial unique index on `customer_id WHERE is_default` permits a maximum of one default for each customer |
 | `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `metered_from`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL. `metered_from` is nullable. It is the start of the metered window after a switch of billing mode, and a new period resets it |

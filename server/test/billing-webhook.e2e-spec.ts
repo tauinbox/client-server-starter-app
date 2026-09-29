@@ -36,6 +36,7 @@ import {
 } from '../src/modules/billing/providers/payment-provider.interface';
 import type {
   NormalizedEvent,
+  NormalizedInvoicePayload,
   PaymentProvider,
   WebhookVerificationResult
 } from '../src/modules/billing/providers/payment-provider.interface';
@@ -104,6 +105,14 @@ function makeManager(stores: Stores) {
         return Promise.resolve(findWhere(stores.creditBalances, opts.where));
       return Promise.resolve(null);
     },
+    find: (entity: unknown) =>
+      Promise.resolve(
+        entity === Plan
+          ? stores.plans
+          : entity === Product
+            ? stores.products
+            : []
+      ),
     update: (
       entity: unknown,
       where: Record<string, unknown>,
@@ -283,24 +292,57 @@ describe('Billing Paddle webhook (e2e)', () => {
       subscriptions: [],
       invoices: [],
       customers: [{ id: 'cust-1', userId: 'user-1' } as Customer],
-      plans: [{ key: 'pro', billingMode: 'fixed' } as Plan],
+      plans: [
+        {
+          key: 'pro',
+          billingMode: 'fixed',
+          prices: {
+            paddle: {
+              currency: 'USD',
+              amountMinor: 1200,
+              providerPriceId: 'pri_pro'
+            }
+          }
+        } as Plan
+      ],
       products: [
         {
           id: 'prod-sku',
           key: 'report-pack',
           type: 'sku',
+          prices: {
+            paddle: {
+              currency: 'USD',
+              amountMinor: 4900,
+              paddlePriceId: 'pri_sku'
+            }
+          },
           grant: { entitlement: 'reports' }
         } as Product,
         {
           id: 'prod-don',
           key: 'donation',
           type: 'custom',
+          prices: {
+            paddle: {
+              currency: 'USD',
+              minAmountMinor: 100,
+              maxAmountMinor: 50000
+            }
+          },
           grant: null
         } as Product,
         {
           id: 'prod-cr',
           key: 'credits-500',
           type: 'credits',
+          prices: {
+            paddle: {
+              currency: 'USD',
+              amountMinor: 500,
+              paddlePriceId: 'pri_cr_500'
+            }
+          },
           grant: { credits: 500 }
         } as Product
       ],
@@ -429,7 +471,7 @@ describe('Billing Paddle webhook (e2e)', () => {
       ref: { customerId: 'cust-1', userId: 'user-1' },
       providerSubscriptionId: 'sub_paddle_1',
       status: 'active',
-      planKey: 'pro',
+      providerPriceIds: ['pri_pro'],
       currentPeriodStart: '2026-06-01T00:00:00Z',
       currentPeriodEnd: '2026-07-01T00:00:00Z',
       cancelAtPeriodEnd: false,
@@ -535,9 +577,11 @@ describe('Billing Paddle webhook (e2e)', () => {
 
   // ── One-time purchases ──────────────────────────────────────────────────────
 
+  // What the Paddle provider reports: the paid catalog price of an sku or a
+  // credit pack, or the product id planted in a custom amount's inline price.
   const oneTimePaid = (
     providerEventId: string,
-    productId: string
+    paid: Pick<NormalizedInvoicePayload, 'productId' | 'providerPriceIds'>
   ): NormalizedEvent => ({
     provider: 'paddle',
     providerEventId,
@@ -552,9 +596,11 @@ describe('Billing Paddle webhook (e2e)', () => {
       periodEnd: null,
       paidAt: '2026-06-11T10:00:00Z',
       kind: 'one_time',
-      productId
+      productId: null,
+      ...paid
     }
   });
+  const skuPaid = { providerPriceIds: ['pri_sku'] };
 
   function postWebhook(event: NormalizedEvent) {
     return request(server)
@@ -566,7 +612,7 @@ describe('Billing Paddle webhook (e2e)', () => {
   }
 
   it('reduces a paid one-time sku purchase onto a one_time invoice and grants the entitlement', async () => {
-    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await postWebhook(oneTimePaid('evt_ot_1', skuPaid));
 
     expect(stores.invoices).toHaveLength(1);
     expect(stores.invoices[0]).toMatchObject({
@@ -600,7 +646,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     expect(before.capabilities).not.toContain('reports');
     await entitlements.invalidateUser('user-1');
 
-    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await postWebhook(oneTimePaid('evt_ot_1', skuPaid));
 
     const after = await entitlements.capabilitiesFor('user-1');
     expect(after.capabilities).toContain('reports');
@@ -615,7 +661,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     ).not.toContain('reports');
     await entitlements.invalidateUser('user-1');
 
-    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await postWebhook(oneTimePaid('evt_ot_1', skuPaid));
     await entitlements.invalidateUser('user-1');
 
     const after = await request(server)
@@ -630,15 +676,15 @@ describe('Billing Paddle webhook (e2e)', () => {
     await request(server).get('/api/v1/billing/premium-content').expect(403);
 
     await entitlements.invalidateUser('user-1');
-    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await postWebhook(oneTimePaid('evt_ot_1', skuPaid));
     await entitlements.invalidateUser('user-1');
 
     await request(server).get('/api/v1/billing/premium-content').expect(200);
   });
 
   it('replays the one-time paid webhook without duplicating the invoice or the grant', async () => {
-    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
-    await postWebhook(oneTimePaid('evt_ot_1', 'prod-sku'));
+    await postWebhook(oneTimePaid('evt_ot_1', skuPaid));
+    await postWebhook(oneTimePaid('evt_ot_1', skuPaid));
 
     expect(stores.invoices).toHaveLength(1);
     expect(stores.grants).toHaveLength(1);
@@ -646,7 +692,7 @@ describe('Billing Paddle webhook (e2e)', () => {
   });
 
   it('records a paid custom (donation) purchase without any grant', async () => {
-    await postWebhook(oneTimePaid('evt_ot_don', 'prod-don'));
+    await postWebhook(oneTimePaid('evt_ot_don', { productId: 'prod-don' }));
 
     expect(stores.invoices).toHaveLength(1);
     expect(stores.invoices[0]).toMatchObject({
@@ -659,7 +705,9 @@ describe('Billing Paddle webhook (e2e)', () => {
   });
 
   it('tops up the prepaid balance from a paid credit-pack purchase', async () => {
-    await postWebhook(oneTimePaid('evt_ot_cr', 'prod-cr'));
+    await postWebhook(
+      oneTimePaid('evt_ot_cr', { providerPriceIds: ['pri_cr_500'] })
+    );
 
     expect(stores.invoices).toHaveLength(1);
     expect(stores.invoices[0]).toMatchObject({
@@ -686,8 +734,12 @@ describe('Billing Paddle webhook (e2e)', () => {
   });
 
   it('replays the credit-pack webhook without topping up twice', async () => {
-    await postWebhook(oneTimePaid('evt_ot_cr', 'prod-cr'));
-    await postWebhook(oneTimePaid('evt_ot_cr', 'prod-cr'));
+    await postWebhook(
+      oneTimePaid('evt_ot_cr', { providerPriceIds: ['pri_cr_500'] })
+    );
+    await postWebhook(
+      oneTimePaid('evt_ot_cr', { providerPriceIds: ['pri_cr_500'] })
+    );
 
     expect(stores.invoices).toHaveLength(1);
     expect(stores.creditBalances[0].balanceUnits).toEqual(Money.fromMinor(500));
@@ -775,7 +827,8 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
               currency: 'USD',
               amountMinor: 0,
               unitPriceMinor: 2,
-              includedUnits: 100
+              includedUnits: 100,
+              providerPriceId: 'pri_usage'
             }
           }
         } as Plan
@@ -883,7 +936,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       ref: { customerId: 'cust-1', userId: 'user-1' },
       providerSubscriptionId: 'sub_paddle_1',
       status: 'active',
-      planKey: 'usage',
+      providerPriceIds: ['pri_usage'],
       currentPeriodStart: '2026-06-01T00:00:00Z',
       currentPeriodEnd: '2026-07-01T00:00:00Z',
       cancelAtPeriodEnd: false,

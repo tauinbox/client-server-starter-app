@@ -50,6 +50,24 @@ function parseDate(iso: string | null, fallback: Date): Date {
 }
 
 /**
+ * The catalog row whose provider price carries one of `priceIds`. Inactive
+ * rows match too: a retired plan keeps its subscribers, and a product retired
+ * after the payment was still paid for.
+ */
+function findByPriceId<T>(
+  rows: T[],
+  priceIds: string[],
+  priceIdOf: (row: T) => string | undefined
+): T | null {
+  return (
+    rows.find((row) => {
+      const priceId = priceIdOf(row);
+      return priceId !== undefined && priceIds.includes(priceId);
+    }) ?? null
+  );
+}
+
+/**
  * Which side owns the subscription lifecycle: YooKassa is
  * self-managed (the core drives renewals), every other provider (Paddle) is
  * provider-managed.
@@ -129,6 +147,53 @@ export class BillingEventReducer {
     return customer?.userId ?? null;
   }
 
+  /**
+   * The plan a subscription snapshot was charged for. No match means a plan
+   * with no price id for this provider, so the snapshot leaves the plan as it
+   * is and the gap is reported.
+   */
+  private async planForPrices(
+    manager: EntityManager,
+    provider: BillingProviderId,
+    payload: NormalizedSubscriptionPayload
+  ): Promise<Plan | null> {
+    const plan = findByPriceId(
+      await manager.find(Plan),
+      payload.providerPriceIds,
+      (row) => row.prices[provider]?.providerPriceId
+    );
+    if (!plan) {
+      this.logger.error(
+        `Subscription ${payload.providerSubscriptionId}: no plan has the ${provider} price [${payload.providerPriceIds.join(', ')}]`
+      );
+    }
+    return plan;
+  }
+
+  /**
+   * The product a one-time payment bought: named by `productId` when our
+   * server wrote it, else matched by the catalog price that was paid.
+   */
+  private async purchasedProduct(
+    manager: EntityManager,
+    provider: BillingProviderId,
+    payload: NormalizedInvoicePayload
+  ): Promise<Product | null> {
+    const product = payload.productId
+      ? await manager.findOne(Product, { where: { id: payload.productId } })
+      : findByPriceId(
+          await manager.find(Product),
+          payload.providerPriceIds ?? [],
+          (row) => row.prices[provider]?.paddlePriceId
+        );
+    if (!product) {
+      this.logger.error(
+        `One-time payment ${payload.providerInvoiceRef}: no product matches it, nothing is granted`
+      );
+    }
+    return product;
+  }
+
   private async reduceSubscription(
     provider: BillingProviderId,
     type:
@@ -148,16 +213,14 @@ export class BillingEventReducer {
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
+      const plan = await this.planForPrices(manager, provider, payload);
 
       const subscription = await manager.findOne(Subscription, {
         where: { providerSubscriptionId: payload.providerSubscriptionId }
       });
 
       if (!subscription) {
-        if (!payload.planKey) {
-          this.logger.warn(
-            `Skipping ${type} for ${payload.providerSubscriptionId}: no plan key`
-          );
+        if (!plan) {
           return null;
         }
         // 1:1 invariant (UQ_subscriptions_customer_open): a customer who already
@@ -175,17 +238,14 @@ export class BillingEventReducer {
           );
           return null;
         }
-        const plan = await manager.findOne(Plan, {
-          where: { key: payload.planKey }
-        });
         const lifecycleOwner = lifecycleOwnerFor(provider);
         const periodStart = parseDate(payload.currentPeriodStart, now);
         const created = await manager.save(
           manager.create(Subscription, {
             customerId: payload.ref.customerId,
-            planKey: payload.planKey,
+            planKey: plan.key,
             provider,
-            billingMode: plan?.billingMode ?? 'fixed',
+            billingMode: plan.billingMode,
             status: payload.status,
             lifecycleOwner,
             currentPeriodStart: periodStart,
@@ -220,10 +280,7 @@ export class BillingEventReducer {
         meteredClose && (type === 'subscription.canceled' || rollsOver);
       // A plan change whose local write missed its guard reaches the row only
       // through this snapshot, so a switch of billing mode is applied here.
-      const toPlan =
-        payload.planKey && payload.planKey !== subscription.planKey
-          ? await manager.findOne(Plan, { where: { key: payload.planKey } })
-          : null;
+      const toPlan = plan && plan.key !== subscription.planKey ? plan : null;
       const switchesMode =
         toPlan !== null && toPlan.billingMode !== subscription.billingMode;
       const closeEnd = closesPeriod
@@ -248,8 +305,8 @@ export class BillingEventReducer {
         cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
         trialEnd: payload.trialEnd ? new Date(payload.trialEnd) : null
       };
-      if (payload.planKey) {
-        snapshot.planKey = payload.planKey;
+      if (toPlan) {
+        snapshot.planKey = toPlan.key;
       }
       if (payload.currentPeriodStart) {
         snapshot.currentPeriodStart = new Date(payload.currentPeriodStart);
@@ -484,6 +541,9 @@ export class BillingEventReducer {
       // subscription id; a self-managed (YooKassa) first payment has none, so
       // the incomplete subscription created at checkout is found by customer id.
       const oneTime = payload.kind === 'one_time';
+      const product = oneTime
+        ? await this.purchasedProduct(manager, provider, payload)
+        : null;
       const subscription = oneTime
         ? null
         : payload.providerSubscriptionId
@@ -515,7 +575,7 @@ export class BillingEventReducer {
           status: 'paid',
           billingMode: subscription?.billingMode ?? 'fixed',
           kind: oneTime ? 'one_time' : 'subscription',
-          productId: oneTime ? (payload.productId ?? null) : null,
+          productId: product?.id ?? null,
           periodStart: parseDate(payload.periodStart, now),
           periodEnd: parseDate(payload.periodEnd, now),
           paidAt: parseDate(payload.paidAt, now),
@@ -538,7 +598,7 @@ export class BillingEventReducer {
           manager,
           customerId,
           rows[0].id,
-          payload.productId ?? null,
+          product,
           now
         );
         return { invoiceId: rows[0].id, userId, activatedSubscriptionId: null };
@@ -582,15 +642,9 @@ export class BillingEventReducer {
     manager: EntityManager,
     customerId: string,
     invoiceId: string,
-    productId: string | null,
+    product: Product | null,
     now: Date
   ): Promise<void> {
-    if (!productId) {
-      return;
-    }
-    const product = await manager.findOne(Product, {
-      where: { id: productId }
-    });
     if (!product?.grant) {
       return;
     }

@@ -727,7 +727,9 @@ export const seedPlans: MockPlan[] = generatePlans();
 
 // One-time purchase catalog — mirrors server/src/seeders/billing-products.seeder.ts:
 // a fixed-price sku unlocking the `reports` entitlement for 30 days, a bounded
-// custom-amount donation (no grant), and prepaid credit packs.
+// custom-amount donation (no grant), and prepaid credit packs. Unlike the server
+// seeder, the fixed-price Paddle entries carry a `paddlePriceId`: a real id is
+// per Paddle account, and without one POST /billing/purchase answers 503.
 function generateProducts(): MockProduct[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [
@@ -739,7 +741,11 @@ function generateProducts(): MockProduct[] {
       type: 'sku',
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 49000 },
-        paddle: { currency: 'USD', amountMinor: 500 }
+        paddle: {
+          currency: 'USD',
+          amountMinor: 500,
+          paddlePriceId: 'pri_mock_report_pack'
+        }
       },
       grant: { entitlement: 'reports', durationDays: 30 },
       active: true,
@@ -773,7 +779,11 @@ function generateProducts(): MockProduct[] {
       type: 'credits',
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 50000 },
-        paddle: { currency: 'USD', amountMinor: 500 }
+        paddle: {
+          currency: 'USD',
+          amountMinor: 500,
+          paddlePriceId: 'pri_mock_credits_500'
+        }
       },
       grant: { credits: 500 },
       active: true,
@@ -788,7 +798,11 @@ function generateProducts(): MockProduct[] {
       type: 'credits',
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 90000 },
-        paddle: { currency: 'USD', amountMinor: 900 }
+        paddle: {
+          currency: 'USD',
+          amountMinor: 900,
+          paddlePriceId: 'pri_mock_credits_1000'
+        }
       },
       grant: { credits: 1000 },
       active: true,
@@ -803,7 +817,11 @@ function generateProducts(): MockProduct[] {
       type: 'credits',
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 400000 },
-        paddle: { currency: 'USD', amountMinor: 4000 }
+        paddle: {
+          currency: 'USD',
+          amountMinor: 4000,
+          paddlePriceId: 'pri_mock_credits_5000'
+        }
       },
       grant: { credits: 5000 },
       active: true,

@@ -86,7 +86,8 @@ describe('GET /billing/products', () => {
     // en-locale seed user resolves to paddle/USD.
     expect(products[0].prices.paddle).toEqual({
       currency: 'USD',
-      amountMinor: 500
+      amountMinor: 500,
+      paddlePriceId: 'pri_mock_report_pack'
     });
     expect(products[1].type).toBe('custom');
     expect(products[1].prices.paddle).toEqual({
@@ -160,6 +161,26 @@ describe('POST /billing/purchase', () => {
     expect(session.provider).toBe('paddle');
     expect(session.url).toContain(session.sessionRef);
   });
+
+  it.each(['report-pack', 'credits-500'])(
+    'rejects a Paddle %s price with no catalog price id with 503',
+    async (productKey) => {
+      const product = [...getState().billingProducts.values()].find(
+        (p) => p.key === productKey
+      )!;
+      product.prices.paddle = { currency: 'USD', amountMinor: 500 };
+
+      const token = await login();
+      const res = await postPurchase(token, { productKey });
+
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(
+        `Product "${productKey}" has no Paddle price configured`
+      );
+      expect(getState().billingPurchaseSessions.size).toBe(0);
+    }
+  );
 });
 
 describe('/__control/billing/complete-purchase', () => {

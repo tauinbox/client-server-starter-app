@@ -307,7 +307,11 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     }
   }
 
+  /** A Paddle snapshot of the next period, on the price of the stored plan. */
   async function rollOverAtProvider(): Promise<void> {
+    const { planKey } = await ds
+      .getRepository(Subscription)
+      .findOneByOrFail({ id: subscriptionId });
     await reducer.reduce({
       provider: 'paddle',
       providerEventId: `evt-renew-${subscriptionId}`,
@@ -316,7 +320,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         ref: { customerId, userId },
         providerSubscriptionId: providerSubscriptionRef,
         status: 'active',
-        planKey: null,
+        providerPriceIds: [`pri_${planKey}`],
         currentPeriodStart: periodEnd.toISOString(),
         currentPeriodEnd: new Date(
           periodEnd.getTime() + 30 * DAY_MS
@@ -327,7 +331,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     });
   }
 
-  /** A Paddle snapshot inside the stored period that reports `planKey`. */
+  /** A Paddle snapshot inside the stored period, on the price of `planKey`. */
   async function planSnapshotAtProvider(planKey: string): Promise<void> {
     await reducer.reduce({
       provider: 'paddle',
@@ -337,7 +341,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         ref: { customerId, userId },
         providerSubscriptionId: providerSubscriptionRef,
         status: 'active',
-        planKey,
+        providerPriceIds: [`pri_${planKey}`],
         currentPeriodStart: periodStart.toISOString(),
         currentPeriodEnd: periodEnd.toISOString(),
         cancelAtPeriodEnd: false,

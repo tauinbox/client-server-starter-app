@@ -495,8 +495,8 @@ billingRouter.get('/credits', authGuard, (req: Request, res: Response) => {
 
 // POST /billing/purchase — start a one-time purchase. Mirrors the server's
 // validation chain: unknown/inactive product 404, no price for the resolved
-// provider 409, misconfigured catalog 503, custom amount required and bounded
-// 400. The provider session is recorded as a pending purchase that
+// provider 409, misconfigured catalog 503 (also a Paddle sku/credits price with
+// no `paddlePriceId`), custom amount required and bounded 400. The provider session is recorded as a pending purchase that
 // /__control/billing/complete-purchase settles the way the paid webhook would.
 billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
@@ -588,6 +588,19 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
       return;
     }
     amountMinor = requestedMinor;
+  }
+  // The Paddle webhook grants the product it finds by the paid catalog price
+  // id, so a fixed-price Paddle purchase needs one.
+  if (
+    provider === 'paddle' &&
+    product.type !== 'custom' &&
+    !price.paddlePriceId
+  ) {
+    res.status(503).json({
+      message: `Product "${product.key}" has no Paddle price configured`,
+      statusCode: 503
+    });
+    return;
   }
 
   const sessionRef = uuidv4();
