@@ -889,6 +889,14 @@ to a fixed plan, over `[windowStart, now)`, under the key `cancel:{subId}:{windo
 path walks dunning. Thus a decline books the window as `failed` and the cancellation or the switch
 still completes.
 
+An immediate cancel after the renewal anchor (`trial_end` for a trial, else `current_period_end`)
+races the renewal scan for the same units. Thus it splits the window at the anchor: it charges
+`[windowStart, anchor)` under the renewal key `renewal:{subId}:{anchorMs}`, and `[anchor, now)` under
+`cancel:{subId}:{anchorMs}`. The invoice insert and the provider `Idempotence-Key` then collapse the
+two charges of the due part into one. A switch does not split, because the next fixed renewal needs
+the renewal key. Instead, a self-managed plan change after the anchor gets `409` until the scan
+renews the period.
+
 Every usage rating reads the metered window `[max(current_period_start, metered_from), end)`
 (`meteredWindowStart` in `utils/period.util.ts`). A switch of billing mode sets `metered_from` to the
 moment of the switch, and a new period resets it to NULL. Thus a usage plan never rates the units

@@ -779,6 +779,21 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     });
     return null;
   }
+  const renewalAnchor =
+    sub.status === 'trialing' && sub.trialEnd
+      ? sub.trialEnd
+      : sub.currentPeriodEnd;
+  if (
+    sub.lifecycleOwner === 'self' &&
+    new Date(renewalAnchor).getTime() <= Date.now()
+  ) {
+    res.status(409).json({
+      message:
+        'The billing period has ended and its renewal is in progress. Try again shortly.',
+      statusCode: 409
+    });
+    return null;
+  }
 
   const toPlan = [...getState().plans.values()].find(
     (p) => p.key === planKey && p.active

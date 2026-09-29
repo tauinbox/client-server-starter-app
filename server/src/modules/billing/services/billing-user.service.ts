@@ -52,7 +52,11 @@ import type {
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
-import { addInterval, meteredWindowStart } from '../utils/period.util';
+import {
+  addInterval,
+  meteredWindowStart,
+  renewalAnchor
+} from '../utils/period.util';
 import { changeChargeKey, changeRefundKey } from '../utils/charge-keys.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
@@ -911,6 +915,17 @@ export class BillingUserService {
     if (subscription.cancelAtPeriodEnd) {
       throw new ConflictException(
         'A cancellation is scheduled for this subscription; it can no longer change plans.'
+      );
+    }
+    // A self-managed period past its due moment belongs to the renewal scan: a
+    // switch now races that charge, or bills usage for time the next fixed
+    // period also prepays.
+    if (
+      subscription.lifecycleOwner === 'self' &&
+      renewalAnchor(subscription).getTime() <= Date.now()
+    ) {
+      throw new ConflictException(
+        'The billing period has ended and its renewal is in progress. Try again shortly.'
       );
     }
 

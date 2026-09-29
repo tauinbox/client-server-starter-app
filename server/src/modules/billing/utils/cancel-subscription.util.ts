@@ -61,7 +61,7 @@ export async function cancelOpenSubscription(
   // rated and charged before the row closes. A period-end cancel leaves that to
   // the renewal scan, which reaches the boundary with the period still open.
   if (mode === 'immediate') {
-    await deps.renewals.billClosingUsagePeriod(subscription);
+    await deps.renewals.billClosingUsagePeriod(subscription, new Date(), true);
   }
 
   const fields = cancelFields(mode);
