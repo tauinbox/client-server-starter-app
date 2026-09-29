@@ -790,6 +790,21 @@ verify, and the answer is a 400.
   refund key of the caller goes into the reason of the adjustment. A retry finds the existing
   adjustment through `adjustments.list` and does nothing. Thus there is no double refund.
 
+**Paddle needs catalog price ids, and the seeders do not write them.** A Paddle price id belongs to
+one Paddle account, thus `billing-plans.seeder.ts` and `billing-products.seeder.ts` leave it out.
+Before you turn Paddle on, create the prices in the Paddle dashboard and write their ids into the
+database:
+
+- each paid plan: `plans.prices -> paddle -> providerPriceId`;
+- each `sku` and `credits` product: `billing_products.prices -> paddle -> paddlePriceId`.
+
+No API edits these fields, and the seeders create rows but do not update them. Thus the operator
+writes them with SQL, for example
+`UPDATE plans SET prices = jsonb_set(prices, '{paddle,providerPriceId}', '"pri_..."') WHERE key = 'pro';`.
+Without a price id, Paddle checkout, plan change, plan-change preview and the purchase of that
+product answer 503. A `custom` product needs no price id. The mock seed carries placeholder
+`paddlePriceId` values on its products so that the mock purchase flows work.
+
 `YooKassaProvider` is the true YooKassa client, and it is self-managed:
 
 - `startCheckout` calls `createPayment` with `save_payment_method` and a redirect. A trial uses a
@@ -1833,7 +1848,7 @@ a currency with zero decimals and a currency with three decimals correctly.
 
 | Table | Description |
 |-------|-------------|
-| `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits? }` for each provider |
+| `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits?, providerPriceId? }` for each provider. Paddle needs `providerPriceId`, and the seeder does not write it (refer to the Paddle price ids note under Billing) |
 | `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL) |
 | `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default`. A partial unique index on `customer_id WHERE is_default` permits a maximum of one default for each customer |
 | `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `metered_from`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL. `metered_from` is nullable. It is the start of the metered window after a switch of billing mode, and a new period resets it |
