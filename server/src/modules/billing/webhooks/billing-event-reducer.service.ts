@@ -213,14 +213,30 @@ export class BillingEventReducer {
       // starts a new one at/after the stored boundary, or it cancels the
       // subscription - a case the rollover predicate never matches. Keyed on
       // the stored boundary, so a replay neither re-detects nor charges twice.
-      const closesPeriod =
+      const meteredClose =
         subscription.billingMode === 'usage' &&
-        subscription.lifecycleOwner === 'provider' &&
-        (type === 'subscription.canceled' || rollsOver);
-      const closedPeriod = closesPeriod
+        subscription.lifecycleOwner === 'provider';
+      const closesPeriod =
+        meteredClose && (type === 'subscription.canceled' || rollsOver);
+      // A plan change whose local write missed its guard reaches the row only
+      // through this snapshot, so a switch of billing mode is applied here.
+      const toPlan =
+        payload.planKey && payload.planKey !== subscription.planKey
+          ? await manager.findOne(Plan, { where: { key: payload.planKey } })
+          : null;
+      const switchesMode =
+        toPlan !== null && toPlan.billingMode !== subscription.billingMode;
+      const closeEnd = closesPeriod
+        ? subscription.currentPeriodEnd
+        : switchesMode && meteredClose && !rollsOver
+          ? now
+          : null;
+      // Rated under the stored plan: the snapshot may already carry the next.
+      const closedPeriod = closeEnd
         ? {
             start: meteredWindowStart(subscription),
-            end: subscription.currentPeriodEnd
+            end: closeEnd,
+            planKey: subscription.planKey
           }
         : null;
 
@@ -241,6 +257,10 @@ export class BillingEventReducer {
       if (payload.currentPeriodEnd) {
         snapshot.currentPeriodEnd = new Date(payload.currentPeriodEnd);
       }
+      if (switchesMode) {
+        snapshot.billingMode = toPlan.billingMode;
+        snapshot.meteredFrom = now;
+      }
       if (rollsOver) {
         snapshot.meteredFrom = null;
       }
@@ -259,7 +279,8 @@ export class BillingEventReducer {
           result.userId,
           result.subscriptionId,
           result.closedPeriod.start,
-          result.closedPeriod.end
+          result.closedPeriod.end,
+          result.closedPeriod.planKey
         )
       );
     }
