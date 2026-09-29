@@ -921,7 +921,11 @@ describe('BillingUserService', () => {
 
       await ctx.service.cancelSubscription('user-1', 'immediate');
 
-      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(sub);
+      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(
+        sub,
+        expect.any(Date),
+        true
+      );
     });
 
     it('leaves a period-end cancel to the renewal scan at the boundary', async () => {
@@ -1184,6 +1188,65 @@ describe('BillingUserService', () => {
 
     afterEach(() => {
       jest.useRealTimers();
+    });
+
+    it.each([
+      [
+        'a period past its end',
+        { currentPeriodEnd: new Date('2026-06-18T00:00:00Z') }
+      ],
+      [
+        'a trial past its end',
+        {
+          status: 'trialing' as const,
+          trialEnd: new Date('2026-06-19T00:00:00Z')
+        }
+      ]
+    ])(
+      'refuses a self-managed change on %s, before any money moves',
+      async (_case, overrides) => {
+        const ctx = await build();
+        plansByKey(ctx);
+        ctx.customers.findOne.mockResolvedValue(customer);
+        ctx.subscriptions.findOne.mockResolvedValue(
+          makeSub({ planKey: 'usage', billingMode: 'usage', ...overrides })
+        );
+        const yoo = provider('yookassa', false);
+        ctx.billing.getProviderById.mockReturnValue(yoo);
+        const message =
+          'The billing period has ended and its renewal is in progress. Try again shortly.';
+
+        await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
+          new ConflictException(message)
+        );
+        await expect(
+          ctx.service.previewChange('user-1', 'pro')
+        ).rejects.toThrow(new ConflictException(message));
+
+        expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+        expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
+        expect(yoo.chargeOffSession).not.toHaveBeenCalled();
+      }
+    );
+
+    it('lets a provider-managed row change after its local period end', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({
+          provider: 'paddle',
+          lifecycleOwner: 'provider',
+          providerSubscriptionId: 'sub_ext',
+          currentPeriodEnd: new Date('2026-06-18T00:00:00Z')
+        })
+      );
+      const paddle = provider('paddle', true);
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+
+      const result = await ctx.service.changePlan('user-1', 'business');
+
+      expect(result.planKey).toBe('business');
     });
 
     it('delegates a provider-managed change to the provider and updates the local row', async () => {

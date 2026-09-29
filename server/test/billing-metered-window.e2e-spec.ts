@@ -376,6 +376,29 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     ).toBeNull();
   }, 30000);
 
+  it('YooKassa usage -> fixed after the period end: the switch is refused and moves no money', async () => {
+    await build('yookassa');
+    await seed('yookassa', USAGE_KEY);
+    await ds
+      .getRepository(Subscription)
+      .update(
+        { id: subscriptionId },
+        { currentPeriodEnd: new Date(Date.now() - 1000) }
+      );
+
+    await expect(
+      users.changePlan(userId as string, FIXED_KEY)
+    ).rejects.toMatchObject({ status: 409 });
+
+    expect(provider.chargeOffSession).not.toHaveBeenCalled();
+    expect(await usageInvoices()).toHaveLength(0);
+    expect(
+      await ds.getRepository(Subscription).findOneByOrFail({
+        id: subscriptionId
+      })
+    ).toMatchObject({ planKey: USAGE_KEY, billingMode: 'usage', version: 1 });
+  }, 30000);
+
   it('Paddle fixed -> usage: the period close bills nothing for units consumed on the fixed plan', async () => {
     await build('paddle');
     await seed('paddle', FIXED_KEY);

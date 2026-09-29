@@ -354,7 +354,11 @@ describe('BillingAdminService', () => {
 
       await ctx.service.cancelSubscription('sub-1', 'immediate');
 
-      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(sub);
+      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(
+        sub,
+        expect.any(Date),
+        true
+      );
     });
 
     it('leaves a period-end cancel to the renewal scan at the boundary', async () => {

@@ -849,7 +849,7 @@ runWithInfra('billing write paths (e2e)', () => {
       );
     }, 60000);
 
-    it('invoices the open metered period an immediate cancellation closes', async () => {
+    it('invoices the open metered window that a mode switch closes', async () => {
       await resetSubscription(USAGE_PLAN);
       const sub = await ds
         .getRepository(Subscription)

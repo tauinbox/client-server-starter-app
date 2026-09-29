@@ -1381,8 +1381,8 @@ describe('RenewalService', () => {
       });
     });
 
-    describe('billClosingUsagePeriod (immediate cancellation)', () => {
-      it('charges [currentPeriodStart, now) and records the invoice paid', async () => {
+    describe('billClosingUsagePeriod', () => {
+      it('charges [currentPeriodStart, now) under one window key when the subscription stays open', async () => {
         const sub = usageSub();
         const store = usageStore(sub);
         const charge = jest.fn().mockResolvedValue({
@@ -1463,7 +1463,7 @@ describe('RenewalService', () => {
         expect(sub.dunningAttempts).toBe(0);
       });
 
-      it('skips a period a renewal invoice already covers', async () => {
+      it('skips a period a renewal invoice already covers when the subscription stays open', async () => {
         const sub = usageSub();
         const store = usageStore(sub);
         const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
@@ -1483,6 +1483,108 @@ describe('RenewalService', () => {
 
         expect(charge).not.toHaveBeenCalled();
         expect(store.invoices).toHaveLength(1);
+      });
+
+      it('charges the due part of an immediate cancel under the renewal key and the rest under a cancel key', async () => {
+        const sub = usageSub();
+        const store = usageStore(sub);
+        const anchor = new Date('2026-06-01T00:00:00Z');
+        const charge = jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_now',
+          status: 'captured'
+        });
+        const { service } = await build(
+          store,
+          charge,
+          jest.fn().mockResolvedValue(142)
+        );
+
+        await service.billClosingUsagePeriod(sub, NOW, true);
+
+        expect(charge.mock.calls.map((call: unknown[]) => call[4])).toEqual([
+          `renewal:sub-1:${anchor.getTime()}`,
+          `cancel:sub-1:${anchor.getTime()}`
+        ]);
+        expect(store.invoices).toEqual([
+          expect.objectContaining({
+            providerEventId: `renewal:sub-1:${anchor.getTime()}`,
+            status: 'paid',
+            periodStart: new Date('2026-05-01T00:00:00Z'),
+            periodEnd: anchor
+          }),
+          expect.objectContaining({
+            providerEventId: `cancel:sub-1:${anchor.getTime()}`,
+            status: 'paid',
+            periodStart: anchor,
+            periodEnd: NOW
+          })
+        ]);
+      });
+
+      it('bills only the time after the due period when a renewal invoice already covers it', async () => {
+        const sub = usageSub();
+        const store = usageStore(sub);
+        const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
+        // @ts-expect-error - partial Invoice fake for this scenario
+        const booked: Invoice & { providerEventId: string | null } = {
+          id: 'inv-renewal',
+          providerEventId: `renewal:sub-1:${anchorMs}`,
+          status: 'failed',
+          providerInvoiceRef: '',
+          creditUnitsApplied: 0
+        };
+        store.invoices.push(booked);
+        const charge = jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_now',
+          status: 'captured'
+        });
+        const { service } = await build(
+          store,
+          charge,
+          jest.fn().mockResolvedValue(142)
+        );
+
+        await service.billClosingUsagePeriod(sub, NOW, true);
+
+        expect(charge).toHaveBeenCalledTimes(1);
+        expect(charge).toHaveBeenCalledWith(
+          expect.anything(),
+          8400,
+          'RUB',
+          expect.anything(),
+          `cancel:sub-1:${anchorMs}`
+        );
+        expect(booked.status).toBe('failed');
+        expect(store.invoices[1]).toMatchObject({
+          periodStart: new Date(anchorMs),
+          periodEnd: NOW
+        });
+      });
+
+      it('keeps the window key for an immediate cancel before the due moment', async () => {
+        const sub = usageSub();
+        const store = usageStore(sub);
+        const midPeriod = new Date('2026-05-20T00:00:00Z');
+        const charge = jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_now',
+          status: 'captured'
+        });
+        const { service } = await build(
+          store,
+          charge,
+          jest.fn().mockResolvedValue(142)
+        );
+
+        await service.billClosingUsagePeriod(sub, midPeriod, true);
+
+        expect(charge).toHaveBeenCalledTimes(1);
+        expect(charge).toHaveBeenCalledWith(
+          expect.anything(),
+          8400,
+          'RUB',
+          expect.anything(),
+          'cancel:sub-1:' + new Date('2026-05-01T00:00:00Z').getTime()
+        );
       });
 
       it('skips provider-managed rows, whose cancel webhook closes the period', async () => {

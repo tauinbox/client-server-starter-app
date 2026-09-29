@@ -62,6 +62,20 @@ export function meteredWindowStart(subscription: {
     : currentPeriodStart;
 }
 
+/**
+ * The boundary a self-managed renewal charges at: `trial_end` for a trial,
+ * else the end of the current period.
+ */
+export function renewalAnchor(subscription: {
+  status: string;
+  trialEnd: Date | null;
+  currentPeriodEnd: Date;
+}): Date {
+  return subscription.status === 'trialing' && subscription.trialEnd
+    ? subscription.trialEnd
+    : subscription.currentPeriodEnd;
+}
+
 /** The UTC wall-clock of `date` - the frame all boundary arithmetic runs in. */
 function utc(date: Date): Temporal.ZonedDateTime {
   return Temporal.Instant.fromEpochMilliseconds(

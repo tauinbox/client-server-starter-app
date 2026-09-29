@@ -34,7 +34,11 @@ import { FixedRating } from '../rating/fixed-rating.strategy';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { RatedAmount } from '../rating/rating-strategy.interface';
 import { CreditService } from '../services/credit.service';
-import { meteredWindowStart, nextPeriodEnd } from '../utils/period.util';
+import {
+  meteredWindowStart,
+  nextPeriodEnd,
+  renewalAnchor
+} from '../utils/period.util';
 import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS,
@@ -113,10 +117,14 @@ export class RenewalService {
    *
    * Provider-managed rows are skipped - Paddle's `subscription.canceled` webhook
    * closes their period through `UsagePeriodClosedEvent` instead.
+   *
+   * `endsSubscription` marks an immediate cancel: no renewal follows it, so
+   * the part of the window that is already due can share the renewal key.
    */
   async billClosingUsagePeriod(
     subscription: Subscription,
-    now: Date = new Date()
+    now: Date = new Date(),
+    endsSubscription = false
   ): Promise<void> {
     if (
       subscription.billingMode !== 'usage' ||
@@ -126,7 +134,7 @@ export class RenewalService {
       return;
     }
     try {
-      await this.chargeClosingUsagePeriod(subscription, now);
+      await this.chargeClosingUsagePeriod(subscription, now, endsSubscription);
     } catch (error) {
       this.logger.error(
         `Closing usage period of subscription ${subscription.id} could not be billed`,
@@ -137,21 +145,27 @@ export class RenewalService {
 
   private async chargeClosingUsagePeriod(
     subscription: Subscription,
-    now: Date
+    now: Date,
+    endsSubscription: boolean
   ): Promise<void> {
-    // The period this cancel closes is the one a due renewal would have rated,
+    // The period this close ends is the one a due renewal would have rated,
     // so a renewal invoice already recorded under that period's key - paid,
     // pending or failed in dunning - is the same money and must not be re-rated.
-    const dueAnchor =
-      subscription.status === 'trialing' && subscription.trialEnd
-        ? subscription.trialEnd
-        : subscription.currentPeriodEnd;
+    const dueAnchor = renewalAnchor(subscription);
+    const renewalKey = `renewal:${subscription.id}:${dueAnchor.getTime()}`;
     const booked = await this.dataSource.manager.findOne(Invoice, {
-      where: {
-        providerEventId: `renewal:${subscription.id}:${dueAnchor.getTime()}`
-      }
+      where: { providerEventId: renewalKey }
     });
-    if (booked) {
+    const windowStart = meteredWindowStart(subscription);
+    // A cancel after the due moment races the renewal scan for the same units.
+    // Charging the due part under the renewal key lets the invoice insert and
+    // the provider's idempotence key collapse the two into one charge. A mode
+    // switch keeps its own key: the next fixed renewal needs the renewal key.
+    const splitsAtDueAnchor =
+      endsSubscription &&
+      now.getTime() >= dueAnchor.getTime() &&
+      dueAnchor.getTime() > windowStart.getTime();
+    if (booked && !splitsAtDueAnchor) {
       this.logger.log(
         `Skipping closing charge for subscription ${subscription.id}: the period is already invoiced (${booked.status})`
       );
@@ -172,16 +186,68 @@ export class RenewalService {
       return;
     }
 
-    const windowStart = meteredWindowStart(subscription);
+    if (!splitsAtDueAnchor) {
+      // Stable per (subscription, window) so two racing closes charge once,
+      // while a later window of the same period gets a key of its own.
+      await this.chargeClosingWindow(
+        subscription,
+        customer,
+        plan,
+        provider,
+        { start: windowStart, end: now },
+        `cancel:${subscription.id}:${windowStart.getTime()}`,
+        now
+      );
+      return;
+    }
+
+    if (booked) {
+      this.logger.log(
+        `Closing charge for subscription ${subscription.id} bills only the time after the due period, which is already invoiced (${booked.status})`
+      );
+    } else {
+      await this.chargeClosingWindow(
+        subscription,
+        customer,
+        plan,
+        provider,
+        { start: windowStart, end: dueAnchor },
+        renewalKey,
+        now
+      );
+    }
+    if (now.getTime() > dueAnchor.getTime()) {
+      await this.chargeClosingWindow(
+        subscription,
+        customer,
+        plan,
+        provider,
+        { start: dueAnchor, end: now },
+        `cancel:${subscription.id}:${dueAnchor.getTime()}`,
+        now
+      );
+    }
+  }
+
+  /**
+   * Rates one closing window and charges it under `idempotencyKey`. Credits are
+   * read without a lock and spent only by the invoice insert that wins.
+   */
+  private async chargeClosingWindow(
+    subscription: Subscription,
+    customer: Customer,
+    plan: Plan,
+    provider: PaymentProvider,
+    window: { start: Date; end: Date },
+    idempotencyKey: string,
+    now: Date
+  ): Promise<void> {
     const rated = await this.usageRating.summarizeForPeriodWithCredits(
       subscription,
       plan,
-      { start: windowStart, end: now },
+      window,
       await this.credits.availableUnits(subscription.customerId)
     );
-    // Stable per (subscription, window) so two racing closes charge once, while
-    // a later window of the same period gets a key of its own.
-    const idempotencyKey = `cancel:${subscription.id}:${windowStart.getTime()}`;
 
     let charge: ChargeResult;
     if (rated.amountMinor === 0) {
@@ -201,10 +267,9 @@ export class RenewalService {
         );
         await this.recordUnpaidCharge(
           subscription,
-          plan,
           rated,
           rated.creditUnitsApplied,
-          now,
+          window,
           idempotencyKey
         );
         return;
@@ -214,11 +279,10 @@ export class RenewalService {
     if (charge.status === 'pending') {
       await this.recordPendingCharge(
         subscription,
-        plan,
         rated,
         rated.creditUnitsApplied,
         charge.providerInvoiceRef,
-        now,
+        window,
         idempotencyKey
       );
       return;
@@ -228,11 +292,10 @@ export class RenewalService {
       this.settlePeriodInvoice(
         manager,
         subscription,
-        plan,
         rated,
         rated.creditUnitsApplied,
         charge,
-        now,
+        window,
         idempotencyKey,
         now,
         false
@@ -336,10 +399,7 @@ export class RenewalService {
     // The new period starts at the boundary that fell due — a trial converts
     // from trial_end, a renewal extends from the current period end — never from
     // wall-clock now, so periods stay contiguous even if a scan runs late.
-    const anchor =
-      subscription.status === 'trialing' && subscription.trialEnd
-        ? subscription.trialEnd
-        : subscription.currentPeriodEnd;
+    const anchor = renewalAnchor(subscription);
     // Fixed prepays the upcoming period; usage postpays the metered window
     // ending at the anchor, with prepaid credits offsetting billable units - the
     // balance is read here and deducted only when the invoice insert wins.
@@ -525,11 +585,10 @@ export class RenewalService {
     if (prior) {
       await this.recordPendingCharge(
         subscription,
-        plan,
         rated,
         creditUnitsApplied,
         prior.providerInvoiceRef,
-        anchor,
+        this.invoicePeriodFor(subscription, plan, anchor),
         idempotencyKey,
         existing !== null
       );
@@ -565,10 +624,9 @@ export class RenewalService {
       // reference back onto a row that already exists, so record it here too.
       await this.recordUnpaidCharge(
         subscription,
-        plan,
         rated,
         creditUnitsApplied,
-        anchor,
+        this.invoicePeriodFor(subscription, plan, anchor),
         idempotencyKey,
         closing
       );
@@ -580,11 +638,10 @@ export class RenewalService {
     if (result.status === 'pending') {
       await this.recordPendingCharge(
         subscription,
-        plan,
         rated,
         creditUnitsApplied,
         result.providerInvoiceRef,
-        anchor,
+        this.invoicePeriodFor(subscription, plan, anchor),
         idempotencyKey
       );
       return null;
@@ -645,15 +702,13 @@ export class RenewalService {
    */
   private async recordPendingCharge(
     subscription: Subscription,
-    plan: Plan,
     rated: RatedAmount,
     creditUnitsApplied: number,
     providerInvoiceRef: string,
-    anchor: Date,
+    period: { start: Date; end: Date },
     idempotencyKey: string,
     keepStored = false
   ): Promise<void> {
-    const period = this.invoicePeriodFor(subscription, plan, anchor);
     await withTransaction(this.dataSource, async (manager) => {
       const insert = await manager
         .createQueryBuilder()
@@ -712,14 +767,12 @@ export class RenewalService {
    */
   private async recordUnpaidCharge(
     subscription: Subscription,
-    plan: Plan,
     rated: RatedAmount,
     creditUnitsApplied: number,
-    anchor: Date,
+    period: { start: Date; end: Date },
     idempotencyKey: string,
     closing = true
   ): Promise<void> {
-    const period = this.invoicePeriodFor(subscription, plan, anchor);
     await this.dataSource.manager
       .createQueryBuilder()
       .insert()
@@ -768,11 +821,10 @@ export class RenewalService {
       const paidInvoiceId = await this.settlePeriodInvoice(
         manager,
         subscription,
-        plan,
         rated,
         creditUnitsApplied,
         charge,
-        anchor,
+        this.invoicePeriodFor(subscription, plan, anchor),
         idempotencyKey,
         now,
         settleStored
@@ -860,16 +912,14 @@ export class RenewalService {
   private async settlePeriodInvoice(
     manager: EntityManager,
     subscription: Subscription,
-    plan: Plan,
     rated: RatedAmount,
     creditUnitsApplied: number,
     charge: ChargeResult,
-    anchor: Date,
+    invoicePeriod: { start: Date; end: Date },
     idempotencyKey: string,
     now: Date,
     settleStored: boolean
   ): Promise<string | null> {
-    const invoicePeriod = this.invoicePeriodFor(subscription, plan, anchor);
     const insert = await manager
       .createQueryBuilder()
       .insert()

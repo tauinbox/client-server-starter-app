@@ -122,6 +122,40 @@ describe('POST /billing/subscription/change', () => {
     expect(res.status).toBe(404);
   });
 
+  it('rejects a self-managed change after the period end, before any money moves', async () => {
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    const sub = getState().billingSubscriptions.get(subId);
+    if (!sub) throw new Error('subscription not seeded');
+    sub.lifecycleOwner = 'self';
+    sub.currentPeriodEnd = new Date(Date.now() - 1000).toISOString();
+    const invoicesBefore = getState().billingInvoices.size;
+
+    for (const path of ['subscription/change', 'subscription/change/preview']) {
+      const res = await post(token, path, { planKey: 'business' });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({
+        message:
+          'The billing period has ended and its renewal is in progress. Try again shortly.'
+      });
+    }
+    expect(sub.planKey).toBe('pro');
+    expect(getState().billingInvoices.size).toBe(invoicesBefore);
+  });
+
+  it('lets a provider-managed row change after its local period end', async () => {
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    const sub = getState().billingSubscriptions.get(subId);
+    if (!sub) throw new Error('subscription not seeded');
+    sub.currentPeriodEnd = new Date(Date.now() - 1000).toISOString();
+
+    const res = await post(token, 'subscription/change', {
+      planKey: 'business'
+    });
+    expect(res.status).toBe(200);
+  });
+
   it('rejects a change while a cancellation is scheduled', async () => {
     const token = await login('user@example.com');
     await activateSubscription('pro');
