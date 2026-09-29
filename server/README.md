@@ -2607,6 +2607,15 @@ from deep inside the driver.
 `global-setup.ts` opens one connection before the workers fork. Thus a database that is unreachable
 or unmigrated is reported one time, by name, and not one time for each suite.
 
+**Billing suites on the real database.** Jest runs the suites in parallel workers on one database.
+`RenewalService.runDueRenewals` charges every due self-managed subscription in the table, thus a
+scan in one suite charged a row that another suite had seeded. Each suite that writes a
+self-managed (`lifecycleOwner: 'self'`) subscription or runs the scan calls `holdBillingDbLock(ds)`
+from `test/billing-db-lock.ts` in its `beforeAll`, with `BILLING_DB_LOCK_TIMEOUT_MS` as the hook
+timeout, and releases it in `afterAll` before `ds.destroy()`. The lock is a Postgres advisory lock,
+thus those suites run one at a time and each other suite stays parallel. A new suite of that kind
+must take the lock too.
+
 **Mail settings.** The run resolves `SMTP_HOST`, `SMTP_PORT` and `MAILPIT_URL` in the same way.
 `test/email-delivery.e2e-spec.ts` runs only when `SMTP_HOST` has a value.
 

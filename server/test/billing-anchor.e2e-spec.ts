@@ -1,19 +1,26 @@
 import { DataSource } from 'typeorm';
 import { postgresConfig } from '../src/postgres.config';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
+import {
+  BILLING_DB_LOCK_TIMEOUT_MS,
+  holdBillingDbLock
+} from './billing-db-lock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 runWithInfra('subscription billing anchor (e2e)', () => {
   let ds: DataSource;
+  let releaseDbLock: (() => Promise<void>) | undefined;
 
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
-  }, 30000);
+    releaseDbLock = await holdBillingDbLock(ds);
+  }, BILLING_DB_LOCK_TIMEOUT_MS);
 
   afterAll(async () => {
+    await releaseDbLock?.();
     await ds?.destroy();
   });
 
