@@ -2,6 +2,8 @@ import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   MIN_JWT_EXPIRATION_SECONDS
 } from '@app/shared/constants';
+import { MAX_BILLING_PROVIDER_TIMEOUT_MS } from '../billing/providers/provider-deadline';
+import { PLAN_CHANGE_LEASE_MS } from '../billing/renewals/renewal-queue.constants';
 import { configValidationSchema } from './config-validation.schema';
 
 // Mirrors the validationOptions ConfigModule uses in core.module.ts.
@@ -200,5 +202,29 @@ describe('configValidationSchema', () => {
       );
       expect(error?.message).toContain('YOOKASSA_VAT_CODE');
     }
+  });
+
+  it('bounds BILLING_PROVIDER_TIMEOUT_MS by the plan change lease', () => {
+    const atMax = configValidationSchema.validate(
+      {
+        ...validEnv,
+        BILLING_PROVIDER_TIMEOUT_MS: String(MAX_BILLING_PROVIDER_TIMEOUT_MS)
+      },
+      options
+    );
+    expect(atMax.error).toBeUndefined();
+
+    const aboveMax = configValidationSchema.validate(
+      {
+        ...validEnv,
+        BILLING_PROVIDER_TIMEOUT_MS: String(MAX_BILLING_PROVIDER_TIMEOUT_MS + 1)
+      },
+      options
+    );
+    expect(aboveMax.error?.message).toContain('BILLING_PROVIDER_TIMEOUT_MS');
+    // Three sequential calls at the maximum still end inside the lease.
+    expect(3 * MAX_BILLING_PROVIDER_TIMEOUT_MS).toBeLessThan(
+      PLAN_CHANGE_LEASE_MS
+    );
   });
 });

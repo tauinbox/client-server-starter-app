@@ -4,7 +4,10 @@ import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   MIN_JWT_EXPIRATION_SECONDS
 } from '@app/shared/constants';
-import { DEFAULT_BILLING_PROVIDER_TIMEOUT_MS } from '../billing/providers/provider-deadline';
+import {
+  DEFAULT_BILLING_PROVIDER_TIMEOUT_MS,
+  MAX_BILLING_PROVIDER_TIMEOUT_MS
+} from '../billing/providers/provider-deadline';
 import {
   DEFAULT_WEBHOOK_PAYLOAD_RETENTION_DAYS,
   DEFAULT_WEBHOOK_RETENTION_DAYS
@@ -108,10 +111,12 @@ export const configValidationSchema = Joi.object({
   BILLING_DEFAULT_CURRENCY: Joi.string().valid('USD', 'RUB').default('USD'),
   // Deadline for a single provider API call. Neither SDK sets a transport
   // timeout, so without this a stalled socket blocks the sequential renewal
-  // scan for as long as the peer keeps it open.
+  // scan for as long as the peer keeps it open. The maximum keeps a plan change
+  // inside the lease that holds the renewal scan off its subscription.
   BILLING_PROVIDER_TIMEOUT_MS: Joi.number()
     .integer()
     .min(1)
+    .max(MAX_BILLING_PROVIDER_TIMEOUT_MS)
     .default(DEFAULT_BILLING_PROVIDER_TIMEOUT_MS),
   // Syntax (IP/CIDR per entry) is validated by
   // WebhookIpAllowlistGuard, which throws at bootstrap on a

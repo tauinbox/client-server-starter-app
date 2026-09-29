@@ -28,6 +28,7 @@ import { RenewalService } from './renewal.service';
 import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS,
+  PLAN_CHANGE_LEASE_MS,
   RENEWAL_SCAN_MAX_PER_RUN
 } from './renewal-queue.constants';
 
@@ -866,6 +867,38 @@ describe('RenewalService', () => {
 
     expect(charge).not.toHaveBeenCalled();
     expect(store.invoices).toHaveLength(0);
+  });
+
+  it('leaves a due subscription to the plan change that holds its lease', async () => {
+    const sub = makeSub({
+      planChangeStartedAt: new Date(NOW.getTime() - PLAN_CHANGE_LEASE_MS + 1)
+    });
+    const store = baseStore(sub);
+    const charge = jest.fn();
+    const { service } = await build(store, charge);
+
+    await service.runDueRenewals(NOW);
+
+    expect(charge).not.toHaveBeenCalled();
+    expect(store.invoices).toHaveLength(0);
+  });
+
+  it('renews a due subscription whose plan change lease expired', async () => {
+    const sub = makeSub({
+      planChangeStartedAt: new Date(NOW.getTime() - PLAN_CHANGE_LEASE_MS)
+    });
+    const store = baseStore(sub);
+    const charge = jest
+      .fn()
+      .mockResolvedValue({ providerInvoiceRef: 'pay-1', status: 'captured' });
+    const { service } = await build(store, charge);
+
+    await service.runDueRenewals(NOW);
+
+    expect(charge).toHaveBeenCalledTimes(1);
+    expect(store.subscriptions[0].currentPeriodStart).toEqual(
+      new Date('2026-06-01T00:00:00Z')
+    );
   });
 
   it('does not sweep a self-managed subscription whose owning user is soft-deleted', async () => {
