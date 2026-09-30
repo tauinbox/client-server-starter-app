@@ -158,7 +158,7 @@ export class BillingSettingsComponent implements OnInit {
       // The message below must not show a raw key on a fresh page load.
       firstValueFrom(
         this.#transloco.load(`billing/${this.#transloco.getActiveLang()}`)
-      )
+      ).catch(() => undefined)
     ]);
     dropPaddleTransactionId(this.#router);
     if (result === 'completed') {

@@ -60,6 +60,9 @@ describe('CheckoutReturnComponent', () => {
     loadPlans: ReturnType<typeof vi.fn>;
   };
 
+  let paddleOpen: ReturnType<typeof vi.fn>;
+  let router: Router;
+
   beforeEach(() => {
     paddleOpen = vi.fn();
   });
@@ -67,9 +70,6 @@ describe('CheckoutReturnComponent', () => {
   afterEach(() => {
     sessionStorage.clear();
   });
-
-  let paddleOpen: ReturnType<typeof vi.fn>;
-  let router: Router;
 
   async function setup(
     mode: 'success' | 'cancel',
