@@ -56,6 +56,32 @@ test.describe('Billing', () => {
     ).toBeVisible();
   });
 
+  test('a refused region change leaves the toggle on the stored region', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+    await page.goto('/billing');
+
+    const region = page.locator('.region-control');
+    const refused = page.waitForResponse(
+      (response) =>
+        response.url().includes('/billing/region') &&
+        response.request().method() !== 'GET'
+    );
+    await region.getByRole('radio', { name: 'Russia' }).click();
+    expect((await refused).status()).toBe(409);
+
+    await expect(region.getByRole('radio', { name: 'Auto' })).toBeChecked();
+    await expect(
+      region.getByRole('radio', { name: 'Russia' })
+    ).not.toBeChecked();
+  });
+
   test('checkout → active subscription → cancel', async ({
     page,
     _mockServer

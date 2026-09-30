@@ -212,6 +212,66 @@ describe('PricingPageComponent', () => {
     ).not.toBeNull();
   });
 
+  function checkedRegions(): string[] {
+    const checked: HTMLElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll(
+        '.region-control button[aria-checked="true"]'
+      )
+    );
+    return checked.map((button) => button.textContent?.trim() ?? '');
+  }
+
+  function regionButton(label: string): HTMLButtonElement {
+    const buttons: HTMLButtonElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('.region-control button')
+    );
+    const button = buttons.find((b) => b.textContent?.trim() === label);
+    if (!button) throw new Error(`No region button "${label}"`);
+    return button;
+  }
+
+  it('returns the region toggle to the stored region when the change is refused', async () => {
+    await setup(true);
+    storeMock.region.set({
+      region: 'auto',
+      detectedProvider: 'paddle',
+      effectiveProvider: 'paddle'
+    });
+    storeMock.setRegion.mockResolvedValue(false);
+    fixture.detectChanges();
+
+    regionButton('Russia').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(storeMock.setRegion).toHaveBeenCalledWith('ru');
+    expect(checkedRegions()).toEqual(['Auto']);
+  });
+
+  it('keeps the chosen region on the toggle when the change succeeds', async () => {
+    await setup(true);
+    storeMock.region.set({
+      region: 'auto',
+      detectedProvider: 'paddle',
+      effectiveProvider: 'paddle'
+    });
+    storeMock.setRegion.mockImplementation(async () => {
+      storeMock.region.set({
+        region: 'ru',
+        detectedProvider: 'paddle',
+        effectiveProvider: 'yookassa'
+      });
+      return true;
+    });
+    fixture.detectChanges();
+
+    regionButton('Russia').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(checkedRegions()).toEqual(['Russia']);
+  });
+
   it('routes anonymous visitors to login on choose', async () => {
     await setup(false);
     fixture.componentInstance.onChoose('pro');

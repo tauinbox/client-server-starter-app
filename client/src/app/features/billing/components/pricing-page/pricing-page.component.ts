@@ -3,11 +3,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  inject
+  inject,
+  viewChild
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import {
+  MatButtonToggleGroup,
+  MatButtonToggleModule
+} from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -74,6 +78,8 @@ export class PricingPageComponent implements OnInit {
   readonly #checkoutRedirect = inject(CheckoutRedirectService);
 
   protected readonly isAuthenticated = this.#authStore.isAuthenticated;
+
+  readonly regionToggle = viewChild(MatButtonToggleGroup);
 
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()
@@ -177,8 +183,15 @@ export class PricingPageComponent implements OnInit {
     void this.store.loadPricing(this.isAuthenticated());
   }
 
+  // The group keeps the clicked value on a refusal, because the stored region
+  // does not change and the [value] binding therefore does not fire again.
   onRegionChange(region: BillingRegion): void {
-    void this.store.setRegion(region);
+    void this.store.setRegion(region).then((updated) => {
+      const toggle = this.regionToggle();
+      if (!updated && toggle) {
+        toggle.value = this.store.region()?.region;
+      }
+    });
   }
 
   onChoose(planKey: string): void {
