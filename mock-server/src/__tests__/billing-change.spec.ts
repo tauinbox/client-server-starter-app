@@ -50,6 +50,13 @@ async function activateSubscription(planKey: string): Promise<string> {
   return sub.id;
 }
 
+/** The ru locale routes user@example.com to YooKassa, a self-managed provider. */
+function useRussianLocale(): void {
+  const user = getState().users.get(mockId('user-2'));
+  if (!user) throw new Error('user not seeded');
+  user.locale = 'ru';
+}
+
 /** The paid invoice that the activation records for the period. */
 function periodInvoice(subId: string): MockInvoice {
   const source = [...getState().billingInvoices.values()].find(
@@ -93,11 +100,29 @@ describe('POST /billing/subscription/change', () => {
     // legs equal the full plan prices (pro $12.00 back, business $29.00 due).
     expect(charge?.amountMinor).toBe(2900);
     expect(refund?.amountMinor).toBe(1200);
+    // Paddle prorates on its side, and the server never flips the source.
+    expect(source.status).toBe('paid');
+  });
+
+  it('marks a YooKassa source invoice refunded when the switch refunds all of it', async () => {
+    useRussianLocale();
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    const source = periodInvoice(subId);
+    expect(source.provider).toBe('yookassa');
+
+    const res = await post(token, 'subscription/change', {
+      planKey: 'business'
+    });
+    expect(res.status).toBe(200);
+
     // Refunded in full, so the admin console offers no second refund of it.
-    expect(source).toMatchObject({ status: 'refunded', refundedMinor: 1200 });
+    expect(source.status).toBe('refunded');
+    expect(source.refundedMinor).toBe(source.amountMinor);
   });
 
   it('keeps the source invoice paid when the switch refunds only part of it', async () => {
+    useRussianLocale();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
