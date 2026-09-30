@@ -2146,9 +2146,21 @@ describe('BillingUserService', () => {
       });
     }
 
+    function periodInvoice(refundedMinor: number) {
+      return {
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(refundedMinor),
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      };
+    }
+
     it('returns the computed split for a self-managed subscription', async () => {
       const ctx = await build();
       setupYoo(ctx);
+      ctx.invoices.findOne.mockResolvedValue(periodInvoice(0));
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
 
       const preview = await ctx.service.previewChange('user-1', 'business');
@@ -2161,6 +2173,44 @@ describe('BillingUserService', () => {
         creditMinor: 39600,
         chargeMinor: 116000,
         dueNowMinor: 76400
+      });
+      expect(ctx.invoices.findOne).toHaveBeenCalledWith({
+        where: {
+          subscriptionId: 'sub-1',
+          status: 'paid',
+          billingMode: 'fixed'
+        },
+        order: { createdAt: 'DESC' }
+      });
+    });
+
+    it('caps the credit by what is still refundable on the source invoice', async () => {
+      const ctx = await build();
+      setupYoo(ctx);
+      ctx.invoices.findOne.mockResolvedValue(periodInvoice(80000));
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      const preview = await ctx.service.previewChange('user-1', 'business');
+
+      // refundable = 99000 - 80000 = 19000, the same cap changePlan applies.
+      expect(preview).toMatchObject({
+        creditMinor: 19000,
+        chargeMinor: 116000,
+        dueNowMinor: 97000
+      });
+    });
+
+    it('shows no credit when no paid fixed invoice covers the period', async () => {
+      const ctx = await build();
+      setupYoo(ctx);
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      const preview = await ctx.service.previewChange('user-1', 'business');
+
+      expect(preview).toMatchObject({
+        creditMinor: 0,
+        chargeMinor: 116000,
+        dueNowMinor: 116000
       });
     });
 

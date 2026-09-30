@@ -845,6 +845,30 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
   return { customer, sub, fromPlan, toPlan };
 }
 
+/**
+ * The refund leg of a self-managed switch: the latest paid fixed invoice, and
+ * the quoted refund capped by what is still unrefunded on it. The preview and
+ * the executed change both read it, so the credit shown is the credit paid.
+ */
+function prorationRefund(
+  sub: MockSubscription,
+  quotedMinor: number
+): { source: MockInvoice | undefined; refundMinor: number } {
+  const source = [...getState().billingInvoices.values()]
+    .filter(
+      (i) =>
+        i.subscriptionId === sub.id &&
+        i.status === 'paid' &&
+        i.billingMode === 'fixed' &&
+        i.amountMinor > 0
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const refundMinor = source
+    ? Math.min(quotedMinor, source.amountMinor - (source.refundedMinor ?? 0))
+    : 0;
+  return { source, refundMinor };
+}
+
 // POST /billing/subscription/change — instant prorated plan/mode switch.
 billingRouter.post(
   '/subscription/change',
@@ -870,22 +894,8 @@ billingRouter.post(
 
       // Resolved before the new charge is recorded so the charge can't become
       // its own refund source (the server has a provider call in between, so it
-      // excludes its charge row by id instead), and capped by the remainder.
-      const source = [...state.billingInvoices.values()]
-        .filter(
-          (i) =>
-            i.subscriptionId === sub.id &&
-            i.status === 'paid' &&
-            i.billingMode === 'fixed' &&
-            i.amountMinor > 0
-        )
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-      const refundMinor = source
-        ? Math.min(
-            quote.refundMinor,
-            source.amountMinor - (source.refundedMinor ?? 0)
-          )
-        : 0;
+      // excludes its charge row by id instead).
+      const { source, refundMinor } = prorationRefund(sub, quote.refundMinor);
 
       if (quote.chargeMinor > 0) {
         const charge: MockInvoice = {
@@ -963,7 +973,13 @@ billingRouter.post(
       new Date()
     );
     const trial = sub.status === 'trialing';
-    const refundMinor = trial ? 0 : quote.refundMinor;
+    // The self-managed credit is capped as the executed refund caps it; the
+    // delegated net stands in for the provider's own preview.
+    const refundMinor = trial
+      ? 0
+      : delegated
+        ? quote.refundMinor
+        : prorationRefund(sub, quote.refundMinor).refundMinor;
     const chargeMinor = trial ? 0 : quote.chargeMinor;
 
     const preview: ProrationPreviewResponse = {
