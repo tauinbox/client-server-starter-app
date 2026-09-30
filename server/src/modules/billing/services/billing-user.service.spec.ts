@@ -14,6 +14,7 @@ import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import {
   DEFAULT_CURSOR_PAGE_SIZE,
+  ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
@@ -280,6 +281,7 @@ async function build() {
 
   const billing = {
     resolveProvider: jest.fn(),
+    isProviderAvailable: jest.fn().mockResolvedValue(true),
     getProviderById: jest.fn(),
     geoDefaultFor: jest.fn((country: string) =>
       country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle'
@@ -2582,6 +2584,46 @@ describe('BillingUserService', () => {
       );
       expect(ctx.customers.update).not.toHaveBeenCalled();
       expect(ctx.customers.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a region whose provider is unavailable before the subscription guard', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      });
+      ctx.billing.isProviderAvailable.mockImplementation(
+        (id: BillingProviderId) => Promise.resolve(id === 'yookassa')
+      );
+
+      const refusal = ctx.service.setRegion('user-1', 'world');
+
+      await expect(refusal).rejects.toThrow(ConflictException);
+      await expect(refusal).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE }
+      });
+      expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith('paddle');
+      expect(ctx.subscriptions.findOne).not.toHaveBeenCalled();
+      expect(ctx.customers.update).not.toHaveBeenCalled();
+    });
+
+    it('checks the geo default provider when the region is auto', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: 'paddle'
+      });
+      ctx.billing.isProviderAvailable.mockResolvedValue(false);
+
+      await expect(ctx.service.setRegion('user-1', 'auto')).rejects.toThrow(
+        ConflictException
+      );
+      expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith('yookassa');
+      expect(ctx.customers.update).not.toHaveBeenCalled();
     });
 
     it('returns the winner when concurrent first requests race customer creation (23505)', async () => {

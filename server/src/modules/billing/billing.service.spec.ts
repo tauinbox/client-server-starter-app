@@ -102,3 +102,60 @@ describe('BillingService.resolveProvider', () => {
     );
   });
 });
+
+describe('BillingService.isProviderAvailable', () => {
+  let featureFlags: { findByKey: jest.Mock };
+  let billingConfig: { isConfigured: jest.Mock };
+
+  const build = async (registered = [paddle, yookassa]) => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        BillingService,
+        { provide: BILLING_PROVIDERS, useValue: registered },
+        { provide: FeatureFlagService, useValue: featureFlags },
+        { provide: BillingConfigService, useValue: billingConfig }
+      ]
+    }).compile();
+    return module.get(BillingService);
+  };
+
+  beforeEach(() => {
+    featureFlags = {
+      findByKey: jest.fn((key: string) =>
+        Promise.resolve({ key, enabled: true })
+      )
+    };
+    billingConfig = { isConfigured: jest.fn().mockReturnValue(true) };
+  });
+
+  it('is true for an enabled, configured and registered provider', async () => {
+    const service = await build();
+    await expect(service.isProviderAvailable('paddle')).resolves.toBe(true);
+  });
+
+  it('is false when the kill-switch flag is disabled', async () => {
+    featureFlags.findByKey.mockResolvedValue({ enabled: false });
+    const service = await build();
+    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
+  });
+
+  it('is false when the kill-switch flag is absent', async () => {
+    featureFlags.findByKey.mockResolvedValue(null);
+    const service = await build();
+    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
+  });
+
+  it('is false when the provider is not configured', async () => {
+    billingConfig.isConfigured.mockImplementation(
+      (id: string) => id !== 'paddle'
+    );
+    const service = await build();
+    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
+    await expect(service.isProviderAvailable('yookassa')).resolves.toBe(true);
+  });
+
+  it('is false when the provider is not registered', async () => {
+    const service = await build([yookassa]);
+    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
+  });
+});

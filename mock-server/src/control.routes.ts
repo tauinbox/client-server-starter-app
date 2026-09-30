@@ -29,6 +29,7 @@ import type {
   State
 } from './types';
 import {
+  BILLING_PROVIDER_FLAGS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   ENTITLED_SUBSCRIPTION_STATUSES,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS
@@ -519,6 +520,28 @@ router.post('/captcha', (req, res) => {
   };
   state.captchaAttempts.clear();
   res.json({ message: `captcha ${enabled ? 'enabled' : 'disabled'}` });
+});
+
+// POST /__control/billing/provider-enabled — set the admin kill-switch flag of
+// one billing provider. The real flag is super-admin only, so E2E sets it here.
+router.post('/billing/provider-enabled', (req, res) => {
+  const { provider, enabled } = req.body as {
+    provider?: string;
+    enabled?: boolean;
+  };
+  const flagKey = BILLING_PROVIDER_FLAGS.find(
+    (p) => p.provider === provider
+  )?.enabledFlagKey;
+  if (!flagKey || typeof enabled !== 'boolean') {
+    res.status(400).json({
+      message: 'provider (paddle | yookassa) and enabled (boolean) are required'
+    });
+    return;
+  }
+  for (const flag of getState().featureFlags.values()) {
+    if (flag.key === flagKey) flag.enabled = enabled;
+  }
+  res.json({ message: `${flagKey} ${enabled ? 'enabled' : 'disabled'}` });
 });
 
 // POST /__control/notify — push a test notification event (E2E helper)

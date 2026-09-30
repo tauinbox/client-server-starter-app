@@ -290,6 +290,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
             effectiveProviderId: (customer: Customer) =>
               customer.providerOverride ?? 'paddle',
             getProviderById: () => null,
+            isProviderAvailable: () => Promise.resolve(true),
             resolveProvider: () => Promise.resolve(null)
           }
         },

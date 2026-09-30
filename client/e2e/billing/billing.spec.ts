@@ -82,6 +82,31 @@ test.describe('Billing', () => {
     ).not.toBeChecked();
   });
 
+  test('a region whose provider is unavailable is refused with the reason', async ({
+    page,
+    _mockServer
+  }) => {
+    await _mockServer.setBillingProviderEnabled('yookassa', false);
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.goto('/billing');
+
+    const region = page.locator('.region-control');
+    const refused = page.waitForResponse(
+      (response) =>
+        response.url().includes('/billing/region') &&
+        response.request().method() !== 'GET'
+    );
+    await region.getByRole('radio', { name: 'Russia' }).click();
+    expect((await refused).status()).toBe(409);
+
+    // The interceptor and the store both show the error, so the store's
+    // snackbar can replace a first one that is still leaving the screen.
+    await expect(page.locator('mat-snack-bar-container').last()).toContainText(
+      'Payments are not available in this billing region.'
+    );
+    await expect(region.getByRole('radio', { name: 'Auto' })).toBeChecked();
+  });
+
   test('checkout → active subscription → cancel', async ({
     page,
     _mockServer

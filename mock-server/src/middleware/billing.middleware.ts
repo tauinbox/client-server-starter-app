@@ -13,8 +13,10 @@ import type {
 import {
   ALLOWED_INVOICE_SORT_COLUMNS,
   ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
+  BILLING_PROVIDER_FLAGS,
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
+  ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import {
@@ -144,6 +146,31 @@ function geoDefault(country: string): BillingProviderId {
 // ownership is purely the provider's: YooKassa self-managed, Paddle managed.
 function managesLifecycle(provider: BillingProviderId): boolean {
   return provider !== 'yookassa';
+}
+
+// Mirrors BillingService.isProviderAvailable. Every provider is configured and
+// registered here, so only the admin kill-switch flag decides.
+function isProviderAvailable(provider: BillingProviderId): boolean {
+  const flagKey = BILLING_PROVIDER_FLAGS.find(
+    (p) => p.provider === provider
+  )?.enabledFlagKey;
+  for (const flag of getState().featureFlags.values()) {
+    if (flag.key === flagKey) return flag.enabled;
+  }
+  return false;
+}
+
+// Mirrors the 503 of BillingService.resolveProvider at checkout and purchase.
+function rejectUnavailableProvider(
+  res: Response,
+  provider: BillingProviderId
+): boolean {
+  if (isProviderAvailable(provider)) return false;
+  res.status(503).json({
+    message: `Billing provider "${provider}" is not available`,
+    statusCode: 503
+  });
+  return true;
 }
 
 function overrideForRegion(region: BillingRegion): BillingProviderId | null {
@@ -540,6 +567,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
 
   const customer = getOrCreateCustomer(user.id, user.locale);
   const provider = effectiveProvider(customer);
+  if (rejectUnavailableProvider(res, provider)) return;
   const price = product.prices[provider];
   if (!price) {
     res.status(409).json({
@@ -655,6 +683,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   }
 
   const provider = effectiveProvider(customer);
+  if (rejectUnavailableProvider(res, provider)) return;
 
   // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
   // stack a second open subscription (the server enforces this with a partial
@@ -1075,6 +1104,15 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
   const customer = getOrCreateCustomer(user.id, user.locale);
   const newOverride = overrideForRegion(region as BillingRegion);
   const newEffective = newOverride ?? geoDefault(customer.country);
+
+  if (!isProviderAvailable(newEffective)) {
+    res.status(409).json({
+      message: 'Payments are not available in this billing region.',
+      errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE,
+      statusCode: 409
+    });
+    return;
+  }
 
   const open = findCurrentSubscription(customer.id);
   if (open && open.provider !== newEffective) {
