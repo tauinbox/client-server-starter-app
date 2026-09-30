@@ -69,6 +69,7 @@ describe('PricingPageComponent', () => {
     plans: ReturnType<typeof signal<PlanResponse[]>>;
     products: ReturnType<typeof signal<ProductResponse[]>>;
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
+    hasActiveSubscription: ReturnType<typeof signal<boolean>>;
     region: ReturnType<typeof signal<BillingRegionResponse | null>>;
     loading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
@@ -97,6 +98,7 @@ describe('PricingPageComponent', () => {
       ]),
       products: signal<ProductResponse[]>(products),
       subscription: signal<SubscriptionResponse | null>(null),
+      hasActiveSubscription: signal(false),
       region: signal<BillingRegionResponse | null>(null),
       loading: signal(false),
       working: signal(false),
@@ -129,6 +131,67 @@ describe('PricingPageComponent', () => {
     expect(storeMock.loadPricing).toHaveBeenCalledWith(true);
     const cards = fixture.nativeElement.querySelectorAll('nxs-plan-card');
     expect(cards.length).toBe(3);
+  });
+
+  function renderedCards(): {
+    name: string;
+    current: boolean;
+    chooseButton: boolean;
+  }[] {
+    const cards: HTMLElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('nxs-plan-card')
+    );
+    return cards.map((card) => ({
+      name: card.querySelector('.plan-name')?.textContent?.trim() ?? '',
+      current: card.querySelector('.current-badge') !== null,
+      chooseButton: card.querySelector('.plan-action button') !== null
+    }));
+  }
+
+  function showSubscription(
+    status: SubscriptionResponse['status'],
+    entitled: boolean
+  ): void {
+    storeMock.subscription.set({
+      id: 'sub-1',
+      customerId: 'cus-1',
+      planKey: 'pro',
+      provider: 'yookassa',
+      billingMode: 'fixed',
+      status,
+      lifecycleOwner: 'self',
+      currentPeriodStart: '2024-01-01T00:00:00.000Z',
+      currentPeriodEnd: '2024-02-01T00:00:00.000Z',
+      cancelAtPeriodEnd: false,
+      trialEnd: null,
+      paymentMethodId: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z'
+    });
+    storeMock.hasActiveSubscription.set(entitled);
+    fixture.detectChanges();
+  }
+
+  it('keeps Free current and offers Pro again for an unpaid incomplete Pro checkout', async () => {
+    await setup(true);
+    showSubscription('incomplete', false);
+
+    expect(renderedCards()).toEqual([
+      { name: 'Free', current: true, chooseButton: false },
+      { name: 'Pro', current: false, chooseButton: true },
+      { name: 'Business', current: false, chooseButton: true }
+    ]);
+  });
+
+  it('marks the plan of a past_due subscription as current', async () => {
+    await setup(true);
+    showSubscription('past_due', true);
+
+    expect(renderedCards()).toEqual([
+      { name: 'Free', current: false, chooseButton: true },
+      { name: 'Pro', current: true, chooseButton: false },
+      { name: 'Business', current: false, chooseButton: true }
+    ]);
   });
 
   it('hides the region control for anonymous visitors', async () => {

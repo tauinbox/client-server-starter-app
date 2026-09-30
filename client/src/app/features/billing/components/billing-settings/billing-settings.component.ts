@@ -16,7 +16,10 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { InvoiceResponse } from '@app/shared/types';
-import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
+import {
+  CHANGEABLE_SUBSCRIPTION_STATUSES,
+  MAX_CONCURRENT_SESSIONS
+} from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
@@ -108,13 +111,12 @@ export class BillingSettingsComponent implements OnInit {
     );
   });
 
-  // Mirrors the server's changeable set: `past_due` must settle its debt first
-  // and a pending cancellation rules a switch out.
+  // A pending cancellation rules a switch out, as on the server.
   protected readonly canChangePlan = computed(() => {
     const sub = this.store.subscription();
     return (
       sub !== null &&
-      (sub.status === 'trialing' || sub.status === 'active') &&
+      CHANGEABLE_SUBSCRIPTION_STATUSES.includes(sub.status) &&
       !sub.cancelAtPeriodEnd
     );
   });

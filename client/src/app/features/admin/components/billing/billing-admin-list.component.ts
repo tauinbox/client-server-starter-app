@@ -33,6 +33,7 @@ import {
 } from '@angular/material/table';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { InvoiceResponse, SubscriptionResponse } from '@app/shared/types';
+import { isOpenStatus } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -163,7 +164,7 @@ export class BillingAdminListComponent implements OnInit {
 
   // A canceled subscription has no further lifecycle action.
   canCancel(subscription: SubscriptionResponse): boolean {
-    return subscription.status !== 'canceled';
+    return isOpenStatus(subscription.status);
   }
 
   // Only paid invoices can be refunded (mirrors the server guard).
