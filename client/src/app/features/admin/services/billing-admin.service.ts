@@ -52,9 +52,9 @@ export class BillingAdminService {
   }
 
   /**
-   * Refund a paid invoice. Omitting `amountMinor` refunds the full amount; a
-   * value refunds that partial amount in minor units (server bounds it to
-   * `1..invoiceTotal`).
+   * Refund a paid invoice. Omitting `amountMinor` refunds the remaining
+   * unrefunded amount; a value refunds that partial amount in minor units
+   * (server bounds it to `1..remaining`).
    */
   refundInvoice(id: string, amountMinor?: number): Observable<InvoiceResponse> {
     return this.#http.post<InvoiceResponse>(

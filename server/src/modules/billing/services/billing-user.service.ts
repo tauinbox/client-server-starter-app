@@ -765,6 +765,16 @@ export class BillingUserService {
             status: 'refunded',
             billingMode: 'fixed'
           });
+          // Gated on this leg's own cumulative, as the admin refund is, so a
+          // concurrent leg still in flight cannot flip it for money that may
+          // never move. A subscription invoice has no grant or credit to revoke.
+          if (refund.cumulative.compare(refund.source.amountMinor) >= 0) {
+            await manager.update(
+              Invoice,
+              { id: refund.source.id, status: 'paid' },
+              { status: 'refunded' }
+            );
+          }
         }
         const saved = await this.commitPlanChange(
           manager,
@@ -1108,7 +1118,7 @@ export class BillingUserService {
     subscription: Subscription,
     refundMinor: number,
     excludeInvoiceId: string | null = null
-  ): Promise<{ source: Invoice; minor: number } | null> {
+  ): Promise<{ source: Invoice; minor: number; cumulative: Money } | null> {
     return withTransaction(this.dataSource, async (manager) => {
       const source = await lockInvoice(
         manager,
@@ -1118,7 +1128,7 @@ export class BillingUserService {
 
       // Capping silently is this leg's policy: a switch is not refused because
       // its source invoice has less left on it than the quote assumed.
-      const { reserved } = await reserveRefund(
+      const { reserved, cumulative } = await reserveRefund(
         manager,
         source,
         Money.fromMinor(refundMinor)
@@ -1126,7 +1136,7 @@ export class BillingUserService {
       const minor = reserved.toNumber();
       if (minor <= 0) return null;
 
-      return { source, minor };
+      return { source, minor, cumulative };
     });
   }
 

@@ -97,6 +97,7 @@ type InsertedInvoice = Record<string, unknown> & {
 };
 
 type InvoiceCriteria = {
+  id?: string;
   providerEventId?: string;
   status?: string | FindOperator<string>;
 };
@@ -129,6 +130,7 @@ function makeInsertStore(invoices: RepoMock) {
   ): { affected: number } => {
     const matched = inserted.filter(
       (row) =>
+        (criteria.id === undefined || row['id'] === criteria.id) &&
         (criteria.providerEventId === undefined ||
           row.providerEventId === criteria.providerEventId) &&
         statusMatches(row, criteria.status)
@@ -1383,6 +1385,12 @@ describe('BillingUserService', () => {
         amountMinor: Money.fromMinor(39600),
         status: 'refunded'
       });
+      // A partial refund leaves the source paid, so the admin can refund the rest.
+      expect(ctx.dataSource.manager.update).not.toHaveBeenCalledWith(
+        Invoice,
+        expect.objectContaining({ id: 'inv-period' }),
+        expect.anything()
+      );
       expect(result.planKey).toBe('business');
       expect(ctx.emit).toHaveBeenCalledWith(
         InvoicePaidEvent.name,
@@ -1455,6 +1463,12 @@ describe('BillingUserService', () => {
         'pay_period',
         100000,
         expect.any(String)
+      );
+      // Refunded in full: the source leaves `paid`, so no admin refund is offered.
+      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
+        Invoice,
+        { id: 'inv-period', status: 'paid' },
+        { status: 'refunded' }
       );
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(
         customer,
@@ -2094,6 +2108,41 @@ describe('BillingUserService', () => {
         'pay_period',
         19000,
         expect.any(String)
+      );
+      // The earlier legs and this one add up to the whole invoice.
+      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
+        Invoice,
+        { id: 'inv-period', status: 'paid' },
+        { status: 'refunded' }
+      );
+    });
+
+    it('keeps the source paid when the full proration refund fails at the provider', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ planKey: 'business' })
+      );
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(100000),
+        refundedMinor: Money.fromMinor(0),
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+      yoo.refund.mockRejectedValue(new Error('provider down'));
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      const result = await ctx.service.changePlan('user-1', 'pro');
+
+      expect(result.planKey).toBe('pro');
+      expect(ctx.dataSource.manager.update).not.toHaveBeenCalledWith(
+        Invoice,
+        expect.objectContaining({ id: 'inv-period' }),
+        expect.anything()
       );
     });
   });
