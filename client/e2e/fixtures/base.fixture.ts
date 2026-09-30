@@ -178,6 +178,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify({ enabled, siteKey: siteKey ?? null })
         });
       },
+      async setBillingProviderEnabled(provider, enabled) {
+        await fetch(`${baseUrl}/__control/billing/provider-enabled`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, enabled })
+        });
+      },
       async activateBillingSubscription(args) {
         const res = await fetch(
           `${baseUrl}/__control/billing/activate-subscription`,

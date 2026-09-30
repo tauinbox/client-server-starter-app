@@ -766,7 +766,8 @@ the same permission both apply.
   enough. For example, January 31 gives February 28, then March 31, then April 30. A trial anchors
   again to its conversion date. A provider-managed subscription takes each boundary from the provider.
 - **Billing region.** The pricing page shows an Auto, Russia and International control to an
-  authenticated user. The control sets the provider of the next checkout.
+  authenticated user. The control sets the provider of the next checkout. The server refuses a
+  region whose provider is not available, with a 409 that tells the user why.
 - **One-time purchases.** A section below the plan grid renders the `GET /api/v1/billing/products`
   catalog for an authenticated user.
 

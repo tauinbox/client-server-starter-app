@@ -92,6 +92,9 @@ export const ErrorKeys = {
     VERSION_CONFLICT: 'errors.featureFlags.versionConflict',
     IF_MATCH_REQUIRED: 'errors.featureFlags.ifMatchRequired'
   },
+  BILLING: {
+    REGION_UNAVAILABLE: 'errors.billing.regionUnavailable'
+  },
   DB: {
     UNIQUE_VIOLATION: 'errors.db.uniqueViolation',
     FOREIGN_KEY_VIOLATION: 'errors.db.foreignKeyViolation',

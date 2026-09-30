@@ -25,6 +25,7 @@ import { Money } from '@app/shared/utils/money';
 import {
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
+  ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import type {
@@ -1389,6 +1390,15 @@ export class BillingUserService {
     const newOverride = overrideForRegion(region);
     const newEffective =
       newOverride ?? this.billing.geoDefaultFor(customer.country);
+
+    // Checked before the subscription guard: telling the user to cancel for a
+    // region that checkout would then refuse leaves them with nothing.
+    if (!(await this.billing.isProviderAvailable(newEffective))) {
+      throw new ConflictException({
+        message: 'Payments are not available in this billing region.',
+        errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE
+      });
+    }
 
     // No in-place cross-provider migration: if a live subscription
     // is on a different provider than the new region resolves to, reject.

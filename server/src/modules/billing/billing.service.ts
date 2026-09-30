@@ -62,6 +62,18 @@ export class BillingService {
     return provider;
   }
 
+  /**
+   * Whether `resolveProvider` would accept this provider: enabled, configured
+   * and registered.
+   */
+  async isProviderAvailable(id: BillingProviderId): Promise<boolean> {
+    return (
+      this.billingConfig.isConfigured(id) &&
+      this.providers.some((p) => p.id === id) &&
+      (await this.isProviderEnabled(id))
+    );
+  }
+
   /** Geo default provider for a country (no enabled/configured check). */
   geoDefaultFor(country: string): BillingProviderId {
     return geoDefault(country);

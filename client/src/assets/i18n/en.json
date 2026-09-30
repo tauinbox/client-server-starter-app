@@ -167,6 +167,9 @@
       "versionConflict": "Feature flag was modified by another request. Reload and retry.",
       "ifMatchRequired": "The If-Match header is required for optimistic locking"
     },
+    "billing": {
+      "regionUnavailable": "Payments are not available in this billing region."
+    },
     "db": {
       "uniqueViolation": "A record with this value already exists",
       "foreignKeyViolation": "Cannot complete operation due to related data",
