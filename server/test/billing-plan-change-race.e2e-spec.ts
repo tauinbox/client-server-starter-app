@@ -488,6 +488,39 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       .getRepository(Invoice)
       .findOneOrFail({ where: { id: source.id } });
     expect(row.refundedMinor.toNumber()).toBe(99000);
+    expect(row.status).toBe('refunded');
+  }, 30000);
+
+  it('marks the source refunded only when the switch refunds all of it', async () => {
+    const { subscription, user } = await setup(
+      'yookassa',
+      null,
+      'race-business'
+    );
+    // The downgrade remainder of the business plan exceeds this source.
+    const source = await seedSourceInvoice(subscription, 99000);
+
+    await service.changePlan(user, 'race-pro');
+
+    const full = await ds
+      .getRepository(Invoice)
+      .findOneOrFail({ where: { id: source.id } });
+    expect(full.status).toBe('refunded');
+    expect(full.refundedMinor.toNumber()).toBe(99000);
+  }, 30000);
+
+  it('keeps the source paid when the switch refunds only part of it', async () => {
+    const { subscription, user } = await setup('yookassa', null);
+    const source = await seedSourceInvoice(subscription, 99000);
+
+    await service.changePlan(user, 'race-business');
+
+    const partial = await ds
+      .getRepository(Invoice)
+      .findOneOrFail({ where: { id: source.id } });
+    expect(partial.status).toBe('paid');
+    expect(partial.refundedMinor.toNumber()).toBeGreaterThan(0);
+    expect(partial.refundedMinor.toNumber()).toBeLessThan(99000);
   }, 30000);
 
   it('refuses a checkout whose incomplete row was activated inside the read-write window', async () => {

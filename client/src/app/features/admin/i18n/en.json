@@ -325,7 +325,7 @@
     "cancelConfirm": "Cancel subscription",
     "cancelSuccess": "Subscription canceled.",
     "refundTitle": "Refund invoice",
-    "refundMessage": "Refund the full amount ({{ amount }}) for this invoice? This cannot be undone.",
+    "refundMessage": "Refund the remaining unrefunded amount of this invoice (total {{ amount }})? This cannot be undone.",
     "refundConfirm": "Refund",
     "refundSuccess": "Invoice refunded.",
     "provider": {

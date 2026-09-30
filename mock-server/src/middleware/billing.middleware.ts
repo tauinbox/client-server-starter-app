@@ -944,6 +944,10 @@ billingRouter.post(
         // Record the partial refund on the source so an admin refund of the same
         // invoice can't give the money back twice.
         source.refundedMinor = (source.refundedMinor ?? 0) + refundMinor;
+        if (source.refundedMinor >= source.amountMinor) {
+          source.status = 'refunded';
+          source.updatedAt = nowIso;
+        }
       }
     }
 

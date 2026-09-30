@@ -4,6 +4,7 @@ import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState, getState } from '../state';
 import type { ProrationPreviewResponse } from '@app/shared/types';
 import { mockId } from '../utils/mock-id';
+import type { MockInvoice } from '../types';
 
 let server: Server;
 let baseUrl: string;
@@ -49,6 +50,15 @@ async function activateSubscription(planKey: string): Promise<string> {
   return sub.id;
 }
 
+/** The paid invoice that the activation records for the period. */
+function periodInvoice(subId: string): MockInvoice {
+  const source = [...getState().billingInvoices.values()].find(
+    (i) => i.subscriptionId === subId && i.status === 'paid'
+  );
+  if (!source) throw new Error('period invoice not seeded');
+  return source;
+}
+
 function post(token: string, path: string, body: unknown): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/billing/${path}`, {
     method: 'POST',
@@ -64,6 +74,7 @@ describe('POST /billing/subscription/change', () => {
   it('switches the plan, records the charge and refund invoices', async () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
+    const source = periodInvoice(subId);
 
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
@@ -74,16 +85,36 @@ describe('POST /billing/subscription/change', () => {
     expect(sub.billingMode).toBe('fixed');
 
     const invoices = [...getState().billingInvoices.values()].filter(
-      (i) => i.subscriptionId === subId
+      (i) => i.subscriptionId === subId && i.id !== source.id
     );
-    const charge = invoices.find(
-      (i) => i.status === 'paid' && i.amountMinor > 0 && i.amountMinor !== 1200
-    );
+    const charge = invoices.find((i) => i.status === 'paid');
     const refund = invoices.find((i) => i.status === 'refunded');
     // A freshly-activated monthly period has its full remainder ahead, so the
     // legs equal the full plan prices (pro $12.00 back, business $29.00 due).
     expect(charge?.amountMinor).toBe(2900);
     expect(refund?.amountMinor).toBe(1200);
+    // Refunded in full, so the admin console offers no second refund of it.
+    expect(source).toMatchObject({ status: 'refunded', refundedMinor: 1200 });
+  });
+
+  it('keeps the source invoice paid when the switch refunds only part of it', async () => {
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    const source = periodInvoice(subId);
+    const sub = getState().billingSubscriptions.get(subId);
+    if (!sub) throw new Error('subscription not seeded');
+    const day = 86_400_000;
+    sub.currentPeriodStart = new Date(Date.now() - 15 * day).toISOString();
+    sub.currentPeriodEnd = new Date(Date.now() + 15 * day).toISOString();
+
+    const res = await post(token, 'subscription/change', {
+      planKey: 'business'
+    });
+    expect(res.status).toBe(200);
+
+    expect(source.status).toBe('paid');
+    expect(source.refundedMinor).toBeGreaterThan(0);
+    expect(source.refundedMinor).toBeLessThan(source.amountMinor);
   });
 
   it('switches fixed → usage with a refund and no charge', async () => {
@@ -302,9 +333,14 @@ describe('POST /billing/subscription/change/preview', () => {
     });
     expect(change.status).toBe(200);
     const refund = [...getState().billingInvoices.values()].find(
-      (i) => i.subscriptionId === subId && i.status === 'refunded'
+      (i) =>
+        i.subscriptionId === subId &&
+        i.status === 'refunded' &&
+        i.id !== source.id
     );
     expect(refund?.amountMinor).toBe(preview.creditMinor);
+    // The earlier refund and this leg add up to the whole invoice.
+    expect(source.status).toBe('refunded');
   });
 
   it('does not mutate the subscription or invoices', async () => {

@@ -194,6 +194,16 @@ describe('BillingAdminListComponent', () => {
     expect(invoicesMock.refundInvoice).toHaveBeenCalledWith('inv-1');
   });
 
+  it('confirmRefund promises the remaining amount, not the full total', async () => {
+    const fixture = await setup();
+    fixture.detectChanges();
+    fixture.componentInstance.confirmRefund(paidInvoice);
+    // An invoice that a plan change refunded in part has less left than its total.
+    const { message } = confirmSpy.mock.calls[0][0] as { message: string };
+    expect(message).toContain('remaining unrefunded amount');
+    expect(message).not.toContain('full amount');
+  });
+
   it('ignores cancel and refund while a mutation is in flight', async () => {
     const fixture = await setup();
     fixture.detectChanges();
