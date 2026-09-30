@@ -16,6 +16,27 @@ async function stubHostedCheckout(page: Page) {
   );
 }
 
+type SnackbarCounter = Window & { snackbarsOpened?: number };
+
+// A second snackbar replaces the first one, so the number on screen cannot tell
+// one message from two. This counts each snackbar that the next page opens.
+// The overlay moves its host in the DOM, so the count is of distinct elements.
+async function countOpenedSnackbars(page: Page) {
+  await page.addInitScript(() => {
+    const counter = window as SnackbarCounter;
+    const opened = new Set<Element>();
+    counter.snackbarsOpened = 0;
+    new MutationObserver(() => {
+      for (const container of document.querySelectorAll(
+        'mat-snack-bar-container'
+      )) {
+        opened.add(container);
+      }
+      counter.snackbarsOpened = opened.size;
+    }).observe(document, { childList: true, subtree: true });
+  });
+}
+
 test.describe('Billing', () => {
   test('anonymous visitor sees pricing without the region control', async ({
     page,
@@ -94,6 +115,7 @@ test.describe('Billing', () => {
     await page.evaluate(() =>
       window.localStorage.setItem('preferred-language', 'ru')
     );
+    await countOpenedSnackbars(page);
     await page.goto('/billing');
 
     const region = page.locator('.region-control');
@@ -105,13 +127,16 @@ test.describe('Billing', () => {
     await region.getByRole('radio', { name: 'Россия' }).click();
     expect((await refused).status()).toBe(409);
 
-    const snackbar = page.locator('mat-snack-bar-container').last();
+    const snackbar = page.locator('mat-snack-bar-container');
     await expect(snackbar).toContainText(
       'Чтобы сменить регион оплаты, сначала отмените текущую подписку.'
     );
     await expect(snackbar).not.toContainText(
       'Не удалось изменить регион оплаты.'
     );
+    expect(
+      await page.evaluate(() => (window as SnackbarCounter).snackbarsOpened)
+    ).toBe(1);
   });
 
   test('a region whose provider is unavailable is refused with the reason', async ({
@@ -131,9 +156,7 @@ test.describe('Billing', () => {
     await region.getByRole('radio', { name: 'Russia' }).click();
     expect((await refused).status()).toBe(409);
 
-    // The interceptor and the store both show the error, so the store's
-    // snackbar can replace a first one that is still leaving the screen.
-    await expect(page.locator('mat-snack-bar-container').last()).toContainText(
+    await expect(page.locator('mat-snack-bar-container')).toContainText(
       'Payments are not available in this billing region.'
     );
     await expect(region.getByRole('radio', { name: 'Auto' })).toBeChecked();

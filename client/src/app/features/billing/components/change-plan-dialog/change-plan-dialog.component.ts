@@ -7,6 +7,7 @@ import {
   signal
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import type { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import {
@@ -24,6 +25,7 @@ import type {
   ProrationPreviewResponse,
   SubscriptionResponse
 } from '@app/shared/types';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { BillingService } from '../../services/billing.service';
 import { formatMoney, planPriceFor } from '../../utils/billing-format';
 
@@ -98,7 +100,7 @@ export class ChangePlanDialogComponent {
   protected readonly selectedKey = signal<string | null>(null);
   protected readonly preview = signal<ProrationPreviewResponse | null>(null);
   protected readonly previewLoading = signal(false);
-  protected readonly previewError = signal(false);
+  protected readonly previewError = signal<string | null>(null);
 
   // Stale-response guard: only the latest selection's preview may land.
   #previewSeq = 0;
@@ -178,7 +180,7 @@ export class ChangePlanDialogComponent {
       this.selectedKey() !== null &&
       this.preview() !== null &&
       !this.previewLoading() &&
-      !this.previewError()
+      this.previewError() === null
   );
 
   setMode(mode: BillingMode): void {
@@ -186,7 +188,7 @@ export class ChangePlanDialogComponent {
     this.mode.set(mode);
     this.selectedKey.set(null);
     this.preview.set(null);
-    this.previewError.set(false);
+    this.previewError.set(null);
     // A single target (the pay-as-you-go plan) needs no extra click.
     const options = this.options();
     if (options.length === 1) this.select(options[0].key);
@@ -196,7 +198,7 @@ export class ChangePlanDialogComponent {
     if (planKey === this.selectedKey()) return;
     this.selectedKey.set(planKey);
     this.preview.set(null);
-    this.previewError.set(false);
+    this.previewError.set(null);
     this.previewLoading.set(true);
 
     const seq = ++this.#previewSeq;
@@ -209,9 +211,15 @@ export class ChangePlanDialogComponent {
           this.preview.set(preview);
           this.previewLoading.set(false);
         },
-        error: () => {
+        error: (error: HttpErrorResponse) => {
           if (seq !== this.#previewSeq) return;
-          this.previewError.set(true);
+          this.previewError.set(
+            parseHttpErrorMessage(
+              error,
+              this.#transloco,
+              'billing.changePlan.previewFailed'
+            )
+          );
           this.previewLoading.set(false);
         }
       });

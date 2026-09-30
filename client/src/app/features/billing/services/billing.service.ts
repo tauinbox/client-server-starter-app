@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type { CursorPaginatedResponse } from '@app/shared/types';
+import { silentContext } from '@core/context-tokens/error-notifications';
 import {
   cursorParams,
   type CursorPageRequest
@@ -40,18 +41,25 @@ export type PurchaseRequest = {
 /**
  * Thin HTTP wrapper over the user billing API. Read endpoints
  * for subscription, payment method and usage return `null` when none exists.
+ *
+ * The caller of each request shows its failure, so the requests are silent for
+ * the global error interceptor. `getEntitlements` is the exception: its caller
+ * shows nothing.
  */
 @Injectable({ providedIn: 'root' })
 export class BillingService {
   readonly #http = inject(HttpClient);
 
   getPlans(): Observable<PlanResponse[]> {
-    return this.#http.get<PlanResponse[]>(`${BILLING_API_V1}/plans`);
+    return this.#http.get<PlanResponse[]>(`${BILLING_API_V1}/plans`, {
+      context: silentContext()
+    });
   }
 
   getSubscription(): Observable<SubscriptionResponse | null> {
     return this.#http.get<SubscriptionResponse | null>(
-      `${BILLING_API_V1}/subscription`
+      `${BILLING_API_V1}/subscription`,
+      { context: silentContext() }
     );
   }
 
@@ -61,24 +69,28 @@ export class BillingService {
   ): Observable<CursorPaginatedResponse<InvoiceResponse>> {
     return this.#http.get<CursorPaginatedResponse<InvoiceResponse>>(
       `${BILLING_API_V1}/invoices`,
-      { params: cursorParams(request) }
+      { params: cursorParams(request), context: silentContext() }
     );
   }
 
   getUsage(): Observable<UsageSummaryResponse | null> {
     return this.#http.get<UsageSummaryResponse | null>(
-      `${BILLING_API_V1}/usage`
+      `${BILLING_API_V1}/usage`,
+      { context: silentContext() }
     );
   }
 
   getPaymentMethod(): Observable<PaymentMethodResponse | null> {
     return this.#http.get<PaymentMethodResponse | null>(
-      `${BILLING_API_V1}/payment-method`
+      `${BILLING_API_V1}/payment-method`,
+      { context: silentContext() }
     );
   }
 
   getProducts(): Observable<ProductResponse[]> {
-    return this.#http.get<ProductResponse[]>(`${BILLING_API_V1}/products`);
+    return this.#http.get<ProductResponse[]>(`${BILLING_API_V1}/products`, {
+      context: silentContext()
+    });
   }
 
   /** The caller's prepaid credit balance; null when no pack was ever bought. */
@@ -95,35 +107,40 @@ export class BillingService {
 
   getCredits(): Observable<CreditBalanceResponse | null> {
     return this.#http.get<CreditBalanceResponse | null>(
-      `${BILLING_API_V1}/credits`
+      `${BILLING_API_V1}/credits`,
+      { context: silentContext() }
     );
   }
 
   purchase(request: PurchaseRequest): Observable<PurchaseSessionResponse> {
     return this.#http.post<PurchaseSessionResponse>(
       `${BILLING_API_V1}/purchase`,
-      request
+      request,
+      { context: silentContext() }
     );
   }
 
   checkout(planKey: string): Observable<CheckoutSessionResponse> {
     return this.#http.post<CheckoutSessionResponse>(
       `${BILLING_API_V1}/checkout`,
-      { planKey }
+      { planKey },
+      { context: silentContext() }
     );
   }
 
   changePlan(planKey: string): Observable<SubscriptionResponse> {
     return this.#http.post<SubscriptionResponse>(
       `${BILLING_API_V1}/subscription/change`,
-      { planKey }
+      { planKey },
+      { context: silentContext() }
     );
   }
 
   previewChange(planKey: string): Observable<ProrationPreviewResponse> {
     return this.#http.post<ProrationPreviewResponse>(
       `${BILLING_API_V1}/subscription/change/preview`,
-      { planKey }
+      { planKey },
+      { context: silentContext() }
     );
   }
 
@@ -131,24 +148,30 @@ export class BillingService {
   updatePaymentMethod(): Observable<CheckoutSessionResponse> {
     return this.#http.post<CheckoutSessionResponse>(
       `${BILLING_API_V1}/payment-method`,
-      {}
+      {},
+      { context: silentContext() }
     );
   }
 
   cancel(mode: CancelMode = 'period_end'): Observable<SubscriptionResponse> {
     return this.#http.post<SubscriptionResponse>(
       `${BILLING_API_V1}/subscription/cancel`,
-      { mode }
+      { mode },
+      { context: silentContext() }
     );
   }
 
   getRegion(): Observable<BillingRegionResponse> {
-    return this.#http.get<BillingRegionResponse>(`${BILLING_API_V1}/region`);
+    return this.#http.get<BillingRegionResponse>(`${BILLING_API_V1}/region`, {
+      context: silentContext()
+    });
   }
 
   setRegion(region: BillingRegion): Observable<BillingRegionResponse> {
-    return this.#http.put<BillingRegionResponse>(`${BILLING_API_V1}/region`, {
-      region
-    });
+    return this.#http.put<BillingRegionResponse>(
+      `${BILLING_API_V1}/region`,
+      { region },
+      { context: silentContext() }
+    );
   }
 }

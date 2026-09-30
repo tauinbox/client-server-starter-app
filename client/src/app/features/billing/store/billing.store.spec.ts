@@ -1,5 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpErrorResponse } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  provideHttpClient,
+  withInterceptors
+} from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting
+} from '@angular/common/http/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import type {
@@ -11,9 +19,11 @@ import type {
   UsageSummaryResponse
 } from '@app/shared/types';
 import { DEFAULT_CURSOR_PAGE_SIZE, ErrorKeys } from '@app/shared/constants';
+import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { NotifyService } from '@core/services/notify.service';
+import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
-import { BillingService } from '../services/billing.service';
+import { BILLING_API_V1, BillingService } from '../services/billing.service';
 import { BillingStore } from './billing.store';
 
 function page<T>(
@@ -496,5 +506,199 @@ describe('BillingStore refusal messages', () => {
       'The subscription changed while the payment was in progress, so the plan was not switched. Any amount charged is on your invoices.',
       'Close'
     );
+  });
+});
+
+describe('Billing requests through the error interceptor', () => {
+  type Store = InstanceType<typeof BillingStore>;
+
+  let httpMock: HttpTestingController;
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
+
+  function refuse(method: string, path: string): void {
+    httpMock
+      .expectOne(
+        (request) =>
+          request.method === method &&
+          request.url === `${BILLING_API_V1}${path}`
+      )
+      .flush(
+        { message: 'Refused', statusCode: 409 },
+        { status: 409, statusText: 'Conflict' }
+      );
+  }
+
+  beforeEach(() => {
+    notifyMock = { success: vi.fn(), error: vi.fn(), warn: vi.fn() };
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([errorInterceptor])),
+        provideHttpClientTesting(),
+        BillingStore,
+        { provide: NotifyService, useValue: notifyMock },
+        {
+          provide: AuthStore,
+          useValue: { setRules: vi.fn(), setMfaMandatory: vi.fn() }
+        }
+      ]
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it.each<[string, (store: Store) => Promise<unknown>, string, string, string]>(
+    [
+      [
+        'loadPlans',
+        (store) => store.loadPlans(),
+        'GET',
+        '/plans',
+        'billing.errors.loadFailed'
+      ],
+      [
+        'loadRegion',
+        (store) => store.loadRegion(),
+        'GET',
+        '/region',
+        'billing.errors.loadFailed'
+      ],
+      [
+        'loadProducts',
+        (store) => store.loadProducts(),
+        'GET',
+        '/products',
+        'billing.errors.loadFailed'
+      ],
+      [
+        'refreshSubscription',
+        (store) => store.refreshSubscription(),
+        'GET',
+        '/subscription',
+        'billing.errors.loadFailed'
+      ],
+      [
+        'refreshInvoices',
+        (store) => store.refreshInvoices(),
+        'GET',
+        '/invoices',
+        'billing.errors.loadFailed'
+      ],
+      [
+        'checkout',
+        (store) => store.checkout('pro'),
+        'POST',
+        '/checkout',
+        'billing.errors.checkoutFailed'
+      ],
+      [
+        'purchase',
+        (store) => store.purchase({ productKey: 'report-pack' }),
+        'POST',
+        '/purchase',
+        'billing.errors.purchaseFailed'
+      ],
+      [
+        'changePlan',
+        (store) => store.changePlan('business'),
+        'POST',
+        '/subscription/change',
+        'billing.errors.changeFailed'
+      ],
+      [
+        'startPaymentMethodUpdate',
+        (store) => store.startPaymentMethodUpdate(),
+        'POST',
+        '/payment-method',
+        'billing.errors.paymentMethodFailed'
+      ],
+      [
+        'cancel',
+        (store) => store.cancel(),
+        'POST',
+        '/subscription/cancel',
+        'billing.errors.cancelFailed'
+      ],
+      [
+        'setRegion',
+        (store) => store.setRegion('ru'),
+        'PUT',
+        '/region',
+        'billing.errors.regionFailed'
+      ]
+    ]
+  )(
+    'a refused %s shows one notification',
+    async (_name, run, method, path, fallbackKey) => {
+      const done = run(TestBed.inject(BillingStore));
+      refuse(method, path);
+      await done;
+
+      expect(notifyMock.warn).not.toHaveBeenCalled();
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 409 }),
+        fallbackKey
+      );
+    }
+  );
+
+  it('a settings load with every read refused shows one notification', async () => {
+    const done = TestBed.inject(BillingStore).loadSettings();
+    httpMock
+      .expectOne((request) => request.url === `${BILLING_API_V1}/invoices`)
+      .flush(page([invoice]));
+    for (const path of [
+      '/subscription',
+      '/payment-method',
+      '/usage',
+      '/credits',
+      '/plans',
+      '/region'
+    ]) {
+      refuse('GET', path);
+    }
+    await done;
+
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('a refused next page of invoices shows one notification', async () => {
+    const store = TestBed.inject(BillingStore);
+    const firstPage = store.refreshInvoices();
+    httpMock
+      .expectOne((request) => request.url === `${BILLING_API_V1}/invoices`)
+      .flush(page([invoice], 'cur-1'));
+    await firstPage;
+
+    store.loadMoreInvoices();
+    refuse('GET', '/invoices');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('a refused proration preview shows no notification, because the dialog shows it', () => {
+    TestBed.inject(BillingService)
+      .previewChange('business')
+      .subscribe({ error: vi.fn() });
+    refuse('POST', '/subscription/change/preview');
+
+    expect(notifyMock.error).not.toHaveBeenCalled();
+  });
+
+  it('a refused entitlements read keeps the interceptor notification, because no caller shows it', () => {
+    TestBed.inject(BillingService)
+      .getEntitlements()
+      .subscribe({ error: vi.fn() });
+    refuse('GET', '/entitlements');
+
+    expect(notifyMock.error).toHaveBeenCalledTimes(1);
   });
 });
