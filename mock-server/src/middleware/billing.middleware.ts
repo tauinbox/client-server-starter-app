@@ -168,6 +168,7 @@ function rejectUnavailableProvider(
   if (isProviderAvailable(provider)) return false;
   res.status(503).json({
     message: `Billing provider "${provider}" is not available`,
+    errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE,
     statusCode: 503
   });
   return true;
@@ -437,6 +438,7 @@ billingRouter.post(
     if (!customer || !sub) {
       res.status(404).json({
         message: 'No active subscription to update the payment method for',
+        errorKey: ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
         statusCode: 404
       });
       return;
@@ -445,6 +447,7 @@ billingRouter.post(
     if (!findPlanByKey(sub.planKey)?.prices[sub.provider]) {
       res.status(503).json({
         message: 'The current plan is missing from the catalog',
+        errorKey: ErrorKeys.BILLING.CURRENT_PLAN_MISSING,
         statusCode: 503
       });
       return;
@@ -560,6 +563,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   if (!product || !product.active) {
     res.status(404).json({
       message: `Product "${productKey}" was not found`,
+      errorKey: ErrorKeys.BILLING.PRODUCT_NOT_FOUND,
       statusCode: 404
     });
     return;
@@ -572,6 +576,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   if (!price) {
     res.status(409).json({
       message: `Product "${product.key}" is not available for your billing provider.`,
+      errorKey: ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER,
       statusCode: 409
     });
     return;
@@ -585,6 +590,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     if (!price.amountMinor || price.amountMinor <= 0) {
       res.status(503).json({
         message: `Product "${product.key}" has no price configured`,
+        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
         statusCode: 503
       });
       return;
@@ -597,6 +603,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     if (minAmountMinor == null || maxAmountMinor == null) {
       res.status(503).json({
         message: `Product "${product.key}" has no amount bounds configured`,
+        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
         statusCode: 503
       });
       return;
@@ -604,6 +611,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     if (requestedMinor === undefined) {
       res.status(400).json({
         message: 'amountMinor is required for a custom-amount product',
+        errorKey: ErrorKeys.BILLING.AMOUNT_REQUIRED,
         statusCode: 400
       });
       return;
@@ -611,6 +619,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     if (requestedMinor < minAmountMinor || requestedMinor > maxAmountMinor) {
       res.status(400).json({
         message: `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`,
+        errorKey: ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE,
         statusCode: 400
       });
       return;
@@ -626,6 +635,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   ) {
     res.status(503).json({
       message: `Product "${product.key}" has no Paddle price configured`,
+      errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
       statusCode: 503
     });
     return;
@@ -660,9 +670,11 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     (p) => p.key === planKey && p.active
   );
   if (!plan) {
-    res
-      .status(404)
-      .json({ message: `Plan "${planKey}" was not found`, statusCode: 404 });
+    res.status(404).json({
+      message: `Plan "${planKey}" was not found`,
+      errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND,
+      statusCode: 404
+    });
     return;
   }
 
@@ -677,6 +689,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     res.status(409).json({
       message:
         'You already have an active subscription. Cancel it before subscribing to another plan.',
+      errorKey: ErrorKeys.BILLING.ALREADY_SUBSCRIBED,
       statusCode: 409
     });
     return;
@@ -800,15 +813,18 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
   const customer = findCustomer(user.id);
   const sub = customer ? findCurrentSubscription(customer.id) : undefined;
   if (!customer || !sub) {
-    res
-      .status(404)
-      .json({ message: 'No active subscription to change', statusCode: 404 });
+    res.status(404).json({
+      message: 'No active subscription to change',
+      errorKey: ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
+      statusCode: 404
+    });
     return null;
   }
   if (!CHANGEABLE_SUBSCRIPTION_STATUSES.includes(sub.status)) {
     res.status(409).json({
       message:
         'The subscription must be active to change plans. Settle any outstanding payment first.',
+      errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE,
       statusCode: 409
     });
     return null;
@@ -817,6 +833,7 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     res.status(409).json({
       message:
         'A cancellation is scheduled for this subscription; it can no longer change plans.',
+      errorKey: ErrorKeys.BILLING.CANCELLATION_SCHEDULED,
       statusCode: 409
     });
     return null;
@@ -832,6 +849,7 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     res.status(409).json({
       message:
         'The billing period has ended and its renewal is in progress. Try again shortly.',
+      errorKey: ErrorKeys.BILLING.RENEWAL_IN_PROGRESS,
       statusCode: 409
     });
     return null;
@@ -841,20 +859,25 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     (p) => p.key === planKey && p.active
   );
   if (!toPlan) {
-    res
-      .status(404)
-      .json({ message: `Plan "${planKey}" was not found`, statusCode: 404 });
+    res.status(404).json({
+      message: `Plan "${planKey}" was not found`,
+      errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND,
+      statusCode: 404
+    });
     return null;
   }
   if (toPlan.key === sub.planKey) {
-    res
-      .status(409)
-      .json({ message: 'You are already on this plan.', statusCode: 409 });
+    res.status(409).json({
+      message: 'You are already on this plan.',
+      errorKey: ErrorKeys.BILLING.SAME_PLAN,
+      statusCode: 409
+    });
     return null;
   }
   if (!toPlan.prices[sub.provider]) {
     res.status(409).json({
       message: `Plan "${toPlan.key}" is not available for your billing provider.`,
+      errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER,
       statusCode: 409
     });
     return null;
@@ -866,6 +889,7 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
   if (!fromPlan) {
     res.status(503).json({
       message: 'The current plan is missing from the catalog',
+      errorKey: ErrorKeys.BILLING.CURRENT_PLAN_MISSING,
       statusCode: 503
     });
     return null;
@@ -1043,9 +1067,11 @@ billingRouter.post(
     const customer = findCustomer(user.id);
     const sub = customer ? findCurrentSubscription(customer.id) : undefined;
     if (!sub) {
-      res
-        .status(404)
-        .json({ message: 'No active subscription to cancel', statusCode: 404 });
+      res.status(404).json({
+        message: 'No active subscription to cancel',
+        errorKey: ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
+        statusCode: 404
+      });
       return;
     }
 
@@ -1119,6 +1145,7 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
     res.status(409).json({
       message:
         'Cancel the current subscription before changing your billing region.',
+      errorKey: ErrorKeys.BILLING.REGION_CHANGE_BLOCKED,
       statusCode: 409
     });
     return;
@@ -1142,6 +1169,7 @@ billingRouter.get(
     if (!resolveEntitlements(user.id).capabilities.includes('reports')) {
       res.status(403).json({
         message: 'This action requires the "reports" entitlement',
+        errorKey: ErrorKeys.BILLING.ENTITLEMENT_REQUIRED,
         statusCode: 403
       });
       return;
@@ -1241,6 +1269,7 @@ billingAdminRouter.post(
     if (!OPEN_SUBSCRIPTION_STATUSES.includes(sub.status)) {
       res.status(409).json({
         message: 'This subscription is already canceled.',
+        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED,
         statusCode: 409
       });
       return;

@@ -7,6 +7,7 @@ import {
   NotFoundException,
   ServiceUnavailableException
 } from '@nestjs/common';
+import type { HttpException, Type } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { In, Not } from 'typeorm';
 import type { FindOperator } from 'typeorm';
@@ -41,6 +42,17 @@ import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import { ProviderTimeoutError } from '../providers/provider-deadline';
 import { BillingUserService } from './billing-user.service';
 import { CreditService } from './credit.service';
+
+/** A refusal answers its status class and the key that the client translates. */
+async function expectRefusal(
+  action: Promise<unknown>,
+  type: Type<HttpException>,
+  errorKey: string
+): Promise<void> {
+  const error: unknown = await action.catch((caught: unknown) => caught);
+  expect(error).toBeInstanceOf(type);
+  expect(error).toMatchObject({ response: { errorKey } });
+}
 
 type QueryBuilderMock = {
   where: jest.Mock;
@@ -453,17 +465,21 @@ describe('BillingUserService', () => {
       const ctx = await build();
       ctx.products.findOne.mockResolvedValue(null);
 
-      await expect(
-        ctx.service.purchase('user-1', { productKey: 'nope' })
-      ).rejects.toThrow(NotFoundException);
+      await expectRefusal(
+        ctx.service.purchase('user-1', { productKey: 'nope' }),
+        NotFoundException,
+        ErrorKeys.BILLING.PRODUCT_NOT_FOUND
+      );
     });
 
     it('rejects an inactive product with 404', async () => {
       const { ctx } = await setupPurchase(makeProduct({ active: false }));
 
-      await expect(
-        ctx.service.purchase('user-1', { productKey: 'report-pack' })
-      ).rejects.toThrow(NotFoundException);
+      await expectRefusal(
+        ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+        NotFoundException,
+        ErrorKeys.BILLING.PRODUCT_NOT_FOUND
+      );
     });
 
     it('rejects a product with no price for the resolved provider with 409', async () => {
@@ -473,9 +489,11 @@ describe('BillingUserService', () => {
         })
       );
 
-      await expect(
-        ctx.service.purchase('user-1', { productKey: 'report-pack' })
-      ).rejects.toThrow(ConflictException);
+      await expectRefusal(
+        ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+        ConflictException,
+        ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER
+      );
     });
 
     it('rejects an sku whose catalog price is misconfigured with 503', async () => {
@@ -483,9 +501,11 @@ describe('BillingUserService', () => {
         makeProduct({ prices: { yookassa: { currency: 'RUB' } } })
       );
 
-      await expect(
-        ctx.service.purchase('user-1', { productKey: 'report-pack' })
-      ).rejects.toThrow(ServiceUnavailableException);
+      await expectRefusal(
+        ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+        ServiceUnavailableException,
+        ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
+      );
     });
 
     describe('on Paddle', () => {
@@ -509,9 +529,11 @@ describe('BillingUserService', () => {
             })
           );
 
-          await expect(
-            ctx.service.purchase('user-1', { productKey: 'report-pack' })
-          ).rejects.toThrow(ServiceUnavailableException);
+          await expectRefusal(
+            ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+            ServiceUnavailableException,
+            ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
+          );
           expect(paddle.createOneTimePayment).not.toHaveBeenCalled();
         }
       );
@@ -547,9 +569,11 @@ describe('BillingUserService', () => {
     it('requires an amount for a custom product', async () => {
       const { ctx } = await setupPurchase(makeDonation());
 
-      await expect(
-        ctx.service.purchase('user-1', { productKey: 'donation' })
-      ).rejects.toThrow(BadRequestException);
+      await expectRefusal(
+        ctx.service.purchase('user-1', { productKey: 'donation' }),
+        BadRequestException,
+        ErrorKeys.BILLING.AMOUNT_REQUIRED
+      );
     });
 
     it.each([9999, 5000001])(
@@ -557,12 +581,14 @@ describe('BillingUserService', () => {
       async (amountMinor) => {
         const { ctx, yoo } = await setupPurchase(makeDonation());
 
-        await expect(
+        await expectRefusal(
           ctx.service.purchase('user-1', {
             productKey: 'donation',
             amountMinor
-          })
-        ).rejects.toThrow(BadRequestException);
+          }),
+          BadRequestException,
+          ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE
+        );
         expect(yoo.createOneTimePayment).not.toHaveBeenCalled();
       }
     );
@@ -598,12 +624,14 @@ describe('BillingUserService', () => {
         makeDonation({ prices: { yookassa: { currency: 'RUB' } } })
       );
 
-      await expect(
+      await expectRefusal(
         ctx.service.purchase('user-1', {
           productKey: 'donation',
           amountMinor: 500
-        })
-      ).rejects.toThrow(ServiceUnavailableException);
+        }),
+        ServiceUnavailableException,
+        ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
+      );
     });
 
     it('charges a bounded custom amount with the sanitized note on the receipt', async () => {
@@ -769,8 +797,10 @@ describe('BillingUserService', () => {
       const ctx = await build();
       ctx.plans.findOne.mockResolvedValue(null);
 
-      await expect(ctx.service.checkout('user-1', 'ghost')).rejects.toThrow(
-        NotFoundException
+      await expectRefusal(
+        ctx.service.checkout('user-1', 'ghost'),
+        NotFoundException,
+        ErrorKeys.BILLING.PLAN_NOT_FOUND
       );
     });
 
@@ -785,8 +815,10 @@ describe('BillingUserService', () => {
       });
       ctx.subscriptions.findOne.mockResolvedValue({ id: 'sub-1' });
 
-      await expect(ctx.service.checkout('user-1', 'pro')).rejects.toThrow(
-        ConflictException
+      await expectRefusal(
+        ctx.service.checkout('user-1', 'pro'),
+        ConflictException,
+        ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(ctx.billing.resolveProvider).not.toHaveBeenCalled();
     });
@@ -837,8 +869,10 @@ describe('BillingUserService', () => {
       // so the conditional write matches nothing.
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
 
-      await expect(ctx.service.checkout('user-1', 'pro')).rejects.toThrow(
-        ConflictException
+      await expectRefusal(
+        ctx.service.checkout('user-1', 'pro'),
+        ConflictException,
+        ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
     });
@@ -858,8 +892,10 @@ describe('BillingUserService', () => {
       ctx.subscriptions.findOne.mockResolvedValue(null);
       ctx.subscriptions.save.mockRejectedValueOnce({ code: '23505' });
 
-      await expect(ctx.service.checkout('user-1', 'pro')).rejects.toThrow(
-        ConflictException
+      await expectRefusal(
+        ctx.service.checkout('user-1', 'pro'),
+        ConflictException,
+        ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
     });
 
@@ -902,8 +938,10 @@ describe('BillingUserService', () => {
         .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
 
-      await expect(ctx.service.checkout('user-1', 'pro')).rejects.toThrow(
-        ConflictException
+      await expectRefusal(
+        ctx.service.checkout('user-1', 'pro'),
+        ConflictException,
+        ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(paddle.startCheckout).not.toHaveBeenCalled();
     });
@@ -1016,9 +1054,11 @@ describe('BillingUserService', () => {
       });
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
 
-      await expect(
-        ctx.service.cancelSubscription('user-1', 'immediate')
-      ).rejects.toThrow(ConflictException);
+      await expectRefusal(
+        ctx.service.cancelSubscription('user-1', 'immediate'),
+        ConflictException,
+        ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED
+      );
       expect(ctx.emit).not.toHaveBeenCalled();
     });
 
@@ -1027,8 +1067,10 @@ describe('BillingUserService', () => {
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue(null);
 
-      await expect(ctx.service.cancelSubscription('user-1')).rejects.toThrow(
-        NotFoundException
+      await expectRefusal(
+        ctx.service.cancelSubscription('user-1'),
+        NotFoundException,
+        ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
       );
     });
   });
@@ -1118,9 +1160,11 @@ describe('BillingUserService', () => {
       const yoo = provider('yookassa', false);
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
-      await expect(
-        ctx.service.startPaymentMethodUpdate('user-1')
-      ).rejects.toThrow(ServiceUnavailableException);
+      await expectRefusal(
+        ctx.service.startPaymentMethodUpdate('user-1'),
+        ServiceUnavailableException,
+        ErrorKeys.BILLING.CURRENT_PLAN_MISSING
+      );
       expect(yoo.updatePaymentMethod).not.toHaveBeenCalled();
     });
 
@@ -1129,9 +1173,11 @@ describe('BillingUserService', () => {
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue(null);
 
-      await expect(
-        ctx.service.startPaymentMethodUpdate('user-1')
-      ).rejects.toThrow(NotFoundException);
+      await expectRefusal(
+        ctx.service.startPaymentMethodUpdate('user-1'),
+        NotFoundException,
+        ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
+      );
     });
 
     it('rejects a provider-managed subscription not yet linked to the provider', async () => {
@@ -1146,9 +1192,11 @@ describe('BillingUserService', () => {
       const paddle = provider('paddle', true);
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
-      await expect(
-        ctx.service.startPaymentMethodUpdate('user-1')
-      ).rejects.toThrow(ConflictException);
+      await expectRefusal(
+        ctx.service.startPaymentMethodUpdate('user-1'),
+        ConflictException,
+        ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED
+      );
       expect(paddle.updatePaymentMethod).not.toHaveBeenCalled();
     });
 
@@ -1163,9 +1211,11 @@ describe('BillingUserService', () => {
       });
       ctx.billing.getProviderById.mockReturnValue(undefined);
 
-      await expect(
-        ctx.service.startPaymentMethodUpdate('user-1')
-      ).rejects.toThrow(ServiceUnavailableException);
+      await expectRefusal(
+        ctx.service.startPaymentMethodUpdate('user-1'),
+        ServiceUnavailableException,
+        ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+      );
     });
   });
 
@@ -1282,6 +1332,11 @@ describe('BillingUserService', () => {
         await expect(
           ctx.service.previewChange('user-1', 'pro')
         ).rejects.toThrow(new ConflictException(message));
+        await expectRefusal(
+          ctx.service.changePlan('user-1', 'pro'),
+          ConflictException,
+          ErrorKeys.BILLING.RENEWAL_IN_PROGRESS
+        );
 
         expect(ctx.subscriptions.update).not.toHaveBeenCalled();
         expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
@@ -1760,35 +1815,45 @@ describe('BillingUserService', () => {
       ctx.customers.findOne.mockResolvedValue(customer);
 
       ctx.subscriptions.findOne.mockResolvedValue(null);
-      await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
-        NotFoundException
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'pro'),
+        NotFoundException,
+        ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
       );
 
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
-      await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
-        'You are already on this plan.'
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'pro'),
+        ConflictException,
+        ErrorKeys.BILLING.SAME_PLAN
       );
 
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ status: 'past_due' })
       );
-      await expect(
-        ctx.service.changePlan('user-1', 'business')
-      ).rejects.toThrow(ConflictException);
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'business'),
+        ConflictException,
+        ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE
+      );
 
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ cancelAtPeriodEnd: true })
       );
-      await expect(
-        ctx.service.changePlan('user-1', 'business')
-      ).rejects.toThrow('cancellation is scheduled');
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'business'),
+        ConflictException,
+        ErrorKeys.BILLING.CANCELLATION_SCHEDULED
+      );
 
       // The usage plan carries no paddle price → unavailable for a paddle sub.
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ provider: 'paddle', providerSubscriptionId: 'sub_ext' })
       );
-      await expect(ctx.service.changePlan('user-1', 'usage')).rejects.toThrow(
-        'not available for your billing provider'
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'usage'),
+        ConflictException,
+        ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
       );
     });
 
@@ -1823,6 +1888,9 @@ describe('BillingUserService', () => {
       );
       expect(rejected).toHaveLength(1);
       expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+      expect(rejected[0].reason).toMatchObject({
+        response: { errorKey: ErrorKeys.BILLING.SUBSCRIPTION_BUSY }
+      });
       // The loser never reaches the provider, so the customer is charged once.
       expect(yoo.chargeOffSession).toHaveBeenCalledTimes(1);
     });
@@ -2045,9 +2113,11 @@ describe('BillingUserService', () => {
             : applyUpdate(target, criteria, patch)
       );
 
-      await expect(
-        ctx.service.changePlan('user-1', 'business')
-      ).rejects.toBeInstanceOf(ConflictException);
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'business'),
+        ConflictException,
+        ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT
+      );
 
       expect(yoo.chargeOffSession).toHaveBeenCalledTimes(1);
       // The charge left the customer's card, so its invoice must survive the
@@ -2079,9 +2149,11 @@ describe('BillingUserService', () => {
       ctx.billing.getProviderById.mockReturnValue(provider('paddle', true));
       ctx.dataSource.manager.update.mockResolvedValue({ affected: 0 });
 
-      await expect(
-        ctx.service.changePlan('user-1', 'business')
-      ).rejects.toBeInstanceOf(ConflictException);
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'business'),
+        ConflictException,
+        ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT
+      );
 
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.emit).not.toHaveBeenCalled();
@@ -2579,8 +2651,10 @@ describe('BillingUserService', () => {
         provider: 'paddle'
       });
 
-      await expect(ctx.service.setRegion('user-1', 'ru')).rejects.toThrow(
-        ConflictException
+      await expectRefusal(
+        ctx.service.setRegion('user-1', 'ru'),
+        ConflictException,
+        ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
       );
       expect(ctx.customers.update).not.toHaveBeenCalled();
       expect(ctx.customers.save).not.toHaveBeenCalled();
@@ -2674,6 +2748,19 @@ describe('BillingUserService', () => {
       await expect(
         ctx.service.setRegion('user-1', 'ru')
       ).resolves.toMatchObject({ region: 'ru' });
+    });
+
+    it('answers 404 when the user of the first billing action is gone', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue(null);
+      ctx.users.findOne.mockResolvedValue(null);
+
+      await expectRefusal(
+        ctx.service.setRegion('user-1', 'ru'),
+        NotFoundException,
+        ErrorKeys.USERS.NOT_FOUND
+      );
+      expect(ctx.customers.save).not.toHaveBeenCalled();
     });
 
     it('rethrows non-unique-violation errors from customer creation', async () => {

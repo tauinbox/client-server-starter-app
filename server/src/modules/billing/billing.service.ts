@@ -4,7 +4,7 @@ import {
   ServiceUnavailableException
 } from '@nestjs/common';
 import type { BillingProviderId } from '@app/shared/types';
-import { BILLING_PROVIDER_FLAGS } from '@app/shared/constants';
+import { BILLING_PROVIDER_FLAGS, ErrorKeys } from '@app/shared/constants';
 import { FeatureFlagService } from '../feature-flags/services/feature-flag.service';
 import type { Customer } from './entities/customer.entity';
 import {
@@ -48,16 +48,18 @@ export class BillingService {
     const enabled = await this.isProviderEnabled(effective);
     const configured = this.billingConfig.isConfigured(effective);
     if (!enabled || !configured) {
-      throw new ServiceUnavailableException(
-        `Billing provider "${effective}" is not available`
-      );
+      throw new ServiceUnavailableException({
+        message: `Billing provider "${effective}" is not available`,
+        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+      });
     }
 
     const provider = this.providers.find((p) => p.id === effective);
     if (!provider) {
-      throw new ServiceUnavailableException(
-        `Billing provider "${effective}" is not registered`
-      );
+      throw new ServiceUnavailableException({
+        message: `Billing provider "${effective}" is not registered`,
+        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+      });
     }
     return provider;
   }

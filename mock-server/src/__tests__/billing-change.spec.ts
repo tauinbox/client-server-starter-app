@@ -3,6 +3,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState, getState } from '../state';
 import type { ProrationPreviewResponse } from '@app/shared/types';
+import { ErrorKeys } from '@app/shared/constants';
 import { mockId } from '../utils/mock-id';
 import type { MockInvoice } from '../types';
 
@@ -396,6 +397,7 @@ describe('POST /billing/payment-method', () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({
       message: 'The current plan is missing from the catalog',
+      errorKey: ErrorKeys.BILLING.CURRENT_PLAN_MISSING,
       statusCode: 503
     });
     expect(getState().billingPaymentMethods.size).toBe(methodsBefore);

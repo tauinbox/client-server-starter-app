@@ -93,7 +93,30 @@ export const ErrorKeys = {
     IF_MATCH_REQUIRED: 'errors.featureFlags.ifMatchRequired'
   },
   BILLING: {
-    REGION_UNAVAILABLE: 'errors.billing.regionUnavailable'
+    REGION_UNAVAILABLE: 'errors.billing.regionUnavailable',
+    REGION_CHANGE_BLOCKED: 'errors.billing.regionChangeBlocked',
+    PROVIDER_UNAVAILABLE: 'errors.billing.providerUnavailable',
+    ALREADY_SUBSCRIBED: 'errors.billing.alreadySubscribed',
+    PLAN_NOT_FOUND: 'errors.billing.planNotFound',
+    PLAN_UNAVAILABLE_FOR_PROVIDER: 'errors.billing.planUnavailableForProvider',
+    SAME_PLAN: 'errors.billing.samePlan',
+    CURRENT_PLAN_MISSING: 'errors.billing.currentPlanMissing',
+    PRODUCT_NOT_FOUND: 'errors.billing.productNotFound',
+    PRODUCT_UNAVAILABLE_FOR_PROVIDER:
+      'errors.billing.productUnavailableForProvider',
+    PRODUCT_NOT_CONFIGURED: 'errors.billing.productNotConfigured',
+    AMOUNT_REQUIRED: 'errors.billing.amountRequired',
+    AMOUNT_OUT_OF_RANGE: 'errors.billing.amountOutOfRange',
+    NO_ACTIVE_SUBSCRIPTION: 'errors.billing.noActiveSubscription',
+    SUBSCRIPTION_NOT_LINKED: 'errors.billing.subscriptionNotLinked',
+    SUBSCRIPTION_NOT_CHANGEABLE: 'errors.billing.subscriptionNotChangeable',
+    SUBSCRIPTION_BUSY: 'errors.billing.subscriptionBusy',
+    SUBSCRIPTION_ALREADY_CANCELED: 'errors.billing.subscriptionAlreadyCanceled',
+    CANCELLATION_SCHEDULED: 'errors.billing.cancellationScheduled',
+    RENEWAL_IN_PROGRESS: 'errors.billing.renewalInProgress',
+    PLAN_CHANGE_CONFLICT: 'errors.billing.planChangeConflict',
+    PLAN_CHANGE_PAYMENT_CONFLICT: 'errors.billing.planChangePaymentConflict',
+    ENTITLEMENT_REQUIRED: 'errors.billing.entitlementRequired'
   },
   DB: {
     UNIQUE_VIOLATION: 'errors.db.uniqueViolation',

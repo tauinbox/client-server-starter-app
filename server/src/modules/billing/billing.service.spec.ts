@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ServiceUnavailableException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
 import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
 import { FeatureFlagService } from '../feature-flags/services/feature-flag.service';
@@ -75,9 +76,12 @@ describe('BillingService.resolveProvider', () => {
         enabled: key !== 'billing.provider.paddle.enabled'
       })
     );
-    await expect(
-      service.resolveProvider(args({ country: 'US' }))
-    ).rejects.toThrow(ServiceUnavailableException);
+    const refusal = service.resolveProvider(args({ country: 'US' }));
+
+    await expect(refusal).rejects.toThrow(ServiceUnavailableException);
+    await expect(refusal).rejects.toMatchObject({
+      response: { errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE }
+    });
   });
 
   it('throws 503 when the resolved provider is not configured', async () => {
@@ -85,6 +89,25 @@ describe('BillingService.resolveProvider', () => {
     await expect(
       service.resolveProvider(args({ country: 'RU' }))
     ).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('throws 503 when the resolved provider is not registered', async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        BillingService,
+        { provide: BILLING_PROVIDERS, useValue: [yookassa] },
+        { provide: FeatureFlagService, useValue: featureFlags },
+        { provide: BillingConfigService, useValue: billingConfig }
+      ]
+    }).compile();
+    const refusal = module
+      .get(BillingService)
+      .resolveProvider(args({ country: 'US' }));
+
+    await expect(refusal).rejects.toThrow(ServiceUnavailableException);
+    await expect(refusal).rejects.toMatchObject({
+      response: { errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE }
+    });
   });
 
   it('treats an absent kill-switch flag as disabled (fail closed)', async () => {

@@ -1,5 +1,6 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ErrorKeys } from '@app/shared/constants';
 import type { JwtAuthRequest } from '../auth/types/auth.request';
 import { EntitlementGuard } from './entitlement.guard';
 import { EntitlementService } from './entitlement.service';
@@ -41,9 +42,12 @@ describe('EntitlementGuard', () => {
   it('throws 403 when the caller lacks the capability', async () => {
     reflector.getAllAndOverride.mockReturnValue('priority-support');
     entitlements.has.mockResolvedValue(false);
-    await expect(guard.canActivate(contextFor('user-1'))).rejects.toThrow(
-      ForbiddenException
-    );
+    const refusal = guard.canActivate(contextFor('user-1'));
+
+    await expect(refusal).rejects.toThrow(ForbiddenException);
+    await expect(refusal).rejects.toMatchObject({
+      response: { errorKey: ErrorKeys.BILLING.ENTITLEMENT_REQUIRED }
+    });
   });
 
   it('throws 403 when there is no authenticated user', async () => {

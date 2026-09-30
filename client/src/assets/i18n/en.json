@@ -168,7 +168,29 @@
       "ifMatchRequired": "The If-Match header is required for optimistic locking"
     },
     "billing": {
-      "regionUnavailable": "Payments are not available in this billing region."
+      "regionUnavailable": "Payments are not available in this billing region.",
+      "regionChangeBlocked": "Cancel your current subscription before you change the billing region.",
+      "providerUnavailable": "Payments are temporarily unavailable. Please try again later.",
+      "alreadySubscribed": "You already have an active subscription. Cancel it before you subscribe to another plan.",
+      "planNotFound": "This plan was not found.",
+      "planUnavailableForProvider": "This plan is not available in your billing region.",
+      "samePlan": "You are already on this plan.",
+      "currentPlanMissing": "Your current plan is missing from the catalog. Please try again later.",
+      "productNotFound": "This product was not found.",
+      "productUnavailableForProvider": "This product is not available in your billing region.",
+      "productNotConfigured": "This product cannot be purchased at the moment. Please try again later.",
+      "amountRequired": "Enter an amount.",
+      "amountOutOfRange": "The amount is outside the allowed range.",
+      "noActiveSubscription": "You have no active subscription.",
+      "subscriptionNotLinked": "The subscription is not linked to the payment provider yet. Try again shortly.",
+      "subscriptionNotChangeable": "The subscription must be active to change plans. Settle any outstanding payment first.",
+      "subscriptionBusy": "This subscription is already being updated. Please try again.",
+      "subscriptionAlreadyCanceled": "This subscription is already canceled.",
+      "cancellationScheduled": "A cancellation is scheduled for this subscription, so its plan can no longer be changed.",
+      "renewalInProgress": "The billing period has ended and its renewal is in progress. Try again shortly.",
+      "planChangeConflict": "The subscription changed while the plan change was in progress. Please try again.",
+      "planChangePaymentConflict": "The subscription changed while the payment was in progress, so the plan was not switched. Any amount charged is on your invoices.",
+      "entitlementRequired": "Your plan does not include this feature."
     },
     "db": {
       "uniqueViolation": "A record with this value already exists",

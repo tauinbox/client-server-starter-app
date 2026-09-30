@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import type {
   CreditBalanceResponse,
@@ -8,8 +10,9 @@ import type {
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
-import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants';
+import { DEFAULT_CURSOR_PAGE_SIZE, ErrorKeys } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
+import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { BillingService } from '../services/billing.service';
 import { BillingStore } from './billing.store';
 
@@ -424,5 +427,74 @@ describe('BillingStore', () => {
     const store = createStore();
     await store.setRegion('ru');
     expect(store.region()?.effectiveProvider).toBe('yookassa');
+  });
+});
+
+describe('BillingStore refusal messages', () => {
+  let billingMock: {
+    setRegion: ReturnType<typeof vi.fn>;
+    changePlan: ReturnType<typeof vi.fn>;
+  };
+  let snackBarMock: { open: ReturnType<typeof vi.fn> };
+
+  function refusal(errorKey: string, message: string): HttpErrorResponse {
+    return new HttpErrorResponse({
+      status: 409,
+      error: { message, errorKey, statusCode: 409 }
+    });
+  }
+
+  beforeEach(() => {
+    billingMock = { setRegion: vi.fn(), changePlan: vi.fn() };
+    snackBarMock = { open: vi.fn() };
+
+    TestBed.configureTestingModule({
+      imports: [TranslocoTestingModuleWithLangs],
+      providers: [
+        BillingStore,
+        { provide: BillingService, useValue: billingMock },
+        { provide: MatSnackBar, useValue: snackBarMock }
+      ]
+    });
+  });
+
+  it('shows the reason of a refused region change, not the generic fallback', async () => {
+    billingMock.setRegion.mockReturnValue(
+      throwError(() =>
+        refusal(
+          ErrorKeys.BILLING.REGION_CHANGE_BLOCKED,
+          'Cancel the current subscription before changing your billing region.'
+        )
+      )
+    );
+
+    const ok = await TestBed.inject(BillingStore).setRegion('ru');
+
+    expect(ok).toBe(false);
+    expect(snackBarMock.open).toHaveBeenCalledTimes(1);
+    expect(snackBarMock.open).toHaveBeenCalledWith(
+      'Cancel your current subscription before you change the billing region.',
+      'Close'
+    );
+  });
+
+  it('shows the reason of a plan change refused after the payment, not an invitation to retry', async () => {
+    billingMock.changePlan.mockReturnValue(
+      throwError(() =>
+        refusal(
+          ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT,
+          'This subscription changed while the payment was in flight; the plan was not switched. Any amount charged is on your invoices.'
+        )
+      )
+    );
+
+    const ok = await TestBed.inject(BillingStore).changePlan('business');
+
+    expect(ok).toBe(false);
+    expect(snackBarMock.open).toHaveBeenCalledTimes(1);
+    expect(snackBarMock.open).toHaveBeenCalledWith(
+      'The subscription changed while the payment was in progress, so the plan was not switched. Any amount charged is on your invoices.',
+      'Close'
+    );
   });
 });

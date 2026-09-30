@@ -23,7 +23,7 @@ import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard'
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
-import { MAX_PAGE_SIZE } from '@app/shared/constants';
+import { ErrorKeys, MAX_PAGE_SIZE } from '@app/shared/constants';
 import { CursorPaginatedResponseDto } from '../src/common/dtos/cursor-paginated-response.dto';
 
 function makeSubscription(): Subscription {
@@ -472,7 +472,13 @@ describe('Billing user self-service (e2e)', () => {
     it('returns 403 when the caller lacks the capability', async () => {
       entitlements.has.mockResolvedValue(false);
 
-      await request(server).get('/api/v1/billing/premium-content').expect(403);
+      const res = await request(server)
+        .get('/api/v1/billing/premium-content')
+        .expect(403);
+
+      expect((res.body as { errorKey?: string }).errorKey).toBe(
+        ErrorKeys.BILLING.ENTITLEMENT_REQUIRED
+      );
     });
 
     it('returns the content when the capability is granted', async () => {

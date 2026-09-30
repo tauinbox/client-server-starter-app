@@ -5,6 +5,7 @@ import {
   Injectable
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ErrorKeys } from '@app/shared/constants';
 import type { JwtAuthRequest } from '../auth/types/auth.request';
 import { ENTITLEMENT_KEY } from './entitlement.constants';
 import { EntitlementService } from './entitlement.service';
@@ -31,9 +32,10 @@ export class EntitlementGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
     const userId = req.user?.userId;
     if (!userId || !(await this.entitlements.has(userId, capability))) {
-      throw new ForbiddenException(
-        `This action requires the "${capability}" entitlement`
-      );
+      throw new ForbiddenException({
+        message: `This action requires the "${capability}" entitlement`,
+        errorKey: ErrorKeys.BILLING.ENTITLEMENT_REQUIRED
+      });
     }
     return true;
   }

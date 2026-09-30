@@ -11,6 +11,7 @@ import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import {
   DEFAULT_CURSOR_PAGE_SIZE,
+  ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
@@ -396,9 +397,12 @@ describe('BillingAdminService', () => {
       const yoo = providerStub('yookassa');
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
-      await expect(
-        ctx.service.cancelSubscription('sub-1', 'immediate')
-      ).rejects.toThrow(ConflictException);
+      const refusal = ctx.service.cancelSubscription('sub-1', 'immediate');
+
+      await expect(refusal).rejects.toThrow(ConflictException);
+      await expect(refusal).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED }
+      });
 
       expect(yoo.cancel).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).not.toHaveBeenCalled();

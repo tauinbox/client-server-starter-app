@@ -86,8 +86,44 @@ import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
-const ALREADY_SUBSCRIBED_MESSAGE =
-  'You already have an active subscription. Cancel it before subscribing to another plan.';
+function alreadySubscribed(): ConflictException {
+  return new ConflictException({
+    message:
+      'You already have an active subscription. Cancel it before subscribing to another plan.',
+    errorKey: ErrorKeys.BILLING.ALREADY_SUBSCRIBED
+  });
+}
+
+function subscriptionNotLinked(): ConflictException {
+  return new ConflictException({
+    message:
+      'The subscription is not linked to the provider yet. Try again shortly.',
+    errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED
+  });
+}
+
+function planNotFound(planKey: string): NotFoundException {
+  return new NotFoundException({
+    message: `Plan "${planKey}" was not found`,
+    errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND
+  });
+}
+
+function currentPlanMissing(): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    message: 'The current plan is missing from the catalog',
+    errorKey: ErrorKeys.BILLING.CURRENT_PLAN_MISSING
+  });
+}
+
+function providerNotRegistered(
+  provider: BillingProviderId
+): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    message: `Billing provider "${provider}" is not registered`,
+    errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+  });
+}
 
 /** Everything a plan change / proration preview operates on. */
 interface ChangeContext {
@@ -309,9 +345,10 @@ export class BillingUserService {
       where: { key: request.productKey }
     });
     if (!product || !product.active) {
-      throw new NotFoundException(
-        `Product "${request.productKey}" was not found`
-      );
+      throw new NotFoundException({
+        message: `Product "${request.productKey}" was not found`,
+        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_FOUND
+      });
     }
 
     const customer = await this.getOrCreateCustomer(userId);
@@ -319,9 +356,10 @@ export class BillingUserService {
 
     const price = product.prices[provider.id];
     if (!price) {
-      throw new ConflictException(
-        `Product "${product.key}" is not available for your billing provider.`
-      );
+      throw new ConflictException({
+        message: `Product "${product.key}" is not available for your billing provider.`,
+        errorKey: ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER
+      });
     }
 
     const amountMinor = this.resolvePurchaseAmount(
@@ -336,9 +374,10 @@ export class BillingUserService {
       product.type !== 'custom' &&
       !price.paddlePriceId
     ) {
-      throw new ServiceUnavailableException(
-        `Product "${product.key}" has no Paddle price configured`
-      );
+      throw new ServiceUnavailableException({
+        message: `Product "${product.key}" has no Paddle price configured`,
+        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
+      });
     }
     const description = this.purchaseDescription(product, request.description);
 
@@ -373,9 +412,10 @@ export class BillingUserService {
   ): number {
     if (product.type !== 'custom') {
       if (!price.amountMinor || price.amountMinor <= 0) {
-        throw new ServiceUnavailableException(
-          `Product "${product.key}" has no price configured`
-        );
+        throw new ServiceUnavailableException({
+          message: `Product "${product.key}" has no price configured`,
+          errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
+        });
       }
       return price.amountMinor;
     }
@@ -384,19 +424,22 @@ export class BillingUserService {
     // `== null`, not falsy: a configured lower bound of 0 (any amount the
     // request DTO already accepts) is a legitimate setting, not "unconfigured".
     if (minAmountMinor == null || maxAmountMinor == null) {
-      throw new ServiceUnavailableException(
-        `Product "${product.key}" has no amount bounds configured`
-      );
+      throw new ServiceUnavailableException({
+        message: `Product "${product.key}" has no amount bounds configured`,
+        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
+      });
     }
     if (requestedMinor === undefined) {
-      throw new BadRequestException(
-        'amountMinor is required for a custom-amount product'
-      );
+      throw new BadRequestException({
+        message: 'amountMinor is required for a custom-amount product',
+        errorKey: ErrorKeys.BILLING.AMOUNT_REQUIRED
+      });
     }
     if (requestedMinor < minAmountMinor || requestedMinor > maxAmountMinor) {
-      throw new BadRequestException(
-        `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`
-      );
+      throw new BadRequestException({
+        message: `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`,
+        errorKey: ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE
+      });
     }
     return requestedMinor;
   }
@@ -421,7 +464,7 @@ export class BillingUserService {
   ): Promise<CheckoutSessionResponse> {
     const plan = await this.plans.findOne({ where: { key: planKey } });
     if (!plan || !plan.active) {
-      throw new NotFoundException(`Plan "${planKey}" was not found`);
+      throw planNotFound(planKey);
     }
 
     const customer = await this.getOrCreateCustomer(userId);
@@ -434,7 +477,7 @@ export class BillingUserService {
       }
     });
     if (active) {
-      throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
+      throw alreadySubscribed();
     }
 
     // resolveProvider asserts the geo's provider is enabled + configured (503),
@@ -482,7 +525,7 @@ export class BillingUserService {
           // Lost the insert race against a concurrent checkout: the partial
           // unique index rejected the second open row.
           if (isUniqueViolation(error)) {
-            throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
+            throw alreadySubscribed();
           }
           throw error;
         }
@@ -521,7 +564,7 @@ export class BillingUserService {
       fields
     );
     if (applied.affected !== 1) {
-      throw new ConflictException(ALREADY_SUBSCRIBED_MESSAGE);
+      throw alreadySubscribed();
     }
   }
 
@@ -543,23 +586,17 @@ export class BillingUserService {
 
     const provider = this.billing.getProviderById(subscription.provider);
     if (!provider) {
-      throw new ServiceUnavailableException(
-        `Billing provider "${subscription.provider}" is not registered`
-      );
+      throw providerNotRegistered(subscription.provider);
     }
     if (provider.managesLifecycle && !subscription.providerSubscriptionId) {
-      throw new ConflictException(
-        'The subscription is not linked to the provider yet. Try again shortly.'
-      );
+      throw subscriptionNotLinked();
     }
     const plan = await this.plans.findOne({
       where: { key: subscription.planKey }
     });
     const price = plan?.prices[subscription.provider];
     if (!price) {
-      throw new ServiceUnavailableException(
-        'The current plan is missing from the catalog'
-      );
+      throw currentPlanMissing();
     }
 
     const session = await provider.updatePaymentMethod(
@@ -623,9 +660,7 @@ export class BillingUserService {
     if (provider.managesLifecycle) {
       const providerSubscriptionId = subscription.providerSubscriptionId;
       if (!providerSubscriptionId) {
-        throw new ConflictException(
-          'The subscription is not linked to the provider yet. Try again shortly.'
-        );
+        throw subscriptionNotLinked();
       }
       // Serialize against a concurrent change on the same row before delegating.
       return this.whileClaimed(subscription, async () => {
@@ -807,9 +842,11 @@ export class BillingUserService {
       );
     }
     if (!saved) {
-      throw new ConflictException(
-        'This subscription changed while the payment was in flight; the plan was not switched. Any amount charged is on your invoices.'
-      );
+      throw new ConflictException({
+        message:
+          'This subscription changed while the payment was in flight; the plan was not switched. Any amount charged is on your invoices.',
+        errorKey: ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT
+      });
     }
     return saved;
   }
@@ -907,9 +944,10 @@ export class BillingUserService {
       { version: subscription.version + 1, planChangeStartedAt: claimedAt }
     );
     if (result.affected !== 1) {
-      throw new ConflictException(
-        'This subscription is already being updated. Please retry.'
-      );
+      throw new ConflictException({
+        message: 'This subscription is already being updated. Please retry.',
+        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_BUSY
+      });
     }
     subscription.version += 1;
     return claimedAt;
@@ -939,9 +977,11 @@ export class BillingUserService {
       subscription.lifecycleOwner === 'self' &&
       renewalAnchor(subscription).getTime() <= at.getTime()
     ) {
-      throw new ConflictException(
-        'The billing period has ended and its renewal is in progress. Try again shortly.'
-      );
+      throw new ConflictException({
+        message:
+          'The billing period has ended and its renewal is in progress. Try again shortly.',
+        errorKey: ErrorKeys.BILLING.RENEWAL_IN_PROGRESS
+      });
     }
   }
 
@@ -964,9 +1004,7 @@ export class BillingUserService {
 
     if (provider.managesLifecycle) {
       if (!subscription.providerSubscriptionId) {
-        throw new ConflictException(
-          'The subscription is not linked to the provider yet. Try again shortly.'
-        );
+        throw subscriptionNotLinked();
       }
       const preview = await provider.previewChangePlan(
         subscription.providerSubscriptionId,
@@ -1053,45 +1091,49 @@ export class BillingUserService {
       'No active subscription to change'
     );
     if (!CHANGEABLE_SUBSCRIPTION_STATUSES.includes(subscription.status)) {
-      throw new ConflictException(
-        'The subscription must be active to change plans. Settle any outstanding payment first.'
-      );
+      throw new ConflictException({
+        message:
+          'The subscription must be active to change plans. Settle any outstanding payment first.',
+        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE
+      });
     }
     if (subscription.cancelAtPeriodEnd) {
-      throw new ConflictException(
-        'A cancellation is scheduled for this subscription; it can no longer change plans.'
-      );
+      throw new ConflictException({
+        message:
+          'A cancellation is scheduled for this subscription; it can no longer change plans.',
+        errorKey: ErrorKeys.BILLING.CANCELLATION_SCHEDULED
+      });
     }
     this.assertBeforeRenewal(subscription, new Date());
 
     const toPlan = await this.plans.findOne({ where: { key: planKey } });
     if (!toPlan || !toPlan.active) {
-      throw new NotFoundException(`Plan "${planKey}" was not found`);
+      throw planNotFound(planKey);
     }
     if (toPlan.key === subscription.planKey) {
-      throw new ConflictException('You are already on this plan.');
+      throw new ConflictException({
+        message: 'You are already on this plan.',
+        errorKey: ErrorKeys.BILLING.SAME_PLAN
+      });
     }
     const toPrice = toPlan.prices[subscription.provider];
     if (!toPrice) {
-      throw new ConflictException(
-        `Plan "${toPlan.key}" is not available for your billing provider.`
-      );
+      throw new ConflictException({
+        message: `Plan "${toPlan.key}" is not available for your billing provider.`,
+        errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
+      });
     }
 
     const fromPlan = await this.plans.findOne({
       where: { key: subscription.planKey }
     });
     if (!fromPlan) {
-      throw new ServiceUnavailableException(
-        'The current plan is missing from the catalog'
-      );
+      throw currentPlanMissing();
     }
 
     const provider = this.billing.getProviderById(subscription.provider);
     if (!provider) {
-      throw new ServiceUnavailableException(
-        `Billing provider "${subscription.provider}" is not registered`
-      );
+      throw providerNotRegistered(subscription.provider);
     }
 
     return { customer, subscription, fromPlan, toPlan, toPrice, provider };
@@ -1184,9 +1226,11 @@ export class BillingUserService {
       now
     );
     if (!saved) {
-      throw new ConflictException(
-        'This subscription changed while the plan change was in flight. Please retry.'
-      );
+      throw new ConflictException({
+        message:
+          'This subscription changed while the plan change was in flight. Please retry.',
+        errorKey: ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT
+      });
     }
     this.events.emit(
       PlanChangedEvent.name,
@@ -1409,9 +1453,11 @@ export class BillingUserService {
       }
     });
     if (open && open.provider !== newEffective) {
-      throw new ConflictException(
-        'Cancel the current subscription before changing your billing region.'
-      );
+      throw new ConflictException({
+        message:
+          'Cancel the current subscription before changing your billing region.',
+        errorKey: ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
+      });
     }
 
     // The override is the only column this call owns; saving the entity would
@@ -1442,7 +1488,10 @@ export class BillingUserService {
       select: { id: true, locale: true }
     });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException({
+        message: 'User not found',
+        errorKey: ErrorKeys.USERS.NOT_FOUND
+      });
     }
     const { country, currency } = geoFromLocale(user.locale);
     try {
@@ -1488,7 +1537,10 @@ export class BillingUserService {
       ? await this.findCurrentSubscription(customer.id)
       : null;
     if (!customer || !subscription) {
-      throw new NotFoundException(notFoundMessage);
+      throw new NotFoundException({
+        message: notFoundMessage,
+        errorKey: ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
+      });
     }
     return { customer, subscription };
   }

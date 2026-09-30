@@ -82,6 +82,38 @@ test.describe('Billing', () => {
     ).not.toBeChecked();
   });
 
+  test('a refused region change shows its reason on the Russian interface', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+    await page.evaluate(() =>
+      window.localStorage.setItem('preferred-language', 'ru')
+    );
+    await page.goto('/billing');
+
+    const region = page.locator('.region-control');
+    const refused = page.waitForResponse(
+      (response) =>
+        response.url().includes('/billing/region') &&
+        response.request().method() !== 'GET'
+    );
+    await region.getByRole('radio', { name: 'Россия' }).click();
+    expect((await refused).status()).toBe(409);
+
+    const snackbar = page.locator('mat-snack-bar-container').last();
+    await expect(snackbar).toContainText(
+      'Чтобы сменить регион оплаты, сначала отмените текущую подписку.'
+    );
+    await expect(snackbar).not.toContainText(
+      'Не удалось изменить регион оплаты.'
+    );
+  });
+
   test('a region whose provider is unavailable is refused with the reason', async ({
     page,
     _mockServer
