@@ -12,6 +12,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
   EntityManager,
+  FindOneOptions,
   In,
   IsNull,
   LessThanOrEqual,
@@ -74,6 +75,7 @@ import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
   lockInvoice,
   releaseRefund,
+  remainingRefundable,
   reserveRefund
 } from '../utils/refund-reservation.util';
 import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
@@ -935,8 +937,7 @@ export class BillingUserService {
   /**
    * What an instant switch to `planKey` would cost right now, without applying
    * it. Paddle answers via `previewUpdate` (net only); YooKassa is the local
-   * calculator's split. The YooKassa credit shown is the uncapped remainder —
-   * the executed refund may be capped by the original invoice's amount.
+   * calculator's split, with the credit capped as the executed refund caps it.
    */
   async previewChange(
     userId: string,
@@ -987,12 +988,47 @@ export class BillingUserService {
       periodEnd: subscription.currentPeriodEnd,
       now: new Date()
     });
+    const creditMinor =
+      quote.refundMinor > 0
+        ? await this.refundableCredit(subscription, quote.refundMinor)
+        : 0;
     return {
       ...base,
       currency: quote.currency,
-      creditMinor: quote.refundMinor,
+      creditMinor,
       chargeMinor: quote.chargeMinor,
-      dueNowMinor: quote.chargeMinor - quote.refundMinor
+      dueNowMinor: quote.chargeMinor - creditMinor
+    };
+  }
+
+  /** The refund leg `reserveProrationRefund` would reserve now, without a lock. */
+  private async refundableCredit(
+    subscription: Subscription,
+    refundMinor: number
+  ): Promise<number> {
+    const source = await this.invoices.findOne(
+      this.prorationRefundSource(subscription)
+    );
+    if (!source) return 0;
+    return Math.min(refundMinor, remainingRefundable(source).toNumber());
+  }
+
+  /**
+   * The invoice that paid for the outgoing plan's current coverage. The preview
+   * and the executed refund must read the same row.
+   */
+  private prorationRefundSource(
+    subscription: Subscription,
+    excludeInvoiceId: string | null = null
+  ): FindOneOptions<Invoice> {
+    return {
+      where: {
+        subscriptionId: subscription.id,
+        status: 'paid',
+        billingMode: 'fixed',
+        ...(excludeInvoiceId ? { id: Not(excludeInvoiceId) } : {})
+      },
+      order: { createdAt: 'DESC' }
     };
   }
 
@@ -1074,15 +1110,10 @@ export class BillingUserService {
     excludeInvoiceId: string | null = null
   ): Promise<{ source: Invoice; minor: number } | null> {
     return withTransaction(this.dataSource, async (manager) => {
-      const source = await lockInvoice(manager, {
-        where: {
-          subscriptionId: subscription.id,
-          status: 'paid',
-          billingMode: 'fixed',
-          ...(excludeInvoiceId ? { id: Not(excludeInvoiceId) } : {})
-        },
-        order: { createdAt: 'DESC' }
-      });
+      const source = await lockInvoice(
+        manager,
+        this.prorationRefundSource(subscription, excludeInvoiceId)
+      );
       if (!source) return null;
 
       // Capping silently is this leg's policy: a switch is not refused because

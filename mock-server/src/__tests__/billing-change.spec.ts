@@ -274,6 +274,39 @@ describe('POST /billing/subscription/change/preview', () => {
     expect(preview.currency).toBe('USD');
   });
 
+  it('caps a self-managed credit by the unrefunded remainder, as the change does', async () => {
+    const user = getState().users.get(mockId('user-2'));
+    if (!user) throw new Error('user not seeded');
+    user.locale = 'ru';
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    const source = [...getState().billingInvoices.values()].find(
+      (i) => i.subscriptionId === subId && i.status === 'paid'
+    );
+    if (!source) throw new Error('period invoice not seeded');
+    expect(source.amountMinor).toBe(99000);
+    source.refundedMinor = 90000;
+
+    const res = await post(token, 'subscription/change/preview', {
+      planKey: 'business'
+    });
+    expect(res.status).toBe(200);
+    const preview = (await res.json()) as ProrationPreviewResponse;
+
+    expect(preview.provider).toBe('yookassa');
+    expect(preview.creditMinor).toBe(9000);
+    expect(preview.dueNowMinor).toBe((preview.chargeMinor ?? 0) - 9000);
+
+    const change = await post(token, 'subscription/change', {
+      planKey: 'business'
+    });
+    expect(change.status).toBe(200);
+    const refund = [...getState().billingInvoices.values()].find(
+      (i) => i.subscriptionId === subId && i.status === 'refunded'
+    );
+    expect(refund?.amountMinor).toBe(preview.creditMinor);
+  });
+
   it('does not mutate the subscription or invoices', async () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
