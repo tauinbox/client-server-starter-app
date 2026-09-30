@@ -86,12 +86,13 @@ export class PricingPageComponent implements OnInit {
     )
   );
 
-  // The plan that's currently active for the caller; Free is the implicit
-  // default for an authenticated user with no paid subscription.
+  // The plan that grants the caller access now. Free is the implicit default
+  // for an authenticated user whose subscription grants nothing, for example
+  // an unpaid `incomplete` checkout.
   protected readonly currentPlanKey = computed(() => {
     if (!this.isAuthenticated()) return null;
     const sub = this.store.subscription();
-    if (sub && sub.status !== 'canceled') return sub.planKey;
+    if (sub && this.store.hasActiveSubscription()) return sub.planKey;
     return 'free';
   });
 
