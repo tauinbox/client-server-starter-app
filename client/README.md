@@ -232,8 +232,8 @@ src/app/
 │       │   │                      # one-time purchases section, which holds the product cards and
 │       │   │                      # the donation cards. The Buy and Pay buttons put the session
 │       │   │                      # reference in sessionStorage. Then the browser goes to the
-│       │   │                      # provider. If the provider completes the payment in the
-│       │   │                      # browser, the app goes directly to /billing/success.
+│       │   │                      # provider. If the provider gives no URL (Paddle), the app
+│       │   │                      # goes to /billing/success?_ptxn=<transaction id>.
 │       │   ├── plan-card/         # PlanCardComponent is a presentational tier card. A featured
 │       │   │                      # card is raised, uses the accent color and shows a "Most
 │       │   │                      # popular" chip. The component emits choose.
@@ -253,7 +253,9 @@ src/app/
 │       │   │                      # cancel action opens a confirmation dialog. For a metered plan
 │       │   │                      # that dialog says that the closing period is charged. The page
 │       │   │                      # also shows the credits wallet card, the payment method with
-│       │   │                      # its update action (a redirect to the provider), the usage
+│       │   │                      # its update action (a redirect to the provider; a Paddle
+│       │   │                      # change comes back with _ptxn and opens the Paddle.js
+│       │   │                      # overlay here), the usage
 │       │   │                      # meter for a usage-mode subscription, and the invoices. The
 │       │   │                      # invoices use cursor pagination with infinite scroll. They
 │       │   │                      # show as a table on a desktop and as cards on a handset.
@@ -285,7 +287,10 @@ src/app/
 │       │                          # it polls the invoices for the paid one_time invoice with that
 │       │                          # provider payment reference. Then it shows a thank-you card.
 │       │                          # The cancel mode shows a neutral state and removes any pending
-│       │                          # purchase.
+│       │                          # purchase. With a _ptxn query parameter the success mode first
+│       │                          # opens the Paddle.js overlay of that transaction: completed
+│       │                          # polls, closed goes to /billing/cancel, and no client token
+│       │                          # shows "Payment form unavailable".
 │       ├── directives/     # HasEntitlementDirective supplies *nxsHasEntitlement="'reports'". It
 │       │                   # has the same surface as HasFeatureDirective, but on the entitlement
 │       │                   # axis. The optional nxsHasEntitlementElse TemplateRef can show an
@@ -295,7 +300,10 @@ src/app/
 │       ├── services/       # BillingService reads /api/v1/billing/*: plans, products,
 │       │                   # subscription, invoices, payment-method (GET and POST), usage,
 │       │                   # credits, entitlements, checkout, purchase, subscription/change with
-│       │                   # /preview, subscription/cancel, and region.
+│       │                   # /preview, subscription/cancel, region and paddle-config.
+│       │                   # PaddleCheckoutService loads the Paddle.js CDN script on the first
+│       │                   # use (through shared/utils/external-script.utils.ts, which the
+│       │                   # CAPTCHA service also uses) and opens the overlay of a txn_ id.
 │       │                   # CheckoutRedirectService is the only owner of the navigation to a
 │       │                   # hosted checkout. It follows a session URL only when the URL is https
 │       │                   # or same-origin. It blocks javascript:, data: and cross-origin http,
@@ -1086,8 +1094,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 291 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1436 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 295 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1452 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
