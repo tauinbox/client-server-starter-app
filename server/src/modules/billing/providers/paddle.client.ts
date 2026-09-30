@@ -5,10 +5,21 @@ import { ConfigService } from '@nestjs/config';
 export const PADDLE_CLIENT = Symbol('PADDLE_CLIENT');
 
 /**
+ * The Paddle environment: sandbox unless `PADDLE_ENVIRONMENT=production`.
+ * The server API client and Paddle.js in the browser must use the same one.
+ */
+export function paddleEnvironment(
+  config: ConfigService
+): 'sandbox' | 'production' {
+  return config.get<string>('PADDLE_ENVIRONMENT') === 'production'
+    ? 'production'
+    : 'sandbox';
+}
+
+/**
  * Builds the Paddle SDK client from env, or `null` when Paddle is not
  * configured (no API key) — the provider then reports billing unavailable
- * instead of constructing a client that would fail on first call. The sandbox
- * environment is selected unless `PADDLE_ENVIRONMENT=production`.
+ * instead of constructing a client that would fail on first call.
  */
 export function createPaddleClient(config: ConfigService): Paddle | null {
   const apiKey = config.get<string>('PADDLE_API_KEY');
@@ -16,7 +27,7 @@ export function createPaddleClient(config: ConfigService): Paddle | null {
     return null;
   }
   const environment =
-    config.get<string>('PADDLE_ENVIRONMENT') === 'production'
+    paddleEnvironment(config) === 'production'
       ? Environment.production
       : Environment.sandbox;
   return new Paddle(apiKey, { environment });

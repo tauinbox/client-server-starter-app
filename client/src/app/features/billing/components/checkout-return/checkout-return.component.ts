@@ -9,7 +9,7 @@ import {
   signal
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
@@ -17,6 +17,11 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import {
+  dropPaddleTransactionId,
+  PaddleCheckoutService,
+  paddleTransactionId
+} from '../../services/paddle-checkout.service';
 import { BillingStore } from '../../store/billing.store';
 import { formatMoney } from '../../utils/billing-format';
 import {
@@ -55,15 +60,20 @@ export class CheckoutReturnComponent implements OnInit {
   protected readonly store = inject(BillingStore);
   readonly #destroyRef = inject(DestroyRef);
   readonly #transloco = inject(TranslocoService);
+  readonly #route = inject(ActivatedRoute);
+  readonly #router = inject(Router);
+  readonly #paddleCheckout = inject(PaddleCheckoutService);
 
   protected readonly settingsRoute = `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSettings}`;
   protected readonly pricingRoute = `/${AppRouteSegmentEnum.Billing}`;
+  protected readonly cancelRoute = `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingCancel}`;
 
-  // 'pending' while polling, 'confirmed' once the subscription is active (or
-  // the one-time invoice is paid), 'unconfirmed' if the webhook never landed
-  // within the poll window.
+  // 'paying' while the Paddle checkout is open, 'unavailable' if it cannot
+  // open. Then 'pending' while polling, 'confirmed' once the subscription is
+  // active (or the one-time invoice is paid), 'unconfirmed' if the webhook
+  // never landed within the poll window.
   protected readonly pollState = signal<
-    'pending' | 'confirmed' | 'unconfirmed'
+    'paying' | 'unavailable' | 'pending' | 'confirmed' | 'unconfirmed'
   >('pending');
 
   // A one-time purchase return: the session ref parked before the provider
@@ -96,6 +106,37 @@ export class CheckoutReturnComponent implements OnInit {
       return;
     }
 
+    this.#destroyRef.onDestroy(() => {
+      if (this.#timer) clearTimeout(this.#timer);
+    });
+    // Paddle sends the buyer here to pay: open the Paddle checkout of that
+    // transaction before polling.
+    const transactionId = paddleTransactionId(this.#route);
+    if (transactionId) {
+      void this.#pay(transactionId);
+    } else {
+      this.#startPolling();
+    }
+  }
+
+  async #pay(transactionId: string): Promise<void> {
+    this.pollState.set('paying');
+    const result = await this.#paddleCheckout.open(transactionId);
+    if (result === 'unavailable') {
+      clearPendingPurchase();
+      this.pollState.set('unavailable');
+      return;
+    }
+    if (result === 'closed') {
+      void this.#router.navigate([this.cancelRoute], { replaceUrl: true });
+      return;
+    }
+    dropPaddleTransactionId(this.#router);
+    this.pollState.set('pending');
+    this.#startPolling();
+  }
+
+  #startPolling(): void {
     const pending = readPendingPurchase();
     this.purchase.set(pending);
     if (pending) {
@@ -108,9 +149,6 @@ export class CheckoutReturnComponent implements OnInit {
       }
       void this.#poll(0);
     }
-    this.#destroyRef.onDestroy(() => {
-      if (this.#timer) clearTimeout(this.#timer);
-    });
   }
 
   async #poll(attempt: number): Promise<void> {

@@ -14,6 +14,7 @@ import type {
   CreditBalanceResponse,
   EntitlementsResponse,
   InvoiceResponse,
+  PaddleClientConfigResponse,
   PaymentMethodResponse,
   PlanResponse,
   ProductResponse,
@@ -157,6 +158,13 @@ export class BillingService {
     return this.#http.post<SubscriptionResponse>(
       `${BILLING_API_V1}/subscription/cancel`,
       { mode },
+      { context: silentContext() }
+    );
+  }
+
+  getPaddleConfig(): Observable<PaddleClientConfigResponse> {
+    return this.#http.get<PaddleClientConfigResponse>(
+      `${BILLING_API_V1}/paddle-config`,
       { context: silentContext() }
     );
   }

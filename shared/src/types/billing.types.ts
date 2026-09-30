@@ -286,6 +286,16 @@ export type CheckoutSessionResponse = {
 };
 
 /**
+ * Result of `GET /billing/paddle-config` — the public values Paddle.js needs
+ * in the browser. `clientToken` is null while Paddle is not configured or has
+ * no client-side token, and then the client cannot open a Paddle checkout.
+ */
+export type PaddleClientConfigResponse = {
+  clientToken: string | null;
+  environment: 'sandbox' | 'production';
+};
+
+/**
  * Result of `POST /billing/purchase` — where the buyer completes a one-time
  * payment. YooKassa always returns a confirmation `url`; Paddle may complete
  * client-side via Paddle.js with the transaction id (`sessionRef`), so `url`

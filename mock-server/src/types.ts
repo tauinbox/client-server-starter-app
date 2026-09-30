@@ -1,6 +1,9 @@
 import type { Request } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
-import type { MfaRequiredResponse } from '@app/shared/types';
+import type {
+  MfaRequiredResponse,
+  PaddleClientConfigResponse
+} from '@app/shared/types';
 
 export type {
   AdminUserResponse,
@@ -427,6 +430,9 @@ export interface State {
   // Prepaid credit balances keyed by customer id — topped up by paid credit
   // pack purchases, mirroring the server's balance row.
   billingCreditBalances: Map<string, MockCreditBalance>;
+  // Paddle.js public configuration advertised via /api/v1/billing/paddle-config.
+  // Default: no client token. E2E sets one via /__control/billing/paddle-config.
+  paddleClientConfig: PaddleClientConfigResponse;
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.

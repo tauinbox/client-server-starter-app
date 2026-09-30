@@ -76,6 +76,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     permissions: Array.from(state.permissions.values()),
     rolePermissions: state.rolePermissions,
     auditLogs: state.auditLogs,
+    paddleClientConfig: state.paddleClientConfig,
     captchaConfig: state.captchaConfig,
     captchaAttempts: state.captchaAttempts.size,
     mfaChallengeFailures: state.mfaChallengeFailures.size,
@@ -520,6 +521,25 @@ router.post('/captcha', (req, res) => {
   };
   state.captchaAttempts.clear();
   res.json({ message: `captcha ${enabled ? 'enabled' : 'disabled'}` });
+});
+
+// POST /__control/billing/paddle-config — set the Paddle.js client token that
+// /api/v1/billing/paddle-config advertises. E2E stubs the Paddle.js script, so
+// any non-empty token works; null disables the Paddle checkout again.
+router.post('/billing/paddle-config', (req, res) => {
+  const { clientToken } = req.body as { clientToken?: string | null };
+  if (clientToken !== null && typeof clientToken !== 'string') {
+    res
+      .status(400)
+      .json({ message: 'clientToken (string | null) is required' });
+    return;
+  }
+  const state = getState();
+  state.paddleClientConfig = {
+    ...state.paddleClientConfig,
+    clientToken: clientToken || null
+  };
+  res.json(state.paddleClientConfig);
 });
 
 // POST /__control/billing/provider-enabled — set the admin kill-switch flag of

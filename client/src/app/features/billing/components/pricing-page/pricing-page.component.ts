@@ -23,6 +23,7 @@ import type {
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
+import { PADDLE_TRANSACTION_PARAM } from '../../services/paddle-checkout.service';
 import { BillingStore } from '../../store/billing.store';
 import {
   formatMoney,
@@ -240,8 +241,8 @@ export class PricingPageComponent implements OnInit {
   /**
    * Start the one-time purchase, park the session reference for the return
    * page, then follow the provider: redirect when it hands back a hosted
-   * checkout URL, or go straight to the return page when the payment
-   * completes client-side (Paddle.js) and the webhook confirms it.
+   * checkout URL, or else open the return page, which opens the Paddle.js
+   * checkout of the transaction and then waits for the webhook.
    */
   async #purchase(
     request: { productKey: string; amountMinor?: number; description?: string },
@@ -254,8 +255,11 @@ export class PricingPageComponent implements OnInit {
       this.#checkoutRedirect.redirect(session.url);
       return;
     }
-    void this.#router.navigate([
-      `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSuccess}`
-    ]);
+    void this.#router.navigate(
+      [`/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSuccess}`],
+      session.provider === 'paddle'
+        ? { queryParams: { [PADDLE_TRANSACTION_PARAM]: session.sessionRef } }
+        : {}
+    );
   }
 }

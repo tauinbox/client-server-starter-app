@@ -60,6 +60,7 @@ type PaddleMock = ReturnType<typeof paddleMock>;
 async function build(opts: {
   client?: PaddleMock | null;
   secret?: string;
+  env?: Record<string, string>;
 }): Promise<{ provider: PaddleProvider; client: PaddleMock | null }> {
   const client = opts.client === undefined ? paddleMock() : opts.client;
   const module = await Test.createTestingModule({
@@ -72,7 +73,7 @@ async function build(opts: {
           get: (key: string) =>
             key === 'PADDLE_WEBHOOK_SECRET'
               ? (opts.secret ?? WEBHOOK_SECRET)
-              : undefined
+              : opts.env?.[key]
         }
       }
     ]
@@ -454,6 +455,48 @@ describe('PaddleProvider', () => {
       });
 
       expect(result).toBe(WEBHOOK_IGNORED);
+    });
+  });
+
+  describe('clientConfig', () => {
+    it('returns the client token and the configured environment', async () => {
+      const { provider } = await build({
+        env: {
+          PADDLE_CLIENT_TOKEN: 'live_abc',
+          PADDLE_ENVIRONMENT: 'production'
+        }
+      });
+
+      expect(provider.clientConfig()).toEqual({
+        clientToken: 'live_abc',
+        environment: 'production'
+      });
+    });
+
+    it('defaults to the sandbox environment', async () => {
+      const { provider } = await build({
+        env: { PADDLE_CLIENT_TOKEN: 'test_abc' }
+      });
+
+      expect(provider.clientConfig()).toEqual({
+        clientToken: 'test_abc',
+        environment: 'sandbox'
+      });
+    });
+
+    it('returns a null token while Paddle has no API client', async () => {
+      const { provider } = await build({
+        client: null,
+        env: { PADDLE_CLIENT_TOKEN: 'test_abc' }
+      });
+
+      expect(provider.clientConfig().clientToken).toBeNull();
+    });
+
+    it('returns a null token for an empty token', async () => {
+      const { provider } = await build({ env: { PADDLE_CLIENT_TOKEN: '' } });
+
+      expect(provider.clientConfig().clientToken).toBeNull();
     });
   });
 

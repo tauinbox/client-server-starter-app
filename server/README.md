@@ -143,7 +143,8 @@ Copy `.env.example` to `.env`, and then configure it:
 | `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | The Express `trust proxy` setting. It is necessary behind a reverse proxy, thus `req.ip` gives the true client. Refer to [Deployment behind a reverse proxy](#deployment-behind-a-reverse-proxy). It accepts `loopback`, `linklocal`, `uniquelocal`, a list of IPs and CIDRs separated by commas, a hop count such as `1`, or `true`. The application has no built-in default, thus an empty value disables the setting. The `docker-compose.yml` file of the repository sets `loopback,uniquelocal` for a production deployment behind a host-local reverse proxy or a docker-bridge sidecar. To change it, export `TRUSTED_PROXIES` in the shell |
 | `PADDLE_API_KEY` | - | Paddle server API key. Use it with `PADDLE_WEBHOOK_SECRET`. The two values are necessary before Paddle counts as configured |
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
-| `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
+| `PADDLE_ENVIRONMENT` | `sandbox` | Paddle environment: `sandbox` or `production`. The server API client and Paddle.js in the browser use the same value |
+| `PADDLE_CLIENT_TOKEN` | - | Public client-side token of Paddle.js (`test_...` for sandbox, `live_...` for production). `GET /api/v1/billing/paddle-config` gives it to the browser. Without it no Paddle payment can complete |
 | `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. The two values are necessary before YooKassa counts as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
@@ -774,16 +775,21 @@ verify, and the answer is a 400.
   custom data. A subscription event and a one-time transaction carry the paid `items[].price.id`
   values as `providerPriceIds`. The reducer finds the plan or the product from them, never from the
   transaction custom data, which a Paddle.js checkout in the browser can set.
-- `startCheckout` opens a hosted checkout.
+- `startCheckout` creates a transaction whose `checkout.url` is `/billing/success`. Paddle adds
+  `?_ptxn=<transaction id>` to it, and the client opens the Paddle.js overlay of that transaction.
+- `clientConfig` gives the public values of Paddle.js to `GET /api/v1/billing/paddle-config`: the
+  `PADDLE_CLIENT_TOKEN` and the `PADDLE_ENVIRONMENT`. The token is null while the server has no
+  Paddle client.
 - `chargeUsage` calls `createOneTimeCharge` at the cycle boundary.
 - `createOneTimePayment` calls `transactions.create`. It uses the catalog `paddlePriceId`, or an
   inline non-catalog price for a custom amount. The one-time marker goes into the custom data of the
   transaction. For a custom amount, the `productId` goes into the custom data of the inline price.
-  The `url` value is optional, because Paddle.js can complete the payment with the transaction id.
+  The `url` value is optional. Without it, the client opens `/billing/success` with the transaction
+  id, and Paddle.js opens the checkout there.
 - `changePlan` and `previewChangePlan` call `subscriptions.update` and `previewUpdate` with
   `prorated_immediately`.
-- `updatePaymentMethod` calls `getPaymentMethodChangeTransaction` for the hosted checkout. The
-  provider ignores the zero-amount completed and failed webhooks of that flow by their origin. It
+- `updatePaymentMethod` calls `getPaymentMethodChangeTransaction`. Its checkout URL is the default
+  payment link of the Paddle account, which must be `/billing/settings`. The provider ignores the zero-amount completed and failed webhooks of that flow by their origin. It
   acknowledges them and does not reject them.
 - `cancel` cancels the subscription.
 - `refund` makes an adjustment. The Paddle API has no idempotency key from the client. Thus the
@@ -804,6 +810,21 @@ writes them with SQL, for example
 Without a price id, Paddle checkout, plan change, plan-change preview and the purchase of that
 product answer 503. A `custom` product needs no price id. The mock seed carries placeholder
 `paddlePriceId` values on its products so that the mock purchase flows work.
+
+**Paddle also needs these settings before a buyer can pay.** Do them in the Paddle dashboard of
+each environment:
+
+1. Create a client-side token, and put it in `PADDLE_CLIENT_TOKEN` (the `PADDLE_CLIENT_TOKEN`
+   repository secret for production). A `test_` token is for sandbox, a `live_` token is for
+   production, and it must agree with `PADDLE_ENVIRONMENT`.
+2. Approve the domain of `CLIENT_URL` as a checkout domain. Paddle refuses a transaction whose
+   `checkout.url` has a domain that is not approved. Sandbox approves a domain automatically.
+3. Set the default payment link to `<CLIENT_URL>/billing/settings`. The payment-method change of a
+   subscription opens there, because its transaction takes the default payment link.
+
+The CSP of `client/nginx.conf` allows the Paddle.js hosts: the script from `cdn.paddle.com`, CSS and
+images from `cdn.paddle.com` and `sandbox-cdn.paddle.com`, and the checkout frame from
+`buy.paddle.com` and `sandbox-buy.paddle.com`.
 
 `YooKassaProvider` is the true YooKassa client, and it is self-managed:
 

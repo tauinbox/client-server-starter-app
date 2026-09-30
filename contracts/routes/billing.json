@@ -7,6 +7,11 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/billing/paddle-config",
+      "expectedStatus": 200
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/billing/entitlements",
       "expectedStatus": 401
     },

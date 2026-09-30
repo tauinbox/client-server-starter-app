@@ -13,11 +13,14 @@ import {
   type SubscriptionNotification,
   type TransactionNotification
 } from '@paddle/paddle-node-sdk';
-import type { SubscriptionStatus } from '@app/shared/types';
+import type {
+  PaddleClientConfigResponse,
+  SubscriptionStatus
+} from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
-import { PADDLE_CLIENT } from './paddle.client';
+import { PADDLE_CLIENT, paddleEnvironment } from './paddle.client';
 import { WEBHOOK_IGNORED } from './payment-provider.interface';
 import type {
   CancelMode,
@@ -141,12 +144,28 @@ export class PaddleProvider implements PaymentProvider {
 
   private readonly logger = new Logger(PaddleProvider.name);
   private readonly webhookSecret: string | undefined;
+  private readonly clientToken: string | undefined;
+  private readonly environment: PaddleClientConfigResponse['environment'];
 
   constructor(
     @Inject(PADDLE_CLIENT) private readonly paddle: Paddle | null,
     config: ConfigService
   ) {
     this.webhookSecret = config.get<string>('PADDLE_WEBHOOK_SECRET');
+    this.clientToken = config.get<string>('PADDLE_CLIENT_TOKEN');
+    this.environment = paddleEnvironment(config);
+  }
+
+  /**
+   * The public values that Paddle.js needs to open the checkout of a
+   * transaction in the browser. The token stays null while the server has no
+   * Paddle client, because no transaction can exist then.
+   */
+  clientConfig(): PaddleClientConfigResponse {
+    return {
+      clientToken: (this.paddle && this.clientToken) || null,
+      environment: this.environment
+    };
   }
 
   private requireClient(): Paddle {

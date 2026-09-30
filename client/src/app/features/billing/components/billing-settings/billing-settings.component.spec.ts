@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
@@ -14,9 +14,11 @@ import type {
 } from '@app/shared/types';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
+import { NotifyService } from '@core/services/notify.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
+import { PaddleCheckoutService } from '../../services/paddle-checkout.service';
 import { BillingStore } from '../../store/billing.store';
 import { EntitlementsStore } from '../../store/entitlements.store';
 import { ChangePlanDialogComponent } from '../change-plan-dialog/change-plan-dialog.component';
@@ -117,6 +119,19 @@ describe('BillingSettingsComponent', () => {
     load: ReturnType<typeof vi.fn>;
     limit: ReturnType<typeof vi.fn>;
   };
+  let notifyMock: {
+    success: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+  };
+  let paddleOpen: ReturnType<typeof vi.fn>;
+  let router: Router;
+  // Set by a test before setup() to land with a Paddle transaction id.
+  let transactionId: string | undefined;
+
+  beforeEach(() => {
+    paddleOpen = vi.fn();
+    transactionId = undefined;
+  });
 
   async function setup(
     hasSub: boolean,
@@ -150,6 +165,7 @@ describe('BillingSettingsComponent', () => {
       load: vi.fn().mockResolvedValue(undefined),
       limit: vi.fn().mockReturnValue(signal(sessionsLimit))
     };
+    notifyMock = { success: vi.fn(), error: vi.fn() };
     dialogMock = { openConfirm: vi.fn().mockReturnValue(of(true)) };
     redirectMock = { redirect: vi.fn() };
     matDialogMock = {
@@ -168,10 +184,17 @@ describe('BillingSettingsComponent', () => {
         { provide: AdaptiveDialogService, useValue: dialogMock },
         { provide: MatDialog, useValue: matDialogMock },
         { provide: LayoutService, useValue: { isHandset: signal(false) } },
-        { provide: CheckoutRedirectService, useValue: redirectMock }
+        { provide: CheckoutRedirectService, useValue: redirectMock },
+        { provide: PaddleCheckoutService, useValue: { open: paddleOpen } },
+        { provide: NotifyService, useValue: notifyMock }
       ]
     }).compileComponents();
 
+    router = TestBed.inject(Router);
+    if (transactionId) {
+      await router.navigateByUrl(`/?_ptxn=${transactionId}`);
+    }
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(BillingSettingsComponent);
     fixture.detectChanges();
   }
@@ -322,5 +345,57 @@ describe('BillingSettingsComponent', () => {
     expect(card.querySelector('.credits-units')?.textContent).toContain(
       '1,240'
     );
+  });
+
+  describe('with a Paddle transaction id from the default payment link', () => {
+    const dropTransactionId = {
+      queryParams: { _ptxn: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    };
+
+    it('opens the Paddle checkout and confirms the updated method', async () => {
+      transactionId = 'txn_01abc';
+      paddleOpen.mockResolvedValue('completed');
+
+      await setup(true);
+      await fixture.whenStable();
+
+      expect(paddleOpen).toHaveBeenCalledWith('txn_01abc');
+      expect(router.navigate).toHaveBeenCalledWith([], dropTransactionId);
+      expect(notifyMock.success).toHaveBeenCalledWith(
+        'billing.settings.paymentMethodUpdated'
+      );
+    });
+
+    it('drops the transaction id without a message when the buyer closes it', async () => {
+      transactionId = 'txn_01abc';
+      paddleOpen.mockResolvedValue('closed');
+
+      await setup(true);
+      await fixture.whenStable();
+
+      expect(router.navigate).toHaveBeenCalledWith([], dropTransactionId);
+      expect(notifyMock.success).not.toHaveBeenCalled();
+      expect(notifyMock.error).not.toHaveBeenCalled();
+    });
+
+    it('reports a payment form that cannot open', async () => {
+      transactionId = 'txn_01abc';
+      paddleOpen.mockResolvedValue('unavailable');
+
+      await setup(true);
+      await fixture.whenStable();
+
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        'billing.errors.paymentFormUnavailable'
+      );
+    });
+
+    it('does not open a checkout without a transaction id', async () => {
+      await setup(true);
+
+      expect(paddleOpen).not.toHaveBeenCalled();
+    });
   });
 });

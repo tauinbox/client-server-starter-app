@@ -83,6 +83,7 @@ export type {
   UsageSummaryResponse,
   ProrationPreviewResponse,
   CheckoutSessionResponse,
+  PaddleClientConfigResponse,
   PurchaseSessionResponse,
   BillingRegionResponse
 } from './billing.types';

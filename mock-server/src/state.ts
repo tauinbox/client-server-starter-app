@@ -103,6 +103,7 @@ export function resetState(): void {
     permissions: new Map(seedPermissions.map((p) => [p.id, { ...p }])),
     rolePermissions: seedRolePermissions.map((rp) => ({ ...rp })),
     auditLogs: [],
+    paddleClientConfig: { clientToken: null, environment: 'sandbox' },
     captchaConfig: { enabled: false, siteKey: null },
     captchaAttempts: new Map(),
     mfaChallengeFailures: new Map(),
