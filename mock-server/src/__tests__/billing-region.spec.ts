@@ -135,6 +135,7 @@ describe('checkout and purchase on an unavailable provider (server parity)', () 
 
   const unavailable = {
     message: 'Billing provider "paddle" is not available',
+    errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE,
     statusCode: 503
   };
 

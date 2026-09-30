@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, type Repository } from 'typeorm';
 import {
+  ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES,
   isOpenStatus
 } from '@app/shared/constants';
@@ -12,8 +13,12 @@ import type { CancelMode } from '../providers/payment-provider.interface';
 import type { RenewalService } from '../renewals/renewal.service';
 import { cancelFields } from './cancel-fields.util';
 
-export const ALREADY_CANCELED_MESSAGE =
-  'This subscription is already canceled.';
+function alreadyCanceled(): ConflictException {
+  return new ConflictException({
+    message: 'This subscription is already canceled.',
+    errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED
+  });
+}
 
 /** What the cancel tail needs from whichever service is running it. */
 export interface CancelSubscriptionDeps {
@@ -44,7 +49,7 @@ export async function cancelOpenSubscription(
   resolveUserId: (subscription: Subscription) => Promise<string | null>
 ): Promise<Subscription> {
   if (!isOpenStatus(subscription.status)) {
-    throw new ConflictException(ALREADY_CANCELED_MESSAGE);
+    throw alreadyCanceled();
   }
 
   // Provider-managed lifecycle: ask the provider to cancel; the resulting
@@ -70,7 +75,7 @@ export async function cancelOpenSubscription(
     fields
   );
   if (applied.affected !== 1) {
-    throw new ConflictException(ALREADY_CANCELED_MESSAGE);
+    throw alreadyCanceled();
   }
 
   Object.assign(subscription, fields);
