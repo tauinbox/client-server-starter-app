@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -9,6 +10,7 @@ import type {
   ProrationPreviewResponse,
   SubscriptionResponse
 } from '@app/shared/types';
+import { ErrorKeys } from '@app/shared/constants';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { BillingService } from '../../services/billing.service';
 import type { ChangePlanDialogData } from './change-plan-dialog.component';
@@ -231,8 +233,35 @@ describe('ChangePlanDialogComponent', () => {
     fixture.detectChanges();
 
     expect(
-      fixture.nativeElement.querySelector('.proration-error')
-    ).not.toBeNull();
+      fixture.nativeElement.querySelector('.proration-error').textContent
+    ).toContain('Could not calculate the proration.');
+    expect(confirmButton().disabled).toBe(true);
+  });
+
+  it('shows the reason of a refused preview in place of the generic text', () => {
+    billingMock.previewChange.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: {
+              message: 'Cancellation is scheduled',
+              errorKey: ErrorKeys.BILLING.CANCELLATION_SCHEDULED,
+              statusCode: 409
+            }
+          })
+      )
+    );
+    createComponent();
+
+    optionButtons()[1].click();
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('.proration-error').textContent.trim()
+    ).toBe(
+      'A cancellation is scheduled for this subscription, so its plan can no longer be changed.'
+    );
     expect(confirmButton().disabled).toBe(true);
   });
 

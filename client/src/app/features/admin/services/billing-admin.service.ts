@@ -6,6 +6,7 @@ import type {
   InvoiceResponse,
   SubscriptionResponse
 } from '@app/shared/types';
+import { silentContext } from '@core/context-tokens/error-notifications';
 import {
   cursorParams,
   type CursorPageRequest
@@ -18,6 +19,9 @@ const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
  * Thin HTTP wrapper over the admin billing API. Reads and
  * mutations are addressed by entity id across all customers — the server gates
  * them on the CASL `manage Billing` permission, not per-caller scoping.
+ *
+ * The stores show the failure of each request, so the requests are silent for
+ * the global error interceptor.
  */
 @Injectable({ providedIn: 'root' })
 export class BillingAdminService {
@@ -28,7 +32,7 @@ export class BillingAdminService {
   ): Observable<CursorPaginatedResponse<SubscriptionResponse>> {
     return this.#http.get<CursorPaginatedResponse<SubscriptionResponse>>(
       `${ADMIN_BILLING_API_V1}/subscriptions`,
-      { params: cursorParams(request) }
+      { params: cursorParams(request), context: silentContext() }
     );
   }
 
@@ -37,7 +41,7 @@ export class BillingAdminService {
   ): Observable<CursorPaginatedResponse<InvoiceResponse>> {
     return this.#http.get<CursorPaginatedResponse<InvoiceResponse>>(
       `${ADMIN_BILLING_API_V1}/invoices`,
-      { params: cursorParams(request) }
+      { params: cursorParams(request), context: silentContext() }
     );
   }
 
@@ -47,7 +51,8 @@ export class BillingAdminService {
   ): Observable<SubscriptionResponse> {
     return this.#http.post<SubscriptionResponse>(
       `${ADMIN_BILLING_API_V1}/subscriptions/${id}/cancel`,
-      { mode }
+      { mode },
+      { context: silentContext() }
     );
   }
 
@@ -59,7 +64,8 @@ export class BillingAdminService {
   refundInvoice(id: string, amountMinor?: number): Observable<InvoiceResponse> {
     return this.#http.post<InvoiceResponse>(
       `${ADMIN_BILLING_API_V1}/invoices/${id}/refund`,
-      amountMinor === undefined ? {} : { amountMinor }
+      amountMinor === undefined ? {} : { amountMinor },
+      { context: silentContext() }
     );
   }
 }

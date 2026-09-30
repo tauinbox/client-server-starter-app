@@ -67,10 +67,8 @@
         <div class="proration-loading">
           <mat-spinner [attr.aria-label]="t('common.loading')" diameter="24" />
         </div>
-      } @else if (previewError()) {
-        <p class="proration-error">
-          {{ t('billing.changePlan.previewFailed') }}
-        </p>
+      } @else if (previewError(); as message) {
+        <p class="proration-error">{{ message }}</p>
       } @else if (ledger(); as ledger) {
         <dl class="ledger">
           @if (ledger.split) {
