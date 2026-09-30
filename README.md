@@ -8,7 +8,7 @@ management and theming.
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | Angular | 21.2.21 |
+| Frontend | Angular | 21.2.25 |
 | UI Library | Angular Material + CDK | 21.2.14 |
 | Backend | NestJS | 11.2.1 |
 | Database | PostgreSQL (TypeORM) | 0.3.31 |

@@ -1220,7 +1220,7 @@ name that gets past the hook. It does this during the changelog generation, and 
 
 | Technology | Version |
 |------------|---------|
-| Angular | 21.2.21 |
+| Angular | 21.2.25 |
 | Angular Material | 21.2.14 |
 | TypeScript | 5.9.3 |
 | @ngrx/signals | 21.1.1 |
