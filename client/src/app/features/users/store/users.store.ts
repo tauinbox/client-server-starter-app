@@ -23,7 +23,6 @@ import { UserService } from '../services/user.service';
 import type { MfaResetRequest } from '../services/user.service';
 import type {
   CursorPaginatedResponse,
-  SortOrder,
   UpdateUser,
   User,
   UserCursorListParams,
@@ -160,10 +159,6 @@ export const UsersStore = signalStore(
 
       setFilters(filters: UserSearch): void {
         patchState(store, { filters });
-      },
-
-      setSorting(sortBy: UserSortColumn, sortOrder: SortOrder): void {
-        store.setSorting(sortBy, sortOrder);
       }
     };
   })

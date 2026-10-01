@@ -66,6 +66,15 @@ describe('FeatureFlagsAdminStore', () => {
     });
   });
 
+  it('declares each store member once', () => {
+    const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined);
+    TestBed.inject(FeatureFlagsAdminStore);
+    expect(warn.mock.calls.flat().join(' ')).not.toContain(
+      'cannot be overridden'
+    );
+    warn.mockRestore();
+  });
+
   it('load() populates entities and clears loading', async () => {
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();

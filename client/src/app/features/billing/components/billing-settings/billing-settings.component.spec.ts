@@ -102,6 +102,7 @@ describe('BillingSettingsComponent', () => {
     usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
     credits: ReturnType<typeof signal<CreditBalanceResponse | null>>;
     plans: ReturnType<typeof signal<PlanResponse[]>>;
+    pageLoading: ReturnType<typeof signal<boolean>>;
     loading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
     currentPlan: ReturnType<typeof signal<PlanResponse | null>>;
@@ -151,6 +152,7 @@ describe('BillingSettingsComponent', () => {
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
       credits: signal<CreditBalanceResponse | null>(credits ?? null),
       plans: signal<PlanResponse[]>([proPlan]),
+      pageLoading: signal(false),
       loading: signal(false),
       working: signal(false),
       currentPlan: signal<PlanResponse | null>(hasSub ? proPlan : null),

@@ -1,7 +1,7 @@
 <section class="billing-settings" *transloco="let t; scope: 'billing'">
   <h1 class="settings-title">{{ t('billing.settings.title') }}</h1>
 
-  @if (store.loading()) {
+  @if (store.pageLoading()) {
     <div class="settings-loading">
       <mat-spinner [attr.aria-label]="t('common.loading')" diameter="40" />
     </div>

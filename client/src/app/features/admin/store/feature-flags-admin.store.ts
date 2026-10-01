@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { tap } from 'rxjs';
-import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
+import { patchState, signalStore, withMethods } from '@ngrx/signals';
 import { removeEntity, setEntity, withEntities } from '@ngrx/signals/entities';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import { withCursorList } from '@shared/store/with-cursor-list';
@@ -12,13 +12,8 @@ import type {
 } from '../services/feature-flags-admin.service';
 import { FeatureFlagsAdminService } from '../services/feature-flags-admin.service';
 
-type FeatureFlagsAdminState = {
-  loading: boolean;
-};
-
 export const FeatureFlagsAdminStore = signalStore(
   withEntities<FeatureFlagResponse>(),
-  withState<FeatureFlagsAdminState>({ loading: false }),
   withCursorList<FeatureFlagResponse>({
     fallbackKey: 'admin.featureFlags.errorLoadFailed'
   }),

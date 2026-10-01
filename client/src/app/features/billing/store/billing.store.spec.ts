@@ -9,7 +9,7 @@ import {
   provideHttpClientTesting
 } from '@angular/common/http/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import type {
   CreditBalanceResponse,
   CursorPaginatedResponse,
@@ -209,7 +209,7 @@ describe('BillingStore', () => {
     expect(store.credits()).toEqual(creditBalance);
     expect(store.currentPlan()?.key).toBe('pro');
     expect(store.hasActiveSubscription()).toBe(true);
-    expect(store.loading()).toBe(false);
+    expect(store.pageLoading()).toBe(false);
   });
 
   it.each([
@@ -246,7 +246,7 @@ describe('BillingStore', () => {
     expect(store.subscription()).toEqual(activeSub);
     expect(store.entities()).toHaveLength(1);
     expect(store.usage()).toEqual(usageSummary);
-    expect(store.loading()).toBe(false);
+    expect(store.pageLoading()).toBe(false);
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.anything(),
@@ -351,6 +351,30 @@ describe('BillingStore', () => {
     await Promise.resolve();
 
     expect(billingMock.getInvoices).toHaveBeenCalledTimes(callsAfterLoad);
+  });
+
+  it('refreshInvoices leaves the page flag alone', async () => {
+    const store = createStore();
+    await store.loadSettings();
+    const pending = new Subject<CursorPaginatedResponse<InvoiceResponse>>();
+    billingMock.getInvoices.mockReturnValue(pending);
+
+    const done = store.refreshInvoices();
+
+    expect(store.loading()).toBe(true);
+    expect(store.pageLoading()).toBe(false);
+    pending.next(page([invoice]));
+    pending.complete();
+    await done;
+  });
+
+  it('declares each store member once', () => {
+    const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined);
+    createStore();
+    expect(warn.mock.calls.flat().join(' ')).not.toContain(
+      'cannot be overridden'
+    );
+    warn.mockRestore();
   });
 
   it('refreshInvoices restarts from the first page', async () => {
@@ -666,6 +690,35 @@ describe('Billing requests through the error interceptor', () => {
     await done;
 
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('a settings load keeps the page flag on until every read lands', async () => {
+    const store = TestBed.inject(BillingStore);
+    const done = store.loadSettings();
+    httpMock
+      .expectOne((request) => request.url === `${BILLING_API_V1}/invoices`)
+      .flush(page([invoice]));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(store.loading()).toBe(false);
+    expect(store.pageLoading()).toBe(true);
+
+    for (const [path, body] of [
+      ['/subscription', activeSub],
+      ['/payment-method', null],
+      ['/usage', usageSummary],
+      ['/credits', creditBalance],
+      ['/plans', [proPlan]],
+      ['/region', null]
+    ] as const) {
+      httpMock
+        .expectOne((request) => request.url === `${BILLING_API_V1}${path}`)
+        .flush(body);
+    }
+    await done;
+
+    expect(store.pageLoading()).toBe(false);
   });
 
   it('a refused next page of invoices shows one notification', async () => {

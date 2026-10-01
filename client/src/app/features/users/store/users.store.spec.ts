@@ -152,3 +152,21 @@ describe('UsersStore', () => {
     });
   });
 });
+
+describe('UsersStore members', () => {
+  it('declares each store member once', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        UsersStore,
+        { provide: UserService, useValue: {} },
+        { provide: NotifyService, useValue: {} }
+      ]
+    });
+    const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined);
+    TestBed.inject(UsersStore);
+    expect(warn.mock.calls.flat().join(' ')).not.toContain(
+      'cannot be overridden'
+    );
+    warn.mockRestore();
+  });
+});
