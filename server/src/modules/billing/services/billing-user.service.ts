@@ -73,6 +73,7 @@ import {
 } from '../utils/period.util';
 import { changeChargeKey, changeRefundKey } from '../utils/charge-keys.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
+import { insertInvoiceOnce } from '../utils/invoice-insert.util';
 import {
   lockInvoice,
   releaseRefund,
@@ -1356,30 +1357,21 @@ export class BillingUserService {
   ): Promise<string | null> {
     const { subscription } = args;
     const now = new Date();
-    const insert = await manager
-      .createQueryBuilder()
-      .insert()
-      .into(Invoice)
-      .values({
-        customerId: subscription.customerId,
-        subscriptionId: subscription.id,
-        provider: subscription.provider,
-        providerEventId: args.providerEventId,
-        providerInvoiceRef: args.providerInvoiceRef,
-        amountMinor: Money.fromMinor(args.amountMinor),
-        currency: args.currency,
-        status: args.status,
-        billingMode: args.billingMode,
-        periodStart: now,
-        periodEnd: subscription.currentPeriodEnd,
-        paidAt: args.status === 'pending' ? null : now,
-        receiptRef: null
-      })
-      .orIgnore()
-      .returning(['id'])
-      .execute();
-    const rows = insert.raw as Array<{ id: string }>;
-    return rows[0]?.id ?? null;
+    return insertInvoiceOnce(manager, {
+      customerId: subscription.customerId,
+      subscriptionId: subscription.id,
+      provider: subscription.provider,
+      providerEventId: args.providerEventId,
+      providerInvoiceRef: args.providerInvoiceRef,
+      amountMinor: Money.fromMinor(args.amountMinor),
+      currency: args.currency,
+      status: args.status,
+      billingMode: args.billingMode,
+      periodStart: now,
+      periodEnd: subscription.currentPeriodEnd,
+      paidAt: args.status === 'pending' ? null : now,
+      receiptRef: null
+    });
   }
 
   async getRegion(userId: string): Promise<{

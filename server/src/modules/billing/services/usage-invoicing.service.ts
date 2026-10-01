@@ -5,7 +5,6 @@ import { DataSource, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
-import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
@@ -17,6 +16,7 @@ import {
   type PaymentProvider
 } from '../providers/payment-provider.interface';
 import { UsageRating } from '../rating/usage-rating.strategy';
+import { insertInvoiceOnce } from '../utils/invoice-insert.util';
 import { CreditService } from './credit.service';
 
 /**
@@ -107,42 +107,33 @@ export class UsageInvoicingService {
       );
       const zeroCharge = summary.amountMinor === 0;
 
-      const insert = await manager
-        .createQueryBuilder()
-        .insert()
-        .into(Invoice)
-        .values({
-          customerId: subscription.customerId,
-          subscriptionId: subscription.id,
-          provider: subscription.provider,
-          providerEventId: chargeKey,
-          providerInvoiceRef: zeroCharge ? chargeKey : '',
-          amountMinor: Money.fromMinor(summary.amountMinor),
-          currency: summary.currency,
-          status: zeroCharge ? 'paid' : 'pending',
-          billingMode: 'usage',
-          periodStart: event.periodStart,
-          periodEnd: event.periodEnd,
-          paidAt: zeroCharge ? new Date() : null,
-          receiptRef: null
-        })
-        .orIgnore()
-        .returning(['id'])
-        .execute();
-
-      const rows = insert.raw as Array<{ id: string }>;
-      if (rows.length === 0) {
+      const invoiceId = await insertInvoiceOnce(manager, {
+        customerId: subscription.customerId,
+        subscriptionId: subscription.id,
+        provider: subscription.provider,
+        providerEventId: chargeKey,
+        providerInvoiceRef: zeroCharge ? chargeKey : '',
+        amountMinor: Money.fromMinor(summary.amountMinor),
+        currency: summary.currency,
+        status: zeroCharge ? 'paid' : 'pending',
+        billingMode: 'usage',
+        periodStart: event.periodStart,
+        periodEnd: event.periodEnd,
+        paidAt: zeroCharge ? new Date() : null,
+        receiptRef: null
+      });
+      if (!invoiceId) {
         return null;
       }
       if (summary.creditUnitsApplied > 0) {
         await this.credits.spendOnUsage(
           manager,
           subscription.customerId,
-          rows[0].id,
+          invoiceId,
           summary.creditUnitsApplied
         );
       }
-      return { invoiceId: rows[0].id, summary, zeroCharge };
+      return { invoiceId, summary, zeroCharge };
     });
 
     if (!result) {
