@@ -54,14 +54,7 @@ export class BillingService {
       });
     }
 
-    const provider = this.providers.find((p) => p.id === effective);
-    if (!provider) {
-      throw new ServiceUnavailableException({
-        message: `Billing provider "${effective}" is not registered`,
-        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-      });
-    }
-    return provider;
+    return this.getProviderById(effective);
   }
 
   /**
@@ -92,9 +85,21 @@ export class BillingService {
     return customer.providerOverride ?? geoDefault(customer.country);
   }
 
-  /** Looks up a registered provider instance by id (cancel/refund dispatch). */
-  getProviderById(id: BillingProviderId): PaymentProvider | undefined {
-    return this.providers.find((p) => p.id === id);
+  /**
+   * The registered provider instance for `id`, with no enabled/configured
+   * check: an existing subscription or invoice keeps its provider. Throws a
+   * `503` for an unregistered id, so no caller can skip the provider call and
+   * still record the result locally.
+   */
+  getProviderById(id: BillingProviderId): PaymentProvider {
+    const provider = this.providers.find((p) => p.id === id);
+    if (!provider) {
+      throw new ServiceUnavailableException({
+        message: `Billing provider "${id}" is not registered`,
+        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+      });
+    }
+    return provider;
   }
 
   private async isProviderEnabled(

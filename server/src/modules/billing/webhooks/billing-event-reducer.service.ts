@@ -31,6 +31,7 @@ import {
   SubscriptionRenewedEvent,
   UsagePeriodClosedEvent
 } from '../events/billing.events';
+import { MANAGES_LIFECYCLE } from '../providers/payment-provider.interface';
 import type {
   NormalizedCustomerRef,
   NormalizedEvent,
@@ -67,13 +68,8 @@ function findByPriceId<T>(
   );
 }
 
-/**
- * Which side owns the subscription lifecycle: YooKassa is
- * self-managed (the core drives renewals), every other provider (Paddle) is
- * provider-managed.
- */
 function lifecycleOwnerFor(provider: BillingProviderId): 'provider' | 'self' {
-  return provider === 'yookassa' ? 'self' : 'provider';
+  return MANAGES_LIFECYCLE[provider] ? 'provider' : 'self';
 }
 
 /**
@@ -124,9 +120,6 @@ export class BillingEventReducer {
           event.provider,
           event.payload as NormalizedPaymentMethodPayload
         );
-        break;
-      case 'subscription.plan_changed':
-        // Plan changes are applied by the dedicated change flow.
         break;
     }
   }

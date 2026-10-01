@@ -130,20 +130,6 @@ describe('YooKassaProvider', () => {
     });
   });
 
-  describe('ensureCustomer', () => {
-    it('returns the existing provider customer id when present', async () => {
-      const { provider } = await build();
-      await expect(
-        provider.ensureCustomer({ providerCustomerId: 'pm-1' } as Customer)
-      ).resolves.toBe('pm-1');
-    });
-
-    it('falls back to the billing customer id (no YooKassa customer object)', async () => {
-      const { provider } = await build();
-      await expect(provider.ensureCustomer(customer)).resolves.toBe('cust-1');
-    });
-  });
-
   describe('startCheckout', () => {
     it('creates a paid first payment with a 54-FZ receipt and returns the redirect url', async () => {
       const { provider, client, users } = await build();

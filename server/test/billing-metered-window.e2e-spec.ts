@@ -57,7 +57,6 @@ function fakeProvider(id: BillingProviderId): FakeProvider {
   return {
     id,
     managesLifecycle: id === 'paddle',
-    ensureCustomer: jest.fn(),
     startCheckout: jest.fn(),
     chargeOffSession: jest.fn<
       Promise<ChargeResult>,

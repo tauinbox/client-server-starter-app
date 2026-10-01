@@ -53,7 +53,6 @@ function fakeProvider(): FakeProvider {
   return {
     id: 'yookassa',
     managesLifecycle: false,
-    ensureCustomer: jest.fn(),
     startCheckout: jest.fn(),
     chargeOffSession: jest.fn(),
     findOffSessionCharge: jest.fn().mockResolvedValue(null),

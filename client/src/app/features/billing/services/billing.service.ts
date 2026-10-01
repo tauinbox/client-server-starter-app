@@ -94,7 +94,6 @@ export class BillingService {
     });
   }
 
-  /** The caller's prepaid credit balance; null when no pack was ever bought. */
   /**
    * What the caller's billing state actually grants. Not derivable from
    * `getPlans()`: the catalog cannot express one-time grants, their expiry, the
@@ -106,6 +105,7 @@ export class BillingService {
     );
   }
 
+  /** The caller's prepaid credit balance; null when no pack was ever bought. */
   getCredits(): Observable<CreditBalanceResponse | null> {
     return this.#http.get<CreditBalanceResponse | null>(
       `${BILLING_API_V1}/credits`,

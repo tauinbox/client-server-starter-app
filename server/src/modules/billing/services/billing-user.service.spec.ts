@@ -1209,7 +1209,11 @@ describe('BillingUserService', () => {
         providerSubscriptionId: null,
         status: 'active'
       });
-      ctx.billing.getProviderById.mockReturnValue(undefined);
+      ctx.billing.getProviderById.mockImplementation(() => {
+        throw new ServiceUnavailableException({
+          errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+        });
+      });
 
       await expectRefusal(
         ctx.service.startPaymentMethodUpdate('user-1'),

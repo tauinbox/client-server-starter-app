@@ -24,6 +24,7 @@ import type { Plan } from '../entities/plan.entity';
 import { YOOKASSA_CLIENT } from './yookassa.client';
 import {
   ChargeDeclinedError,
+  MANAGES_LIFECYCLE,
   WEBHOOK_IGNORED
 } from './payment-provider.interface';
 import type {
@@ -154,7 +155,7 @@ interface YooKassaNotification {
 @Injectable()
 export class YooKassaProvider implements PaymentProvider {
   readonly id = 'yookassa' as const;
-  readonly managesLifecycle = false;
+  readonly managesLifecycle = MANAGES_LIFECYCLE.yookassa;
 
   private readonly logger = new Logger(YooKassaProvider.name);
   private readonly vatCode: number;
@@ -186,13 +187,6 @@ export class YooKassaProvider implements PaymentProvider {
       throw new ServiceUnavailableException('YooKassa is not configured');
     }
     return this.yoo;
-  }
-
-  ensureCustomer(customer: Customer): Promise<string> {
-    // YooKassa has no customer object to create — payments carry our identifiers
-    // via `metadata`/`merchant_customer_id`. The billing customer id is the
-    // stable reference we tag every payment with.
-    return Promise.resolve(customer.providerCustomerId ?? customer.id);
   }
 
   chargeUsage(): Promise<void> {

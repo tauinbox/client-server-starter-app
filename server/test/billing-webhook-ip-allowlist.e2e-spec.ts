@@ -93,7 +93,6 @@ async function makeApp(options: {
   const provider = {
     id: 'paddle',
     managesLifecycle: true,
-    ensureCustomer: jest.fn(),
     startCheckout: jest.fn(),
     chargeOffSession: jest.fn(),
     findOffSessionCharge: jest.fn(),

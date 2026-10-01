@@ -116,15 +116,6 @@ function currentPlanMissing(): ServiceUnavailableException {
   });
 }
 
-function providerNotRegistered(
-  provider: BillingProviderId
-): ServiceUnavailableException {
-  return new ServiceUnavailableException({
-    message: `Billing provider "${provider}" is not registered`,
-    errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-  });
-}
-
 /** Everything a plan change / proration preview operates on. */
 interface ChangeContext {
   customer: Customer;
@@ -585,9 +576,6 @@ export class BillingUserService {
     );
 
     const provider = this.billing.getProviderById(subscription.provider);
-    if (!provider) {
-      throw providerNotRegistered(subscription.provider);
-    }
     if (provider.managesLifecycle && !subscription.providerSubscriptionId) {
       throw subscriptionNotLinked();
     }
@@ -1132,9 +1120,6 @@ export class BillingUserService {
     }
 
     const provider = this.billing.getProviderById(subscription.provider);
-    if (!provider) {
-      throw providerNotRegistered(subscription.provider);
-    }
 
     return { customer, subscription, fromPlan, toPlan, toPrice, provider };
   }
@@ -1483,17 +1468,14 @@ export class BillingUserService {
     const existing = await this.customers.findOne({ where: { userId } });
     if (existing) return existing;
 
-    const user = await this.users.findOne({
-      where: { id: userId },
-      select: { id: true, locale: true }
-    });
-    if (!user) {
+    const geo = await this.detectGeo(userId);
+    if (!geo) {
       throw new NotFoundException({
         message: 'User not found',
         errorKey: ErrorKeys.USERS.NOT_FOUND
       });
     }
-    const { country, currency } = geoFromLocale(user.locale);
+    const { country, currency } = geo;
     try {
       return await this.customers.save(
         this.customers.create({
@@ -1555,11 +1537,18 @@ export class BillingUserService {
   }
 
   private async detectCountry(userId: string): Promise<string> {
+    return ((await this.detectGeo(userId)) ?? geoFromLocale('en')).country;
+  }
+
+  /** The billing geo of the user's locale; null when the user is gone. */
+  private async detectGeo(
+    userId: string
+  ): Promise<{ country: string; currency: string } | null> {
     const user = await this.users.findOne({
       where: { id: userId },
       select: { id: true, locale: true }
     });
-    return geoFromLocale(user?.locale ?? 'en').country;
+    return user ? geoFromLocale(user.locale) : null;
   }
 
   // Must match the client's checkout-return routes (/billing/success|cancel).

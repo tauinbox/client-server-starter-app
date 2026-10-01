@@ -962,21 +962,4 @@ describe('PaddleProvider', () => {
       expect(client!.adjustments.create).not.toHaveBeenCalled();
     });
   });
-
-  describe('ensureCustomer', () => {
-    it('returns an existing provider customer id', async () => {
-      const { provider } = await build({});
-      const id = await provider.ensureCustomer({
-        providerCustomerId: 'ctm_existing'
-      } as Customer);
-      expect(id).toBe('ctm_existing');
-    });
-
-    it('is not implemented when no provider customer exists (created at checkout)', async () => {
-      const { provider } = await build({});
-      expect(() =>
-        provider.ensureCustomer({ providerCustomerId: null } as Customer)
-      ).toThrow(NotImplementedException);
-    });
-  });
 });
