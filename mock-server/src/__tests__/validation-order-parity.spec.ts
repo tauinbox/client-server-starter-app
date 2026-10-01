@@ -4,6 +4,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
 import { mockId } from '../utils/mock-id';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -159,7 +160,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message:
         'This password has appeared in a public data breach. Please choose a different one.',
       statusCode: 400,

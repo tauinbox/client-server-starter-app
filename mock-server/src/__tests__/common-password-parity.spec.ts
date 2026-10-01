@@ -5,6 +5,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -74,7 +75,7 @@ describe('the local common-password check mirrors the server verdict', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(TOO_COMMON);
+    expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(findUserByEmail('common-register@example.com')).toBeUndefined();
   });
 
@@ -87,7 +88,7 @@ describe('the local common-password check mirrors the server verdict', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(TOO_COMMON);
+    expect(await readErrorBody(res)).toEqual(TOO_COMMON);
   });
 
   it('answers the local check before the breach corpus', async () => {
@@ -119,7 +120,7 @@ describe('the local common-password check mirrors the server verdict', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(TOO_COMMON);
+    expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(findUserByEmail(email)?.password).toBe('Password1');
   });
 
@@ -138,7 +139,7 @@ describe('the local common-password check mirrors the server verdict', () => {
     );
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(TOO_COMMON);
+    expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(findUserByEmail('user@example.com')?.firstName).toBe('Regular');
   });
 
@@ -158,7 +159,7 @@ describe('the local common-password check mirrors the server verdict', () => {
     );
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(TOO_COMMON);
+    expect(await readErrorBody(res)).toEqual(TOO_COMMON);
   });
 
   it('checks the admin update password against the email sent in the same body', async () => {
@@ -176,7 +177,7 @@ describe('the local common-password check mirrors the server verdict', () => {
     );
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(TOO_COMMON);
+    expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(getState().users.get(mockId('user-3'))?.email).toBe(
       'john@example.com'
     );

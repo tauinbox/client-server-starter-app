@@ -3,6 +3,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -77,7 +78,7 @@ describe('confirm-email-change against a deactivated account', () => {
     const res = await confirm(token);
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(invalidTokenBody);
+    expect(await readErrorBody(res)).toEqual(invalidTokenBody);
     expect(findUserByEmail(email)?.email).toBe(email);
     expect(findUserByEmail(email)?.isEmailVerified).toBe(true);
   });
@@ -90,7 +91,9 @@ describe('confirm-email-change against a deactivated account', () => {
     const unknown = await confirm('no-such-email-change-token');
 
     expect(deactivated.status).toBe(unknown.status);
-    expect(await deactivated.json()).toEqual(await unknown.json());
+    expect(await readErrorBody(deactivated)).toEqual(
+      await readErrorBody(unknown)
+    );
   });
 
   it('cancels the pending change when an administrator deactivates', async () => {
@@ -116,6 +119,6 @@ describe('confirm-email-change against a deactivated account', () => {
 
     const res = await confirm(token);
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(invalidTokenBody);
+    expect(await readErrorBody(res)).toEqual(invalidTokenBody);
   });
 });

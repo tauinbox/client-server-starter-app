@@ -3,6 +3,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -45,7 +46,8 @@ async function issueResetToken(): Promise<string> {
 
 const invalidTokenBody = {
   message: 'Invalid or expired password reset token',
-  errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
+  errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN,
+  statusCode: 400
 };
 
 describe('reset-password against a deactivated account', () => {
@@ -58,7 +60,7 @@ describe('reset-password against a deactivated account', () => {
       password: newPassword
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual(invalidTokenBody);
+    expect(await readErrorBody(res)).toEqual(invalidTokenBody);
     expect(findUserByEmail(email)?.password).toBe(oldPassword);
   });
 
@@ -76,7 +78,9 @@ describe('reset-password against a deactivated account', () => {
     });
 
     expect(deactivated.status).toBe(unknown.status);
-    expect(await deactivated.json()).toEqual(await unknown.json());
+    expect(await readErrorBody(deactivated)).toEqual(
+      await readErrorBody(unknown)
+    );
   });
 
   it('keeps the token usable while the account stays active', async () => {

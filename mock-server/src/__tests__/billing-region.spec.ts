@@ -5,6 +5,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
 import { mockId } from '../utils/mock-id';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -129,7 +130,7 @@ describe('checkout and purchase on an unavailable provider (server parity)', () 
     });
     return {
       status: res.status,
-      body: (await res.json()) as Record<string, unknown>
+      body: await readErrorBody(res)
     };
   }
 

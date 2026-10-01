@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, httpStatusText } from '@app/shared/constants';
 import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { ErrorResponse } from './error-response.interface';
 
@@ -69,9 +69,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const body: ErrorResponse = {
       statusCode,
       message,
-      error: HttpStatus[statusCode]
-        ? this.getHttpStatusText(statusCode)
-        : 'Internal Server Error',
+      error: httpStatusText(statusCode),
       timestamp: new Date().toISOString(),
       path,
       ...(errors && { errors }),
@@ -113,6 +111,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof QueryFailedError) {
       return this.handleQueryFailedError(exception as QueryFailedError<Error>);
+    }
+
+    const clientError = this.exposedClientError(exception);
+    if (clientError) {
+      return clientError;
     }
 
     if (exception instanceof EntityNotFoundError) {
@@ -191,28 +194,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
   }
 
-  private getHttpStatusText(statusCode: number): string {
-    const statusTexts: Record<number, string> = {
-      400: 'Bad Request',
-      401: 'Unauthorized',
-      403: 'Forbidden',
-      404: 'Not Found',
-      405: 'Method Not Allowed',
-      408: 'Request Timeout',
-      409: 'Conflict',
-      410: 'Gone',
-      413: 'Payload Too Large',
-      415: 'Unsupported Media Type',
-      422: 'Unprocessable Entity',
-      423: 'Locked',
-      428: 'Precondition Required',
-      429: 'Too Many Requests',
-      500: 'Internal Server Error',
-      501: 'Not Implemented',
-      502: 'Bad Gateway',
-      503: 'Service Unavailable'
+  /**
+   * An http-errors 4xx with `expose` set, as body-parser throws for a body over
+   * the size limit. Nest maps only a SyntaxError (bad JSON) to a 400.
+   */
+  private exposedClientError(exception: unknown): ResolvedException | null {
+    if (!(exception instanceof Error)) {
+      return null;
+    }
+    const { status, expose } = exception as Error & {
+      status?: unknown;
+      expose?: unknown;
     };
-
-    return statusTexts[statusCode] ?? 'Internal Server Error';
+    if (
+      expose !== true ||
+      typeof status !== 'number' ||
+      status < 400 ||
+      status >= 500
+    ) {
+      return null;
+    }
+    return { statusCode: status, message: exception.message };
   }
 }

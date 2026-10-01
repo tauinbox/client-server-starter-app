@@ -8,6 +8,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 import type { MockAuditLog } from '../types';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -82,7 +83,7 @@ describe('refresh-token failure parity', () => {
       method: 'POST'
     });
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'Refresh token is required',
       statusCode: 401
     });
@@ -95,7 +96,7 @@ describe('refresh-token failure parity', () => {
 
     const res = await refresh(session);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'User account is deactivated',
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
@@ -115,7 +116,7 @@ describe('refresh-token failure parity', () => {
 
     const res = await refresh(session);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'User not found',
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.USER_NOT_FOUND
@@ -135,7 +136,7 @@ describe('refresh-token failure parity', () => {
 
     const replay = await refresh(phone);
     expect(replay.status).toBe(401);
-    expect(await replay.json()).toEqual({
+    expect(await readErrorBody(replay)).toEqual({
       message: 'Invalid refresh token',
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
@@ -147,7 +148,7 @@ describe('refresh-token failure parity', () => {
     setActive(phone.userId, true);
     const other = await refresh(desktop);
     expect(other.status).toBe(401);
-    expect(await other.json()).toEqual({
+    expect(await readErrorBody(other)).toEqual({
       message: 'Invalid refresh token',
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
@@ -172,7 +173,7 @@ describe('refresh-token failure parity', () => {
 
     const res = await refresh(session);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'Session has reached its maximum duration. Please log in again.',
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
@@ -193,7 +194,7 @@ describe('refresh-token failure parity', () => {
 
     const replay = await refresh(session);
     expect(replay.status).toBe(401);
-    expect(await replay.json()).toEqual({
+    expect(await readErrorBody(replay)).toEqual({
       message: 'Invalid refresh token',
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
@@ -259,7 +260,7 @@ describe('refresh-token failure parity', () => {
 
       const replay = await refresh(phone);
       expect(replay.status).toBe(401);
-      expect(await replay.json()).toEqual({
+      expect(await readErrorBody(replay)).toEqual({
         message: 'Invalid refresh token',
         statusCode: 401,
         errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
