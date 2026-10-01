@@ -5,9 +5,15 @@ import cookieParser from 'cookie-parser';
 import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { registerRoutes } from './middleware';
 import controlRouter from './control.routes';
+import {
+  errorEnvelope,
+  routeNotFound,
+  unhandledError
+} from './helpers/error-envelope.helpers';
 
 export function createApp() {
   const app = express();
+  app.use(errorEnvelope);
   app.use(cors({ origin: true, credentials: true }));
   app.use(cookieParser());
   // JSON only, as the server: a cross-site form can post a urlencoded body with
@@ -59,6 +65,8 @@ export function createApp() {
 
   // Application routes
   registerRoutes(app);
+  app.use(routeNotFound);
+  app.use(unhandledError);
 
   return app;
 }

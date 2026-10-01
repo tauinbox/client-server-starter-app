@@ -3,6 +3,7 @@ import { ErrorKeys, MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -121,7 +122,7 @@ describe('lockout recovery', () => {
 
     const res = await postJson('login', { email, password });
 
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message:
         'Account is temporarily locked due to too many failed login attempts',
       statusCode: 423,

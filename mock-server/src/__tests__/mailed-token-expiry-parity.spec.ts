@@ -7,6 +7,7 @@ import {
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -103,9 +104,10 @@ describe('mailed tokens carry the deadline the server enforces', () => {
       password: newPassword
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'Password reset token has expired. Please request a new one.',
-      errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED
+      errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
+      statusCode: 400
     });
 
     const login = await postJson('login', { email, password: newPassword });
@@ -118,9 +120,10 @@ describe('mailed tokens carry the deadline the server enforces', () => {
 
     const res = await postJson('verify-email', { token });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'Verification token has expired. Please request a new one.',
-      errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED
+      errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED,
+      statusCode: 400
     });
     expect(findUserByEmail(email)?.isEmailVerified).toBe(false);
   });
@@ -154,9 +157,10 @@ describe('POST /__control/expire-token', () => {
       password: newPassword
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'Password reset token has expired. Please request a new one.',
-      errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED
+      errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
+      statusCode: 400
     });
   });
 
@@ -166,9 +170,10 @@ describe('POST /__control/expire-token', () => {
 
     const res = await postJson('verify-email', { token });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'Verification token has expired. Please request a new one.',
-      errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED
+      errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED,
+      statusCode: 400
     });
   });
 

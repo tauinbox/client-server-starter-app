@@ -3,6 +3,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
 import { mockId } from '../utils/mock-id';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -111,18 +112,12 @@ describe('ParseUUIDPipe parity with server', () => {
     const res = await send('GET', `/api/v1/users/${BAD_ID}`, token);
 
     expect(res.status).toBe(400);
-    const body = (await res.json()) as {
-      message: string;
-      statusCode: number;
-      error: string;
-      errors?: string[];
-    };
+    const body = await readErrorBody(res);
     expect(body).toEqual({
       message: 'Validation failed (uuid is expected)',
-      statusCode: 400,
-      error: 'Bad Request'
+      statusCode: 400
     });
-    expect(body.errors).toBeUndefined();
+    expect(body['errors']).toBeUndefined();
   });
 
   it('runs after the auth guard, as the pipe does on the server', async () => {

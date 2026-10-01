@@ -310,6 +310,41 @@ describe('GlobalExceptionFilter', () => {
     expect(body.message).not.toContain('database');
   });
 
+  it('should answer an exposed body-parser 4xx with its status and message', () => {
+    const tooLarge = Object.assign(new Error('request entity too large'), {
+      status: 413,
+      statusCode: 413,
+      expose: true,
+      type: 'entity.too.large'
+    });
+    filter.catch(tooLarge, mockHost);
+
+    expect(getResponseStatus()).toBe(413);
+    expect(getResponseBody()).toMatchObject({
+      statusCode: 413,
+      message: 'request entity too large',
+      error: 'Payload Too Large'
+    });
+    expect(getResponseBody().errorKey).toBeUndefined();
+    expect(loggerErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('should keep a 4xx error that is not exposed, and any 5xx, as 500', () => {
+    for (const extra of [
+      { status: 400, expose: false },
+      { status: 503, expose: true }
+    ]) {
+      mockHttpAdapter.reply.mockClear();
+      filter.catch(
+        Object.assign(new Error('internal detail'), extra),
+        mockHost
+      );
+
+      expect(getResponseStatus()).toBe(500);
+      expect(getResponseBody().message).toBe('Internal server error');
+    }
+  });
+
   it('should handle non-Error thrown value as 500', () => {
     filter.catch('unexpected string error', mockHost);
 

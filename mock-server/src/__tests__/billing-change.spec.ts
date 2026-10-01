@@ -6,6 +6,7 @@ import type { ProrationPreviewResponse } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants';
 import { mockId } from '../utils/mock-id';
 import type { MockInvoice } from '../types';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -385,8 +386,7 @@ describe('POST /billing/subscription/change/preview', () => {
 describe('a plan with no Paddle price id (server parity)', () => {
   const NO_PRICE_BODY = {
     statusCode: 503,
-    message: 'Plan "business" has no Paddle price configured',
-    error: 'Service Unavailable'
+    message: 'Plan "business" has no Paddle price configured'
   };
 
   function removePaddlePriceId(planKey: string): void {
@@ -401,7 +401,7 @@ describe('a plan with no Paddle price id (server parity)', () => {
 
     const res = await post(token, 'checkout', { planKey: 'business' });
     expect(res.status).toBe(503);
-    expect(await res.json()).toEqual(NO_PRICE_BODY);
+    expect(await readErrorBody(res)).toEqual(NO_PRICE_BODY);
   });
 
   it('answers 503 on a Paddle change and preview, with nothing changed', async () => {
@@ -413,7 +413,7 @@ describe('a plan with no Paddle price id (server parity)', () => {
     for (const path of ['subscription/change', 'subscription/change/preview']) {
       const res = await post(token, path, { planKey: 'business' });
       expect(res.status).toBe(503);
-      expect(await res.json()).toEqual(NO_PRICE_BODY);
+      expect(await readErrorBody(res)).toEqual(NO_PRICE_BODY);
     }
     expect(getState().billingSubscriptions.get(subId)?.planKey).toBe('pro');
     expect(getState().billingInvoices.size).toBe(invoicesBefore);
@@ -445,7 +445,7 @@ describe('POST /billing/payment-method', () => {
     const res = await post(token, 'payment-method', {});
 
     expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({
+    expect(await readErrorBody(res)).toEqual({
       message: 'The current plan is missing from the catalog',
       errorKey: ErrorKeys.BILLING.CURRENT_PLAN_MISSING,
       statusCode: 503

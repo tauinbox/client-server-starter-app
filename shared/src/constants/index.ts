@@ -70,6 +70,8 @@ export {
 
 export { ErrorKeys } from './error-keys';
 
+export { httpStatusText } from './http-status.constants';
+
 export {
   OAUTH_PROVIDER_FLAGS,
   type OAuthProviderFlag

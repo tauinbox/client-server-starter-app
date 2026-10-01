@@ -3,6 +3,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -59,7 +60,7 @@ describe('resend-verification captcha gate', () => {
 
     const second = await resend({ email });
     expect(second.status).toBe(400);
-    expect(await second.json()).toEqual({
+    expect(await readErrorBody(second)).toEqual({
       message: 'Captcha verification is required',
       statusCode: 400,
       errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED

@@ -3,6 +3,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 import type { MockAuditLog } from '../types';
+import { readErrorBody } from '../utils/error-body';
 
 let server: Server;
 let baseUrl: string;
@@ -47,7 +48,7 @@ describe('register conflict audit parity', () => {
 
     const conflict = await register(validBody);
     expect(conflict.status).toBe(409);
-    expect(await conflict.json()).toEqual({
+    expect(await readErrorBody(conflict)).toEqual({
       message: 'User with this email already exists',
       statusCode: 409,
       errorKey: 'errors.users.emailExists'

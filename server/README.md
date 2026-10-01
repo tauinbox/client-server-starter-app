@@ -1125,7 +1125,8 @@ Request -> Global Middleware (Compression, CookieParser, CORS)
 
 On an exception, `GlobalExceptionFilter` catches each error. It returns a standard error response
 with a timestamp, the path and a message for the user. It maps a TypeORM error by its PG error code.
-An unknown error becomes a generic 500.
+A body-parser 4xx with `expose` set, such as the 413 for a body over 100 kB, keeps its status and
+message. An unknown error becomes a generic 500.
 
 ### Authentication
 
