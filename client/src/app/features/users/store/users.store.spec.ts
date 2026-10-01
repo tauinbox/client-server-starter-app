@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
+import { storeOverrideWarnings } from '../../../../test-utils/store-override-warnings';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { UsersStore } from './users.store';
@@ -162,11 +163,6 @@ describe('UsersStore members', () => {
         { provide: NotifyService, useValue: {} }
       ]
     });
-    const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined);
-    TestBed.inject(UsersStore);
-    expect(warn.mock.calls.flat().join(' ')).not.toContain(
-      'cannot be overridden'
-    );
-    warn.mockRestore();
+    expect(storeOverrideWarnings(() => TestBed.inject(UsersStore))).toEqual([]);
   });
 });

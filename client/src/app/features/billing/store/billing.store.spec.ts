@@ -22,6 +22,7 @@ import { DEFAULT_CURSOR_PAGE_SIZE, ErrorKeys } from '@app/shared/constants';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { storeOverrideWarnings } from '../../../../test-utils/store-override-warnings';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { BILLING_API_V1, BillingService } from '../services/billing.service';
 import { BillingStore } from './billing.store';
@@ -369,12 +370,7 @@ describe('BillingStore', () => {
   });
 
   it('declares each store member once', () => {
-    const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined);
-    createStore();
-    expect(warn.mock.calls.flat().join(' ')).not.toContain(
-      'cannot be overridden'
-    );
-    warn.mockRestore();
+    expect(storeOverrideWarnings(createStore)).toEqual([]);
   });
 
   it('refreshInvoices restarts from the first page', async () => {
