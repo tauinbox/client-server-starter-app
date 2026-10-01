@@ -20,6 +20,7 @@ import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { isPlantedBeforeCharge } from '../utils/charge-keys.util';
+import { insertInvoiceOnce } from '../utils/invoice-insert.util';
 import { meteredWindowStart } from '../utils/period.util';
 import { CreditService } from '../services/credit.service';
 import {
@@ -553,36 +554,27 @@ export class BillingEventReducer {
               })
             : null;
 
-      const insert = await manager
-        .createQueryBuilder()
-        .insert()
-        .into(Invoice)
-        .values({
-          customerId,
-          subscriptionId: subscription?.id ?? null,
-          provider,
-          providerEventId,
-          providerInvoiceRef: payload.providerInvoiceRef,
-          amountMinor: Money.fromMinor(payload.amountMinor),
-          currency: payload.currency,
-          status: 'paid',
-          billingMode: subscription?.billingMode ?? 'fixed',
-          kind: oneTime ? 'one_time' : 'subscription',
-          productId: product?.id ?? null,
-          periodStart: parseDate(payload.periodStart, now),
-          periodEnd: parseDate(payload.periodEnd, now),
-          paidAt: parseDate(payload.paidAt, now),
-          receiptRef: null
-        })
-        .orIgnore()
-        .returning(['id'])
-        .execute();
-
-      // orIgnore returns no row on a replayed event — the unique
-      // provider_event_id gates the whole reduce, so the activation/grant
-      // below runs exactly once per paid invoice.
-      const rows = insert.raw as Array<{ id: string }>;
-      if (rows.length === 0) {
+      // No id on a replayed event — the unique provider_event_id gates the
+      // whole reduce, so the activation/grant below runs exactly once per
+      // paid invoice.
+      const invoiceId = await insertInvoiceOnce(manager, {
+        customerId,
+        subscriptionId: subscription?.id ?? null,
+        provider,
+        providerEventId,
+        providerInvoiceRef: payload.providerInvoiceRef,
+        amountMinor: Money.fromMinor(payload.amountMinor),
+        currency: payload.currency,
+        status: 'paid',
+        billingMode: subscription?.billingMode ?? 'fixed',
+        kind: oneTime ? 'one_time' : 'subscription',
+        productId: product?.id ?? null,
+        periodStart: parseDate(payload.periodStart, now),
+        periodEnd: parseDate(payload.periodEnd, now),
+        paidAt: parseDate(payload.paidAt, now),
+        receiptRef: null
+      });
+      if (!invoiceId) {
         return null;
       }
 
@@ -590,11 +582,11 @@ export class BillingEventReducer {
         await this.applyOneTimeGrant(
           manager,
           customerId,
-          rows[0].id,
+          invoiceId,
           product,
           now
         );
-        return { invoiceId: rows[0].id, userId, activatedSubscriptionId: null };
+        return { invoiceId, userId, activatedSubscriptionId: null };
       }
 
       const activatedSubscriptionId =
@@ -602,7 +594,7 @@ export class BillingEventReducer {
           ? await this.activateSelfManaged(manager, subscription, payload, now)
           : null;
 
-      return { invoiceId: rows[0].id, userId, activatedSubscriptionId };
+      return { invoiceId, userId, activatedSubscriptionId };
     });
 
     if (!result?.userId) {
