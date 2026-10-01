@@ -382,6 +382,56 @@ describe('POST /billing/subscription/change/preview', () => {
   });
 });
 
+describe('a plan with no Paddle price id (server parity)', () => {
+  const NO_PRICE_BODY = {
+    statusCode: 503,
+    message: 'Plan "business" has no Paddle price configured',
+    error: 'Service Unavailable'
+  };
+
+  function removePaddlePriceId(planKey: string): void {
+    const plan = [...getState().plans.values()].find((p) => p.key === planKey);
+    if (!plan?.prices.paddle) throw new Error('plan not seeded');
+    delete plan.prices.paddle.providerPriceId;
+  }
+
+  it('answers 503 on a Paddle checkout', async () => {
+    const token = await login('user@example.com');
+    removePaddlePriceId('business');
+
+    const res = await post(token, 'checkout', { planKey: 'business' });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual(NO_PRICE_BODY);
+  });
+
+  it('answers 503 on a Paddle change and preview, with nothing changed', async () => {
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    removePaddlePriceId('business');
+    const invoicesBefore = getState().billingInvoices.size;
+
+    for (const path of ['subscription/change', 'subscription/change/preview']) {
+      const res = await post(token, path, { planKey: 'business' });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual(NO_PRICE_BODY);
+    }
+    expect(getState().billingSubscriptions.get(subId)?.planKey).toBe('pro');
+    expect(getState().billingInvoices.size).toBe(invoicesBefore);
+  });
+
+  it('leaves a YooKassa change unaffected', async () => {
+    const token = await login('user@example.com');
+    useRussianLocale();
+    await activateSubscription('pro');
+    removePaddlePriceId('business');
+
+    const res = await post(token, 'subscription/change', {
+      planKey: 'business'
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
 describe('POST /billing/payment-method', () => {
   it('refuses the re-bind when the plan of the subscription is missing from the catalog', async () => {
     const token = await login('user@example.com');

@@ -631,7 +631,9 @@ export const seedFeatureFlagRules: MockFeatureFlagRule[] =
 
 // Billing plan catalog — mirrors server/src/seeders/billing-plans.seeder.ts:
 // Free/Pro/Business (fixed) + the `usage` tier. Two prices per tier
-// (RUB via YooKassa, USD via Paddle) in minor units.
+// (RUB via YooKassa, USD via Paddle) in minor units. Unlike the server seeder,
+// each Paddle price carries a `providerPriceId`: a real id is per Paddle
+// account, and without one a Paddle checkout or plan change answers 503.
 function generatePlans(): MockPlan[] {
   const now = '2025-01-01T00:00:00.000Z';
   const base = {
@@ -654,7 +656,11 @@ function generatePlans(): MockPlan[] {
       active: true,
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 0 },
-        paddle: { currency: 'USD', amountMinor: 0 }
+        paddle: {
+          currency: 'USD',
+          amountMinor: 0,
+          providerPriceId: 'pri_mock_free'
+        }
       }
     },
     {
@@ -670,7 +676,11 @@ function generatePlans(): MockPlan[] {
       active: true,
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 99000 },
-        paddle: { currency: 'USD', amountMinor: 1200 }
+        paddle: {
+          currency: 'USD',
+          amountMinor: 1200,
+          providerPriceId: 'pri_mock_pro'
+        }
       }
     },
     {
@@ -691,7 +701,11 @@ function generatePlans(): MockPlan[] {
       active: true,
       prices: {
         yookassa: { currency: 'RUB', amountMinor: 290000 },
-        paddle: { currency: 'USD', amountMinor: 2900 }
+        paddle: {
+          currency: 'USD',
+          amountMinor: 2900,
+          providerPriceId: 'pri_mock_business'
+        }
       }
     },
     {
@@ -716,7 +730,8 @@ function generatePlans(): MockPlan[] {
           currency: 'USD',
           amountMinor: 0,
           unitPriceMinor: 2,
-          includedUnits: 0
+          includedUnits: 0,
+          providerPriceId: 'pri_mock_usage'
         }
       }
     }
