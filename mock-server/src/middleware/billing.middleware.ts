@@ -966,8 +966,9 @@ billingRouter.post(
       billClosingUsagePeriod(sub, now);
     }
 
-    // Trial moves no fixed money; a paid period settles the charge + refund legs.
-    if (sub.status !== 'trialing') {
+    // Trial moves no fixed money, and a provider-managed row is prorated by the
+    // provider; a self-managed paid period settles the charge + refund legs.
+    if (sub.status !== 'trialing' && !managesLifecycle(sub.provider)) {
       const quote = prorationQuote(fromPlan, toPlan, sub.provider, sub, now);
       const state = getState();
 
@@ -1023,10 +1024,7 @@ billingRouter.post(
         // Record the partial refund on the source so an admin refund of the same
         // invoice can't give the money back twice.
         source.refundedMinor = (source.refundedMinor ?? 0) + refundMinor;
-        if (
-          !managesLifecycle(sub.provider) &&
-          source.refundedMinor >= source.amountMinor
-        ) {
+        if (source.refundedMinor >= source.amountMinor) {
           source.status = 'refunded';
           source.updatedAt = nowIso;
         }

@@ -81,6 +81,7 @@ function post(token: string, path: string, body: unknown): Promise<Response> {
 
 describe('POST /billing/subscription/change', () => {
   it('switches the plan, records the charge and refund invoices', async () => {
+    useRussianLocale();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
@@ -99,11 +100,28 @@ describe('POST /billing/subscription/change', () => {
     const charge = invoices.find((i) => i.status === 'paid');
     const refund = invoices.find((i) => i.status === 'refunded');
     // A freshly-activated monthly period has its full remainder ahead, so the
-    // legs equal the full plan prices (pro $12.00 back, business $29.00 due).
-    expect(charge?.amountMinor).toBe(2900);
-    expect(refund?.amountMinor).toBe(1200);
-    // Paddle prorates on its side, and the server never flips the source.
+    // legs equal the full plan prices (pro 990 RUB back, business 2900 RUB due).
+    expect(charge?.amountMinor).toBe(290000);
+    expect(refund?.amountMinor).toBe(99000);
+  });
+
+  it('records no invoice for a Paddle switch, which Paddle prorates', async () => {
+    const token = await login('user@example.com');
+    const subId = await activateSubscription('pro');
+    const source = periodInvoice(subId);
+    expect(source.provider).toBe('paddle');
+    const invoicesBefore = getState().billingInvoices.size;
+
+    const res = await post(token, 'subscription/change', {
+      planKey: 'business'
+    });
+    expect(res.status).toBe(200);
+    const sub = (await res.json()) as { planKey: string };
+    expect(sub.planKey).toBe('business');
+
+    expect(getState().billingInvoices.size).toBe(invoicesBefore);
     expect(source.status).toBe('paid');
+    expect(source.refundedMinor ?? 0).toBe(0);
   });
 
   it('marks a YooKassa source invoice refunded when the switch refunds all of it', async () => {
@@ -145,6 +163,7 @@ describe('POST /billing/subscription/change', () => {
   });
 
   it('switches fixed → usage with a refund and no charge', async () => {
+    useRussianLocale();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
 
@@ -157,9 +176,9 @@ describe('POST /billing/subscription/change', () => {
       (i) => i.subscriptionId === subId
     );
     expect(invoices.some((i) => i.status === 'refunded')).toBe(true);
-    // No new paid invoice beyond the activation one ($12.00).
+    // No new paid invoice beyond the activation one (990 RUB).
     expect(
-      invoices.filter((i) => i.status === 'paid' && i.amountMinor !== 1200)
+      invoices.filter((i) => i.status === 'paid' && i.amountMinor !== 99000)
     ).toHaveLength(0);
   });
 

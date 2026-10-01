@@ -205,7 +205,7 @@ test.describe('Billing', () => {
     await expect(page.locator('.plan-summary')).toContainText('Cancels on');
   });
 
-  test('change plan via the proration dialog surfaces the receipts', async ({
+  test('a Paddle plan change via the proration dialog adds no local receipt', async ({
     page,
     _mockServer
   }) => {
@@ -233,8 +233,37 @@ test.describe('Billing', () => {
 
     await expect(page.locator('.plan-summary')).toContainText('Business');
 
-    // Proration receipts surfaced in the invoice history: the original period
-    // invoice plus the two legs of the switch (charge + refund).
+    // Paddle prorates on its side, so the history keeps the period invoice only.
+    await expect(page.locator('.invoice-table tbody tr')).toHaveCount(1);
+    await expect(page.locator('.invoice-table')).not.toContainText('Refunded');
+  });
+
+  test('a YooKassa plan change via the proration dialog surfaces the receipts', async ({
+    page,
+    _mockServer
+  }) => {
+    // The ru profile locale routes the user to YooKassa; the UI stays English.
+    await loginViaUi(page, _mockServer.url, {
+      id: USER_ID,
+      roles: ['user'],
+      locale: 'ru'
+    });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+
+    await page.goto('/billing/settings');
+    await page.getByRole('button', { name: 'Change plan' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /Business/ }).click();
+    await expect(dialog.locator('.due-now dd')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+
+    await expect(page.locator('.plan-summary')).toContainText('Business');
+
+    // The period invoice plus the two legs of the switch (charge + refund).
     await expect(page.locator('.invoice-table tbody tr')).toHaveCount(3);
     await expect(page.locator('.invoice-table')).toContainText('Refunded');
   });
