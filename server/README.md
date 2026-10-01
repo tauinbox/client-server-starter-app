@@ -801,7 +801,10 @@ one Paddle account, thus `billing-plans.seeder.ts` and `billing-products.seeder.
 Before you turn Paddle on, create the prices in the Paddle dashboard and write their ids into the
 database:
 
-- each paid plan: `plans.prices -> paddle -> providerPriceId`;
+- each active plan, Free and the usage plan included: `plans.prices -> paddle -> providerPriceId`.
+  The change-plan dialog offers every active plan of the current billing mode, and the server asks
+  Paddle for the price of the target plan. For Free and for the base of the usage plan, create a
+  recurring price of 0; Paddle accepts it;
 - each `sku` and `credits` product: `billing_products.prices -> paddle -> paddlePriceId`.
 
 No API edits these fields, and the seeders create rows but do not update them. Thus the operator
