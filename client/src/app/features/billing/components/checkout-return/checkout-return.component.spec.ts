@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import type {
   InvoiceResponse,
@@ -9,6 +9,10 @@ import type {
   SubscriptionResponse
 } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
+import {
+  PADDLE_TRANSACTION_PARAM,
+  PaddleCheckoutService
+} from '../../services/paddle-checkout.service';
 import { BillingStore } from '../../store/billing.store';
 import {
   readPendingPurchase,
@@ -56,6 +60,13 @@ describe('CheckoutReturnComponent', () => {
     loadPlans: ReturnType<typeof vi.fn>;
   };
 
+  let paddleOpen: ReturnType<typeof vi.fn>;
+  let router: Router;
+
+  beforeEach(() => {
+    paddleOpen = vi.fn();
+  });
+
   afterEach(() => {
     sessionStorage.clear();
   });
@@ -63,7 +74,8 @@ describe('CheckoutReturnComponent', () => {
   async function setup(
     mode: 'success' | 'cancel',
     active: boolean,
-    invoices: InvoiceResponse[] = []
+    invoices: InvoiceResponse[] = [],
+    transactionId?: string
   ): Promise<void> {
     storeMock = {
       plans: signal<PlanResponse[]>(active ? [proPlan] : []),
@@ -82,10 +94,18 @@ describe('CheckoutReturnComponent', () => {
       providers: [
         provideNoopAnimations(),
         provideRouter([]),
-        { provide: BillingStore, useValue: storeMock }
+        { provide: BillingStore, useValue: storeMock },
+        { provide: PaddleCheckoutService, useValue: { open: paddleOpen } }
       ]
     }).compileComponents();
 
+    router = TestBed.inject(Router);
+    if (transactionId) {
+      await router.navigateByUrl(
+        `/?${PADDLE_TRANSACTION_PARAM}=${transactionId}`
+      );
+    }
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(CheckoutReturnComponent);
     fixture.componentRef.setInput('mode', mode);
     fixture.detectChanges();
@@ -141,5 +161,61 @@ describe('CheckoutReturnComponent', () => {
     });
     await setup('cancel', false);
     expect(readPendingPurchase()).toBeNull();
+  });
+
+  describe('with a Paddle transaction id', () => {
+    it('opens the Paddle checkout and does not poll while it is open', async () => {
+      paddleOpen.mockReturnValue(new Promise(() => undefined));
+
+      await setup('success', true, [], 'txn_01abc');
+
+      expect(paddleOpen).toHaveBeenCalledWith('txn_01abc');
+      expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('Opening the payment form');
+    });
+
+    it('drops the transaction id and polls after the payment completes', async () => {
+      paddleOpen.mockResolvedValue('completed');
+
+      await setup('success', true, [], 'txn_01abc');
+
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        queryParams: { [PADDLE_TRANSACTION_PARAM]: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+      expect(storeMock.refreshSubscription).toHaveBeenCalled();
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('Pro');
+    });
+
+    it('goes to the cancel page when the buyer closes the checkout', async () => {
+      paddleOpen.mockResolvedValue('closed');
+
+      await setup('success', false, [], 'txn_01abc');
+
+      expect(router.navigate).toHaveBeenCalledWith(['/billing/cancel'], {
+        replaceUrl: true
+      });
+      expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
+    });
+
+    it('shows the unavailable state and clears the purchase hand-off', async () => {
+      storePendingPurchase({
+        sessionRef: 'txn_01abc',
+        productName: 'Report pack',
+        amountMinor: 500,
+        currency: 'USD'
+      });
+      paddleOpen.mockResolvedValue('unavailable');
+
+      await setup('success', false, [], 'txn_01abc');
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('Payment form unavailable');
+      expect(storeMock.refreshInvoices).not.toHaveBeenCalled();
+      expect(readPendingPurchase()).toBeNull();
+    });
   });
 });

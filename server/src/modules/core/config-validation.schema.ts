@@ -102,6 +102,9 @@ export const configValidationSchema = Joi.object({
   // counts as configured only when both of its vars are set.
   PADDLE_API_KEY: Joi.string().optional().allow(''),
   PADDLE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
+  // Public client-side token for Paddle.js (test_... or live_...), not a
+  // credential. Without it the browser cannot open a Paddle checkout.
+  PADDLE_CLIENT_TOKEN: Joi.string().optional().allow(''),
   PADDLE_ENVIRONMENT: Joi.string()
     .valid('sandbox', 'production')
     .default('sandbox'),

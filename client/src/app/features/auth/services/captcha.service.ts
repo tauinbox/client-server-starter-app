@@ -5,6 +5,7 @@ import type { CaptchaConfigResponse } from '@app/shared/types';
 import { firstValueFrom } from 'rxjs';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
+import { loadExternalScript } from '@shared/utils/external-script.utils';
 
 const TURNSTILE_SCRIPT_URL =
   'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
@@ -98,51 +99,11 @@ export class CaptchaService {
   }
 
   #requestScript(): Promise<TurnstileApi> {
-    return new Promise<TurnstileApi>((resolve, reject) => {
-      const loaded = this.#document.defaultView?.turnstile;
-      if (loaded) {
-        resolve(loaded);
-        return;
-      }
-
-      // A tag left behind by a failed attempt never fires another event, so it
-      // is dropped on failure and the next attempt appends a fresh one.
-      const attach = (script: HTMLScriptElement) => {
-        const fail = (message: string) => {
-          script.remove();
-          reject(new Error(message));
-        };
-        script.addEventListener(
-          'load',
-          () => {
-            const api = this.#document.defaultView?.turnstile;
-            if (api) resolve(api);
-            else fail('Turnstile script loaded without exposing API');
-          },
-          { once: true }
-        );
-        script.addEventListener(
-          'error',
-          () => fail('Failed to load Turnstile script'),
-          { once: true }
-        );
-      };
-
-      const existing = this.#document.getElementById(
-        TURNSTILE_SCRIPT_ID
-      ) as HTMLScriptElement | null;
-      if (existing) {
-        attach(existing);
-        return;
-      }
-
-      const script = this.#document.createElement('script');
-      script.id = TURNSTILE_SCRIPT_ID;
-      script.src = TURNSTILE_SCRIPT_URL;
-      script.async = true;
-      script.defer = true;
-      attach(script);
-      this.#document.head.appendChild(script);
+    return loadExternalScript(this.#document, {
+      name: 'Turnstile',
+      id: TURNSTILE_SCRIPT_ID,
+      src: TURNSTILE_SCRIPT_URL,
+      api: () => this.#document.defaultView?.turnstile
     });
   }
 }

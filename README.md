@@ -723,6 +723,12 @@ the same permission both apply.
 - **Checkout.** "Choose" starts a hosted-checkout session on the resolved provider and redirects the
   browser. The return route `/billing/success` polls the subscription until it is active. The return
   route `/billing/cancel` shows the other outcome. The provider webhook is the source of truth.
+
+  Paddle sends the browser to `/billing/success?_ptxn=<transaction id>`. That page loads Paddle.js
+  from `cdn.paddle.com` and opens the Paddle checkout of the transaction in an overlay. When the
+  payment completes, the page polls as above. When the buyer closes the overlay, the page goes to
+  `/billing/cancel`. Without `PADDLE_CLIENT_TOKEN` the page says that the payment form is not
+  available. The Paddle payment-method change opens in the same way on `/billing/settings`.
 - **Billing settings** (`/billing/settings`). The page shows the current plan with a semantic status
   chip, the change-plan dialog, and the cancel action. The cancel action opens a confirmation dialog.
   On a metered plan that dialog says that the system charges the usage of the period at the close of
@@ -1085,7 +1091,8 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `TURNSTILE_SECRET_KEY` | - | Secret key of Cloudflare Turnstile for the `siteverify` calls on the server. Use it with `TURNSTILE_SITE_KEY` |
 | `PADDLE_API_KEY` | - | Paddle server API key. Use it with `PADDLE_WEBHOOK_SECRET`. The two values are necessary before Paddle counts as configured |
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
-| `PADDLE_ENVIRONMENT` | `sandbox` | Paddle API host: `sandbox` or `production` |
+| `PADDLE_ENVIRONMENT` | `sandbox` | Paddle environment: `sandbox` or `production`. The server API client and Paddle.js in the browser use the same value |
+| `PADDLE_CLIENT_TOKEN` | - | Public client-side token of Paddle.js (`test_...` for sandbox, `live_...` for production). Without it the browser cannot open a Paddle checkout |
 | `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. The two values are necessary before YooKassa counts as configured |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
@@ -1461,6 +1468,7 @@ the script is the authoritative reference for the key list.
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register`, `/forgot-password` and `/resend-verification`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
 | `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. Keep them empty until a person connects a provider |
+| `PADDLE_CLIENT_TOKEN` | deploy, rebuild | `server/.env` | The public client-side token of Paddle.js. It is not a credential, but the workflow injects it in the same way, as it does for `TURNSTILE_SITE_KEY`. Without it no Paddle payment can complete |
 | `CI_JWT_SECRET` | ci.yml | - (CI tests only) | Production does not use it. The `Server E2E` job runs on HS256, thus the value must hold a minimum of 32 characters |
 
 > **Caution about `DB_PASSWORD`.** Postgres writes the password into its data volume at the first
@@ -1820,11 +1828,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2713 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 519 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 509 pass and 10 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1436 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 291 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 918 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2718 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 521 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 509 pass and 10 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1452 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 295 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 923 tests pass |
 
 ## CI/CD
 

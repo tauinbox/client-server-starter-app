@@ -8,6 +8,19 @@
         <a matButton="filled" [routerLink]="pricingRoute">
           {{ t('billing.checkout.backToPlans') }}
         </a>
+      } @else if (pollState() === 'paying') {
+        <mat-spinner [attr.aria-label]="t('common.loading')" diameter="48" />
+        <h1>{{ t('billing.checkout.payingTitle') }}</h1>
+        <p>{{ t('billing.checkout.payingMessage') }}</p>
+      } @else if (pollState() === 'unavailable') {
+        <mat-icon class="return-icon neutral" aria-hidden="true"
+          >error_outline</mat-icon
+        >
+        <h1>{{ t('billing.checkout.unavailableTitle') }}</h1>
+        <p>{{ t('billing.checkout.unavailableMessage') }}</p>
+        <a matButton="filled" [routerLink]="pricingRoute">
+          {{ t('billing.checkout.backToPlans') }}
+        </a>
       } @else if (purchase(); as pending) {
         @switch (pollState()) {
           @case ('pending') {

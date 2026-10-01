@@ -367,9 +367,11 @@ describe('PricingPageComponent', () => {
       amountMinor: 500,
       currency: 'USD'
     });
-    // No hosted-checkout URL (client-side completion) → straight to the
-    // return page where the webhook confirmation is polled.
-    expect(routerMock.navigate).toHaveBeenCalledWith(['/billing/success']);
+    // No hosted-checkout URL: the return page opens the Paddle.js checkout of
+    // the transaction, then polls for the webhook confirmation.
+    expect(routerMock.navigate).toHaveBeenCalledWith(['/billing/success'], {
+      queryParams: { _ptxn: 'session-7' }
+    });
   });
 
   it('starts a donation purchase with the chosen amount and note', async () => {

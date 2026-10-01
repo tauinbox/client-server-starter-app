@@ -86,6 +86,9 @@ export type ControlApi = {
     provider: BillingProviderId,
     enabled: boolean
   ): Promise<void>;
+  // Sets the Paddle.js client token that /api/v1/billing/paddle-config
+  // advertises. `null` means that the Paddle checkout cannot open.
+  setPaddleClientToken(clientToken: string | null): Promise<void>;
   // Simulates a successful checkout + provider webhook for billing E2E: brings
   // the user's subscription to `status` (default 'active') on `planKey` (default
   // 'pro'), attaching a default payment method and a paid invoice. The real flow

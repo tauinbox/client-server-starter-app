@@ -2,6 +2,7 @@
 // returns only active plans, serialized to the wire shape (dates as ISO strings,
 // per-provider prices map), reachable without authentication — without a running
 // PostgreSQL. Mirrors the billing-webhook e2e harness (in-memory repo + supertest).
+// The same controller serves the public Paddle.js config: GET /billing/paddle-config.
 
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -11,6 +12,9 @@ import type { Server } from 'http';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { PlanService } from '../src/modules/billing/services/plan.service';
 import { BillingPlansController } from '../src/modules/billing/controllers/billing-plans.controller';
+import { PaddleProvider } from '../src/modules/billing/providers/paddle.provider';
+import { PADDLE_CLIENT } from '../src/modules/billing/providers/paddle.client';
+import { ConfigService } from '@nestjs/config';
 
 function makePlan(overrides: Partial<Plan>): Plan {
   return {
@@ -39,8 +43,10 @@ describe('Billing plan catalog (e2e)', () => {
   let app: INestApplication;
   let server: Server;
   let store: Plan[];
+  let paddleClient: object | null;
+  let env: Record<string, string>;
 
-  beforeEach(async () => {
+  async function start(): Promise<void> {
     store = [
       makePlan({ id: 'p-free', key: 'free' }),
       makePlan({
@@ -71,7 +77,14 @@ describe('Billing plan catalog (e2e)', () => {
       controllers: [BillingPlansController],
       providers: [
         PlanService,
-        { provide: getRepositoryToken(Plan), useValue: planRepo }
+        { provide: getRepositoryToken(Plan), useValue: planRepo },
+        PaddleProvider,
+        // Only its presence counts: clientConfig reads no API.
+        { provide: PADDLE_CLIENT, useValue: paddleClient },
+        {
+          provide: ConfigService,
+          useValue: { get: (key: string) => env[key] }
+        }
       ]
     }).compile();
 
@@ -80,6 +93,14 @@ describe('Billing plan catalog (e2e)', () => {
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
     server = app.getHttpServer() as Server;
+  }
+
+  beforeEach(() => {
+    paddleClient = {};
+    env = {
+      PADDLE_CLIENT_TOKEN: 'test_client_token',
+      PADDLE_ENVIRONMENT: 'sandbox'
+    };
   });
 
   afterEach(async () => {
@@ -87,6 +108,7 @@ describe('Billing plan catalog (e2e)', () => {
   });
 
   it('returns only active plans, anonymously, in wire shape', async () => {
+    await start();
     const res = await request(server).get('/api/v1/billing/plans').expect(200);
 
     const body = res.body as Array<{
@@ -106,5 +128,29 @@ describe('Billing plan catalog (e2e)', () => {
     });
     // Dates serialize to ISO strings on the wire.
     expect(typeof pro?.createdAt).toBe('string');
+  });
+
+  it('returns the Paddle.js config anonymously', async () => {
+    await start();
+
+    const res = await request(server)
+      .get('/api/v1/billing/paddle-config')
+      .expect(200);
+
+    expect(res.body).toEqual({
+      clientToken: 'test_client_token',
+      environment: 'sandbox'
+    });
+  });
+
+  it('returns no Paddle.js token while Paddle is not configured', async () => {
+    paddleClient = null;
+    await start();
+
+    const res = await request(server)
+      .get('/api/v1/billing/paddle-config')
+      .expect(200);
+
+    expect(res.body).toEqual({ clientToken: null, environment: 'sandbox' });
   });
 });

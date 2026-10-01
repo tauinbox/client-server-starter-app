@@ -132,6 +132,12 @@ billingRouter.get('/plans', (_req: Request, res: Response) => {
   res.json(plans);
 });
 
+// Public Paddle.js configuration. Mirrors the server's @Public()
+// GET /billing/paddle-config. No auth.
+billingRouter.get('/paddle-config', (_req: Request, res: Response) => {
+  res.json(getState().paddleClientConfig);
+});
+
 function geoFromLocale(locale: string): { country: string; currency: string } {
   return locale.toLowerCase().startsWith('ru')
     ? { country: 'RU', currency: 'RUB' }
