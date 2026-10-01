@@ -180,6 +180,24 @@ function rejectUnavailableProvider(
   return true;
 }
 
+// Mirrors the 503 of PaddleProvider at checkout, plan change and its preview:
+// Paddle bills a plan only through its catalog price id.
+function rejectMissingPaddlePrice(
+  res: Response,
+  provider: BillingProviderId,
+  plan: MockPlan
+): boolean {
+  if (provider !== 'paddle' || plan.prices.paddle?.providerPriceId) {
+    return false;
+  }
+  res.status(503).json({
+    statusCode: 503,
+    message: `Plan "${plan.key}" has no Paddle price configured`,
+    error: 'Service Unavailable'
+  });
+  return true;
+}
+
 function overrideForRegion(region: BillingRegion): BillingProviderId | null {
   if (region === 'ru') return 'yookassa';
   if (region === 'world') return 'paddle';
@@ -747,6 +765,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     pending.status = 'canceled';
     pending.updatedAt = new Date().toISOString();
   }
+  if (rejectMissingPaddlePrice(res, provider, plan)) return;
 
   const sessionRef = uuidv4();
   res.json({
@@ -900,6 +919,7 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     });
     return null;
   }
+  if (rejectMissingPaddlePrice(res, sub.provider, toPlan)) return null;
 
   return { customer, sub, fromPlan, toPlan };
 }

@@ -809,7 +809,8 @@ writes them with SQL, for example
 `UPDATE plans SET prices = jsonb_set(prices, '{paddle,providerPriceId}', '"pri_..."') WHERE key = 'pro';`.
 Without a price id, Paddle checkout, plan change, plan-change preview and the purchase of that
 product answer 503. A `custom` product needs no price id. The mock seed carries placeholder
-`paddlePriceId` values on its products so that the mock purchase flows work.
+`providerPriceId` values on its plans and `paddlePriceId` values on its products, so that the mock
+checkout, plan change and purchase flows work. The mock answers the same 503 when an id is missing.
 
 **Paddle also needs these settings before a buyer can pay.** Do them in the Paddle dashboard of
 each environment:
