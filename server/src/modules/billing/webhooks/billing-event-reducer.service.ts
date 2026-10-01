@@ -554,7 +554,7 @@ export class BillingEventReducer {
               })
             : null;
 
-      // No id on a replayed event — the unique provider_event_id gates the
+      // No id on a replayed event: the unique provider_event_id gates the
       // whole reduce, so the activation/grant below runs exactly once per
       // paid invoice.
       const invoiceId = await insertInvoiceOnce(manager, {
