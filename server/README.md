@@ -541,7 +541,8 @@ The module imports `EntitlementsModule` and re-exports it. Thus an importer cont
 **Geo-router (`billing.service.ts`).** `resolveProvider()` computes
 `providerOverride ?? geoDefault(country)`. It answers 503 when the provider is disabled or not
 configured. The file also holds the `geoDefaultFor()`, `effectiveProviderId()` and
-`getProviderById()` helpers.
+`getProviderById()` helpers. `getProviderById()` answers 503 for a provider that is not registered,
+so a refund or a cancel cannot skip the provider call.
 
 **Controllers.** `BillingPlansController` holds the `@Public()` route `GET /api/v1/billing/plans`. It
 returns the active plans with the price of each provider.
@@ -864,8 +865,8 @@ images from `cdn.paddle.com` and `sandbox-cdn.paddle.com`, and the checkout fram
 `paddle.client.ts` and `yookassa.client.ts` build each SDK from the environment. Each one returns
 null when the provider is not configured.
 
-**Rating.** The directory holds the `RatingStrategy` interface, `FixedRating`, `UsageRating` and
-`ProrationCalculator`.
+**Rating.** The directory holds the `RatedAmount` and `BillingPeriod` types, `FixedRating`,
+`UsageRating` and `ProrationCalculator`.
 
 `FixedRating` uses the plan price.
 

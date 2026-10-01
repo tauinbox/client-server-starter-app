@@ -182,3 +182,38 @@ describe('BillingService.isProviderAvailable', () => {
     await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
   });
 });
+
+describe('BillingService.getProviderById', () => {
+  const build = async (registered = [paddle, yookassa]) => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        BillingService,
+        { provide: BILLING_PROVIDERS, useValue: registered },
+        { provide: FeatureFlagService, useValue: { findByKey: jest.fn() } },
+        { provide: BillingConfigService, useValue: { isConfigured: jest.fn() } }
+      ]
+    }).compile();
+    return module.get(BillingService);
+  };
+
+  it('returns the registered provider without an availability check', async () => {
+    const service = await build();
+    expect(service.getProviderById('yookassa')).toBe(yookassa);
+  });
+
+  it('throws 503 when the provider is not registered', async () => {
+    const service = await build([yookassa]);
+
+    let refusal: unknown;
+    try {
+      service.getProviderById('paddle');
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(refusal).toBeInstanceOf(ServiceUnavailableException);
+    expect(refusal).toMatchObject({
+      response: { errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE }
+    });
+  });
+});

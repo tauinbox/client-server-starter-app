@@ -17,7 +17,6 @@ export type NormalizedEventType =
   | 'subscription.renewed'
   | 'subscription.past_due'
   | 'subscription.canceled'
-  | 'subscription.plan_changed'
   | 'invoice.paid'
   | 'payment.failed'
   | 'payment_method.updated';
@@ -255,7 +254,6 @@ export interface ChangePreview {
 export interface PaymentProvider {
   readonly id: BillingProviderId;
   readonly managesLifecycle: boolean;
-  ensureCustomer(customer: Customer): Promise<string>;
   startCheckout(
     customer: Customer,
     plan: Plan,
@@ -376,6 +374,16 @@ export interface PaymentProvider {
     headers: Record<string, string | string[] | undefined>
   ): Promise<WebhookVerificationResult>;
 }
+
+/**
+ * Whether a provider drives the subscription lifecycle itself. The source of
+ * `PaymentProvider.managesLifecycle`, and of `Subscription.lifecycleOwner` for
+ * the webhook reducer, which has no provider instance to ask.
+ */
+export const MANAGES_LIFECYCLE: Record<BillingProviderId, boolean> = {
+  paddle: true,
+  yookassa: false
+};
 
 /** Injection token for the registered `PaymentProvider` array. */
 export const BILLING_PROVIDERS = Symbol('BILLING_PROVIDERS');

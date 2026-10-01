@@ -3,7 +3,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   BadRequestException,
   ConflictException,
-  NotFoundException
+  NotFoundException,
+  ServiceUnavailableException
 } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { In, IsNull } from 'typeorm';
@@ -386,6 +387,25 @@ describe('BillingAdminService', () => {
       expect(ctx.billing.getProviderById).not.toHaveBeenCalled();
     });
 
+    it('refuses to cancel locally when the provider of a linked sub is not registered', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ providerSubscriptionId: 'sub_ext_1' })
+      );
+      ctx.billing.getProviderById.mockImplementation(() => {
+        throw new ServiceUnavailableException({
+          errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+        });
+      });
+
+      await expect(
+        ctx.service.cancelSubscription('sub-1', 'immediate')
+      ).rejects.toThrow(ServiceUnavailableException);
+
+      expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+      expect(ctx.emit).not.toHaveBeenCalled();
+    });
+
     it('refuses a second cancel of an already-canceled subscription', async () => {
       const ctx = await build();
       ctx.subscriptions.findOne.mockResolvedValue(
@@ -606,6 +626,24 @@ describe('BillingAdminService', () => {
         50000,
         'refund-inv-1-50000'
       );
+    });
+
+    it('refuses a refund with no registered provider and records nothing', async () => {
+      const ctx = await build();
+      const invoice = makeInvoice();
+      ctx.invoices.findOne.mockResolvedValue(invoice);
+      ctx.billing.getProviderById.mockImplementation(() => {
+        throw new ServiceUnavailableException({
+          errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+        });
+      });
+
+      await expect(ctx.service.refundInvoice('inv-1')).rejects.toThrow(
+        ServiceUnavailableException
+      );
+
+      expect(invoice.refundedMinor.toMinorString()).toBe('0');
+      expect(invoice.status).toBe('paid');
     });
 
     it('does not settle on a concurrent leg reservation whose money is still in flight', async () => {

@@ -317,7 +317,6 @@ async function build(
   const provider = {
     id: 'yookassa' as BillingProviderId,
     managesLifecycle: false,
-    ensureCustomer: jest.fn(),
     startCheckout: jest.fn(),
     chargeOffSession,
     findOffSessionCharge,

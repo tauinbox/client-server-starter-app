@@ -315,7 +315,6 @@ describe('Billing renewal scheduler (e2e)', () => {
             {
               id: 'yookassa',
               managesLifecycle: false,
-              ensureCustomer: jest.fn(),
               startCheckout: jest.fn(),
               chargeOffSession,
               findOffSessionCharge: jest.fn().mockResolvedValue(null),

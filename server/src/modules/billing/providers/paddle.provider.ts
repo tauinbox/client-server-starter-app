@@ -21,7 +21,10 @@ import { Money } from '@app/shared/utils/money';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import { PADDLE_CLIENT, paddleEnvironment } from './paddle.client';
-import { WEBHOOK_IGNORED } from './payment-provider.interface';
+import {
+  MANAGES_LIFECYCLE,
+  WEBHOOK_IGNORED
+} from './payment-provider.interface';
 import type {
   CancelMode,
   ChangePreview,
@@ -140,7 +143,7 @@ function refFromCustomData(
 @Injectable()
 export class PaddleProvider implements PaymentProvider {
   readonly id = 'paddle' as const;
-  readonly managesLifecycle = true;
+  readonly managesLifecycle = MANAGES_LIFECYCLE.paddle;
 
   private readonly logger = new Logger(PaddleProvider.name);
   private readonly webhookSecret: string | undefined;
@@ -173,19 +176,6 @@ export class PaddleProvider implements PaymentProvider {
       throw new ServiceUnavailableException('Paddle is not configured');
     }
     return this.paddle;
-  }
-
-  ensureCustomer(customer: Customer): Promise<string> {
-    if (customer.providerCustomerId) {
-      return Promise.resolve(customer.providerCustomerId);
-    }
-    // Paddle creates/links the customer during hosted checkout (it collects the
-    // email there) and we correlate back via custom data, so a standalone
-    // create — which needs an email the billing Customer doesn't carry — is not
-    // part of the checkout flow.
-    throw new NotImplementedException(
-      'Paddle links the customer during checkout; ensureCustomer is unused'
-    );
   }
 
   async startCheckout(

@@ -5,11 +5,7 @@ import { Money } from '@app/shared/utils/money';
 import { UsageRecord } from '../entities/usage-record.entity';
 import type { Plan } from '../entities/plan.entity';
 import type { Subscription } from '../entities/subscription.entity';
-import type {
-  BillingPeriod,
-  RatedAmount,
-  RatingStrategy
-} from './rating-strategy.interface';
+import type { BillingPeriod, RatedAmount } from './rating-strategy.interface';
 
 /** A period's metered usage rated against the plan's per-provider price. */
 export interface UsagePeriodSummary extends RatedAmount {
@@ -37,26 +33,11 @@ export interface CreditedUsageSummary extends UsagePeriodSummary {
  * `amountMinor` is not added.
  */
 @Injectable()
-export class UsageRating implements RatingStrategy {
-  readonly mode = 'usage' as const;
-
+export class UsageRating {
   constructor(
     @InjectRepository(UsageRecord)
     private readonly usageRecords: Repository<UsageRecord>
   ) {}
-
-  async amountForPeriod(
-    subscription: Subscription,
-    plan: Plan,
-    period: BillingPeriod
-  ): Promise<RatedAmount> {
-    const summary = await this.summarizeForPeriod(subscription, plan, period);
-    return {
-      amountMinor: summary.amountMinor,
-      currency: summary.currency,
-      receiptItems: summary.receiptItems
-    };
-  }
 
   /**
    * Rates a period with the customer's prepaid credits spent before money is

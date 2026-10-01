@@ -56,10 +56,9 @@ export async function cancelOpenSubscription(
   // webhook reconciles status. Self-managed: there is no provider object — the
   // renewal scheduler simply stops charging the saved card.
   if (subscription.providerSubscriptionId) {
-    const provider = deps.billing.getProviderById(subscription.provider);
-    if (provider) {
-      await provider.cancel(subscription.providerSubscriptionId, mode);
-    }
+    await deps.billing
+      .getProviderById(subscription.provider)
+      .cancel(subscription.providerSubscriptionId, mode);
   }
 
   // Ending a metered period now means its postpaid units are owed now: they are

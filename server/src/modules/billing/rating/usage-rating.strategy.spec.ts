@@ -209,28 +209,6 @@ describe('UsageRating', () => {
     expect(summary.receiptItems).toEqual([]);
   });
 
-  it('exposes the rated amount through the RatingStrategy contract', async () => {
-    mockTotal(142);
-
-    const rated = await rating.amountForPeriod(
-      makeSubscription(),
-      makePlan(),
-      PERIOD
-    );
-
-    expect(rated).toEqual({
-      amountMinor: 8400,
-      currency: 'RUB',
-      receiptItems: [
-        {
-          description: 'Pay as you go: api_calls × 42',
-          amountMinor: 8400,
-          quantity: 1
-        }
-      ]
-    });
-  });
-
   it('rates an overage product that exceeds int32 without overflow or precision loss', async () => {
     // 50_000 billable units at 50_000 minor each = 2_500_000_000 minor, beyond
     // the old int32 column ceiling (2_147_483_647). The bigint Money path keeps

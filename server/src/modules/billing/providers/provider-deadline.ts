@@ -73,12 +73,6 @@ export class DeadlineBoundProvider implements PaymentProvider {
     return this.inner.managesLifecycle;
   }
 
-  ensureCustomer(customer: Customer): Promise<string> {
-    return this.bound('ensureCustomer', () =>
-      this.inner.ensureCustomer(customer)
-    );
-  }
-
   startCheckout(
     customer: Customer,
     plan: Plan,

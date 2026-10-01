@@ -214,20 +214,18 @@ export class BillingAdminService {
         };
       });
 
-    const provider = this.billing.getProviderById(providerRef.provider);
-    if (provider) {
-      try {
-        // Keying on the cumulative-after total makes a post-crash retry reuse
-        // the same key and dedup at the provider.
-        await provider.refund(
-          providerRef.invoiceRef,
-          refundAmount.toNumber(),
-          `refund-${id}-${cumulativeRefunded.toMinorString()}`
-        );
-      } catch (error) {
-        await this.releaseReservation(id, refundAmount);
-        throw error;
-      }
+    try {
+      const provider = this.billing.getProviderById(providerRef.provider);
+      // Keying on the cumulative-after total makes a post-crash retry reuse
+      // the same key and dedup at the provider.
+      await provider.refund(
+        providerRef.invoiceRef,
+        refundAmount.toNumber(),
+        `refund-${id}-${cumulativeRefunded.toMinorString()}`
+      );
+    } catch (error) {
+      await this.releaseReservation(id, refundAmount);
+      throw error;
     }
 
     // The money side is already recorded, so settling is only the status flip.

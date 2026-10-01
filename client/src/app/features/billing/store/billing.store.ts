@@ -222,10 +222,6 @@ export const BillingStore = signalStore(
     }
 
     /**
-     * Refresh just the invoices (e.g. while a one-time purchase return waits
-     * for the provider webhook to settle the paid invoice).
-     */
-    /**
      * Re-reads the invoice list from its first page (a purchase or plan change
      * lands at the top, and a cursor already handed out cannot see it).
      */

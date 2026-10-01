@@ -1,4 +1,5 @@
 import type { Customer } from '../entities/customer.entity';
+import type { Plan } from '../entities/plan.entity';
 import type { PaymentProvider } from './payment-provider.interface';
 import {
   DeadlineBoundProvider,
@@ -12,7 +13,6 @@ function providerStub() {
   return {
     id: 'yookassa',
     managesLifecycle: false,
-    ensureCustomer: jest.fn(),
     startCheckout: jest.fn(),
     chargeOffSession: jest.fn(),
     findOffSessionCharge: jest.fn(),
@@ -29,6 +29,8 @@ function providerStub() {
 }
 
 const customer = { id: 'cust-1', userId: 'user-1' } as Customer;
+const plan = { key: 'pro' } as Plan;
+const urls = { successUrl: 'https://app/ok', cancelUrl: 'https://app/no' };
 
 /** A call that never settles — the stalled socket this wrapper exists for. */
 const hangs = (): Promise<never> => new Promise<never>(() => {});
@@ -36,23 +38,24 @@ const hangs = (): Promise<never> => new Promise<never>(() => {});
 describe('withProviderDeadline', () => {
   it('rejects a call that outlives the deadline, naming provider and method', async () => {
     const inner = providerStub();
-    inner.ensureCustomer.mockImplementation(hangs);
+    inner.startCheckout.mockImplementation(hangs);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
-    await expect(provider.ensureCustomer(customer)).rejects.toThrow(
-      new ProviderTimeoutError('yookassa', 'ensureCustomer', TIMEOUT_MS)
+    await expect(provider.startCheckout(customer, plan, urls)).rejects.toThrow(
+      new ProviderTimeoutError('yookassa', 'startCheckout', TIMEOUT_MS)
     );
   });
 
   it('passes a call that settles in time through untouched', async () => {
     const inner = providerStub();
-    inner.ensureCustomer.mockResolvedValue('provider-cust-1');
+    const session = { url: 'https://pay.example/1', sessionRef: 'pay-1' };
+    inner.startCheckout.mockResolvedValue(session);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
-    await expect(provider.ensureCustomer(customer)).resolves.toBe(
-      'provider-cust-1'
+    await expect(provider.startCheckout(customer, plan, urls)).resolves.toBe(
+      session
     );
-    expect(inner.ensureCustomer).toHaveBeenCalledWith(customer);
+    expect(inner.startCheckout).toHaveBeenCalledWith(customer, plan, urls);
   });
 
   it('forwards every argument, including optional ones', async () => {
