@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of, Subject } from 'rxjs';
+import { firstValueFrom, of, Subject, throwError } from 'rxjs';
 import { toArray } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { UserService } from '@features/users/services/user.service';
@@ -162,5 +162,25 @@ describe('debouncedUserSearch', () => {
     terms$.complete();
 
     expect(await collected).toEqual([[makeUser({ id: 'adam' })]]);
+  });
+
+  it('answers a failed term with no options and still searches the next one', () => {
+    const search = vi.fn((term: string) =>
+      term === 'ann'
+        ? throwError(() => new Error('429'))
+        : of([makeUser({ id: term })])
+    );
+    const terms$ = new Subject<string>();
+    const seen: User[][] = [];
+
+    terms$.pipe(debouncedUserSearch(search)).subscribe((u) => seen.push(u));
+
+    terms$.next('ann');
+    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+    terms$.next('bob');
+    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(seen).toEqual([[], [makeUser({ id: 'bob' })]]);
   });
 });

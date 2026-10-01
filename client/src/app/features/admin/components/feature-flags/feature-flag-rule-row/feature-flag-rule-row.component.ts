@@ -272,7 +272,10 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
     this.#roleCatalog
       .getAll()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .pipe(
+        catchError(() => of([])),
+        takeUntilDestroyed(this.#destroyRef)
+      )
       .subscribe((roles) => {
         const cache = new Map(this.#roleLabelCache());
         const opts: ChipOption[] = [];

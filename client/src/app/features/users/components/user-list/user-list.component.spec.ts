@@ -2,7 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { config, of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import type { Sort } from '@angular/material/sort';
@@ -134,6 +134,26 @@ describe('UserListComponent', () => {
   it('should fetch roles on init and expose them for the filter select', () => {
     expect(roleCatalogMock.getAll).toHaveBeenCalled();
     expect(component.roles()).toEqual([mockUserRole]);
+  });
+
+  it('reports no unhandled error when the role catalog is refused', () => {
+    const unhandled = vi.fn();
+    config.onUnhandledError = unhandled;
+    vi.useFakeTimers();
+    try {
+      roleCatalogMock.getAll.mockReturnValue(
+        throwError(() => new Error('503'))
+      );
+      const refused = TestBed.createComponent(UserListComponent);
+      refused.detectChanges();
+      vi.runOnlyPendingTimers();
+
+      expect(unhandled).not.toHaveBeenCalled();
+      expect(refused.componentInstance.roles()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      config.onUnhandledError = null;
+    }
   });
 
   describe('sortData', () => {

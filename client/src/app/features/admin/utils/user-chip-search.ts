@@ -1,5 +1,12 @@
 import type { Observable, OperatorFunction } from 'rxjs';
-import { debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  of,
+  switchMap
+} from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 import type { ChipOption } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
@@ -66,7 +73,9 @@ export function searchUsersPage(
 
 /**
  * Turns a stream of typed terms into a stream of results: debounced, deduped,
- * and switched so a stale response can never overwrite a newer one.
+ * and switched so a stale response can never overwrite a newer one. A failed
+ * search yields no options and keeps the stream open for the next term; the
+ * HTTP interceptor already tells the user about the failure.
  */
 export function debouncedUserSearch(
   search: (term: string) => Observable<User[]>
@@ -75,6 +84,6 @@ export function debouncedUserSearch(
     terms$.pipe(
       debounceTime(USER_SEARCH_DEBOUNCE_MS),
       distinctUntilChanged(),
-      switchMap((term) => search(term))
+      switchMap((term) => search(term).pipe(catchError(() => of([] as User[]))))
     );
 }

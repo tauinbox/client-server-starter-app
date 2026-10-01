@@ -194,6 +194,44 @@ describe('FeatureFlagPreviewComponent', () => {
     }
   });
 
+  it('searches again after a refused user search', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = await setup();
+      const cmp = fixture.componentInstance;
+      const bob: User = {
+        id: 'u-bob',
+        email: 'bob@example.com',
+        firstName: 'Bob',
+        lastName: 'Marley',
+        isActive: true,
+        roles: [],
+        isEmailVerified: true,
+        hasPassword: true,
+        mfaEnabled: false,
+        locale: 'en',
+        createdAt: '',
+        updatedAt: '',
+        deletedAt: null
+      };
+      searchUsersSpy
+        .mockReturnValueOnce(
+          throwError(() => new HttpErrorResponse({ status: 429 }))
+        )
+        .mockReturnValueOnce(of({ data: [bob], meta: { nextCursor: null } }));
+
+      cmp.onUserSearchTerm('ann');
+      vi.advanceTimersByTime(500);
+      cmp.onUserSearchTerm('bob');
+      vi.advanceTimersByTime(500);
+
+      expect(searchUsersSpy).toHaveBeenCalledTimes(2);
+      expect(cmp['userOptions']().map((c) => c.value)).toEqual(['u-bob']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('caps user selection to at most one chip (newest wins)', async () => {
     const fixture = await setup();
     const cmp = fixture.componentInstance;
