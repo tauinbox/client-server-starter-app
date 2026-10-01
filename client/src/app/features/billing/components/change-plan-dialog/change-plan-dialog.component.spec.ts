@@ -238,6 +238,34 @@ describe('ChangePlanDialogComponent', () => {
     expect(confirmButton().disabled).toBe(true);
   });
 
+  it('asks for the preview again when the failed plan is picked again', () => {
+    billingMock.previewChange
+      .mockReturnValueOnce(throwError(() => new Error('500')))
+      .mockReturnValue(of(splitPreview));
+    createComponent();
+
+    optionButtons()[1].click();
+    fixture.detectChanges();
+    optionButtons()[1].click();
+    fixture.detectChanges();
+
+    expect(billingMock.previewChange).toHaveBeenCalledTimes(2);
+    expect(fixture.nativeElement.querySelector('.proration-error')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.ledger')).not.toBeNull();
+    expect(confirmButton().disabled).toBe(false);
+  });
+
+  it('does not ask again when the plan on screen is picked again', () => {
+    createComponent();
+
+    optionButtons()[1].click();
+    fixture.detectChanges();
+    optionButtons()[1].click();
+    fixture.detectChanges();
+
+    expect(billingMock.previewChange).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the reason of a refused preview in place of the generic text', () => {
     billingMock.previewChange.mockReturnValue(
       throwError(

@@ -195,7 +195,7 @@ export class ChangePlanDialogComponent {
   }
 
   select(planKey: string): void {
-    if (planKey === this.selectedKey()) return;
+    if (planKey === this.selectedKey() && this.previewError() === null) return;
     this.selectedKey.set(planKey);
     this.preview.set(null);
     this.previewError.set(null);
