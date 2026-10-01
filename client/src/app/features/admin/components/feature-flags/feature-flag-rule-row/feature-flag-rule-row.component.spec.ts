@@ -5,7 +5,7 @@ import type { MatSelect } from '@angular/material/select';
 import { By } from '@angular/platform-browser';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { config, of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
@@ -757,6 +757,69 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
     expect(roleCatalogStub.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports no unhandled error when the role catalog is refused', () => {
+    const unhandled = vi.fn();
+    config.onUnhandledError = unhandled;
+    vi.useFakeTimers();
+    try {
+      roleCatalogStub.getAll.mockReturnValueOnce(
+        throwError(() => new Error('503'))
+      );
+      const fixture = TestBed.createComponent(HostComponent);
+      fixture.detectChanges();
+      vi.runOnlyPendingTimers();
+
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      config.onUnhandledError = null;
+    }
+  });
+
+  it('searches again after a refused user search', async () => {
+    vi.useFakeTimers();
+    try {
+      const bob: User = {
+        id: '22222222-2222-2222-2222-222222222222',
+        email: 'bob@example.com',
+        firstName: 'Bob',
+        lastName: 'Marley',
+        isActive: true,
+        roles: [],
+        isEmailVerified: true,
+        hasPassword: true,
+        mfaEnabled: false,
+        locale: 'en',
+        createdAt: '',
+        updatedAt: '',
+        deletedAt: null
+      };
+      userServiceStub.searchCursor
+        .mockReturnValueOnce(throwError(() => new Error('429')))
+        .mockReturnValueOnce(of({ data: [bob], meta: { nextCursor: null } }));
+
+      const fixture = TestBed.createComponent(HostComponent);
+      fixture.componentInstance.rule.set({
+        effect: 'include',
+        type: 'user',
+        payload: { type: 'user', userIds: [] }
+      });
+      fixture.detectChanges();
+      const cmp = fixture.debugElement.children[0]
+        .componentInstance as FeatureFlagRuleRowComponent;
+
+      cmp.onUserSearchTerm('ann');
+      vi.advanceTimersByTime(400);
+      cmp.onUserSearchTerm('bob');
+      vi.advanceTimersByTime(400);
+
+      expect(userServiceStub.searchCursor).toHaveBeenCalledTimes(2);
+      expect(cmp['userOptions']().map((c) => c.value)).toEqual([bob.id]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('user search debounces and issues a single request with unified q', async () => {

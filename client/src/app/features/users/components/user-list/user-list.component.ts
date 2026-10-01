@@ -8,6 +8,7 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { catchError, of } from 'rxjs';
 import {
   MatCard,
   MatCardContent,
@@ -112,7 +113,10 @@ export class UserListComponent implements OnInit {
     this.#usersStore.load();
     this.#roleCatalog
       .getAll()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .pipe(
+        catchError(() => of([])),
+        takeUntilDestroyed(this.#destroyRef)
+      )
       .subscribe((roles) => this.roles.set(roles));
     this.#notificationsService.userCrudEvents$
       .pipe(takeUntilDestroyed(this.#destroyRef))
