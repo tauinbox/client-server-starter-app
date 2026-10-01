@@ -27,7 +27,7 @@
     }
   </header>
 
-  @if (store.loading()) {
+  @if (store.pageLoading()) {
     <div class="pricing-loading">
       <mat-spinner [attr.aria-label]="t('common.loading')" diameter="40" />
     </div>

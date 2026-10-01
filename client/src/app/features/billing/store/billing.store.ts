@@ -39,7 +39,7 @@ type BillingState = {
   usage: UsageSummaryResponse | null;
   credits: CreditBalanceResponse | null;
   region: BillingRegionResponse | null;
-  loading: boolean;
+  pageLoading: boolean;
   working: boolean;
 };
 
@@ -51,7 +51,7 @@ const initialState: BillingState = {
   usage: null,
   credits: null,
   region: null,
-  loading: false,
+  pageLoading: false,
   working: false
 };
 
@@ -115,14 +115,14 @@ export const BillingStore = signalStore(
      * the subscription drives the "Current" badge on the matching tier).
      */
     async function loadPricing(authenticated: boolean): Promise<void> {
-      patchState(store, { loading: true });
+      patchState(store, { pageLoading: true });
       await Promise.all([
         loadPlans(),
         authenticated ? loadRegion() : Promise.resolve(),
         authenticated ? refreshSubscription() : Promise.resolve(),
         authenticated ? loadProducts() : Promise.resolve()
       ]);
-      patchState(store, { loading: false });
+      patchState(store, { pageLoading: false });
     }
 
     /**
@@ -132,7 +132,7 @@ export const BillingStore = signalStore(
      * once.
      */
     async function loadSettings(): Promise<void> {
-      patchState(store, { loading: true });
+      patchState(store, { pageLoading: true });
       // Opening the page always restarts the invoice list at its first page.
       void store.loadFirstPage((request) => billing.getInvoices(request));
       const results = await Promise.allSettled([
@@ -145,7 +145,7 @@ export const BillingStore = signalStore(
       ]);
       const [subscription, paymentMethod, usage, credits, plans, region] =
         results;
-      const patch: Partial<BillingState> = { loading: false };
+      const patch: Partial<BillingState> = { pageLoading: false };
       if (subscription.status === 'fulfilled')
         patch.subscription = subscription.value;
       if (paymentMethod.status === 'fulfilled')

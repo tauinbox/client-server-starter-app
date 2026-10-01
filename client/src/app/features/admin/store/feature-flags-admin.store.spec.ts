@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { storeOverrideWarnings } from '../../../../test-utils/store-override-warnings';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsAdminStore } from './feature-flags-admin.store';
@@ -64,6 +65,12 @@ describe('FeatureFlagsAdminStore', () => {
         { provide: NotifyService, useValue: notify }
       ]
     });
+  });
+
+  it('declares each store member once', () => {
+    expect(
+      storeOverrideWarnings(() => TestBed.inject(FeatureFlagsAdminStore))
+    ).toEqual([]);
   });
 
   it('load() populates entities and clears loading', async () => {

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
+import { storeOverrideWarnings } from '../../../../test-utils/store-override-warnings';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { UsersStore } from './users.store';
@@ -150,5 +151,18 @@ describe('UsersStore', () => {
 
       expect(store.entities()[0].isActive).toBe(false);
     });
+  });
+});
+
+describe('UsersStore members', () => {
+  it('declares each store member once', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        UsersStore,
+        { provide: UserService, useValue: {} },
+        { provide: NotifyService, useValue: {} }
+      ]
+    });
+    expect(storeOverrideWarnings(() => TestBed.inject(UsersStore))).toEqual([]);
   });
 });

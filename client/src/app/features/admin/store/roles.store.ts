@@ -1,20 +1,15 @@
 import { inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { tap } from 'rxjs';
-import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
+import { patchState, signalStore, withMethods } from '@ngrx/signals';
 import { removeEntity, setEntity, withEntities } from '@ngrx/signals/entities';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import type { CreateRole, UpdateRole } from '../services/role.service';
 import { RoleService } from '../services/role.service';
 
-type RolesState = {
-  loading: boolean;
-};
-
 export const RolesStore = signalStore(
   withEntities<RoleAdminResponse>(),
-  withState<RolesState>({ loading: false }),
   withCursorList<RoleAdminResponse>({
     fallbackKey: 'admin.store.errorLoadRolesFailed'
   }),

@@ -71,7 +71,7 @@ describe('PricingPageComponent', () => {
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
     hasActiveSubscription: ReturnType<typeof signal<boolean>>;
     region: ReturnType<typeof signal<BillingRegionResponse | null>>;
-    loading: ReturnType<typeof signal<boolean>>;
+    pageLoading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
     loadPricing: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
@@ -100,7 +100,7 @@ describe('PricingPageComponent', () => {
       subscription: signal<SubscriptionResponse | null>(null),
       hasActiveSubscription: signal(false),
       region: signal<BillingRegionResponse | null>(null),
-      loading: signal(false),
+      pageLoading: signal(false),
       working: signal(false),
       loadPricing: vi.fn().mockResolvedValue(undefined),
       checkout: vi.fn().mockResolvedValue(null),
