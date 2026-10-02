@@ -137,7 +137,8 @@ describe('BillingService', () => {
     req.flush({
       region: 'ru',
       detectedProvider: 'paddle',
-      effectiveProvider: 'yookassa'
+      effectiveProvider: 'yookassa',
+      availableProviders: ['paddle', 'yookassa']
     });
   });
 });

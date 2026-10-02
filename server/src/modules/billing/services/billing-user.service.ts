@@ -23,6 +23,7 @@ import {
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import {
+  BILLING_PROVIDER_FLAGS,
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
@@ -31,6 +32,7 @@ import {
 import type {
   BillingProviderId,
   BillingRegion,
+  BillingRegionResponse,
   CheckoutSessionResponse,
   PlanPrice,
   ProductPrice,
@@ -1374,39 +1376,20 @@ export class BillingUserService {
     });
   }
 
-  async getRegion(userId: string): Promise<{
-    region: BillingRegion;
-    detectedProvider: BillingProviderId;
-    effectiveProvider: BillingProviderId;
-  }> {
+  async getRegion(userId: string): Promise<BillingRegionResponse> {
     const customer = await this.customerFor(userId);
-    if (customer) {
-      return {
-        region: regionForOverride(customer.providerOverride),
-        detectedProvider: this.billing.geoDefaultFor(customer.country),
-        effectiveProvider: this.billing.effectiveProviderId(customer)
-      };
-    }
+    if (customer) return this.regionView(customer);
 
     // No customer yet: report the geo default derived from the registration
     // locale; nothing is persisted until the first checkout / region change.
     const country = await this.detectCountry(userId);
-    const detected = this.billing.geoDefaultFor(country);
-    return {
-      region: 'auto',
-      detectedProvider: detected,
-      effectiveProvider: detected
-    };
+    return this.regionView({ providerOverride: null, country });
   }
 
   async setRegion(
     userId: string,
     region: BillingRegion
-  ): Promise<{
-    region: BillingRegion;
-    detectedProvider: BillingProviderId;
-    effectiveProvider: BillingProviderId;
-  }> {
+  ): Promise<BillingRegionResponse> {
     const customer = await this.getOrCreateCustomer(userId);
     const newOverride = overrideForRegion(region);
     const newEffective =
@@ -1448,10 +1431,24 @@ export class BillingUserService {
     const updated =
       (await this.customers.findOne({ where: { id: customer.id } })) ??
       Object.assign(customer, { providerOverride: newOverride });
+    return this.regionView(updated);
+  }
+
+  private async regionView(
+    customer: Pick<Customer, 'providerOverride' | 'country'>
+  ): Promise<BillingRegionResponse> {
+    const availability = await Promise.all(
+      BILLING_PROVIDER_FLAGS.map(({ provider }) =>
+        this.billing.isProviderAvailable(provider)
+      )
+    );
     return {
-      region: regionForOverride(updated.providerOverride),
-      detectedProvider: this.billing.geoDefaultFor(updated.country),
-      effectiveProvider: this.billing.effectiveProviderId(updated)
+      region: regionForOverride(customer.providerOverride),
+      detectedProvider: this.billing.geoDefaultFor(customer.country),
+      effectiveProvider: this.billing.effectiveProviderId(customer),
+      availableProviders: BILLING_PROVIDER_FLAGS.filter(
+        (_, i) => availability[i]
+      ).map(({ provider }) => provider)
     };
   }
 

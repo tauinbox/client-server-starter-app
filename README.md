@@ -771,9 +771,11 @@ the same permission both apply.
   Thus a short month clamps one time, and the original day returns as soon as the next month is long
   enough. For example, January 31 gives February 28, then March 31, then April 30. A trial anchors
   again to its conversion date. A provider-managed subscription takes each boundary from the provider.
-- **Billing region.** The pricing page shows an Auto, Russia and International control to an
-  authenticated user. The control sets the provider of the next checkout. The server refuses a
-  region whose provider is not available, with a 409 that tells the user why.
+- **Billing region.** The pricing page and the billing settings page show an Auto, Russia and
+  International control to an authenticated user. The control sets the provider of the next
+  checkout. It stays hidden when only one provider is available, unless the stored region resolves
+  to a provider that is not available. The server refuses a region whose provider is not
+  available, with a 409 that tells the user why.
 - **One-time purchases.** A section below the plan grid renders the `GET /api/v1/billing/products`
   catalog for an authenticated user.
 

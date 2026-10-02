@@ -5,26 +5,7 @@
       <p>{{ t('billing.pricing.subtitle') }}</p>
     </div>
 
-    @if (showRegionControl()) {
-      <div class="region-control">
-        <span class="region-label" id="region-label">
-          <mat-icon aria-hidden="true">public</mat-icon>
-          {{ t('billing.region.label') }}
-        </span>
-        <mat-button-toggle-group
-          aria-labelledby="region-label"
-          [value]="store.region()?.region"
-          [disabled]="store.working()"
-          (change)="onRegionChange($event.value)"
-        >
-          @for (option of regionOptions; track option) {
-            <mat-button-toggle [value]="option">
-              {{ t('billing.region.' + option) }}
-            </mat-button-toggle>
-          }
-        </mat-button-toggle-group>
-      </div>
-    }
+    <nxs-region-control />
   </header>
 
   @if (store.pageLoading()) {

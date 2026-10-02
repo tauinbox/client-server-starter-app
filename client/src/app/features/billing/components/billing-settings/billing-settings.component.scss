@@ -11,8 +11,17 @@
   margin: 0 auto;
 }
 
+.settings-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-md;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: vars.$spacing-lg;
+}
+
 .settings-title {
-  margin: 0 0 vars.$spacing-lg;
+  margin: 0;
   font-size: vars.$font-size-xxl;
   font-weight: vars.$font-weight-bold;
 }

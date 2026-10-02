@@ -3,23 +3,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  inject,
-  viewChild
+  inject
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import {
-  MatButtonToggleGroup,
-  MatButtonToggleModule
-} from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { toSignal } from '@angular/core/rxjs-interop';
-import type {
-  BillingRegion,
-  PlanResponse,
-  ProductResponse
-} from '@app/shared/types';
+import type { PlanResponse, ProductResponse } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
@@ -36,6 +27,7 @@ import {
   type PendingPurchase
 } from '../../utils/pending-purchase';
 import { PlanCardComponent } from '../plan-card/plan-card.component';
+import { RegionControlComponent } from '../region-control/region-control.component';
 import { ProductCardComponent } from '../product-card/product-card.component';
 import {
   DonationCardComponent,
@@ -60,10 +52,10 @@ type PricedProduct = {
   selector: 'nxs-pricing-page',
   imports: [
     MatProgressSpinner,
-    MatButtonToggleModule,
     MatIcon,
     TranslocoDirective,
     PlanCardComponent,
+    RegionControlComponent,
     ProductCardComponent,
     DonationCardComponent
   ],
@@ -79,8 +71,6 @@ export class PricingPageComponent implements OnInit {
   readonly #checkoutRedirect = inject(CheckoutRedirectService);
 
   protected readonly isAuthenticated = this.#authStore.isAuthenticated;
-
-  readonly regionToggle = viewChild(MatButtonToggleGroup);
 
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()
@@ -138,13 +128,6 @@ export class PricingPageComponent implements OnInit {
     return formatMoney(price.unitPriceMinor, price.currency, this.#lang());
   });
 
-  // Region control: shown to authenticated callers once the region is known
-  // (the endpoint requires auth). Hidden for anonymous visitors (no override
-  // to set).
-  protected readonly showRegionControl = computed(
-    () => this.isAuthenticated() && this.store.region() !== null
-  );
-
   // One-time purchases: fixed-price products as cards, custom
   // products as donation forms. The catalog endpoint requires auth, so the
   // section exists only for authenticated callers with a non-empty catalog.
@@ -174,25 +157,8 @@ export class PricingPageComponent implements OnInit {
     () => this.isAuthenticated() && this.store.products().length > 0
   );
 
-  protected readonly regionOptions: readonly BillingRegion[] = [
-    'auto',
-    'ru',
-    'world'
-  ];
-
   ngOnInit(): void {
     void this.store.loadPricing(this.isAuthenticated());
-  }
-
-  // The group keeps the clicked value on a refusal, because the stored region
-  // does not change and the [value] binding therefore does not fire again.
-  onRegionChange(region: BillingRegion): void {
-    void this.store.setRegion(region).then((updated) => {
-      const toggle = this.regionToggle();
-      if (!updated && toggle) {
-        toggle.value = this.store.region()?.region;
-      }
-    });
   }
 
   onChoose(planKey: string): void {

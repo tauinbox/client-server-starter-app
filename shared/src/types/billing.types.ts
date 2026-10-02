@@ -311,10 +311,13 @@ export type PurchaseSessionResponse = {
  * Result of `GET`/`PUT /billing/region`. `region` is the user's
  * current selection (`auto` = no override). `detectedProvider` is the geo
  * default; `effectiveProvider` is what the next checkout would actually use
- * (`providerOverride ?? geoDefault`).
+ * (`providerOverride ?? geoDefault`). `availableProviders` lists the providers
+ * that a checkout can use now; the region control is shown only when it has
+ * more than one entry.
  */
 export type BillingRegionResponse = {
   region: BillingRegion;
   detectedProvider: BillingProviderId;
   effectiveProvider: BillingProviderId;
+  availableProviders: BillingProviderId[];
 };

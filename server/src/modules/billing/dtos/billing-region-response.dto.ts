@@ -17,6 +17,13 @@ export class BillingRegionResponseDto {
 
   @ApiProperty({ enum: ['paddle', 'yookassa'], example: 'paddle' })
   effectiveProvider: BillingProviderId;
+
+  @ApiProperty({
+    enum: ['paddle', 'yookassa'],
+    isArray: true,
+    example: ['paddle', 'yookassa']
+  })
+  availableProviders: BillingProviderId[];
 }
 
 type _DtoMatchesShared = _AssertNever<

@@ -33,26 +33,6 @@
   }
 }
 
-.region-control {
-  display: flex;
-  flex-direction: column;
-  gap: vars.$spacing-xs;
-
-  .region-label {
-    display: inline-flex;
-    gap: vars.$spacing-xxs;
-    align-items: center;
-    font-size: vars.$font-size-sm;
-    color: var(--mat-sys-on-surface-variant);
-
-    mat-icon {
-      width: func.rem(18);
-      height: func.rem(18);
-      font-size: func.rem(18);
-    }
-  }
-}
-
 .pricing-loading {
   @include mix.loading-container;
 }

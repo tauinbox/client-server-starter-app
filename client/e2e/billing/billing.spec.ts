@@ -139,15 +139,16 @@ test.describe('Billing', () => {
     ).toBe(1);
   });
 
-  test('a region whose provider is unavailable is refused with the reason', async ({
+  test('a region whose provider was turned off after the page loaded is refused with the reason', async ({
     page,
     _mockServer
   }) => {
-    await _mockServer.setBillingProviderEnabled('yookassa', false);
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
     const region = page.locator('.region-control');
+    await expect(region.getByRole('radio', { name: 'Russia' })).toBeVisible();
+    await _mockServer.setBillingProviderEnabled('yookassa', false);
     const refused = page.waitForResponse(
       (response) =>
         response.url().includes('/billing/region') &&
@@ -160,6 +161,41 @@ test.describe('Billing', () => {
       'Payments are not available in this billing region.'
     );
     await expect(region.getByRole('radio', { name: 'Auto' })).toBeChecked();
+  });
+
+  test('the region control hides with one provider, but shows to leave a provider that was turned off', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.goto('/billing/settings');
+
+    const region = page.locator('.settings-header .region-control');
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().includes('/billing/region') &&
+        response.request().method() === 'PUT'
+    );
+    await region.getByRole('radio', { name: 'Russia' }).click();
+    expect((await saved).status()).toBe(200);
+
+    await _mockServer.setBillingProviderEnabled('yookassa', false);
+    await page.reload();
+    await expect(region.getByRole('radio', { name: 'Russia' })).toBeChecked();
+
+    const left = page.waitForResponse(
+      (response) =>
+        response.url().includes('/billing/region') &&
+        response.request().method() === 'PUT'
+    );
+    await region.getByRole('radio', { name: 'International' }).click();
+    expect((await left).status()).toBe(200);
+    await expect(region).toHaveCount(0);
+
+    // Plans and region load together, so a rendered card means the region is known.
+    await page.goto('/billing');
+    await expect(page.locator('nxs-plan-card').first()).toBeVisible();
+    await expect(page.locator('.region-control')).toHaveCount(0);
   });
 
   test('checkout → active subscription → cancel', async ({
