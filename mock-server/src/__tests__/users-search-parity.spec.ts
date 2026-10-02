@@ -2,10 +2,10 @@
 // filter inputs with 400 instead of coercing or silently dropping them.
 
 import type { Server } from 'http';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import { MAX_PAGE_SIZE, MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
 
 let server: Server;
 let baseUrl: string;
@@ -138,6 +138,101 @@ describe('User list/search filter-param validation parity with server', () => {
     );
 
     expect(res.status).toBe(200);
+  });
+
+  describe('ids', () => {
+    function seededIds(): string[] {
+      return Array.from(getState().users.values()).map((u) => u.id);
+    }
+
+    function returnedIds(body: unknown): string[] {
+      return (body as { data: { id: string }[] }).data.map((u) => u.id).sort();
+    }
+
+    it.each(['/cursor', '/search/cursor'])(
+      'returns exactly the listed users on GET /users%s',
+      async (path) => {
+        const token = await loginAsAdmin();
+        const [first, second] = seededIds();
+
+        const res = await getUsers(token, `${path}?ids=${first},${second}`);
+
+        expect(res.status).toBe(200);
+        expect(returnedIds(await res.json())).toEqual([first, second].sort());
+      }
+    );
+
+    it('leaves out a soft-deleted user unless includeDeleted is set', async () => {
+      const token = await loginAsAdmin();
+      const [first, second] = seededIds();
+      const deleted = getState().users.get(second);
+      if (!deleted) throw new Error('seed user missing');
+      deleted.deletedAt = new Date().toISOString();
+
+      const live = await getUsers(
+        token,
+        `/search/cursor?ids=${first},${second}`
+      );
+      const all = await getUsers(
+        token,
+        `/search/cursor?ids=${first},${second}&includeDeleted=true`
+      );
+
+      expect(returnedIds(await live.json())).toEqual([first]);
+      expect(returnedIds(await all.json())).toEqual([first, second].sort());
+    });
+
+    it.each([
+      [
+        'more than the page cap',
+        () =>
+          Array(MAX_PAGE_SIZE + 1)
+            .fill(seededIds()[0])
+            .join(','),
+        `ids must contain no more than ${MAX_PAGE_SIZE} elements`
+      ],
+      [
+        'a value that is not a UUID',
+        () => `${seededIds()[0]},nope`,
+        'each value in ids must be a UUID'
+      ],
+      ['an empty value', () => '', 'each value in ids must be a UUID']
+    ])('rejects %s with the server message', async (_case, ids, message) => {
+      const token = await loginAsAdmin();
+
+      const res = await getUsers(token, `/search/cursor?ids=${ids()}`);
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(message);
+    });
+
+    it('reports the UUID check before the size, as the server does', async () => {
+      const token = await loginAsAdmin();
+
+      const res = await getUsers(
+        token,
+        `/search/cursor?ids=${Array(MAX_PAGE_SIZE + 1)
+          .fill('nope')
+          .join(',')}`
+      );
+
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors).toEqual([
+        'each value in ids must be a UUID',
+        `ids must contain no more than ${MAX_PAGE_SIZE} elements`
+      ]);
+    });
+  });
+
+  it('applies the filters on GET /users/cursor too, as the server does', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await getUsers(token, '/cursor?q=admin@example.com');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { email: string }[] };
+    expect(body.data.map((u) => u.email)).toEqual(['admin@example.com']);
   });
 
   it('accepts scalar filters on GET /users/search/cursor', async () => {

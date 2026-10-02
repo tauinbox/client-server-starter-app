@@ -38,6 +38,7 @@ import {
   FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
+  MAX_PAGE_SIZE,
   type FeatureFlagAttributeField,
   type FeatureFlagAttributeOp,
   type FeatureFlagBucketBy,
@@ -299,16 +300,29 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     const cache = this.#userLabelCache();
     const missing = payload.userIds.filter((id) => !cache.has(id));
     if (missing.length === 0) return;
+    // One page per chunk: a request per id spent the global rate limit of
+    // the admin on a single large rule.
+    const chunks: string[][] = [];
+    for (let i = 0; i < missing.length; i += MAX_PAGE_SIZE) {
+      chunks.push(missing.slice(i, i + MAX_PAGE_SIZE));
+    }
     forkJoin(
-      missing.map((id) =>
-        this.#userService.getById(id).pipe(catchError(() => of(null)))
+      chunks.map((ids) =>
+        this.#userService
+          .searchCursor(
+            { ids, includeDeleted: true },
+            { limit: ids.length, sortBy: 'createdAt', sortOrder: 'desc' }
+          )
+          .pipe(
+            map((page) => page.data),
+            catchError(() => of([] as User[]))
+          )
       )
     )
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((users) => {
+      .subscribe((pages) => {
         const next = new Map(this.#userLabelCache());
-        for (const u of users) {
-          if (u === null) continue;
+        for (const u of pages.flat()) {
           const chip = userToChip(u);
           next.set(chip.value, chip);
         }

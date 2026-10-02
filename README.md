@@ -1536,7 +1536,7 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
 | GET | `/users/cursor` | `users:search` | List the users with cursor (keyset) pagination. `includeDeleted=true` adds the soft-deleted rows |
-| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
+| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
@@ -1830,11 +1830,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2720 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 521 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 511 pass and 10 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1480 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2726 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 525 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 511 pass and 10 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1482 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 299 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 933 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 941 tests pass |
 
 ## CI/CD
 

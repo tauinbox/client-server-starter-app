@@ -1,7 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength
+} from 'class-validator';
+import { MAX_PAGE_SIZE, MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 
 /**
  * Recognises the two spellings a query string can carry for a boolean and
@@ -15,6 +23,14 @@ function toOptionalBoolean({ value }: { value: unknown }): unknown {
   if (value === 'false' || value === false) return false;
   if (value === '' || value === null || value === undefined) return undefined;
   return value;
+}
+
+/**
+ * An empty `?ids=` becomes `['']` and fails the UUID check, so it can never
+ * read as "no id filter" and widen the result to every user.
+ */
+function toIdList({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.split(',') : value;
 }
 
 /**
@@ -68,6 +84,17 @@ export class UserFiltersQueryDto {
   @IsString()
   @MaxLength(MAX_USER_FILTER_LENGTH)
   role?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: `Comma-separated user ids (at most ${MAX_PAGE_SIZE}); returns only these users`
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_PAGE_SIZE)
+  @IsUUID('all', { each: true })
+  @Transform(toIdList)
+  ids?: string[];
 
   @ApiPropertyOptional({ description: 'Filter by active status' })
   @IsOptional()
