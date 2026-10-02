@@ -6,7 +6,7 @@ import {
   inject,
   signal
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -70,7 +70,7 @@ const PLUS = '+ ';
 @Component({
   selector: 'nxs-change-plan-dialog',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     MatDialogModule,
     MatButtonModule,
     MatButtonToggleModule,

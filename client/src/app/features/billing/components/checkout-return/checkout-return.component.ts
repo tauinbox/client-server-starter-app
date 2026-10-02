@@ -8,7 +8,7 @@ import {
   input,
   signal
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatButton } from '@angular/material/button';
@@ -42,7 +42,7 @@ const POLL_INTERVAL_MS = 1500;
 @Component({
   selector: 'nxs-checkout-return',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     RouterLink,
     MatCard,
     MatCardContent,

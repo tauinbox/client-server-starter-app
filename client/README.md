@@ -380,6 +380,10 @@ src/app/
     │                       # nxsRequirePermissions, nxsHasFeature and nxsHasEntitlement. It owns
     │                       # the then and else view-container bookkeeping. Thus each directive
     │                       # supplies only its predicate and its else template.
+    ├── pipes/              # LocalizedDatePipe supplies {{ value | localizedDate: 'mediumDate' :
+    │                       # 'UTC' }}. Use it for all dates, not Angular's DatePipe. It formats
+    │                       # with Intl in the active LanguageService language, thus a language
+    │                       # switch changes the dates at runtime. It is impure for this reason.
     ├── services/           # AdaptiveDialogService opens a confirm dialog as a bottom sheet on a
     │                       # handset and as a dialog on a desktop.
     ├── store/              # withCursorList<T>({ fallbackKey }) is the shared cursor-list feature
@@ -656,10 +660,12 @@ Computed signal: `subjectMap` maps a resource name to a CASL subject.
   quotation marks, thus a plain value stays readable outside Angular. For example, `main.ts` reads
   the language preference before the bootstrap. `getItem` accepts an optional type guard. If a value
   fails the guard, the method returns `null` and does not cast the value.
-- **LanguageService** has the `lang` signal with the value `'en'` or `'ru'`. It reads
+- **LanguageService** has the `language` signal with the value `'en'` or `'ru'`. It reads
   `localStorage` first, then `navigator.language`, and then uses `'en'` as the fallback.
   `setLanguage()` changes the active Transloco language, registers the Angular locale data, and sets
-  `document.documentElement.lang`. A factory supplies `LOCALE_ID` from this service.
+  `document.documentElement.lang`. The app does not provide `LOCALE_ID`, thus Angular's `DatePipe`
+  always formats in `en-US`. Dates use `LocalizedDatePipe` (`shared/pipes/`), which reads this
+  signal and formats with `Intl`, so no locale data must be registered first.
 - **DisplayPreferencesService** has the `density` signal with a level of `0` to `5`. The default
   level is `0`. The service writes the level to `localStorage` with the key `display-density`. An
   `effect` applies it as the `data-ui-density` attribute on `<html>`. `provideAppInitializer` makes

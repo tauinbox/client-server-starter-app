@@ -34,7 +34,11 @@
                 <dt>{{ t('admin.billing.colMode') }}</dt>
                 <dd>{{ t('admin.billing.mode.' + sub.billingMode) }}</dd>
                 <dt>{{ t('admin.billing.colRenews') }}</dt>
-                <dd>{{ sub.currentPeriodEnd | date: 'mediumDate' : 'UTC' }}</dd>
+                <dd>
+                  {{
+                    sub.currentPeriodEnd | localizedDate: 'mediumDate' : 'UTC'
+                  }}
+                </dd>
               </dl>
               @if (canManage() && canCancel(sub)) {
                 <div class="record-card-actions">
@@ -123,7 +127,7 @@
                 {{ t('admin.billing.colRenews') }}
               </th>
               <td mat-cell *matCellDef="let sub">
-                {{ sub.currentPeriodEnd | date: 'mediumDate' : 'UTC' }}
+                {{ sub.currentPeriodEnd | localizedDate: 'mediumDate' : 'UTC' }}
               </td>
             </ng-container>
 
@@ -218,7 +222,9 @@
                 <dt>{{ t('admin.billing.colAmount') }}</dt>
                 <dd>{{ invoiceAmount(inv) }}</dd>
                 <dt>{{ t('admin.billing.colPeriod') }}</dt>
-                <dd>{{ inv.periodEnd | date: 'mediumDate' : 'UTC' }}</dd>
+                <dd>
+                  {{ inv.periodEnd | localizedDate: 'mediumDate' : 'UTC' }}
+                </dd>
               </dl>
               @if (canManage() && canRefund(inv)) {
                 <div class="record-card-actions">
@@ -284,7 +290,7 @@
                 {{ t('admin.billing.colPeriod') }}
               </th>
               <td mat-cell *matCellDef="let inv">
-                {{ inv.periodEnd | date: 'mediumDate' : 'UTC' }}
+                {{ inv.periodEnd | localizedDate: 'mediumDate' : 'UTC' }}
               </td>
             </ng-container>
 

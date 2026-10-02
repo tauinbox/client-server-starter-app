@@ -79,7 +79,7 @@
                 <dt>{{ t('admin.featureFlags.tableHeaderRules') }}</dt>
                 <dd>{{ flag.rules.length }}</dd>
                 <dt>{{ t('admin.featureFlags.tableHeaderUpdated') }}</dt>
-                <dd>{{ flag.updatedAt | date: 'medium' }}</dd>
+                <dd>{{ flag.updatedAt | localizedDate: 'medium' }}</dd>
               </dl>
 
               @if (canManage()) {
@@ -206,7 +206,7 @@
               {{ t('admin.featureFlags.tableHeaderUpdated') }}
             </th>
             <td mat-cell *matCellDef="let flag">
-              {{ flag.updatedAt | date: 'medium' }}
+              {{ flag.updatedAt | localizedDate: 'medium' }}
             </td>
           </ng-container>
 

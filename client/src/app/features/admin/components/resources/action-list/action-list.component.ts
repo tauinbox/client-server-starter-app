@@ -8,7 +8,7 @@ import {
   ViewContainerRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   MatCard,
   MatCardContent,
@@ -47,7 +47,7 @@ import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dia
 @Component({
   selector: 'nxs-action-list',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     MatCard,
     MatCardHeader,
     MatCardTitle,

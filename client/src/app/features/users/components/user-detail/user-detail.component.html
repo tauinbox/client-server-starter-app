@@ -79,7 +79,7 @@
             <div class="detail-item">
               <div class="detail-label">{{ t('users.detail.createdOn') }}</div>
               <div class="detail-value">
-                {{ u.createdAt | date: 'medium' }}
+                {{ u.createdAt | localizedDate: 'medium' }}
               </div>
             </div>
 
@@ -88,7 +88,7 @@
                 {{ t('users.detail.lastUpdated') }}
               </div>
               <div class="detail-value">
-                {{ user()!.updatedAt | date: 'medium' }}
+                {{ user()!.updatedAt | localizedDate: 'medium' }}
               </div>
             </div>
           </div>

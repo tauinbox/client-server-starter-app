@@ -161,6 +161,25 @@ test.describe('Billing', () => {
     await expect(page.locator('main')).not.toContainText('Core access');
   });
 
+  test('the renewal date is formatted in Russian on the Russian interface', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+    await page.evaluate(() =>
+      window.localStorage.setItem('preferred-language', 'ru')
+    );
+    await page.goto('/billing/settings');
+
+    await expect(page.locator('.renewal')).toHaveText(
+      /^\s*Продление \d{1,2} [а-я]+\.? \d{4} г\.\s*$/
+    );
+  });
+
   test('a region whose provider was turned off after the page loaded is refused with the reason', async ({
     page,
     _mockServer

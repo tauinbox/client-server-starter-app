@@ -64,7 +64,7 @@
           </dd>
 
           <dt>{{ t('users.table.columnCreated') }}</dt>
-          <dd>{{ user.createdAt | date: 'medium' }}</dd>
+          <dd>{{ user.createdAt | localizedDate: 'medium' }}</dd>
         </dl>
       </mat-card-content>
     </mat-card>

@@ -23,8 +23,8 @@ import { MatIconButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { MatChip, MatChipAvatar } from '@angular/material/chips';
 import { MatIcon } from '@angular/material/icon';
-import { DatePipe } from '@angular/common';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   isAdminRole,
   overflowRoleNames,
@@ -62,7 +62,7 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
     MatRow,
     MatHeaderRowDef,
     MatRowDef,
-    DatePipe,
+    LocalizedDatePipe,
     TranslocoDirective,
     RequirePermissionsDirective
   ],

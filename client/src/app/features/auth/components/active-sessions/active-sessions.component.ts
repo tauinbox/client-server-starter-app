@@ -9,7 +9,6 @@ import {
   output,
   signal
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import {
   MatCard,
   MatCardContent,
@@ -25,6 +24,7 @@ import type { Observable } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { ActiveSessionResponse, UserResponse } from '@app/shared/types';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '../../services/auth.service';
@@ -55,7 +55,7 @@ type StepUpFactor = 'password' | 'code' | 'provider';
 @Component({
   selector: 'nxs-active-sessions',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     MatCard,
     MatCardHeader,
     MatCardTitle,

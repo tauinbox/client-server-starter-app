@@ -14,7 +14,6 @@ import {
 } from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatChip, MatChipAvatar } from '@angular/material/chips';
@@ -26,6 +25,7 @@ import {
   roleIcon,
   sortRolesForDisplay
 } from '@shared/utils/role-display.utils';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { UsersStore } from '../../store/users.store';
 import { RequirePermissionsDirective } from '../../../auth/directives/require-permissions.directive';
 
@@ -45,7 +45,7 @@ import { RequirePermissionsDirective } from '../../../auth/directives/require-pe
     MatDivider,
     MatButton,
     MatTooltip,
-    DatePipe,
+    LocalizedDatePipe,
     RequirePermissionsDirective,
     TranslocoDirective
   ],

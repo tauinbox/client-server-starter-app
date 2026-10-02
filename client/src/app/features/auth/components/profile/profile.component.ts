@@ -27,7 +27,7 @@ import {
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
-import { DOCUMENT, DatePipe } from '@angular/common';
+import { DOCUMENT } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { AuthStore } from '../../store/auth.store';
 import { SessionStorageService } from '@core/services/session-storage.service';
@@ -65,6 +65,7 @@ import {
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   isAdminRole,
   roleIcon,
@@ -175,7 +176,7 @@ function canonicalEmail(value: string | undefined): string {
     MatProgressSpinner,
     MatButton,
     MatIcon,
-    DatePipe,
+    LocalizedDatePipe,
     PasswordToggleComponent,
     PasswordStrengthComponent,
     NxsFormFieldComponent,

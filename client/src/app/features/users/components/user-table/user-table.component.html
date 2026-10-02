@@ -90,7 +90,7 @@
         {{ t('users.table.columnCreated') }}
       </th>
       <td mat-cell *matCellDef="let user">
-        {{ user.createdAt | date: 'medium' }}
+        {{ user.createdAt | localizedDate: 'medium' }}
       </td>
     </ng-container>
 

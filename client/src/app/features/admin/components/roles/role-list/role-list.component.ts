@@ -7,7 +7,7 @@ import {
   inject
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   MatCard,
   MatCardContent,
@@ -52,7 +52,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
 @Component({
   selector: 'nxs-role-list',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     MatCard,
     MatCardHeader,
     MatCardTitle,
