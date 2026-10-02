@@ -64,6 +64,25 @@ async function disableProvider(provider: BillingProviderId): Promise<void> {
   expect(res.status).toBe(200);
 }
 
+describe('GET /billing/region available providers (server parity)', () => {
+  it('lists both providers when both are enabled', async () => {
+    const token = await login('user@example.com');
+
+    const current = await region('GET', token);
+
+    expect(current.body['availableProviders']).toEqual(['paddle', 'yookassa']);
+  });
+
+  it('drops a disabled provider from the list', async () => {
+    await disableProvider('yookassa');
+    const token = await login('user@example.com');
+
+    const current = await region('GET', token);
+
+    expect(current.body['availableProviders']).toEqual(['paddle']);
+  });
+});
+
 describe('PUT /billing/region provider availability (server parity)', () => {
   it('refuses a region whose provider is unavailable and keeps the stored region', async () => {
     await disableProvider('yookassa');

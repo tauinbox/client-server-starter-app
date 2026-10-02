@@ -152,7 +152,8 @@ describe('BillingStore', () => {
         of({
           region: 'auto',
           detectedProvider: 'paddle',
-          effectiveProvider: 'paddle'
+          effectiveProvider: 'paddle',
+          availableProviders: ['paddle', 'yookassa']
         })
       ),
       checkout: vi
@@ -184,7 +185,8 @@ describe('BillingStore', () => {
         of({
           region: 'ru',
           detectedProvider: 'paddle',
-          effectiveProvider: 'yookassa'
+          effectiveProvider: 'yookassa',
+          availableProviders: ['paddle', 'yookassa']
         })
       )
     };

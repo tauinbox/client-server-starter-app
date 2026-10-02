@@ -76,7 +76,6 @@ describe('PricingPageComponent', () => {
     loadPricing: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
     purchase: ReturnType<typeof vi.fn>;
-    setRegion: ReturnType<typeof vi.fn>;
   };
   let authMock: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
@@ -104,8 +103,7 @@ describe('PricingPageComponent', () => {
       working: signal(false),
       loadPricing: vi.fn().mockResolvedValue(undefined),
       checkout: vi.fn().mockResolvedValue(null),
-      purchase: vi.fn().mockResolvedValue(null),
-      setRegion: vi.fn().mockResolvedValue(true)
+      purchase: vi.fn().mockResolvedValue(null)
     };
     authMock = { isAuthenticated: signal(authenticated) };
     routerMock = { navigate: vi.fn() };
@@ -194,82 +192,21 @@ describe('PricingPageComponent', () => {
     ]);
   });
 
-  it('hides the region control for anonymous visitors', async () => {
-    await setup(false);
-    expect(fixture.nativeElement.querySelector('.region-control')).toBeNull();
-  });
-
-  it('shows the region control once the region is known for authed users', async () => {
+  it('shows the region control in the page header', async () => {
     await setup(true);
     storeMock.region.set({
       region: 'auto',
       detectedProvider: 'paddle',
-      effectiveProvider: 'paddle'
+      effectiveProvider: 'paddle',
+      availableProviders: ['paddle', 'yookassa']
     });
     fixture.detectChanges();
+
     expect(
-      fixture.nativeElement.querySelector('.region-control')
-    ).not.toBeNull();
-  });
-
-  function checkedRegions(): string[] {
-    const checked: HTMLElement[] = Array.from(
-      fixture.nativeElement.querySelectorAll(
-        '.region-control button[aria-checked="true"]'
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '.pricing-header .region-control'
       )
-    );
-    return checked.map((button) => button.textContent?.trim() ?? '');
-  }
-
-  function regionButton(label: string): HTMLButtonElement {
-    const buttons: HTMLButtonElement[] = Array.from(
-      fixture.nativeElement.querySelectorAll('.region-control button')
-    );
-    const button = buttons.find((b) => b.textContent?.trim() === label);
-    if (!button) throw new Error(`No region button "${label}"`);
-    return button;
-  }
-
-  it('returns the region toggle to the stored region when the change is refused', async () => {
-    await setup(true);
-    storeMock.region.set({
-      region: 'auto',
-      detectedProvider: 'paddle',
-      effectiveProvider: 'paddle'
-    });
-    storeMock.setRegion.mockResolvedValue(false);
-    fixture.detectChanges();
-
-    regionButton('Russia').click();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(storeMock.setRegion).toHaveBeenCalledWith('ru');
-    expect(checkedRegions()).toEqual(['Auto']);
-  });
-
-  it('keeps the chosen region on the toggle when the change succeeds', async () => {
-    await setup(true);
-    storeMock.region.set({
-      region: 'auto',
-      detectedProvider: 'paddle',
-      effectiveProvider: 'paddle'
-    });
-    storeMock.setRegion.mockImplementation(async () => {
-      storeMock.region.set({
-        region: 'ru',
-        detectedProvider: 'paddle',
-        effectiveProvider: 'yookassa'
-      });
-      return true;
-    });
-    fixture.detectChanges();
-
-    regionButton('Russia').click();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(checkedRegions()).toEqual(['Russia']);
+    ).not.toBeNull();
   });
 
   it('routes anonymous visitors to login on choose', async () => {

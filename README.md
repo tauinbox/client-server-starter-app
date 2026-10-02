@@ -771,9 +771,11 @@ the same permission both apply.
   Thus a short month clamps one time, and the original day returns as soon as the next month is long
   enough. For example, January 31 gives February 28, then March 31, then April 30. A trial anchors
   again to its conversion date. A provider-managed subscription takes each boundary from the provider.
-- **Billing region.** The pricing page shows an Auto, Russia and International control to an
-  authenticated user. The control sets the provider of the next checkout. The server refuses a
-  region whose provider is not available, with a 409 that tells the user why.
+- **Billing region.** The pricing page and the billing settings page show an Auto, Russia and
+  International control to an authenticated user. The control sets the provider of the next
+  checkout. It stays hidden when only one provider is available, unless the stored region resolves
+  to a provider that is not available. The server refuses a region whose provider is not
+  available, with a 409 that tells the user why.
 - **One-time purchases.** A section below the plan grid renders the `GET /api/v1/billing/products`
   catalog for an authenticated user.
 
@@ -1828,11 +1830,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2719 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2720 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 521 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 511 pass and 10 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1465 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 296 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 931 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1470 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 297 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 933 tests pass |
 
 ## CI/CD
 

@@ -6,6 +6,7 @@ import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import type {
+  BillingRegionResponse,
   CreditBalanceResponse,
   InvoiceResponse,
   PlanResponse,
@@ -16,6 +17,7 @@ import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { NotifyService } from '@core/services/notify.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
+import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { PaddleCheckoutService } from '../../services/paddle-checkout.service';
@@ -102,6 +104,7 @@ describe('BillingSettingsComponent', () => {
     usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
     credits: ReturnType<typeof signal<CreditBalanceResponse | null>>;
     plans: ReturnType<typeof signal<PlanResponse[]>>;
+    region: ReturnType<typeof signal<BillingRegionResponse | null>>;
     pageLoading: ReturnType<typeof signal<boolean>>;
     loading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
@@ -152,6 +155,7 @@ describe('BillingSettingsComponent', () => {
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
       credits: signal<CreditBalanceResponse | null>(credits ?? null),
       plans: signal<PlanResponse[]>([proPlan]),
+      region: signal<BillingRegionResponse | null>(null),
       pageLoading: signal(false),
       loading: signal(false),
       working: signal(false),
@@ -182,6 +186,7 @@ describe('BillingSettingsComponent', () => {
         provideNoopAnimations(),
         provideRouter([]),
         { provide: BillingStore, useValue: storeMock },
+        { provide: AuthStore, useValue: { isAuthenticated: signal(true) } },
         { provide: EntitlementsStore, useValue: entitlementsMock },
         { provide: AdaptiveDialogService, useValue: dialogMock },
         { provide: MatDialog, useValue: matDialogMock },
@@ -207,6 +212,23 @@ describe('BillingSettingsComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Pro');
     expect(text).toContain('$12.00');
+  });
+
+  it('shows the region control in the page header', async () => {
+    await setup(true);
+    storeMock.region.set({
+      region: 'auto',
+      detectedProvider: 'paddle',
+      effectiveProvider: 'paddle',
+      availableProviders: ['paddle', 'yookassa']
+    });
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '.settings-header .region-control'
+      )
+    ).not.toBeNull();
   });
 
   it('shows the plan device allowance and its eviction semantics', async () => {

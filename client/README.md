@@ -225,8 +225,8 @@ src/app/
 │       │                     # The parent route provides BillingStore.
 │       ├── components/
 │       │   ├── pricing-page/      # PricingPageComponent shows the plan cards, with Pro as the
-│       │   │                      # featured card. An authenticated user also gets the region
-│       │   │                      # control (Auto, Russia, International). The Choose button
+│       │   │                      # featured card. The header holds the region control. The
+│       │   │                      # Choose button
 │       │   │                      # starts the checkout. An anonymous visitor goes to /login.
 │       │   │                      # An authenticated user with a non-empty catalog also sees the
 │       │   │                      # one-time purchases section, which holds the product cards and
@@ -234,6 +234,12 @@ src/app/
 │       │   │                      # reference in sessionStorage. Then the browser goes to the
 │       │   │                      # provider. If the provider gives no URL (Paddle), the app
 │       │   │                      # goes to /billing/success?_ptxn=<transaction id>.
+│       │   ├── region-control/    # RegionControlComponent is the Auto, Russia and International
+│       │   │                      # toggle of the pricing and settings headers. It shows for an
+│       │   │                      # authenticated user when GET /billing/region lists two
+│       │   │                      # available providers, or one available provider that the
+│       │   │                      # stored region does not resolve to. A refused change returns
+│       │   │                      # the toggle to the stored region.
 │       │   ├── plan-card/         # PlanCardComponent is a presentational tier card. A featured
 │       │   │                      # card is raised, uses the accent color and shows a "Most
 │       │   │                      # popular" chip. The component emits choose.
@@ -247,8 +253,8 @@ src/app/
 │       │   │                      # against the catalog bounds. An optional note goes to the
 │       │   │                      # receipt. The pay button shows the live amount. The component
 │       │   │                      # emits donate.
-│       │   ├── billing-settings/  # BillingSettingsComponent shows the current plan and a status
-│       │   │                      # chip. It opens the change-plan dialog, which stays hidden for
+│       │   ├── billing-settings/  # BillingSettingsComponent shows the region control in the
+│       │   │                      # header, and the current plan and a status chip. It opens the change-plan dialog, which stays hidden for
 │       │   │                      # the past_due status and for a pending cancellation. The
 │       │   │                      # cancel action opens a confirmation dialog. For a metered plan
 │       │   │                      # that dialog says that the closing period is charged. The page
@@ -1094,8 +1100,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 296 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1465 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 297 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1470 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

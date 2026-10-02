@@ -2614,8 +2614,26 @@ describe('BillingUserService', () => {
       expect(region).toEqual({
         region: 'auto',
         detectedProvider: 'yookassa',
-        effectiveProvider: 'yookassa'
+        effectiveProvider: 'yookassa',
+        availableProviders: ['paddle', 'yookassa']
       });
+    });
+
+    it('lists only the providers that a checkout can use now', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'US',
+        providerOverride: null
+      });
+      ctx.billing.isProviderAvailable.mockImplementation(
+        (id: BillingProviderId) => Promise.resolve(id === 'paddle')
+      );
+
+      const region = await ctx.service.getRegion('user-1');
+
+      expect(region.availableProviders).toEqual(['paddle']);
     });
 
     it('persists the override when no conflicting subscription exists', async () => {
@@ -2640,6 +2658,7 @@ describe('BillingUserService', () => {
       expect(ctx.customers.save).not.toHaveBeenCalled();
       expect(region.region).toBe('ru');
       expect(region.effectiveProvider).toBe('yookassa');
+      expect(region.availableProviders).toEqual(['paddle', 'yookassa']);
     });
 
     it('rejects a region change that would orphan a live subscription on another provider', async () => {

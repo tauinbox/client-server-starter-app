@@ -42,6 +42,7 @@ import type {
 } from '../change-plan-dialog/change-plan-dialog.component';
 import { ChangePlanDialogComponent } from '../change-plan-dialog/change-plan-dialog.component';
 import { CreditsCardComponent } from '../credits-card/credits-card.component';
+import { RegionControlComponent } from '../region-control/region-control.component';
 import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
 
 @Component({
@@ -57,6 +58,7 @@ import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
     TranslocoDirective,
     InfiniteScrollDirective,
     CreditsCardComponent,
+    RegionControlComponent,
     UsageMeterComponent
   ],
   templateUrl: './billing-settings.component.html',

@@ -1,0 +1,27 @@
+@use '../../../../../styles/abstracts/functions' as func;
+@use '../../../../../styles/abstracts/variables' as vars;
+
+// No box of its own: a hidden control must not take a gap in the page header.
+:host {
+  display: contents;
+}
+
+.region-control {
+  display: flex;
+  flex-direction: column;
+  gap: vars.$spacing-xs;
+
+  .region-label {
+    display: inline-flex;
+    gap: vars.$spacing-xxs;
+    align-items: center;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+
+    mat-icon {
+      width: func.rem(18);
+      height: func.rem(18);
+      font-size: func.rem(18);
+    }
+  }
+}

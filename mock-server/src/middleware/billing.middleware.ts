@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   BillingProviderId,
   BillingRegion,
+  BillingRegionResponse,
   EntitlementLimitKey,
   EntitlementsResponse,
   PlanResponse,
@@ -210,8 +211,24 @@ function regionForOverride(override: BillingProviderId | null): BillingRegion {
   return 'auto';
 }
 
-function effectiveProvider(customer: MockCustomer): BillingProviderId {
+function effectiveProvider(
+  customer: Pick<MockCustomer, 'providerOverride' | 'country'>
+): BillingProviderId {
   return customer.providerOverride ?? geoDefault(customer.country);
+}
+
+// Mirrors BillingUserService.regionView: the body of GET and PUT /region.
+function regionView(
+  customer: Pick<MockCustomer, 'providerOverride' | 'country'>
+): BillingRegionResponse {
+  return {
+    region: regionForOverride(customer.providerOverride),
+    detectedProvider: geoDefault(customer.country),
+    effectiveProvider: effectiveProvider(customer),
+    availableProviders: BILLING_PROVIDER_FLAGS.map(
+      ({ provider }) => provider
+    ).filter(isProviderAvailable)
+  };
 }
 
 function findCustomer(userId: string): MockCustomer | undefined {
@@ -1122,20 +1139,11 @@ billingRouter.get('/region', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
   if (customer) {
-    res.json({
-      region: regionForOverride(customer.providerOverride),
-      detectedProvider: geoDefault(customer.country),
-      effectiveProvider: effectiveProvider(customer)
-    });
+    res.json(regionView(customer));
     return;
   }
   const { country } = geoFromLocale(user.locale);
-  const detected = geoDefault(country);
-  res.json({
-    region: 'auto',
-    detectedProvider: detected,
-    effectiveProvider: detected
-  });
+  res.json(regionView({ providerOverride: null, country }));
 });
 
 // PUT /billing/region — set the region for the next checkout.
@@ -1177,11 +1185,7 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
 
   customer.providerOverride = newOverride;
   customer.updatedAt = new Date().toISOString();
-  res.json({
-    region: regionForOverride(customer.providerOverride),
-    detectedProvider: geoDefault(customer.country),
-    effectiveProvider: effectiveProvider(customer)
-  });
+  res.json(regionView(customer));
 });
 
 // GET /billing/premium-content — worked example of @RequireEntitlement('reports').

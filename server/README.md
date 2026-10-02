@@ -565,7 +565,8 @@ are:
   payment-method-change checkout. YooKassa does a zero-amount re-bind, and its webhook changes the
   default method. A `past_due` subscription can use this route, because it is how dunning recovers.
 - `GET region` and `PUT region` read and write the `auto`, `ru` or `world` override. The write has an
-  active-subscription guard, as in section 19 of the billing design.
+  active-subscription guard, as in section 19 of the billing design. Both responses carry
+  `availableProviders`: the providers that `BillingService.isProviderAvailable` accepts now.
 - `GET products` returns the one-time catalog. It holds each active product that carries a price for
   the effective provider, that is a fixed-price `sku` or `credits` entry, and a `custom` entry whose
   price holds the donation bounds. The route resolves the provider without the availability
