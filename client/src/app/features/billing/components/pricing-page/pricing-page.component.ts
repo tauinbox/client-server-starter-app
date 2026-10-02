@@ -16,6 +16,7 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { PADDLE_TRANSACTION_PARAM } from '../../services/paddle-checkout.service';
 import { BillingStore } from '../../store/billing.store';
+import { catalogText } from '../../utils/catalog-text';
 import {
   formatMoney,
   planPriceFor,
@@ -181,7 +182,12 @@ export class PricingPageComponent implements OnInit {
     void this.#purchase(
       { productKey: item.product.key },
       {
-        productName: item.product.name,
+        productName: catalogText(
+          this.#transloco,
+          'products',
+          item.product,
+          'name'
+        ),
         amountMinor: price?.amountMinor ?? 0,
         currency: price?.currency ?? 'USD'
       }
@@ -197,7 +203,7 @@ export class PricingPageComponent implements OnInit {
         description: submit.note
       },
       {
-        productName: product.name,
+        productName: catalogText(this.#transloco, 'products', product, 'name'),
         amountMinor: submit.amountMinor,
         currency: price?.currency ?? 'USD'
       }

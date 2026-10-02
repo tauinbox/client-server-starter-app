@@ -26,6 +26,7 @@ import type {
   SubscriptionResponse
 } from '@app/shared/types';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
+import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 import { BillingService } from '../../services/billing.service';
 import { formatMoney, planPriceFor } from '../../utils/billing-format';
 
@@ -75,7 +76,8 @@ const PLUS = '+ ';
     MatButtonToggleModule,
     MatIcon,
     MatProgressSpinner,
-    TranslocoDirective
+    TranslocoDirective,
+    CatalogTextPipe
   ],
   templateUrl: './change-plan-dialog.component.html',
   styleUrl: './change-plan-dialog.component.scss',
@@ -107,8 +109,6 @@ export class ChangePlanDialogComponent {
 
   protected readonly isTrial = this.data.subscription.status === 'trialing';
   protected readonly periodEnd = this.data.subscription.currentPeriodEnd;
-  protected readonly currentPlanName =
-    this.data.currentPlan?.name ?? this.data.subscription.planKey;
 
   /** Valid switch targets for the picked mode, priced for the sub's provider. */
   protected readonly options = computed<PlanOption[]>(() => {
@@ -140,10 +140,9 @@ export class ChangePlanDialogComponent {
       });
   });
 
-  protected readonly selectedPlanName = computed(() => {
+  protected readonly selectedPlan = computed(() => {
     const key = this.selectedKey();
-    if (!key) return null;
-    return this.data.plans.find((plan) => plan.key === key)?.name ?? key;
+    return this.data.plans.find((plan) => plan.key === key) ?? null;
   });
 
   /**

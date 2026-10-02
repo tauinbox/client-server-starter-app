@@ -9,9 +9,13 @@
         <mat-icon>volunteer_activism</mat-icon>
       </span>
       <div>
-        <h3 class="donation-name">{{ product().name }}</h3>
+        <h3 class="donation-name">
+          {{ product() | catalogText: 'products' : 'name' }}
+        </h3>
         @if (product().description) {
-          <p class="donation-description">{{ product().description }}</p>
+          <p class="donation-description">
+            {{ product() | catalogText: 'products' : 'description' }}
+          </p>
         }
       </div>
     </header>

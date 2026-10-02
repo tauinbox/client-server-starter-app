@@ -22,6 +22,7 @@ import {
   PaddleCheckoutService,
   paddleTransactionId
 } from '../../services/paddle-checkout.service';
+import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 import { BillingStore } from '../../store/billing.store';
 import { formatMoney } from '../../utils/billing-format';
 import {
@@ -48,7 +49,8 @@ const POLL_INTERVAL_MS = 1500;
     MatButton,
     MatIcon,
     MatProgressSpinner,
-    TranslocoDirective
+    TranslocoDirective,
+    CatalogTextPipe
   ],
   templateUrl: './checkout-return.component.html',
   styleUrl: './checkout-return.component.scss',
@@ -84,9 +86,6 @@ export class CheckoutReturnComponent implements OnInit {
     initialValue: this.#transloco.getActiveLang()
   });
 
-  protected readonly planName = computed(
-    () => this.store.currentPlan()?.name ?? ''
-  );
   protected readonly periodEnd = computed(
     () => this.store.subscription()?.currentPeriodEnd ?? null
   );

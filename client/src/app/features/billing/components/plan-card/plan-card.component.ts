@@ -9,6 +9,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective } from '@jsverse/transloco';
 import type { PlanResponse } from '@app/shared/types';
+import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 
 /**
  * Presentational pricing-tier card. The recommended tier is
@@ -17,7 +18,14 @@ import type { PlanResponse } from '@app/shared/types';
  */
 @Component({
   selector: 'nxs-plan-card',
-  imports: [MatCard, MatCardContent, MatButton, MatIcon, TranslocoDirective],
+  imports: [
+    MatCard,
+    MatCardContent,
+    MatButton,
+    MatIcon,
+    TranslocoDirective,
+    CatalogTextPipe
+  ],
   templateUrl: './plan-card.component.html',
   styleUrl: './plan-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

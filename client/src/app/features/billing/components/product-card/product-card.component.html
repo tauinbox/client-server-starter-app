@@ -10,9 +10,13 @@
     </span>
 
     <div class="product-info">
-      <h3 class="product-name">{{ product().name }}</h3>
+      <h3 class="product-name">
+        {{ product() | catalogText: 'products' : 'name' }}
+      </h3>
       @if (product().description) {
-        <p class="product-description">{{ product().description }}</p>
+        <p class="product-description">
+          {{ product() | catalogText: 'products' : 'description' }}
+        </p>
       }
       @if (grantEntitlement(); as entitlement) {
         <p class="product-grant">

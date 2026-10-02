@@ -17,7 +17,9 @@
 
           @if (store.hasActiveSubscription() && store.currentPlan(); as plan) {
             <div class="plan-line">
-              <span class="plan-name">{{ plan.name }}</span>
+              <span class="plan-name">{{
+                plan | catalogText: 'plans' : 'name'
+              }}</span>
               <span
                 class="status-chip"
                 [class]="statusClass(store.subscription()!.status)"

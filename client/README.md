@@ -335,7 +335,11 @@ src/app/
 │       ├── guards/         # billingAvailableGuard waits for the flag load. It permits access
 │       │                   # when the `billing` flag is true. If not, it goes to the home page.
 │       │                   # It does not require authentication, thus the pricing page is public.
-│       └── utils/          # billing-format holds formatMoney (minor units to an Intl currency),
+│       ├── pipes/          # CatalogTextPipe is the template form of catalogText (see utils/).
+│       └── utils/          # catalog-text translates the name or the description of a plan or a
+│                           # product by the key billing.catalog.<plans|products>.<key>.<field>.
+│                           # Without a translation it returns the database text.
+│                           # billing-format holds formatMoney (minor units to an Intl currency),
 │                           # formatUnits (locale-grouped credit units that keep the sign),
 │                           # resolveDisplayProvider (a heuristic on the region or the language),
 │                           # planPriceFor, productPriceFor and parseAmountToMinor.

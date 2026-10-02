@@ -1,12 +1,17 @@
 <ng-container *transloco="let t; scope: 'billing'">
+  @let currentPlanName =
+    data.currentPlan
+      ? (data.currentPlan | catalogText: 'plans' : 'name')
+      : data.subscription.planKey;
+  @let selectedPlanName = selectedPlan() | catalogText: 'plans' : 'name';
   <h2 mat-dialog-title>{{ t('billing.changePlan.title') }}</h2>
 
   <mat-dialog-content>
     <p class="plan-transition">
       <span class="plan-pill">{{ currentPlanName }}</span>
       <mat-icon aria-hidden="true">arrow_forward</mat-icon>
-      <span class="plan-pill to" [class.placeholder]="!selectedPlanName()">
-        {{ selectedPlanName() ?? t('billing.changePlan.pickTarget') }}
+      <span class="plan-pill to" [class.placeholder]="!selectedPlanName">
+        {{ selectedPlanName || t('billing.changePlan.pickTarget') }}
       </span>
     </p>
 
@@ -43,9 +48,13 @@
           (click)="select(option.key)"
         >
           <span class="option-main">
-            <span class="option-name">{{ option.name }}</span>
+            <span class="option-name">{{
+              option | catalogText: 'plans' : 'name'
+            }}</span>
             @if (option.description) {
-              <span class="option-description">{{ option.description }}</span>
+              <span class="option-description">{{
+                option | catalogText: 'plans' : 'description'
+              }}</span>
             }
           </span>
           <span class="option-price">
@@ -86,7 +95,7 @@
               <dt>
                 {{
                   t('billing.changePlan.chargeUntil', {
-                    plan: selectedPlanName(),
+                    plan: selectedPlanName,
                     date: periodEnd | date: 'mediumDate' : 'UTC'
                   })
                 }}
