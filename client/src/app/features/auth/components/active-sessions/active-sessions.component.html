@@ -70,14 +70,14 @@
               <p class="sessions-meta">
                 {{
                   t('auth.sessions.startedAt', {
-                    date: session.startedAt | date: 'medium'
+                    date: session.startedAt | localizedDate: 'medium'
                   })
                 }}
               </p>
               <p class="sessions-meta">
                 {{
                   t('auth.sessions.lastActiveAt', {
-                    date: session.lastActiveAt | date: 'medium'
+                    date: session.lastActiveAt | localizedDate: 'medium'
                   })
                 }}
               </p>

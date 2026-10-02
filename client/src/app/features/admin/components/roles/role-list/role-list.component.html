@@ -60,7 +60,7 @@
               {{ t('admin.roles.tableHeaderCreated') }}
             </th>
             <td mat-cell *matCellDef="let role">
-              {{ role.createdAt | date: 'medium' }}
+              {{ role.createdAt | localizedDate: 'medium' }}
             </td>
           </ng-container>
 

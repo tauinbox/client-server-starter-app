@@ -36,7 +36,7 @@
                     t('billing.settings.cancelsOn', {
                       date:
                         store.subscription()!.currentPeriodEnd
-                        | date: 'mediumDate' : 'UTC'
+                        | localizedDate: 'mediumDate' : 'UTC'
                     })
                   }}
                 </span>
@@ -46,7 +46,7 @@
                     t('billing.settings.renewsOn', {
                       date:
                         store.subscription()!.currentPeriodEnd
-                        | date: 'mediumDate' : 'UTC'
+                        | localizedDate: 'mediumDate' : 'UTC'
                     })
                   }}
                 </span>
@@ -159,7 +159,7 @@
                 <div class="invoice-card-row">
                   <span>{{
                     invoice.paidAt ?? invoice.createdAt
-                      | date: 'mediumDate' : 'UTC'
+                      | localizedDate: 'mediumDate' : 'UTC'
                   }}</span>
                   <span class="amount">{{ invoiceAmount(invoice) }}</span>
                 </div>
@@ -200,7 +200,7 @@
                   <td>
                     {{
                       invoice.paidAt ?? invoice.createdAt
-                        | date: 'mediumDate' : 'UTC'
+                        | localizedDate: 'mediumDate' : 'UTC'
                     }}
                   </td>
                   <td>

@@ -5,11 +5,11 @@ import {
   inject,
   input
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { UsageSummaryResponse } from '@app/shared/types';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { formatMoney, formatUnits } from '../../utils/billing-format';
 
 /**
@@ -20,7 +20,7 @@ import { formatMoney, formatUnits } from '../../utils/billing-format';
  */
 @Component({
   selector: 'nxs-usage-meter',
-  imports: [DatePipe, MatCard, MatCardContent, TranslocoDirective],
+  imports: [LocalizedDatePipe, MatCard, MatCardContent, TranslocoDirective],
   templateUrl: './usage-meter.component.html',
   styleUrl: './usage-meter.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

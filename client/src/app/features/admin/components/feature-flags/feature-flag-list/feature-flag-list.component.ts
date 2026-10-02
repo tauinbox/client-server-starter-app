@@ -8,7 +8,7 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import type { HttpErrorResponse } from '@angular/common/http';
 import {
   MatCard,
@@ -57,7 +57,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
 @Component({
   selector: 'nxs-feature-flag-list',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     MatCard,
     MatCardHeader,
     MatCardTitle,

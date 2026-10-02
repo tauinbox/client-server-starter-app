@@ -6,7 +6,7 @@ import {
   DestroyRef,
   inject
 } from '@angular/core';
-import { DatePipe, SlicePipe } from '@angular/common';
+import { SlicePipe } from '@angular/common';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   MatCard,
@@ -39,6 +39,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { formatMoney } from '@features/billing/utils/billing-format';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingInvoicesStore } from '../../store/billing-invoices.store';
 import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.store';
@@ -53,7 +54,7 @@ import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.sto
 @Component({
   selector: 'nxs-billing-admin-list',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     SlicePipe,
     MatCard,
     MatCardHeader,

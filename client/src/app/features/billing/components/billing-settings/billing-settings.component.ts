@@ -6,7 +6,7 @@ import {
   DestroyRef,
   inject
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { MatCard, MatCardContent } from '@angular/material/card';
@@ -49,7 +49,7 @@ import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
 @Component({
   selector: 'nxs-billing-settings',
   imports: [
-    DatePipe,
+    LocalizedDatePipe,
     RouterLink,
     MatCard,
     MatCardContent,

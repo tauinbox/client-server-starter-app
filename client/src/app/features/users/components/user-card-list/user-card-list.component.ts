@@ -22,8 +22,8 @@ import {
 } from '@angular/material/menu';
 import { MatTooltip } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
 import { TranslocoDirective } from '@jsverse/transloco';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   isAdminRole,
   roleIcon,
@@ -50,7 +50,7 @@ import type { User } from '../../models/user.types';
     MatMenuTrigger,
     MatTooltip,
     RouterLink,
-    DatePipe,
+    LocalizedDatePipe,
     TranslocoDirective,
     RequirePermissionsDirective
   ],
