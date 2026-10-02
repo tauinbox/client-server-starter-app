@@ -15,7 +15,8 @@ export default defineConfig({
   reporter: process.env['CI'] ? [['dot'], ['html', { open: 'never' }]] : 'html',
   use: {
     baseURL,
-    trace: 'on-first-retry',
+    // Local runs have no retry, so keep the trace of every failure.
+    trace: process.env['CI'] ? 'on-first-retry' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
     actionTimeout: 10_000
