@@ -1536,7 +1536,7 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
 | GET | `/users/cursor` | `users:search` | List the users with cursor (keyset) pagination. `includeDeleted=true` adds the soft-deleted rows |
-| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
+| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |

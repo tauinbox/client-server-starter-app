@@ -127,6 +127,10 @@ export class UserService {
       next = next.set('role', criteria.role);
     }
 
+    if (criteria.ids?.length) {
+      next = next.set('ids', criteria.ids.join(','));
+    }
+
     if (criteria.isActive !== undefined) {
       next = next.set('isActive', criteria.isActive.toString());
     }

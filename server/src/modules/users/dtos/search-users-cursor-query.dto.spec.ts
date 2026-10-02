@@ -1,5 +1,5 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import { MAX_PAGE_SIZE, MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
 import { SearchUsersCursorQueryDto } from './search-users-cursor-query.dto';
 
 // The DTO pulls its filters from UserFiltersQueryDto through IntersectionType,
@@ -104,6 +104,57 @@ describe('SearchUsersCursorQueryDto filters', () => {
       expect(result[field]).toBeUndefined();
     }
   );
+
+  describe('ids', () => {
+    const uuid = (n: number) =>
+      `00000000-0000-4000-8000-${n.toString().padStart(12, '0')}`;
+
+    it('splits a comma-separated list', async () => {
+      await expect(
+        validate({ ids: `${uuid(1)},${uuid(2)}` })
+      ).resolves.toMatchObject({ ids: [uuid(1), uuid(2)] });
+    });
+
+    it(`accepts ${MAX_PAGE_SIZE} ids`, async () => {
+      const ids = Array.from({ length: MAX_PAGE_SIZE }, (_, i) => uuid(i));
+
+      const result = await validate({ ids: ids.join(',') });
+
+      expect(result['ids']).toEqual(ids);
+    });
+
+    it(`rejects ${MAX_PAGE_SIZE + 1} ids`, async () => {
+      const ids = Array.from({ length: MAX_PAGE_SIZE + 1 }, (_, i) => uuid(i));
+
+      const message = await expectMessage({ ids: ids.join(',') });
+
+      expect(message).toBe(
+        `ids must contain no more than ${MAX_PAGE_SIZE} elements`
+      );
+    });
+
+    it('rejects a value that is not a UUID', async () => {
+      const message = await expectMessage({ ids: `${uuid(1)},nope` });
+
+      expect(message).toBe('each value in ids must be a UUID');
+    });
+
+    it('reports the UUID check before the size when both fail', async () => {
+      const ids = Array.from({ length: MAX_PAGE_SIZE + 1 }, () => 'nope');
+
+      const message = await expectMessage({ ids: ids.join(',') });
+
+      expect(message).toBe(
+        `each value in ids must be a UUID ids must contain no more than ${MAX_PAGE_SIZE} elements`
+      );
+    });
+
+    it('rejects an empty value instead of dropping the filter', async () => {
+      const message = await expectMessage({ ids: '' });
+
+      expect(message).toBe('each value in ids must be a UUID');
+    });
+  });
 
   it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
     'rejects an array-valued %s',

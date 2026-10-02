@@ -147,9 +147,14 @@ export class UsersService {
       firstName?: string;
       lastName?: string;
       role?: string;
+      ids?: string[];
       isActive?: boolean;
     }
   ): void {
+    if (filters.ids) {
+      qb.andWhere('user.id IN (:...ids)', { ids: filters.ids });
+    }
+
     if (filters.q) {
       const pattern = `%${escapeLikePattern(filters.q)}%`;
       qb.andWhere(

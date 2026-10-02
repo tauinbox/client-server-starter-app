@@ -18,6 +18,7 @@ export type UserSearch = Pick<
 > & {
   q?: string;
   role?: string;
+  ids?: string[];
   includeDeleted?: boolean;
 };
 

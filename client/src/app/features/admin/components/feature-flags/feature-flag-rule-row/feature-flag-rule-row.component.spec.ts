@@ -5,6 +5,11 @@ import type { MatSelect } from '@angular/material/select';
 import { By } from '@angular/platform-browser';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideHttpClient } from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting
+} from '@angular/common/http/testing';
 import { config, of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
@@ -63,19 +68,19 @@ const roleCatalogStub = {
 
 const userServiceStub: {
   searchCursor: ReturnType<typeof vi.fn>;
-  getById: ReturnType<typeof vi.fn>;
 } = {
   searchCursor: vi.fn(() =>
     of({ data: [] as User[], meta: { nextCursor: null as string | null } })
-  ),
-  getById: vi.fn(() => of(null))
+  )
 };
 
 describe('FeatureFlagRuleRowComponent', () => {
   beforeEach(async () => {
     roleCatalogStub.getAll.mockClear();
-    userServiceStub.searchCursor.mockClear();
-    userServiceStub.getById.mockClear();
+    userServiceStub.searchCursor.mockReset();
+    userServiceStub.searchCursor.mockImplementation(() =>
+      of({ data: [] as User[], meta: { nextCursor: null as string | null } })
+    );
     await TestBed.configureTestingModule({
       imports: [HostComponent, TranslocoTestingModuleWithLangs],
       providers: [
@@ -271,14 +276,27 @@ describe('FeatureFlagRuleRowComponent', () => {
     });
   });
 
-  it('preloads user labels via getById when opening a user-rule with existing IDs', () => {
-    userServiceStub.getById.mockImplementation((id: string) =>
-      of({
-        id,
-        firstName: 'Alice',
-        lastName: 'Adams',
-        email: `alice+${id}@example.com`
-      } as Partial<User>)
+  function pageOf(users: Partial<User>[]) {
+    return of({ data: users, meta: { nextCursor: null, hasMore: false } });
+  }
+
+  function preloadCalls(): unknown[][] {
+    return userServiceStub.searchCursor.mock.calls.filter(
+      ([criteria]) => (criteria as { ids?: string[] }).ids !== undefined
+    );
+  }
+
+  it('preloads user labels with one id search when opening a user-rule', () => {
+    userServiceStub.searchCursor.mockImplementation(
+      (criteria: { ids: string[] }) =>
+        pageOf(
+          criteria.ids.map((id) => ({
+            id,
+            firstName: 'Alice',
+            lastName: 'Adams',
+            email: `alice+${id}@example.com`
+          }))
+        )
     );
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
@@ -287,9 +305,12 @@ describe('FeatureFlagRuleRowComponent', () => {
       payload: { type: 'user', userIds: ['uuid-1', 'uuid-2'] }
     });
     fixture.detectChanges();
-    expect(userServiceStub.getById).toHaveBeenCalledTimes(2);
-    expect(userServiceStub.getById).toHaveBeenCalledWith('uuid-1');
-    expect(userServiceStub.getById).toHaveBeenCalledWith('uuid-2');
+    expect(preloadCalls()).toEqual([
+      [
+        { ids: ['uuid-1', 'uuid-2'], includeDeleted: true },
+        { limit: 2, sortBy: 'createdAt', sortOrder: 'desc' }
+      ]
+    ]);
 
     const chipLabels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
@@ -306,10 +327,10 @@ describe('FeatureFlagRuleRowComponent', () => {
       payload: { type: 'role', roleNames: ['admin'] }
     });
     fixture.detectChanges();
-    expect(userServiceStub.getById).not.toHaveBeenCalled();
+    expect(preloadCalls()).toEqual([]);
   });
 
-  it('skips getById when payload.userIds is empty', () => {
+  it('skips the id search when payload.userIds is empty', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
@@ -317,19 +338,19 @@ describe('FeatureFlagRuleRowComponent', () => {
       payload: { type: 'user', userIds: [] }
     });
     fixture.detectChanges();
-    expect(userServiceStub.getById).not.toHaveBeenCalled();
+    expect(preloadCalls()).toEqual([]);
   });
 
-  it('falls back to UUID label when getById fails for an unknown user', () => {
-    userServiceStub.getById.mockImplementation((id: string) =>
-      id === 'uuid-known'
-        ? of({
-            id,
-            firstName: 'Carol',
-            lastName: 'Clark',
-            email: 'carol@example.com'
-          } as Partial<User>)
-        : throwError(() => new Error('not found'))
+  it('falls back to the UUID label for an id the search does not return', () => {
+    userServiceStub.searchCursor.mockImplementation(() =>
+      pageOf([
+        {
+          id: 'uuid-known',
+          firstName: 'Carol',
+          lastName: 'Clark',
+          email: 'carol@example.com'
+        }
+      ])
     );
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
@@ -337,12 +358,29 @@ describe('FeatureFlagRuleRowComponent', () => {
       type: 'user',
       payload: { type: 'user', userIds: ['uuid-known', 'uuid-missing'] }
     });
-    expect(() => fixture.detectChanges()).not.toThrow();
+    fixture.detectChanges();
     const chipLabels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
     ).map((el) => el.textContent?.trim());
     expect(chipLabels.some((t) => t?.includes('Carol Clark'))).toBe(true);
     expect(chipLabels.some((t) => t?.includes('uuid-missing'))).toBe(true);
+  });
+
+  it('keeps the raw UUID labels when the id search fails', () => {
+    userServiceStub.searchCursor.mockImplementation(() =>
+      throwError(() => new Error('rate limited'))
+    );
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'user',
+      payload: { type: 'user', userIds: ['uuid-1'] }
+    });
+    expect(() => fixture.detectChanges()).not.toThrow();
+    const chipLabels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
+    ).map((el) => el.textContent?.trim());
+    expect(chipLabels.some((t) => t?.includes('uuid-1'))).toBe(true);
   });
 
   it('user chip change writes UUIDs (not labels) into payload.userIds', () => {
@@ -1072,5 +1110,56 @@ describe('FeatureFlagRuleRowComponent', () => {
       expect(el).not.toBeNull();
       expect(el!.textContent?.trim()).toBe('Pick a date.');
     });
+  });
+});
+
+describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
+  it('labels a 130-id rule with 2 id searches and no per-user lookup', async () => {
+    await TestBed.configureTestingModule({
+      imports: [HostComponent, TranslocoTestingModuleWithLangs],
+      providers: [
+        provideNoopAnimations(),
+        provideNativeDateAdapter(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: RoleCatalogService, useValue: roleCatalogStub }
+      ]
+    }).compileComponents();
+    const http = TestBed.inject(HttpTestingController);
+    const userIds = Array.from(
+      { length: 130 },
+      (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`
+    );
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'user',
+      payload: { type: 'user', userIds }
+    });
+
+    fixture.detectChanges();
+
+    const searches = http.match((req) =>
+      req.url.endsWith('/users/search/cursor')
+    );
+    expect(searches.map((req) => req.request.params.get('limit'))).toEqual([
+      '100',
+      '30'
+    ]);
+    expect(
+      searches.flatMap((req) => req.request.params.get('ids')?.split(','))
+    ).toEqual(userIds);
+    expect(
+      searches.every(
+        (req) => req.request.params.get('includeDeleted') === 'true'
+      )
+    ).toBe(true);
+    expect(http.match((req) => /\/users\/[^/]+$/.test(req.url))).toHaveLength(
+      0
+    );
+    for (const req of searches) {
+      req.flush({ data: [], meta: { nextCursor: null, hasMore: false } });
+    }
+    http.verify();
   });
 });

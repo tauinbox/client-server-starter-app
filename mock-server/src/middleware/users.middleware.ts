@@ -1,8 +1,10 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import {
   ALLOWED_USER_SORT_COLUMNS,
   ErrorKeys,
   MAX_NAME_LENGTH,
+  MAX_PAGE_SIZE,
   MAX_USER_FILTER_LENGTH,
   STEP_UP_OPERATION,
   TOTP_DIGITS
@@ -10,6 +12,7 @@ import {
 import { normalizeEmail } from '@app/shared/utils/email';
 import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
+  BODY_UUID_PATTERN,
   emailErrors,
   passwordLengthError,
   validateLocale,
@@ -49,7 +52,7 @@ import {
   stepUpError
 } from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
-import type { AuthenticatedRequest } from '../types';
+import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
 import {
   requireUuid,
@@ -77,7 +80,33 @@ const STRING_FILTER_PARAMS = ['q', 'email', 'firstName', 'lastName', 'role'];
 const BOOLEAN_FILTER_PARAMS = ['isActive', 'includeDeleted'];
 
 /** Filters the user list routes carry on top of the shared paging params. */
-const USER_QUERY_KEYS = [...STRING_FILTER_PARAMS, ...BOOLEAN_FILTER_PARAMS];
+const USER_QUERY_KEYS = [
+  ...STRING_FILTER_PARAMS,
+  ...BOOLEAN_FILTER_PARAMS,
+  'ids'
+];
+
+/** Mirrors the DTO's `ids` @Transform: a comma-separated string is split. */
+function parseIds(value: unknown): unknown {
+  return typeof value === 'string' ? value.split(',') : value;
+}
+
+/** Mirrors `@IsArray`, `@IsUUID('all', { each: true })`, `@ArrayMaxSize`. */
+function idsErrors(value: unknown): string[] {
+  if (value === undefined) return [];
+  const ids = parseIds(value);
+  if (!Array.isArray(ids)) return ['ids must be an array'];
+  const errors: string[] = [];
+  if (
+    !ids.every((id) => typeof id === 'string' && BODY_UUID_PATTERN.test(id))
+  ) {
+    errors.push('each value in ids must be a UUID');
+  }
+  if (ids.length > MAX_PAGE_SIZE) {
+    errors.push(`ids must contain no more than ${MAX_PAGE_SIZE} elements`);
+  }
+  return errors;
+}
 
 /** Mirrors the DTO's boolean @Transform: an empty param reads as unset. */
 function parseOptionalBoolean(value: unknown): boolean | undefined {
@@ -120,7 +149,75 @@ function userQueryErrors(query: Record<string, unknown>): string[] {
     extraAllowed: USER_QUERY_KEYS,
     sortColumns: ALLOWED_USER_SORT_COLUMNS
   });
-  return filterError ? [filterError, ...pagingErrors] : pagingErrors;
+  return [
+    ...(filterError ? [filterError] : []),
+    ...idsErrors(query['ids']),
+    ...pagingErrors
+  ];
+}
+
+/**
+ * Both list routes share one DTO and one query on the server, so both apply
+ * every filter. Call it only after `userQueryErrors` returned none.
+ */
+function filterUsers(query: Record<string, unknown>): MockUser[] {
+  const { q, email, firstName, lastName, role, isActive } = query;
+  const includeDeleted = String(query['includeDeleted']) === 'true';
+  let users = Array.from(getState().users.values());
+
+  if (!includeDeleted) {
+    users = users.filter((u) => !u.deletedAt);
+  }
+
+  const ids = parseIds(query['ids']);
+  if (Array.isArray(ids)) {
+    const wanted = new Set(ids.map((id) => String(id).toLowerCase()));
+    users = users.filter((u) => wanted.has(u.id.toLowerCase()));
+  }
+
+  if (q) {
+    const qStr = String(q).toLowerCase();
+    users = users.filter(
+      (u) =>
+        u.email.toLowerCase().includes(qStr) ||
+        u.firstName.toLowerCase().includes(qStr) ||
+        u.lastName.toLowerCase().includes(qStr) ||
+        u.id.toLowerCase().includes(qStr)
+    );
+  }
+  if (email) {
+    const emailStr = String(email).toLowerCase();
+    users = users.filter((u) => u.email.toLowerCase().includes(emailStr));
+  }
+  if (firstName) {
+    const fnStr = String(firstName).toLowerCase();
+    users = users.filter((u) => u.firstName.toLowerCase().includes(fnStr));
+  }
+  if (lastName) {
+    const lnStr = String(lastName).toLowerCase();
+    users = users.filter((u) => u.lastName.toLowerCase().includes(lnStr));
+  }
+  if (role) {
+    const roleStr = String(role);
+    users = users.filter((u) => u.roles.includes(roleStr));
+  }
+  const activeBool = parseOptionalBoolean(isActive);
+  if (activeBool !== undefined) {
+    users = users.filter((u) => u.isActive === activeBool);
+  }
+
+  return users;
+}
+
+function listUsers(req: Request, res: Response): void {
+  const query = req.query as Record<string, unknown>;
+  const queryErrors = userQueryErrors(query);
+  if (queryErrors.length > 0) {
+    res.status(400).json(validationError(queryErrors));
+    return;
+  }
+  const users = filterUsers(query).map(toAdminUserResponse);
+  res.json(cursorPaginate(users, parseCursorQuery(query)));
 }
 
 const router = Router();
@@ -164,74 +261,10 @@ router.post('/', permissionGuard('create', 'User'), (req, res) => {
 });
 
 // GET /api/v1/users/cursor
-router.get('/cursor', permissionGuard('search', 'User'), (req, res) => {
-  const queryErrors = userQueryErrors(req.query as Record<string, unknown>);
-  if (queryErrors.length > 0) {
-    res.status(400).json(validationError(queryErrors));
-    return;
-  }
-  const includeDeleted = String(req.query['includeDeleted']) === 'true';
-  let allUsers = Array.from(getState().users.values());
-  if (!includeDeleted) {
-    allUsers = allUsers.filter((u) => !u.deletedAt);
-  }
-  const users = allUsers.map(toAdminUserResponse);
-  const params = parseCursorQuery(req.query as Record<string, unknown>);
-  const result = cursorPaginate(users, params);
-  res.json(result);
-});
+router.get('/cursor', permissionGuard('search', 'User'), listUsers);
 
 // GET /api/v1/users/search/cursor
-router.get('/search/cursor', permissionGuard('search', 'User'), (req, res) => {
-  const queryErrors = userQueryErrors(req.query as Record<string, unknown>);
-  if (queryErrors.length > 0) {
-    res.status(400).json(validationError(queryErrors));
-    return;
-  }
-  const { q, email, firstName, lastName, role, isActive } = req.query;
-  const includeDeleted = String(req.query['includeDeleted']) === 'true';
-  let users = Array.from(getState().users.values());
-
-  if (!includeDeleted) {
-    users = users.filter((u) => !u.deletedAt);
-  }
-
-  if (q) {
-    const qStr = String(q).toLowerCase();
-    users = users.filter(
-      (u) =>
-        u.email.toLowerCase().includes(qStr) ||
-        u.firstName.toLowerCase().includes(qStr) ||
-        u.lastName.toLowerCase().includes(qStr) ||
-        u.id.toLowerCase().includes(qStr)
-    );
-  }
-  if (email) {
-    const emailStr = String(email).toLowerCase();
-    users = users.filter((u) => u.email.toLowerCase().includes(emailStr));
-  }
-  if (firstName) {
-    const fnStr = String(firstName).toLowerCase();
-    users = users.filter((u) => u.firstName.toLowerCase().includes(fnStr));
-  }
-  if (lastName) {
-    const lnStr = String(lastName).toLowerCase();
-    users = users.filter((u) => u.lastName.toLowerCase().includes(lnStr));
-  }
-  if (role) {
-    const roleStr = String(role);
-    users = users.filter((u) => u.roles.includes(roleStr));
-  }
-  const activeBool = parseOptionalBoolean(isActive);
-  if (activeBool !== undefined) {
-    users = users.filter((u) => u.isActive === activeBool);
-  }
-
-  const userResponses = users.map(toAdminUserResponse);
-  const params = parseCursorQuery(req.query as Record<string, unknown>);
-  const result = cursorPaginate(userResponses, params);
-  res.json(result);
-});
+router.get('/search/cursor', permissionGuard('search', 'User'), listUsers);
 
 // GET /api/v1/users/:id
 router.get(
