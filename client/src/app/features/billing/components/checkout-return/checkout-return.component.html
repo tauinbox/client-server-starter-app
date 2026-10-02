@@ -72,7 +72,11 @@
               >check_circle</mat-icon
             >
             <h1>
-              {{ t('billing.checkout.successTitle', { plan: planName() }) }}
+              {{
+                t('billing.checkout.successTitle', {
+                  plan: store.currentPlan() | catalogText: 'plans' : 'name'
+                })
+              }}
             </h1>
             @if (periodEnd()) {
               <p>

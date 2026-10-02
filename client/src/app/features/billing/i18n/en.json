@@ -36,6 +36,48 @@
     "data-export": "Data export",
     "priority-support": "Priority support"
   },
+  "catalog": {
+    "plans": {
+      "free": {
+        "name": "Free",
+        "description": "Core access at no cost"
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "For growing teams"
+      },
+      "business": {
+        "name": "Business",
+        "description": "More concurrent devices and priority support"
+      },
+      "usage": {
+        "name": "Pay as you go",
+        "description": "Pay only for what you use"
+      }
+    },
+    "products": {
+      "report-pack": {
+        "name": "Report pack",
+        "description": "30 days of reports access without a subscription"
+      },
+      "donation": {
+        "name": "Donation",
+        "description": "Support the project with any amount"
+      },
+      "credits-500": {
+        "name": "500 credits",
+        "description": "500 prepaid usage units"
+      },
+      "credits-1000": {
+        "name": "1000 credits",
+        "description": "1000 prepaid usage units at a better rate"
+      },
+      "credits-5000": {
+        "name": "5000 credits",
+        "description": "5000 prepaid usage units at the best rate"
+      }
+    }
+  },
   "status": {
     "incomplete": "Incomplete",
     "trialing": "Trial",

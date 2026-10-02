@@ -139,6 +139,28 @@ test.describe('Billing', () => {
     ).toBe(1);
   });
 
+  test('plan and product cards are translated on the Russian interface', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.evaluate(() =>
+      window.localStorage.setItem('preferred-language', 'ru')
+    );
+    await page.goto('/billing');
+
+    await expect(
+      page.locator('nxs-plan-card', { hasText: 'Бесплатный' })
+    ).toContainText('Базовый доступ без оплаты');
+    await expect(
+      page.locator('nxs-product-card', { hasText: 'Пакет отчётов' })
+    ).toContainText('30 дней доступа к отчётам без подписки');
+    await expect(
+      page.locator('nxs-donation-card', { hasText: 'Пожертвование' })
+    ).toContainText('Поддержите проект любой суммой');
+    await expect(page.locator('main')).not.toContainText('Core access');
+  });
+
   test('a region whose provider was turned off after the page loaded is refused with the reason', async ({
     page,
     _mockServer

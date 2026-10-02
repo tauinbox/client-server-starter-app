@@ -27,6 +27,7 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import {
   dropPaddleTransactionId,
@@ -59,7 +60,8 @@ import { UsageMeterComponent } from '../usage-meter/usage-meter.component';
     InfiniteScrollDirective,
     CreditsCardComponent,
     RegionControlComponent,
-    UsageMeterComponent
+    UsageMeterComponent,
+    CatalogTextPipe
   ],
   templateUrl: './billing-settings.component.html',
   styleUrl: './billing-settings.component.scss',

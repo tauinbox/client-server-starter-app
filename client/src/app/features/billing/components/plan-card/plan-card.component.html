@@ -14,7 +14,7 @@
   }
 
   <mat-card-content class="plan-body">
-    <h2 class="plan-name">{{ plan().name }}</h2>
+    <h2 class="plan-name">{{ plan() | catalogText: 'plans' : 'name' }}</h2>
 
     <p class="plan-price">
       <span class="amount">{{ price() }}</span>
@@ -22,7 +22,9 @@
     </p>
 
     @if (plan().description) {
-      <p class="plan-description">{{ plan().description }}</p>
+      <p class="plan-description">
+        {{ plan() | catalogText: 'plans' : 'description' }}
+      </p>
     }
 
     <ul class="plan-features">

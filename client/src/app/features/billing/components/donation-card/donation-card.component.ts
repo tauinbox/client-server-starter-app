@@ -17,6 +17,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { BillingProviderId, ProductResponse } from '@app/shared/types';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 import {
   formatMoney,
   parseAmountToMinor,
@@ -53,7 +54,8 @@ type DonationFormData = {
     MatButtonToggleModule,
     MatIcon,
     NxsFormFieldComponent,
-    TranslocoDirective
+    TranslocoDirective,
+    CatalogTextPipe
   ],
   templateUrl: './donation-card.component.html',
   styleUrl: './donation-card.component.scss',

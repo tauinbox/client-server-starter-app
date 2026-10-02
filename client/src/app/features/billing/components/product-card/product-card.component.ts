@@ -10,6 +10,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective } from '@jsverse/transloco';
 import type { ProductResponse } from '@app/shared/types';
+import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 
 /**
  * Presentational one-time product card: a fixed-price
@@ -20,7 +21,14 @@ import type { ProductResponse } from '@app/shared/types';
  */
 @Component({
   selector: 'nxs-product-card',
-  imports: [MatCard, MatCardContent, MatButton, MatIcon, TranslocoDirective],
+  imports: [
+    MatCard,
+    MatCardContent,
+    MatButton,
+    MatIcon,
+    TranslocoDirective,
+    CatalogTextPipe
+  ],
   templateUrl: './product-card.component.html',
   styleUrl: './product-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
