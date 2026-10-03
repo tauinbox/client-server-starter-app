@@ -9,11 +9,12 @@ export interface AttributeResolverUser {
 
 /**
  * Resolves a value for a single attribute key given the current user and request.
+ * The request is null when a service evaluates a flag outside an HTTP request.
  * Returning `undefined` means "no value to contribute".
  */
 export type AttributeResolver = (
   user: AttributeResolverUser | null,
-  req: Request
+  req: Request | null
 ) => unknown;
 
 const BUILT_IN_RESOLVERS: Record<string, AttributeResolver> = {
@@ -78,7 +79,7 @@ export class AttributeRegistryService {
 
   resolveAll(
     user: AttributeResolverUser | null,
-    req: Request
+    req: Request | null
   ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const [key, resolver] of this.resolvers.entries()) {

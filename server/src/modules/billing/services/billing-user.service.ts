@@ -1378,12 +1378,12 @@ export class BillingUserService {
 
   async getRegion(userId: string): Promise<BillingRegionResponse> {
     const customer = await this.customerFor(userId);
-    if (customer) return this.regionView(customer);
+    if (customer) return this.regionView(userId, customer);
 
     // No customer yet: report the geo default derived from the registration
     // locale; nothing is persisted until the first checkout / region change.
     const country = await this.detectCountry(userId);
-    return this.regionView({ providerOverride: null, country });
+    return this.regionView(userId, { providerOverride: null, country });
   }
 
   async setRegion(
@@ -1397,7 +1397,7 @@ export class BillingUserService {
 
     // Checked before the subscription guard: telling the user to cancel for a
     // region that checkout would then refuse leaves them with nothing.
-    if (!(await this.billing.isProviderAvailable(newEffective))) {
+    if (!(await this.billing.isProviderAvailable(newEffective, userId))) {
       throw new ConflictException({
         message: 'Payments are not available in this billing region.',
         errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE
@@ -1431,15 +1431,16 @@ export class BillingUserService {
     const updated =
       (await this.customers.findOne({ where: { id: customer.id } })) ??
       Object.assign(customer, { providerOverride: newOverride });
-    return this.regionView(updated);
+    return this.regionView(userId, updated);
   }
 
   private async regionView(
+    userId: string,
     customer: Pick<Customer, 'providerOverride' | 'country'>
   ): Promise<BillingRegionResponse> {
     const availability = await Promise.all(
       BILLING_PROVIDER_FLAGS.map(({ provider }) =>
-        this.billing.isProviderAvailable(provider)
+        this.billing.isProviderAvailable(provider, userId)
       )
     );
     return {

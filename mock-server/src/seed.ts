@@ -621,7 +621,24 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
       },
       createdAt: now,
       updatedAt: now
-    }
+    },
+    ...BILLING_PROVIDER_FLAGS.map(
+      ({ enabledFlagKey, configuredAttribute }) => ({
+        id: mockId(`rule-${enabledFlagKey}-configured`),
+        flagId: mockId(`flag-${enabledFlagKey}`),
+        type: 'attribute' as const,
+        effect: 'include' as const,
+        payload: {
+          type: 'attribute' as const,
+          field: 'custom' as const,
+          op: 'eq' as const,
+          value: true,
+          customKey: configuredAttribute
+        },
+        createdAt: now,
+        updatedAt: now
+      })
+    )
   ];
 }
 

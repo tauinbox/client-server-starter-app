@@ -135,6 +135,31 @@ describe('FeatureFlagResolverService', () => {
     });
   });
 
+  it('isEnabledForUserId applies environments and rules, and is false for a missing flag', async () => {
+    seedFlags([
+      { id: 'f1', key: 'other-env', enabled: true, environments: ['staging'] },
+      { id: 'f2', key: 'role-gated', enabled: true },
+      { id: 'f3', key: 'on', enabled: true }
+    ]);
+    ruleRepo.find.mockResolvedValue([
+      {
+        id: 'r1',
+        flagId: 'f2',
+        type: 'role',
+        effect: 'include',
+        payload: { type: 'role', roleNames: ['beta'] },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ]);
+
+    expect(await service.isEnabledForUserId('u1', 'other-env')).toBe(false);
+    expect(await service.isEnabledForUserId('u1', 'role-gated')).toBe(false);
+    expect(await service.isEnabledForUserId('u1', 'on')).toBe(true);
+    expect(await service.isEnabledForUserId('u1', 'missing')).toBe(false);
+    expect(usersService.findOne).toHaveBeenCalledWith('u1');
+  });
+
   it('returns evaluated booleans for an authenticated user', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true, public: false }]);
     const result = await service.evaluateForUser(

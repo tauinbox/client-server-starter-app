@@ -132,7 +132,7 @@ export class FeatureFlagResolverService {
    */
   async evaluateForUser(
     user: ResolverUser,
-    req: Request
+    req: Request | null
   ): Promise<EvaluatedFeatureFlagsResponse> {
     const version = await this.getVersion();
     const cacheKey = `featureflags:user:${user.userId}:v${version}`;
@@ -171,11 +171,20 @@ export class FeatureFlagResolverService {
 
   async isEnabledForUser(
     user: ResolverUser,
-    req: Request,
+    req: Request | null,
     key: string
   ): Promise<boolean> {
     const evaluated = await this.evaluateForUser(user, req);
     return evaluated.flags[key] === true;
+  }
+
+  /**
+   * Full evaluation of one flag for a user, for a service that has no request.
+   * A missing flag is `false`, so a gate built on it fails closed.
+   */
+  async isEnabledForUserId(userId: string, key: string): Promise<boolean> {
+    const user = await this.buildResolverUser(userId);
+    return this.isEnabledForUser(user, null, key);
   }
 
   /**
@@ -257,7 +266,7 @@ export class FeatureFlagResolverService {
   private buildContext(
     user: ResolverUser | null,
     anonId: string | null,
-    req: Request
+    req: Request | null
   ): FeatureFlagEvaluationContext {
     const env = this.env();
     const attributes = this.attributeRegistry.resolveAll(

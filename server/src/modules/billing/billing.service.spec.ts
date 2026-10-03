@@ -3,18 +3,20 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
 import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
-import { FeatureFlagService } from '../feature-flags/services/feature-flag.service';
+import { FeatureFlagResolverService } from '../feature-flags/services/feature-flag-resolver.service';
 import { BILLING_PROVIDERS } from './providers/payment-provider.interface';
 import type { Customer } from './entities/customer.entity';
 
 const paddle = { id: 'paddle' };
 const yookassa = { id: 'yookassa' };
 
-type Args = Pick<Customer, 'providerOverride' | 'country'>;
+type Args = Pick<Customer, 'providerOverride' | 'country' | 'userId'>;
+
+const USER_ID = 'user-1';
 
 describe('BillingService.resolveProvider', () => {
   let service: BillingService;
-  let featureFlags: { findByKey: jest.Mock };
+  let featureFlags: { isEnabledForUserId: jest.Mock };
   let billingConfig: { isConfigured: jest.Mock };
 
   // Default kill-switch state: both provider flags enabled. Per-test overrides
@@ -26,10 +28,8 @@ describe('BillingService.resolveProvider', () => {
 
   beforeEach(async () => {
     featureFlags = {
-      findByKey: jest.fn((key: string) =>
-        Promise.resolve(
-          key in enabledByKey ? { key, enabled: enabledByKey[key] } : null
-        )
+      isEnabledForUserId: jest.fn((_userId: string, key: string) =>
+        Promise.resolve(enabledByKey[key] ?? false)
       )
     };
     billingConfig = { isConfigured: jest.fn().mockReturnValue(true) };
@@ -38,7 +38,7 @@ describe('BillingService.resolveProvider', () => {
       providers: [
         BillingService,
         { provide: BILLING_PROVIDERS, useValue: [paddle, yookassa] },
-        { provide: FeatureFlagService, useValue: featureFlags },
+        { provide: FeatureFlagResolverService, useValue: featureFlags },
         { provide: BillingConfigService, useValue: billingConfig }
       ]
     }).compile();
@@ -49,6 +49,7 @@ describe('BillingService.resolveProvider', () => {
   const args = (over: Partial<Args> = {}): Args => ({
     providerOverride: null,
     country: 'US',
+    userId: USER_ID,
     ...over
   });
 
@@ -70,11 +71,9 @@ describe('BillingService.resolveProvider', () => {
   });
 
   it('throws 503 when the resolved provider is disabled', async () => {
-    featureFlags.findByKey.mockImplementation((key: string) =>
-      Promise.resolve({
-        key,
-        enabled: key !== 'billing-paddle'
-      })
+    featureFlags.isEnabledForUserId.mockImplementation(
+      (_userId: string, key: string) =>
+        Promise.resolve(key !== 'billing-paddle')
     );
     const refusal = service.resolveProvider(args({ country: 'US' }));
 
@@ -96,7 +95,7 @@ describe('BillingService.resolveProvider', () => {
       providers: [
         BillingService,
         { provide: BILLING_PROVIDERS, useValue: [yookassa] },
-        { provide: FeatureFlagService, useValue: featureFlags },
+        { provide: FeatureFlagResolverService, useValue: featureFlags },
         { provide: BillingConfigService, useValue: billingConfig }
       ]
     }).compile();
@@ -110,22 +109,18 @@ describe('BillingService.resolveProvider', () => {
     });
   });
 
-  it('treats an absent kill-switch flag as disabled (fail closed)', async () => {
-    featureFlags.findByKey.mockResolvedValue(null);
-    await expect(
-      service.resolveProvider(args({ country: 'US' }))
-    ).rejects.toThrow(ServiceUnavailableException);
-  });
-
-  it('looks up only the resolved provider flag, not the whole flag set', async () => {
+  it('evaluates only the resolved provider flag, for the customer user', async () => {
     await service.resolveProvider(args({ country: 'US' }));
-    expect(featureFlags.findByKey).toHaveBeenCalledTimes(1);
-    expect(featureFlags.findByKey).toHaveBeenCalledWith('billing-paddle');
+    expect(featureFlags.isEnabledForUserId).toHaveBeenCalledTimes(1);
+    expect(featureFlags.isEnabledForUserId).toHaveBeenCalledWith(
+      USER_ID,
+      'billing-paddle'
+    );
   });
 });
 
 describe('BillingService.isProviderAvailable', () => {
-  let featureFlags: { findByKey: jest.Mock };
+  let featureFlags: { isEnabledForUserId: jest.Mock };
   let billingConfig: { isConfigured: jest.Mock };
 
   const build = async (registered = [paddle, yookassa]) => {
@@ -133,7 +128,7 @@ describe('BillingService.isProviderAvailable', () => {
       providers: [
         BillingService,
         { provide: BILLING_PROVIDERS, useValue: registered },
-        { provide: FeatureFlagService, useValue: featureFlags },
+        { provide: FeatureFlagResolverService, useValue: featureFlags },
         { provide: BillingConfigService, useValue: billingConfig }
       ]
     }).compile();
@@ -142,28 +137,28 @@ describe('BillingService.isProviderAvailable', () => {
 
   beforeEach(() => {
     featureFlags = {
-      findByKey: jest.fn((key: string) =>
-        Promise.resolve({ key, enabled: true })
-      )
+      isEnabledForUserId: jest.fn().mockResolvedValue(true)
     };
     billingConfig = { isConfigured: jest.fn().mockReturnValue(true) };
   });
 
   it('is true for an enabled, configured and registered provider', async () => {
     const service = await build();
-    await expect(service.isProviderAvailable('paddle')).resolves.toBe(true);
+    await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
+      true
+    );
+    expect(featureFlags.isEnabledForUserId).toHaveBeenCalledWith(
+      USER_ID,
+      'billing-paddle'
+    );
   });
 
-  it('is false when the kill-switch flag is disabled', async () => {
-    featureFlags.findByKey.mockResolvedValue({ enabled: false });
+  it('is false when the kill-switch flag evaluates to false', async () => {
+    featureFlags.isEnabledForUserId.mockResolvedValue(false);
     const service = await build();
-    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
-  });
-
-  it('is false when the kill-switch flag is absent', async () => {
-    featureFlags.findByKey.mockResolvedValue(null);
-    const service = await build();
-    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
+    await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
+      false
+    );
   });
 
   it('is false when the provider is not configured', async () => {
@@ -171,13 +166,19 @@ describe('BillingService.isProviderAvailable', () => {
       (id: string) => id !== 'paddle'
     );
     const service = await build();
-    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
-    await expect(service.isProviderAvailable('yookassa')).resolves.toBe(true);
+    await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
+      false
+    );
+    await expect(
+      service.isProviderAvailable('yookassa', USER_ID)
+    ).resolves.toBe(true);
   });
 
   it('is false when the provider is not registered', async () => {
     const service = await build([yookassa]);
-    await expect(service.isProviderAvailable('paddle')).resolves.toBe(false);
+    await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
+      false
+    );
   });
 });
 
@@ -187,7 +188,10 @@ describe('BillingService.getProviderById', () => {
       providers: [
         BillingService,
         { provide: BILLING_PROVIDERS, useValue: registered },
-        { provide: FeatureFlagService, useValue: { findByKey: jest.fn() } },
+        {
+          provide: FeatureFlagResolverService,
+          useValue: { isEnabledForUserId: jest.fn() }
+        },
         { provide: BillingConfigService, useValue: { isConfigured: jest.fn() } }
       ]
     }).compile();
