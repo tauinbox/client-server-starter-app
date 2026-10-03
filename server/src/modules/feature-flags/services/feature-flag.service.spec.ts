@@ -503,7 +503,9 @@ describe('FeatureFlagService', () => {
         })
       ).rejects.toMatchObject({
         status: 400,
-        response: { message: 'user rule requires userIds: string[]' }
+        response: {
+          message: 'user rule requires userIds: an array of up to 100 UUIDs'
+        }
       });
     });
 

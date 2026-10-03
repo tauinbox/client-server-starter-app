@@ -3,11 +3,15 @@ import {
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
   FEATURE_FLAG_BUCKET_BY,
+  FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
   type FeatureFlagAttributeField,
   type FeatureFlagAttributeOp,
   type FeatureFlagBucketBy,
   type FeatureFlagRuleType
 } from '../constants/feature-flag.constants';
+import { MAX_PAGE_SIZE } from '../constants/pagination.constants';
+import { ROLE_NAME_MAX_LENGTH } from '../constants/permission.constants';
+import { BODY_UUID_PATTERN } from '../constants/uuid.constants';
 import type { FeatureFlagRulePayload } from '../types/feature-flag.types';
 import { attributeValueError } from './feature-flag-attribute-value';
 
@@ -20,9 +24,21 @@ const fail = (message: string): FeatureFlagRulePayloadResult => ({
   message
 });
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+function isBoundedArray<T>(
+  value: unknown,
+  maxItems: number,
+  isItem: (item: unknown) => item is T
+): value is T[] {
+  return (
+    Array.isArray(value) && value.length <= maxItems && value.every(isItem)
+  );
 }
+
+const isUserId = (v: unknown): v is string =>
+  typeof v === 'string' && BODY_UUID_PATTERN.test(v);
+
+const isRoleName = (v: unknown): v is string =>
+  typeof v === 'string' && v.length > 0 && v.length <= ROLE_NAME_MAX_LENGTH;
 
 export function parseFeatureFlagRulePayload(
   type: FeatureFlagRuleType,
@@ -43,27 +59,38 @@ export function parseFeatureFlagRulePayload(
   switch (type) {
     case 'user': {
       const userIds = p['userIds'];
-      if (!isStringArray(userIds)) {
-        return fail('user rule requires userIds: string[]');
+      if (!isBoundedArray(userIds, MAX_PAGE_SIZE, isUserId)) {
+        return fail(
+          `user rule requires userIds: an array of up to ${MAX_PAGE_SIZE} UUIDs`
+        );
       }
       return { ok: true, payload: { type: 'user', userIds } };
     }
     case 'role': {
       const roleNames = p['roleNames'];
-      if (!isStringArray(roleNames)) {
-        return fail('role rule requires roleNames: string[]');
+      if (
+        !isBoundedArray(
+          roleNames,
+          FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
+          isRoleName
+        )
+      ) {
+        return fail(
+          `role rule requires roleNames: an array of up to ${FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS} names of 1-${ROLE_NAME_MAX_LENGTH} characters`
+        );
       }
       return { ok: true, payload: { type: 'role', roleNames } };
     }
     case 'percentage': {
       const percent = p['percent'];
+      // The bucket is an integer 0-99, so a fraction rounds the share up.
       if (
         typeof percent !== 'number' ||
-        !Number.isFinite(percent) ||
+        !Number.isInteger(percent) ||
         percent < 0 ||
         percent > 100
       ) {
-        return fail('percentage rule requires percent: number in [0, 100]');
+        return fail('percentage rule requires percent: an integer in [0, 100]');
       }
       const bucketBy = p['bucketBy'];
       if (

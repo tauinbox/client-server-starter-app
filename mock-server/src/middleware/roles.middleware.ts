@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { ALLOWED_ROLE_SORT_COLUMNS, ErrorKeys } from '@app/shared/constants';
+import {
+  ALLOWED_ROLE_SORT_COLUMNS,
+  ErrorKeys,
+  ROLE_NAME_MAX_LENGTH
+} from '@app/shared/constants';
 import {
   cursorPaginate,
   cursorQueryErrors,
@@ -47,7 +51,7 @@ const router = Router();
 
 type RoleName = { ok: true; name: string } | { ok: false; error: string };
 
-// CreateRoleDto pairs @Transform(trim) with @IsNotEmpty/@IsString/@MaxLength(100),
+// CreateRoleDto pairs @Transform(trim) with @IsNotEmpty/@IsString/@MaxLength,
 // and UpdateRoleDto inherits them without the null escape hatch.
 function normalizeRoleName(value: unknown): RoleName {
   if (typeof value !== 'string') {
@@ -57,7 +61,7 @@ function normalizeRoleName(value: unknown): RoleName {
   if (name.length === 0) {
     return { ok: false, error: 'name should not be empty' };
   }
-  const maxErr = validateMaxLength(name, 100, 'name');
+  const maxErr = validateMaxLength(name, ROLE_NAME_MAX_LENGTH, 'name');
   return maxErr ? { ok: false, error: maxErr } : { ok: true, name };
 }
 

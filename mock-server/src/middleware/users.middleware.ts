@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
   ALLOWED_USER_SORT_COLUMNS,
+  BODY_UUID_PATTERN,
   ErrorKeys,
   MAX_NAME_LENGTH,
   MAX_PAGE_SIZE,
@@ -12,7 +13,6 @@ import {
 import { normalizeEmail } from '@app/shared/utils/email';
 import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
-  BODY_UUID_PATTERN,
   emailErrors,
   passwordLengthError,
   validateLocale,

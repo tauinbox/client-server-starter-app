@@ -52,7 +52,13 @@ export {
   type UserSortColumn
 } from './user.constants';
 
-export { SYSTEM_ROLES, type SystemRole } from './permission.constants';
+export {
+  SYSTEM_ROLES,
+  ROLE_NAME_MAX_LENGTH,
+  type SystemRole
+} from './permission.constants';
+
+export { BODY_UUID_PATTERN } from './uuid.constants';
 
 export {
   SUPPORTED_LOCALES,
@@ -96,6 +102,7 @@ export {
   FEATURE_FLAG_KEY_PATTERN,
   FEATURE_FLAG_KEY_MIN_LENGTH,
   FEATURE_FLAG_KEY_MAX_LENGTH,
+  FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
   type FeatureFlagRuleType,
   type FeatureFlagRuleEffect,
   type FeatureFlagBucketBy,

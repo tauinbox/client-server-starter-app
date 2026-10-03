@@ -1,6 +1,7 @@
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { ROLE_NAME_MAX_LENGTH } from '@app/shared/constants';
 
 export class CreateRoleDto {
   @ApiProperty({
@@ -12,7 +13,7 @@ export class CreateRoleDto {
   )
   @IsNotEmpty()
   @IsString()
-  @MaxLength(100)
+  @MaxLength(ROLE_NAME_MAX_LENGTH)
   name: string;
 
   @ApiPropertyOptional({

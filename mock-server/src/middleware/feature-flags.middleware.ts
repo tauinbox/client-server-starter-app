@@ -23,9 +23,11 @@ import {
   FEATURE_FLAG_KEY_MAX_LENGTH,
   FEATURE_FLAG_KEY_MIN_LENGTH,
   FEATURE_FLAG_KEY_PATTERN,
+  FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
   OAUTH_PROVIDER_FLAGS,
+  ROLE_NAME_MAX_LENGTH,
   normalizeEnvironmentList,
   type FeatureFlagRuleEffect,
   type FeatureFlagRuleType
@@ -800,8 +802,8 @@ function previewContextErrors(body: Record<string, unknown>): string[] {
     ...unknownPropertyErrors(body, PREVIEW_BODY_KEYS),
     ...uuidErrors('userId', body['userId'], 'nullable'),
     ...stringArrayErrors('roles', body['roles'], {
-      maxItems: 32,
-      maxItemLength: 64,
+      maxItems: FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
+      maxItemLength: ROLE_NAME_MAX_LENGTH,
       optional: 'nullable'
     }),
     ...objectErrors('attributes', body['attributes'], 'nullable'),

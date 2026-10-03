@@ -650,6 +650,39 @@ describe('Feature flags end-to-end', () => {
     });
   });
 
+  it.each<[string, FeatureFlagRulePayload, string]>([
+    [
+      'a fractional percent',
+      { type: 'percentage', percent: 0.5 },
+      'percentage rule requires percent: an integer in [0, 100]'
+    ],
+    [
+      'a non-UUID user id',
+      { type: 'user', userIds: ['not-a-uuid', ''] },
+      'user rule requires userIds: an array of up to 100 UUIDs'
+    ],
+    [
+      'a role name over the cap',
+      { type: 'role', roleNames: ['x'.repeat(20000)] },
+      'role rule requires roleNames: an array of up to 32 names of 1-100 characters'
+    ]
+  ])('rejects a rule with %s', async (_label, payload, message) => {
+    const flag = await flagService.create(
+      { key: `bad-payload-${payload.type}`, enabled: true },
+      'actor-1'
+    );
+    await expect(
+      flagService.replaceRules(
+        flag.id,
+        [{ type: payload.type, effect: 'include', payload }],
+        'actor-1'
+      )
+    ).rejects.toMatchObject({ status: 400, message });
+    await expect(flagService.findOne(flag.id)).resolves.toMatchObject({
+      rules: []
+    });
+  });
+
   it('a createdAt after rule matches in the preview and in the real evaluation', async () => {
     const createdAt = new Date('2026-03-01T12:00:00.000Z');
     const dayBefore = new Date(createdAt.getTime() - 24 * 60 * 60 * 1000);
