@@ -51,8 +51,10 @@ import type {
   MockPaymentMethod,
   MockPlan,
   MockSubscription,
-  MockUsageRecord
+  MockUsageRecord,
+  MockUser
 } from '../types';
+import { isFlagEnabledForUser } from './feature-flags.middleware';
 import {
   requireUuid,
   validationError
@@ -156,23 +158,25 @@ function managesLifecycle(provider: BillingProviderId): boolean {
 }
 
 // Mirrors BillingService.isProviderAvailable. Every provider is configured and
-// registered here, so only the admin kill-switch flag decides.
-function isProviderAvailable(provider: BillingProviderId): boolean {
+// registered here, so only the admin kill-switch flag, evaluated in full for
+// the user, decides.
+function isProviderAvailable(
+  provider: BillingProviderId,
+  user: MockUser
+): boolean {
   const flagKey = BILLING_PROVIDER_FLAGS.find(
     (p) => p.provider === provider
   )?.enabledFlagKey;
-  for (const flag of getState().featureFlags.values()) {
-    if (flag.key === flagKey) return flag.enabled;
-  }
-  return false;
+  return flagKey !== undefined && isFlagEnabledForUser(user, flagKey);
 }
 
 // Mirrors the 503 of BillingService.resolveProvider at checkout and purchase.
 function rejectUnavailableProvider(
   res: Response,
-  provider: BillingProviderId
+  provider: BillingProviderId,
+  user: MockUser
 ): boolean {
-  if (isProviderAvailable(provider)) return false;
+  if (isProviderAvailable(provider, user)) return false;
   res.status(503).json({
     message: `Billing provider "${provider}" is not available`,
     errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE,
@@ -219,6 +223,7 @@ function effectiveProvider(
 
 // Mirrors BillingUserService.regionView: the body of GET and PUT /region.
 function regionView(
+  user: MockUser,
   customer: Pick<MockCustomer, 'providerOverride' | 'country'>
 ): BillingRegionResponse {
   return {
@@ -227,7 +232,7 @@ function regionView(
     effectiveProvider: effectiveProvider(customer),
     availableProviders: BILLING_PROVIDER_FLAGS.map(
       ({ provider }) => provider
-    ).filter(isProviderAvailable)
+    ).filter((provider) => isProviderAvailable(provider, user))
   };
 }
 
@@ -612,7 +617,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
 
   const customer = getOrCreateCustomer(user.id, user.locale);
   const provider = effectiveProvider(customer);
-  if (rejectUnavailableProvider(res, provider)) return;
+  if (rejectUnavailableProvider(res, provider, user)) return;
   const price = product.prices[provider];
   if (!price) {
     res.status(409).json({
@@ -737,7 +742,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   }
 
   const provider = effectiveProvider(customer);
-  if (rejectUnavailableProvider(res, provider)) return;
+  if (rejectUnavailableProvider(res, provider, user)) return;
 
   // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
   // stack a second open subscription (the server enforces this with a partial
@@ -1139,11 +1144,11 @@ billingRouter.get('/region', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
   if (customer) {
-    res.json(regionView(customer));
+    res.json(regionView(user, customer));
     return;
   }
   const { country } = geoFromLocale(user.locale);
-  res.json(regionView({ providerOverride: null, country }));
+  res.json(regionView(user, { providerOverride: null, country }));
 });
 
 // PUT /billing/region — set the region for the next checkout.
@@ -1163,7 +1168,7 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
   const newOverride = overrideForRegion(region as BillingRegion);
   const newEffective = newOverride ?? geoDefault(customer.country);
 
-  if (!isProviderAvailable(newEffective)) {
+  if (!isProviderAvailable(newEffective, user)) {
     res.status(409).json({
       message: 'Payments are not available in this billing region.',
       errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE,
@@ -1185,7 +1190,7 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
 
   customer.providerOverride = newOverride;
   customer.updatedAt = new Date().toISOString();
-  res.json(regionView(customer));
+  res.json(regionView(user, customer));
 });
 
 // GET /billing/premium-content — worked example of @RequireEntitlement('reports').

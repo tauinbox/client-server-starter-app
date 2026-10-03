@@ -497,6 +497,12 @@ function evaluateAll(
   return { flags: result, evaluatedAt: nowIso() };
 }
 
+// Mirrors FeatureFlagResolverService.isEnabledForUserId: the full evaluation
+// with no rollout id; a missing flag is false.
+export function isFlagEnabledForUser(user: MockUser, key: string): boolean {
+  return evaluateAll(userContext(user, null), false).flags[key] === true;
+}
+
 // ── Public router ──────────────────────────────────────────────────────────
 const publicRouter = Router();
 

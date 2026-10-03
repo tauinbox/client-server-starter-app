@@ -2701,7 +2701,10 @@ describe('BillingUserService', () => {
       await expect(refusal).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE }
       });
-      expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith('paddle');
+      expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith(
+        'paddle',
+        'user-1'
+      );
       expect(ctx.subscriptions.findOne).not.toHaveBeenCalled();
       expect(ctx.customers.update).not.toHaveBeenCalled();
     });
@@ -2719,7 +2722,10 @@ describe('BillingUserService', () => {
       await expect(ctx.service.setRegion('user-1', 'auto')).rejects.toThrow(
         ConflictException
       );
-      expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith('yookassa');
+      expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith(
+        'yookassa',
+        'user-1'
+      );
       expect(ctx.customers.update).not.toHaveBeenCalled();
     });
 

@@ -542,7 +542,9 @@ The module imports `EntitlementsModule` and re-exports it. Thus an importer cont
 
 **Geo-router (`billing.service.ts`).** `resolveProvider()` computes
 `providerOverride ?? geoDefault(country)`. It answers 503 when the provider is disabled or not
-configured. The file also holds the `geoDefaultFor()`, `effectiveProviderId()` and
+configured. "Disabled" is the full evaluation of the kill-switch flag for the user of the customer
+(`FeatureFlagResolverService.isEnabledForUserId`), so the environments and the rules of the flag
+apply. The file also holds the `geoDefaultFor()`, `effectiveProviderId()` and
 `getProviderById()` helpers. `getProviderById()` answers 503 for a provider that is not registered,
 so a refund or a cancel cannot skip the provider call.
 
@@ -1058,7 +1060,8 @@ which come from the environment.
 **Registrars.** `BillingConfiguredAttributesRegistrar` registers the `paddleConfigured`,
 `yookassaConfigured` and combined `billingConfigured` feature-flag attributes. The public `billing`
 flag gates the UI on the configuration. The per-provider `billing-paddle` / `billing-yookassa` administrator
-kill switches gate the geo-router.
+kill switches gate the geo-router. Each one carries an `attribute / custom / eq true` rule on its
+`<provider>Configured` attribute (seeder, and migration `1785600000000` for existing rows).
 
 #### entitlements
 

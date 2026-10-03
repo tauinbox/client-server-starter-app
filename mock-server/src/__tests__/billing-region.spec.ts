@@ -3,7 +3,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
 import { readErrorBody } from '../utils/error-body';
 
@@ -179,5 +179,42 @@ describe('checkout and purchase on an unavailable provider (server parity)', () 
 
     expect(res.status).toBe(503);
     expect(res.body).toEqual(unavailable);
+  });
+
+  function narrowPaddleKillSwitch(environments: string[]): void {
+    for (const flag of getState().featureFlags.values()) {
+      if (flag.key === 'billing-paddle') {
+        flag.enabled = true;
+        flag.environments = environments;
+      }
+    }
+  }
+
+  it('answers 503 when the enabled kill switch targets another environment', async () => {
+    narrowPaddleKillSwitch(['e2e-no-such-environment']);
+    const token = await login('user@example.com');
+
+    const res = await post('/billing/checkout', token, { planKey: 'pro' });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual(unavailable);
+    const current = await region('GET', token);
+    expect(current.body['availableProviders']).toEqual(['yookassa']);
+  });
+
+  it('accepts checkout when the kill switch matches the environment', async () => {
+    narrowPaddleKillSwitch([]);
+    const token = await login('user@example.com');
+
+    const res = await fetch(`${baseUrl}/api/v1/billing/checkout`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ planKey: 'pro' })
+    });
+
+    expect(res.status).toBe(200);
   });
 });

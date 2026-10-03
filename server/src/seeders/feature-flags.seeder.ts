@@ -81,13 +81,27 @@ const FLAGS: FlagSeed[] = [
       }
     }
   },
-  // Seeded off: an admin enables each provider explicitly.
-  ...BILLING_PROVIDER_FLAGS.map(({ provider, enabledFlagKey }) => ({
-    key: enabledFlagKey,
-    description: `Admin kill-switch enabling the ${provider} billing provider`,
-    enabled: false,
-    public: false
-  }))
+  // Seeded off: an admin enables each provider explicitly. The rule keeps an
+  // unconfigured provider off, as for the OAuth flags.
+  ...BILLING_PROVIDER_FLAGS.map(
+    ({ provider, enabledFlagKey, configuredAttribute }) => ({
+      key: enabledFlagKey,
+      description: `Admin kill-switch enabling the ${provider} billing provider`,
+      enabled: false,
+      public: false,
+      rule: {
+        type: 'attribute' as const,
+        effect: 'include' as const,
+        payload: {
+          type: 'attribute' as const,
+          field: 'custom' as const,
+          op: 'eq' as const,
+          value: true,
+          customKey: configuredAttribute
+        }
+      }
+    })
+  )
 ];
 
 export default class FeatureFlagsSeeder extends Seeder {
