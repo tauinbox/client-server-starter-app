@@ -503,8 +503,10 @@ that name to pick the rollout bucket of a visitor. The read also ignores a value
 cache, increases the version, and calls `pushToAll` over SSE. It also does a per-user invalidation on
 `UserRoleChangedEvent` and on `UserDeletedEvent`.
 
-`utils/validate-rule-payload.util.ts` validates the payload of each rule type separately. It rejects
-a custom attribute key that the registry does not hold. The value check itself is the shared
+`utils/validate-rule-payload.util.ts` wraps the shared `parseFeatureFlagRulePayload`
+(`shared/src/utils/feature-flag-rule-payload.ts`) and throws its message as a 400. That function
+validates the payload of each rule type separately, and the mock server calls it too, so both reject
+with the same text. It rejects a custom attribute key that the registry does not hold. The value check itself is the shared
 `attributeValueError`, which the mock server and the admin rule editor also call, thus the client
 blocks a save that this file would reject. That shared function reads `toTimestamp` from
 `shared/src/utils/feature-flag-timestamp.ts` and not from the evaluator, because the evaluator opens

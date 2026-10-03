@@ -179,6 +179,32 @@ describe('validateRulePayload attribute value', () => {
     ).toEqual({ type: 'percentage', percent: 25, bucketBy });
   });
 
+  it('rejects an unregistered customKey with the registry message', () => {
+    expect(() =>
+      validateRulePayload(
+        'attribute',
+        {
+          type: 'attribute',
+          field: 'custom',
+          customKey: 'nope',
+          op: 'eq',
+          value: true
+        },
+        knownCustomKeys
+      )
+    ).toThrow('customKey "nope" is not registered in the attribute registry');
+  });
+
+  it('rejects an out-of-range percent with the range message', () => {
+    expect(() =>
+      validateRulePayload(
+        'percentage',
+        { type: 'percentage', percent: 500 },
+        knownCustomKeys
+      )
+    ).toThrow('percentage rule requires percent: number in [0, 100]');
+  });
+
   it.each(['session', null, 1])(
     'rejects percentage bucketBy=%p',
     (bucketBy) => {

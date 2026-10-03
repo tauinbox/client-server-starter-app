@@ -176,72 +176,61 @@ describe('feature-flag validation parity with server', () => {
     });
   });
 
-  describe('attribute rule value', () => {
-    let flagId = '';
-
-    async function ruleResponse(op: string, value: unknown): Promise<Response> {
-      const created = await createFlag({ key: `attr-${op.toLowerCase()}` });
+  // The mock runs the same shared rule-payload parser as the server, so the
+  // value rules are covered by its server spec. These cases pin the response
+  // envelope: the server text with no prefix, and nothing stored on rejection.
+  describe('rule payload rejection', () => {
+    async function ruleResponse(
+      key: string,
+      rule: unknown
+    ): Promise<{ res: Response; flagId: string }> {
+      const created = await createFlag({ key });
       expect(created.status).toBe(201);
       const flag = (await created.json()) as { id: string };
-      flagId = flag.id;
-      return replaceRules(flag.id, [
-        {
-          type: 'attribute',
-          effect: 'include',
-          payload: { type: 'attribute', field: 'email', op, value }
-        }
-      ]);
+      return { res: await replaceRules(flag.id, [rule]), flagId: flag.id };
     }
 
-    it('accepts a scalar for op=eq', async () => {
-      expect((await ruleResponse('eq', 'a@b.com')).status).toBe(200);
-    });
-
-    it('rejects an object for op=eq', async () => {
-      const res = await ruleResponse('eq', { nested: true });
+    it('returns the server text for an unregistered customKey', async () => {
+      const { res, flagId } = await ruleResponse('payload-custom-key', {
+        type: 'attribute',
+        effect: 'include',
+        payload: {
+          type: 'attribute',
+          field: 'custom',
+          customKey: 'nope',
+          op: 'eq',
+          value: true
+        }
+      });
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
-      expect(body.message).toContain('op=eq');
+      expect(body.message).toBe(
+        'customKey "nope" is not registered in the attribute registry'
+      );
       expect(
         getState().featureFlagRules.filter((r) => r.flagId === flagId)
       ).toHaveLength(0);
     });
 
-    it('rejects an empty array for op=in', async () => {
-      expect((await ruleResponse('in', [])).status).toBe(400);
-    });
-
-    it('rejects an empty string for op=endsWith', async () => {
-      expect((await ruleResponse('endsWith', '')).status).toBe(400);
-    });
-
-    it('rejects an unparseable date for op=before', async () => {
-      expect((await ruleResponse('before', 'not-a-date')).status).toBe(400);
-    });
-
-    it('accepts an ISO date for op=after', async () => {
-      expect((await ruleResponse('after', '2026-01-01T00:00:00Z')).status).toBe(
-        200
+    it('returns the server text for an out-of-range percent', async () => {
+      const { res } = await ruleResponse('payload-percent', {
+        type: 'percentage',
+        effect: 'include',
+        payload: { type: 'percentage', percent: 500 }
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(
+        'percentage rule requires percent: number in [0, 100]'
       );
     });
-  });
 
-  describe('percentage rule bucketBy', () => {
-    async function ruleResponse(bucketBy: unknown): Promise<Response> {
-      const created = await createFlag({ key: `pct-${String(bucketBy)}` });
-      expect(created.status).toBe(201);
-      const flag = (await created.json()) as { id: string };
-      return replaceRules(flag.id, [
-        {
-          type: 'percentage',
-          effect: 'include',
-          payload: { type: 'percentage', percent: 10, bucketBy }
-        }
-      ]);
-    }
-
-    it('stores device', async () => {
-      const res = await ruleResponse('device');
+    it('stores percentage bucketBy=device', async () => {
+      const { res } = await ruleResponse('payload-bucket-device', {
+        type: 'percentage',
+        effect: 'include',
+        payload: { type: 'percentage', percent: 10, bucketBy: 'device' }
+      });
       expect(res.status).toBe(200);
       const flag = (await res.json()) as {
         rules: { payload: Record<string, unknown> }[];
@@ -251,13 +240,6 @@ describe('feature-flag validation parity with server', () => {
         percent: 10,
         bucketBy: 'device'
       });
-    });
-
-    it('rejects a value outside the list', async () => {
-      const res = await ruleResponse('session');
-      expect(res.status).toBe(400);
-      const body = (await res.json()) as { message: string };
-      expect(body.message).toContain('bucketBy');
     });
   });
 

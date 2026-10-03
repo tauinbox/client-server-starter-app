@@ -20,16 +20,10 @@ import {
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_PROVIDER_FLAGS,
   ErrorKeys,
-  FEATURE_FLAG_ATTRIBUTE_FIELDS,
-  FEATURE_FLAG_ATTRIBUTE_OPS,
-  FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
   OAUTH_PROVIDER_FLAGS,
   normalizeEnvironmentList,
-  type FeatureFlagAttributeField,
-  type FeatureFlagAttributeOp,
-  type FeatureFlagBucketBy,
   type FeatureFlagRuleEffect,
   type FeatureFlagRuleType
 } from '@app/shared/constants';
@@ -38,7 +32,7 @@ import {
   cursorQueryErrors,
   parseCursorQuery
 } from '../helpers/pagination.helpers';
-import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
+import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { authenticateRequest, permissionGuard } from '../helpers/auth.helpers';
 import {
   requireUuid,
@@ -279,113 +273,8 @@ function validateRulePayload(
     // rule-payload validator ever runs.
     return dtoFail('rule payload must be an object');
   }
-  const p = payload as Record<string, unknown>;
-  if (p['type'] !== type) {
-    return serviceFail(
-      `payload.type "${String(p['type'])}" does not match rule.type "${type}"`
-    );
-  }
-  switch (type) {
-    case 'user': {
-      const userIds = p['userIds'];
-      if (!isStringArray(userIds)) {
-        return serviceFail('user rule requires userIds: string[]');
-      }
-      return { ok: true, payload: { type: 'user', userIds } };
-    }
-    case 'role': {
-      const roleNames = p['roleNames'];
-      if (!isStringArray(roleNames)) {
-        return serviceFail('role rule requires roleNames: string[]');
-      }
-      return { ok: true, payload: { type: 'role', roleNames } };
-    }
-    case 'percentage': {
-      const percent = p['percent'];
-      if (
-        typeof percent !== 'number' ||
-        !Number.isFinite(percent) ||
-        percent < 0 ||
-        percent > 100
-      ) {
-        return serviceFail(
-          'percentage rule requires percent: number in [0, 100]'
-        );
-      }
-      const bucketBy = p['bucketBy'];
-      if (
-        bucketBy !== undefined &&
-        !FEATURE_FLAG_BUCKET_BY.includes(bucketBy as FeatureFlagBucketBy)
-      ) {
-        return serviceFail(
-          `percentage rule bucketBy must be one of ${FEATURE_FLAG_BUCKET_BY.join(', ')}`
-        );
-      }
-      return {
-        ok: true,
-        payload: {
-          type: 'percentage',
-          percent,
-          ...(bucketBy !== undefined
-            ? { bucketBy: bucketBy as FeatureFlagBucketBy }
-            : {})
-        }
-      };
-    }
-    case 'attribute': {
-      const field = p['field'];
-      const op = p['op'];
-      const value = p['value'];
-      const customKey = p['customKey'];
-      if (
-        typeof field !== 'string' ||
-        !FEATURE_FLAG_ATTRIBUTE_FIELDS.includes(
-          field as FeatureFlagAttributeField
-        )
-      ) {
-        return serviceFail(
-          `attribute rule requires field ∈ ${FEATURE_FLAG_ATTRIBUTE_FIELDS.join(', ')}`
-        );
-      }
-      if (
-        typeof op !== 'string' ||
-        !FEATURE_FLAG_ATTRIBUTE_OPS.includes(op as FeatureFlagAttributeOp)
-      ) {
-        return serviceFail(
-          `attribute rule requires op ∈ ${FEATURE_FLAG_ATTRIBUTE_OPS.join(', ')}`
-        );
-      }
-      if (field === 'custom') {
-        if (typeof customKey !== 'string' || customKey === '') {
-          return serviceFail(
-            'attribute rule with field=custom requires customKey: string'
-          );
-        }
-        if (!KNOWN_CUSTOM_KEYS.has(customKey)) {
-          return serviceFail(
-            `customKey "${customKey}" is not registered (mock-server has no DI registry)`
-          );
-        }
-      }
-      const valueError = attributeValueError(
-        op as FeatureFlagAttributeOp,
-        value
-      );
-      if (valueError) {
-        return serviceFail(valueError);
-      }
-      return {
-        ok: true,
-        payload: {
-          type: 'attribute',
-          field: field as FeatureFlagAttributeField,
-          op: op as FeatureFlagAttributeOp,
-          value,
-          ...(typeof customKey === 'string' ? { customKey } : {})
-        }
-      };
-    }
-  }
+  const result = parseFeatureFlagRulePayload(type, payload, KNOWN_CUSTOM_KEYS);
+  return result.ok ? result : serviceFail(result.message);
 }
 
 type ValidatedRule = {
@@ -423,7 +312,9 @@ function validateRules(
       r.payload
     );
     if (!validated.ok) {
-      return { ...validated, message: `rules[${i}]: ${validated.message}` };
+      return validated.source === 'dto'
+        ? { ...validated, message: `rules[${i}]: ${validated.message}` }
+        : validated;
     }
     out.push({
       type: r.type as FeatureFlagRuleType,
