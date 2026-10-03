@@ -1,4 +1,7 @@
-import type { FeatureFlagAttributeOp } from '@app/shared/constants';
+import {
+  FEATURE_FLAG_ATTRIBUTE_FIELD_OPS,
+  type FeatureFlagAttributeOp
+} from '@app/shared/constants';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { attributeValueError } from '@app/shared/utils/feature-flag-attribute-value';
 
@@ -30,6 +33,9 @@ export function featureFlagRuleError(
   knownCustomKeys: ReadonlySet<string> | null = null
 ): string | null {
   if (payload.type !== 'attribute') return null;
+  if (!FEATURE_FLAG_ATTRIBUTE_FIELD_OPS[payload.field].includes(payload.op)) {
+    return 'admin.featureFlagRule.errorOpUnsupported';
+  }
   if (payload.field === 'custom') {
     const customKey = payload.customKey ?? '';
     if (customKey.trim() === '') {

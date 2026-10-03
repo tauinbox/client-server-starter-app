@@ -622,6 +622,71 @@ describe('Feature flags end-to-end', () => {
     });
   });
 
+  it('rejects a createdAt rule with an operator that can never match', async () => {
+    const flag = await flagService.create(
+      { key: 'created-eq', enabled: true },
+      'actor-1'
+    );
+    await expect(
+      flagService.replaceRules(
+        flag.id,
+        [
+          {
+            type: 'attribute',
+            effect: 'include',
+            payload: {
+              type: 'attribute',
+              field: 'createdAt',
+              op: 'eq',
+              value: '2026-01-01T00:00:00.000Z'
+            }
+          }
+        ],
+        'actor-1'
+      )
+    ).rejects.toMatchObject({
+      status: 400,
+      message: 'attribute rule with field=createdAt does not support op=eq'
+    });
+  });
+
+  it('a createdAt after rule matches in the preview and in the real evaluation', async () => {
+    const createdAt = new Date('2026-03-01T12:00:00.000Z');
+    const dayBefore = new Date(createdAt.getTime() - 24 * 60 * 60 * 1000);
+    const flag = await flagService.create(
+      { key: 'new-accounts', enabled: true },
+      'actor-1'
+    );
+    await flagService.replaceRules(
+      flag.id,
+      [
+        {
+          type: 'attribute',
+          effect: 'include',
+          payload: {
+            type: 'attribute',
+            field: 'createdAt',
+            op: 'after',
+            value: dayBefore.toISOString()
+          }
+        }
+      ],
+      'actor-1'
+    );
+    await resolver.invalidateAll();
+
+    const preview = await flagService.preview(flag.id, {
+      attributes: { createdAt: createdAt.toISOString() }
+    });
+    expect(preview.result).toBe(true);
+
+    const evaluated = await resolver.evaluateForUser(
+      { userId: 'u-new', email: null, createdAt, roles: [] },
+      {} as Parameters<typeof resolver.evaluateForUser>[1]
+    );
+    expect(evaluated.flags['new-accounts']).toBe(true);
+  });
+
   it('preview() reports disabled when the flag itself is off', async () => {
     const flag = await flagService.create(
       { key: 'off-preview', enabled: false },

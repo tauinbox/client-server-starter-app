@@ -1,4 +1,5 @@
 import {
+  FEATURE_FLAG_ATTRIBUTE_FIELD_OPS,
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
   FEATURE_FLAG_BUCKET_BY,
@@ -105,6 +106,15 @@ export function parseFeatureFlagRulePayload(
       ) {
         return fail(
           `attribute rule requires op ∈ ${FEATURE_FLAG_ATTRIBUTE_OPS.join(', ')}`
+        );
+      }
+      if (
+        !FEATURE_FLAG_ATTRIBUTE_FIELD_OPS[
+          field as FeatureFlagAttributeField
+        ].includes(op as FeatureFlagAttributeOp)
+      ) {
+        return fail(
+          `attribute rule with field=${field} does not support op=${op}`
         );
       }
       if (field === 'custom') {

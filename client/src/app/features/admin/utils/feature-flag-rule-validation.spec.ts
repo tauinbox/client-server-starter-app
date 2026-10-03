@@ -138,6 +138,25 @@ describe('featureFlagRuleError', () => {
     ).toBe('admin.featureFlagRule.errorCustomKeyRequired');
   });
 
+  it('reports an operator the field can never match', () => {
+    expect(
+      featureFlagRuleError({
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'eq',
+        value: '2026-01-15T00:00:00.000Z'
+      })
+    ).toBe('admin.featureFlagRule.errorOpUnsupported');
+    expect(
+      featureFlagRuleError({
+        type: 'attribute',
+        field: 'email',
+        op: 'before',
+        value: '2026-01-15T00:00:00.000Z'
+      })
+    ).toBe('admin.featureFlagRule.errorOpUnsupported');
+  });
+
   it('accepts a filled date operator', () => {
     expect(
       featureFlagRuleError({

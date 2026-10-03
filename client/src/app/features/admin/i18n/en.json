@@ -132,7 +132,8 @@
     "errorValueListRequired": "Add at least one value, up to 100.",
     "errorValueDate": "Pick a date.",
     "errorCustomKeyRequired": "Enter the custom attribute key.",
-    "errorCustomKeyUnknown": "This key is not registered on the server. Select one from the list."
+    "errorCustomKeyUnknown": "This key is not registered on the server. Select one from the list.",
+    "errorOpUnsupported": "This operator cannot match this field. Select a different operator."
   },
   "roles": {
     "title": "Roles management",

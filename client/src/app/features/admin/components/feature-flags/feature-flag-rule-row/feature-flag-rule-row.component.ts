@@ -33,8 +33,8 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import { forkJoin, of, Subject } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import {
+  FEATURE_FLAG_ATTRIBUTE_FIELD_OPS,
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
-  FEATURE_FLAG_ATTRIBUTE_OPS,
   FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
@@ -151,7 +151,6 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected readonly types = FEATURE_FLAG_RULE_TYPES;
   protected readonly effects = FEATURE_FLAG_RULE_EFFECTS;
   protected readonly attributeFields = FEATURE_FLAG_ATTRIBUTE_FIELDS;
-  protected readonly attributeOps = FEATURE_FLAG_ATTRIBUTE_OPS;
   protected readonly bucketByOptions = FEATURE_FLAG_BUCKET_BY;
 
   // Chip-label caches — keyed by the underlying API value (user UUID or role
@@ -213,6 +212,10 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected get attributeOp(): FeatureFlagAttributeOp {
     const p = this.rule().payload;
     return p.type === 'attribute' ? p.op : 'eq';
+  }
+
+  protected get attributeOps(): readonly FeatureFlagAttributeOp[] {
+    return FEATURE_FLAG_ATTRIBUTE_FIELD_OPS[this.attributeField];
   }
 
   protected get attributeValueText(): string {
@@ -440,8 +443,16 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   onAttributeFieldChange(field: FeatureFlagAttributeField): void {
     const current = this.rule().payload;
-    const op = current.type === 'attribute' ? current.op : 'eq';
-    const value = current.type === 'attribute' ? current.value : '';
+    const allowedOps = FEATURE_FLAG_ATTRIBUTE_FIELD_OPS[field];
+    const currentOp = current.type === 'attribute' ? current.op : 'eq';
+    const keepOp = allowedOps.includes(currentOp);
+    const op = keepOp ? currentOp : allowedOps[0];
+    const value =
+      keepOp && current.type === 'attribute'
+        ? current.value
+        : op === 'in'
+          ? []
+          : '';
     const customKey =
       field === 'custom'
         ? current.type === 'attribute'

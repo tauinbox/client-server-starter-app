@@ -37,6 +37,20 @@ export const FEATURE_FLAG_ATTRIBUTE_OPS = [
   'after'
 ] as const;
 
+// The operators that can ever match each field. `eq` and `in` compare with
+// `===`, and the server resolves `createdAt` to a Date, so only a date
+// comparison reaches it; an email never parses as a date. A custom key holds
+// whatever its registrar returns, so it keeps every operator.
+export const FEATURE_FLAG_ATTRIBUTE_FIELD_OPS: Record<
+  FeatureFlagAttributeField,
+  readonly FeatureFlagAttributeOp[]
+> = {
+  email: ['eq', 'in', 'endsWith'],
+  emailDomain: ['eq', 'in', 'endsWith'],
+  createdAt: ['before', 'after'],
+  custom: FEATURE_FLAG_ATTRIBUTE_OPS
+};
+
 // Why a preview returned the result it did, in the order the evaluator checks
 // them: the kill-switch, the environment gate, deny-overrides, the no-rules
 // default, the includes, then the fall-through when no include matched.
