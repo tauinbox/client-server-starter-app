@@ -209,6 +209,78 @@ describe('PricingPageComponent', () => {
     ).not.toBeNull();
   });
 
+  // Plan "Choose" and product "Buy". The donation pay button also waits for an
+  // amount, so its presets carry the disabled state instead.
+  function actionButtons(): HTMLButtonElement[] {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '.plan-action button, nxs-product-card button'
+      )
+    );
+  }
+
+  function donationPresets(): HTMLButtonElement[] {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '.amount-presets button'
+      )
+    );
+  }
+
+  it('disables every purchase action and shows a notice when the effective provider is off', async () => {
+    await setup(true, [reportPack, donation]);
+    storeMock.region.set({
+      region: 'auto',
+      detectedProvider: 'paddle',
+      effectiveProvider: 'paddle',
+      availableProviders: ['yookassa']
+    });
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const notice = host.querySelector('.payments-unavailable');
+    expect(notice?.getAttribute('role')).toBe('status');
+    expect(notice?.textContent).toContain(
+      'Payments are temporarily unavailable in your billing region.'
+    );
+    const buttons = actionButtons();
+    expect(buttons.length).toBe(3);
+    expect(buttons.every((button) => button.disabled)).toBe(true);
+    expect(donationPresets().length).toBeGreaterThan(0);
+    expect(donationPresets().every((button) => button.disabled)).toBe(true);
+    expect(
+      host.querySelector<HTMLButtonElement>('nxs-donation-card .pay-btn')
+        ?.disabled
+    ).toBe(true);
+  });
+
+  it('keeps the purchase actions enabled while the region is unknown', async () => {
+    await setup(true, [reportPack, donation]);
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.payments-unavailable')).toBeNull();
+    const buttons = actionButtons();
+    expect(buttons.length).toBe(3);
+    expect(buttons.some((button) => button.disabled)).toBe(false);
+    expect(donationPresets().some((button) => button.disabled)).toBe(false);
+  });
+
+  it('keeps the purchase actions enabled when the effective provider is on', async () => {
+    await setup(true, [reportPack]);
+    storeMock.region.set({
+      region: 'auto',
+      detectedProvider: 'paddle',
+      effectiveProvider: 'paddle',
+      availableProviders: ['paddle']
+    });
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('.payments-unavailable')
+    ).toBeNull();
+    expect(actionButtons().some((button) => button.disabled)).toBe(false);
+  });
+
   it('routes anonymous visitors to login on choose', async () => {
     await setup(false);
     fixture.componentInstance.onChoose('pro');

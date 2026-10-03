@@ -77,6 +77,57 @@ test.describe('Billing', () => {
     ).toBeVisible();
   });
 
+  test('with every provider off, the plans cannot be chosen and a notice says why', async ({
+    page,
+    _mockServer
+  }) => {
+    await _mockServer.setBillingProviderEnabled('paddle', false);
+    await _mockServer.setBillingProviderEnabled('yookassa', false);
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.goto('/billing');
+
+    const notice = page.locator('.payments-unavailable');
+    await expect(notice).toHaveAttribute('role', 'status');
+    await expect(notice).toContainText(
+      'Payments are temporarily unavailable in your billing region.'
+    );
+    await expect(
+      page
+        .locator('nxs-plan-card', { hasText: 'Pro' })
+        .getByRole('button', { name: 'Choose' })
+    ).toBeDisabled();
+  });
+
+  test('leaving a region whose provider is off enables the plans again', async ({
+    page,
+    _mockServer
+  }) => {
+    await _mockServer.setBillingProviderEnabled('paddle', false);
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.goto('/billing');
+
+    const choosePro = page
+      .locator('nxs-plan-card', { hasText: 'Pro' })
+      .getByRole('button', { name: 'Choose' });
+    const notice = page.locator('.payments-unavailable');
+    await expect(notice).toBeVisible();
+    await expect(choosePro).toBeDisabled();
+
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().includes('/billing/region') &&
+        response.request().method() === 'PUT'
+    );
+    await page
+      .locator('.region-control')
+      .getByRole('radio', { name: 'Russia' })
+      .click();
+    expect((await saved).status()).toBe(200);
+
+    await expect(notice).toHaveCount(0);
+    await expect(choosePro).toBeEnabled();
+  });
+
   test('a refused region change leaves the toggle on the stored region', async ({
     page,
     _mockServer

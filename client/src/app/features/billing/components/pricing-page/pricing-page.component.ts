@@ -84,6 +84,19 @@ export class PricingPageComponent implements OnInit {
     )
   );
 
+  // No region (anonymous, or not loaded) keeps the actions enabled; an
+  // anonymous "Choose" goes to login first.
+  protected readonly paymentsAvailable = computed(() => {
+    const region = this.store.region();
+    return (
+      !region || region.availableProviders.includes(region.effectiveProvider)
+    );
+  });
+
+  protected readonly actionsDisabled = computed(
+    () => this.store.working() || !this.paymentsAvailable()
+  );
+
   // The plan that grants the caller access now. Free is the implicit default
   // for an authenticated user whose subscription grants nothing, for example
   // an unpaid `incomplete` checkout.
