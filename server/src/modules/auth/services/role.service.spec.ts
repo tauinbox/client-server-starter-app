@@ -286,6 +286,32 @@ describe('RoleService', () => {
       });
       expect(result.description).toBe('Updated');
     });
+
+    it('should invalidate the holders after a rename', async () => {
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockRoleRepo.findOne.mockResolvedValueOnce(null);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+
+      await service.update('role-2', { name: 'senior-editor' });
+
+      const [save] = mockRoleRepo.save.mock.invocationCallOrder;
+      const [invalidate] =
+        mockPermissionService.invalidateUserCache.mock.invocationCallOrder;
+      expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
+        'u-1'
+      );
+      expect(save).toBeLessThan(invalidate);
+    });
+
+    it('should not invalidate the holders when the name stays the same', async () => {
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+
+      await service.update('role-2', { name: 'editor', description: 'New' });
+
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {

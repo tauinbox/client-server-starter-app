@@ -155,7 +155,13 @@ describe('Instance-level @Authorize re-check', () => {
             createForUser: jest.fn().mockResolvedValue({ rules: [] })
           }
         },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: EventEmitter2,
+          useValue: {
+            emit: jest.fn(),
+            emitAsync: jest.fn().mockResolvedValue([])
+          }
+        },
         {
           provide: AuditService,
           useValue: {
@@ -303,7 +309,11 @@ describe('Instance-level @Authorize re-check', () => {
           return Promise.resolve({ id: ROLE_B, name: 'editor-b' });
         return Promise.reject(new Error('not found'));
       });
-      mocks.roleService.update.mockResolvedValue({ id: ROLE_A });
+      mocks.roleService.update.mockResolvedValue({
+        id: ROLE_A,
+        name: 'editor-a',
+        description: 'x'
+      });
       // Allow update only on the role named 'editor-a'.
       holder.current = abilityWithRule('update', 'Role', { name: 'editor-a' });
     });

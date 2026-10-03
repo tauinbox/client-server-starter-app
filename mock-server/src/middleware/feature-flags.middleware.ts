@@ -363,6 +363,37 @@ function broadcastFlagsUpdated(): void {
   }, FLAGS_BROADCAST_COALESCE_MS);
 }
 
+// Mirrors FeatureFlagService.rewriteRoleName and RoleRulesListener: replace a
+// role name in every role rule, or remove it when newName is null. The order is
+// kept, a duplicate is dropped, and each changed flag gets a new version.
+export function rewriteRoleNameInRules(
+  oldName: string,
+  newName: string | null
+): void {
+  const state = getState();
+  const updatedAt = nowIso();
+  const changedFlagIds = new Set<string>();
+  for (const rule of state.featureFlagRules) {
+    const { payload } = rule;
+    if (payload.type !== 'role' || !payload.roleNames.includes(oldName)) {
+      continue;
+    }
+    const mapped = payload.roleNames
+      .map((name) => (name === oldName ? newName : name))
+      .filter((name): name is string => name !== null);
+    rule.payload = { type: 'role', roleNames: [...new Set(mapped)] };
+    rule.updatedAt = updatedAt;
+    changedFlagIds.add(rule.flagId);
+  }
+  for (const id of changedFlagIds) {
+    const flag = state.featureFlags.get(id);
+    if (!flag) continue;
+    flag.version += 1;
+    flag.updatedAt = updatedAt;
+  }
+  if (changedFlagIds.size > 0) broadcastFlagsUpdated();
+}
+
 function findFlagByKey(key: string): MockFeatureFlag | undefined {
   for (const f of getState().featureFlags.values()) {
     if (f.key === key) return f;

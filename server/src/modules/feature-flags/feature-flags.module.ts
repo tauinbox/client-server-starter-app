@@ -11,6 +11,7 @@ import { AttributeRegistryService } from './services/attribute-registry.service'
 import { FeatureFlagsAdminController } from './controllers/feature-flags-admin.controller';
 import { FeatureFlagsController } from './controllers/feature-flags.controller';
 import { FeatureFlagChangedListener } from './listeners/feature-flag-changed.listener';
+import { RoleRulesListener } from './listeners/role-rules.listener';
 import { FeatureFlagGuard } from './guards/feature-flag.guard';
 
 @Module({
@@ -26,6 +27,7 @@ import { FeatureFlagGuard } from './guards/feature-flag.guard';
     FeatureFlagResolverService,
     AttributeRegistryService,
     FeatureFlagChangedListener,
+    RoleRulesListener,
     FeatureFlagGuard
   ],
   exports: [

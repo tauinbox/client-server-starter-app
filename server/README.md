@@ -2455,7 +2455,11 @@ The system invalidates the cache at each change. It coalesces the broadcast in a
 Thus a burst of changes causes one synchronized refetch on the client, and not one refetch for each
 change. One save in a dialog is such a burst, because it emits an update and a rules-replaced event.
 
-`UserRoleChangedEvent` and `UserDeletedEvent` invalidate the cache of the affected user only. The
+`UserRoleChangedEvent` and `UserDeletedEvent` invalidate the cache of the affected user only.
+
+Role rules store role names. `RoleRulesListener` rewrites them on `RoleRenamedEvent` and removes the
+name on `RoleDeletedEvent`. Each changed flag gets a new version and a `FeatureFlagChangedEvent`. The
+roles API awaits both events, so a failed rewrite fails the request. The
 cross-module communication uses `EventEmitter2` and never `forwardRef`. A `no-restricted-syntax`
 ESLint rule rejects a `forwardRef()` call in `src/`.
 

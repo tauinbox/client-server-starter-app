@@ -358,8 +358,12 @@ export class RoleService {
         );
       }
     }
+    const renamed = data.name !== undefined && data.name !== role.name;
     Object.assign(role, data);
-    return this.roleRepository.save(role);
+    const saved = await this.roleRepository.save(role);
+    // Holders have the old name in the cached role names that flag rules use.
+    if (renamed) await this.invalidateUsersWithRole(id);
+    return saved;
   }
 
   async delete(

@@ -9,6 +9,8 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
+import { RoleRenamedEvent } from '../events/role-renamed.event';
+import { RoleDeletedEvent } from '../events/role-deleted.event';
 import type { AppAbility } from '../casl/app-ability';
 import {
   LOG_AUDIT_KEY,
@@ -296,6 +298,35 @@ describe('RolesController', () => {
       expect(roleServiceMock.findOne).toHaveBeenCalledWith('role-1');
       expect(roleServiceMock.update).toHaveBeenCalledWith('role-1', dto);
       expect(result).toBe(updated);
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        RoleRenamedEvent.name,
+        new RoleRenamedEvent('editor', 'senior-editor')
+      );
+    });
+
+    it('should not emit RoleRenamedEvent when the name stays the same', async () => {
+      const role = { id: 'role-1', name: 'editor' };
+      roleServiceMock.findOne.mockResolvedValue(role);
+      roleServiceMock.update.mockResolvedValue({ ...role, description: 'x' });
+
+      await controller.update(
+        'role-1',
+        { description: 'x' },
+        mockReq,
+        mockAbility
+      );
+
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+    });
+
+    it('should fail the request when the rename cascade fails', async () => {
+      roleServiceMock.findOne.mockResolvedValue({ id: 'role-1', name: 'a' });
+      roleServiceMock.update.mockResolvedValue({ id: 'role-1', name: 'b' });
+      eventEmitterMock.emitAsync.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(
+        controller.update('role-1', { name: 'b' }, mockReq, mockAbility)
+      ).rejects.toThrow('db down');
     });
 
     it('should throw ForbiddenException and skip update when ability denies the loaded role', async () => {
@@ -329,6 +360,20 @@ describe('RolesController', () => {
         mockReq.user?.userId
       );
       expect(result).toBeUndefined();
+      expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
+        RoleDeletedEvent.name,
+        new RoleDeletedEvent('editor')
+      );
+    });
+
+    it('should not emit RoleDeletedEvent when the delete fails', async () => {
+      roleServiceMock.findOne.mockResolvedValue({ id: 'role-1', name: 'a' });
+      roleServiceMock.delete.mockRejectedValueOnce(new Error('system role'));
+
+      await expect(
+        controller.remove('role-1', mockReq, mockAbility)
+      ).rejects.toThrow('system role');
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
     });
 
     it('should record the deleted role name in the ROLE_DELETE audit details', async () => {
