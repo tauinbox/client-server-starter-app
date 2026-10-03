@@ -41,6 +41,10 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ActionsStore } from '../../../store/actions.store';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import {
+  ListSkeletonComponent,
+  type ListSkeletonCell
+} from '@shared/components/list-skeleton/list-skeleton.component';
 import type { ActionFormDialogData } from '../action-form-dialog/action-form-dialog.component';
 import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dialog.component';
 
@@ -57,6 +61,7 @@ import { ActionFormDialogComponent } from '../action-form-dialog/action-form-dia
     MatIcon,
     MatProgressSpinner,
     InfiniteScrollDirective,
+    ListSkeletonComponent,
     MatTooltip,
     MatChip,
     MatTable,
@@ -96,6 +101,15 @@ export class ActionListComponent implements OnInit {
   loadMore(): void {
     this.#actionsStore.loadMore();
   }
+
+  readonly skeletonCells: readonly ListSkeletonCell[] = [
+    'medium',
+    'medium',
+    'wide',
+    'chip',
+    'medium',
+    'actions'
+  ];
 
   readonly actionColumns = [
     'displayName',

@@ -9,9 +9,7 @@
 
     <mat-card-content>
       @if (subscriptionsLoading() && subscriptions().length === 0) {
-        <div class="loading-container">
-          <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
-        </div>
+        <nxs-list-skeleton [cells]="subscriptionSkeletonCells" />
       } @else if (subscriptions().length === 0) {
         <p class="empty-state">{{ t('admin.billing.subscriptionsEmpty') }}</p>
       } @else if (layout.isHandset()) {
@@ -197,9 +195,7 @@
 
     <mat-card-content>
       @if (invoicesLoading() && invoices().length === 0) {
-        <div class="loading-container">
-          <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
-        </div>
+        <nxs-list-skeleton [cells]="invoiceSkeletonCells" />
       } @else if (invoices().length === 0) {
         <p class="empty-state">{{ t('admin.billing.invoicesEmpty') }}</p>
       } @else if (layout.isHandset()) {

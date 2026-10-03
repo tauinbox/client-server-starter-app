@@ -39,6 +39,10 @@ import {
   MatTable
 } from '@angular/material/table';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import {
+  ListSkeletonComponent,
+  type ListSkeletonCell
+} from '@shared/components/list-skeleton/list-skeleton.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import { LayoutService } from '@core/services/layout.service';
@@ -80,6 +84,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
     MatRowDef,
     MatCell,
     InfiniteScrollDirective,
+    ListSkeletonComponent,
     TranslocoDirective
   ],
   templateUrl: './feature-flag-list.component.html',
@@ -113,6 +118,16 @@ export class FeatureFlagListComponent implements OnInit {
   // partial-save state after the snackbar has dismissed.
   readonly #rulesFailedFlagIds = signal<ReadonlySet<string>>(new Set());
   readonly rulesFailedFlagIds = this.#rulesFailedFlagIds.asReadonly();
+
+  readonly skeletonCells: readonly ListSkeletonCell[] = [
+    'medium',
+    'wide',
+    'chip',
+    'chip',
+    'chip',
+    'medium',
+    'actions'
+  ];
 
   readonly displayedColumns = [
     'key',

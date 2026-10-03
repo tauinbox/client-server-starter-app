@@ -1,0 +1,76 @@
+@use 'abstracts/functions' as func;
+@use 'abstracts/variables' as vars;
+
+:host {
+  display: block;
+}
+
+.skeleton-table {
+  border-top: func.rem(1) solid var(--mat-sys-outline-variant);
+}
+
+.skeleton-row {
+  display: flex;
+  gap: vars.$spacing-md;
+  align-items: center;
+  padding: vars.$spacing-sm vars.$spacing-md;
+  overflow: hidden;
+  border-bottom: func.rem(1) solid var(--mat-sys-outline-variant);
+}
+
+// Every cell has a basis and may shrink, so a narrow screen scales the row
+// down instead of pushing the fixed cells past the card edge.
+.skeleton-cell {
+  min-width: 0;
+  height: func.rem(16);
+  background: linear-gradient(
+    90deg,
+    var(--mat-sys-surface-variant) 25%,
+    color-mix(in srgb, var(--mat-sys-surface-variant) 50%, var(--mat-sys-surface)) 50%,
+    var(--mat-sys-surface-variant) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: vars.$border-radius-sm;
+  animation: sk-shimmer vars.$transition-slow infinite linear;
+
+  &.sk-narrow {
+    flex: 0 1 func.rem(32);
+  }
+
+  &.sk-wide {
+    flex: 2 1 func.rem(64);
+  }
+
+  &.sk-medium {
+    flex: 1 1 func.rem(32);
+  }
+
+  &.sk-chip {
+    flex: 0 1 func.rem(64);
+    height: func.rem(22);
+    border-radius: func.rem(11);
+  }
+
+  &.sk-actions {
+    flex: 0 1 func.rem(80);
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: func.rem(1);
+  height: func.rem(1);
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+@keyframes sk-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+
+  to {
+    background-position: 200% 0;
+  }
+}

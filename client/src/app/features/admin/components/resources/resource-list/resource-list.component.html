@@ -5,9 +5,7 @@
 
   <mat-card-content>
     @if (loading() && resources().length === 0) {
-      <div class="loading-container">
-        <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
-      </div>
+      <nxs-list-skeleton [cells]="skeletonCells" />
     } @else {
       <div class="table-wrapper">
         <table mat-table [dataSource]="resources()" class="resources-table">
