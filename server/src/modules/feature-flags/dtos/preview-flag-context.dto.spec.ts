@@ -50,6 +50,20 @@ describe('PreviewFlagContextDto draft fields', () => {
     expect(dto.rules).toBeUndefined();
   });
 
+  it('accepts a role name as long as a role can be named', async () => {
+    const dto = await transform<PreviewFlagContextDto>(
+      { roles: ['r'.repeat(100)] },
+      PreviewFlagContextDto
+    );
+    expect(dto.roles).toEqual(['r'.repeat(100)]);
+  });
+
+  it('rejects a role name longer than a role can be named', async () => {
+    await expect(messagesFor({ roles: ['r'.repeat(101)] })).resolves.toBe(
+      'each value in roles must be shorter than or equal to 100 characters'
+    );
+  });
+
   it('accepts a well-formed rule set', async () => {
     const dto = await transform<PreviewFlagContextDto>(
       { rules: [validRule] },

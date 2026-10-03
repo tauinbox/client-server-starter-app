@@ -15,6 +15,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   APP_ENVIRONMENTS,
+  FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
+  ROLE_NAME_MAX_LENGTH,
   normalizeEnvironmentList
 } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
@@ -39,9 +41,9 @@ export class PreviewFlagContextDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(32)
+  @ArrayMaxSize(FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS)
   @IsString({ each: true })
-  @MaxLength(64, { each: true })
+  @MaxLength(ROLE_NAME_MAX_LENGTH, { each: true })
   roles?: string[];
 
   @ApiPropertyOptional({

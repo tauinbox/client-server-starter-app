@@ -88,3 +88,5 @@ export const ANON_ID_PATTERN =
 export const FEATURE_FLAG_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 export const FEATURE_FLAG_KEY_MIN_LENGTH = 2;
 export const FEATURE_FLAG_KEY_MAX_LENGTH = 100;
+
+export const FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS = 32;

@@ -223,8 +223,37 @@ describe('feature-flag validation parity with server', () => {
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(
-        'percentage rule requires percent: number in [0, 100]'
+        'percentage rule requires percent: an integer in [0, 100]'
       );
+    });
+
+    it.each([
+      [
+        'a fractional percent',
+        { type: 'percentage', percent: 0.5 },
+        'percentage rule requires percent: an integer in [0, 100]'
+      ],
+      [
+        'a non-UUID user id',
+        { type: 'user', userIds: ['not-a-uuid'] },
+        'user rule requires userIds: an array of up to 100 UUIDs'
+      ],
+      [
+        'a role name over the cap',
+        { type: 'role', roleNames: ['x'.repeat(101)] },
+        'role rule requires roleNames: an array of up to 32 names of 1-100 characters'
+      ]
+    ])('returns the server text for %s', async (_label, payload, message) => {
+      const { res, flagId } = await ruleResponse(
+        `payload-${payload.type}-bad`,
+        { type: payload.type, effect: 'include', payload }
+      );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(message);
+      expect(
+        getState().featureFlagRules.filter((r) => r.flagId === flagId)
+      ).toHaveLength(0);
     });
 
     it('returns the server text for a field and operator that never match', async () => {
@@ -573,7 +602,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a non-array roles', async () => {
       await expect(errorsOf({ roles: 5 })).resolves.toEqual([
-        'each value in roles must be shorter than or equal to 64 characters',
+        'each value in roles must be shorter than or equal to 100 characters',
         'each value in roles must be a string',
         'roles must contain no more than 32 elements',
         'roles must be an array'
@@ -587,9 +616,14 @@ describe('feature-flag validation parity with server', () => {
       ]);
     });
 
-    it('rejects a role name over 64 characters', async () => {
-      await expect(errorsOf({ roles: ['r'.repeat(65)] })).resolves.toEqual([
-        'each value in roles must be shorter than or equal to 64 characters'
+    it('accepts a role name of the role-name cap', async () => {
+      const res = await preview({ roles: ['r'.repeat(100)] });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects a role name over 100 characters', async () => {
+      await expect(errorsOf({ roles: ['r'.repeat(101)] })).resolves.toEqual([
+        'each value in roles must be shorter than or equal to 100 characters'
       ]);
     });
 

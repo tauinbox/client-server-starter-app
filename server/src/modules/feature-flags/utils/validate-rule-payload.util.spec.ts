@@ -14,6 +14,53 @@ import {
 } from '@app/shared/utils/feature-flag-attribute-value';
 import { validateRulePayload } from './validate-rule-payload.util';
 
+describe('validateRulePayload user and role lists', () => {
+  const noCustomKeys = new Set<string>();
+  const userIdsMessage =
+    'user rule requires userIds: an array of up to 100 UUIDs';
+  const roleNamesMessage =
+    'role rule requires roleNames: an array of up to 32 names of 1-100 characters';
+  const uuid = (i: number): string =>
+    `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+
+  it('accepts 100 UUIDs', () => {
+    const userIds = Array.from({ length: 100 }, (_, i) => uuid(i));
+    expect(
+      validateRulePayload('user', { type: 'user', userIds }, noCustomKeys)
+    ).toEqual({ type: 'user', userIds });
+  });
+
+  it.each([
+    ['a non-UUID', ['not-a-uuid']],
+    ['an empty string', ['']],
+    ['a param-only UUID', ['11111111-1111-1111-1111-111111111111']],
+    ['101 items', Array.from({ length: 101 }, (_, i) => uuid(i))]
+  ])('rejects userIds with %s', (_label, userIds) => {
+    expect(() =>
+      validateRulePayload('user', { type: 'user', userIds }, noCustomKeys)
+    ).toThrow(userIdsMessage);
+  });
+
+  it('accepts 32 role names of 100 characters', () => {
+    const roleNames = Array.from({ length: 32 }, (_, i) =>
+      String(i).padEnd(100, 'x')
+    );
+    expect(
+      validateRulePayload('role', { type: 'role', roleNames }, noCustomKeys)
+    ).toEqual({ type: 'role', roleNames });
+  });
+
+  it.each([
+    ['an empty name', ['']],
+    ['a name of 101 characters', ['x'.repeat(101)]],
+    ['33 items', Array.from({ length: 33 }, (_, i) => `role-${i}`)]
+  ])('rejects roleNames with %s', (_label, roleNames) => {
+    expect(() =>
+      validateRulePayload('role', { type: 'role', roleNames }, noCustomKeys)
+    ).toThrow(roleNamesMessage);
+  });
+});
+
 // The unions are derived from these arrays, so dropping a member no longer
 // fails to compile anywhere - it silently narrows the type in all three
 // workspaces at once. These lists are a wire contract with every stored rule,
@@ -256,7 +303,17 @@ describe('validateRulePayload attribute value', () => {
         { type: 'percentage', percent: 500 },
         knownCustomKeys
       )
-    ).toThrow('percentage rule requires percent: number in [0, 100]');
+    ).toThrow('percentage rule requires percent: an integer in [0, 100]');
+  });
+
+  it('rejects a fractional percent, which the integer bucket rounds up', () => {
+    expect(() =>
+      validateRulePayload(
+        'percentage',
+        { type: 'percentage', percent: 0.5 },
+        knownCustomKeys
+      )
+    ).toThrow('percentage rule requires percent: an integer in [0, 100]');
   });
 
   it.each(['session', null, 1])(
