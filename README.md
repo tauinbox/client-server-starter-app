@@ -1571,7 +1571,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/admin/feature-flags/:id` | `feature-flags:manage` | Get a feature flag by ID |
 | GET | `/admin/feature-flags/attribute-keys` | `feature-flags:manage` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
 | POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag |
-| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. Uses optimistic locking through `If-Match` |
+| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. The key is immutable after create. Uses optimistic locking through `If-Match` |
 | DELETE | `/admin/feature-flags/:id` | `feature-flags:manage` | Delete a feature flag |
 | PUT | `/admin/feature-flags/:id/rules` | `feature-flags:manage` | Replace the targeting rules of a flag |
 | POST | `/admin/feature-flags/:id/preview` | `feature-flags:manage` | Show how a flag evaluates for given attributes, and save nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag |
@@ -1830,11 +1830,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2755 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 533 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 523 pass and 10 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1494 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2756 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 535 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 525 pass and 10 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1496 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 299 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 943 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 942 tests pass |
 
 ## CI/CD
 

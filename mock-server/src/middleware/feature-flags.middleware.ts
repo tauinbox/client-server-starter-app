@@ -95,7 +95,14 @@ interface CreateFlagBody {
   public?: unknown;
 }
 
-type UpdateFlagBody = CreateFlagBody;
+type UpdateFlagBody = Omit<CreateFlagBody, 'key'>;
+
+const UPDATE_BODY_KEYS = [
+  'description',
+  'enabled',
+  'environments',
+  'public'
+] as const;
 
 interface ReplaceRulesBody {
   rules?: unknown;
@@ -192,18 +199,15 @@ function validateCreate(
   };
 }
 
-type UpdatePatch = Partial<CreateData>;
+type UpdatePatch = Partial<Omit<CreateData, 'key'>>;
 
 function validateUpdate(
   body: UpdateFlagBody
 ):
   { ok: true; patch: UpdatePatch } | { ok: false; message: string | string[] } {
+  const unknown = unknownPropertyErrors(body, UPDATE_BODY_KEYS);
+  if (unknown.length > 0) return { ok: false, message: unknown };
   const patch: UpdatePatch = {};
-  if (body.key !== undefined) {
-    const keyFailures = keyErrors(body.key);
-    if (keyFailures.length > 0) return { ok: false, message: keyFailures };
-    patch.key = (body.key as string).trim();
-  }
   if (body.description !== undefined) {
     if (
       body.description !== null &&
@@ -623,20 +627,6 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
     );
     return;
   }
-  if (validation.patch.key !== undefined) {
-    const conflict = findFlagByKey(validation.patch.key);
-    if (conflict && conflict.id !== flag.id) {
-      sendError(
-        res,
-        409,
-        'Feature flag with this key already exists',
-        ErrorKeys.FEATURE_FLAGS.KEY_EXISTS
-      );
-      return;
-    }
-  }
-  // The server compares the version inside the UPDATE ... WHERE clause, so the
-  // key conflict above wins when a request is both stale and duplicate-keyed.
   if (flag.version !== ifMatch.version) {
     sendError(
       res,
@@ -645,9 +635,6 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
       ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
     );
     return;
-  }
-  if (validation.patch.key !== undefined) {
-    flag.key = validation.patch.key;
   }
   if (validation.patch.description !== undefined) {
     flag.description = validation.patch.description;

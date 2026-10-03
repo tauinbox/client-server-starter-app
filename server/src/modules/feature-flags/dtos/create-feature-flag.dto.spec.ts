@@ -21,10 +21,14 @@ describe('CreateFeatureFlagDto environments', () => {
       | typeof CreateFeatureFlagDto
       | typeof UpdateFeatureFlagDto = CreateFeatureFlagDto
   ): Promise<CreateFeatureFlagDto> {
-    return (await pipe.transform(
-      { key: 'new-dashboard', environments },
-      { type: 'body', metatype }
-    )) as CreateFeatureFlagDto;
+    const body =
+      metatype === CreateFeatureFlagDto
+        ? { key: 'new-dashboard', environments }
+        : { environments };
+    return (await pipe.transform(body, {
+      type: 'body',
+      metatype
+    })) as CreateFeatureFlagDto;
   }
 
   async function expectRejected(environments: unknown): Promise<string> {
@@ -135,5 +139,38 @@ describe('CreateFeatureFlagDto key', () => {
     ]
   ])('reports every failed rule for %s', async (_case, body, expected) => {
     expect(await keyErrors(body)).toEqual(expected);
+  });
+});
+
+describe('UpdateFeatureFlagDto key', () => {
+  const pipe = new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true
+  });
+
+  it('rejects a key, because a rename re-buckets every percentage rollout', async () => {
+    const error = await pipe
+      .transform(
+        { key: 'new-dashboard-renamed', enabled: true },
+        { type: 'body', metatype: UpdateFeatureFlagDto }
+      )
+      .then(
+        () => null,
+        (e: unknown) => e
+      );
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect(
+      ((error as BadRequestException).getResponse() as { message: string[] })
+        .message
+    ).toEqual(['property key should not exist']);
+  });
+
+  it('accepts a body without a key', async () => {
+    const dto = (await pipe.transform(
+      { enabled: true },
+      { type: 'body', metatype: UpdateFeatureFlagDto }
+    )) as UpdateFeatureFlagDto;
+    expect(dto.enabled).toBe(true);
   });
 });

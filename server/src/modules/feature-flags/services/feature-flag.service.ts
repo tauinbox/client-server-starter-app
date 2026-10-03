@@ -6,13 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  DataSource,
-  EntityManager,
-  In,
-  Repository,
-  UpdateResult
-} from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import type {
   FeatureFlagAttributeKeysResponse,
@@ -191,17 +185,10 @@ export class FeatureFlagService {
     actorId: string | null
   ): Promise<FeatureFlag> {
     await this.findOne(id);
-    if (dto.key !== undefined) {
-      const conflict = await this.flagRepo.findOne({ where: { key: dto.key } });
-      if (conflict && conflict.id !== id) {
-        throw keyExistsConflict();
-      }
-    }
-    const qb = this.flagRepo
+    const result = await this.flagRepo
       .createQueryBuilder()
       .update(FeatureFlag)
       .set({
-        ...(dto.key !== undefined ? { key: dto.key } : {}),
         ...(dto.description !== undefined
           ? { description: dto.description }
           : {}),
@@ -216,17 +203,8 @@ export class FeatureFlagService {
       .where('id = :id AND version = :expected', {
         id,
         expected: expectedVersion
-      });
-
-    // Same race as in create(): a concurrent writer may take the key between
-    // the check above and this statement.
-    let result: UpdateResult;
-    try {
-      result = await qb.execute();
-    } catch (error: unknown) {
-      if (isUniqueViolation(error)) throw keyExistsConflict();
-      throw error;
-    }
+      })
+      .execute();
 
     if (result.affected === 0) {
       throw new HttpException(

@@ -14,6 +14,7 @@ import {
   maxLength,
   minLength,
   pattern,
+  readonly,
   required
 } from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
@@ -30,9 +31,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, of } from 'rxjs';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
 import type {
-  CreateFeatureFlag,
   FeatureFlagRuleInput,
-  PreviewFlagDraft
+  PreviewFlagDraft,
+  UpdateFeatureFlag
 } from '../../../services/feature-flags-admin.service';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import {
@@ -58,8 +59,10 @@ export type FeatureFlagFormDialogData = {
   flag?: FeatureFlagResponse;
 };
 
+// `key` stays out of `flag` because the server rejects a key on update.
 export type FeatureFlagFormDialogResult = {
-  flag: CreateFeatureFlag;
+  key: string;
+  flag: UpdateFeatureFlag;
   rules: FeatureFlagRuleInput[];
   rulesChanged: boolean;
 };
@@ -168,6 +171,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     minLength(path.key, FEATURE_FLAG_KEY_MIN_LENGTH);
     maxLength(path.key, FEATURE_FLAG_KEY_MAX_LENGTH);
     pattern(path.key, FEATURE_FLAG_KEY_PATTERN);
+    readonly(path.key, () => this.isEdit);
     maxLength(path.description, 500);
   });
 
@@ -262,8 +266,8 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   #close(): void {
     const formData = this.model();
     const result: FeatureFlagFormDialogResult = {
+      key: formData.key.trim(),
       flag: {
-        key: formData.key.trim(),
         description: formData.description.trim() || null,
         enabled: this.enabled(),
         environments: this.environments().map((c) => c.value),

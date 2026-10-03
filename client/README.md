@@ -855,7 +855,9 @@ evaluator defaults to on when there is no include rule. A change to off does not
 already targets a subset also does not ask.
 
 **`FeatureFlagFormDialogComponent`** has a top form and an embedded rules editor. The top form holds
-the key, the description, the environments, the enabled state and the public state.
+the key, the description, the environments, the enabled state and the public state. On edit the key
+is read-only and the update body carries no `key`, because the server rejects a key change: the
+percentage bucket hashes the key.
 
 The environments chip grid gives options only and permits no free text. It gives exactly the
 `APP_ENVIRONMENTS` names that the API accepts. Thus a user cannot type an invented name and get a 400

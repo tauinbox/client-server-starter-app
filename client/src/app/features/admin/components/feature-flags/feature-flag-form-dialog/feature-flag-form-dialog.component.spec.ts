@@ -210,7 +210,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.submit();
     expect(closeSpy).toHaveBeenCalledTimes(1);
     const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.flag.key).toBe('new-dashboard');
+    expect(result.key).toBe('new-dashboard');
     expect(result.flag.enabled).toBe(true);
     expect(result.flag.environments).toEqual([]);
   });
@@ -239,9 +239,41 @@ describe('FeatureFlagFormDialogComponent', () => {
       cmp.submit();
       expect(closeSpy).toHaveBeenCalledTimes(1);
       const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-      expect(result.flag.key).toBe(key);
+      expect(result.key).toBe(key);
+      expect(result.flag).not.toHaveProperty('key');
     }
   );
+
+  it('shows the key read-only on edit and sends no key in the update body', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    await fixture.whenStable();
+    const input = (fixture.nativeElement as HTMLElement).querySelector(
+      'nxs-form-field input'
+    ) as HTMLInputElement;
+    expect(input.readOnly).toBe(true);
+
+    const cmp = fixture.componentInstance;
+    cmp.model.update((m) => ({ ...m, description: 'paused' }));
+    await fixture.whenStable();
+    cmp.submit();
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
+    expect(result.flag).toEqual({
+      description: 'paused',
+      enabled: true,
+      environments: ['production'],
+      public: false
+    });
+  });
+
+  it('keeps the key editable on create', async () => {
+    const fixture = await setup({});
+    await fixture.whenStable();
+    const input = (fixture.nativeElement as HTMLElement).querySelector(
+      'nxs-form-field input'
+    ) as HTMLInputElement;
+    expect(input.readOnly).toBe(false);
+  });
 
   it('submit() is a no-op when the key fails validation', async () => {
     const fixture = await setup({});
