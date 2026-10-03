@@ -1,5 +1,8 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import { APP_ENVIRONMENTS } from '@app/shared/constants';
+import {
+  APP_ENVIRONMENTS,
+  BILLING_PROVIDER_FLAGS
+} from '@app/shared/constants';
 import { CreateFeatureFlagDto } from './create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from './update-feature-flag.dto';
 
@@ -77,5 +80,60 @@ describe('CreateFeatureFlagDto environments', () => {
       { type: 'body', metatype: CreateFeatureFlagDto }
     )) as CreateFeatureFlagDto;
     expect(dto.environments).toBeUndefined();
+  });
+});
+
+describe('CreateFeatureFlagDto key', () => {
+  const pipe = new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true
+  });
+
+  async function keyErrors(body: object): Promise<string[] | null> {
+    return pipe
+      .transform(body, { type: 'body', metatype: CreateFeatureFlagDto })
+      .then(
+        () => null,
+        (e: unknown) =>
+          ((e as BadRequestException).getResponse() as { message: string[] })
+            .message
+      );
+  }
+
+  it.each(BILLING_PROVIDER_FLAGS.map((p) => p.enabledFlagKey))(
+    'accepts the billing kill-switch key %s',
+    async (key) => {
+      expect(await keyErrors({ key })).toBeNull();
+    }
+  );
+
+  // The mock sends the same arrays: validation-error-envelope-parity.spec.ts.
+  it.each([
+    [
+      'a malformed key',
+      { key: 'Not A Key' },
+      ['key must match /^[a-z0-9][a-z0-9-]*[a-z0-9]$/ regular expression']
+    ],
+    [
+      'a one-character key',
+      { key: 'a' },
+      [
+        'key must match /^[a-z0-9][a-z0-9-]*[a-z0-9]$/ regular expression',
+        'key must be longer than or equal to 2 characters'
+      ]
+    ],
+    [
+      'no key',
+      {},
+      [
+        'key must match /^[a-z0-9][a-z0-9-]*[a-z0-9]$/ regular expression',
+        'key must be shorter than or equal to 100 characters',
+        'key must be longer than or equal to 2 characters',
+        'key must be a string'
+      ]
+    ]
+  ])('reports every failed rule for %s', async (_case, body, expected) => {
+    expect(await keyErrors(body)).toEqual(expected);
   });
 });

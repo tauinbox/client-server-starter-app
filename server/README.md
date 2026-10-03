@@ -1057,7 +1057,7 @@ which come from the environment.
 
 **Registrars.** `BillingConfiguredAttributesRegistrar` registers the `paddleConfigured`,
 `yookassaConfigured` and combined `billingConfigured` feature-flag attributes. The public `billing`
-flag gates the UI on the configuration. The per-provider `billing.provider.*.enabled` administrator
+flag gates the UI on the configuration. The per-provider `billing-paddle` / `billing-yookassa` administrator
 kill switches gate the geo-router.
 
 #### entitlements
@@ -2558,7 +2558,8 @@ administrator-only data, never reaches the audit log.
 through the administrator UI or API. Attach the rules if you want a partial rollout. Then verify the
 result with `GET /api/v1/feature-flags` as the target caller.
 
-The `key` of a flag is a free-form string of lowercase letters, digits and hyphens. Give it the same
+The `key` of a flag is a string of lowercase letters, digits and hyphens that starts and ends with a
+letter or a digit (`FEATURE_FLAG_KEY_PATTERN`). Every flag uses this rule. Give it the same
 name as the gate. Thus a later reader can go from the code to the configuration with a grep.
 
 ### Users (`/api/v1/users`)

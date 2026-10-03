@@ -84,3 +84,7 @@ export type FeatureFlagPreviewReason =
 // cookie of any other shape is treated as absent rather than hashed.
 export const ANON_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const FEATURE_FLAG_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+export const FEATURE_FLAG_KEY_MIN_LENGTH = 2;
+export const FEATURE_FLAG_KEY_MAX_LENGTH = 100;

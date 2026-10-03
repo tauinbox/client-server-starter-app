@@ -129,19 +129,45 @@ describe('validation-error envelope parity with server', () => {
       ]);
     });
 
-    it('feature-flags: creating a flag with a malformed key', async () => {
-      const token = await login('admin@example.com');
-      const { status, body } = await send(
-        'POST',
-        '/api/v1/admin/feature-flags',
+    it.each([
+      [
+        'a malformed key',
         { key: 'Not A Key' },
-        token
-      );
+        ['key must match /^[a-z0-9][a-z0-9-]*[a-z0-9]$/ regular expression']
+      ],
+      [
+        'a one-character key',
+        { key: 'a' },
+        [
+          'key must match /^[a-z0-9][a-z0-9-]*[a-z0-9]$/ regular expression',
+          'key must be longer than or equal to 2 characters'
+        ]
+      ],
+      [
+        'no key',
+        {},
+        [
+          'key must match /^[a-z0-9][a-z0-9-]*[a-z0-9]$/ regular expression',
+          'key must be shorter than or equal to 100 characters',
+          'key must be longer than or equal to 2 characters',
+          'key must be a string'
+        ]
+      ]
+    ])(
+      'feature-flags: creating a flag with %s',
+      async (_case, payload, expected) => {
+        const token = await login('admin@example.com');
+        const { status, body } = await send(
+          'POST',
+          '/api/v1/admin/feature-flags',
+          payload,
+          token
+        );
 
-      expect(status).toBe(400);
-      expect(body.errors).toEqual([body.message]);
-      expect(body.errors?.join(' ')).toContain('key must match');
-    });
+        expect(status).toBe(400);
+        expect(body.errors).toEqual(expected);
+      }
+    );
 
     it('feature-flags: a rules array whose entry has an unknown type', async () => {
       const token = await login('admin@example.com');

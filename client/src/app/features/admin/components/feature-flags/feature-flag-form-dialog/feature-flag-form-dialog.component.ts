@@ -35,7 +35,12 @@ import type {
   PreviewFlagDraft
 } from '../../../services/feature-flags-admin.service';
 import type { FeatureFlagResponse } from '@app/shared/types';
-import { APP_ENVIRONMENTS } from '@app/shared/constants';
+import {
+  APP_ENVIRONMENTS,
+  FEATURE_FLAG_KEY_MAX_LENGTH,
+  FEATURE_FLAG_KEY_MIN_LENGTH,
+  FEATURE_FLAG_KEY_PATTERN
+} from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -63,8 +68,6 @@ type FlagFormData = {
   key: string;
   description: string;
 };
-
-const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
 function envToChip(name: string): ChipOption {
   return { value: name, label: name };
@@ -162,9 +165,9 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   readonly flagForm = form(this.model, (path) => {
     required(path.key);
-    minLength(path.key, 2);
-    maxLength(path.key, 100);
-    pattern(path.key, KEY_PATTERN);
+    minLength(path.key, FEATURE_FLAG_KEY_MIN_LENGTH);
+    maxLength(path.key, FEATURE_FLAG_KEY_MAX_LENGTH);
+    pattern(path.key, FEATURE_FLAG_KEY_PATTERN);
     maxLength(path.description, 500);
   });
 
