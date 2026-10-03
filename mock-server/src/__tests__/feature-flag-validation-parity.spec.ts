@@ -94,19 +94,21 @@ describe('feature-flag validation parity with server', () => {
       expect(res.status).toBe(409);
     });
 
-    it('applies the same trim on PATCH', async () => {
-      const created = await createFlag({ key: 'patch-trim' });
-      expect(created.status).toBe(201);
-      const flag = (await created.json()) as { id: string; version: number };
+    it('rejects a key on PATCH with 400 and keeps the flag unchanged', async () => {
+      const created = await createFlag({ key: 'patch-stable-key' });
+      const target = (await created.json()) as { id: string; version: number };
 
       const res = await patchFlag(
-        flag.id,
-        { key: '  patch-trimmed  ' },
-        String(flag.version)
+        target.id,
+        { key: 'patch-renamed-key', enabled: true },
+        String(target.version)
       );
-      expect(res.status).toBe(200);
-      const patched = (await res.json()) as { key: string };
-      expect(patched.key).toBe('patch-trimmed');
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors).toEqual(['property key should not exist']);
+      const flag = getState().featureFlags.get(target.id);
+      expect(flag?.key).toBe('patch-stable-key');
+      expect(flag?.version).toBe(target.version);
     });
 
     it('rejects a key that is only whitespace', async () => {
@@ -721,22 +723,6 @@ describe('feature-flag validation parity with server', () => {
       expect(res.status).toBe(428);
       const body = (await res.json()) as { errorKey: string };
       expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED);
-    });
-
-    it('reports the key conflict, not the version conflict, when a PATCH is both', async () => {
-      const first = await createFlag({ key: 'order-taken-key' });
-      const second = await createFlag({ key: 'order-stale-flag' });
-      expect(first.status).toBe(201);
-      const target = (await second.json()) as { id: string; version: number };
-
-      const res = await patchFlag(
-        target.id,
-        { key: 'order-taken-key' },
-        String(target.version + 5)
-      );
-      expect(res.status).toBe(409);
-      const body = (await res.json()) as { errorKey: string };
-      expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.KEY_EXISTS);
     });
 
     it('rejects a non-array rule set on an absent flag with 400, not 404', async () => {

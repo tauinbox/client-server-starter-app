@@ -211,22 +211,6 @@ describe('FeatureFlagService', () => {
   });
 
   describe('update — optimistic lock', () => {
-    it('maps a lost duplicate-key race to 409 with the flag-specific key', async () => {
-      flagRepo.findOne
-        .mockResolvedValueOnce(sampleFlag) // findOne preload
-        .mockResolvedValueOnce(null); // key-conflict check passes
-      const qb = createQueryBuilder(1);
-      qb.execute.mockRejectedValue({ code: '23505' });
-      flagRepo.createQueryBuilder.mockReturnValue(qb);
-
-      await expect(
-        service.update('flag-1', { key: 'taken' }, 1, 'actor-1')
-      ).rejects.toMatchObject({
-        status: 409,
-        response: { errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS }
-      });
-    });
-
     it('returns 409 when version does not match (affected = 0)', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       const qb = createQueryBuilder(0);

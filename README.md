@@ -1571,7 +1571,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/admin/feature-flags/:id` | `feature-flags:manage` | Get a feature flag by ID |
 | GET | `/admin/feature-flags/attribute-keys` | `feature-flags:manage` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
 | POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag |
-| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. Uses optimistic locking through `If-Match` |
+| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. The key is immutable after create. Uses optimistic locking through `If-Match` |
 | DELETE | `/admin/feature-flags/:id` | `feature-flags:manage` | Delete a feature flag |
 | PUT | `/admin/feature-flags/:id/rules` | `feature-flags:manage` | Replace the targeting rules of a flag |
 | POST | `/admin/feature-flags/:id/preview` | `feature-flags:manage` | Show how a flag evaluates for given attributes, and save nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag |

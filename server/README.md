@@ -2431,7 +2431,7 @@ The base URL is `/api/v1`.
 | GET | `/admin/feature-flags` | `manage:FeatureFlag` | List each flag with its rules |
 | GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
 | POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag. The audit action is `FEATURE_FLAG_CREATE` |
-| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict`. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
+| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict`. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
 | DELETE | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
 | PUT | `/admin/feature-flags/:id/rules` | `manage:FeatureFlag` | Replace the full rule set in one transaction. The audit action is `FEATURE_FLAG_RULES_REPLACE` |
 | POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Change `enabled` and increase the version. The audit action is `FEATURE_FLAG_TOGGLE` |

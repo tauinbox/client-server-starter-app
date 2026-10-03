@@ -263,8 +263,8 @@ describe('FeatureFlagListComponent', () => {
   describe('FF-UX-008 — composite outcome for create + replaceRules', () => {
     const createdFlag = { ...flag, id: 'flag-new', key: 'just-created' };
     const dialogResult: FeatureFlagFormDialogResult = {
+      key: 'just-created',
       flag: {
-        key: 'just-created',
         description: null,
         enabled: false,
         environments: [],
@@ -291,7 +291,10 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       fixture.componentInstance.openCreateDialog();
 
-      expect(serviceMock.create).toHaveBeenCalled();
+      expect(serviceMock.create).toHaveBeenCalledWith({
+        key: 'just-created',
+        ...dialogResult.flag
+      });
       expect(serviceMock.replaceRules).toHaveBeenCalledWith(
         'flag-new',
         dialogResult.rules
@@ -373,8 +376,8 @@ describe('FeatureFlagListComponent', () => {
 
   describe('FF-UX-008 — composite outcome for update + replaceRules', () => {
     const dialogResult: FeatureFlagFormDialogResult = {
+      key: 'new-dashboard',
       flag: {
-        key: 'new-dashboard',
         description: 'updated',
         enabled: true,
         environments: ['production'],
@@ -401,6 +404,12 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       fixture.componentInstance.openEditDialog(flag);
 
+      expect(serviceMock.update).toHaveBeenCalledWith(
+        'flag-1',
+        dialogResult.flag,
+        flag.version
+      );
+      expect(serviceMock.update.mock.calls[0][1]).not.toHaveProperty('key');
       expect(notifySuccess).toHaveBeenCalledTimes(1);
       expect(notifySuccess).toHaveBeenCalledWith(
         'admin.featureFlags.successUpdated',
@@ -520,8 +529,8 @@ describe('FeatureFlagListComponent', () => {
         throwError(() => new Error('boom'))
       );
       stubDialogResult({
+        key: flag.key,
         flag: {
-          key: flag.key,
           description: flag.description,
           enabled: flag.enabled,
           environments: flag.environments,

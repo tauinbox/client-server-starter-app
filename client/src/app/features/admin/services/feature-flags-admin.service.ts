@@ -28,7 +28,7 @@ export type CreateFeatureFlag = {
   public?: boolean;
 };
 
-export type UpdateFeatureFlag = Partial<CreateFeatureFlag>;
+export type UpdateFeatureFlag = Partial<Omit<CreateFeatureFlag, 'key'>>;
 
 export type FeatureFlagRuleInput = {
   type: FeatureFlagRuleType;

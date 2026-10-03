@@ -265,7 +265,7 @@ export class FeatureFlagListComponent implements OnInit {
   ): void {
     if (!existing) {
       this.#store
-        .createFlag(result.flag)
+        .createFlag({ key: result.key, ...result.flag })
         .pipe(takeUntilDestroyed(this.#destroyRef))
         .subscribe({
           next: (created) => {
