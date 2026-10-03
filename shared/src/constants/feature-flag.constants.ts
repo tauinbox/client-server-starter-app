@@ -7,6 +7,10 @@
  * removed in one place — a hand-written union next to a hand-written array
  * constrains the members but never the completeness of either copy.
  */
+export const FEATURE_FLAG_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+export const FEATURE_FLAG_KEY_MIN_LENGTH = 2;
+export const FEATURE_FLAG_KEY_MAX_LENGTH = 100;
+
 export const FEATURE_FLAG_RULE_TYPES = [
   'user',
   'role',

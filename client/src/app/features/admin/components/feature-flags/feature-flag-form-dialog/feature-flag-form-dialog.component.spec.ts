@@ -8,7 +8,10 @@ import type {
   FeatureFlagRulePayload,
   FeatureFlagRuleResponse
 } from '@app/shared/types';
-import { APP_ENVIRONMENTS } from '@app/shared/constants';
+import {
+  APP_ENVIRONMENTS,
+  BILLING_PROVIDER_FLAGS
+} from '@app/shared/constants';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -211,6 +214,34 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(result.flag.enabled).toBe(true);
     expect(result.flag.environments).toEqual([]);
   });
+
+  it.each(BILLING_PROVIDER_FLAGS.map((p) => p.enabledFlagKey))(
+    'saves an edit of the billing kill-switch %s',
+    async (key) => {
+      const fixture = await setup({
+        flag: {
+          id: 'flag-1',
+          key,
+          description: null,
+          enabled: false,
+          environments: [],
+          public: false,
+          version: 1,
+          updatedByUserId: null,
+          createdAt: '2026-05-19T10:00:00Z',
+          updatedAt: '2026-05-19T10:00:00Z',
+          rules: []
+        }
+      });
+      const cmp = fixture.componentInstance;
+      cmp.model.update((m) => ({ ...m, description: 'paused' }));
+      await fixture.whenStable();
+      cmp.submit();
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+      const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
+      expect(result.flag.key).toBe(key);
+    }
+  );
 
   it('submit() is a no-op when the key fails validation', async () => {
     const fixture = await setup({});

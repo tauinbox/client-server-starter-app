@@ -20,8 +20,8 @@ describe('BillingService.resolveProvider', () => {
   // Default kill-switch state: both provider flags enabled. Per-test overrides
   // replace this map.
   const enabledByKey: Record<string, boolean> = {
-    'billing.provider.paddle.enabled': true,
-    'billing.provider.yookassa.enabled': true
+    'billing-paddle': true,
+    'billing-yookassa': true
   };
 
   beforeEach(async () => {
@@ -73,7 +73,7 @@ describe('BillingService.resolveProvider', () => {
     featureFlags.findByKey.mockImplementation((key: string) =>
       Promise.resolve({
         key,
-        enabled: key !== 'billing.provider.paddle.enabled'
+        enabled: key !== 'billing-paddle'
       })
     );
     const refusal = service.resolveProvider(args({ country: 'US' }));
@@ -120,9 +120,7 @@ describe('BillingService.resolveProvider', () => {
   it('looks up only the resolved provider flag, not the whole flag set', async () => {
     await service.resolveProvider(args({ country: 'US' }));
     expect(featureFlags.findByKey).toHaveBeenCalledTimes(1);
-    expect(featureFlags.findByKey).toHaveBeenCalledWith(
-      'billing.provider.paddle.enabled'
-    );
+    expect(featureFlags.findByKey).toHaveBeenCalledWith('billing-paddle');
   });
 });
 

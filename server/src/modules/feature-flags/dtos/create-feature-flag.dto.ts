@@ -14,11 +14,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   APP_ENVIRONMENTS,
+  FEATURE_FLAG_KEY_MAX_LENGTH,
+  FEATURE_FLAG_KEY_MIN_LENGTH,
+  FEATURE_FLAG_KEY_PATTERN,
   normalizeEnvironmentList
 } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
-
-const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
 export class CreateFeatureFlagDto {
   @ApiProperty({
@@ -30,9 +31,9 @@ export class CreateFeatureFlagDto {
     typeof value === 'string' ? value.trim() : value
   )
   @IsString()
-  @MinLength(2)
-  @MaxLength(100)
-  @Matches(KEY_PATTERN)
+  @MinLength(FEATURE_FLAG_KEY_MIN_LENGTH)
+  @MaxLength(FEATURE_FLAG_KEY_MAX_LENGTH)
+  @Matches(FEATURE_FLAG_KEY_PATTERN)
   key: string;
 
   @ApiPropertyOptional({ example: 'New dashboard rollout' })

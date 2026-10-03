@@ -20,6 +20,9 @@ import {
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_PROVIDER_FLAGS,
   ErrorKeys,
+  FEATURE_FLAG_KEY_MAX_LENGTH,
+  FEATURE_FLAG_KEY_MIN_LENGTH,
+  FEATURE_FLAG_KEY_PATTERN,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
   OAUTH_PROVIDER_FLAGS,
@@ -49,8 +52,6 @@ import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
 import type { MockFeatureFlag, MockFeatureFlagRule, MockUser } from '../types';
 import { readAnonId, writeAnonId } from '../helpers/anon-id.helpers';
-
-const KEY_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
 // Mirrors the server's attribute registry. The custom attributes are the
 // per-OAuth-provider "configured" signals (registered by the server's
@@ -100,10 +101,23 @@ interface ReplaceRulesBody {
   rules?: unknown;
 }
 
-// Mirrors the @Transform on CreateFeatureFlagDto.key: class-transformer trims
-// the value before the length and pattern validators see it.
-function trimKey(value: unknown): unknown {
-  return typeof value === 'string' ? value.trim() : value;
+// Mirrors CreateFeatureFlagDto.key: the trim runs first, then the decorators
+// report bottom-up, so `@Matches` comes ahead of the length and type rules.
+function keyErrors(value: unknown): string[] {
+  const key = typeof value === 'string' ? value.trim() : value;
+  const errors: string[] = [];
+  if (typeof key !== 'string' || !FEATURE_FLAG_KEY_PATTERN.test(key)) {
+    errors.push(
+      `key must match ${String(FEATURE_FLAG_KEY_PATTERN)} regular expression`
+    );
+  }
+  return [
+    ...errors,
+    ...stringErrors('key', key, {
+      min: FEATURE_FLAG_KEY_MIN_LENGTH,
+      max: FEATURE_FLAG_KEY_MAX_LENGTH
+    })
+  ];
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -142,19 +156,10 @@ type CreateData = {
 
 function validateCreate(
   body: CreateFlagBody
-): { ok: true; data: CreateData } | { ok: false; message: string } {
-  const key = trimKey(body.key);
-  if (
-    typeof key !== 'string' ||
-    key.length < 2 ||
-    key.length > 100 ||
-    !KEY_PATTERN.test(key)
-  ) {
-    return {
-      ok: false,
-      message: 'key must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (2-100 chars)'
-    };
-  }
+): { ok: true; data: CreateData } | { ok: false; message: string | string[] } {
+  const keyFailures = keyErrors(body.key);
+  if (keyFailures.length > 0) return { ok: false, message: keyFailures };
+  const key = (body.key as string).trim();
   if (body.description !== undefined && body.description !== null) {
     if (typeof body.description !== 'string' || body.description.length > 500) {
       return {
@@ -191,22 +196,13 @@ type UpdatePatch = Partial<CreateData>;
 
 function validateUpdate(
   body: UpdateFlagBody
-): { ok: true; patch: UpdatePatch } | { ok: false; message: string } {
+):
+  { ok: true; patch: UpdatePatch } | { ok: false; message: string | string[] } {
   const patch: UpdatePatch = {};
   if (body.key !== undefined) {
-    const key = trimKey(body.key);
-    if (
-      typeof key !== 'string' ||
-      key.length < 2 ||
-      key.length > 100 ||
-      !KEY_PATTERN.test(key)
-    ) {
-      return {
-        ok: false,
-        message: 'key must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (2-100 chars)'
-      };
-    }
-    patch.key = key;
+    const keyFailures = keyErrors(body.key);
+    if (keyFailures.length > 0) return { ok: false, message: keyFailures };
+    patch.key = (body.key as string).trim();
   }
   if (body.description !== undefined) {
     if (

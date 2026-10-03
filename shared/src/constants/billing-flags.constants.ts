@@ -26,12 +26,12 @@ export const BILLING_PROVIDER_FLAGS = [
   {
     provider: 'paddle',
     configuredAttribute: 'paddleConfigured',
-    enabledFlagKey: 'billing.provider.paddle.enabled'
+    enabledFlagKey: 'billing-paddle'
   },
   {
     provider: 'yookassa',
     configuredAttribute: 'yookassaConfigured',
-    enabledFlagKey: 'billing.provider.yookassa.enabled'
+    enabledFlagKey: 'billing-yookassa'
   }
 ] as const satisfies ReadonlyArray<{
   provider: BillingProviderId;
