@@ -31,6 +31,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { subject } from '@casl/ability';
 import { ErrorKeys } from '@app/shared/constants';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import {
   ActionCursorQueryDto,
   ResourceCursorQueryDto
@@ -201,6 +202,7 @@ export class RbacController {
       { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
       this.metricsService
     );
+    const changed = changedFields(resource, dto);
     const result = await this.resourceService.update(id, dto);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
@@ -209,7 +211,7 @@ export class RbacController {
       actorEmail: req.user.email,
       targetId: id,
       targetType: 'Resource',
-      details: { changedFields: Object.keys(dto) },
+      details: { changedFields: changed },
       context: extractAuditContext(req)
     });
     return result;
@@ -295,6 +297,7 @@ export class RbacController {
       { actorId: req.user.userId, targetId: id, targetType: 'Action' },
       this.metricsService
     );
+    const changed = changedFields(action, dto);
     const result = await this.actionService.update(id, dto);
     await this.cacheManager.del(METADATA_CACHE_KEY);
     await this.auditService.log({
@@ -303,7 +306,7 @@ export class RbacController {
       actorEmail: req.user.email,
       targetId: id,
       targetType: 'Action',
-      details: { changedFields: Object.keys(dto) },
+      details: { changedFields: changed },
       context: extractAuditContext(req)
     });
     return result;

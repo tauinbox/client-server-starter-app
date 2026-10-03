@@ -470,8 +470,9 @@ orphans each per-user entry with no Redis `SCAN`.
 
 `controllers/feature-flags-admin.controller.ts` holds 9 administrator endpoints below
 `/admin/feature-flags`. Each one uses `@Authorize(['manage','FeatureFlag'])`. The 5 mutating
-endpoints each write an audit entry. Four of them use `@LogAudit`. The delete calls
-`AuditService.log` itself, to record `details: { key }` of the flag that it removed. The 3 read
+endpoints each write an audit entry. Three of them use `@LogAudit`. The delete calls
+`AuditService.log` itself, to record `details: { key }` of the flag that it removed. The update
+calls it too, because `changedFields` compares the request with the flag read before the write. The 3 read
 endpoints and `POST :id/preview` write nothing, thus they make no audit entry.
 
 `controllers/feature-flags.controller.ts` holds `GET /feature-flags` with `@OptionalAuth()`. An
@@ -2553,7 +2554,8 @@ resolved value, because a resolver can carry personal data.
 `FEATURE_FLAG_DELETE`, `FEATURE_FLAG_TOGGLE` and `FEATURE_FLAG_RULES_REPLACE`.
 
 The `details` JSONB column holds `key`, `changedFields`, `ruleCount` or `enabled`, and the action
-decides which one. It never holds the raw rule payload. Thus the segmentation strategy, which is
+decides which one. `changedFields` names only the fields whose stored value changed, so a resubmit
+of the edit form writes an empty list. It never holds the raw rule payload. Thus the segmentation strategy, which is
 administrator-only data, never reaches the audit log.
 
 **To add a new flag from a feature module.** The flag site needs no code above

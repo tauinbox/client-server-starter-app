@@ -11,6 +11,7 @@ import {
   TOTP_DIGITS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
   emailErrors,
@@ -498,6 +499,20 @@ router.patch(
       return;
     }
 
+    const changed = changedFields(user, {
+      email,
+      firstName,
+      lastName,
+      locale,
+      isActive
+    });
+    if (
+      unlockAccount &&
+      (user.failedLoginAttempts !== 0 || user.lockedUntil !== null)
+    ) {
+      changed.push('unlockAccount');
+    }
+
     let previousEmail: string | undefined;
     if (email !== undefined) {
       const existing = findUserByEmail(email);
@@ -551,16 +566,12 @@ router.patch(
     user.updatedAt = new Date().toISOString();
 
     const actor = (req as AuthenticatedRequest).user;
-    // The step-up factors are stripped before the write, as on the server.
-    const changedFields = Object.keys(req.body).filter(
-      (k: string) => !['password', 'currentPassword', 'code'].includes(k)
-    );
     logAudit('USER_UPDATE', {
       actorId: actor.id,
       actorEmail: actor.email,
       targetId: id,
       targetType: 'User',
-      details: { changedFields },
+      details: { changedFields: changed },
       ip: req.ip
     });
 

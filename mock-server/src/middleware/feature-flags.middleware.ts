@@ -38,6 +38,7 @@ import {
   parseCursorQuery
 } from '../helpers/pagination.helpers';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import { authenticateRequest, permissionGuard } from '../helpers/auth.helpers';
 import {
   requireUuid,
@@ -644,6 +645,12 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
     );
     return;
   }
+  const changed = changedFields(flag, {
+    description: validation.patch.description,
+    enabled: validation.patch.enabled,
+    environments: validation.patch.environments,
+    public: validation.patch.isPublic
+  });
   if (validation.patch.description !== undefined) {
     flag.description = validation.patch.description;
   }
@@ -661,7 +668,7 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
     actorId: actorIdFromReq(req),
     targetId: flag.id,
     targetType: 'FeatureFlag',
-    details: { changedFields: Object.keys(req.body as object) }
+    details: { changedFields: changed }
   });
   broadcastFlagsUpdated();
   res.json(toFeatureFlagResponse(flag));

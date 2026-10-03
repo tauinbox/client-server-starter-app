@@ -30,6 +30,7 @@ describe('Admin user update DTO validation (e2e)', () => {
   let app: INestApplication;
   let server: Server;
   const usersService = {
+    findOne: jest.fn(),
     update: jest.fn()
   };
 
@@ -97,6 +98,13 @@ describe('Admin user update DTO validation (e2e)', () => {
     ['isActive', { isActive: false }],
     ['unlockAccount', { unlockAccount: true }]
   ])('accepts %s (200) and dispatches the update', async (_field, payload) => {
+    usersService.findOne.mockResolvedValue({
+      id: TARGET_ID,
+      email: 'target@example.com',
+      isActive: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null
+    });
     usersService.update.mockResolvedValue({ id: TARGET_ID });
 
     await request(server)

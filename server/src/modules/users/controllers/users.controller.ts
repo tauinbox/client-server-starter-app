@@ -61,6 +61,7 @@ import { AuthService } from '../../auth/services/auth.service';
 import { CHALLENGE_THROTTLE } from '../../auth/constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import { Throttle } from '@nestjs/throttler';
 import { MfaService } from '../../auth/services/mfa.service';
 import { MfaStepUpDto } from '../../auth/dtos/mfa.dto';
@@ -284,9 +285,9 @@ export class UsersController {
     // The service rewrites the address only when it actually differs, so the
     // pre-image is the only way to tell a real change from a form resubmit -
     // and revoking on a resubmit would log the target out for nothing.
+    const target = await this.usersService.findOne(id);
     let previousEmail: string | undefined;
     if (changes.email !== undefined || changes.password !== undefined) {
-      const target = await this.usersService.findOne(id);
       if (changes.email !== undefined) {
         previousEmail = target.email;
       }
@@ -317,6 +318,15 @@ export class UsersController {
       }
     }
 
+    const { password, unlockAccount, ...fields } = changes;
+    const changed = changedFields(target, fields);
+    if (
+      unlockAccount &&
+      (target.failedLoginAttempts !== 0 || target.lockedUntil !== null)
+    ) {
+      changed.push('unlockAccount');
+    }
+
     const updatedUser = await this.usersService.update(
       id,
       changes,
@@ -325,18 +335,17 @@ export class UsersController {
     );
     const emailChanged =
       previousEmail !== undefined && updatedUser.email !== previousEmail;
-    const changedFields = Object.keys(changes).filter((k) => k !== 'password');
     await this.auditService.log({
       action: AuditAction.USER_UPDATE,
       actorId: req.user.userId,
       actorEmail: req.user.email,
       targetId: id,
       targetType: 'User',
-      details: { changedFields },
+      details: { changedFields: changed },
       context: extractAuditContext(req)
     });
 
-    if (changes.password) {
+    if (password) {
       this.eventEmitter.emit(
         UserPasswordChangedByAdminEvent.name,
         new UserPasswordChangedByAdminEvent(id)

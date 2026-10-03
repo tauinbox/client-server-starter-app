@@ -769,14 +769,65 @@ describe('UsersController', () => {
       expect(eventEmitterMock.emitAsync).toHaveBeenCalledTimes(1);
     });
 
-    it('should not read the pre-image when the dto carries no email', async () => {
-      const dto: UpdateUserDto = { firstName: 'Updated' };
+    it('should log only the fields that differ from the stored user', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'target@example.com',
+        firstName: 'Old',
+        lastName: 'Kept',
+        isActive: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'target@example.com'
+      });
+      const dto: UpdateUserDto = {
+        email: 'target@example.com',
+        firstName: 'New',
+        lastName: 'Kept',
+        isActive: true,
+        unlockAccount: true
+      };
+
+      await controller.update(
+        'user-5',
+        dto,
+        mockJwtRequest() as JwtAuthRequest,
+        mockAbility
+      );
+
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_UPDATE,
+          details: { changedFields: ['firstName'] }
+        })
+      );
+    });
+
+    it('should log unlockAccount when the stored user is locked', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'target@example.com',
+        failedLoginAttempts: 5,
+        lockedUntil: new Date()
+      });
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
-      const req = mockJwtRequest() as JwtAuthRequest;
 
-      await controller.update('user-5', dto, req, mockAbility);
+      await controller.update(
+        'user-5',
+        { unlockAccount: true },
+        mockJwtRequest() as JwtAuthRequest,
+        mockAbility
+      );
 
-      expect(usersServiceMock.findOne).not.toHaveBeenCalled();
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_UPDATE,
+          details: { changedFields: ['unlockAccount'] }
+        })
+      );
     });
 
     it('should log USER_UPDATE and PASSWORD_CHANGE when dto contains password', async () => {
