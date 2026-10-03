@@ -7,7 +7,7 @@ import {
   Logger
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { Role } from '../entities/role.entity';
 import { CursorPaginatedResponseDto } from '../../../common/dtos';
@@ -39,6 +39,8 @@ import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-tar
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
+import { RoleRenamedEvent } from '../events/role-renamed.event';
+import { RoleDeletedEvent } from '../events/role-deleted.event';
 
 @Injectable()
 export class RoleService {
@@ -358,8 +360,18 @@ export class RoleService {
         );
       }
     }
+    const oldName = role.name;
     Object.assign(role, data);
-    return this.roleRepository.save(role);
+    if (role.name === oldName) return this.roleRepository.save(role);
+
+    const saved = await this.writeWithRoleEvent(
+      (em) => em.save(Role, role),
+      RoleRenamedEvent.name,
+      (em, committed) => new RoleRenamedEvent(oldName, role.name, em, committed)
+    );
+    // Holders have the old name in the cached role names that flag rules use.
+    await this.invalidateUsersWithRole(id);
+    return saved;
   }
 
   async delete(
@@ -383,11 +395,39 @@ export class RoleService {
         roleId: id
       });
     }
-    // Invalidate after the remove, or a holder read in between re-caches the
-    // deleted grants for the TTL. Holders are read first: the remove cascades.
+    // Invalidate after the commit of the remove, or a holder read in between
+    // re-caches the deleted grants for the TTL. Holders are read first: the
+    // remove cascades.
     const holderIds = await this.findHolderIds(id);
-    await this.roleRepository.remove(role);
+    await this.writeWithRoleEvent(
+      (em) => em.remove(Role, role),
+      RoleDeletedEvent.name,
+      (em, committed) => new RoleDeletedEvent(role.name, em, committed)
+    );
     await this.invalidateHolders(holderIds);
+  }
+
+  /**
+   * Runs `write` and the listeners of the event in one transaction, so a
+   * failed listener rolls the write back. The event gets a promise that
+   * resolves after the commit.
+   */
+  private async writeWithRoleEvent<T>(
+    write: (em: EntityManager) => Promise<T>,
+    eventName: string,
+    createEvent: (em: EntityManager, committed: Promise<void>) => object
+  ): Promise<T> {
+    let markCommitted: () => void = () => undefined;
+    const committed = new Promise<void>((resolve) => {
+      markCommitted = resolve;
+    });
+    const result = await this.roleRepository.manager.transaction(async (em) => {
+      const written = await write(em);
+      await this.eventEmitter.emitAsync(eventName, createEvent(em, committed));
+      return written;
+    });
+    markCommitted();
+    return result;
   }
 
   /**

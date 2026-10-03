@@ -36,6 +36,7 @@ import {
   sameConditions
 } from '../helpers/grant-scope.helpers';
 import { pushToUser } from '../sse-hub';
+import { rewriteRoleNameInRules } from './feature-flags.middleware';
 import {
   requireUuid,
   validationError
@@ -405,7 +406,15 @@ router.patch(
             return;
           }
         }
+        // Users hold role names here, where the server joins by role id, so
+        // the holders follow the rename to keep the role.
+        const oldName = role.name;
         role.name = normalized.name;
+        for (const user of state.users.values()) {
+          user.roles = user.roles.map((r) => (r === oldName ? role.name : r));
+        }
+        notifyRoleHolders(role.name);
+        rewriteRoleNameInRules(oldName, role.name);
       }
     }
 
@@ -483,6 +492,7 @@ router.delete(
     }
 
     state.roles.delete(id);
+    rewriteRoleNameInRules(role.name, null);
 
     for (const userId of holderIds) {
       pushToUser(userId, { type: 'permissions_updated', userId });
