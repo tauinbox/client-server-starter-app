@@ -149,6 +149,8 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
 
     await ruleRow.getByRole('combobox', { name: 'Type' }).click();
     await page.getByRole('option', { name: 'Attribute', exact: true }).click();
+    await ruleRow.getByRole('combobox', { name: 'Field' }).click();
+    await page.getByRole('option', { name: 'Created at', exact: true }).click();
     await ruleRow.getByRole('combobox', { name: 'Operator' }).click();
     await page.getByRole('option', { name: 'before', exact: true }).click();
 

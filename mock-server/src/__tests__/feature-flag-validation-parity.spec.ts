@@ -225,6 +225,27 @@ describe('feature-flag validation parity with server', () => {
       );
     });
 
+    it('returns the server text for a field and operator that never match', async () => {
+      const { res, flagId } = await ruleResponse('payload-created-eq', {
+        type: 'attribute',
+        effect: 'include',
+        payload: {
+          type: 'attribute',
+          field: 'createdAt',
+          op: 'eq',
+          value: '2026-01-01T00:00:00.000Z'
+        }
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe(
+        'attribute rule with field=createdAt does not support op=eq'
+      );
+      expect(
+        getState().featureFlagRules.filter((r) => r.flagId === flagId)
+      ).toHaveLength(0);
+    });
+
     it('stores percentage bucketBy=device', async () => {
       const { res } = await ruleResponse('payload-bucket-device', {
         type: 'percentage',
@@ -240,6 +261,86 @@ describe('feature-flag validation parity with server', () => {
         percent: 10,
         bucketBy: 'device'
       });
+    });
+  });
+
+  // The server resolves createdAt to a Date, so `eq` never matches it and only
+  // a date comparison does. A row stored before the pair check still loads.
+  describe('createdAt evaluation', () => {
+    async function flagsAsUser(): Promise<Record<string, boolean>> {
+      const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email: 'user@example.com',
+          password: 'Password1'
+        })
+      });
+      expect(login.status).toBe(200);
+      const { tokens } = (await login.json()) as {
+        tokens: { access_token: string };
+      };
+      const res = await fetch(`${baseUrl}/api/v1/feature-flags`, {
+        headers: { authorization: `Bearer ${tokens.access_token}` }
+      });
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { flags: Record<string, boolean> }).flags;
+    }
+
+    function userCreatedAt(): string {
+      const user = [...getState().users.values()].find(
+        (u) => u.email === 'user@example.com'
+      );
+      if (!user) throw new Error('seed user missing');
+      return user.createdAt;
+    }
+
+    it('matches an after rule for the user', async () => {
+      const dayBefore = new Date(
+        new Date(userCreatedAt()).getTime() - 24 * 60 * 60 * 1000
+      ).toISOString();
+      const created = await createFlag({ key: 'created-after', enabled: true });
+      const flag = (await created.json()) as { id: string };
+      const res = await replaceRules(flag.id, [
+        {
+          type: 'attribute',
+          effect: 'include',
+          payload: {
+            type: 'attribute',
+            field: 'createdAt',
+            op: 'after',
+            value: dayBefore
+          }
+        }
+      ]);
+      expect(res.status).toBe(200);
+
+      await expect(flagsAsUser()).resolves.toMatchObject({
+        'created-after': true
+      });
+    });
+
+    it('never matches a stored eq rule, as on the server', async () => {
+      const created = await createFlag({ key: 'created-eq', enabled: true });
+      const flag = (await created.json()) as { id: string };
+      const now = new Date().toISOString();
+      getState().featureFlagRules.push({
+        id: 'legacy-created-eq',
+        flagId: flag.id,
+        type: 'attribute',
+        effect: 'include',
+        payload: {
+          type: 'attribute',
+          field: 'createdAt',
+          op: 'eq',
+          value: userCreatedAt()
+        },
+        createdAt: now,
+        updatedAt: now
+      });
+
+      const flags = await flagsAsUser();
+      expect('created-eq' in flags).toBe(false);
     });
   });
 

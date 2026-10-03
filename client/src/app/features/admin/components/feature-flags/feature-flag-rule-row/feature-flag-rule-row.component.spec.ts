@@ -791,6 +791,65 @@ describe('FeatureFlagRuleRowComponent', () => {
     });
   });
 
+  it('lists only the date operators for createdAt', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: { type: 'attribute', field: 'createdAt', op: 'after', value: '' }
+    });
+    fixture.detectChanges();
+    const opSelect = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '.rule-attribute mat-select'
+    )[1];
+    opSelect?.querySelector<HTMLElement>('.mat-mdc-select-trigger')?.click();
+    fixture.detectChanges();
+    expect(document.querySelectorAll('mat-option')).toHaveLength(2);
+  });
+
+  it('onAttributeFieldChange to createdAt replaces an operator it cannot match', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: { type: 'attribute', field: 'email', op: 'in', value: ['a'] }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeFieldChange('createdAt');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'createdAt',
+      op: 'before',
+      value: ''
+    });
+  });
+
+  it('onAttributeFieldChange from createdAt to email starts a fresh eq value', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'attribute',
+      payload: {
+        type: 'attribute',
+        field: 'createdAt',
+        op: 'after',
+        value: '2026-01-15T00:00:00.000Z'
+      }
+    });
+    fixture.detectChanges();
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    cmp.onAttributeFieldChange('email');
+    expect(fixture.componentInstance.rule().payload).toEqual({
+      type: 'attribute',
+      field: 'email',
+      op: 'eq',
+      value: ''
+    });
+  });
+
   it('loads roles into the autocomplete options on init', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();

@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  FEATURE_FLAG_ATTRIBUTE_FIELD_OPS,
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
   FEATURE_FLAG_BUCKET_BY,
@@ -54,6 +55,15 @@ describe('feature-flag rule vocabulary', () => {
     ]);
   });
 
+  it('pins the operators each attribute field supports', () => {
+    expect(FEATURE_FLAG_ATTRIBUTE_FIELD_OPS).toEqual({
+      email: ['eq', 'in', 'endsWith'],
+      emailDomain: ['eq', 'in', 'endsWith'],
+      createdAt: ['before', 'after'],
+      custom: ['eq', 'in', 'endsWith', 'before', 'after']
+    });
+  });
+
   it('pins the preview reasons', () => {
     expect(FEATURE_FLAG_PREVIEW_REASONS).toEqual([
       'disabled',
@@ -70,9 +80,10 @@ describe('validateRulePayload attribute value', () => {
   const knownCustomKeys = new Set<string>(['oauth.google.configured']);
 
   function validate(op: string, value: unknown): unknown {
+    const field = op === 'before' || op === 'after' ? 'createdAt' : 'email';
     return validateRulePayload(
       'attribute',
-      { type: 'attribute', field: 'email', op, value },
+      { type: 'attribute', field, op, value },
       knownCustomKeys
     );
   }
@@ -157,6 +168,49 @@ describe('validateRulePayload attribute value', () => {
     it('rejects a boolean', () => {
       expectRejected(op, true);
     });
+  });
+
+  describe('field and operator pair', () => {
+    it.each([
+      ['createdAt', 'eq', '2026-01-01T00:00:00Z'],
+      ['createdAt', 'in', ['2026-01-01T00:00:00Z']],
+      ['createdAt', 'endsWith', 'Z'],
+      ['email', 'before', '2026-01-01T00:00:00Z'],
+      ['emailDomain', 'after', '2026-01-01T00:00:00Z']
+    ])('rejects field=%s with op=%s', (field, op, value) => {
+      expect(() =>
+        validateRulePayload(
+          'attribute',
+          { type: 'attribute', field, op, value },
+          knownCustomKeys
+        )
+      ).toThrow(`attribute rule with field=${field} does not support op=${op}`);
+    });
+
+    it.each(['eq', 'in', 'endsWith', 'before', 'after'])(
+      'accepts a custom key with op=%s',
+      (op) => {
+        const value =
+          op === 'in'
+            ? [true]
+            : op === 'before' || op === 'after'
+              ? '2026-01-01T00:00:00Z'
+              : 'x';
+        expect(
+          validateRulePayload(
+            'attribute',
+            {
+              type: 'attribute',
+              field: 'custom',
+              customKey: 'oauth.google.configured',
+              op,
+              value
+            },
+            knownCustomKeys
+          )
+        ).toMatchObject({ field: 'custom', op });
+      }
+    );
   });
 
   it('still validates the other rule types unchanged', () => {

@@ -400,7 +400,8 @@ function userContext(
     email: user.email
   };
   if (emailDomain) attributes['emailDomain'] = emailDomain;
-  if (user.createdAt) attributes['createdAt'] = user.createdAt;
+  // A Date, as the server resolves it: `eq` and `in` must not match it.
+  if (user.createdAt) attributes['createdAt'] = new Date(user.createdAt);
   // As the server: only a rule bucketed by device reads `anonId` here.
   return {
     userId: user.id,
