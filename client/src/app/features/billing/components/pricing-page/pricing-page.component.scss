@@ -50,7 +50,8 @@
   }
 }
 
-.usage-teaser {
+.usage-teaser,
+.payments-unavailable {
   display: flex;
   gap: vars.$spacing-xs;
   align-items: center;
@@ -65,6 +66,11 @@
   mat-icon {
     color: var(--mat-sys-primary);
   }
+}
+
+.payments-unavailable {
+  margin-top: 0;
+  margin-bottom: vars.$spacing-lg;
 }
 
 // One-time purchases band (design §21.4): catalog column + donation column,

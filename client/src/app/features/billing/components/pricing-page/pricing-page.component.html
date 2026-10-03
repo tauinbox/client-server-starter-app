@@ -13,6 +13,13 @@
       <mat-spinner [attr.aria-label]="t('common.loading')" diameter="40" />
     </div>
   } @else {
+    @if (!paymentsAvailable()) {
+      <div class="payments-unavailable" role="status">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        <span>{{ t('billing.pricing.paymentsUnavailable') }}</span>
+      </div>
+    }
+
     <div class="plan-grid">
       @for (item of pricedPlans(); track item.key) {
         <nxs-plan-card
@@ -20,7 +27,7 @@
           [price]="item.price"
           [featured]="item.featured"
           [current]="item.current"
-          [disabled]="store.working()"
+          [disabled]="actionsDisabled()"
           (choose)="onChoose($event)"
         />
       }
@@ -49,7 +56,7 @@
               <nxs-product-card
                 [product]="item.product"
                 [price]="item.price"
-                [disabled]="store.working()"
+                [disabled]="actionsDisabled()"
                 (buy)="onBuy(item)"
               />
             }
@@ -61,7 +68,7 @@
                 <nxs-donation-card
                   [product]="donation"
                   [provider]="displayProvider()"
-                  [disabled]="store.working()"
+                  [disabled]="actionsDisabled()"
                   (donate)="onDonate(donation, $event)"
                 />
               }
