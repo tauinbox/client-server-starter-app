@@ -38,6 +38,10 @@ import {
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import {
+  ListSkeletonComponent,
+  type ListSkeletonCell
+} from '@shared/components/list-skeleton/list-skeleton.component';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
@@ -70,7 +74,8 @@ const INITIAL_FILTER: FilterModel = {
     UserCardListComponent,
     TranslocoDirective,
     NxsFormFieldComponent,
-    InfiniteScrollDirective
+    InfiniteScrollDirective,
+    ListSkeletonComponent
   ],
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss',
@@ -96,6 +101,16 @@ export class UserListComponent implements OnInit {
   readonly roleFilter = signal('');
   readonly includeDeletedFilter = signal(false);
   readonly roles = signal<RoleAdminResponse[]>([]);
+
+  readonly skeletonCells: readonly ListSkeletonCell[] = [
+    'narrow',
+    'wide',
+    'medium',
+    'chip',
+    'chip',
+    'medium',
+    'actions'
+  ];
 
   readonly loading = this.#usersStore.loading;
   readonly displayedUsers = this.#usersStore.displayedUsers;

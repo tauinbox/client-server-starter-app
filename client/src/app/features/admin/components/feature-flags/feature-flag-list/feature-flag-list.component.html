@@ -12,9 +12,7 @@
 
   <mat-card-content>
     @if (loading() && flags().length === 0) {
-      <div class="loading-container">
-        <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>
-      </div>
+      <nxs-list-skeleton [cells]="skeletonCells" />
     } @else if (flags().length === 0) {
       <p class="empty-state">{{ t('admin.featureFlags.empty') }}</p>
     } @else if (layout.isHandset()) {

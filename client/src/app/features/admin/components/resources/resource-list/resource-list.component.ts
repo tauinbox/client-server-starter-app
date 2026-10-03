@@ -39,6 +39,10 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import {
+  ListSkeletonComponent,
+  type ListSkeletonCell
+} from '@shared/components/list-skeleton/list-skeleton.component';
 import type { ResourceFormDialogData } from '../resource-form-dialog/resource-form-dialog.component';
 import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-form-dialog.component';
 
@@ -53,6 +57,7 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
     MatIcon,
     MatProgressSpinner,
     InfiniteScrollDirective,
+    ListSkeletonComponent,
     MatTooltip,
     MatChip,
     MatTable,
@@ -90,6 +95,15 @@ export class ResourceListComponent implements OnInit {
   loadMore(): void {
     this.#resourcesStore.loadMore();
   }
+
+  readonly skeletonCells: readonly ListSkeletonCell[] = [
+    'medium',
+    'medium',
+    'medium',
+    'wide',
+    'chip',
+    'actions'
+  ];
 
   readonly resourceColumns = [
     'displayName',

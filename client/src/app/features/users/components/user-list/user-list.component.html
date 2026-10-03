@@ -70,20 +70,8 @@
 
       <mat-divider></mat-divider>
 
-      @if (loading()) {
-        <div class="skeleton-table" aria-busy="true" aria-label="Loading users">
-          @for (i of [1, 2, 3, 4, 5]; track i) {
-            <div class="skeleton-row">
-              <div class="skeleton-cell sk-narrow"></div>
-              <div class="skeleton-cell sk-wide"></div>
-              <div class="skeleton-cell sk-medium"></div>
-              <div class="skeleton-cell sk-chip"></div>
-              <div class="skeleton-cell sk-chip"></div>
-              <div class="skeleton-cell sk-medium"></div>
-              <div class="skeleton-cell sk-actions"></div>
-            </div>
-          }
-        </div>
+      @if (loading() && displayedUsers().length === 0) {
+        <nxs-list-skeleton [cells]="skeletonCells" [topBorder]="false" />
       } @else if (displayedUsers().length === 0) {
         <div class="empty-state">
           <mat-icon class="empty-icon">people_outline</mat-icon>

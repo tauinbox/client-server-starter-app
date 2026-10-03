@@ -349,6 +349,8 @@ src/app/
     ├── components/
     │   ├── confirm-dialog/            # ConfirmDialogComponent for a desktop and
     │   │                              # ConfirmBottomSheetComponent for a handset
+    │   ├── list-skeleton/             # ListSkeletonComponent shows shimmer rows on the first
+    │   │                              # load of every cursor list, one cell per column.
     │   ├── keyboard-shortcuts-help/   # KeyboardShortcutsHelpComponent is a Material dialog. It
     │   │                              # lists the active shortcuts in category groups.
     │   ├── password-strength/         # PasswordStrengthComponent is a meter with 4 bars and an

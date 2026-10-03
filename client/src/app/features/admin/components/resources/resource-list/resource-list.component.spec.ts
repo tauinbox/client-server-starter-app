@@ -95,14 +95,25 @@ describe('ResourceListComponent', () => {
     expect(resourcesStoreMock.load).toHaveBeenCalled();
   });
 
-  it('shows spinner when loading', async () => {
+  it('shows the skeleton while the first page loads', async () => {
     resourcesStoreMock.loading = signal(true);
     resourcesStoreMock.resources = signal([]);
     await setupComponent();
     fixture.detectChanges();
 
-    const spinner = fixture.nativeElement.querySelector('mat-spinner');
-    expect(spinner).toBeTruthy();
+    const skeleton = fixture.nativeElement.querySelector('nxs-list-skeleton');
+    expect(skeleton).toBeTruthy();
+  });
+
+  it('keeps the rows and shows no skeleton while a loaded list reloads', async () => {
+    resourcesStoreMock.loading = signal(true);
+    await setupComponent();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('nxs-list-skeleton')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelectorAll('table[mat-table]').length
+    ).toBe(1);
   });
 
   it('shows resources table when not loading', async () => {
@@ -113,12 +124,12 @@ describe('ResourceListComponent', () => {
     expect(tables.length).toBe(1);
   });
 
-  it('does not show spinner when not loading', async () => {
+  it('does not show the skeleton when not loading', async () => {
     await setupComponent();
     fixture.detectChanges();
 
-    const spinner = fixture.nativeElement.querySelector('mat-spinner');
-    expect(spinner).toBeNull();
+    const skeleton = fixture.nativeElement.querySelector('nxs-list-skeleton');
+    expect(skeleton).toBeNull();
   });
 
   describe('permission-based rendering', () => {

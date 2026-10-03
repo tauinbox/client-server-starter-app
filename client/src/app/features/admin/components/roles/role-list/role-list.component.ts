@@ -33,6 +33,10 @@ import {
   MatTable
 } from '@angular/material/table';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import {
+  ListSkeletonComponent,
+  type ListSkeletonCell
+} from '@shared/components/list-skeleton/list-skeleton.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
@@ -74,6 +78,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatRowDef,
     MatCell,
     InfiniteScrollDirective,
+    ListSkeletonComponent,
     TranslocoDirective
   ],
   templateUrl: './role-list.component.html',
@@ -101,6 +106,14 @@ export class RoleListComponent implements OnInit {
     this.#rolesStore.loadMore();
   }
   readonly roles = this.#rolesStore.entities;
+
+  readonly skeletonCells: readonly ListSkeletonCell[] = [
+    'medium',
+    'wide',
+    'chip',
+    'medium',
+    'actions'
+  ];
 
   readonly displayedColumns = [
     'name',

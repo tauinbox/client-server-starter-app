@@ -39,6 +39,10 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { formatMoney } from '@features/billing/utils/billing-format';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import {
+  ListSkeletonComponent,
+  type ListSkeletonCell
+} from '@shared/components/list-skeleton/list-skeleton.component';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingInvoicesStore } from '../../store/billing-invoices.store';
@@ -78,7 +82,8 @@ import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.sto
     MatRowDef,
     MatCell,
     TranslocoDirective,
-    InfiniteScrollDirective
+    InfiniteScrollDirective,
+    ListSkeletonComponent
   ],
   templateUrl: './billing-admin-list.component.html',
   styleUrl: './billing-admin-list.component.scss',
@@ -119,6 +124,16 @@ export class BillingAdminListComponent implements OnInit {
     initialValue: this.#transloco.getActiveLang()
   });
 
+  readonly subscriptionSkeletonCells: readonly ListSkeletonCell[] = [
+    'wide',
+    'medium',
+    'medium',
+    'chip',
+    'chip',
+    'medium',
+    'actions'
+  ];
+
   readonly subscriptionColumns = [
     'customer',
     'plan',
@@ -128,6 +143,15 @@ export class BillingAdminListComponent implements OnInit {
     'renews',
     'actions'
   ];
+  readonly invoiceSkeletonCells: readonly ListSkeletonCell[] = [
+    'medium',
+    'wide',
+    'medium',
+    'chip',
+    'medium',
+    'actions'
+  ];
+
   readonly invoiceColumns = [
     'reference',
     'customer',

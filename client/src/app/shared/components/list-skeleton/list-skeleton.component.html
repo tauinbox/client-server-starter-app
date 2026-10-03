@@ -1,0 +1,16 @@
+<div
+  class="skeleton-table"
+  [class.top-border]="topBorder()"
+  role="status"
+  aria-busy="true"
+  *transloco="let t"
+>
+  <span class="visually-hidden">{{ t('common.loading') }}</span>
+  @for (row of rowIndexes(); track row) {
+    <div class="skeleton-row" aria-hidden="true">
+      @for (cell of cells(); track $index) {
+        <div class="skeleton-cell" [class]="'sk-' + cell"></div>
+      }
+    </div>
+  }
+</div>
