@@ -29,6 +29,8 @@ export class ListSkeletonComponent {
     'medium',
     'actions'
   ]);
+  /** Off when a divider already sits right above the skeleton. */
+  readonly topBorder = input(true);
 
   protected readonly rowIndexes = computed(() =>
     Array.from({ length: this.rows() }, (_, i) => i)

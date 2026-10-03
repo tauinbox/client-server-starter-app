@@ -71,7 +71,7 @@
       <mat-divider></mat-divider>
 
       @if (loading() && displayedUsers().length === 0) {
-        <nxs-list-skeleton [cells]="skeletonCells" />
+        <nxs-list-skeleton [cells]="skeletonCells" [topBorder]="false" />
       } @else if (displayedUsers().length === 0) {
         <div class="empty-state">
           <mat-icon class="empty-icon">people_outline</mat-icon>

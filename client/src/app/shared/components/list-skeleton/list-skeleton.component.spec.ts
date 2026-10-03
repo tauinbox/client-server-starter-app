@@ -36,6 +36,16 @@ describe('ListSkeletonComponent', () => {
     expect(cells[1].classList).toContain('sk-chip');
   });
 
+  it('should draw the top border unless the host turns it off', () => {
+    fixture.detectChanges();
+    const table = (): Element | null => host.querySelector('.skeleton-table');
+    expect(table()?.classList).toContain('top-border');
+
+    fixture.componentRef.setInput('topBorder', false);
+    fixture.detectChanges();
+    expect(table()?.classList).not.toContain('top-border');
+  });
+
   it('should announce a busy status with the loading text', () => {
     fixture.detectChanges();
 

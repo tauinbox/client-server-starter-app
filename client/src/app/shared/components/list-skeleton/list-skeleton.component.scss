@@ -5,7 +5,7 @@
   display: block;
 }
 
-.skeleton-table {
+.skeleton-table.top-border {
   border-top: func.rem(1) solid var(--mat-sys-outline-variant);
 }
 
