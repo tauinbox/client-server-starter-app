@@ -531,13 +531,32 @@ describe('RolesController', () => {
       });
     });
 
-    it('update: ROLE_UPDATE with changedFields in details', () => {
-      const opts = getAuditOptions('update');
-      expect(opts?.action).toBe(AuditAction.ROLE_UPDATE);
-      expect(opts?.targetType).toBe('Role');
-      expect(
-        opts?.details?.(detailsCtx({ name: 'x', description: 'y' }))
-      ).toEqual({ changedFields: ['name', 'description'] });
+    it('update: no @LogAudit metadata - the handler logs ROLE_UPDATE itself', () => {
+      expect(getAuditOptions('update')).toBeUndefined();
+    });
+
+    it('update: ROLE_UPDATE lists only the fields that differ from the stored role', async () => {
+      roleServiceMock.findOne.mockResolvedValue({
+        id: 'role-1',
+        name: 'editor',
+        description: 'old'
+      });
+
+      await controller.update(
+        'role-1',
+        { name: 'editor', description: 'new' },
+        mockReq,
+        mockAbility
+      );
+
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.ROLE_UPDATE,
+          targetId: 'role-1',
+          targetType: 'Role',
+          details: { changedFields: ['description'] }
+        })
+      );
     });
 
     it('remove: no @LogAudit metadata - the handler logs ROLE_DELETE itself', () => {

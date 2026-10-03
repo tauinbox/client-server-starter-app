@@ -41,6 +41,7 @@ import { CurrentAbility } from '../decorators/current-ability.decorator';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import type { AppAbility } from '../casl/app-ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { AuditService } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
@@ -181,13 +182,6 @@ export class RolesController {
 
   @Patch(':id')
   @Authorize(['update', 'Role'])
-  @LogAudit({
-    action: AuditAction.ROLE_UPDATE,
-    targetType: 'Role',
-    details: ({ body }) => ({
-      changedFields: Object.keys(body as UpdateRoleDto)
-    })
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -209,7 +203,18 @@ export class RolesController {
       { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
       this.metricsService
     );
-    return this.roleService.update(id, updateRoleDto);
+    const changed = changedFields(role, updateRoleDto);
+    const updated = await this.roleService.update(id, updateRoleDto);
+    await this.auditService.log({
+      action: AuditAction.ROLE_UPDATE,
+      actorId: req.user?.userId ?? null,
+      actorEmail: req.user?.email ?? null,
+      targetId: id,
+      targetType: 'Role',
+      details: { changedFields: changed },
+      context: extractAuditContext(req)
+    });
+    return updated;
   }
 
   @Delete(':id')

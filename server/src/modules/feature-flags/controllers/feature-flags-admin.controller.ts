@@ -33,6 +33,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
@@ -137,11 +138,6 @@ export class FeatureFlagsAdminController {
 
   @Patch(':id')
   @Authorize(['manage', 'FeatureFlag'])
-  @LogAudit({
-    action: AuditAction.FEATURE_FLAG_UPDATE,
-    targetType: 'FeatureFlag',
-    details: ({ body }) => ({ changedFields: Object.keys(body as object) })
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a feature flag (optimistic locking)' })
   @ApiHeader({
@@ -159,6 +155,9 @@ export class FeatureFlagsAdminController {
     @Req() req: JwtAuthRequest
   ) {
     const expectedVersion = this.parseIfMatch(ifMatch);
+    // The update is conditional on the version, so when it succeeds this read
+    // is exactly the state that it replaced.
+    const changed = changedFields(await this.flagService.findOne(id), dto);
     const flag = await this.flagService.update(
       id,
       dto,
@@ -169,6 +168,15 @@ export class FeatureFlagsAdminController {
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent(flag.key, 'updated')
     );
+    await this.auditService.log({
+      action: AuditAction.FEATURE_FLAG_UPDATE,
+      actorId: req.user?.userId ?? null,
+      actorEmail: req.user?.email ?? null,
+      targetId: id,
+      targetType: 'FeatureFlag',
+      details: { changedFields: changed },
+      context: extractAuditContext(req)
+    });
     return flag;
   }
 

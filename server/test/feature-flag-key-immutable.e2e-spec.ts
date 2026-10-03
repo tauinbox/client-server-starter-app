@@ -25,6 +25,7 @@ describe('Feature flag key is immutable after create (e2e)', () => {
   let app: INestApplication;
   let server: Server;
   const flagService = {
+    findOne: jest.fn(),
     update: jest.fn()
   };
 
@@ -85,6 +86,12 @@ describe('Feature flag key is immutable after create (e2e)', () => {
   });
 
   it('accepts a PATCH without a key (200)', async () => {
+    flagService.findOne.mockResolvedValue({
+      id: FLAG_ID,
+      key: 'stable-flag',
+      enabled: false,
+      rules: []
+    });
     flagService.update.mockResolvedValue({
       id: FLAG_ID,
       key: 'stable-flag',

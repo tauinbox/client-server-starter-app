@@ -13,6 +13,7 @@ import {
 
 import type { PermissionCondition } from '@app/shared/types';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import {
   findConditionActionError,
   findFieldMatchShapeError,
@@ -398,6 +399,11 @@ router.patch(
       return;
     }
 
+    const changed = changedFields(role, {
+      name: normalized?.ok ? normalized.name : undefined,
+      description
+    });
+
     if (normalized?.ok) {
       if (normalized.name !== role.name) {
         for (const existing of state.roles.values()) {
@@ -434,7 +440,7 @@ router.patch(
       actorEmail: actor.email,
       targetId: id,
       targetType: 'Role',
-      details: { changedFields: Object.keys(req.body) },
+      details: { changedFields: changed },
       ip: req.ip
     });
 

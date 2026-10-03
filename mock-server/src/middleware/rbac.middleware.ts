@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import {
   ALLOWED_ACTION_SORT_COLUMNS,
   ALLOWED_RESOURCE_SORT_COLUMNS,
@@ -197,6 +198,12 @@ router.patch(
       return;
     }
 
+    const changed = changedFields(resource, {
+      displayName,
+      description,
+      allowedActionNames
+    });
+
     if (displayName !== undefined) {
       resource.displayName = displayName;
     }
@@ -215,7 +222,7 @@ router.patch(
       actorEmail: actor.email,
       targetId: id,
       targetType: 'Resource',
-      details: { changedFields: Object.keys(req.body) },
+      details: { changedFields: changed },
       ip: req.ip
     });
 
@@ -409,6 +416,8 @@ router.patch(
       return;
     }
 
+    const changed = changedFields(action, { displayName, description });
+
     if (displayName !== undefined) {
       action.displayName = displayName;
     }
@@ -423,7 +432,7 @@ router.patch(
       actorEmail: actor.email,
       targetId: id,
       targetType: 'Action',
-      details: { changedFields: Object.keys(req.body) },
+      details: { changedFields: changed },
       ip: req.ip
     });
 
