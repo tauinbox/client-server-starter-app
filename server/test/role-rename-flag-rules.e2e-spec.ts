@@ -7,6 +7,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 import { RolesController } from '../src/modules/auth/controllers/roles.controller';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { Role } from '../src/modules/auth/entities/role.entity';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
@@ -81,6 +82,12 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
         .createQueryBuilder()
         .delete()
         .where('key LIKE :prefix', { prefix: `${tag}%` })
+        .execute();
+      await dataSource
+        .getRepository(Role)
+        .createQueryBuilder()
+        .delete()
+        .where('name LIKE :prefix', { prefix: `${tag}%` })
         .execute();
       await dataSource.getRepository(User).delete({ email });
     }
@@ -174,5 +181,44 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
 
     expect(await roleNamesOf(flag.id)).toEqual([[otherName]]);
     expect((await flagService.findOne(flag.id)).version).toBe(versionBefore);
+  });
+
+  it('rolls the rename and the delete back when the rule rewrite fails', async () => {
+    const name = `${tag}-atomic`;
+    const role = await roleService.create({ name });
+    const flag = await flagService.create(
+      { key: `${tag}-atomic-flag`, enabled: true },
+      null
+    );
+    await flagService.replaceRules(
+      flag.id,
+      [
+        {
+          type: 'role',
+          effect: 'include',
+          payload: { type: 'role', roleNames: [name] }
+        }
+      ],
+      null
+    );
+    const rewrite = jest
+      .spyOn(flagService, 'rewriteRoleName')
+      .mockRejectedValue(new Error('rewrite failed'));
+    const roles = dataSource.getRepository(Role);
+
+    await expect(
+      controller.update(role.id, { name: `${name}-2` }, req, ability)
+    ).rejects.toThrow('rewrite failed');
+    expect((await roles.findOneByOrFail({ id: role.id })).name).toBe(name);
+
+    await expect(controller.remove(role.id, req, ability)).rejects.toThrow(
+      'rewrite failed'
+    );
+    expect(await roles.findOneBy({ id: role.id })).not.toBeNull();
+    expect(await roleNamesOf(flag.id)).toEqual([[name]]);
+
+    rewrite.mockRestore();
+    await controller.update(role.id, { name: `${name}-2` }, req, ability);
+    expect(await roleNamesOf(flag.id)).toEqual([[`${name}-2`]]);
   });
 });

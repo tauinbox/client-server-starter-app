@@ -2457,9 +2457,10 @@ change. One save in a dialog is such a burst, because it emits an update and a r
 
 `UserRoleChangedEvent` and `UserDeletedEvent` invalidate the cache of the affected user only.
 
-Role rules store role names. `RoleRulesListener` rewrites them on `RoleRenamedEvent` and removes the
-name on `RoleDeletedEvent`. Each changed flag gets a new version and a `FeatureFlagChangedEvent`. The
-roles API awaits both events, so a failed rewrite fails the request. The
+Role rules store role names. `RoleService` emits `RoleRenamedEvent` and `RoleDeletedEvent` inside the
+transaction that renames or deletes the role. `RoleRulesListener` rewrites the rules in that
+transaction, so a failed rewrite rolls the role write back and fails the request. Each changed flag
+gets a new version, and a `FeatureFlagChangedEvent` after the commit. The
 cross-module communication uses `EventEmitter2` and never `forwardRef`. A `no-restricted-syntax`
 ESLint rule rejects a `forwardRef()` call in `src/`.
 

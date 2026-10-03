@@ -13,6 +13,8 @@ import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RoleRenamedEvent } from '../events/role-renamed.event';
+import { RoleDeletedEvent } from '../events/role-deleted.event';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
 
 describe('RoleService', () => {
@@ -27,6 +29,7 @@ describe('RoleService', () => {
       createQueryBuilder: jest.Mock;
       update: jest.Mock;
       findOne: jest.Mock;
+      transaction: jest.Mock;
     };
     createQueryBuilder: jest.Mock;
   };
@@ -47,7 +50,7 @@ describe('RoleService', () => {
   let mockPermissionService: { invalidateUserCache: jest.Mock };
   let mockAuditService: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mockMetricsService: { recordPermissionDenied: jest.Mock };
-  let mockEventEmitter: { emit: jest.Mock };
+  let mockEventEmitter: { emit: jest.Mock; emitAsync: jest.Mock };
   let mockRelationQueryBuilder: {
     relation: jest.Mock;
     of: jest.Mock;
@@ -125,10 +128,23 @@ describe('RoleService', () => {
         update: jest.fn().mockResolvedValue(undefined),
         // Role membership writes now resolve the target user first, so the
         // default is an existing row; absence is opted into per test.
-        findOne: jest.fn().mockResolvedValue({ id: 'user-1' })
+        findOne: jest.fn().mockResolvedValue({ id: 'user-1' }),
+        // The writes inside the transaction land on the repository mocks, so
+        // a test asserts them in one place whether or not a transaction ran.
+        transaction: jest.fn()
       },
       createQueryBuilder: jest.fn().mockReturnValue(mockRoleRepoQB)
     };
+    const roleRepo = mockRoleRepo;
+    roleRepo.manager.transaction.mockImplementation(
+      (cb: (em: unknown) => Promise<unknown>) =>
+        cb({
+          save: (_target: unknown, entity: unknown): unknown =>
+            roleRepo.save(entity) as unknown,
+          remove: (_target: unknown, entity: unknown): unknown =>
+            roleRepo.remove(entity) as unknown
+        })
+    );
 
     mockPermissionRepo = {
       find: jest.fn()
@@ -182,7 +198,8 @@ describe('RoleService', () => {
     };
 
     mockEventEmitter = {
-      emit: jest.fn()
+      emit: jest.fn(),
+      emitAsync: jest.fn().mockResolvedValue([])
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -287,29 +304,61 @@ describe('RoleService', () => {
       expect(result.description).toBe('Updated');
     });
 
-    it('should invalidate the holders after a rename', async () => {
+    it('should save a rename and emit RoleRenamedEvent in one transaction, then invalidate the holders', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      let committedInside: boolean | undefined;
+      mockEventEmitter.emitAsync.mockImplementation(
+        async (_name: string, event: RoleRenamedEvent) => {
+          let settled = false;
+          void event.committed.then(() => (settled = true));
+          await Promise.resolve();
+          committedInside = settled;
+          return [];
+        }
+      );
 
       await service.update('role-2', { name: 'senior-editor' });
 
+      expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
+        RoleRenamedEvent.name,
+        expect.objectContaining({ oldName: 'editor', newName: 'senior-editor' })
+      );
+      expect(committedInside).toBe(false);
       const [save] = mockRoleRepo.save.mock.invocationCallOrder;
+      const [emit] = mockEventEmitter.emitAsync.mock.invocationCallOrder;
       const [invalidate] =
         mockPermissionService.invalidateUserCache.mock.invocationCallOrder;
+      expect(save).toBeLessThan(emit);
+      expect(emit).toBeLessThan(invalidate);
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'u-1'
       );
-      expect(save).toBeLessThan(invalidate);
     });
 
-    it('should not invalidate the holders when the name stays the same', async () => {
+    it('should fail the rename and skip the invalidation when a listener fails', async () => {
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockRoleRepo.findOne.mockResolvedValueOnce(null);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(
+        service.update('role-2', { name: 'senior-editor' })
+      ).rejects.toThrow('db down');
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+
+    it('should not emit or invalidate when the name stays the same', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
 
       await service.update('role-2', { name: 'editor', description: 'New' });
 
+      expect(mockRoleRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
   });
@@ -353,6 +402,30 @@ describe('RoleService', () => {
       await service.delete('role-2');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
       expect(mockRoleRepo.remove).toHaveBeenCalledWith(customRole);
+    });
+
+    it('should emit RoleDeletedEvent in the transaction of the remove', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+
+      await service.delete('role-2');
+
+      expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
+        RoleDeletedEvent.name,
+        expect.objectContaining({ name: 'editor' })
+      );
+      const [remove] = mockRoleRepo.remove.mock.invocationCallOrder;
+      const [emit] = mockEventEmitter.emitAsync.mock.invocationCallOrder;
+      expect(remove).toBeLessThan(emit);
+    });
+
+    it('should fail the delete and skip the invalidation when a listener fails', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(service.delete('role-2')).rejects.toThrow('db down');
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
   });
 

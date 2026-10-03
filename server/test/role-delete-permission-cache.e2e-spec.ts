@@ -1,6 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
+import { RoleDeletedEvent } from '../src/modules/auth/events/role-deleted.event';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
@@ -74,20 +76,27 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
     ]);
     await roleService.assignRoleToUser(holder.id, role.id);
 
-    // Stand-in for a request of the holder that lands between the invalidation
-    // and the commit of the remove: it loads from the DB and fills the cache.
-    const roleRepository = dataSource.getRepository(Role);
-    const remove = roleRepository.remove.bind(roleRepository);
+    // Stand-in for a request of the holder that lands after the remove and
+    // before its commit: it loads from the DB and fills the cache. The event
+    // runs inside the transaction of the remove.
+    const eventEmitter = app.get(EventEmitter2);
+    const emitAsync = eventEmitter.emitAsync.bind(eventEmitter);
+    let readInside = false;
     jest
-      .spyOn(roleRepository, 'remove')
-      .mockImplementationOnce(async (entity: Role) => {
-        await permissionService.getPermissionsForUser(holder.id);
-        await permissionService.getRolesForUser(holder.id);
-        return remove(entity);
+      .spyOn(eventEmitter, 'emitAsync')
+      .mockImplementation(async (event, ...values: unknown[]) => {
+        if (event === RoleDeletedEvent.name) {
+          await permissionService.getPermissionsForUser(holder.id);
+          await permissionService.getRolesForUser(holder.id);
+          readInside = true;
+        }
+        return emitAsync(event, ...values);
       });
 
     await roleService.delete(role.id);
 
+    expect(readInside).toBe(true);
+    const roleRepository = dataSource.getRepository(Role);
     expect(await roleRepository.findOne({ where: { id: role.id } })).toBeNull();
     const cachedPermissions = await permissionService.getPermissionsForUser(
       holder.id

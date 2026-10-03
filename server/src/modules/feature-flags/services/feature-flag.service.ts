@@ -6,7 +6,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository, UpdateResult } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  In,
+  Repository,
+  UpdateResult
+} from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import type {
   FeatureFlagAttributeKeysResponse,
@@ -335,20 +341,21 @@ export class FeatureFlagService {
 
   /**
    * Replaces a role name in every role rule, or removes it when `newName` is
-   * null. The order of the names is kept and a duplicate is dropped. Returns
-   * the keys of the flags whose rules changed; each of them gets a new version
-   * so an open editor cannot save the old names back.
+   * null, through the caller's transaction. The order of the names is kept and
+   * a duplicate is dropped. Returns the keys of the flags whose rules changed;
+   * each of them gets a new version so an open editor cannot save the old
+   * names back.
    */
   async rewriteRoleName(
+    em: EntityManager,
     oldName: string,
     newName: string | null
   ): Promise<string[]> {
-    return this.dataSource.transaction(async (em) => {
-      const rules = await em
-        .createQueryBuilder()
-        .update(FeatureFlagRule)
-        .set({
-          payload: () => `jsonb_set(payload, '{roleNames}', (
+    const rules = await em
+      .createQueryBuilder()
+      .update(FeatureFlagRule)
+      .set({
+        payload: () => `jsonb_set(payload, '{roleNames}', (
             SELECT COALESCE(jsonb_agg(n ORDER BY i), '[]'::jsonb)
             FROM (
               SELECT n, MIN(i) AS i
@@ -361,23 +368,22 @@ export class FeatureFlagService {
               GROUP BY n
             ) deduped
           ))`
-        })
-        .where(`type = 'role' AND payload->'roleNames' ? :oldName`)
-        .setParameters({ oldName, newName })
-        .returning('flag_id')
-        .execute();
-      const flagIds = [
-        ...new Set((rules.raw as { flag_id: string }[]).map((r) => r.flag_id))
-      ];
-      if (flagIds.length === 0) return [];
-      const flags = await em
-        .createQueryBuilder()
-        .update(FeatureFlag)
-        .set({ version: () => `version + 1` })
-        .whereInIds(flagIds)
-        .returning('key')
-        .execute();
-      return (flags.raw as { key: string }[]).map((f) => f.key);
-    });
+      })
+      .where(`type = 'role' AND payload->'roleNames' ? :oldName`)
+      .setParameters({ oldName, newName })
+      .returning('flag_id')
+      .execute();
+    const flagIds = [
+      ...new Set((rules.raw as { flag_id: string }[]).map((r) => r.flag_id))
+    ];
+    if (flagIds.length === 0) return [];
+    const flags = await em
+      .createQueryBuilder()
+      .update(FeatureFlag)
+      .set({ version: () => `version + 1` })
+      .whereInIds(flagIds)
+      .returning('key')
+      .execute();
+    return (flags.raw as { key: string }[]).map((f) => f.key);
   }
 }

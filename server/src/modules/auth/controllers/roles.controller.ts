@@ -48,8 +48,6 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
-import { RoleRenamedEvent } from '../events/role-renamed.event';
-import { RoleDeletedEvent } from '../events/role-deleted.event';
 import type { JwtAuthRequest } from '../types/auth.request';
 
 @ApiTags('Roles API')
@@ -211,14 +209,7 @@ export class RolesController {
       { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
       this.metricsService
     );
-    const updated = await this.roleService.update(id, updateRoleDto);
-    if (updated.name !== role.name) {
-      await this.eventEmitter.emitAsync(
-        RoleRenamedEvent.name,
-        new RoleRenamedEvent(role.name, updated.name)
-      );
-    }
-    return updated;
+    return this.roleService.update(id, updateRoleDto);
   }
 
   @Delete(':id')
@@ -254,10 +245,6 @@ export class RolesController {
       details: { name: role.name },
       context: extractAuditContext(req)
     });
-    await this.eventEmitter.emitAsync(
-      RoleDeletedEvent.name,
-      new RoleDeletedEvent(role.name)
-    );
   }
 
   @Put(':id/permissions')
