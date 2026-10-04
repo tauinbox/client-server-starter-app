@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
@@ -86,10 +86,17 @@ export class FeatureFlagResolverService {
    * Assembles the evaluation context for a user id: looks up the user record
    * (tolerating an orphaned token whose user no longer exists) and their role
    * names. Single source for the wiring shared by the controller and guard.
+   * Any other lookup error propagates: without the user record an `exclude`
+   * attribute rule cannot match, so swallowing it would fail open.
    */
   async buildResolverUser(userId: string): Promise<ResolverUser> {
     const [user, roles] = await Promise.all([
-      this.usersService.findOne(userId).catch(() => null),
+      this.usersService.findOne(userId).catch((err: unknown) => {
+        if (err instanceof HttpException && err.getStatus() === 404) {
+          return null;
+        }
+        throw err;
+      }),
       this.permissionService.getRoleNamesForUser(userId)
     ]);
     return {

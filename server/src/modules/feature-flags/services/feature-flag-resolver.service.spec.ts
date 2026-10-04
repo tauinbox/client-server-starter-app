@@ -1,3 +1,4 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -125,7 +126,9 @@ describe('FeatureFlagResolverService', () => {
   });
 
   it('buildResolverUser falls back to null email/createdAt when the user is gone', async () => {
-    usersService.findOne.mockRejectedValueOnce(new Error('orphaned token'));
+    usersService.findOne.mockRejectedValueOnce(
+      new HttpException('User with ID u1 not found', HttpStatus.NOT_FOUND)
+    );
     const user = await service.buildResolverUser('u1');
     expect(user).toEqual({
       userId: 'u1',
@@ -133,6 +136,39 @@ describe('FeatureFlagResolverService', () => {
       createdAt: null,
       roles: ['admin']
     });
+  });
+
+  it('buildResolverUser rethrows a lookup error that is not a 404', async () => {
+    const failure = new Error('connection terminated');
+    usersService.findOne.mockRejectedValueOnce(failure);
+    await expect(service.buildResolverUser('u1')).rejects.toBe(failure);
+  });
+
+  it('isEnabledForUserId fails closed for an excluded user when the lookup fails', async () => {
+    seedFlags(
+      [{ id: 'f1', key: 'gated', enabled: true }],
+      [
+        {
+          flagId: 'f1',
+          type: 'attribute',
+          effect: 'exclude',
+          payload: {
+            type: 'attribute',
+            field: 'emailDomain',
+            op: 'eq',
+            value: 'b.com'
+          }
+        }
+      ]
+    );
+    expect(await service.isEnabledForUserId('u1', 'gated')).toBe(false);
+
+    usersService.findOne.mockRejectedValueOnce(
+      new Error('connection terminated')
+    );
+    await expect(service.isEnabledForUserId('u1', 'gated')).rejects.toThrow(
+      'connection terminated'
+    );
   });
 
   it('isEnabledForUserId applies environments and rules, and is false for a missing flag', async () => {
