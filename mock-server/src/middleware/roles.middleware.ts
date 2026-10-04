@@ -929,6 +929,9 @@ router.post(
     if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
+    if (!assertInstancePermission(req, res, 'assign', 'Role', role)) {
+      return;
+    }
 
     // `RoleService.assignRoleToUser` checks the rows of the role before the
     // insert that raises the duplicate 409.
@@ -1011,6 +1014,9 @@ router.delete(
     }
 
     if (!assertCanWriteUser(req, res, 'update', user)) {
+      return;
+    }
+    if (!assertInstancePermission(req, res, 'assign', 'Role', role)) {
       return;
     }
 

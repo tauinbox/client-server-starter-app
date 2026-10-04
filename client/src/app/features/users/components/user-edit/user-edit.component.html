@@ -126,7 +126,11 @@
                 [disabled]="saving()"
               >
                 @for (role of availableRoles(); track role.id) {
-                  <mat-option [value]="role.id">{{ role.name }}</mat-option>
+                  <mat-option
+                    [value]="role.id"
+                    [disabled]="!canAssignRole(role)"
+                    >{{ role.name }}</mat-option
+                  >
                 }
               </mat-select>
               <mat-icon matPrefix aria-hidden="true"

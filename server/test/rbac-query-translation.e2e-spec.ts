@@ -9,7 +9,7 @@ import type { SelectQueryBuilder } from 'typeorm';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
 import type { RoleInfo } from '../src/modules/auth/services/permission.service';
 import type { User } from '../src/modules/users/entities/user.entity';
-import { applyAbilityToUserQuery } from '../src/modules/users/utils/apply-ability.util';
+import { applyAbilityToUserQuery } from '../src/common/utils/apply-ability.util';
 
 const SUBJECT_MAP: Record<string, string> = {
   users: 'User',

@@ -22,6 +22,8 @@ import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import type { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
+import { applyAbilityToFeatureFlagQuery } from '../../../common/utils/apply-ability.util';
+import type { AppAbility } from '../../auth/casl/app-ability';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 
@@ -73,32 +75,37 @@ export class FeatureFlagService {
     };
   }
 
-  async findAll(): Promise<FeatureFlag[]> {
-    const flags = await this.flagRepo.find({ order: { key: 'ASC' } });
+  /** The flags the ability may search, for the reference load. */
+  async findAll(ability: AppAbility): Promise<FeatureFlag[]> {
+    const qb = this.flagRepo
+      .createQueryBuilder('flag')
+      .orderBy('flag.key', 'ASC');
+    applyAbilityToFeatureFlagQuery(qb, ability, 'search');
+    const flags = await qb.getMany();
     await this.#attachRules(flags);
     return flags;
   }
 
   /**
    * Cursor-paginated flags for the admin list page, each with its rules
-   * hydrated exactly as findAll does. findAll stays for the callers that need
-   * the whole set in one shot (cache warm-up, evaluation).
+   * hydrated exactly as findAll does. The ability filter is SQL, so the
+   * keyset pages stay complete.
    */
   async findCursorPaginated(
-    query: FeatureFlagCursorQueryDto
+    query: FeatureFlagCursorQueryDto,
+    ability: AppAbility
   ): Promise<CursorPaginatedResponseDto<FeatureFlag>> {
     const { cursor, limit, sortBy, sortOrder } = query;
-    const { data, nextCursor } = await applyKeysetPagination(
-      this.flagRepo.createQueryBuilder('flag'),
-      {
-        cursor,
-        limit,
-        sortBy,
-        sortOrder,
-        sortColumnMap: FEATURE_FLAG_SORT_COLUMN_MAP,
-        idColumn: 'flag.id'
-      }
-    );
+    const qb = this.flagRepo.createQueryBuilder('flag');
+    applyAbilityToFeatureFlagQuery(qb, ability, 'search');
+    const { data, nextCursor } = await applyKeysetPagination(qb, {
+      cursor,
+      limit,
+      sortBy,
+      sortOrder,
+      sortColumnMap: FEATURE_FLAG_SORT_COLUMN_MAP,
+      idColumn: 'flag.id'
+    });
     await this.#attachRules(data);
     return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
@@ -134,6 +141,17 @@ export class FeatureFlagService {
     return flag;
   }
 
+  /** The fields of a new flag as `create` writes them, defaults included. */
+  newFlagFields(dto: CreateFeatureFlagDto) {
+    return {
+      key: dto.key,
+      description: dto.description ?? null,
+      enabled: dto.enabled ?? false,
+      environments: dto.environments ?? [],
+      public: dto.public ?? false
+    };
+  }
+
   async create(
     dto: CreateFeatureFlagDto,
     actorId: string | null
@@ -152,11 +170,7 @@ export class FeatureFlagService {
         const flag = await em.save(
           FeatureFlag,
           em.create(FeatureFlag, {
-            key: dto.key,
-            description: dto.description ?? null,
-            enabled: dto.enabled ?? false,
-            environments: dto.environments ?? [],
-            public: dto.public ?? false,
+            ...this.newFlagFields(dto),
             version: 1,
             updatedByUserId: actorId
           })

@@ -182,6 +182,52 @@ describe('RolePermissionsDialogComponent', () => {
       );
     });
 
+    it('renders the AND/OR condition builder under Custom on a conditional action', async () => {
+      const { fixture } = setup([makeRolePermItem('perm-a')]);
+      const host = fixture.nativeElement as HTMLElement;
+
+      (host.querySelector('.condition-toggle') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const custom = Array.from(
+        host.querySelectorAll('.condition-editor mat-checkbox')
+      ).find((el) => el.textContent?.includes('Custom'));
+      (custom?.querySelector('input') as HTMLInputElement).click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const builder = host.querySelector('nxs-condition-builder');
+      expect(builder).not.toBeNull();
+      const logic = Array.from(
+        builder!.querySelectorAll('mat-button-toggle')
+      ).map((el) => el.textContent?.trim());
+      expect(logic).toEqual(expect.arrayContaining(['AND', 'OR']));
+    });
+
+    it('explains instead of offering conditions on an action that takes none', () => {
+      const { fixture } = setup(
+        [
+          {
+            id: 'rp-billing',
+            roleId: mockRole.id,
+            permissionId: 'perm-billing-update',
+            conditions: null,
+            permission: billingPermission('update')
+          }
+        ],
+        { allPermissions: [billingPermission('update')] }
+      );
+      const host = fixture.nativeElement as HTMLElement;
+
+      (host.querySelector('.condition-toggle') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(host.querySelector('nxs-condition-builder')).toBeNull();
+      expect(host.querySelector('.condition-editor')?.textContent).toContain(
+        'No check of this action reads the record'
+      );
+    });
+
     it('clears a stored restriction and keeps the effect', () => {
       const { component } = setup([
         {

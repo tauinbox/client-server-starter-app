@@ -18,6 +18,12 @@ import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factor
 import { AuditService } from '../src/modules/audit/audit.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import {
+  AbilityBuilder,
+  createMongoAbility
+} from '../src/modules/auth/casl/app-ability';
+import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 
 const FLAG_ID = '4f9d38f6-6c67-4a54-9d5e-222222222222';
 
@@ -39,7 +45,11 @@ describe('Feature flag key is immutable after create (e2e)', () => {
         { provide: PermissionService, useValue: {} },
         { provide: CaslAbilityFactory, useValue: {} },
         { provide: AuditService, useValue: { log: jest.fn() } },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } }
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: MetricsService,
+          useValue: { recordPermissionDenied: jest.fn() }
+        }
       ]
     })
       .overrideGuard(PermissionsGuard)
@@ -59,9 +69,9 @@ describe('Feature flag key is immutable after create (e2e)', () => {
       })
     );
     app.use((req: Request, _res: Response, next: NextFunction) => {
-      (req as Request & { user: { userId: string } }).user = {
-        userId: 'admin-1'
-      };
+      const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+      can('update', 'FeatureFlag');
+      Object.assign(req, { user: { userId: 'admin-1' }, ability: build() });
       next();
     });
     await app.init();

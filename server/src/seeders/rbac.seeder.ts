@@ -19,14 +19,11 @@ import { AuthController } from '../modules/auth/controllers/auth.controller';
 // controller, which is the declaration the startup sync reads too. Thus a seed
 // before the first start, or on a schema that no migration filled, still
 // writes every declared action and permission.
-const SEEDED_RESOURCES: { controller: object; description: string }[] = [
-  { controller: UsersController, description: 'User accounts management' },
-  { controller: RolesController, description: 'Role management' },
-  {
-    controller: RbacController,
-    description: 'Permission and RBAC metadata management'
-  },
-  { controller: AuthController, description: 'User own profile' }
+const SEEDED_RESOURCES: object[] = [
+  UsersController,
+  RolesController,
+  RbacController,
+  AuthController
 ];
 
 function declarationOf(controller: object): ResourceMetadata {
@@ -103,17 +100,14 @@ export default class RbacSeeder extends Seeder {
     const resourceRepo = dataSource.getRepository(Resource);
     const actionRepo = dataSource.getRepository(Action);
 
-    const declared = SEEDED_RESOURCES.map(({ controller, description }) => ({
-      meta: declarationOf(controller),
-      description
-    }));
+    const declared = SEEDED_RESOURCES.map(declarationOf);
     const resources = await ensureRows(
       resourceRepo,
-      declared.map(({ meta, description }) => ({
+      declared.map((meta) => ({
         name: meta.name,
         subject: meta.subject,
         displayName: meta.displayName,
-        description,
+        description: meta.description,
         actionNames: [...meta.actions],
         conditionalActionNames: [...meta.conditionalActions],
         isSystem: true,
@@ -123,7 +117,7 @@ export default class RbacSeeder extends Seeder {
     // A stored row keeps its admin edits, but its declared lists follow the
     // code, as the sync rewrites them.
     for (const resource of resources) {
-      const meta = declared.find((d) => d.meta.name === resource.name)?.meta;
+      const meta = declared.find((d) => d.name === resource.name);
       if (meta) {
         resource.actionNames = [...meta.actions];
         resource.conditionalActionNames = [...meta.conditionalActions];
@@ -133,9 +127,9 @@ export default class RbacSeeder extends Seeder {
 
     const actions = await ensureRows(
       actionRepo,
-      [...new Set(declared.flatMap(({ meta }) => meta.actions))].map(
-        (name) => ({ name })
-      )
+      [...new Set(declared.flatMap((meta) => meta.actions))].map((name) => ({
+        name
+      }))
     );
     const roles = await ensureRows(roleRepo, DEFAULT_ROLES);
 

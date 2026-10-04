@@ -68,9 +68,9 @@
                 <dd>{{ flag.updatedAt | localizedDate: 'medium' }}</dd>
               </dl>
 
-              @if (canUpdate() || canDelete()) {
+              @if (canUpdate(flag) || canDelete(flag)) {
                 <div class="flag-card-actions">
-                  @if (canUpdate()) {
+                  @if (canUpdate(flag)) {
                     <button
                       matIconButton
                       (click)="toggleFlag(flag)"
@@ -94,7 +94,7 @@
                       <mat-icon>edit</mat-icon>
                     </button>
                   }
-                  @if (canDelete()) {
+                  @if (canDelete(flag)) {
                     <button
                       matIconButton
                       class="app-btn-danger"
@@ -197,7 +197,7 @@
               {{ t('admin.featureFlags.tableHeaderActions') }}
             </th>
             <td mat-cell *matCellDef="let flag">
-              @if (canUpdate()) {
+              @if (canUpdate(flag)) {
                 <button
                   matIconButton
                   (click)="toggleFlag(flag)"
@@ -221,7 +221,7 @@
                   <mat-icon>edit</mat-icon>
                 </button>
               }
-              @if (canDelete()) {
+              @if (canDelete(flag)) {
                 <button
                   matIconButton
                   class="app-btn-danger"

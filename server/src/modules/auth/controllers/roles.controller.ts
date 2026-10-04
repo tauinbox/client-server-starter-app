@@ -60,8 +60,9 @@ import type { JwtAuthRequest } from '../types/auth.request';
   name: 'roles',
   subject: 'Role',
   displayName: 'Roles',
+  description: 'Role management',
   actions: ['create', 'read', 'update', 'delete', 'assign'],
-  conditionalActions: ['create', 'update', 'delete']
+  conditionalActions: ['create', 'update', 'delete', 'assign']
 })
 @UseInterceptors(ClassSerializerInterceptor)
 @SerializeOptions({ groups: ['privileged'] })

@@ -50,6 +50,7 @@ import { UsageResponseDto } from '../dtos/usage-response.dto';
   name: 'billing',
   subject: 'Billing',
   displayName: 'Billing',
+  description: 'Billing administration',
   actions: ['search', 'create', 'update', 'refund'],
   conditionalActions: []
 })

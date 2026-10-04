@@ -323,6 +323,7 @@ succeeding and no error rate moves. That counter is the only place the gap shows
 
 `ResourceSyncService` reads every `@RegisterResource` at startup. It writes the declared `actions`
 and `conditionalActions` to `resources.action_names` and `resources.conditional_action_names`,
+writes the declared `description` when the stored one is empty (an admin edit survives),
 creates a missing `actions` row for a declared action, and creates a `permissions` row for each
 declared pair only. It never creates an action named `manage` or `all`. The admin narrowing
 `allowed_action_names` survives a sync.
@@ -480,8 +481,12 @@ orphans each per-user entry with no Redis `SCAN`.
 `controllers/feature-flags-admin.controller.ts` holds 9 administrator endpoints below
 `/admin/feature-flags`. The two list endpoints and `GET attribute-keys` check `search`,
 `GET :id` and `POST :id/preview` check `read`, and the create, the update, the toggle and the
-delete check `create`, `update`, `update` and `delete` on `FeatureFlag`. No check of these reads the
-record, so `FeatureFlag` declares no `conditionalActions`. The 5 mutating
+delete check `create`, `update`, `update` and `delete` on `FeatureFlag`. All five actions are
+`conditionalActions`: the two lists filter in SQL with `applyAbilityToFeatureFlagQuery`
+(`GET attribute-keys` returns no flag data), and each route on one flag runs `assertCan` on it.
+The create checks the record with the defaults that the service writes. The update and the toggle
+also check the record as it is after the write, so a grant scoped by a writable field (`enabled`,
+`public`) cannot move a flag out of its own scope. The 5 mutating
 endpoints each write an audit entry. Three of them use `@LogAudit`. The delete calls
 `AuditService.log` itself, to record `details: { key }` of the flag that it removed. The update
 calls it too, because `changedFields` compares the request with the flag read before the write. The 3 read
@@ -1389,11 +1394,12 @@ condition can legitimately test. Thus the server enforces a `create` grant with 
 
 **A condition only where every check reads the record.** An action goes into the
 `conditionalActions` of its resource only when each route that checks it also runs one of the
-checks above (or, for `search:User`, the SQL filter of `applyAbilityToUserQuery`). The lists are
-`User`: all five actions; `Role`: `create`, `update`, `delete`; `Permission`: `update`; `Profile`,
-`Billing` and `FeatureFlag`: none. `read:Role` is not in the list, because `GET /roles` and
-`GET /roles/cursor` return every role, and neither is `assign:Role`, because the role-assignment
-routes check `update:User` on the target user. `RoleService.assertGrantsApplicable` answers 400
+checks above (or, for `search`, the SQL filter of `applyAbilityToQuery`). The lists are
+`User` and `FeatureFlag`: all five actions; `Role`: `create`, `update`, `delete`, `assign`;
+`Permission`: `update`; `Profile` and `Billing`: none. `read:Role` is not in the list, because
+`GET /roles` and `GET /roles/cursor` return every role. `RoleService.assignRoleToUser` and
+`removeRoleFromUser` check `assign` on the role after `update` on the target user, so a role can be
+limited to assigning some roles. `RoleService.assertGrantsApplicable` answers 400
 `errors.roles.conditionNotSupported` for a restriction on any other action, and
 `errors.roles.actionNotGrantable` for an allow on an action that the resource does not offer.
 `buildAbility` fails closed on a stored row that breaks either rule: the allow registers nothing,
