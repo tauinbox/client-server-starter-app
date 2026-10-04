@@ -385,6 +385,9 @@ src/app/
     │                       # nxsRequirePermissions, nxsHasFeature and nxsHasEntitlement. It owns
     │                       # the then and else view-container bookkeeping. Thus each directive
     │                       # supplies only its predicate and its else template.
+    │                       # TemplateRowOfDirective ([nxsTemplateRowOf]="rows()") gives let-row
+    │                       # on an ng-template the item type of the list. Use it on a row
+    │                       # template that ngTemplateOutlet shows, thus the template is type-checked.
     ├── pipes/              # LocalizedDatePipe supplies {{ value | localizedDate: 'mediumDate' :
     │                       # 'UTC' }}. Use it for all dates, not Angular's DatePipe. It formats
     │                       # with Intl in the active LanguageService language, thus a language

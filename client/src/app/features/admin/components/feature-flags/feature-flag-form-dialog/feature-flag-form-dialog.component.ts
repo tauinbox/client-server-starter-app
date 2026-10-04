@@ -47,6 +47,10 @@ import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 import { deepEqual } from '@shared/utils/deep-equal.utils';
 import { featureFlagRuleError } from '../../../utils/feature-flag-rule-validation';
 import {
+  confirmEnableForEveryone,
+  hasIncludeRule
+} from '../../../utils/feature-flag-enable-confirm';
+import {
   NxsChipsAutocompleteComponent,
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
@@ -233,33 +237,19 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   submit(): void {
     if (this.flagForm().invalid() || this.hasRuleErrors()) return;
-    // An enabled flag with no include rules evaluates "on" for every
-    // authenticated user, so confirm that intent before saving. Disabled
-    // flags and flags that target a subset via include rules save directly.
-    if (this.enabled() && !this.#hasIncludeRules()) {
-      this.#adaptiveDialog
-        .openConfirm({
-          title: this.#transloco.translate(
-            'admin.featureFlags.confirmEnableNoRulesTitle'
-          ),
-          message: this.#transloco.translate(
-            'admin.featureFlags.confirmEnableNoRulesMessage',
-            { key: this.model().key.trim() }
-          ),
-          confirmButton: this.#transloco.translate('common.confirm'),
-          cancelButton: this.#transloco.translate('common.cancel')
-        })
+    if (this.enabled() && !hasIncludeRule(this.rules())) {
+      confirmEnableForEveryone(
+        this.#adaptiveDialog,
+        this.#transloco,
+        this.model().key.trim()
+      )
         .pipe(takeUntilDestroyed(this.#destroyRef))
-        .subscribe((confirmed: boolean | undefined) => {
+        .subscribe((confirmed) => {
           if (confirmed) this.#close();
         });
       return;
     }
     this.#close();
-  }
-
-  #hasIncludeRules(): boolean {
-    return this.rules().some((r) => r.effect === 'include');
   }
 
   #close(): void {
