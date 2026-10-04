@@ -814,7 +814,6 @@ describe('feature-flag validation parity with server', () => {
     });
   });
 
-  // The server writes the flag and its rules in one transaction.
   describe('flag and rules save together', () => {
     const roleRule = (name: string) => ({
       type: 'role',

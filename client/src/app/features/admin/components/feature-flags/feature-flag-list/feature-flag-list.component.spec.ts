@@ -258,8 +258,6 @@ describe('FeatureFlagListComponent', () => {
     });
   });
 
-  // The flag and its rules travel in one request, so there is no state in
-  // which the flag saved and the rules did not.
   describe('save in one request', () => {
     const rules = [
       {

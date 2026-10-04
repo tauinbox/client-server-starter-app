@@ -572,19 +572,13 @@ adminRouter.get('/:id', requireUuid('id'), (req, res) => {
   res.json(toFeatureFlagResponse(flag));
 });
 
-// A body without `rules` keeps the stored rules. A 'dto' failure belongs to
-// the ValidationPipe, which runs before the handler; a 'service' failure is
-// reported only after the lookups, as the server validates the payloads after
-// them and before its transaction.
 function rulesOf(body: {
   rules?: unknown;
 }): ReturnType<typeof validateRules> | null {
   return body.rules === undefined ? null : validateRules(body.rules);
 }
 
-// Mirrors the server write: the new set replaces the old one, and createdAt is
-// staggered per index so the rules keep the request order (the server column
-// defaults to clock_timestamp()).
+// Staggered createdAt keeps the request order, as clock_timestamp() does on the server.
 function writeRules(
   flagId: string,
   rules: ValidatedRule[],

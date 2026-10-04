@@ -94,7 +94,6 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     expect(created.key).toBe('chips-rollout');
     expect(created.environments.sort()).toEqual(['production', 'staging']);
 
-    // The rules travel in the create request itself.
     const createBody = response.request().postDataJSON() as {
       rules: {
         type: string;
