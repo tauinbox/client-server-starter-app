@@ -37,6 +37,7 @@ describe('FeatureFlagsAdminController', () => {
     toggle: jest.Mock;
     delete: jest.Mock;
     getAttributeCustomKeys: jest.Mock;
+    newFlagFields: FeatureFlagService['newFlagFields'];
   };
   let eventEmitter: { emit: jest.Mock };
   let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
@@ -57,6 +58,7 @@ describe('FeatureFlagsAdminController', () => {
     flagService = {
       findAll: jest.fn().mockResolvedValue([sampleFlag]),
       findOne: jest.fn().mockResolvedValue(sampleFlag),
+      newFlagFields: FeatureFlagService.prototype.newFlagFields,
       create: jest.fn().mockResolvedValue(sampleFlag),
       update: jest
         .fn()

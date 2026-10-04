@@ -100,12 +100,10 @@ export default class RbacSeeder extends Seeder {
     const resourceRepo = dataSource.getRepository(Resource);
     const actionRepo = dataSource.getRepository(Action);
 
-    const declared = SEEDED_RESOURCES.map((controller) => ({
-      meta: declarationOf(controller)
-    }));
+    const declared = SEEDED_RESOURCES.map(declarationOf);
     const resources = await ensureRows(
       resourceRepo,
-      declared.map(({ meta }) => ({
+      declared.map((meta) => ({
         name: meta.name,
         subject: meta.subject,
         displayName: meta.displayName,
@@ -119,7 +117,7 @@ export default class RbacSeeder extends Seeder {
     // A stored row keeps its admin edits, but its declared lists follow the
     // code, as the sync rewrites them.
     for (const resource of resources) {
-      const meta = declared.find((d) => d.meta.name === resource.name)?.meta;
+      const meta = declared.find((d) => d.name === resource.name);
       if (meta) {
         resource.actionNames = [...meta.actions];
         resource.conditionalActionNames = [...meta.conditionalActions];
@@ -129,9 +127,9 @@ export default class RbacSeeder extends Seeder {
 
     const actions = await ensureRows(
       actionRepo,
-      [...new Set(declared.flatMap(({ meta }) => meta.actions))].map(
-        (name) => ({ name })
-      )
+      [...new Set(declared.flatMap((meta) => meta.actions))].map((name) => ({
+        name
+      }))
     );
     const roles = await ensureRows(roleRepo, DEFAULT_ROLES);
 

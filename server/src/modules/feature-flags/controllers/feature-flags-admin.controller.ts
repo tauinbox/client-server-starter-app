@@ -153,18 +153,10 @@ export class FeatureFlagsAdminController {
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    // The record as the service will write it, defaults included.
-    const { rules: _rules, ...fields } = dto;
     this.assertCanFlag(
       ability,
       'create',
-      {
-        ...fields,
-        description: fields.description ?? null,
-        enabled: fields.enabled ?? false,
-        environments: fields.environments ?? [],
-        public: fields.public ?? false
-      },
+      this.flagService.newFlagFields(dto),
       req
     );
     const flag = await this.flagService.create(dto, req.user?.userId ?? null);

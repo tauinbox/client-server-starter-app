@@ -141,6 +141,17 @@ export class FeatureFlagService {
     return flag;
   }
 
+  /** The fields of a new flag as `create` writes them, defaults included. */
+  newFlagFields(dto: CreateFeatureFlagDto) {
+    return {
+      key: dto.key,
+      description: dto.description ?? null,
+      enabled: dto.enabled ?? false,
+      environments: dto.environments ?? [],
+      public: dto.public ?? false
+    };
+  }
+
   async create(
     dto: CreateFeatureFlagDto,
     actorId: string | null
@@ -159,11 +170,7 @@ export class FeatureFlagService {
         const flag = await em.save(
           FeatureFlag,
           em.create(FeatureFlag, {
-            key: dto.key,
-            description: dto.description ?? null,
-            enabled: dto.enabled ?? false,
-            environments: dto.environments ?? [],
-            public: dto.public ?? false,
+            ...this.newFlagFields(dto),
             version: 1,
             updatedByUserId: actorId
           })
