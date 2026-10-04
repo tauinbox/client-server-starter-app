@@ -3,7 +3,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
-import KeyvRedis from '@keyv/redis';
 import type { Request } from 'express';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import { FeatureFlagResolverService } from './feature-flag-resolver.service';
@@ -23,7 +22,6 @@ describe('FeatureFlagResolverService', () => {
     get: jest.Mock;
     set: jest.Mock;
     del: jest.Mock;
-    stores: { store?: unknown }[];
   };
   let configService: { get: jest.Mock };
   let permissionService: { getRoleNamesForUser: jest.Mock };
@@ -43,9 +41,7 @@ describe('FeatureFlagResolverService', () => {
       del: jest.fn((k: string) => {
         cacheStore.delete(k);
         return Promise.resolve();
-      }),
-      // In-memory fallback wiring: no Redis adapter behind the cache.
-      stores: [{}]
+      })
     };
     flagRepo = { find: jest.fn() };
     ruleRepo = { find: jest.fn() };
@@ -224,31 +220,46 @@ describe('FeatureFlagResolverService', () => {
     expect(result.flags['enabled-private']).toBe(true);
   });
 
-  it('caches per user using the global version', async () => {
-    seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-    await service.evaluateForUser(
-      { userId: 'u1', email: null, createdAt: null, roles: [] },
-      fakeReq
+  it('evaluates the current user attributes on every call', async () => {
+    seedFlags(
+      [{ id: 'f1', key: 'gated', enabled: true }],
+      [
+        {
+          flagId: 'f1',
+          type: 'attribute',
+          payload: {
+            type: 'attribute',
+            field: 'emailDomain',
+            op: 'eq',
+            value: 'a.com'
+          }
+        }
+      ]
     );
-    flagRepo.find.mockClear();
-    await service.evaluateForUser(
-      { userId: 'u1', email: null, createdAt: null, roles: [] },
-      fakeReq
-    );
-    // Second call should hit the user cache, not re-load.
-    expect(flagRepo.find).not.toHaveBeenCalled();
+    const user = { userId: 'u1', createdAt: null, roles: [] };
+
+    expect(
+      await service.isEnabledForUser(
+        { ...user, email: 'x@a.com' },
+        fakeReq,
+        'gated'
+      )
+    ).toBe(true);
+    expect(
+      await service.isEnabledForUser(
+        { ...user, email: 'x@b.com' },
+        fakeReq,
+        'gated'
+      )
+    ).toBe(false);
+    expect([...cacheStore.keys()]).toEqual(['featureflags:all']);
   });
 
-  it('records a feature_flags miss then hit across two evaluations', async () => {
+  it('records a feature_flags_all miss then hit across two evaluations', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
     const user = { userId: 'u1', email: null, createdAt: null, roles: [] };
 
-    // First evaluation: user cache miss + all-flags cache miss.
     await service.evaluateForUser(user, fakeReq);
-    expect(metrics.recordCacheAccess).toHaveBeenCalledWith(
-      'feature_flags',
-      'miss'
-    );
     expect(metrics.recordCacheAccess).toHaveBeenCalledWith(
       'feature_flags_all',
       'miss'
@@ -256,10 +267,10 @@ describe('FeatureFlagResolverService', () => {
 
     metrics.recordCacheAccess.mockClear();
 
-    // Second evaluation: served from the per-user cache.
     await service.evaluateForUser(user, fakeReq);
+    expect(metrics.recordCacheAccess).toHaveBeenCalledTimes(1);
     expect(metrics.recordCacheAccess).toHaveBeenCalledWith(
-      'feature_flags',
+      'feature_flags_all',
       'hit'
     );
   });
@@ -383,9 +394,6 @@ describe('FeatureFlagResolverService', () => {
     const inId = pickAnonId((b) => b < 50);
     const outId = pickAnonId((b) => b >= 50);
 
-    const hasUserEntry = () =>
-      [...cacheStore.keys()].some((k) => k.startsWith('featureflags:user:u1:'));
-
     function pickAnonId(fits: (bucket: number) => boolean): string {
       for (let i = 0; ; i++) {
         const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
@@ -393,7 +401,7 @@ describe('FeatureFlagResolverService', () => {
       }
     }
 
-    it('issues no id and uses the per-user cache when no rule buckets by device', async () => {
+    it('issues no id when no rule buckets by device', async () => {
       seedFlags([{ id: 'f1', key: 'pct' }], [{ flagId: 'f1' }]);
       const { result, issuedAnonId } = await service.evaluateSignedIn(
         user,
@@ -402,7 +410,6 @@ describe('FeatureFlagResolverService', () => {
       );
       expect(issuedAnonId).toBeNull();
       expect(result.flags['pct']).toBe(true);
-      expect(hasUserEntry()).toBe(true);
     });
 
     it('issues an id for a device rule on a flag that is not public', async () => {
@@ -422,9 +429,7 @@ describe('FeatureFlagResolverService', () => {
       const outside = await service.evaluateSignedIn(user, outId, fakeReq);
       expect(inside.result.flags).toEqual({ 'dev-pct': true });
       expect(inside.issuedAnonId).toBeNull();
-      // A shared per-user entry would hand the first device's map to the second.
       expect(outside.result.flags['dev-pct']).toBeUndefined();
-      expect(hasUserEntry()).toBe(false);
     });
 
     it('never opens a device rule for an evaluation without an anon id', async () => {
@@ -435,57 +440,15 @@ describe('FeatureFlagResolverService', () => {
     });
   });
 
-  it('invalidateAll bumps the version so user caches orphan', async () => {
+  it('invalidateAll makes the next evaluation reload the flags', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-    await service.evaluateForUser(
-      { userId: 'u1', email: null, createdAt: null, roles: [] },
-      fakeReq
-    );
-    const beforeKeys = [...cacheStore.keys()].filter((k) =>
-      k.startsWith('featureflags:user:u1:v')
-    );
-    expect(beforeKeys).toHaveLength(1);
+    const user = { userId: 'u1', email: null, createdAt: null, roles: [] };
+    await service.evaluateForUser(user, fakeReq);
 
-    // Advance time enough for the bumped version (Date.now()) to differ.
-    const realNow = Date.now;
-    Date.now = () => realNow() + 1000;
     await service.invalidateAll();
-    Date.now = realNow;
-
     flagRepo.find.mockClear();
-    await service.evaluateForUser(
-      { userId: 'u1', email: null, createdAt: null, roles: [] },
-      fakeReq
-    );
-    // The version-suffixed key changed, so the resolver had to re-load.
-    expect(flagRepo.find).toHaveBeenCalled();
-  });
-
-  it('invalidateAll stays monotonic when Date.now() does not advance', async () => {
-    seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-    const realNow = Date.now;
-    const frozen = realNow();
-    Date.now = () => frozen;
-    try {
-      await service.evaluateForUser(
-        { userId: 'u1', email: null, createdAt: null, roles: [] },
-        fakeReq
-      );
-      // Two successive invalidations in the same millisecond (fast CI / clock
-      // skew across instances) must still produce a strictly newer version,
-      // otherwise per-user cache entries from before the first invalidation
-      // would be re-reachable after the second.
-      await service.invalidateAll();
-      await service.invalidateAll();
-      flagRepo.find.mockClear();
-      await service.evaluateForUser(
-        { userId: 'u1', email: null, createdAt: null, roles: [] },
-        fakeReq
-      );
-      expect(flagRepo.find).toHaveBeenCalled();
-    } finally {
-      Date.now = realNow;
-    }
+    await service.evaluateForUser(user, fakeReq);
+    expect(flagRepo.find).toHaveBeenCalledTimes(1);
   });
 
   it('concurrent evaluations share one DB load (single-flight)', async () => {
@@ -538,135 +501,5 @@ describe('FeatureFlagResolverService', () => {
     const { result } = await service.evaluateAnonymous('anon-1', fakeReq);
     expect(flagRepo.find).toHaveBeenCalledTimes(1);
     expect(result.flags['fresh']).toBe(true);
-  });
-
-  describe('version counter with a Redis-backed cache', () => {
-    let redis: {
-      get: jest.Mock;
-      incr: jest.Mock;
-      on: jest.Mock;
-    };
-    let counter: number | null;
-
-    async function setupRedisBacked(): Promise<FeatureFlagResolverService> {
-      counter = null;
-      redis = {
-        get: jest.fn(() =>
-          Promise.resolve(counter === null ? null : String(counter))
-        ),
-        incr: jest.fn(() => {
-          counter = (counter ?? 0) + 1;
-          return Promise.resolve(counter);
-        }),
-        on: jest.fn()
-      };
-      // Nest wraps the configured adapter in a Keyv, so the service reaches the
-      // adapter at stores[0].store - a real KeyvRedis is required for the
-      // instanceof narrowing, but no connection is opened.
-      const adapter = new KeyvRedis('redis://localhost:6379');
-      // @ts-expect-error stand-in for the node-redis client: only get/incr/on
-      // are exercised, and widening the production type for a mock is banned.
-      adapter.client = redis;
-      cacheManager.stores = [{ store: adapter }];
-
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          FeatureFlagResolverService,
-          { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
-          { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
-          { provide: CACHE_MANAGER, useValue: cacheManager },
-          {
-            provide: AttributeRegistryService,
-            useValue: new AttributeRegistryService()
-          },
-          { provide: ConfigService, useValue: configService },
-          { provide: PermissionService, useValue: permissionService },
-          { provide: UsersService, useValue: usersService },
-          { provide: MetricsService, useValue: metrics }
-        ]
-      }).compile();
-      return module.get(FeatureFlagResolverService);
-    }
-
-    function userCacheVersions(): string[] {
-      return cacheManager.set.mock.calls
-        .map((c: unknown[]) => c[0] as string)
-        .filter((k) => k.startsWith('featureflags:user:u1:v'))
-        .map((k) => k.slice('featureflags:user:u1:v'.length));
-    }
-
-    it('bumps the version with an atomic INCR instead of a read-modify-write', async () => {
-      const svc = await setupRedisBacked();
-      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-
-      await svc.invalidateAll();
-
-      expect(redis.incr).toHaveBeenCalledWith('featureflags:version:counter');
-      // The racy get -> compute -> set on the version key must be gone.
-      expect(cacheManager.set).not.toHaveBeenCalledWith(
-        'featureflags:version',
-        expect.anything(),
-        expect.anything()
-      );
-    });
-
-    it('gives concurrent invalidations distinct, strictly increasing versions', async () => {
-      const svc = await setupRedisBacked();
-      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-
-      await Promise.all([
-        svc.invalidateAll(),
-        svc.invalidateAll(),
-        svc.invalidateAll()
-      ]);
-
-      // Three INCRs means three distinct versions; the pre-fix read-then-write
-      // could observe the same previous value and collapse them into one.
-      expect(redis.incr).toHaveBeenCalledTimes(3);
-      expect(counter).toBe(3);
-    });
-
-    it('reads the counter for the per-user cache key and starts at 0', async () => {
-      const svc = await setupRedisBacked();
-      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-      const user = { userId: 'u1', email: null, createdAt: null, roles: [] };
-
-      await svc.evaluateForUser(user, fakeReq);
-      expect(userCacheVersions()).toEqual(['0']);
-
-      await svc.invalidateAll();
-      await svc.evaluateForUser(user, fakeReq);
-      expect(userCacheVersions()).toEqual(['0', '1']);
-    });
-
-    it('falls back to the cache-manager counter when Redis rejects', async () => {
-      const svc = await setupRedisBacked();
-      seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-      redis.incr.mockRejectedValue(new Error('connection refused'));
-      redis.get.mockRejectedValue(new Error('connection refused'));
-
-      await expect(svc.invalidateAll()).resolves.toBeUndefined();
-      expect(cacheManager.set).toHaveBeenCalledWith(
-        'featureflags:version',
-        expect.any(Number),
-        0
-      );
-    });
-  });
-
-  it('invalidateUser deletes that user’s current cache key', async () => {
-    seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
-    await service.evaluateForUser(
-      { userId: 'u1', email: null, createdAt: null, roles: [] },
-      fakeReq
-    );
-    cacheManager.del.mockClear();
-    await service.invalidateUser('u1');
-    const delKeys = cacheManager.del.mock.calls.map(
-      (c: unknown[]) => c[0] as string
-    );
-    expect(delKeys.some((k) => k.startsWith('featureflags:user:u1:v'))).toBe(
-      true
-    );
   });
 });

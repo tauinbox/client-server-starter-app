@@ -950,7 +950,7 @@
           "refId": "A"
         }
       ],
-      "description": "Hit ratio (hits / total lookups) per logical Redis-backed cache over a 5-min window: permissions, roles, resources (RBAC subject map), feature_flags (per-user evaluated set), feature_flags_all (shared flag list). A persistently low ratio means the cache is being invalidated faster than it can serve hits — check TTLs and invalidation frequency. A series is absent while its cache sees no traffic.",
+      "description": "Hit ratio (hits / total lookups) per logical Redis-backed cache over a 5-min window: permissions, roles, resources (RBAC subject map), feature_flags_all (shared flag list). A persistently low ratio means the cache is being invalidated faster than it can serve hits — check TTLs and invalidation frequency. A series is absent while its cache sees no traffic.",
       "title": "Cache Hit Ratio by Cache",
       "type": "timeseries"
     },

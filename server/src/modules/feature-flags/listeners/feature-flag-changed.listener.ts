@@ -4,7 +4,6 @@ import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { UserRoleChangedEvent } from '../../auth/events/user-role-changed.event';
-import { UserDeletedEvent } from '../../users/events/user-deleted.event';
 
 export const FLAGS_BROADCAST_COALESCE_MS = 500;
 
@@ -31,16 +30,10 @@ export class FeatureFlagChangedListener implements OnModuleDestroy {
   }
 
   @OnEvent(UserRoleChangedEvent.name)
-  async handleUserRoleChanged(event: UserRoleChangedEvent): Promise<void> {
-    await this.resolver.invalidateUser(event.userId);
+  handleUserRoleChanged(event: UserRoleChangedEvent): void {
     this.notificationsService.push(event.userId, {
       type: 'feature_flags_updated'
     });
-  }
-
-  @OnEvent(UserDeletedEvent.name)
-  async handleUserDeleted(event: UserDeletedEvent): Promise<void> {
-    await this.resolver.invalidateUser(event.userId);
   }
 
   onModuleDestroy(): void {

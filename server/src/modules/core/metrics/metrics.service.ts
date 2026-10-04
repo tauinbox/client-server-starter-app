@@ -17,12 +17,7 @@ export type PermissionDenialLevel = 'guard' | 'instance';
 export type MailJobOutcome = 'completed' | 'failed';
 
 export type CacheName =
-  | 'permissions'
-  | 'roles'
-  | 'resources'
-  | 'feature_flags'
-  | 'feature_flags_all'
-  | 'entitlements';
+  'permissions' | 'roles' | 'resources' | 'feature_flags_all' | 'entitlements';
 
 export type CacheOutcome = 'hit' | 'miss';
 

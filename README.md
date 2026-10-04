@@ -236,9 +236,8 @@ management and theming.
   broadcast of `{ type: 'feature_flags_updated' }`, thus a burst of changes causes one synchronized
   client refetch. The flag-list reload behind those refetches is single-flight.
 
-  The per-user cache is keyed by a global version counter. Thus a change orphans each per-user entry
-  and needs no Redis `SCAN MATCH`. A deployment with Redis increases the counter with an atomic
-  `INCR`, thus simultaneous invalidations across instances cannot collapse into one version.
+  The server does not cache an evaluated result. Each check evaluates the cached flag list against the
+  user as the database holds it now, thus a change of email or roles applies on the next check.
 
   The `environments` of a flag are restricted to the names that the server can run as, and the server
   normalizes them on a write. The `value` of an `attribute` rule must have a shape that its operator

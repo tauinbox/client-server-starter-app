@@ -44,15 +44,10 @@ export class AttributeRegistryService {
    * `onModuleInit` to expose tenant/org/region/etc. attributes to the feature
    * flag evaluator without modifying the evaluator itself.
    *
-   * Request-stable contract: a resolver MUST return a stable value for a given
-   * user across requests — it may depend on the `user` argument but MUST NOT
-   * depend on per-request data (IP, headers, query string, country, etc.). The
-   * feature-flag evaluator caches the full evaluated set per user for 60s
-   * (`featureflags:user:<id>:v<version>` in `FeatureFlagResolverService`), so a
-   * request-derived attribute would freeze the first request's value for the
-   * whole TTL, making attribute rules non-deterministic per request. The `req`
-   * argument exists only for stable, request-independent enrichment; do not
-   * branch evaluation on volatile request state.
+   * A resolver runs on every evaluation, so it must be cheap and synchronous.
+   * `req` is null when a service checks a flag outside an HTTP request: a
+   * rule on a value read from the request never matches there, so a server
+   * gate and the flag list can disagree for one user.
    */
   registerAttribute(key: string, resolver: AttributeResolver): void {
     if (this.resolvers.has(key)) {

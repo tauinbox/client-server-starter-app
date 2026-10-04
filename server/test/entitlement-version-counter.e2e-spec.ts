@@ -14,9 +14,9 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 const REDIS_URL = process.env['REDIS_URL'];
 const COUNTER_KEY = 'entitlements:version:counter';
 
-// The entitlements cache uses the same CacheVersionCounter as feature flags, and
-// the atomicity claim is about a Redis command - a mocked client cannot prove
-// it. Skipped when REDIS_URL is unset (CI has no Redis service).
+// The atomicity claim of CacheVersionCounter is about a Redis command - a
+// mocked client cannot prove it. Skipped when REDIS_URL is unset (CI has no
+// Redis service).
 const runWithRedis = REDIS_URL ? describe : describe.skip;
 
 runWithRedis('entitlement version counter (real Redis)', () => {

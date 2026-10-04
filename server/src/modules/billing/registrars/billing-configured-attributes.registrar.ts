@@ -14,8 +14,7 @@ import { BillingConfigService } from '../config/billing-config.service';
  * shown only when at least one provider is configured AND the flag is enabled.
  * Mirror of `OAuthProviderFlagAttributesRegistrar`.
  *
- * Values are read once at startup (env is request-stable), honoring the
- * attribute-registry's request-stable contract.
+ * Values are read once at startup, so each evaluation reads a constant.
  */
 @Injectable()
 export class BillingConfiguredAttributesRegistrar implements OnModuleInit {

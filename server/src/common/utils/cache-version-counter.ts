@@ -17,7 +17,7 @@ import { redisClientOf, ThrottledFailureLog } from './redis-client';
  * Without Redis (in-memory fallback, no `REDIS_URL`) a single process owns the
  * counter, so the read-modify-write below cannot lose to another instance. It
  * is also the degradation path when Redis is unreachable: a cache outage must
- * not take down flag evaluation or entitlement resolution.
+ * not take down entitlement resolution.
  */
 export class CacheVersionCounter {
   readonly #cache: Cache;
