@@ -13,6 +13,9 @@ export default defineConfig({
   retries: process.env['CI'] ? 1 : 0,
   workers: process.env['CI'] ? 4 : undefined,
   reporter: process.env['CI'] ? [['dot'], ['html', { open: 'never' }]] : 'html',
+  // A full parallel run keeps the CPU near 100%, and a starved renderer can
+  // paint the first view after a navigation more than 5 s late.
+  expect: { timeout: 10_000 },
   use: {
     baseURL,
     // Local runs have no retry, so keep the trace of every failure.

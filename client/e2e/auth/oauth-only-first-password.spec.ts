@@ -108,7 +108,7 @@ test.describe('OAuth-only account sets its first password', () => {
     // A credential never enters web storage, so the page asks for it again.
     await expect(
       page.getByText(/enter your new password/i).first()
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible();
 
     await page
       .getByLabel('New Password (Optional)', { exact: true })
@@ -162,7 +162,7 @@ test.describe('OAuth-only account sets its first password', () => {
     await page.goto('/profile?reauth=ok');
     await expect(
       page.getByText(/enter your new password/i).first()
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible();
 
     await page
       .getByLabel('New Password (Optional)', { exact: true })

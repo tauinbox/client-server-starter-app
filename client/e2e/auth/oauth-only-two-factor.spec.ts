@@ -156,9 +156,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
 
     await page.goto('/profile?reauth=ok');
 
-    await expect(page.locator('.two-factor-qr')).toBeVisible({
-      timeout: 10_000
-    });
+    await expect(page.locator('.two-factor-qr')).toBeVisible();
     await expect(page.getByText(MOCK_TOTP_SECRET)).toBeVisible();
 
     await page.getByLabel('Authentication code').fill(MOCK_TOTP_CODE);
@@ -232,9 +230,9 @@ test.describe('OAuth-only account turns two-factor on', () => {
     await page.goto('/profile');
 
     const card = page.locator('nxs-two-factor');
-    await expect(card.getByText('Two-factor authentication is on')).toBeVisible(
-      { timeout: 10_000 }
-    );
+    await expect(
+      card.getByText('Two-factor authentication is on')
+    ).toBeVisible();
 
     await card.getByRole('button', { name: 'Turn off' }).click();
 
@@ -264,6 +262,6 @@ test.describe('OAuth-only account turns two-factor on', () => {
 
     await expect(
       card.getByText('Two-factor authentication is off')
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible();
   });
 });
