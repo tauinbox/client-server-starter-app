@@ -7,6 +7,7 @@ import {
   inject
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NgTemplateOutlet } from '@angular/common';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   MatCard,
@@ -37,6 +38,7 @@ import {
   MatTable
 } from '@angular/material/table';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import { TemplateRowOfDirective } from '@shared/directives/template-row-of.directive';
 import {
   ListSkeletonComponent,
   type ListSkeletonCell
@@ -49,6 +51,10 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { FeatureFlagsAdminStore } from '../../../store/feature-flags-admin.store';
+import {
+  confirmEnableForEveryone,
+  hasIncludeRule
+} from '../../../utils/feature-flag-enable-confirm';
 import type {
   FeatureFlagFormDialogData,
   FeatureFlagFormDialogResult
@@ -58,6 +64,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
 @Component({
   selector: 'nxs-feature-flag-list',
   imports: [
+    NgTemplateOutlet,
     LocalizedDatePipe,
     MatCard,
     MatCardHeader,
@@ -81,6 +88,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
     MatRowDef,
     MatCell,
     InfiniteScrollDirective,
+    TemplateRowOfDirective,
     ListSkeletonComponent,
     TranslocoDirective
   ],
@@ -162,26 +170,10 @@ export class FeatureFlagListComponent implements OnInit {
   }
 
   toggleFlag(flag: FeatureFlagResponse): void {
-    // Enabling a flag that has no include rules turns it on for every
-    // authenticated user (the evaluator defaults to "on" with no include
-    // rules), so confirm that intent before flipping it on. Disabling and
-    // flags that already target a subset via include rules flip silently.
-    const enabling = !flag.enabled;
-    if (enabling && !this.#hasIncludeRules(flag)) {
-      this.#adaptiveDialog
-        .openConfirm({
-          title: this.#transloco.translate(
-            'admin.featureFlags.confirmEnableNoRulesTitle'
-          ),
-          message: this.#transloco.translate(
-            'admin.featureFlags.confirmEnableNoRulesMessage',
-            { key: flag.key }
-          ),
-          confirmButton: this.#transloco.translate('common.confirm'),
-          cancelButton: this.#transloco.translate('common.cancel')
-        })
+    if (!flag.enabled && !hasIncludeRule(flag.rules)) {
+      confirmEnableForEveryone(this.#adaptiveDialog, this.#transloco, flag.key)
         .pipe(takeUntilDestroyed(this.#destroyRef))
-        .subscribe((confirmed: boolean | undefined) => {
+        .subscribe((confirmed) => {
           if (confirmed) this.#applyToggle(flag);
         });
       return;
@@ -206,10 +198,6 @@ export class FeatureFlagListComponent implements OnInit {
           this.#notify.error(err, 'admin.featureFlags.errorToggleFailed');
         }
       });
-  }
-
-  #hasIncludeRules(flag: FeatureFlagResponse): boolean {
-    return flag.rules.some((r) => r.effect === 'include');
   }
 
   confirmDelete(flag: FeatureFlagResponse): void {

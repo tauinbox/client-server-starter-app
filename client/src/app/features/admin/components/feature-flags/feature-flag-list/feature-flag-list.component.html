@@ -70,43 +70,9 @@
 
               @if (canUpdate(flag) || canDelete(flag)) {
                 <div class="flag-card-actions">
-                  @if (canUpdate(flag)) {
-                    <button
-                      matIconButton
-                      (click)="toggleFlag(flag)"
-                      [matTooltip]="t('admin.featureFlags.toggleFlag')"
-                      [attr.aria-label]="
-                        t('admin.featureFlags.toggleFlag') + ' ' + flag.key
-                      "
-                    >
-                      <mat-icon>{{
-                        flag.enabled ? 'toggle_on' : 'toggle_off'
-                      }}</mat-icon>
-                    </button>
-                    <button
-                      matIconButton
-                      (click)="openEditDialog(flag)"
-                      [matTooltip]="t('admin.featureFlags.editFlag')"
-                      [attr.aria-label]="
-                        t('admin.featureFlags.editFlag') + ' ' + flag.key
-                      "
-                    >
-                      <mat-icon>edit</mat-icon>
-                    </button>
-                  }
-                  @if (canDelete(flag)) {
-                    <button
-                      matIconButton
-                      class="app-btn-danger"
-                      (click)="confirmDelete(flag)"
-                      [matTooltip]="t('admin.featureFlags.deleteFlag')"
-                      [attr.aria-label]="
-                        t('admin.featureFlags.deleteFlag') + ' ' + flag.key
-                      "
-                    >
-                      <mat-icon>delete</mat-icon>
-                    </button>
-                  }
+                  <ng-container
+                    *ngTemplateOutlet="rowActions; context: { $implicit: flag }"
+                  />
                 </div>
               }
             </mat-card-content>
@@ -197,43 +163,9 @@
               {{ t('admin.featureFlags.tableHeaderActions') }}
             </th>
             <td mat-cell *matCellDef="let flag">
-              @if (canUpdate(flag)) {
-                <button
-                  matIconButton
-                  (click)="toggleFlag(flag)"
-                  [matTooltip]="t('admin.featureFlags.toggleFlag')"
-                  [attr.aria-label]="
-                    t('admin.featureFlags.toggleFlag') + ' ' + flag.key
-                  "
-                >
-                  <mat-icon>{{
-                    flag.enabled ? 'toggle_on' : 'toggle_off'
-                  }}</mat-icon>
-                </button>
-                <button
-                  matIconButton
-                  (click)="openEditDialog(flag)"
-                  [matTooltip]="t('admin.featureFlags.editFlag')"
-                  [attr.aria-label]="
-                    t('admin.featureFlags.editFlag') + ' ' + flag.key
-                  "
-                >
-                  <mat-icon>edit</mat-icon>
-                </button>
-              }
-              @if (canDelete(flag)) {
-                <button
-                  matIconButton
-                  class="app-btn-danger"
-                  (click)="confirmDelete(flag)"
-                  [matTooltip]="t('admin.featureFlags.deleteFlag')"
-                  [attr.aria-label]="
-                    t('admin.featureFlags.deleteFlag') + ' ' + flag.key
-                  "
-                >
-                  <mat-icon>delete</mat-icon>
-                </button>
-              }
+              <ng-container
+                *ngTemplateOutlet="rowActions; context: { $implicit: flag }"
+              />
             </td>
           </ng-container>
 
@@ -272,4 +204,36 @@
       {{ t('admin.featureFlags.addFlag') }}
     </button>
   }
+
+  <ng-template #rowActions [nxsTemplateRowOf]="flags()" let-flag>
+    @if (canUpdate(flag)) {
+      <button
+        matIconButton
+        (click)="toggleFlag(flag)"
+        [matTooltip]="t('admin.featureFlags.toggleFlag')"
+        [attr.aria-label]="t('admin.featureFlags.toggleFlag') + ' ' + flag.key"
+      >
+        <mat-icon>{{ flag.enabled ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+      </button>
+      <button
+        matIconButton
+        (click)="openEditDialog(flag)"
+        [matTooltip]="t('admin.featureFlags.editFlag')"
+        [attr.aria-label]="t('admin.featureFlags.editFlag') + ' ' + flag.key"
+      >
+        <mat-icon>edit</mat-icon>
+      </button>
+    }
+    @if (canDelete(flag)) {
+      <button
+        matIconButton
+        class="app-btn-danger"
+        (click)="confirmDelete(flag)"
+        [matTooltip]="t('admin.featureFlags.deleteFlag')"
+        [attr.aria-label]="t('admin.featureFlags.deleteFlag') + ' ' + flag.key"
+      >
+        <mat-icon>delete</mat-icon>
+      </button>
+    }
+  </ng-template>
 </mat-card>

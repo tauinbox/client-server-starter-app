@@ -167,7 +167,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
 
   run(): void {
     const ctx = this.useRawJson()
-      ? this.#parseRawJson()
+      ? (this.#parseJsonObject(this.rawJson()) as PreviewFlagContext | null)
       : this.#buildStructuredContext();
     if (ctx === null) return;
     const request: PreviewFlagRequest = { ...ctx, ...(this.draft() ?? {}) };
@@ -198,31 +198,26 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
     if (roles.length > 0) ctx.roles = roles;
     const trimmedEnv = this.env().trim();
     if (trimmedEnv.length > 0) ctx.env = trimmedEnv;
-    const attrs = this.#parseAttributes();
+    const attrs = this.#parseJsonObject(this.attributesJson());
     if (attrs === null) return null;
     if (Object.keys(attrs).length > 0) ctx.attributes = attrs;
     return ctx;
   }
 
-  #parseAttributes(): Record<string, unknown> | null {
-    const text = this.attributesJson().trim();
-    if (text === '' || text === '{}') return {};
+  #parseJsonObject(text: string): Record<string, unknown> | null {
+    const trimmed = text.trim();
+    if (trimmed === '') return {};
+    let parsed: unknown;
     try {
-      const parsed: unknown = JSON.parse(text);
-      if (
-        parsed === null ||
-        typeof parsed !== 'object' ||
-        Array.isArray(parsed)
-      ) {
-        this.contextError.set(
-          this.#transloco.translate(
-            'admin.featureFlagPreview.advancedJsonInvalid'
-          )
-        );
-        return null;
-      }
-      return parsed as Record<string, unknown>;
+      parsed = JSON.parse(trimmed);
     } catch {
+      parsed = null;
+    }
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed)
+    ) {
       this.contextError.set(
         this.#transloco.translate(
           'admin.featureFlagPreview.advancedJsonInvalid'
@@ -230,33 +225,6 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
       );
       return null;
     }
-  }
-
-  #parseRawJson(): PreviewFlagContext | null {
-    const text = this.rawJson().trim();
-    if (text === '') return {};
-    try {
-      const parsed: unknown = JSON.parse(text);
-      if (
-        parsed === null ||
-        typeof parsed !== 'object' ||
-        Array.isArray(parsed)
-      ) {
-        this.contextError.set(
-          this.#transloco.translate(
-            'admin.featureFlagPreview.advancedJsonInvalid'
-          )
-        );
-        return null;
-      }
-      return parsed as PreviewFlagContext;
-    } catch {
-      this.contextError.set(
-        this.#transloco.translate(
-          'admin.featureFlagPreview.advancedJsonInvalid'
-        )
-      );
-      return null;
-    }
+    return parsed as Record<string, unknown>;
   }
 }
