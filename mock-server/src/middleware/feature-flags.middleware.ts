@@ -11,7 +11,6 @@ import {
 } from '@app/shared/utils/feature-flag-evaluator';
 import type {
   FeatureFlagAttributeKeysResponse,
-  FeatureFlagResponse,
   FeatureFlagRulePayload
 } from '@app/shared/types';
 import {
@@ -572,17 +571,6 @@ adminRouter.get(
     res.json(body);
   }
 );
-
-adminRouter.get('/', permissionGuard('search', 'FeatureFlag'), (req, res) => {
-  const flags: FeatureFlagResponse[] = filterByAbility(
-    Array.from(getState().featureFlags.values()),
-    (req as AuthenticatedRequest).user,
-    'search',
-    'FeatureFlag'
-  ).map(toFeatureFlagResponse);
-  flags.sort((a, b) => a.key.localeCompare(b.key));
-  res.json(flags);
-});
 
 adminRouter.get(
   '/:id',

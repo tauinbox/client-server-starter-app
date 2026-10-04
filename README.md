@@ -1580,7 +1580,7 @@ The base URL of the API is `/api/v1`.
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 400 for an action that the code does not check |
 | POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 400 when no controller registers it |
 | GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
-| GET | `/admin/feature-flags` | `feature-flags:search` | List each feature flag |
+| GET | `/admin/feature-flags/cursor` | `feature-flags:search` | List the feature flags, cursor paginated |
 | GET | `/admin/feature-flags/:id` | `feature-flags:read` | Get a feature flag by ID |
 | GET | `/admin/feature-flags/attribute-keys` | `feature-flags:search` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
 | POST | `/admin/feature-flags` | `feature-flags:create` | Create a feature flag, optionally with its targeting rules in the same write |

@@ -2,11 +2,6 @@
   "routes": [
     {
       "method": "GET",
-      "path": "/api/v1/admin/feature-flags",
-      "expectedStatus": 401
-    },
-    {
-      "method": "GET",
       "path": "/api/v1/admin/feature-flags/1",
       "expectedStatus": 401
     },

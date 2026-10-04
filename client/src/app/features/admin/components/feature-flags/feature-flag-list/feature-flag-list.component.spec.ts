@@ -37,7 +37,6 @@ describe('FeatureFlagListComponent', () => {
   let dialogOpen: ReturnType<typeof vi.fn>;
   let hasPermissions: ReturnType<typeof vi.fn>;
   let serviceMock: {
-    getAll: ReturnType<typeof vi.fn>;
     getAllCursor: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
@@ -55,7 +54,6 @@ describe('FeatureFlagListComponent', () => {
     notifyError = vi.fn();
 
     serviceMock = {
-      getAll: vi.fn().mockReturnValue(of([flag])),
       getAllCursor: vi.fn().mockReturnValue(
         of({
           data: [flag],

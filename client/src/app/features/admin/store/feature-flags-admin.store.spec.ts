@@ -27,7 +27,6 @@ const sampleFlag = (
 
 describe('FeatureFlagsAdminStore', () => {
   let service: {
-    getAll: ReturnType<typeof vi.fn>;
     getAllCursor: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
@@ -41,7 +40,6 @@ describe('FeatureFlagsAdminStore', () => {
 
   beforeEach(() => {
     service = {
-      getAll: vi.fn().mockReturnValue(of([sampleFlag()])),
       getAllCursor: vi.fn().mockReturnValue(
         of({
           data: [sampleFlag()],

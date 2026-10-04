@@ -514,8 +514,9 @@ environment other than `local`, a life of 1 year and `httpOnly=true`. Outside `l
 that name to pick the rollout bucket of a visitor. The read also ignores a value that is not a UUID
 (`ANON_ID_PATTERN`), because each value the server issues is a UUID.
 
-`events/feature-flag-changed.event.ts` holds
-`{ flagKey, changeType: 'created'|'updated'|'deleted'|'toggled'|'rules-replaced' }`.
+`events/feature-flag-changed.event.ts` has no fields: the listener resets the whole cache, so it does
+not need to know which flag changed. A role rename or delete that changes role rules emits one event
+after the commit.
 
 `listeners/feature-flag-changed.listener.ts` reacts to `FeatureFlagChangedEvent`. It invalidates the
 cache, increases the version, and calls `pushToAll` over SSE. It also does a per-user invalidation on
@@ -2458,7 +2459,7 @@ The base URL is `/api/v1`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. An anonymous call sets the `nxs_anon_id` cookie only when a live public flag has a percentage rule and the caller holds no valid one. A signed-in call sets it only when a live flag has a percentage rule with `bucketBy: 'device'` and the caller holds no valid one |
-| GET | `/admin/feature-flags` | `search:FeatureFlag` | List each flag with its rules |
+| GET | `/admin/feature-flags/cursor` | `search:FeatureFlag` | List the flags with their rules, cursor paginated |
 | GET | `/admin/feature-flags/:id` | `read:FeatureFlag` | Get a flag by ID |
 | POST | `/admin/feature-flags` | `create:FeatureFlag` | Create a flag. An optional `rules` array is written in the same transaction. The audit action is `FEATURE_FLAG_CREATE` |
 | PATCH | `/admin/feature-flags/:id` | `update:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. An optional `rules` array replaces the full rule set in the same transaction as the flag fields, with one version increase; without `rules` the stored rules stay. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict` and writes no rule. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |

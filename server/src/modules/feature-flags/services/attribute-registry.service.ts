@@ -63,11 +63,6 @@ export class AttributeRegistryService {
     this.resolvers.set(key, resolver);
   }
 
-  /** Returns the set of attribute keys safe to reference from rule payloads. */
-  getKnownKeys(): ReadonlySet<string> {
-    return new Set(this.resolvers.keys());
-  }
-
   /** Returns the set of `custom` keys (excluding the built-in non-custom fields). */
   getKnownCustomKeys(): ReadonlySet<string> {
     const all = new Set(this.resolvers.keys());

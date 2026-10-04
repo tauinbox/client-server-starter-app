@@ -774,7 +774,7 @@ describe('LoginComponent', () => {
 
       // The state the store is left in by a logout or a failed bootstrap
       // refresh: nothing on this route has ever fetched the flags.
-      expect(TestBed.inject(FeatureFlagsStore).flagKeys()).toEqual([]);
+      expect(TestBed.inject(FeatureFlagsStore).flags()).toEqual({});
 
       const newFixture = TestBed.createComponent(LoginComponent);
       newFixture.detectChanges();

@@ -11,12 +11,12 @@ import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
 
-// A conditional search:FeatureFlag narrows both flag lists in SQL, to exactly
-// the flags that the in-memory check allows.
+// A conditional search:FeatureFlag narrows the flag list in SQL, to exactly the
+// flags that the in-memory check allows.
 // Runs only when DB_HOST is set: CI provides Postgres, a bare local run skips.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
-runWithInfra('Feature flag lists filtered by the ability (e2e)', () => {
+runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
   const tag = `ff-ability-${Date.now()}`;
   const keys = {
     on: `${tag}-on`,
@@ -76,17 +76,11 @@ runWithInfra('Feature flag lists filtered by the ability (e2e)', () => {
   }
 
   async function listedKeys(ability: AppAbility): Promise<string[]> {
-    const all = await flagService.findAll(ability);
     const page = await flagService.findCursorPaginated(
       { limit: 100, sortBy: 'key', sortOrder: 'asc' },
       ability
     );
-    const fromAll = all.map((f) => f.key).filter((k) => k.startsWith(tag));
-    const fromPage = page.data
-      .map((f) => f.key)
-      .filter((k) => k.startsWith(tag));
-    expect(fromPage).toEqual(fromAll);
-    return fromAll;
+    return page.data.map((f) => f.key).filter((k) => k.startsWith(tag));
   }
 
   function allowedKeys(ability: AppAbility): string[] {

@@ -35,7 +35,6 @@ import {
   FeatureFlagChangedListener,
   FLAGS_BROADCAST_COALESCE_MS
 } from '../src/modules/feature-flags/listeners/feature-flag-changed.listener';
-import { FeatureFlagChangedEvent } from '../src/modules/feature-flags/events/feature-flag-changed.event';
 import { FeatureFlagGuard } from '../src/modules/feature-flags/guards/feature-flag.guard';
 import { RequireFeature } from '../src/modules/feature-flags/decorators/require-feature.decorator';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
@@ -476,7 +475,7 @@ describe('Feature flags end-to-end', () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
-  it('FeatureFlagChangedEvent invalidates cache and broadcasts SSE', async () => {
+  it('a flag change invalidates cache and broadcasts SSE', async () => {
     // Prime cache.
     await resolver.evaluateForUser(
       { userId: 'u-1', email: null, createdAt: null, roles: [] },
@@ -484,9 +483,7 @@ describe('Feature flags end-to-end', () => {
     );
     expect(cache.store.has('featureflags:all')).toBe(true);
 
-    await listener.handleFeatureFlagChanged(
-      new FeatureFlagChangedEvent('new-dashboard', 'toggled')
-    );
+    await listener.handleFeatureFlagChanged();
 
     expect(cache.store.has('featureflags:all')).toBe(false);
     // The broadcast is coalesced: nothing is pushed until the window elapses.

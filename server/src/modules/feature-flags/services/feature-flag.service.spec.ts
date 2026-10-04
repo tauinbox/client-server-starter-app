@@ -575,10 +575,10 @@ describe('FeatureFlagService', () => {
   });
 
   describe('delete', () => {
-    it('removes the flag', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
+    it('removes the given flag without loading it again', async () => {
       flagRepo.remove.mockResolvedValue({});
-      await service.delete('flag-1');
+      await service.delete(sampleFlag);
+      expect(flagRepo.findOne).not.toHaveBeenCalled();
       expect(flagRepo.remove).toHaveBeenCalledWith(sampleFlag);
     });
   });

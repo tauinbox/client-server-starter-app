@@ -615,18 +615,20 @@ describe('permission-based route authorization', () => {
         { permissionId: permissionId('res-feature-flags', 'act-read') }
       ]);
       const readOnly = await login('user@example.com');
-      const refused = await fetch(`${baseUrl}/api/v1/admin/feature-flags`, {
-        headers: { authorization: `Bearer ${readOnly}` }
-      });
+      const refused = await fetch(
+        `${baseUrl}/api/v1/admin/feature-flags/cursor`,
+        { headers: { authorization: `Bearer ${readOnly}` } }
+      );
       expect(refused.status).toBe(403);
 
       delegateToRegularUser([
         { permissionId: permissionId('res-feature-flags', 'act-search') }
       ]);
       const searcher = await login('user@example.com');
-      const admitted = await fetch(`${baseUrl}/api/v1/admin/feature-flags`, {
-        headers: { authorization: `Bearer ${searcher}` }
-      });
+      const admitted = await fetch(
+        `${baseUrl}/api/v1/admin/feature-flags/cursor`,
+        { headers: { authorization: `Bearer ${searcher}` } }
+      );
       expect(admitted.status).toBe(200);
     });
 

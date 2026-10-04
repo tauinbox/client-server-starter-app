@@ -64,7 +64,7 @@ describe('RoleRulesListener', () => {
     expect(flagService.rewriteRoleName).toHaveBeenCalledWith(em, 'beta', null);
   });
 
-  it('should announce each changed flag only after the commit', async () => {
+  it('should announce the changed flags once, only after the commit', async () => {
     flagService.rewriteRoleName.mockResolvedValue(['flag-a', 'flag-b']);
 
     await eventEmitter.emitAsync(
@@ -76,13 +76,8 @@ describe('RoleRulesListener', () => {
     commit();
     await committed;
 
-    expect(flagChanged).toHaveBeenCalledTimes(2);
-    expect(flagChanged).toHaveBeenCalledWith(
-      new FeatureFlagChangedEvent('flag-a', 'rules-replaced')
-    );
-    expect(flagChanged).toHaveBeenCalledWith(
-      new FeatureFlagChangedEvent('flag-b', 'rules-replaced')
-    );
+    expect(flagChanged).toHaveBeenCalledTimes(1);
+    expect(flagChanged).toHaveBeenCalledWith(new FeatureFlagChangedEvent());
   });
 
   it('should announce nothing when no rule names the role', async () => {

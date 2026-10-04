@@ -30,7 +30,6 @@ const fullAbility = abilityFor(['create', 'read', 'update', 'delete']);
 describe('FeatureFlagsAdminController', () => {
   let controller: FeatureFlagsAdminController;
   let flagService: {
-    findAll: jest.Mock;
     findOne: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
@@ -56,7 +55,6 @@ describe('FeatureFlagsAdminController', () => {
 
   beforeEach(async () => {
     flagService = {
-      findAll: jest.fn().mockResolvedValue([sampleFlag]),
       findOne: jest.fn().mockResolvedValue(sampleFlag),
       newFlagFields: FeatureFlagService.prototype.newFlagFields,
       create: jest.fn().mockResolvedValue(sampleFlag),
@@ -105,14 +103,11 @@ describe('FeatureFlagsAdminController', () => {
     expect(flagService.getAttributeCustomKeys).toHaveBeenCalled();
   });
 
-  it('create emits a "created" change event', async () => {
+  it('create emits a change event', async () => {
     await controller.create({ key: 'new-dashboard' }, req, fullAbility);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
-      expect.objectContaining({
-        flagKey: 'new-dashboard',
-        changeType: 'created'
-      })
+      expect.any(FeatureFlagChangedEvent)
     );
   });
 
@@ -150,11 +145,11 @@ describe('FeatureFlagsAdminController', () => {
     );
   });
 
-  it('toggle emits a "toggled" change event', async () => {
+  it('toggle emits a change event', async () => {
     await controller.toggle('flag-1', req, fullAbility);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
-      expect.objectContaining({ changeType: 'toggled' })
+      expect.any(FeatureFlagChangedEvent)
     );
   });
 
@@ -196,15 +191,13 @@ describe('FeatureFlagsAdminController', () => {
     );
   });
 
-  it('delete emits a "deleted" change event with the flag key', async () => {
+  it('delete removes the loaded flag and emits a change event', async () => {
     await controller.remove('flag-1', req, fullAbility);
-    expect(flagService.delete).toHaveBeenCalledWith('flag-1');
+    expect(flagService.findOne).toHaveBeenCalledTimes(1);
+    expect(flagService.delete).toHaveBeenCalledWith(sampleFlag);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
-      expect.objectContaining({
-        flagKey: 'new-dashboard',
-        changeType: 'deleted'
-      })
+      expect.any(FeatureFlagChangedEvent)
     );
   });
 
