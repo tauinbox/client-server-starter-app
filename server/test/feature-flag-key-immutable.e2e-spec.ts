@@ -69,9 +69,7 @@ describe('Feature flag key is immutable after create (e2e)', () => {
       })
     );
     app.use((req: Request, _res: Response, next: NextFunction) => {
-      const { can, build } = new AbilityBuilder<AppAbility>(
-        createMongoAbility
-      );
+      const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
       can('update', 'FeatureFlag');
       Object.assign(req, { user: { userId: 'admin-1' }, ability: build() });
       next();
