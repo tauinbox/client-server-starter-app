@@ -12,8 +12,3 @@ export const RESOURCE_SORT_COLUMN_MAP: Record<string, string> = {
   createdAt: 'resource.createdAt',
   name: 'resource.name'
 };
-
-export const ACTION_SORT_COLUMN_MAP: Record<string, string> = {
-  createdAt: 'action.createdAt',
-  name: 'action.name'
-};

@@ -3,16 +3,15 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { of, Subject, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 
 import { ResourceFormDialogComponent } from './resource-form-dialog.component';
 import type { ResourceFormDialogData } from './resource-form-dialog.component';
 import { ResourcesStore } from '../../../store/resources.store';
-import { RbacAdminService } from '../../../services/rbac-admin.service';
 import { NotifyService } from '@core/services/notify.service';
-import type { ActionResponse, ResourceResponse } from '@app/shared/types';
+import type { ResourceResponse } from '@app/shared/types';
 
 const mockResource: ResourceResponse = {
   id: 'res-1',
@@ -23,36 +22,11 @@ const mockResource: ResourceResponse = {
   isSystem: true,
   isOrphaned: false,
   isRegistered: true,
+  actionNames: ['create', 'read', 'update', 'delete', 'search'],
+  conditionalActionNames: ['update'],
   allowedActionNames: null,
   createdAt: '2024-01-01T00:00:00.000Z'
 };
-
-const mockActions: ActionResponse[] = [
-  {
-    id: 'act-1',
-    name: 'create',
-    displayName: 'Create',
-    description: '',
-    isDefault: true,
-    createdAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'act-2',
-    name: 'read',
-    displayName: 'Read',
-    description: '',
-    isDefault: true,
-    createdAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'act-3',
-    name: 'assign',
-    displayName: 'Assign',
-    description: '',
-    isDefault: false,
-    createdAt: '2024-01-01T00:00:00.000Z'
-  }
-];
 
 describe('ResourceFormDialogComponent', () => {
   let component: ResourceFormDialogComponent;
@@ -64,7 +38,6 @@ describe('ResourceFormDialogComponent', () => {
     load: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
   };
-  let rbacServiceMock: { getActions: ReturnType<typeof vi.fn> };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
@@ -84,7 +57,6 @@ describe('ResourceFormDialogComponent', () => {
         { provide: MatDialogRef, useValue: dialogRefMock },
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: ResourcesStore, useValue: resourcesStoreMock },
-        { provide: RbacAdminService, useValue: rbacServiceMock },
         { provide: NotifyService, useValue: notifyMock }
       ]
     });
@@ -102,7 +74,6 @@ describe('ResourceFormDialogComponent', () => {
       load: vi.fn(),
       updateResource: vi.fn().mockReturnValue(of(mockResource))
     };
-    rbacServiceMock = { getActions: vi.fn().mockReturnValue(of(mockActions)) };
     notifyMock = {
       success: vi.fn(),
       error: vi.fn(),
@@ -219,70 +190,45 @@ describe('ResourceFormDialogComponent', () => {
     expect(dialogRefMock.close).toHaveBeenCalledWith();
   });
 
-  describe('allowed-actions catalog', () => {
+  describe('allowed actions', () => {
     function customToggle(): HTMLButtonElement {
       return fixture.nativeElement.querySelector('button[role="switch"]');
     }
 
-    it('loads the whole catalog rather than receiving it from the opener', () => {
-      createComponent();
-      expect(rbacServiceMock.getActions).toHaveBeenCalled();
-    });
-
-    it('renders a checkbox for every action in the catalog', () => {
+    it('offers exactly the actions the resource declares, translated', () => {
       createComponent({
         resource: { ...mockResource, allowedActionNames: ['create'] }
       });
 
-      const checkboxes = fixture.nativeElement.querySelectorAll('mat-checkbox');
-      expect(checkboxes.length).toBe(mockActions.length);
+      const labels = Array.from(
+        fixture.nativeElement.querySelectorAll(
+          'mat-checkbox'
+        ) as NodeListOf<Element>
+      ).map((el) => el.textContent?.trim());
+      expect(labels).toEqual(['Create', 'Read', 'Update', 'Delete', 'Search']);
     });
 
-    it('seeds custom mode from every default action in the catalog', () => {
+    it('lists the declared actions while no narrowing is set', () => {
+      createComponent();
+
+      expect(fixture.nativeElement.textContent).toContain(
+        'Create, Read, Update, Delete, Search'
+      );
+    });
+
+    it('seeds custom mode from every declared action', () => {
       createComponent();
 
       customToggle().click();
       fixture.detectChanges();
+      component.toggleAction('delete');
       component.submit();
 
       expect(resourcesStoreMock.updateResource).toHaveBeenCalledWith(
         'res-1',
-        expect.objectContaining({ allowedActionNames: ['create', 'read'] })
-      );
-    });
-
-    it('cannot enter custom mode while the catalog is still loading', () => {
-      rbacServiceMock.getActions.mockReturnValue(new Subject());
-      createComponent();
-
-      expect(customToggle().disabled).toBe(true);
-
-      customToggle().click();
-      fixture.detectChanges();
-
-      expect(
-        fixture.nativeElement.querySelectorAll('mat-checkbox').length
-      ).toBe(0);
-    });
-
-    it('keeps the stored action list intact when the catalog fails to load', () => {
-      rbacServiceMock.getActions.mockReturnValue(
-        throwError(() => new Error('offline'))
-      );
-      createComponent({
-        resource: { ...mockResource, allowedActionNames: ['create', 'read'] }
-      });
-
-      component.resourceModel.set({
-        displayName: 'Updated',
-        description: 'User management'
-      });
-      TestBed.tick();
-      component.submit();
-
-      expect(resourcesStoreMock.updateResource).toHaveBeenCalledWith(
-        'res-1',
-        expect.objectContaining({ allowedActionNames: ['create', 'read'] })
+        expect.objectContaining({
+          allowedActionNames: ['create', 'read', 'update', 'search']
+        })
       );
     });
   });

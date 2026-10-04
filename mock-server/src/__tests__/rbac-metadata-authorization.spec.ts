@@ -53,13 +53,8 @@ describe('GET /api/v1/rbac/metadata authorization', () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      resources: unknown[];
-      actions: unknown[];
-    };
-    expect(Array.isArray(body.resources)).toBe(true);
-    expect(Array.isArray(body.actions)).toBe(true);
-    expect(body.resources.length).toBeGreaterThan(0);
-    expect(body.actions.length).toBeGreaterThan(0);
+    const body = (await res.json()) as Record<string, unknown[]>;
+    expect(Object.keys(body)).toEqual(['resources']);
+    expect(body['resources'].length).toBeGreaterThan(0);
   });
 });

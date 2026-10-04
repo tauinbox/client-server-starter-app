@@ -49,7 +49,9 @@ import { UsageResponseDto } from '../dtos/usage-response.dto';
 @RegisterResource({
   name: 'billing',
   subject: 'Billing',
-  displayName: 'Billing'
+  displayName: 'Billing',
+  actions: ['search', 'create', 'update', 'refund'],
+  conditionalActions: []
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class BillingAdminController {
@@ -59,7 +61,7 @@ export class BillingAdminController {
   ) {}
 
   @Get('subscriptions')
-  @Authorize(['manage', 'Billing'])
+  @Authorize(['search', 'Billing'])
   @ApiOperation({
     summary: 'List subscriptions, newest first (cursor-paginated).'
   })
@@ -69,7 +71,7 @@ export class BillingAdminController {
   }
 
   @Get('invoices')
-  @Authorize(['manage', 'Billing'])
+  @Authorize(['search', 'Billing'])
   @ApiOperation({ summary: 'List invoices, newest first (cursor-paginated).' })
   @ApiOkResponse({ description: 'Cursor-paginated list of invoices' })
   listInvoices(@Query() query: InvoiceCursorQueryDto) {
@@ -78,7 +80,7 @@ export class BillingAdminController {
 
   @Post('subscriptions/:id/cancel')
   @HttpCode(200)
-  @Authorize(['manage', 'Billing'])
+  @Authorize(['update', 'Billing'])
   @LogAudit({
     action: AuditAction.BILLING_SUBSCRIPTION_CANCEL,
     targetType: 'Subscription',
@@ -103,7 +105,7 @@ export class BillingAdminController {
 
   @Post('invoices/:id/refund')
   @HttpCode(200)
-  @Authorize(['manage', 'Billing'])
+  @Authorize(['refund', 'Billing'])
   @LogAudit({
     action: AuditAction.BILLING_INVOICE_REFUND,
     targetType: 'Invoice',
@@ -128,7 +130,7 @@ export class BillingAdminController {
 
   @Post('webhook-events/:id/replay')
   @HttpCode(200)
-  @Authorize(['manage', 'Billing'])
+  @Authorize(['update', 'Billing'])
   @LogAudit({
     action: AuditAction.BILLING_WEBHOOK_EVENT_REPLAY,
     targetType: 'WebhookEvent',
@@ -148,7 +150,7 @@ export class BillingAdminController {
   }
 
   @Post('usage')
-  @Authorize(['manage', 'Billing'])
+  @Authorize(['create', 'Billing'])
   @LogAudit({
     action: AuditAction.BILLING_USAGE_RECORD,
     targetType: 'UsageRecord',

@@ -35,10 +35,22 @@ describe('ResourceSyncService', () => {
     create: jest.Mock;
     save: jest.Mock;
   };
-  let actionRepoMock: { find: jest.Mock };
+  let actionRepoMock: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
 
-  const usersMeta = { name: 'users', subject: 'User', displayName: 'Users' };
-  const rolesMeta = { name: 'roles', subject: 'Role', displayName: 'Roles' };
+  const usersMeta = {
+    name: 'users',
+    subject: 'User',
+    displayName: 'Users',
+    actions: ['read', 'search'],
+    conditionalActions: ['read']
+  };
+  const rolesMeta = {
+    name: 'roles',
+    subject: 'Role',
+    displayName: 'Roles',
+    actions: ['assign'],
+    conditionalActions: []
+  };
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
@@ -71,7 +83,17 @@ describe('ResourceSyncService', () => {
       save: jest.fn().mockResolvedValue(undefined)
     };
 
-    actionRepoMock = { find: jest.fn().mockResolvedValue([]) };
+    actionRepoMock = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockImplementation((data: object) => data),
+      save: jest
+        .fn()
+        .mockImplementation((rows: { name: string }[]) =>
+          Promise.resolve(
+            rows.map((row) => ({ id: `act-${row.name}`, ...row }))
+          )
+        )
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -193,7 +215,7 @@ describe('ResourceSyncService', () => {
   // ── syncResources — upsert & permissions ─────────────────────────
 
   describe('syncResources — upsert and permission creation', () => {
-    it('should upsert resource with isSystem:true for decorated controller', async () => {
+    it('should upsert resource with isSystem:true and its declared actions', async () => {
       const ctrl = makeController('RbacController');
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockImplementation((key: string) => {
@@ -207,11 +229,13 @@ describe('ResourceSyncService', () => {
         name: 'users',
         subject: 'User',
         displayName: 'Users',
-        isSystem: true
+        isSystem: true,
+        actionNames: ['read', 'search'],
+        conditionalActionNames: ['read']
       });
     });
 
-    it('should auto-create permissions for each resource × action pair', async () => {
+    it('creates permissions only for the declared actions', async () => {
       const ctrl = makeController('RbacController');
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
@@ -224,21 +248,11 @@ describe('ResourceSyncService', () => {
 
       await service.onApplicationBootstrap();
 
-      expect(permissionRepoMock.create).toHaveBeenCalledTimes(2);
-      expect(permissionRepoMock.create).toHaveBeenCalledWith({
-        resourceId: 'res-1',
-        actionId: 'act-read'
-      });
-      expect(permissionRepoMock.create).toHaveBeenCalledWith({
-        resourceId: 'res-1',
-        actionId: 'act-write'
-      });
       expect(permissionRepoMock.save).toHaveBeenCalledTimes(1);
       expect(permissionRepoMock.save).toHaveBeenCalledWith([
         { resourceId: 'res-1', actionId: 'act-read' },
-        { resourceId: 'res-1', actionId: 'act-write' }
+        { resourceId: 'res-1', actionId: 'act-search' }
       ]);
-      expect(permissionRepoMock.find).toHaveBeenCalledTimes(1);
       expect(permissionRepoMock.find).toHaveBeenCalledWith({
         where: { resourceId: 'res-1' }
       });
@@ -247,7 +261,7 @@ describe('ResourceSyncService', () => {
     it('should not create permission if it already exists', async () => {
       const ctrl = makeController('RbacController');
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
-      reflectorMock.get.mockReturnValue(usersMeta);
+      reflectorMock.get.mockReturnValue({ ...usersMeta, actions: ['read'] });
       resourceServiceMock.upsertResource.mockResolvedValue({ id: 'res-1' });
       actionRepoMock.find.mockResolvedValue([{ id: 'act-1', name: 'read' }]);
       permissionRepoMock.find.mockResolvedValue([
@@ -256,20 +270,40 @@ describe('ResourceSyncService', () => {
 
       await service.onApplicationBootstrap();
 
+      expect(actionRepoMock.save).not.toHaveBeenCalled();
       expect(permissionRepoMock.create).not.toHaveBeenCalled();
       expect(permissionRepoMock.save).not.toHaveBeenCalled();
     });
 
-    it('should not create permissions when no actions exist', async () => {
+    it('creates a row for each declared action that has none', async () => {
       const ctrl = makeController('RbacController');
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
-      actionRepoMock.find.mockResolvedValue([]);
+      actionRepoMock.find.mockResolvedValue([{ id: 'act-read', name: 'read' }]);
 
       await service.onApplicationBootstrap();
 
-      expect(permissionRepoMock.find).not.toHaveBeenCalled();
-      expect(permissionRepoMock.create).not.toHaveBeenCalled();
+      expect(actionRepoMock.save).toHaveBeenCalledWith([{ name: 'search' }]);
+    });
+
+    it('never creates a reserved CASL action', async () => {
+      const ctrl = makeController('RbacController');
+      discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
+      reflectorMock.get.mockReturnValue({
+        ...usersMeta,
+        actions: ['manage'],
+        conditionalActions: []
+      });
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+
+      await service.onApplicationBootstrap();
+
+      expect(actionRepoMock.save).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"manage" is a reserved CASL keyword')
+      );
     });
 
     it('should deduplicate controllers with the same resource name', async () => {
@@ -317,7 +351,9 @@ describe('ResourceSyncService', () => {
       reflectorMock.get.mockReturnValue({
         name: 'posts',
         subject: 'post',
-        displayName: 'Posts'
+        displayName: 'Posts',
+        actions: ['read'],
+        conditionalActions: []
       });
       const warnSpy = jest.spyOn(Logger.prototype, 'warn');
 

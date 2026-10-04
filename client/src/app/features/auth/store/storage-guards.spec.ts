@@ -27,28 +27,21 @@ describe('isPersistedUser', () => {
 
 describe('isCachedRbacMetadata', () => {
   const resource = { name: 'users', subject: 'User' };
-  const action = { name: 'read' };
 
-  it('should accept resources and actions of the expected shape', () => {
-    expect(
-      isCachedRbacMetadata({ resources: [resource], actions: [action] })
-    ).toBe(true);
+  it('should accept resources of the expected shape', () => {
+    expect(isCachedRbacMetadata({ resources: [resource] })).toBe(true);
   });
 
-  it('should accept empty collections', () => {
-    expect(isCachedRbacMetadata({ resources: [], actions: [] })).toBe(true);
+  it('should accept an empty collection', () => {
+    expect(isCachedRbacMetadata({ resources: [] })).toBe(true);
   });
 
   it.each([
     ['null', null],
     ['a string', 'rbac'],
-    ['a missing collection', { resources: [resource] }],
-    ['a non-array collection', { resources: 'nope', actions: [] }],
-    [
-      'a resource without a subject',
-      { resources: [{ name: 'u' }], actions: [] }
-    ],
-    ['an action without a name', { resources: [], actions: [{ id: 'a' }] }]
+    ['a missing collection', {}],
+    ['a non-array collection', { resources: 'nope' }],
+    ['a resource without a subject', { resources: [{ name: 'u' }] }]
   ])('should reject %s', (_label, value) => {
     expect(isCachedRbacMetadata(value)).toBe(false);
   });

@@ -38,20 +38,7 @@
       </a>
     </ng-container>
     <ng-container
-      *nxsRequirePermissions="{ action: 'read', subject: 'Permission' }"
-    >
-      <a
-        mat-tab-link
-        [routerLink]="routes.Actions"
-        routerLinkActive
-        #actionsActive="routerLinkActive"
-        [active]="actionsActive.isActive"
-      >
-        {{ t('admin.panel.manageActions') }}
-      </a>
-    </ng-container>
-    <ng-container
-      *nxsRequirePermissions="{ action: 'manage', subject: 'FeatureFlag' }"
+      *nxsRequirePermissions="{ action: 'search', subject: 'FeatureFlag' }"
     >
       <a
         mat-tab-link
@@ -65,7 +52,7 @@
     </ng-container>
     @if (billingAvailable()) {
       <ng-container
-        *nxsRequirePermissions="{ action: 'manage', subject: 'Billing' }"
+        *nxsRequirePermissions="{ action: 'search', subject: 'Billing' }"
       >
         <a
           mat-tab-link

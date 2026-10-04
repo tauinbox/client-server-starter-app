@@ -271,12 +271,20 @@ management and theming.
   "Roles" and "Resources". The role list has create, edit and delete dialogs.
   `RolePermissionsDialogComponent` assigns the permissions to a role with optional CASL conditions:
   ownership, fieldMatch, userAttr and custom.
-- **Resource and action management.** The "Manage Resources" tab is at `/admin/resources` and needs
-  `read:Permission`. The Resources table edits the display name, the description and the allowed
-  actions of each resource (`allowedActionNames`). The Actions table creates, edits and deletes a
-  non-default action. Each mutation refreshes `RbacMetadataStore` automatically.
-- **Billing console.** The "Billing" tab is at `/admin/billing`. It needs `manage:Billing`, and the
-  public `billing` flag hides it. It shows read-only tables of the subscriptions and the invoices of
+- **Resource management.** The "Manage Resources" tab is at `/admin/resources` and needs
+  `read:Permission`. The Resources table edits the display name, the description and the offered
+  actions of each resource (`allowedActionNames`). An admin can offer fewer actions than the code
+  checks, but never an action that the code does not check: the server answers 400
+  `errors.resources.actionNotDeclared`. Each mutation refreshes `RbacMetadataStore` automatically.
+- **Actions come from the code.** Each `@RegisterResource` declares the actions that its `@Authorize`
+  decorators check (`actions`) and the actions whose checks read the record (`conditionalActions`).
+  The startup sync writes both lists to the resource row and creates a missing action row. No admin
+  creates, renames or deletes an action. The permission matrix shows each action through the client
+  translation `rbacActions.<name>`. `npm run check:permissions` fails when a declared list, a check in
+  the server, the client or the mock server, or a translation drifts apart.
+- **Billing console.** The "Billing" tab is at `/admin/billing`. It needs `search:Billing`, and the
+  public `billing` flag hides it. A cancel needs `update:Billing` and a refund needs
+  `refund:Billing`, so a role can cancel subscriptions without the right to return money. It shows read-only tables of the subscriptions and the invoices of
   each customer, as a table on a desktop and as cards on a handset.
 
   It has the two M1 mutations. The first cancels a subscription, at the end of the period or
@@ -343,8 +351,15 @@ management and theming.
   on the two permission-write routes, `PUT /roles/:id/permissions` and `POST /roles/:id/permissions`,
   for each caller and for a super role. The mock server mirrors the rule.
 
-  `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users`,
-  `POST /roles` and `POST /rbac/actions` evaluates them against the submitted payload.
+  `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users` and
+  `POST /roles` evaluates them against the submitted payload.
+- **A condition only where a check reads the record.** CASL answers a route check on a subject type
+  from the rule alone, so a conditional allow passes it as a full grant and a conditional deny stops
+  nothing. A grant can carry a restriction (`ownership`, `fieldMatch`, `userAttr`, `custom`) only on an
+  action that its resource lists in `conditionalActions`; elsewhere the write answers 400
+  `errors.roles.conditionNotSupported`. An allow on an action that the resource does not offer answers
+  400 `errors.roles.actionNotGrantable`. A stored row that breaks either rule fails closed: an allow
+  grants nothing and a deny denies the whole action. `npm run check:grant-scope` lists such rows.
 - **Condition shape validation at the input.** `PermissionConditionDto` enforces the inner shape of
   `ownership`, `fieldMatch` and `userAttr`. It uses the shared finders in
   `shared/src/utils/permission-condition-shape.ts`, which the client editors and the mock server also
@@ -617,9 +632,10 @@ super. `PATCH /users/:id`, `DELETE /users/:id`, `POST /users/:id/restore`, `POST
 delegated role with `update:User` could set the password of the super account and sign in as it, or
 keep it signed out, because each role change ends every session of the target.
 
-This is the only path to a wildcard rule. The system rejects `manage` and `all` as an action name, and
-`all` as a resource subject, when a person writes them. It rejects them again when it builds the
-rules. A stored permission that carries one of the two keywords is skipped when it is an allow, and
+This is the only path to a wildcard rule. `npm run check:permissions` rejects `manage` and `all` in
+an `@Authorize` check and in a client or mock-server check, the startup sync never creates an action
+with either name, and `ResourceService` rejects `all` as a resource subject. The server rejects them
+again when it builds the rules. A stored permission that carries one of the two keywords is skipped when it is an allow, and
 the server logs this at `error` level. Such a permission is kept when it is a deny, because an
 inverted wildcard can only restrict. The rule packer of the mock server applies the same guard.
 
@@ -710,8 +726,8 @@ the same permission both apply.
   a second COUNT over the whole table.
 
   **A picker is the intentional exception.** A select, an autocomplete or a checkbox list that offers
-  a whole catalog reads the unpaginated sibling endpoint: `GET /rbac/actions`, `GET /roles`,
-  `GET /admin/feature-flags` or `GET /admin/feature-flags/attribute-keys`. If you feed a picker from
+  a whole catalog reads the unpaginated sibling endpoint: `GET /roles`, `GET /admin/feature-flags`
+  or `GET /admin/feature-flags/attribute-keys`. If you feed a picker from
   a page of the cursor list, the picker drops each item after the first page silently.
 - **Sticky header.** The toolbar stays at the top while the user scrolls through a long list.
 
@@ -1559,23 +1575,19 @@ The base URL of the API is `/api/v1`.
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign a role to a user. Answers 404 when the user is unknown or soft-deleted |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted |
 | GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated` and `user_crud_events`. The last one goes only to a client with `users:search` |
-| GET | `/rbac/metadata` | `permissions:read` | Get the RBAC metadata: the resources and the actions. Redis caches it for 60 s |
+| GET | `/rbac/metadata` | `permissions:read` | Get the RBAC metadata: the resources. Redis caches it for 60 s |
 | GET | `/rbac/resources` | `permissions:read` | List each resource |
-| PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data of a resource |
+| PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 400 for an action that the code does not check |
 | POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 400 when no controller registers it |
-| GET | `/rbac/actions` | `permissions:read` | List each action |
-| POST | `/rbac/actions` | `permissions:create` | Create a new action |
-| PATCH | `/rbac/actions/:id` | `permissions:update` | Update an action |
-| DELETE | `/rbac/actions/:id` | `permissions:delete` | Delete a custom action |
 | GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
-| GET | `/admin/feature-flags` | `feature-flags:manage` | List each feature flag |
-| GET | `/admin/feature-flags/:id` | `feature-flags:manage` | Get a feature flag by ID |
-| GET | `/admin/feature-flags/attribute-keys` | `feature-flags:manage` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
-| POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag, optionally with its targeting rules in the same write |
-| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. The key is immutable after create. An optional `rules` array replaces the targeting rules in the same write. Uses optimistic locking through `If-Match` |
-| DELETE | `/admin/feature-flags/:id` | `feature-flags:manage` | Delete a feature flag |
-| POST | `/admin/feature-flags/:id/preview` | `feature-flags:manage` | Show how a flag evaluates for given attributes, and save nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag |
-| POST | `/admin/feature-flags/:id/toggle` | `feature-flags:manage` | Enable or disable a flag |
+| GET | `/admin/feature-flags` | `feature-flags:search` | List each feature flag |
+| GET | `/admin/feature-flags/:id` | `feature-flags:read` | Get a feature flag by ID |
+| GET | `/admin/feature-flags/attribute-keys` | `feature-flags:search` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
+| POST | `/admin/feature-flags` | `feature-flags:create` | Create a feature flag, optionally with its targeting rules in the same write |
+| PATCH | `/admin/feature-flags/:id` | `feature-flags:update` | Update a feature flag. The key is immutable after create. An optional `rules` array replaces the targeting rules in the same write. Uses optimistic locking through `If-Match` |
+| DELETE | `/admin/feature-flags/:id` | `feature-flags:delete` | Delete a feature flag |
+| POST | `/admin/feature-flags/:id/preview` | `feature-flags:read` | Show how a flag evaluates for given attributes, and save nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag |
+| POST | `/admin/feature-flags/:id/toggle` | `feature-flags:update` | Enable or disable a flag |
 
 ## Available Commands
 
@@ -1709,10 +1721,11 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
 - **resources** has a UUID primary key, a unique name, a `displayName`, a description and an
   `isSystem` flag. The `is_orphaned` boolean is true when a person removed the controller. The
   permissions of an orphaned resource then give nothing, and a deny rule continues to apply until a
-  person restores it. `allowed_action_names text[]` holds the permitted actions, and `null` means the
-  full set of default actions.
-- **actions** has a UUID primary key, a unique name, a `displayName`, a description, an `isSystem`
-  flag and a `sortOrder`.
+  person restores it. `action_names text[]` and `conditional_action_names text[]` hold the lists that
+  `@RegisterResource` declares, and the startup sync rewrites them. `allowed_action_names text[]` is
+  the admin narrowing of `action_names`, and `null` offers every declared action.
+- **actions** has a UUID primary key and a unique name. The startup sync creates a row for each
+  declared action.
 - **permissions** has a UUID primary key, a `resource_id` and an `action_id`. The pair is unique, and
   the two columns are foreign keys to the resources and the actions.
 - **role_permissions** has a foreign key to the roles and a foreign key to the permissions. It has an
@@ -1830,11 +1843,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2775 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 553 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 543 pass and 10 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1496 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 301 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 960 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2741 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 547 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 537 pass and 10 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1461 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 294 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 934 tests pass |
 
 ## CI/CD
 

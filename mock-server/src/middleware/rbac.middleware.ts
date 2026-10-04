@@ -1,8 +1,6 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import {
-  ALLOWED_ACTION_SORT_COLUMNS,
   ALLOWED_RESOURCE_SORT_COLUMNS,
   ErrorKeys
 } from '@app/shared/constants';
@@ -12,17 +10,11 @@ import {
   parseCursorQuery
 } from '../helpers/pagination.helpers';
 
-import {
-  getState,
-  logAudit,
-  toResourceResponse,
-  toActionResponse
-} from '../state';
+import { getState, logAudit, toResourceResponse } from '../state';
 import {
   assertInstancePermission,
   permissionGuard
 } from '../helpers/auth.helpers';
-import { CASL_RESERVED_ACTION_NAMES } from '../constants';
 import type { AuthenticatedRequest } from '../types';
 import {
   requireUuid,
@@ -31,7 +23,6 @@ import {
 import {
   stringArrayErrors,
   stringErrors,
-  trimmedStringErrors,
   unknownPropertyErrors
 } from '../utils/validation';
 
@@ -43,8 +34,7 @@ router.get('/metadata', permissionGuard('read', 'Permission'), (_req, res) => {
   const resources = Array.from(state.resources.values()).map(
     toResourceResponse
   );
-  const actions = Array.from(state.actions.values()).map(toActionResponse);
-  res.json({ resources, actions });
+  res.json({ resources });
 });
 
 // GET /api/v1/rbac/resources
@@ -198,6 +188,20 @@ router.patch(
       return;
     }
 
+    // Mirrors ResourceService.update: an admin may offer fewer actions than
+    // the code checks, never one it does not check.
+    const undeclared = ((allowedActionNames as string[] | null) ?? []).filter(
+      (name) => !resource.actionNames.includes(name)
+    );
+    if (undeclared.length > 0) {
+      res.status(400).json({
+        message: `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`,
+        statusCode: 400,
+        errorKey: ErrorKeys.RESOURCES.ACTION_NOT_DECLARED
+      });
+      return;
+    }
+
     const changed = changedFields(resource, {
       displayName,
       description,
@@ -227,304 +231,6 @@ router.patch(
     });
 
     res.json(toResourceResponse(resource));
-  }
-);
-
-// GET /api/v1/rbac/actions
-// GET /api/v1/rbac/actions/cursor
-router.get(
-  '/actions/cursor',
-  permissionGuard('read', 'Permission'),
-  (req, res) => {
-    const query = req.query as Record<string, unknown>;
-    const errors = cursorQueryErrors(query, {
-      sortColumns: ALLOWED_ACTION_SORT_COLUMNS
-    });
-    if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
-      return;
-    }
-    const page = cursorPaginate(
-      Array.from(getState().actions.values()),
-      parseCursorQuery(query)
-    );
-    res.json({ data: page.data.map(toActionResponse), meta: page.meta });
-  }
-);
-
-router.get('/actions', permissionGuard('read', 'Permission'), (_req, res) => {
-  const actions = Array.from(getState().actions.values()).map(toActionResponse);
-  res.json(actions);
-});
-
-// POST /api/v1/rbac/actions
-router.post('/actions', permissionGuard('create', 'Permission'), (req, res) => {
-  const { name, displayName, description } = req.body;
-
-  // `name` carries a `@Transform` that trims and lowercases before the
-  // validators see it, so a whitespace-only name is an IsNotEmpty violation.
-  const errors = [
-    ...unknownPropertyErrors(req.body, ['name', 'displayName', 'description']),
-    ...trimmedStringErrors('name', name, { max: 50, notEmpty: true }),
-    ...stringErrors('displayName', displayName, { max: 100, notEmpty: true }),
-    ...stringErrors('description', description, {
-      max: 500,
-      optional: 'nullable'
-    })
-  ];
-
-  if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
-    return;
-  }
-
-  const trimmedName = (name as string).trim().toLowerCase();
-
-  // CreateActionDto reaches the controller with `name` already trimmed and
-  // lowercased, and the checks below live in the service, so the instance
-  // check sits between the pipe and the service.
-  if (
-    !assertInstancePermission(
-      req,
-      res,
-      'create',
-      'Permission',
-      {
-        name: trimmedName,
-        displayName,
-        description
-      },
-      'Action'
-    )
-  ) {
-    return;
-  }
-
-  // Raised by the service, below the pipe, so it carries no `errors` array.
-  if (CASL_RESERVED_ACTION_NAMES.includes(trimmedName)) {
-    res.status(400).json({
-      message: `Action name "${trimmedName}" is reserved and cannot be used`,
-      statusCode: 400,
-      errorKey: ErrorKeys.ACTIONS.NAME_RESERVED
-    });
-    return;
-  }
-
-  const desc = typeof description === 'string' ? description : '';
-
-  // Check duplicate name
-  const state = getState();
-  for (const existing of state.actions.values()) {
-    if (existing.name === trimmedName) {
-      res.status(400).json({
-        message: 'Action with this name already exists',
-        statusCode: 400,
-        errorKey: ErrorKeys.ACTIONS.NAME_EXISTS
-      });
-      return;
-    }
-  }
-
-  const now = new Date().toISOString();
-  const action = {
-    id: uuidv4(),
-    name: trimmedName,
-    displayName,
-    description: desc,
-    isDefault: false,
-    createdAt: now
-  };
-
-  state.actions.set(action.id, action);
-
-  // Auto-create permissions for all resources
-  for (const resource of state.resources.values()) {
-    const perm = {
-      id: uuidv4(),
-      resourceId: resource.id,
-      actionId: action.id,
-      description: `${action.displayName} ${resource.displayName}`,
-      createdAt: now
-    };
-    state.permissions.set(perm.id, perm);
-  }
-
-  const actor = (req as AuthenticatedRequest).user;
-  logAudit('ACTION_CREATE', {
-    actorId: actor.id,
-    actorEmail: actor.email,
-    targetId: action.id,
-    targetType: 'Action',
-    details: { name: trimmedName },
-    ip: req.ip
-  });
-
-  res.status(201).json(toActionResponse(action));
-});
-
-// PATCH /api/v1/rbac/actions/:id
-router.patch(
-  '/actions/:id',
-  permissionGuard('update', 'Permission'),
-  requireUuid('id'),
-  (req, res) => {
-    const id = req.params['id'] as string;
-    const state = getState();
-
-    const { displayName, description } = req.body;
-
-    // `actions.description` is NOT NULL, so UpdateActionDto rejects an explicit
-    // null - unlike `resources.description`, which is nullable.
-    const errors = [
-      ...unknownPropertyErrors(req.body, ['displayName', 'description']),
-      ...stringErrors('displayName', displayName, {
-        max: 100,
-        optional: 'definedOnly'
-      }),
-      ...stringErrors('description', description, {
-        max: 500,
-        optional: 'definedOnly'
-      })
-    ];
-
-    if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
-      return;
-    }
-
-    const action = state.actions.get(id);
-
-    if (!action) {
-      res.status(404).json({
-        message: 'Action not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-      });
-      return;
-    }
-
-    if (
-      !assertInstancePermission(
-        req,
-        res,
-        'update',
-        'Permission',
-        action,
-        'Action'
-      )
-    ) {
-      return;
-    }
-
-    const changed = changedFields(action, { displayName, description });
-
-    if (displayName !== undefined) {
-      action.displayName = displayName;
-    }
-
-    if (description !== undefined) {
-      action.description = description;
-    }
-
-    const actor = (req as AuthenticatedRequest).user;
-    logAudit('ACTION_UPDATE', {
-      actorId: actor.id,
-      actorEmail: actor.email,
-      targetId: id,
-      targetType: 'Action',
-      details: { changedFields: changed },
-      ip: req.ip
-    });
-
-    res.json(toActionResponse(action));
-  }
-);
-
-// DELETE /api/v1/rbac/actions/:id
-router.delete(
-  '/actions/:id',
-  permissionGuard('delete', 'Permission'),
-  requireUuid('id'),
-  (req, res) => {
-    const id = req.params['id'] as string;
-    const state = getState();
-    const action = state.actions.get(id);
-
-    if (!action) {
-      res.status(404).json({
-        message: 'Action not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-      });
-      return;
-    }
-
-    // `ActionService.delete` raises the isDefault 403, so it sits below the
-    // instance check on the server.
-    if (
-      !assertInstancePermission(
-        req,
-        res,
-        'delete',
-        'Permission',
-        action,
-        'Action'
-      )
-    ) {
-      return;
-    }
-
-    if (action.isDefault) {
-      res.status(403).json({
-        message: 'Cannot delete default actions',
-        statusCode: 403,
-        errorKey: ErrorKeys.ACTIONS.CANNOT_DELETE_DEFAULT
-      });
-      return;
-    }
-
-    // Find all permissions that reference this action
-    const affectedPermissionIds: string[] = [];
-    for (const [permId, perm] of state.permissions) {
-      if (perm.actionId === id) {
-        affectedPermissionIds.push(permId);
-      }
-    }
-
-    // Check if any role_permissions reference these permissions
-    const usedInRolePerms = state.rolePermissions.some((rp) =>
-      affectedPermissionIds.includes(rp.permissionId)
-    );
-
-    if (usedInRolePerms) {
-      res.status(409).json({
-        message:
-          'Cannot delete action: it is referenced by role permissions. Remove the role-permission assignments first.',
-        statusCode: 409,
-        errorKey: ErrorKeys.ACTIONS.ASSIGNED_TO_ROLES
-      });
-      return;
-    }
-
-    // Delete associated permissions
-    for (const permId of affectedPermissionIds) {
-      state.permissions.delete(permId);
-    }
-
-    // Delete the action
-    state.actions.delete(id);
-
-    const actor = (req as AuthenticatedRequest).user;
-    logAudit('ACTION_DELETE', {
-      actorId: actor.id,
-      actorEmail: actor.email,
-      targetId: id,
-      targetType: 'Action',
-      details: { name: action.name },
-      ip: req.ip
-    });
-
-    res.send();
   }
 );
 

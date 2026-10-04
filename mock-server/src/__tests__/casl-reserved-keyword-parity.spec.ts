@@ -34,9 +34,6 @@ function addReservedAction(): string {
   state.actions.set('act-manage', {
     id: 'act-manage',
     name: 'manage',
-    displayName: 'Manage',
-    description: 'Reserved keyword that bypassed the write-time check',
-    isDefault: false,
     createdAt: NOW
   });
   state.permissions.set('perm-users-manage', {
@@ -60,6 +57,8 @@ function addReservedSubjectResource(): string {
     isSystem: false,
     isOrphaned: false,
     isRegistered: true,
+    actionNames: ['read'],
+    conditionalActionNames: [],
     allowedActionNames: null,
     lastSyncedAt: NOW,
     createdAt: NOW

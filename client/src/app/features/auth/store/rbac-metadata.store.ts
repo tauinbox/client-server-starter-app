@@ -6,7 +6,7 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
-import type { ResourceResponse, ActionResponse } from '@app/shared/types';
+import type { ResourceResponse } from '@app/shared/types';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import { isCachedRbacMetadata } from './storage-guards';
 
@@ -14,7 +14,6 @@ const RBAC_CACHE_KEY = 'rbac_metadata';
 
 type RbacMetadataState = {
   resources: ResourceResponse[];
-  actions: ActionResponse[];
   loaded: boolean;
 };
 
@@ -25,7 +24,6 @@ export const RbacMetadataStore = signalStore(
     const cached = storage.getItem(RBAC_CACHE_KEY, isCachedRbacMetadata);
     return {
       resources: cached?.resources ?? [],
-      actions: cached?.actions ?? [],
       loaded: false
     };
   }),
@@ -42,16 +40,13 @@ export const RbacMetadataStore = signalStore(
     const storage = inject(LocalStorageService);
 
     return {
-      setMetadata(
-        resources: ResourceResponse[],
-        actions: ActionResponse[]
-      ): void {
-        storage.setItem(RBAC_CACHE_KEY, { resources, actions });
-        patchState(store, { resources, actions, loaded: true });
+      setMetadata(resources: ResourceResponse[]): void {
+        storage.setItem(RBAC_CACHE_KEY, { resources });
+        patchState(store, { resources, loaded: true });
       },
       clear(): void {
         storage.removeItem(RBAC_CACHE_KEY);
-        patchState(store, { resources: [], actions: [], loaded: false });
+        patchState(store, { resources: [], loaded: false });
       }
     };
   })

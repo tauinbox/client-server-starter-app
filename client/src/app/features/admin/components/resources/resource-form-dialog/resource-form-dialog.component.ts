@@ -2,6 +2,7 @@ import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   inject,
   signal
@@ -23,9 +24,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
-import type { ActionResponse, ResourceResponse } from '@app/shared/types';
+import type { ResourceResponse } from '@app/shared/types';
 import type { UpdateResource } from '../../../services/rbac-admin.service';
-import { RbacAdminService } from '../../../services/rbac-admin.service';
 import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
@@ -65,7 +65,6 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   readonly #translocoService = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #shortcuts = inject(KeyboardShortcutsService);
-  readonly #rbacService = inject(RbacAdminService);
   protected readonly data = inject<ResourceFormDialogData>(MAT_DIALOG_DATA);
 
   #cleanupSave: (() => void) | null = null;
@@ -89,13 +88,13 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
-  /**
-   * The whole action catalog, never a page of it: the default-action seed below
-   * would silently drop every action outside the page it did not see.
-   */
-  protected readonly actions = signal<ActionResponse[]>([]);
-  protected readonly actionsLoaded = signal(false);
-  protected readonly actionsFailed = signal(false);
+  /** The actions the code checks on this resource: the only ones to offer. */
+  protected readonly actionNames = this.data.resource.actionNames;
+  protected readonly actionLabels = computed(() =>
+    this.actionNames
+      .map((name) => this.#translocoService.translate(`rbacActions.${name}`))
+      .join(', ')
+  );
 
   ngOnInit(): void {
     this.#cleanupSave = this.#shortcuts.registerSave(
@@ -103,19 +102,6 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
       'shortcuts.groupForms',
       () => this.submit()
     );
-
-    this.#rbacService
-      .getActions()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: (actions) => {
-          this.actions.set(actions);
-          this.actionsLoaded.set(true);
-        },
-        error: () => {
-          this.actionsFailed.set(true);
-        }
-      });
   }
 
   ngOnDestroy(): void {
@@ -144,16 +130,9 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   }
 
   toggleCustomMode(enabled: boolean): void {
-    if (enabled && !this.actionsLoaded()) return;
     this.isCustomMode.set(enabled);
     if (enabled && this.data.resource.allowedActionNames === null) {
-      this.selectedActionNames.set(
-        new Set(
-          this.actions()
-            .filter((a) => a.isDefault)
-            .map((a) => a.name)
-        )
-      );
+      this.selectedActionNames.set(new Set(this.actionNames));
     }
   }
 

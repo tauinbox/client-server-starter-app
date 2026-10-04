@@ -16,7 +16,7 @@ export function canAccessAdminPanel(authStore: AuthStoreLike): boolean {
     authStore.hasPermissions({ action: 'search', subject: 'User' }) ||
     authStore.hasPermissions({ action: 'read', subject: 'Role' }) ||
     authStore.hasPermissions({ action: 'read', subject: 'Permission' }) ||
-    authStore.hasPermissions({ action: 'manage', subject: 'FeatureFlag' }) ||
-    authStore.hasPermissions({ action: 'manage', subject: 'Billing' })
+    authStore.hasPermissions({ action: 'search', subject: 'FeatureFlag' }) ||
+    authStore.hasPermissions({ action: 'search', subject: 'Billing' })
   );
 }

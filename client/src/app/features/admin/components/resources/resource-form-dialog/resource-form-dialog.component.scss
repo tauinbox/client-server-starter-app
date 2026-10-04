@@ -31,23 +31,11 @@ form {
     padding-bottom: vars.$spacing-xs;
   }
 
-  &__loading {
-    display: flex;
-    justify-content: center;
-    padding: vars.$spacing-sm 0;
-  }
-
   &__hint {
     margin: 0;
     font-size: func.rem(13);
     color: var(--mat-sys-on-surface-variant);
   }
-}
-
-.action-badge {
-  margin-left: vars.$spacing-xxs;
-  font-size: func.rem(11);
-  color: var(--mat-sys-on-surface-variant);
 }
 
 .hint-button {

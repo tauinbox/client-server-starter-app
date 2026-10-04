@@ -64,6 +64,8 @@ export interface MockResource {
   isSystem: boolean;
   isOrphaned: boolean;
   isRegistered: boolean;
+  actionNames: string[];
+  conditionalActionNames: string[];
   allowedActionNames: string[] | null;
   lastSyncedAt: string;
   createdAt: string;
@@ -72,9 +74,6 @@ export interface MockResource {
 export interface MockAction {
   id: string;
   name: string;
-  displayName: string;
-  description: string;
-  isDefault: boolean;
   createdAt: string;
 }
 

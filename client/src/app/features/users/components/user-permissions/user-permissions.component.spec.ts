@@ -46,6 +46,8 @@ const mockResources: ResourceResponse[] = [
     isSystem: true,
     isOrphaned: false,
     isRegistered: true,
+    actionNames: ['create', 'read', 'update', 'delete', 'search'],
+    conditionalActionNames: ['update'],
     allowedActionNames: null,
     createdAt: '2024-01-01T00:00:00.000Z'
   },
@@ -58,6 +60,8 @@ const mockResources: ResourceResponse[] = [
     isSystem: true,
     isOrphaned: false,
     isRegistered: true,
+    actionNames: ['create', 'read', 'update', 'delete', 'search'],
+    conditionalActionNames: ['update'],
     allowedActionNames: null,
     createdAt: '2024-01-01T00:00:00.000Z'
   }

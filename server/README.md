@@ -319,7 +319,13 @@ succeeding and no error rate moves. That counter is the only place the gap shows
 
 `services/` holds `AuthService`, `OAuthService`, `TokenGeneratorService`, `RefreshTokenService`,
 `SessionIssuerService`, `SignInCompletionService`, `SessionLimitService`, `OAuthAccountService`,
-`TokenCleanupService`, `ResourceService`, `ActionService` and `ResourceSyncService`.
+`TokenCleanupService`, `ResourceService` and `ResourceSyncService`.
+
+`ResourceSyncService` reads every `@RegisterResource` at startup. It writes the declared `actions`
+and `conditionalActions` to `resources.action_names` and `resources.conditional_action_names`,
+creates a missing `actions` row for a declared action, and creates a `permissions` row for each
+declared pair only. It never creates an action named `manage` or `all`. The admin narrowing
+`allowed_action_names` survives a sync.
 
 `utils/auth-cookies.ts` holds `AuthCookies`, the one owner of the auth cookies: the `Secure`
 decision, the refresh cookie (`SameSite=strict`) and its lifetime, and the short-lived cookies
@@ -472,7 +478,10 @@ orphans each per-user entry with no Redis `SCAN`.
 `registerAttribute(key, resolver)` from its `onModuleInit` method.
 
 `controllers/feature-flags-admin.controller.ts` holds 9 administrator endpoints below
-`/admin/feature-flags`. Each one uses `@Authorize(['manage','FeatureFlag'])`. The 5 mutating
+`/admin/feature-flags`. The two list endpoints and `GET attribute-keys` check `search`,
+`GET :id` and `POST :id/preview` check `read`, and the create, the update, the toggle and the
+delete check `create`, `update`, `update` and `delete` on `FeatureFlag`. No check of these reads the
+record, so `FeatureFlag` declares no `conditionalActions`. The 5 mutating
 endpoints each write an audit entry. Three of them use `@LogAudit`. The delete calls
 `AuditService.log` itself, to record `details: { key }` of the flag that it removed. The update
 calls it too, because `changedFields` compares the request with the flag read before the write. The 3 read
@@ -592,8 +601,10 @@ are:
   fallback, nor the `past_due` grace window.
 - `GET premium-content` is the worked example of `@RequireEntitlement('reports')`.
 
-`BillingAdminController` uses the CASL subject `Billing` through `@RegisterResource Billing`. Its
-routes are:
+`BillingAdminController` uses the CASL subject `Billing` through `@RegisterResource Billing`. The
+lists check `search`, the cancel and the webhook replay check `update`, the refund checks `refund`
+and the usage record checks `create`. No check reads the record, so `Billing` declares no
+`conditionalActions`. Its routes are:
 
 - `GET subscriptions` and `GET invoices`. Each one takes a cursor DTO for its entity and returns the
   shared cursor envelope through `applyKeysetPagination`. Neither can return more than
@@ -1368,15 +1379,25 @@ malformed condition with a 400 at authoring time.
 **Instance-level enforcement.** Each single-entity endpoint loads the target record and runs
 `assertCan(ability, action, subject(<Subject>, entity))` BEFORE it returns or changes the record.
 Those endpoints are `GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`, `POST /users/:id/mfa/reset`, `POST /users/:id/sessions/revoke`,
-`GET/PATCH/DELETE /roles/:id`, `GET /roles/:id/permissions`, `PATCH /rbac/resources/:id`,
-`POST /rbac/resources/:id/restore`, and `PATCH/DELETE /rbac/actions/:id`.
+`GET/PATCH/DELETE /roles/:id`, `GET /roles/:id/permissions`, `PATCH /rbac/resources/:id` and
+`POST /rbac/resources/:id/restore`.
 
-`POST /users`, `POST /roles` and `POST /rbac/actions` run the same check against the record that
-they make. The subject comes from the submitted DTO. `POST /users` removes `password` from it, which
-no authorization condition can legitimately test. `POST /rbac/actions` uses the `Permission` subject,
-because that is the `@Authorize` subject of the route, and it audits the denial with
-`targetType: 'Action'`. Thus the server enforces a `create` grant with a `fieldMatch` or `custom`
-condition, and that grant does not collapse to the type-level check.
+`POST /users` and `POST /roles` run the same check against the record that they make. The subject
+comes from the submitted DTO. `POST /users` removes `password` from it, which no authorization
+condition can legitimately test. Thus the server enforces a `create` grant with a `fieldMatch` or
+`custom` condition, and that grant does not collapse to the type-level check.
+
+**A condition only where every check reads the record.** An action goes into the
+`conditionalActions` of its resource only when each route that checks it also runs one of the
+checks above (or, for `search:User`, the SQL filter of `applyAbilityToUserQuery`). The lists are
+`User`: all five actions; `Role`: `create`, `update`, `delete`; `Permission`: `update`; `Profile`,
+`Billing` and `FeatureFlag`: none. `read:Role` is not in the list, because `GET /roles` and
+`GET /roles/cursor` return every role, and neither is `assign:Role`, because the role-assignment
+routes check `update:User` on the target user. `RoleService.assertGrantsApplicable` answers 400
+`errors.roles.conditionNotSupported` for a restriction on any other action, and
+`errors.roles.actionNotGrantable` for an allow on an action that the resource does not offer.
+`buildAbility` fails closed on a stored row that breaks either rule: the allow registers nothing,
+and the deny becomes a blanket deny.
 
 This blocks the type-level `@Authorize` bypass. Without it, a conditional grant that an administrator
 configured becomes unconditional on a single-entity route.
@@ -1859,8 +1880,8 @@ before the row that gave it, and pages then drop or repeat rows silently.
 | `oauth_accounts` | UUID PK. `provider` and `provider_id` are unique together. The FK to `users` uses CASCADE and has an index |
 | `refresh_tokens` | UUID PK. `token` is a unique SHA-256 hash, and `@Exclude` keeps it off the wire. The FK to `users` uses CASCADE. The row also holds `expires_at` and `revoked` |
 | `roles` | UUID PK, unique `name`, description, `isSystem` flag, `isSuper` flag |
-| `resources` | UUID PK, unique `name`, unique `subject`, `displayName`, description, `isSystem` flag. CASL cannot resolve an ambiguous subject, and `check:permissions` enforces the uniqueness in CI. The `is_orphaned` boolean becomes true when a person removes the controller. The permissions of such a resource then give nothing, and a deny rule continues to apply until a person restores it. `allowed_action_names text[]` holds the permitted actions |
-| `actions` | UUID PK, unique `name`, `displayName`, description, `isSystem` flag, `sortOrder` |
+| `resources` | UUID PK, unique `name`, unique `subject`, `displayName`, description, `isSystem` flag. CASL cannot resolve an ambiguous subject, and `check:permissions` enforces the uniqueness in CI. The `is_orphaned` boolean becomes true when a person removes the controller. The permissions of such a resource then give nothing, and a deny rule continues to apply until a person restores it. `action_names text[]` and `conditional_action_names text[]` hold what `@RegisterResource` declares, and the startup sync rewrites them. `allowed_action_names text[]` is the admin narrowing of `action_names`, and `null` offers every declared action |
+| `actions` | UUID PK, unique `name`. The startup sync creates a row for each declared action |
 | `permissions` | UUID PK. `resource_id` and `action_id` are unique together, and the two are FKs to `resources` and `actions` |
 | `role_permissions` | FK to `roles` and FK to `permissions`, plus an optional jsonb `conditions` column |
 | `user_roles` | Join table of `user_id` and `role_id`, with a composite PK |
@@ -2415,14 +2436,10 @@ The base URL is `/api/v1`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/metadata` | `permissions:read` | Get the RBAC metadata: the resources and the actions. Redis caches it for 60 s |
+| GET | `/metadata` | `permissions:read` | Get the RBAC metadata: the resources. Redis caches it for 60 s |
 | GET | `/resources` | `permissions:read` | List each resource |
-| PATCH | `/resources/:id` | `permissions:update` | Update the display data of a resource |
+| PATCH | `/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. An action that the code does not check answers 400 `errors.resources.actionNotDeclared` |
 | POST | `/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. It answers 400 when no `@RegisterResource` controller exists |
-| GET | `/actions` | `permissions:read` | List each action |
-| POST | `/actions` | `permissions:create` | Create a new action |
-| PATCH | `/actions/:id` | `permissions:update` | Update an action |
-| DELETE | `/actions/:id` | `permissions:delete` | Delete a custom action |
 
 ### Notifications (`/api/v1/notifications`)
 
@@ -2435,13 +2452,13 @@ The base URL is `/api/v1`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. An anonymous call sets the `nxs_anon_id` cookie only when a live public flag has a percentage rule and the caller holds no valid one. A signed-in call sets it only when a live flag has a percentage rule with `bucketBy: 'device'` and the caller holds no valid one |
-| GET | `/admin/feature-flags` | `manage:FeatureFlag` | List each flag with its rules |
-| GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
-| POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag. An optional `rules` array is written in the same transaction. The audit action is `FEATURE_FLAG_CREATE` |
-| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. An optional `rules` array replaces the full rule set in the same transaction as the flag fields, with one version increase; without `rules` the stored rules stay. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict` and writes no rule. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
-| DELETE | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
-| POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Change `enabled` and increase the version. The audit action is `FEATURE_FLAG_TOGGLE` |
-| POST | `/admin/feature-flags/:id/preview` | `manage:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 400. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
+| GET | `/admin/feature-flags` | `search:FeatureFlag` | List each flag with its rules |
+| GET | `/admin/feature-flags/:id` | `read:FeatureFlag` | Get a flag by ID |
+| POST | `/admin/feature-flags` | `create:FeatureFlag` | Create a flag. An optional `rules` array is written in the same transaction. The audit action is `FEATURE_FLAG_CREATE` |
+| PATCH | `/admin/feature-flags/:id` | `update:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. An optional `rules` array replaces the full rule set in the same transaction as the flag fields, with one version increase; without `rules` the stored rules stay. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict` and writes no rule. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
+| DELETE | `/admin/feature-flags/:id` | `delete:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
+| POST | `/admin/feature-flags/:id/toggle` | `update:FeatureFlag` | Change `enabled` and increase the version. The audit action is `FEATURE_FLAG_TOGGLE` |
+| POST | `/admin/feature-flags/:id/preview` | `read:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 400. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
 
 **Caching.** The system uses three keys:
 

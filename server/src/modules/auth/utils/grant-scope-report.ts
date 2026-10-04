@@ -8,6 +8,8 @@ import { buildAbility } from '../casl/build-ability';
 import { resolveConditions } from '../casl/resolve-conditions';
 import type { SubjectMaps } from '../services/resource.service';
 import { assertCanGrantPermissions } from './can-grant.util';
+import { grantableActionNames } from '@app/shared/utils/grantable-actions';
+import { findConditionSupportError } from '@app/shared/utils/permission-condition-shape';
 
 /**
  * Analysis behind `npm run check:grant-scope`: which stored grants the
@@ -34,6 +36,9 @@ export interface GrantRow {
   resource_name: string;
   resource_subject: string;
   is_orphaned: boolean;
+  action_names: string[];
+  allowed_action_names: string[] | null;
+  conditional_action_names: string[];
   conditions: PermissionCondition | null;
 }
 
@@ -78,7 +83,11 @@ export interface GrantScopeReport {
   totalGrants: number;
   activeUsersWithRoles: number;
   auditRows: number;
-  /** Conditions the resolver vetoes: inert today, rejected on rewrite. */
+  /**
+   * Grants that register nothing as authored, and that the grant rule rejects
+   * on rewrite: an allow on an action the resource does not offer, a condition
+   * no check of the action reads, or a condition the resolver vetoes.
+   */
   inert: GrantRow[];
   /** Attributed grants the check rejects today. */
   findings: Finding[];
@@ -157,10 +166,21 @@ export function analyzeGrants(input: {
 
   // Keyed by resource name, valued by CASL subject, as `ResourceService`
   // builds them: a permission names its resource, the rule names the subject.
-  const subjectMaps: SubjectMaps = { active: {}, orphaned: {} };
+  const subjectMaps: SubjectMaps = {
+    active: {},
+    orphaned: {},
+    grantableActions: {},
+    conditionalActions: {}
+  };
   for (const g of grants) {
     const map = g.is_orphaned ? subjectMaps.orphaned : subjectMaps.active;
     map[g.resource_name] = g.resource_subject;
+    subjectMaps.grantableActions[g.resource_name] = grantableActionNames({
+      actionNames: g.action_names,
+      allowedActionNames: g.allowed_action_names
+    });
+    subjectMaps.conditionalActions[g.resource_name] =
+      g.conditional_action_names;
   }
 
   const rolesByUser = new Map<string, UserRoleRow[]>();
@@ -192,6 +212,21 @@ export function analyzeGrants(input: {
 
   const inert: GrantRow[] = [];
   for (const g of grants) {
+    const isDeny = g.conditions?.effect === 'deny';
+    if (
+      (!isDeny &&
+        !subjectMaps.grantableActions[g.resource_name]?.includes(
+          g.action_name
+        )) ||
+      findConditionSupportError(
+        g.action_name,
+        g.conditional_action_names,
+        g.conditions
+      )
+    ) {
+      inert.push(g);
+      continue;
+    }
     if (!g.conditions) continue;
     const resolved = resolveConditions(g.conditions, {
       // The veto outcome does not depend on the id's value, only on the shape

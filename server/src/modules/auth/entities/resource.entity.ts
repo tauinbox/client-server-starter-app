@@ -27,6 +27,18 @@ export class Resource {
   @Column({ name: 'is_system', default: false })
   isSystem: boolean;
 
+  /** Written from `@RegisterResource` on every sync; never edited by an admin. */
+  @Column('text', { array: true, name: 'action_names', default: '{}' })
+  actionNames: string[];
+
+  /** Written from `@RegisterResource` on every sync; never edited by an admin. */
+  @Column('text', {
+    array: true,
+    name: 'conditional_action_names',
+    default: '{}'
+  })
+  conditionalActionNames: string[];
+
   @Column('text', {
     array: true,
     nullable: true,

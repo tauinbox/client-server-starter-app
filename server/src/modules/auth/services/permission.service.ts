@@ -8,7 +8,9 @@ import { ResolvedPermission } from '@app/shared/types';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
 const CACHE_TTL = 120_000; // 2 minutes
-const CACHE_PREFIX = 'permissions:';
+// Versioned: a migration that deletes grants must not be outlived by a cached
+// list that still carries them.
+const CACHE_PREFIX = 'permissions:v2:';
 const ROLES_CACHE_PREFIX = 'roles:';
 
 export interface RoleInfo {

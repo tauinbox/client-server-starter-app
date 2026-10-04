@@ -1,7 +1,6 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import type { Type } from '@nestjs/common';
 import { UpdateResourceDto } from '../../modules/auth/dtos/update-resource.dto';
-import { UpdateActionDto } from '../../modules/auth/dtos/update-action.dto';
 import { UpdateRoleDto } from '../../modules/auth/dtos/update-role.dto';
 import { UpdateProfileDto } from '../../modules/auth/dtos/update-profile.dto';
 import { CreateUserDto } from '../../modules/users/dtos/create-user.dto';
@@ -66,23 +65,6 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
       await expect(
         validate(UpdateResourceDto, { description: null })
       ).resolves.toEqual({ description: null });
-    });
-  });
-
-  describe('UpdateActionDto', () => {
-    it('rejects a null displayName', async () => {
-      await expectRejected(UpdateActionDto, { displayName: null });
-    });
-
-    it('rejects a null description', async () => {
-      await expectRejected(UpdateActionDto, { description: null });
-    });
-
-    it('still accepts an omitted field and an empty description', async () => {
-      await expect(validate(UpdateActionDto, {})).resolves.toEqual({});
-      await expect(
-        validate(UpdateActionDto, { description: '' })
-      ).resolves.toEqual({ description: '' });
     });
   });
 

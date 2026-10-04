@@ -34,6 +34,8 @@ describe('ResourceService', () => {
     description: 'User management',
     isSystem: true,
     isOrphaned: false,
+    actionNames: ['read', 'update'],
+    conditionalActionNames: ['update'],
     allowedActionNames: null,
     lastSyncedAt: new Date(),
     permissions: [],
@@ -48,7 +50,9 @@ describe('ResourceService', () => {
     description: null,
     isSystem: false,
     isOrphaned: false,
-    allowedActionNames: null,
+    actionNames: ['read'],
+    conditionalActionNames: [],
+    allowedActionNames: ['read'],
     lastSyncedAt: null,
     permissions: [],
     createdAt: new Date()
@@ -62,6 +66,8 @@ describe('ResourceService', () => {
     description: null,
     isSystem: false,
     isOrphaned: true,
+    actionNames: ['read'],
+    conditionalActionNames: [],
     allowedActionNames: null,
     lastSyncedAt: null,
     permissions: [],
@@ -182,7 +188,7 @@ describe('ResourceService', () => {
 
       await service.update('res-1', { description: 'New desc' });
 
-      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v2');
+      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v3');
     });
 
     it('should apply partial update data via Object.assign', async () => {
@@ -202,6 +208,35 @@ describe('ResourceService', () => {
           displayName: 'New Name',
           description: null
         })
+      );
+    });
+  });
+
+  describe('update - offered actions', () => {
+    it('rejects an action the resource does not declare', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+
+      await expect(
+        service.update('res-1', { allowedActionNames: ['read', 'delete'] })
+      ).rejects.toMatchObject({
+        response: { errorKey: 'errors.resources.actionNotDeclared' }
+      });
+      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a narrowing to declared actions and a reset to null', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      await service.update('res-1', { allowedActionNames: ['read'] });
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      await service.update('res-1', { allowedActionNames: null });
+
+      expect(mockResourceRepo.save).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ allowedActionNames: ['read'] })
+      );
+      expect(mockResourceRepo.save).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ allowedActionNames: null })
       );
     });
   });
@@ -230,20 +265,34 @@ describe('ResourceService', () => {
 
       const result = await service.getSubjectMaps();
 
-      expect(result).toEqual({
+      const expected = {
         active: { users: 'User', articles: 'Article' },
-        orphaned: {}
-      });
+        orphaned: {},
+        grantableActions: { users: ['read', 'update'], articles: ['read'] },
+        conditionalActions: { users: ['update'], articles: [] }
+      };
+      expect(result).toEqual(expected);
       expect(mockResourceRepo.find).toHaveBeenCalled();
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'rbac:subject_map:v2',
-        { active: { users: 'User', articles: 'Article' }, orphaned: {} },
+        'rbac:subject_map:v3',
+        expected,
         300_000
       );
       expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
         'resources',
         'miss'
       );
+    });
+
+    it('offers only declared actions, whatever the admin narrowing names', async () => {
+      mockCacheManager.get.mockResolvedValue(undefined);
+      mockResourceRepo.find.mockResolvedValue([
+        { ...resource1, allowedActionNames: ['update', 'search'] }
+      ]);
+
+      const result = await service.getSubjectMaps();
+
+      expect(result.grantableActions).toEqual({ users: ['update'] });
     });
 
     it('should keep orphaned resources out of the active map but expose them separately', async () => {
@@ -263,7 +312,12 @@ describe('ResourceService', () => {
 
       const result = await service.getSubjectMaps();
 
-      expect(result).toEqual({ active: {}, orphaned: {} });
+      expect(result).toEqual({
+        active: {},
+        orphaned: {},
+        grantableActions: {},
+        conditionalActions: {}
+      });
       expect(mockResourceRepo.find).toHaveBeenCalled();
     });
 
@@ -273,16 +327,28 @@ describe('ResourceService', () => {
 
       const result = await service.getSubjectMaps();
 
-      expect(result).toEqual({ active: {}, orphaned: {} });
+      expect(result).toEqual({
+        active: {},
+        orphaned: {},
+        grantableActions: {},
+        conditionalActions: {}
+      });
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'rbac:subject_map:v2',
-        { active: {}, orphaned: {} },
+        'rbac:subject_map:v3',
+        {
+          active: {},
+          orphaned: {},
+          grantableActions: {},
+          conditionalActions: {}
+        },
         300_000
       );
     });
   });
 
   describe('upsertResource', () => {
+    const declared = { actionNames: ['read'], conditionalActionNames: [] };
+
     it('should update existing resource if found by name', async () => {
       const existing = { ...resource1 };
       mockResourceRepo.findOne.mockResolvedValue(existing);
@@ -291,6 +357,7 @@ describe('ResourceService', () => {
       );
 
       const result = await service.upsertResource({
+        ...declared,
         name: 'users',
         subject: 'UpdatedUser',
         displayName: 'Updated Users'
@@ -316,6 +383,7 @@ describe('ResourceService', () => {
       );
 
       await service.upsertResource({
+        ...declared,
         name: 'users',
         subject: 'User',
         displayName: 'Users'
@@ -324,10 +392,37 @@ describe('ResourceService', () => {
       expect(existing.lastSyncedAt).toBeInstanceOf(Date);
     });
 
+    it('rewrites the declared lists and keeps the admin narrowing', async () => {
+      const existing = {
+        ...resource1,
+        actionNames: ['read'],
+        conditionalActionNames: [],
+        allowedActionNames: ['read']
+      };
+      mockResourceRepo.findOne.mockResolvedValue(existing);
+
+      const result = await service.upsertResource({
+        name: 'users',
+        subject: 'User',
+        displayName: 'Users',
+        actionNames: ['read', 'update'],
+        conditionalActionNames: ['update']
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          actionNames: ['read', 'update'],
+          conditionalActionNames: ['update'],
+          allowedActionNames: ['read']
+        })
+      );
+    });
+
     it('should create new resource if not found by name', async () => {
       mockResourceRepo.findOne.mockResolvedValue(null);
 
       const result = await service.upsertResource({
+        ...declared,
         name: 'posts',
         subject: 'Post',
         displayName: 'Posts'
@@ -351,6 +446,7 @@ describe('ResourceService', () => {
       mockResourceRepo.findOne.mockResolvedValue(null);
 
       await service.upsertResource({
+        ...declared,
         name: 'settings',
         subject: 'Setting',
         displayName: 'Settings',
@@ -366,6 +462,7 @@ describe('ResourceService', () => {
       mockResourceRepo.findOne.mockResolvedValue(null);
 
       await service.upsertResource({
+        ...declared,
         name: 'reports',
         subject: 'Report',
         displayName: 'Reports'
@@ -379,6 +476,7 @@ describe('ResourceService', () => {
     it('should throw HttpException when subject is CASL reserved word "all"', async () => {
       await expect(
         service.upsertResource({
+          ...declared,
           name: 'everything',
           subject: 'all',
           displayName: 'Everything'
@@ -390,6 +488,7 @@ describe('ResourceService', () => {
     it('should reject reserved subject even with mixed case', async () => {
       await expect(
         service.upsertResource({
+          ...declared,
           name: 'everything',
           subject: 'ALL',
           displayName: 'Everything'
@@ -401,6 +500,7 @@ describe('ResourceService', () => {
       mockResourceRepo.findOne.mockResolvedValue(null);
 
       await service.upsertResource({
+        ...declared,
         name: 'posts',
         subject: 'post',
         displayName: 'Posts'
@@ -419,6 +519,7 @@ describe('ResourceService', () => {
       );
 
       await service.upsertResource({
+        ...declared,
         name: 'users',
         subject: 'user',
         displayName: 'Users'
@@ -431,6 +532,7 @@ describe('ResourceService', () => {
       mockResourceRepo.findOne.mockResolvedValue(null);
 
       await service.upsertResource({
+        ...declared,
         name: 'posts',
         subject: 'Post',
         displayName: 'Posts'
@@ -475,7 +577,7 @@ describe('ResourceService', () => {
 
       await service.restore('res-3');
 
-      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v2');
+      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v3');
     });
 
     it('should throw NotFoundException if resource not found', async () => {
@@ -498,7 +600,7 @@ describe('ResourceService', () => {
   describe('invalidateSubjectMapCache', () => {
     it('should delete the subject map cache entry', async () => {
       await service.invalidateSubjectMapCache();
-      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v2');
+      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v3');
     });
   });
 });

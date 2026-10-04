@@ -1,10 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ForbiddenException, HttpException, Logger } from '@nestjs/common';
-import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { RbacController } from './rbac.controller';
 import { ResourceService } from '../services/resource.service';
-import { ActionService } from '../services/action.service';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -47,13 +45,6 @@ describe('RbacController', () => {
     update: jest.Mock;
     restore: jest.Mock;
   };
-  let actionServiceMock: {
-    findAll: jest.Mock;
-    findOne: jest.Mock;
-    create: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-  };
   let auditServiceMock: {
     log: jest.Mock;
     logFireAndForget: jest.Mock;
@@ -76,14 +67,6 @@ describe('RbacController', () => {
       restore: jest.fn().mockResolvedValue({ id: 'res-1', isOrphaned: false })
     };
 
-    actionServiceMock = {
-      findAll: jest.fn().mockResolvedValue([]),
-      findOne: jest.fn().mockResolvedValue({ id: 'act-1', name: 'export' }),
-      create: jest.fn().mockResolvedValue({ id: 'act-1', name: 'export' }),
-      update: jest.fn().mockResolvedValue({ id: 'act-1' }),
-      delete: jest.fn().mockResolvedValue(undefined)
-    };
-
     auditServiceMock = {
       log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn()
@@ -101,7 +84,6 @@ describe('RbacController', () => {
       controllers: [RbacController],
       providers: [
         { provide: ResourceService, useValue: resourceServiceMock },
-        { provide: ActionService, useValue: actionServiceMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MetricsService, useValue: metricsServiceMock },
         { provide: CACHE_MANAGER, useValue: cacheManagerMock }
@@ -145,41 +127,28 @@ describe('RbacController', () => {
     });
 
     it('should return cached value without fetching services', async () => {
-      const cached = { resources: [], actions: [] };
+      const cached = { resources: [] };
       cacheManagerMock.get.mockResolvedValue(cached);
 
       const result = await controller.getMetadata();
 
       expect(result).toBe(cached);
       expect(resourceServiceMock.findAll).not.toHaveBeenCalled();
-      expect(actionServiceMock.findAll).not.toHaveBeenCalled();
     });
 
-    it('should fetch from services and set cache when no cached value', async () => {
+    it('should fetch resources and set cache when no cached value', async () => {
       const resources = [{ id: 'r1', name: 'users' }];
-      const actions = [{ id: 'a1', name: 'read' }];
       cacheManagerMock.get.mockResolvedValue(null);
       resourceServiceMock.findAll.mockResolvedValue(resources);
-      actionServiceMock.findAll.mockResolvedValue(actions);
 
       const result = await controller.getMetadata();
 
-      expect(result).toEqual({ resources, actions });
+      expect(result).toEqual({ resources });
       expect(cacheManagerMock.set).toHaveBeenCalledWith(
         'rbac:metadata',
-        { resources, actions },
+        { resources },
         60_000
       );
-    });
-
-    it('should call both services when cache is empty', async () => {
-      resourceServiceMock.findAll.mockResolvedValue([]);
-      actionServiceMock.findAll.mockResolvedValue([]);
-
-      await controller.getMetadata();
-
-      expect(resourceServiceMock.findAll).toHaveBeenCalled();
-      expect(actionServiceMock.findAll).toHaveBeenCalled();
     });
   });
 
@@ -330,250 +299,4 @@ describe('RbacController', () => {
   });
 
   // ── findAllActions ────────────────────────────────────────────────
-
-  describe('findAllActions', () => {
-    it('should return all actions from actionService', () => {
-      const actions = [{ id: 'a1', name: 'read' }];
-      actionServiceMock.findAll.mockReturnValue(actions);
-
-      const result = controller.findAllActions();
-
-      expect(result).toBe(actions);
-    });
-  });
-
-  // ── createAction ──────────────────────────────────────────────────
-
-  describe('createAction', () => {
-    it('should create action and return it', async () => {
-      const dto = {
-        name: 'export',
-        displayName: 'Export',
-        description: 'Export data'
-      };
-      const created = { id: 'act-new', name: 'export' };
-      actionServiceMock.create.mockResolvedValue(created);
-      const req = mockJwtRequest() as JwtAuthRequest;
-
-      const result = await controller.createAction(dto, req, mockAbility);
-
-      expect(actionServiceMock.create).toHaveBeenCalledWith(dto);
-      expect(result).toBe(created);
-    });
-
-    it('should invalidate metadata cache after creation', async () => {
-      const req = mockJwtRequest() as JwtAuthRequest;
-
-      await controller.createAction(
-        { name: 'export', displayName: 'Export', description: '' },
-        req,
-        mockAbility
-      );
-
-      expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
-    });
-
-    it('should log ACTION_CREATE audit event with action name', async () => {
-      const dto = { name: 'export', displayName: 'Export', description: '' };
-      const created = { id: 'act-new', name: 'export' };
-      actionServiceMock.create.mockResolvedValue(created);
-      const req = mockJwtRequest(
-        'user-1',
-        'admin@example.com'
-      ) as JwtAuthRequest;
-
-      await controller.createAction(dto, req, mockAbility);
-
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: AuditAction.ACTION_CREATE,
-          actorId: 'user-1',
-          actorEmail: 'admin@example.com',
-          targetId: 'act-new',
-          targetType: 'Action',
-          details: { name: 'export' }
-        })
-      );
-    });
-
-    // Built on a real CASL ability: a mocked `can` cannot show the difference
-    // between the type-level check the route guard runs and the instance-level
-    // one, which is the whole point of this path.
-    describe('conditional create grant', () => {
-      function abilityWithNameCondition(): AppAbility {
-        const { can, build } = new AbilityBuilder<AppAbility>(
-          createMongoAbility
-        );
-        can('create', 'Permission', { name: { $in: ['export'] } });
-        return build();
-      }
-
-      it('creates the action when the record satisfies the condition', async () => {
-        const created = { id: 'act-new', name: 'export' };
-        actionServiceMock.create.mockResolvedValue(created);
-        const req = mockJwtRequest() as JwtAuthRequest;
-
-        const result = await controller.createAction(
-          { name: 'export', displayName: 'Export' },
-          req,
-          abilityWithNameCondition()
-        );
-
-        expect(result).toBe(created);
-      });
-
-      it('throws ForbiddenException and audits when the record fails the condition', async () => {
-        const req = mockJwtRequest('user-1') as JwtAuthRequest;
-
-        await expect(
-          controller.createAction(
-            { name: 'archive', displayName: 'Archive' },
-            req,
-            abilityWithNameCondition()
-          )
-        ).rejects.toBeInstanceOf(ForbiddenException);
-
-        expect(actionServiceMock.create).not.toHaveBeenCalled();
-        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
-          expect.objectContaining({
-            action: AuditAction.PERMISSION_CHECK_FAILURE,
-            actorId: 'user-1',
-            targetType: 'Action'
-          })
-        );
-        expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
-          'instance',
-          'create',
-          'Permission'
-        );
-      });
-    });
-  });
-
-  // ── updateAction ──────────────────────────────────────────────────
-
-  describe('updateAction', () => {
-    it('should load the action, assert update access, update, and return result', async () => {
-      const dto = { description: 'Updated' };
-      const updated = { id: 'act-1', description: 'Updated' };
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-      actionServiceMock.update.mockResolvedValue(updated);
-      const req = mockJwtRequest() as JwtAuthRequest;
-
-      const result = await controller.updateAction(
-        'act-1',
-        dto,
-        req,
-        mockAbility
-      );
-
-      expect(actionServiceMock.findOne).toHaveBeenCalledWith('act-1');
-      expect(actionServiceMock.update).toHaveBeenCalledWith('act-1', dto);
-      expect(result).toBe(updated);
-    });
-
-    it('should throw ForbiddenException and skip update when ability denies', async () => {
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-      const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
-
-      await expect(
-        controller.updateAction('act-1', {}, req, denyAbility)
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(actionServiceMock.update).not.toHaveBeenCalled();
-    });
-
-    it('should invalidate metadata cache after update', async () => {
-      const req = mockJwtRequest() as JwtAuthRequest;
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-
-      await controller.updateAction('act-1', {}, req, mockAbility);
-
-      expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
-    });
-
-    it('should log ACTION_UPDATE audit event', async () => {
-      const dto = { displayName: 'New Name' };
-      const req = mockJwtRequest('user-2', 'mod@example.com') as JwtAuthRequest;
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-
-      await controller.updateAction('act-1', dto, req, mockAbility);
-
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: AuditAction.ACTION_UPDATE,
-          actorId: 'user-2',
-          actorEmail: 'mod@example.com',
-          targetId: 'act-1',
-          targetType: 'Action',
-          details: { changedFields: ['displayName'] }
-        })
-      );
-    });
-  });
-
-  // ── deleteAction ──────────────────────────────────────────────────
-
-  describe('deleteAction', () => {
-    it('should load the action, assert delete access, then delete', async () => {
-      const req = mockJwtRequest() as JwtAuthRequest;
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-
-      await controller.deleteAction('act-1', req, mockAbility);
-
-      expect(actionServiceMock.findOne).toHaveBeenCalledWith('act-1');
-      expect(actionServiceMock.delete).toHaveBeenCalledWith('act-1');
-    });
-
-    it('should throw ForbiddenException and skip delete when ability denies', async () => {
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-      const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
-
-      await expect(
-        controller.deleteAction('act-1', req, denyAbility)
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(actionServiceMock.delete).not.toHaveBeenCalled();
-    });
-
-    it('should invalidate metadata cache after deletion', async () => {
-      const req = mockJwtRequest() as JwtAuthRequest;
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-
-      await controller.deleteAction('act-1', req, mockAbility);
-
-      expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
-    });
-
-    it('should log ACTION_DELETE audit event with the deleted action name', async () => {
-      const req = mockJwtRequest(
-        'user-3',
-        'deleter@example.com'
-      ) as JwtAuthRequest;
-      actionServiceMock.findOne.mockResolvedValue({
-        id: 'act-1',
-        name: 'approve'
-      });
-
-      await controller.deleteAction('act-1', req, mockAbility);
-
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: AuditAction.ACTION_DELETE,
-          actorId: 'user-3',
-          actorEmail: 'deleter@example.com',
-          targetId: 'act-1',
-          targetType: 'Action',
-          details: { name: 'approve' }
-        })
-      );
-    });
-
-    it('should return undefined (void response)', async () => {
-      const req = mockJwtRequest() as JwtAuthRequest;
-      actionServiceMock.findOne.mockResolvedValue({ id: 'act-1' });
-
-      const result = await controller.deleteAction('act-1', req, mockAbility);
-
-      expect(result).toBeUndefined();
-    });
-  });
 });

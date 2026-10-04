@@ -15,9 +15,8 @@ import type { UpdateResource } from '../services/rbac-admin.service';
 import { RbacAdminService } from '../services/rbac-admin.service';
 
 /**
- * One list, one store, one entity collection. The resources page shows two
- * lists, so it provides this store next to `ActionsStore` rather than holding
- * both collections here - see the pagination standard in the contributor guide.
+ * One list, one store, one entity collection - see the pagination standard in
+ * the contributor guide.
  */
 export const ResourcesStore = signalStore(
   withEntities<ResourceResponse>(),

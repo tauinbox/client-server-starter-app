@@ -38,7 +38,7 @@
                   }}
                 </dd>
               </dl>
-              @if (canManage() && canCancel(sub)) {
+              @if (hasCancelAccess() && canCancel(sub)) {
                 <div class="record-card-actions">
                   <button
                     matIconButton
@@ -134,7 +134,7 @@
                 {{ t('admin.billing.colActions') }}
               </th>
               <td mat-cell *matCellDef="let sub">
-                @if (canManage() && canCancel(sub)) {
+                @if (hasCancelAccess() && canCancel(sub)) {
                   <button
                     matIconButton
                     [matMenuTriggerFor]="rowSubMenu"
@@ -222,7 +222,7 @@
                   {{ inv.periodEnd | localizedDate: 'mediumDate' : 'UTC' }}
                 </dd>
               </dl>
-              @if (canManage() && canRefund(inv)) {
+              @if (hasRefundAccess() && canRefund(inv)) {
                 <div class="record-card-actions">
                   <button
                     matIconButton
@@ -295,7 +295,7 @@
                 {{ t('admin.billing.colActions') }}
               </th>
               <td mat-cell *matCellDef="let inv">
-                @if (canManage() && canRefund(inv)) {
+                @if (hasRefundAccess() && canRefund(inv)) {
                   <button
                     matIconButton
                     (click)="confirmRefund(inv)"

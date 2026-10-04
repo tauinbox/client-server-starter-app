@@ -83,22 +83,4 @@ describe('delete audit details parity', () => {
     expect(rows[0].targetType).toBe('Role');
     expect(rows[0].details).toEqual({ name: role.name });
   });
-
-  it('records the action name on ACTION_DELETE', async () => {
-    const created = await call('POST', '/api/v1/rbac/actions', {
-      name: 'auditprobe',
-      displayName: 'Audit Probe'
-    });
-    expect(created.status).toBe(201);
-    const action = (await created.json()) as { id: string; name: string };
-
-    expect(
-      (await call('DELETE', `/api/v1/rbac/actions/${action.id}`)).status
-    ).toBe(200);
-
-    const rows = auditRows('ACTION_DELETE');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].targetType).toBe('Action');
-    expect(rows[0].details).toEqual({ name: action.name });
-  });
 });

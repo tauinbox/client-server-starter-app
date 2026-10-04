@@ -18,6 +18,7 @@ import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
 import { PermissionService } from './permission.service';
+import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import { PermissionCondition } from '@app/shared/types';
 import { ErrorKeys } from '@app/shared/constants';
 import type { AppAbility } from '../casl/app-ability';
@@ -30,7 +31,7 @@ import {
 } from '../utils/can-grant.util';
 import {
   findConditionActionError,
-  findIdentityBoundBranch
+  findConditionSupportError
 } from '@app/shared/utils/permission-condition-shape';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -181,37 +182,67 @@ export class RoleService {
   }
 
   /**
-   * Reject a condition branch the granted action can never satisfy, whoever
-   * writes it (supers included) - an identity-bound branch on a `create` grant
-   * denies every create instead of restricting it, so it reads as a
-   * restriction in the admin UI while enforcing nothing. Only items that carry
-   * such a branch are resolved, so the common case costs no query. Unknown
-   * permission ids are left to the grant check, which reports them.
+   * Reject a grant that would enforce nothing, whoever writes it (supers
+   * included), because the admin UI would show it as access or as a limit:
+   * - an allow on an action the resource does not offer is not in the
+   *   permission matrix, and buildAbility drops it;
+   * - a restriction on an action whose checks never read the record passes
+   *   the type-level route check as a full grant;
+   * - an identity-bound branch on a `create` grant denies every create.
+   * Unknown permission ids are left to the grant check, which reports them.
    */
-  private async assertConditionsApplicable(
+  private async assertGrantsApplicable(
     items: { permissionId: string; conditions?: PermissionCondition | null }[]
   ): Promise<void> {
-    const identityBound = items.filter(
-      (item) => findIdentityBoundBranch(item.conditions) !== null
-    );
-    if (identityBound.length === 0) return;
+    if (items.length === 0) return;
 
     const permissions = await this.permissionRepository.find({
-      where: identityBound.map((item) => ({ id: item.permissionId }))
+      where: items.map((item) => ({ id: item.permissionId }))
     });
     const byId = new Map(permissions.map((p) => [p.id, p]));
 
-    for (const item of identityBound) {
+    for (const item of items) {
       const permission = byId.get(item.permissionId);
       if (!permission) continue;
-      const error = findConditionActionError(
-        permission.action.name,
-        item.conditions
-      );
-      if (error) {
+      const { action, resource } = permission;
+      const label = `${action.name}:${resource.subject}`;
+
+      if (
+        !isDenyCondition(item.conditions ?? null) &&
+        !grantableActionNames(resource).includes(action.name)
+      ) {
         throw new HttpException(
           {
-            message: `Cannot grant ${permission.action.name}:${permission.resource.subject} - ${error}`,
+            message: `Cannot grant ${label} - the resource does not offer this action`,
+            errorKey: ErrorKeys.ROLES.ACTION_NOT_GRANTABLE
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      const supportError = findConditionSupportError(
+        action.name,
+        resource.conditionalActionNames,
+        item.conditions
+      );
+      if (supportError) {
+        throw new HttpException(
+          {
+            message: `Cannot grant ${label} - ${supportError}`,
+            errorKey: ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      const actionError = findConditionActionError(
+        action.name,
+        item.conditions
+      );
+      if (actionError) {
+        throw new HttpException(
+          {
+            message: `Cannot grant ${label} - ${actionError}`,
             errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
           },
           HttpStatus.BAD_REQUEST
@@ -590,7 +621,7 @@ export class RoleService {
     const role = await this.findOne(roleId);
     this.assertCanUpdateRole(role, ability, actorId);
     this.assertNotSystem(role, ability);
-    await this.assertConditionsApplicable(items);
+    await this.assertGrantsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     if (this.isScopeChecked(ability)) {
       // A deny row survives a replace only when it is sent back unchanged;
@@ -635,7 +666,7 @@ export class RoleService {
       permissionId,
       conditions: conditions ?? null
     }));
-    await this.assertConditionsApplicable(items);
+    await this.assertGrantsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     const rolePermissions = permissionIds.map((permissionId) =>
       this.rolePermissionRepository.create({

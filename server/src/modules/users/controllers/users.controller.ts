@@ -72,7 +72,13 @@ import { maskEmail } from '../../../common/utils/escape-html';
   path: 'users',
   version: '1'
 })
-@RegisterResource({ name: 'users', subject: 'User', displayName: 'Users' })
+@RegisterResource({
+  name: 'users',
+  subject: 'User',
+  displayName: 'Users',
+  actions: ['create', 'read', 'update', 'delete', 'search'],
+  conditionalActions: ['create', 'read', 'update', 'delete', 'search']
+})
 @UseInterceptors(ClassSerializerInterceptor)
 @SerializeOptions({ groups: ['privileged'] })
 export class UsersController {

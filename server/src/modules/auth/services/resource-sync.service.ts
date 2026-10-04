@@ -11,6 +11,7 @@ import { Permission } from '../entities/permission.entity';
 import { Action } from '../entities/action.entity';
 import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
+import { CASL_RESERVED_ACTION_NAMES } from '../casl/constants';
 
 @Injectable()
 export class ResourceSyncService implements OnApplicationBootstrap {
@@ -43,7 +44,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
   private async syncResources(): Promise<void> {
     const registeredNames = new Set<string>();
     const controllers = this.discoveryService.getControllers();
-    const actions = await this.actionRepository.find();
+    const declared: { meta: ResourceMetadata; controllerName: string }[] = [];
 
     for (const wrapper of controllers) {
       const metatype = wrapper.metatype as
@@ -72,12 +73,19 @@ export class ResourceSyncService implements OnApplicationBootstrap {
 
       if (registeredNames.has(meta.name)) continue;
       registeredNames.add(meta.name);
+      declared.push({ meta, controllerName: metatype.name });
+    }
 
+    const actions = await this.ensureDeclaredActions(
+      declared.flatMap(({ meta }) => meta.actions)
+    );
+
+    for (const { meta, controllerName } of declared) {
       // Warn early if subject is not PascalCase — upsertResource auto-normalizes,
       // but this surfaces decorator misconfiguration to developers at startup
       if (meta.subject.charAt(0) !== meta.subject.charAt(0).toUpperCase()) {
         this.logger.warn(
-          `@RegisterResource subject "${meta.subject}" on controller "${metatype.name}" is not PascalCase — auto-normalizing. Fix the decorator to suppress this warning.`
+          `@RegisterResource subject "${meta.subject}" on controller "${controllerName}" is not PascalCase — auto-normalizing. Fix the decorator to suppress this warning.`
         );
       }
 
@@ -95,18 +103,23 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         name: meta.name,
         subject: meta.subject,
         displayName: meta.displayName,
-        isSystem: true
+        isSystem: true,
+        actionNames: [...meta.actions],
+        conditionalActionNames: [...meta.conditionalActions]
       });
 
-      // Auto-create permissions for this resource × all actions
-      if (actions.length > 0) {
+      // A permission row exists only for a pair the code checks
+      const declaredActions = actions.filter((action) =>
+        meta.actions.includes(action.name)
+      );
+      if (declaredActions.length > 0) {
         const existingPermissions = await this.permissionRepository.find({
           where: { resourceId: resource.id }
         });
         const existingActionIds = new Set(
           existingPermissions.map((permission) => permission.actionId)
         );
-        const missingActions = actions.filter(
+        const missingActions = declaredActions.filter(
           (action) => !existingActionIds.has(action.id)
         );
         if (missingActions.length > 0) {
@@ -142,5 +155,34 @@ export class ResourceSyncService implements OnApplicationBootstrap {
 
     this.resourceRegistry.register([...registeredNames]);
     await this.resourceService.invalidateSubjectMapCache();
+  }
+
+  /**
+   * Actions exist because code checks them, so a declared action that has no
+   * row yet gets one here. Its label is a client translation keyed by name. A
+   * reserved CASL keyword is never stored: `check:permissions` rejects it, and
+   * a row named `manage` would let a grant read as full access.
+   */
+  private async ensureDeclaredActions(names: string[]): Promise<Action[]> {
+    const existing = await this.actionRepository.find();
+    const known = new Set(existing.map((action) => action.name));
+    const missing = [...new Set(names)].filter((name) => {
+      if (CASL_RESERVED_ACTION_NAMES.includes(name)) {
+        this.logger.error(
+          `Declared action "${name}" is a reserved CASL keyword - not created`
+        );
+        return false;
+      }
+      return !known.has(name);
+    });
+    if (missing.length === 0) return existing;
+
+    const created = await this.actionRepository.save(
+      missing.map((name) => this.actionRepository.create({ name }))
+    );
+    for (const action of created) {
+      this.logger.log(`Created action: ${action.name}`);
+    }
+    return [...existing, ...created];
   }
 }

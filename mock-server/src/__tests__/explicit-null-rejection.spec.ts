@@ -103,25 +103,6 @@ describe('explicit null parity with server DTOs', () => {
     });
   });
 
-  describe('PATCH /rbac/actions/:id', () => {
-    it('rejects a null displayName and a null description', async () => {
-      await expectValidation400(
-        'PATCH',
-        `/rbac/actions/${mockId('act-assign')}`,
-        {
-          displayName: null
-        }
-      );
-      await expectValidation400(
-        'PATCH',
-        `/rbac/actions/${mockId('act-assign')}`,
-        {
-          description: null
-        }
-      );
-    });
-  });
-
   describe('PATCH /rbac/resources/:id', () => {
     it('keeps accepting a null description, whose column is nullable', async () => {
       const res = await send(

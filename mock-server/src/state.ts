@@ -49,10 +49,16 @@ import type {
 import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
+  findConditionSupportError,
   findFieldMatchShapeError,
   findOwnershipShapeError,
   findUserAttrShapeError
 } from '@app/shared/utils/permission-condition-shape';
+import { grantableActionNames } from '@app/shared/utils/grantable-actions';
+import type {
+  KnownActions,
+  KnownSubjects
+} from '@app/shared/generated/casl-subjects';
 import {
   seedOAuthAccounts,
   seedUsers,
@@ -357,6 +363,8 @@ export function toResourceResponse(resource: {
   isSystem: boolean;
   isOrphaned: boolean;
   isRegistered: boolean;
+  actionNames: string[];
+  conditionalActionNames: string[];
   allowedActionNames: string[] | null;
   createdAt: string;
 }): ResourceResponse {
@@ -369,6 +377,8 @@ export function toResourceResponse(resource: {
     isSystem: resource.isSystem,
     isOrphaned: resource.isOrphaned,
     isRegistered: resource.isRegistered,
+    actionNames: resource.actionNames,
+    conditionalActionNames: resource.conditionalActionNames,
     allowedActionNames: resource.allowedActionNames,
     createdAt: resource.createdAt
   };
@@ -377,17 +387,11 @@ export function toResourceResponse(resource: {
 export function toActionResponse(action: {
   id: string;
   name: string;
-  displayName: string;
-  description: string;
-  isDefault: boolean;
   createdAt: string;
 }): ActionResponse {
   return {
     id: action.id,
     name: action.name,
-    displayName: action.displayName,
-    description: action.description,
-    isDefault: action.isDefault,
     createdAt: action.createdAt
   };
 }
@@ -539,12 +543,11 @@ export function logAudit(
   state.auditLogs.push(entry);
 }
 
-export type Actions =
-  'manage' | 'create' | 'read' | 'update' | 'delete' | 'search' | 'assign';
+/** Generated from the server decorators, so the mock cannot fall behind. */
+export type Actions = KnownActions;
 
 /** Every subject the server registers through `@RegisterResource`. */
-export type SubjectNames =
-  'User' | 'Role' | 'Permission' | 'Profile' | 'FeatureFlag' | 'Billing';
+export type SubjectNames = KnownSubjects;
 
 /**
  * Branded plain-object subject for instance-level checks, mirroring
@@ -654,9 +657,13 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
   // orphaned rather than vanish with it.
   const activeSubjects = new Map<string, string>();
   const orphanedSubjects = new Map<string, string>();
+  const grantableActions = new Map<string, string[]>();
+  const conditionalActions = new Map<string, string[]>();
   for (const resource of currentState.resources.values()) {
     const target = resource.isOrphaned ? orphanedSubjects : activeSubjects;
     target.set(resource.name, resource.subject);
+    grantableActions.set(resource.name, grantableActionNames(resource));
+    conditionalActions.set(resource.name, resource.conditionalActionNames);
   }
 
   const resolved = getResolvedPermissionsForUser(user);
@@ -693,8 +700,29 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
       continue;
     }
 
+    // Mirrors the server factory: an allow the permission matrix does not
+    // show grants nothing.
+    if (!isDeny && !grantableActions.get(resource)?.includes(action)) {
+      continue;
+    }
+
     if (!conditions) {
       register(action as Actions, subject);
+      continue;
+    }
+
+    // Mirrors the server factory: a condition no check of the action reads
+    // fails closed - the allow grants nothing, the deny denies everything.
+    if (
+      findConditionSupportError(
+        action,
+        conditionalActions.get(resource) ?? [],
+        conditions
+      )
+    ) {
+      if (isDeny) {
+        register(action as Actions, subject);
+      }
       continue;
     }
 

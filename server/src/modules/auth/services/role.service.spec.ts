@@ -17,6 +17,13 @@ import { RoleRenamedEvent } from '../events/role-renamed.event';
 import { RoleDeletedEvent } from '../events/role-deleted.event';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
 
+// Every action offered and evaluated, so a fixture tests the grant rules alone.
+const OFFERS_ALL = {
+  actionNames: ['create', 'read', 'update', 'delete', 'search', 'assign'],
+  allowedActionNames: null,
+  conditionalActionNames: ['create', 'read', 'update', 'delete', 'search']
+};
+
 describe('RoleService', () => {
   let service: RoleService;
   let mockRoleRepo: {
@@ -147,7 +154,7 @@ describe('RoleService', () => {
     );
 
     mockPermissionRepo = {
-      find: jest.fn()
+      find: jest.fn().mockResolvedValue([])
     };
 
     mockRolePermissionRepo = {
@@ -807,12 +814,12 @@ describe('RoleService', () => {
     const permCreateUser = {
       id: 'perm-create-user',
       action: { name: 'create' },
-      resource: { subject: 'User' }
+      resource: { subject: 'User', ...OFFERS_ALL }
     };
     const permUpdateUser = {
       id: 'perm-update-user',
       action: { name: 'update' },
-      resource: { subject: 'User' }
+      resource: { subject: 'User', ...OFFERS_ALL }
     };
 
     // Super callers bypass the can-grant check, so the rejection must not live
@@ -880,18 +887,77 @@ describe('RoleService', () => {
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
     });
 
-    it('does not query permissions when no item carries an identity-bound branch', async () => {
+    it('rejects a condition on an action whose checks never read the record', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-
-      await service.setPermissionsForRole('role-2', [
+      mockPermissionRepo.find.mockResolvedValue([
         {
-          permissionId: 'perm-create-user',
-          conditions: { fieldMatch: { locale: ['ru'] } }
+          ...permUpdateUser,
+          resource: { ...permUpdateUser.resource, conditionalActionNames: [] }
         }
       ]);
 
-      expect(mockPermissionRepo.find).not.toHaveBeenCalled();
-      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+      await expect(
+        service.setPermissionsForRole(
+          'role-2',
+          [
+            {
+              permissionId: 'perm-update-user',
+              conditions: { fieldMatch: { locale: ['ru'] } }
+            }
+          ],
+          superAbility,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.roles.conditionNotSupported' }
+      });
+      expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects an allow on an action the resource does not offer', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([
+        {
+          ...permUpdateUser,
+          resource: { ...permUpdateUser.resource, allowedActionNames: ['read'] }
+        }
+      ]);
+
+      await expect(
+        service.assignPermissionsToRole(
+          'role-2',
+          ['perm-update-user'],
+          undefined,
+          superAbility,
+          'actor-1'
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.roles.actionNotGrantable' }
+      });
+      expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a plain deny on an action the resource does not offer', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockPermissionRepo.find.mockResolvedValue([
+        {
+          ...permUpdateUser,
+          resource: { ...permUpdateUser.resource, allowedActionNames: ['read'] }
+        }
+      ]);
+      mockRolePermissionRepo.save.mockResolvedValue([]);
+
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-update-user'],
+        { effect: 'deny' },
+        superAbility,
+        'actor-1'
+      );
+
+      expect(mockRolePermissionRepo.save).toHaveBeenCalled();
     });
   });
 
@@ -901,12 +967,12 @@ describe('RoleService', () => {
     const permCreateRole = {
       id: 'perm-create-role',
       action: { name: 'create' },
-      resource: { subject: 'Role' }
+      resource: { subject: 'Role', ...OFFERS_ALL }
     };
     const permUpdateUser = {
       id: 'perm-update-user',
       action: { name: 'update' },
-      resource: { subject: 'User' }
+      resource: { subject: 'User', ...OFFERS_ALL }
     };
 
     function abilityMock(opts: {
@@ -1393,7 +1459,7 @@ describe('RoleService', () => {
     const permUpdateUser = {
       id: 'perm-update-user',
       action: { name: 'update' },
-      resource: { subject: 'User' }
+      resource: { subject: 'User', ...OFFERS_ALL }
     };
     const denyCeo = {
       effect: 'deny' as const,

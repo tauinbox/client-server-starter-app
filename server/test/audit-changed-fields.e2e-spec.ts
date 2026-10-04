@@ -20,7 +20,6 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
-import { Action } from '../src/modules/auth/entities/action.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { withPrivateThrottlerStorage } from './private-throttler';
@@ -38,7 +37,6 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
   const adminEmail = `audit-fields-admin-${stamp}@example.com`;
   const targetEmail = `audit-fields-target-${stamp}@example.com`;
   const roleName = `audit-fields-role-${stamp}`;
-  const actionName = `audit-fields-action-${stamp}`;
   const flagKey = `audit-fields-flag-${stamp}`;
   const password = 'Lantern-Orchard-47';
   let resourceRestore: Pick<Resource, 'id' | 'description'> | undefined;
@@ -94,17 +92,6 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
       });
     }
     await dataSource?.getRepository(FeatureFlag).delete({ key: flagKey });
-    // Through the route: the service also removes the permissions that the
-    // create made for the action.
-    const action = await dataSource
-      ?.getRepository(Action)
-      .findOneBy({ name: actionName });
-    if (action) {
-      await request(http())
-        .delete(`/api/v1/rbac/actions/${action.id}`)
-        .auth(token, { type: 'bearer' })
-        .expect(200);
-    }
     await dataSource?.getRepository(Role).delete({ name: roleName });
     await dataSource
       ?.getRepository(User)
@@ -215,29 +202,6 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     expect(
       await lastChangedFields(AuditAction.RESOURCE_UPDATE, resource.id)
     ).toEqual(['description']);
-  });
-
-  it('action: a resubmit logs [] and a description edit logs ["description"]', async () => {
-    const created = await request(http())
-      .post('/api/v1/rbac/actions')
-      .auth(token, { type: 'bearer' })
-      .send({ name: actionName, displayName: 'Audit', description: 'old' })
-      .expect(201);
-    const id = (created.body as { id: string }).id;
-
-    await patch(`rbac/actions/${id}`, {
-      displayName: 'Audit',
-      description: 'old'
-    });
-    expect(await lastChangedFields(AuditAction.ACTION_UPDATE, id)).toEqual([]);
-
-    await patch(`rbac/actions/${id}`, {
-      displayName: 'Audit',
-      description: 'new'
-    });
-    expect(await lastChangedFields(AuditAction.ACTION_UPDATE, id)).toEqual([
-      'description'
-    ]);
   });
 
   it('user: a resubmit logs [] and a name edit logs ["firstName"]', async () => {

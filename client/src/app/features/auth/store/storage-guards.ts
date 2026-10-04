@@ -28,10 +28,6 @@ function isCachedResource(value: unknown): boolean {
   );
 }
 
-function isCachedAction(value: unknown): boolean {
-  return isRecord(value) && typeof value['name'] === 'string';
-}
-
 /**
  * Narrows the cached RBAC metadata. The elements are checked too: `subjectMap`
  * reads `name` and `subject` off every resource, so an array of the wrong shape
@@ -43,8 +39,6 @@ export function isCachedRbacMetadata(
   return (
     isRecord(value) &&
     Array.isArray(value['resources']) &&
-    value['resources'].every(isCachedResource) &&
-    Array.isArray(value['actions']) &&
-    value['actions'].every(isCachedAction)
+    value['resources'].every(isCachedResource)
   );
 }

@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   HttpException,
@@ -17,7 +16,6 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
-  ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -32,16 +30,10 @@ import type { Cache } from 'cache-manager';
 import { subject } from '@casl/ability';
 import { ErrorKeys } from '@app/shared/constants';
 import { changedFields } from '@app/shared/utils/changed-fields';
-import {
-  ActionCursorQueryDto,
-  ResourceCursorQueryDto
-} from '../../../common/dtos';
+import { ResourceCursorQueryDto } from '../../../common/dtos';
 import { ResourceService } from '../services/resource.service';
-import { ActionService } from '../services/action.service';
 import { Authorize } from '../decorators/authorize.decorator';
 import { CurrentAbility } from '../decorators/current-ability.decorator';
-import { CreateActionDto } from '../dtos/create-action.dto';
-import { UpdateActionDto } from '../dtos/update-action.dto';
 import { UpdateResourceDto } from '../dtos/update-resource.dto';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -63,12 +55,13 @@ const METADATA_CACHE_TTL = 60_000; // 1 minute
 @RegisterResource({
   name: 'permissions',
   subject: 'Permission',
-  displayName: 'Permissions'
+  displayName: 'Permissions',
+  actions: ['read', 'update'],
+  conditionalActions: ['update']
 })
 export class RbacController {
   constructor(
     private readonly resourceService: ResourceService,
-    private readonly actionService: ActionService,
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
@@ -80,21 +73,17 @@ export class RbacController {
   @Authorize(['read', 'Permission'])
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get RBAC metadata (resources and actions)' })
+  @ApiOperation({ summary: 'Get RBAC metadata (resources)' })
   @ApiOkResponse({ description: 'RBAC metadata' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async getMetadata() {
     // Admin catalog, deliberately unscoped by ABAC: a display-name lookup
-    // over every resource/action. Conditions apply on mutations and reads by id.
+    // over every resource. Conditions apply on mutations and reads by id.
     const cached = await this.cacheManager.get(METADATA_CACHE_KEY);
     if (cached) return cached;
 
-    const [resources, actions] = await Promise.all([
-      this.resourceService.findAll(),
-      this.actionService.findAll()
-    ]);
-    const result = { resources, actions };
+    const result = { resources: await this.resourceService.findAll() };
     await this.cacheManager.set(METADATA_CACHE_KEY, result, METADATA_CACHE_TTL);
     return result;
   }
@@ -215,134 +204,5 @@ export class RbacController {
       context: extractAuditContext(req)
     });
     return result;
-  }
-
-  // ── Actions (full CRUD) ──────────────────────────────────────────
-
-  @Get('actions/cursor')
-  @Authorize(['read', 'Permission'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Cursor-paginated actions for the list page' })
-  @ApiOkResponse({ description: 'Cursor-paginated list of actions' })
-  findAllActionsCursor(@Query() query: ActionCursorQueryDto) {
-    return this.actionService.findCursorPaginated(query);
-  }
-
-  @Get('actions')
-  @Authorize(['read', 'Permission'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'List all actions' })
-  @ApiOkResponse({ description: 'List of actions' })
-  findAllActions() {
-    // Admin catalog, deliberately unscoped by ABAC; see getMetadata().
-    return this.actionService.findAll();
-  }
-
-  @Post('actions')
-  @Authorize(['create', 'Permission'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new action' })
-  @ApiBody({ type: CreateActionDto })
-  @ApiCreatedResponse({ description: 'Action created' })
-  async createAction(
-    @Body() dto: CreateActionDto,
-    @Request() req: JwtAuthRequest,
-    @CurrentAbility() ability: AppAbility
-  ) {
-    // The route-level @Authorize check is type-level and ignores conditions,
-    // so a conditional create grant is re-evaluated against the record the
-    // caller is asking to create.
-    assertCan(
-      ability,
-      'create',
-      subject('Permission', dto),
-      this.auditService,
-      { actorId: req.user.userId, targetType: 'Action' },
-      this.metricsService
-    );
-    const action = await this.actionService.create(dto);
-    await this.cacheManager.del(METADATA_CACHE_KEY);
-    await this.auditService.log({
-      action: AuditAction.ACTION_CREATE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: action.id,
-      targetType: 'Action',
-      details: { name: dto.name },
-      context: extractAuditContext(req)
-    });
-    return action;
-  }
-
-  @Patch('actions/:id')
-  @Authorize(['update', 'Permission'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update an action' })
-  @ApiParam({ name: 'id', description: 'The action ID' })
-  @ApiBody({ type: UpdateActionDto })
-  @ApiOkResponse({ description: 'Action updated' })
-  @ApiNotFoundResponse({ description: 'Action not found' })
-  async updateAction(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateActionDto,
-    @Request() req: JwtAuthRequest,
-    @CurrentAbility() ability: AppAbility
-  ) {
-    const action = await this.actionService.findOne(id);
-    assertCan(
-      ability,
-      'update',
-      subject('Permission', action),
-      this.auditService,
-      { actorId: req.user.userId, targetId: id, targetType: 'Action' },
-      this.metricsService
-    );
-    const changed = changedFields(action, dto);
-    const result = await this.actionService.update(id, dto);
-    await this.cacheManager.del(METADATA_CACHE_KEY);
-    await this.auditService.log({
-      action: AuditAction.ACTION_UPDATE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: id,
-      targetType: 'Action',
-      details: { changedFields: changed },
-      context: extractAuditContext(req)
-    });
-    return result;
-  }
-
-  @Delete('actions/:id')
-  @Authorize(['delete', 'Permission'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a custom action' })
-  @ApiParam({ name: 'id', description: 'The action ID' })
-  @ApiOkResponse({ description: 'Action deleted' })
-  @ApiNotFoundResponse({ description: 'Action not found' })
-  async deleteAction(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: JwtAuthRequest,
-    @CurrentAbility() ability: AppAbility
-  ) {
-    const action = await this.actionService.findOne(id);
-    assertCan(
-      ability,
-      'delete',
-      subject('Permission', action),
-      this.auditService,
-      { actorId: req.user.userId, targetId: id, targetType: 'Action' },
-      this.metricsService
-    );
-    await this.actionService.delete(id);
-    await this.cacheManager.del(METADATA_CACHE_KEY);
-    await this.auditService.log({
-      action: AuditAction.ACTION_DELETE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: id,
-      targetType: 'Action',
-      details: { name: action.name },
-      context: extractAuditContext(req)
-    });
   }
 }

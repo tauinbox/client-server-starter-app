@@ -17,6 +17,15 @@ const SUBJECT_MAP: Record<string, string> = {
   permissions: 'Permission'
 };
 
+// Every resource offers and evaluates every action, so the cases below test the
+// SQL translation alone.
+const ACTION_MAP: Record<string, string[]> = Object.fromEntries(
+  Object.keys(SUBJECT_MAP).map((name) => [
+    name,
+    ['create', 'read', 'update', 'delete', 'search']
+  ])
+);
+
 interface RecordedCall {
   sql: string;
   params?: Record<string, unknown>;
@@ -138,9 +147,12 @@ function buildFactory(): CaslAbilityFactory {
   return new CaslAbilityFactory(
     // @ts-expect-error partial mocks — only getSubjectMaps exercised
     {
-      getSubjectMaps: jest
-        .fn()
-        .mockResolvedValue({ active: SUBJECT_MAP, orphaned: {} })
+      getSubjectMaps: jest.fn().mockResolvedValue({
+        active: SUBJECT_MAP,
+        orphaned: {},
+        grantableActions: ACTION_MAP,
+        conditionalActions: ACTION_MAP
+      })
     },
     {}
   );

@@ -97,23 +97,6 @@ describe('validation-error envelope parity with server', () => {
       expect(body.errors).toEqual(['permissionIds should not be empty']);
     });
 
-    it('rbac: creating an action without a name', async () => {
-      const token = await login('admin@example.com');
-      const { status, body } = await send(
-        'POST',
-        '/api/v1/rbac/actions',
-        { displayName: 'Publish', description: 'Publish a record' },
-        token
-      );
-
-      expect(status).toBe(400);
-      expect(body.errors).toEqual([
-        'name must be shorter than or equal to 50 characters',
-        'name must be a string',
-        'name should not be empty'
-      ]);
-    });
-
     it('billing: an unsupported region', async () => {
       const token = await login('user@example.com');
       const { status, body } = await send(
@@ -210,20 +193,6 @@ describe('validation-error envelope parity with server', () => {
       expect(status).toBe(400);
       expect(body.errors).toBeUndefined();
       expect(body.message).toBe('isSuper flag cannot be set via API');
-    });
-
-    it('rbac: creating an action with a CASL-reserved name', async () => {
-      const token = await login('admin@example.com');
-      const { status, body } = await send(
-        'POST',
-        '/api/v1/rbac/actions',
-        { name: 'manage', displayName: 'Manage', description: 'Manage all' },
-        token
-      );
-
-      expect(status).toBe(400);
-      expect(body.errors).toBeUndefined();
-      expect(body.message).toContain('is reserved');
     });
 
     it('billing: a webhook with an empty body', async () => {

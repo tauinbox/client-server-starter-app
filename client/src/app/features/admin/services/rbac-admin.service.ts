@@ -1,23 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import type { ActionResponse, ResourceResponse } from '@app/shared/types';
+import type { ResourceResponse } from '@app/shared/types';
 
 export type UpdateResource = {
   displayName?: string;
   description?: string | null;
   allowedActionNames?: string[] | null;
-};
-
-export type CreateAction = {
-  name: string;
-  displayName: string;
-  description?: string;
-};
-
-export type UpdateAction = {
-  displayName?: string;
-  description?: string;
 };
 
 import type { CursorPaginatedResponse } from '@app/shared/types';
@@ -59,35 +48,5 @@ export class RbacAdminService {
       `${RBAC_API_V1}/resources/${id}/restore`,
       {}
     );
-  }
-
-  /** One page of actions for the admin list page. */
-  getActionsCursor(
-    request: CursorPageRequest
-  ): Observable<CursorPaginatedResponse<ActionResponse>> {
-    return this.#http.get<CursorPaginatedResponse<ActionResponse>>(
-      `${RBAC_API_V1}/actions/cursor`,
-      { params: cursorParams(request) }
-    );
-  }
-
-  /** The whole catalog, for the resource editor's allowed-actions picker. */
-  getActions(): Observable<ActionResponse[]> {
-    return this.#http.get<ActionResponse[]>(`${RBAC_API_V1}/actions`);
-  }
-
-  createAction(dto: CreateAction): Observable<ActionResponse> {
-    return this.#http.post<ActionResponse>(`${RBAC_API_V1}/actions`, dto);
-  }
-
-  updateAction(id: string, dto: UpdateAction): Observable<ActionResponse> {
-    return this.#http.patch<ActionResponse>(
-      `${RBAC_API_V1}/actions/${id}`,
-      dto
-    );
-  }
-
-  deleteAction(id: string): Observable<void> {
-    return this.#http.delete<void>(`${RBAC_API_V1}/actions/${id}`);
   }
 }

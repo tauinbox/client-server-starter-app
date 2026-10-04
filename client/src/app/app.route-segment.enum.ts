@@ -6,7 +6,6 @@ export enum AppRouteSegmentEnum {
   Admin = 'admin',
   Roles = 'roles',
   Resources = 'resources',
-  Actions = 'actions',
   FeatureFlags = 'feature-flags',
   Billing = 'billing',
   BillingSettings = 'settings',

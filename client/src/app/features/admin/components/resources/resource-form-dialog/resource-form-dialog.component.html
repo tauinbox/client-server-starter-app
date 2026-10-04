@@ -43,43 +43,28 @@
         }}</span>
         <mat-slide-toggle
           [checked]="isCustomMode()"
-          [disabled]="!actionsLoaded()"
           (change)="toggleCustomMode($event.checked)"
         >
           {{ t('admin.resourceForm.customToggle') }}
         </mat-slide-toggle>
       </div>
 
-      @if (actionsFailed()) {
-        <p class="allowed-actions__hint" role="alert">
-          {{ t('admin.resourceForm.errorActionsFailed') }}
-        </p>
-      } @else if (!actionsLoaded()) {
-        <div class="allowed-actions__loading">
-          <mat-spinner
-            [attr.aria-label]="t('common.loading')"
-            [diameter]="24"
-          />
-        </div>
-      } @else if (isCustomMode()) {
+      @if (isCustomMode()) {
         <div class="allowed-actions__checkboxes">
-          @for (action of actions(); track action.id) {
+          @for (name of actionNames; track name) {
             <mat-checkbox
-              [checked]="isActionSelected(action.name)"
-              (change)="toggleAction(action.name)"
+              [checked]="isActionSelected(name)"
+              (change)="toggleAction(name)"
             >
-              {{ action.displayName }}
-              @if (!action.isDefault) {
-                <span class="action-badge">{{
-                  t('admin.resourceForm.customBadge')
-                }}</span>
-              }
+              {{ t('rbacActions.' + name) }}
             </mat-checkbox>
           }
         </div>
       } @else {
         <p class="allowed-actions__hint">
-          {{ t('admin.resourceForm.defaultActionsHint') }}
+          {{
+            t('admin.resourceForm.allActionsHint', { actions: actionLabels() })
+          }}
         </p>
       }
     </div>

@@ -1241,7 +1241,7 @@ function auditAdminAction(
 
 billingAdminRouter.get(
   '/subscriptions',
-  permissionGuard('manage', 'Billing'),
+  permissionGuard('search', 'Billing'),
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
     const errors = cursorQueryErrors(query, {
@@ -1263,7 +1263,7 @@ billingAdminRouter.get(
 
 billingAdminRouter.get(
   '/invoices',
-  permissionGuard('manage', 'Billing'),
+  permissionGuard('search', 'Billing'),
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
     const errors = cursorQueryErrors(query, {
@@ -1282,7 +1282,7 @@ billingAdminRouter.get(
 
 billingAdminRouter.post(
   '/subscriptions/:id/cancel',
-  permissionGuard('manage', 'Billing'),
+  permissionGuard('update', 'Billing'),
   requireUuid('id'),
   (req: Request, res: Response) => {
     if (rejectInvalidBody(res, cancelBodyErrors(req.body))) return;
@@ -1362,7 +1362,7 @@ function revokeOneTimeEffects(invoice: MockInvoice): void {
 
 billingAdminRouter.post(
   '/invoices/:id/refund',
-  permissionGuard('manage', 'Billing'),
+  permissionGuard('refund', 'Billing'),
   requireUuid('id'),
   (req: Request, res: Response) => {
     const amountMinor = (req.body as Record<string, unknown> | undefined)?.[
@@ -1429,7 +1429,7 @@ billingAdminRouter.post(
 // server's auth contract (401 unauthenticated / 403 non-admin), then 404.
 billingAdminRouter.post(
   '/webhook-events/:id/replay',
-  permissionGuard('manage', 'Billing'),
+  permissionGuard('update', 'Billing'),
   requireUuid('id'),
   (_req: Request, res: Response) => {
     res
@@ -1443,7 +1443,7 @@ billingAdminRouter.post(
 // no public meter endpoint — this lives under the `manage Billing` admin guard.
 billingAdminRouter.post(
   '/usage',
-  permissionGuard('manage', 'Billing'),
+  permissionGuard('create', 'Billing'),
   (req: Request, res: Response) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const occurredAtRaw = body['occurredAt'];

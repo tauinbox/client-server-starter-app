@@ -16,6 +16,17 @@ const MOCK_ORPHANED_SUBJECT_MAP: Record<string, string> = {
   legacy: 'LegacyThing'
 };
 
+const ALL_ACTIONS = ['create', 'read', 'update', 'delete', 'search', 'manage'];
+
+// Every resource offers and evaluates every action, so the cases below test
+// condition resolution alone; the declared-list rules have their own block.
+const MOCK_ACTION_MAP: Record<string, string[]> = Object.fromEntries(
+  [
+    ...Object.keys(MOCK_SUBJECT_MAP),
+    ...Object.keys(MOCK_ORPHANED_SUBJECT_MAP)
+  ].map((name) => [name, ALL_ACTIONS])
+);
+
 describe('CaslAbilityFactory', () => {
   let factory: CaslAbilityFactory;
   let resourceService: { getSubjectMaps: jest.Mock };
@@ -28,7 +39,9 @@ describe('CaslAbilityFactory', () => {
     resourceService = {
       getSubjectMaps: jest.fn().mockResolvedValue({
         active: MOCK_SUBJECT_MAP,
-        orphaned: MOCK_ORPHANED_SUBJECT_MAP
+        orphaned: MOCK_ORPHANED_SUBJECT_MAP,
+        grantableActions: MOCK_ACTION_MAP,
+        conditionalActions: MOCK_ACTION_MAP
       })
     };
     permissionService = {
@@ -40,6 +53,75 @@ describe('CaslAbilityFactory', () => {
       resourceService,
       permissionService
     );
+  });
+
+  describe('declared action lists', () => {
+    const viewer: RoleInfo[] = [{ name: 'viewer', isSuper: false }];
+    const OWN_RECORD = { ownership: { userField: 'id' } };
+
+    beforeEach(() => {
+      resourceService.getSubjectMaps.mockResolvedValue({
+        active: MOCK_SUBJECT_MAP,
+        orphaned: {},
+        grantableActions: { users: ['read', 'update'] },
+        conditionalActions: { users: ['update'] }
+      });
+    });
+
+    const grant = (
+      action: string,
+      conditions: ResolvedPermission['conditions'] = null
+    ): ResolvedPermission => ({
+      resource: 'users',
+      action,
+      permission: `users:${action}`,
+      conditions
+    });
+
+    it('registers no allow on an action the resource does not offer', async () => {
+      const ability = await factory.createForUser('user-1', viewer, [
+        grant('delete')
+      ]);
+
+      expect(ability.can('delete', 'User')).toBe(false);
+    });
+
+    it('still registers a deny on an action the resource does not offer', async () => {
+      const ability = await factory.createForUser('user-1', viewer, [
+        grant('read'),
+        grant('read', { effect: 'deny' })
+      ]);
+
+      expect(ability.can('read', 'User')).toBe(false);
+    });
+
+    it('registers no allow whose condition no check of the action reads', async () => {
+      const ability = await factory.createForUser('user-1', viewer, [
+        grant('read', OWN_RECORD)
+      ]);
+
+      expect(ability.can('read', 'User')).toBe(false);
+    });
+
+    it('widens a deny whose condition no check reads into a blanket deny', async () => {
+      const ability = await factory.createForUser('user-1', viewer, [
+        grant('read'),
+        grant('read', { effect: 'deny', ...OWN_RECORD })
+      ]);
+
+      expect(ability.can('read', 'User')).toBe(false);
+    });
+
+    it('keeps a condition on an action whose checks read the record', async () => {
+      const ability = await factory.createForUser('user-1', viewer, [
+        grant('update', OWN_RECORD)
+      ]);
+
+      expect(ability.can('update', 'User')).toBe(true);
+      expect(ability.rulesFor('update', 'User')[0].conditions).toEqual({
+        id: 'user-1'
+      });
+    });
   });
 
   describe('resolveForUser', () => {

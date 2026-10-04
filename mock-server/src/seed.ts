@@ -216,6 +216,8 @@ function generateResources(): MockResource[] {
       isSystem: true,
       isOrphaned: false,
       isRegistered: true,
+      actionNames: ['create', 'read', 'update', 'delete', 'search'],
+      conditionalActionNames: ['create', 'read', 'update', 'delete', 'search'],
       allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
@@ -229,7 +231,9 @@ function generateResources(): MockResource[] {
       isSystem: true,
       isOrphaned: false,
       isRegistered: true,
-      allowedActionNames: ['read', 'update'],
+      actionNames: ['update'],
+      conditionalActionNames: [],
+      allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
     },
@@ -242,14 +246,9 @@ function generateResources(): MockResource[] {
       isSystem: true,
       isOrphaned: false,
       isRegistered: true,
-      allowedActionNames: [
-        'create',
-        'read',
-        'update',
-        'delete',
-        'search',
-        'assign'
-      ],
+      actionNames: ['create', 'read', 'update', 'delete', 'assign'],
+      conditionalActionNames: ['create', 'update', 'delete'],
+      allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
     },
@@ -262,6 +261,8 @@ function generateResources(): MockResource[] {
       isSystem: true,
       isOrphaned: false,
       isRegistered: true,
+      actionNames: ['read', 'update'],
+      conditionalActionNames: ['update'],
       allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
@@ -275,6 +276,8 @@ function generateResources(): MockResource[] {
       isSystem: true,
       isOrphaned: false,
       isRegistered: true,
+      actionNames: ['search', 'create', 'update', 'refund'],
+      conditionalActionNames: [],
       allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
@@ -288,6 +291,8 @@ function generateResources(): MockResource[] {
       isSystem: true,
       isOrphaned: false,
       isRegistered: true,
+      actionNames: ['create', 'read', 'update', 'delete', 'search'],
+      conditionalActionNames: [],
       allowedActionNames: null,
       lastSyncedAt: now,
       createdAt: now
@@ -295,58 +300,23 @@ function generateResources(): MockResource[] {
   ];
 }
 
+// Mirrors the server: actions exist because code checks them, and the sync
+// creates one row per declared action name.
 function generateActions(): MockAction[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [
-    {
-      id: mockId('act-create'),
-      name: 'create',
-      displayName: 'Create',
-      description: 'Create new records',
-      isDefault: true,
-      createdAt: now
-    },
-    {
-      id: mockId('act-read'),
-      name: 'read',
-      displayName: 'Read',
-      description: 'View records',
-      isDefault: true,
-      createdAt: now
-    },
-    {
-      id: mockId('act-update'),
-      name: 'update',
-      displayName: 'Update',
-      description: 'Modify existing records',
-      isDefault: true,
-      createdAt: now
-    },
-    {
-      id: mockId('act-delete'),
-      name: 'delete',
-      displayName: 'Delete',
-      description: 'Remove records',
-      isDefault: true,
-      createdAt: now
-    },
-    {
-      id: mockId('act-search'),
-      name: 'search',
-      displayName: 'Search',
-      description: 'Search and list records',
-      isDefault: true,
-      createdAt: now
-    },
-    {
-      id: mockId('act-assign'),
-      name: 'assign',
-      displayName: 'Assign',
-      description: 'Assign associations',
-      isDefault: false,
-      createdAt: now
-    }
-  ];
+    'create',
+    'read',
+    'update',
+    'delete',
+    'search',
+    'assign',
+    'refund'
+  ].map((name) => ({
+    id: mockId(`act-${name}`),
+    name,
+    createdAt: now
+  }));
 }
 
 function generateRoles(): MockRole[] {
@@ -416,13 +386,15 @@ function generatePermissions(
   const perms: MockPermission[] = [];
   let id = 1;
 
+  // Mirrors the sync: one permission per pair the code checks.
   for (const resource of resources) {
     for (const action of actions) {
+      if (!resource.actionNames.includes(action.name)) continue;
       perms.push({
         id: mockId(`perm-${id++}`),
         resourceId: resource.id,
         actionId: action.id,
-        description: `${action.displayName} ${resource.displayName}`,
+        description: `${action.name} ${resource.displayName}`,
         createdAt: now
       });
     }
@@ -453,18 +425,17 @@ function generateRolePermissions(
     }
   }
 
-  // User gets profile:read, profile:update, and update:User (own record only),
+  // User gets profile:update and update:User (own record only),
   // exactly as the server RBAC seeder grants them.
   if (userRole) {
     const profileResource = resources.find((r) => r.name === 'profile');
     const usersResource = resources.find((r) => r.name === 'users');
-    const readActionId = mockId('act-read');
     const updateActionId = mockId('act-update');
 
     for (const perm of permissions) {
       if (
         perm.resourceId === profileResource?.id &&
-        (perm.actionId === readActionId || perm.actionId === updateActionId)
+        perm.actionId === updateActionId
       ) {
         result.push({
           id: mockId(`rp-${id++}`),

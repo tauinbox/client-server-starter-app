@@ -120,7 +120,13 @@ describe('Grant scope over the HTTP path', () => {
     const permission = {
       id: PERMISSION_ID,
       action: { name: 'update' },
-      resource: { subject: 'User', name: 'User' }
+      resource: {
+        subject: 'User',
+        name: 'User',
+        actionNames: ['update'],
+        allowedActionNames: null,
+        conditionalActionNames: ['update']
+      }
     };
 
     rolePermissionRepo = {

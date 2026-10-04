@@ -3,7 +3,6 @@
     "manageUsers": "Пользователи",
     "manageRoles": "Роли",
     "manageResources": "Ресурсы",
-    "manageActions": "Действия",
     "manageFeatureFlags": "Фича-флаги",
     "manageBilling": "Биллинг"
   },
@@ -221,7 +220,9 @@
     "effectDenyBadge": "Запрет",
     "effectDenyBadgeHint": "Это разрешение работает как правило запрета — оно отнимает совпадающий доступ, предоставленный другими правилами",
     "errorLoadFailed": "Не удалось загрузить разрешения. Попробуйте снова.",
-    "errorSaveFailed": "Не удалось сохранить разрешения."
+    "errorSaveFailed": "Не удалось сохранить разрешения.",
+    "conditionsNotSupported": "Ни одна проверка этого действия не читает запись, поэтому ограничение к нему не применяется. Действие можно только разрешить или запретить целиком.",
+    "clearRestrictions": "Снять ограничение"
   },
   "resources": {
     "title": "Ресурсы",
@@ -252,51 +253,11 @@
     "descriptionPlaceholder": "Необязательное описание",
     "allowedActions": "Разрешённые действия",
     "customToggle": "Пользовательские",
-    "customBadge": "пользов.",
-    "defaultActionsHint": "Показаны все действия по умолчанию: создание, чтение, обновление, удаление, поиск.",
-    "errorActionsFailed": "Не удалось загрузить каталог действий. Откройте диалог заново, чтобы повторить попытку."
-  },
-  "actions": {
-    "title": "Действия",
-    "tableHeaderDisplayName": "Отображаемое имя",
-    "tableHeaderName": "Название",
-    "tableHeaderDescription": "Описание",
-    "tableHeaderDefault": "По умолчанию",
-    "typeDefault": "По умолчанию",
-    "tableHeaderCreated": "Создано",
-    "tableHeaderActions": "Действия",
-    "editAction": "Редактировать действие",
-    "deleteAction": "Удалить действие",
-    "successCreated": "Действие успешно создано",
-    "errorCreateFailed": "Не удалось создать действие.",
-    "successUpdated": "Действие успешно обновлено",
-    "errorUpdateFailed": "Не удалось обновить действие.",
-    "confirmDeleteTitle": "Удаление действия",
-    "confirmDeleteMessage": "Вы уверены, что хотите удалить действие «{{ name }}»?",
-    "successDeleted": "Действие успешно удалено",
-    "errorDeleteFailed": "Не удалось удалить действие."
-  },
-  "actionForm": {
-    "editTitle": "Редактирование действия",
-    "addTitle": "Добавление действия",
-    "nameLabel": "Внутреннее имя",
-    "namePlaceholder": "напр. publish",
-    "nameImmutableHint": "Внутреннее имя нельзя изменить после создания",
-    "nameRequired": "Название обязательно",
-    "nameMaxLength": "Название должно быть не более 50 символов",
-    "namePattern": "Должно начинаться с буквы; допускаются только строчные буквы, цифры и подчёркивания",
-    "displayNameLabel": "Отображаемое имя",
-    "displayNamePlaceholder": "Отображаемое имя",
-    "displayNameRequired": "Отображаемое имя обязательно",
-    "displayNameMaxLength": "Отображаемое имя должно быть не более 100 символов",
-    "descriptionLabel": "Описание",
-    "descriptionPlaceholder": "Необязательное описание",
-    "descriptionMaxLength": "Описание должно быть не более 500 символов"
+    "allActionsHint": "Предлагаются все действия, которые проверяет этот ресурс: {{ actions }}."
   },
   "store": {
     "errorLoadRolesFailed": "Не удалось загрузить роли. Попробуйте снова.",
-    "errorLoadResourcesFailed": "Не удалось загрузить ресурсы. Попробуйте снова.",
-    "errorLoadActionsFailed": "Не удалось загрузить действия. Попробуйте снова."
+    "errorLoadResourcesFailed": "Не удалось загрузить ресурсы. Попробуйте снова."
   },
   "billing": {
     "subscriptionsTitle": "Подписки",

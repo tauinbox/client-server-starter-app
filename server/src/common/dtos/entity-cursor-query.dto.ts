@@ -1,7 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional } from 'class-validator';
 import {
-  ALLOWED_ACTION_SORT_COLUMNS,
   ALLOWED_FEATURE_FLAG_SORT_COLUMNS,
   ALLOWED_RESOURCE_SORT_COLUMNS,
   ALLOWED_ROLE_SORT_COLUMNS,
@@ -31,16 +30,6 @@ export class ResourceCursorQueryDto extends CursorPaginationQueryDto {
   })
   @IsOptional()
   @IsIn(ALLOWED_RESOURCE_SORT_COLUMNS)
-  override sortBy: string = DEFAULT_SORT_BY;
-}
-
-export class ActionCursorQueryDto extends CursorPaginationQueryDto {
-  @ApiPropertyOptional({
-    default: DEFAULT_SORT_BY,
-    enum: ALLOWED_ACTION_SORT_COLUMNS
-  })
-  @IsOptional()
-  @IsIn(ALLOWED_ACTION_SORT_COLUMNS)
   override sortBy: string = DEFAULT_SORT_BY;
 }
 

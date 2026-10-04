@@ -45,7 +45,7 @@ async function permissionsOf(token: string): Promise<{
 }
 
 describe('seeded user role parity with the server RBAC seeder', () => {
-  it('grants read and update on Profile and nothing else on that subject', async () => {
+  it('grants update on Profile and nothing else on that subject', async () => {
     const body = await permissionsOf(await loginAsUser());
 
     expect(body.roles).toEqual(['user']);
@@ -53,7 +53,7 @@ describe('seeded user role parity with the server RBAC seeder', () => {
       .filter((rule) => rule[1] === 'Profile')
       .map((rule) => rule[0]);
 
-    expect(profileActions.sort()).toEqual(['read', 'update']);
+    expect(profileActions).toEqual(['update']);
   });
 
   it('grants update on User restricted to the caller own record', async () => {
@@ -66,7 +66,7 @@ describe('seeded user role parity with the server RBAC seeder', () => {
 
   // Rule order follows the seeded permission table and is not a parity
   // property, so the set is compared instead.
-  it('packs exactly the three seeded rules and no more', async () => {
+  it('packs exactly the two seeded rules and no more', async () => {
     const body = await permissionsOf(await loginAsUser());
 
     const sorted = [...body.rules].sort((a, b) =>
@@ -74,7 +74,6 @@ describe('seeded user role parity with the server RBAC seeder', () => {
     );
 
     expect(sorted).toEqual([
-      ['read', 'Profile'],
       ['update', 'Profile'],
       ['update', 'User', { id: mockId('user-2') }]
     ]);

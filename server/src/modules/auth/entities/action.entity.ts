@@ -15,15 +15,6 @@ export class Action {
   @Column({ unique: true })
   name: string;
 
-  @Column({ name: 'display_name' })
-  displayName: string;
-
-  @Column({ default: '' })
-  description: string;
-
-  @Column({ name: 'is_default', default: false })
-  isDefault: boolean;
-
   @OneToMany(() => Permission, (p) => p.action)
   permissions: Permission[];
 
