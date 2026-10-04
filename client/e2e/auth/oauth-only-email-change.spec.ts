@@ -124,11 +124,9 @@ test.describe('OAuth-only account changes its email', () => {
     await page.goto('/profile?reauth=ok');
     await initiated;
 
-    await expect(page.getByText(/confirmation link sent/i).first()).toBeVisible(
-      {
-        timeout: 10_000
-      }
-    );
+    await expect(
+      page.getByText(/confirmation link sent/i).first()
+    ).toBeVisible();
 
     const state = (await _mockServer.getState()) as {
       users: { id: string; email: string }[];
