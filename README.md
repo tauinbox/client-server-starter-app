@@ -1015,7 +1015,7 @@ is a 400 by itself.
 
 `utils/validation.ts` mirrors the individual class-validator constraints. The mirrors are
 `unknownPropertyErrors`, `stringErrors`, `trimmedStringErrors`, `stringArrayErrors`, `emailErrors`,
-`objectErrors`, `intErrors`, `uuidErrors`, `iso8601Errors` and `oneOfErrors`. Take `stringErrors` for a field with no
+`objectErrors`, `booleanErrors`, `intErrors`, `uuidErrors`, `iso8601Errors` and `oneOfErrors`. Take `stringErrors` for a field with no
 `@Transform(trim)`, because a trim here accepts a value that the server rejects on length. Set the
 `notEmpty` rule for a field with `@IsNotEmpty()`. That constraint counts only `''`, null and
 undefined as empty. Thus a number fails `@IsString()` alone, and a whitespace-only value fails only
@@ -1847,7 +1847,7 @@ activates the git hooks through the `prepare` script.
 | Server E2E tests | Jest | A separate configuration in `test/` | 553 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 543 pass and 10 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1465 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 294 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 944 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 961 tests pass |
 
 ## CI/CD
 
