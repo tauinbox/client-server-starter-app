@@ -1587,7 +1587,6 @@ The base URL of the API is `/api/v1`.
 | PATCH | `/admin/feature-flags/:id` | `feature-flags:update` | Update a feature flag. The key is immutable after create. An optional `rules` array replaces the targeting rules in the same write. Uses optimistic locking through `If-Match` |
 | DELETE | `/admin/feature-flags/:id` | `feature-flags:delete` | Delete a feature flag |
 | POST | `/admin/feature-flags/:id/preview` | `feature-flags:read` | Show how a flag evaluates for given attributes, and save nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag |
-| POST | `/admin/feature-flags/:id/toggle` | `feature-flags:update` | Enable or disable a flag |
 
 ## Available Commands
 

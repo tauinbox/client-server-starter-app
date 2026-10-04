@@ -82,7 +82,6 @@ const GUARDED_ROUTES: ReadonlyArray<readonly [string, string]> = [
   ['PATCH', `/api/v1/admin/feature-flags/${BAD_ID}`],
   ['DELETE', `/api/v1/admin/feature-flags/${BAD_ID}`],
   ['POST', `/api/v1/admin/feature-flags/${BAD_ID}/preview`],
-  ['POST', `/api/v1/admin/feature-flags/${BAD_ID}/toggle`],
 
   ['POST', `/api/v1/admin/billing/subscriptions/${BAD_ID}/cancel`],
   ['POST', `/api/v1/admin/billing/invoices/${BAD_ID}/refund`],

@@ -112,13 +112,6 @@ export class FeatureFlagsAdminService {
     return this.#http.delete<void>(`${ADMIN_API_V1}/${id}`);
   }
 
-  toggle(id: string): Observable<FeatureFlagResponse> {
-    return this.#http.post<FeatureFlagResponse>(
-      `${ADMIN_API_V1}/${id}/toggle`,
-      {}
-    );
-  }
-
   preview(
     id: string,
     request: PreviewFlagRequest

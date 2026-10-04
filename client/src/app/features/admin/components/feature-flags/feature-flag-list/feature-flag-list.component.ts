@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
+import type { HttpErrorResponse } from '@angular/common/http';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   MatCard,
@@ -45,6 +46,7 @@ import {
 } from '@shared/components/list-skeleton/list-skeleton.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { FeatureFlagResponse } from '@app/shared/types';
+import { ErrorKeys } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -182,8 +184,10 @@ export class FeatureFlagListComponent implements OnInit {
   }
 
   #applyToggle(flag: FeatureFlagResponse): void {
+    // The target value is absolute and the write is conditional on the
+    // version, so a stale row ends in a conflict instead of the wrong state.
     this.#store
-      .toggleFlag(flag.id)
+      .updateFlag(flag.id, { enabled: !flag.enabled }, flag.version)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (updated) => {
@@ -194,8 +198,24 @@ export class FeatureFlagListComponent implements OnInit {
             { key: updated.key }
           );
         },
-        error: (err) => {
+        error: (err: HttpErrorResponse) => {
           this.#notify.error(err, 'admin.featureFlags.errorToggleFailed');
+          if (
+            err.error?.errorKey === ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+          ) {
+            this.#reloadFlag(flag.id);
+          }
+        }
+      });
+  }
+
+  #reloadFlag(id: string): void {
+    this.#store
+      .reloadFlag(id)
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        error: (err) => {
+          this.#notify.error(err, 'admin.featureFlags.errorLoadFailed');
         }
       });
   }

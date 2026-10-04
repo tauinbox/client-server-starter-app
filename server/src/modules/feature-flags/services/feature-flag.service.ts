@@ -219,26 +219,6 @@ export class FeatureFlagService {
     return this.findOne(id);
   }
 
-  async toggle(id: string, actorId: string | null): Promise<FeatureFlag> {
-    const result = await this.flagRepo
-      .createQueryBuilder()
-      .update(FeatureFlag)
-      .set({
-        enabled: () => 'NOT enabled',
-        updatedByUserId: actorId,
-        version: () => `version + 1`
-      })
-      .where('id = :id', { id })
-      .execute();
-    if (result.affected === 0) {
-      throw new NotFoundException({
-        message: 'Feature flag not found',
-        errorKey: ErrorKeys.FEATURE_FLAGS.NOT_FOUND
-      });
-    }
-    return this.findOne(id);
-  }
-
   async delete(flag: FeatureFlag): Promise<void> {
     await this.flagRepo.remove(flag);
   }

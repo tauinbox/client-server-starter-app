@@ -854,7 +854,9 @@ on `FeatureFlag`. It is the fourth tab of `AdminPanelComponent`. Its components 
 
 **`FeatureFlagListComponent`** shows a `mat-table` on a desktop. On a handset it shows a `mat-card`
 list with a `mat-fab` at the bottom. `LayoutService.isHandset()` selects the layout. Each row has a
-toggle, an edit action and a delete action.
+toggle, an edit action and a delete action. The toggle sends `PATCH /admin/feature-flags/:id` with
+the target value `{ enabled }` and the version of the row in `If-Match`. A repeated click therefore
+does not revert the flag. On HTTP 409 the list shows the error and loads the row again.
 
 If a flag has no include-effect rules, a change of the toggle to **on** first asks for a
 confirmation. Such a flag evaluates to `true` for each authenticated user, because the shared

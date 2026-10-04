@@ -29,7 +29,7 @@ describe('FeatureFlagListComponent', () => {
     rules: []
   };
 
-  let toggleSpy: ReturnType<typeof vi.fn>;
+  let updateSpy: ReturnType<typeof vi.fn>;
   let confirmSpy: ReturnType<typeof vi.fn>;
   let layoutHandset: ReturnType<typeof signal<boolean>>;
   let notifySuccess: ReturnType<typeof vi.fn>;
@@ -41,11 +41,11 @@ describe('FeatureFlagListComponent', () => {
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
-    toggle: ReturnType<typeof vi.fn>;
+    getOne: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
-    toggleSpy = vi
+    updateSpy = vi
       .fn()
       .mockReturnValue(of({ ...flag, enabled: true, version: 2 }));
     confirmSpy = vi.fn().mockReturnValue(of(true));
@@ -61,9 +61,9 @@ describe('FeatureFlagListComponent', () => {
         })
       ),
       create: vi.fn(),
-      update: vi.fn(),
+      update: updateSpy,
       delete: vi.fn(),
-      toggle: toggleSpy
+      getOne: vi.fn()
     };
 
     dialogOpen = vi.fn();
@@ -183,7 +183,53 @@ describe('FeatureFlagListComponent', () => {
     fixture.detectChanges();
     fixture.componentInstance.toggleFlag(includedFlag);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+    expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
+    expect(notifySuccess).toHaveBeenCalledWith(
+      'admin.featureFlags.successEnabled',
+      { key: 'new-dashboard' }
+    );
+  });
+
+  it('toggleFlag() reloads the row after a version conflict', async () => {
+    const conflict = new HttpErrorResponse({
+      status: 409,
+      error: {
+        message: 'Feature flag was modified by another request',
+        errorKey: 'errors.featureFlags.versionConflict'
+      }
+    });
+    const fresh = { ...flag, enabled: true, version: 2 };
+    updateSpy.mockReturnValue(throwError(() => conflict));
+    serviceMock.getOne.mockReturnValue(of(fresh));
+    const fixture = TestBed.createComponent(FeatureFlagListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    fixture.componentInstance.toggleFlag({ ...flag, enabled: true });
+
+    expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: false }, 1);
+    expect(notifyError).toHaveBeenCalledWith(
+      conflict,
+      'admin.featureFlags.errorToggleFailed'
+    );
+    expect(serviceMock.getOne).toHaveBeenCalledWith('flag-1');
+    expect(fixture.componentInstance.flags()).toEqual([fresh]);
+  });
+
+  it('toggleFlag() does not reload the row after another error', async () => {
+    const error = new HttpErrorResponse({ status: 500 });
+    updateSpy.mockReturnValue(throwError(() => error));
+    const fixture = TestBed.createComponent(FeatureFlagListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    fixture.componentInstance.toggleFlag({ ...flag, enabled: true });
+
+    expect(notifyError).toHaveBeenCalledWith(
+      error,
+      'admin.featureFlags.errorToggleFailed'
+    );
+    expect(serviceMock.getOne).not.toHaveBeenCalled();
   });
 
   describe('enable-without-rules confirmation', () => {
@@ -194,7 +240,7 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       fixture.componentInstance.toggleFlag(flag); // disabled, rules: []
       expect(confirmSpy).toHaveBeenCalledTimes(1);
-      expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+      expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
     });
 
     it('does not toggle when the confirmation is cancelled', async () => {
@@ -205,7 +251,7 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       fixture.componentInstance.toggleFlag(flag);
       expect(confirmSpy).toHaveBeenCalledTimes(1);
-      expect(toggleSpy).not.toHaveBeenCalled();
+      expect(updateSpy).not.toHaveBeenCalled();
     });
 
     it('skips the confirmation when an include rule exists', async () => {
@@ -228,7 +274,7 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       fixture.componentInstance.toggleFlag(includedFlag);
       expect(confirmSpy).not.toHaveBeenCalled();
-      expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+      expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
     });
 
     it('skips the confirmation when disabling an enabled flag', async () => {
@@ -239,7 +285,7 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       fixture.componentInstance.toggleFlag(enabledNoRules);
       expect(confirmSpy).not.toHaveBeenCalled();
-      expect(toggleSpy).toHaveBeenCalledWith('flag-1');
+      expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: false }, 1);
     });
   });
 

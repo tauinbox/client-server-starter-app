@@ -963,47 +963,6 @@ adminRouter.post(
   }
 );
 
-adminRouter.post(
-  '/:id/toggle',
-  permissionGuard('update', 'FeatureFlag'),
-  requireUuid('id'),
-  (req, res) => {
-    const flag = getState().featureFlags.get(
-      (req.params['id'] as string) ?? ''
-    );
-    if (!flag) {
-      sendError(
-        res,
-        404,
-        'Feature flag not found',
-        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
-      );
-      return;
-    }
-    if (
-      !assertInstancePermission(req, res, 'update', 'FeatureFlag', flag) ||
-      !assertInstancePermission(req, res, 'update', 'FeatureFlag', {
-        ...flag,
-        enabled: !flag.enabled
-      })
-    ) {
-      return;
-    }
-    flag.enabled = !flag.enabled;
-    flag.version += 1;
-    flag.updatedAt = nowIso();
-    flag.updatedByUserId = actorIdFromReq(req);
-    logAudit('FEATURE_FLAG_TOGGLE', {
-      actorId: actorIdFromReq(req),
-      targetId: flag.id,
-      targetType: 'FeatureFlag',
-      details: { enabled: flag.enabled }
-    });
-    broadcastFlagsUpdated();
-    res.json(toFeatureFlagResponse(flag));
-  }
-);
-
 export {
   publicRouter as featureFlagsRouter,
   adminRouter as featureFlagsAdminRouter

@@ -175,7 +175,7 @@ describe('conditional grants on FeatureFlag', () => {
     expect(await flagKeys()).toEqual(['new-dashboard']);
   });
 
-  it('refuses read, preview, toggle and delete outside the condition', async () => {
+  it('refuses read, preview, update and delete outside the condition', async () => {
     grant([
       ['feature-flags', 'read', onlyNewDashboard],
       ['feature-flags', 'update', onlyNewDashboard],
@@ -184,7 +184,10 @@ describe('conditional grants on FeatureFlag', () => {
     const outside = `/admin/feature-flags/${BETA_EXPORT_ID}`;
     expect((await call('GET', outside)).status).toBe(403);
     expect((await call('POST', `${outside}/preview`, {})).status).toBe(403);
-    expect((await call('POST', `${outside}/toggle`)).status).toBe(403);
+    expect(
+      (await call('PATCH', outside, { enabled: false }, { 'if-match': '1' }))
+        .status
+    ).toBe(403);
     expect((await call('DELETE', outside)).status).toBe(403);
     expect(getState().featureFlags.get(BETA_EXPORT_ID)?.enabled).toBe(true);
 
@@ -206,7 +209,6 @@ describe('conditional grants on FeatureFlag', () => {
     expect(
       (await call('PATCH', path, { enabled: true }, { 'if-match': '1' })).status
     ).toBe(403);
-    expect((await call('POST', `${path}/toggle`)).status).toBe(403);
     expect(
       (await call('PATCH', path, { description: 'x' }, { 'if-match': '1' }))
         .status
