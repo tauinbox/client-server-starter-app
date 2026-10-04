@@ -316,7 +316,7 @@ describe('Instance-level @Authorize re-check', () => {
     });
   });
 
-  // ── RBAC resources: PATCH /rbac/resources/:id ───────────────────
+  // RBAC resources: PATCH /rbac/resources/:id
 
   describe('PATCH /api/v1/rbac/resources/:id with fieldMatch on name', () => {
     const USERS_RESOURCE = '77777777-7777-7777-7777-777777777777';
