@@ -262,6 +262,16 @@ export function objectErrors(
     : [`${field} must be an object`];
 }
 
+/** Mirrors `@IsBoolean()`. */
+export function booleanErrors(
+  field: string,
+  value: unknown,
+  optional?: OptionalMode
+): string[] {
+  if (isSkipped(value, optional)) return [];
+  return typeof value === 'boolean' ? [] : [`${field} must be a boolean value`];
+}
+
 interface IntRules {
   min: number;
   /** Omitted for a field carrying no `@Max`. */

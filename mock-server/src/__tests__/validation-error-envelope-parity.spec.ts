@@ -166,7 +166,7 @@ describe('validation-error envelope parity with server', () => {
 
       expect(status).toBe(400);
       expect(body.errors).toEqual([body.message]);
-      expect(body.errors?.join(' ')).toContain('rules[0].type');
+      expect(body.errors?.join(' ')).toContain('rules.0.type');
     });
   });
 

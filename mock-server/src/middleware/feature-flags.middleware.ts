@@ -50,11 +50,14 @@ import {
   validationError
 } from '../helpers/validation-error.helpers';
 import {
+  booleanErrors,
   objectErrors,
+  oneOfErrors,
   stringArrayErrors,
   stringErrors,
   unknownPropertyErrors,
-  uuidErrors
+  uuidErrors,
+  type OptionalMode
 } from '../utils/validation';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
@@ -119,6 +122,8 @@ const UPDATE_BODY_KEYS = [
   'rules'
 ] as const;
 
+const CREATE_BODY_KEYS = ['key', ...UPDATE_BODY_KEYS] as const;
+
 // Mirrors CreateFeatureFlagDto.key: the trim runs first, then the decorators
 // report bottom-up, so `@Matches` comes ahead of the length and type rules.
 function keyErrors(value: unknown): string[] {
@@ -142,26 +147,106 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
-// Mirrors the server DTO: normalize first (trim/lowercase/dedupe), then reject
-// anything outside the deployable environment names.
-function validateEnvironments(
-  input: unknown
-): { ok: true; environments: string[] } | { ok: false; message: string } {
-  if (!Array.isArray(input)) {
-    return { ok: false, message: 'environments must be a string array' };
+const ENVIRONMENTS_ONE_OF = `each value in environments must be one of the following values: ${APP_ENVIRONMENTS.join(', ')}`;
+
+// Mirrors `@Transform(normalizeEnvironmentList) @ValidateIf(propertyIsDefined)
+// @IsArray() @ArrayMaxSize @IsString({ each: true }) @IsIn({ each: true })`,
+// reported bottom-up. An `each` rule validates a non-array as its one element.
+function environmentErrors(value: unknown): string[] {
+  if (value === undefined) return [];
+  const normalized = Array.isArray(value)
+    ? normalizeEnvironmentList(value)
+    : value;
+  const isArray = Array.isArray(normalized);
+  const items: unknown[] = isArray ? normalized : [normalized];
+  const allowed: readonly unknown[] = APP_ENVIRONMENTS;
+  const errors: string[] = [];
+  if (items.some((e) => !allowed.includes(e))) errors.push(ENVIRONMENTS_ONE_OF);
+  if (items.some((e) => typeof e !== 'string')) {
+    errors.push('each value in environments must be a string');
   }
-  const normalized = normalizeEnvironmentList(input);
-  if (!isStringArray(normalized)) {
-    return { ok: false, message: 'environments must be a string array' };
+  if (!isArray || items.length > APP_ENVIRONMENTS.length) {
+    errors.push(
+      `environments must contain no more than ${APP_ENVIRONMENTS.length} elements`
+    );
   }
-  const allowed: readonly string[] = APP_ENVIRONMENTS;
-  if (normalized.some((e) => !allowed.includes(e))) {
-    return {
-      ok: false,
-      message: `each environment must be one of: ${APP_ENVIRONMENTS.join(', ')}`
-    };
+  if (!isArray) errors.push('environments must be an array');
+  return errors;
+}
+
+// Call it only on a value that environmentErrors accepted.
+function normalizedEnvironments(value: unknown): string[] {
+  return normalizeEnvironmentList(value as unknown[]).filter(isString);
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+const MAX_RULES = 64;
+const RULE_KEYS = ['effect', 'type', 'payload'] as const;
+const NESTED_RULES_MESSAGE =
+  'each value in nested property rules must be either object or array';
+
+// The ValidationPipe flattens a nested error from its leaves: a leaf message
+// gets the path of its parent, and a parent with child errors loses its own
+// messages. So a primitive entry reports no index, and a too-long array with a
+// bad entry reports only the entry.
+function ruleObjectErrors(path: string, rule: object): string[] {
+  const r = rule as Record<string, unknown>;
+  return [
+    ...unknownPropertyErrors(r, RULE_KEYS),
+    ...oneOfErrors('effect', r['effect'], FEATURE_FLAG_RULE_EFFECTS),
+    ...oneOfErrors('type', r['type'], FEATURE_FLAG_RULE_TYPES),
+    ...objectErrors('payload', r['payload'])
+  ].map((message) => `${path}.${message}`);
+}
+
+function ruleEntryErrors(path: string, entries: unknown[]): string[] {
+  return entries.flatMap((entry, i) => {
+    if (Array.isArray(entry)) return ruleEntryErrors(`${path}.${i}`, entry);
+    if (typeof entry === 'object' && entry !== null) {
+      return ruleObjectErrors(`${path}.${i}`, entry);
+    }
+    return [`${path}.${NESTED_RULES_MESSAGE}`];
+  });
+}
+
+// Mirrors `@IsArray() @ArrayMaxSize(64) @ValidateNested({ each: true })
+// @Type(() => FeatureFlagRuleDto)`. A plain object is validated as one rule.
+function rulesErrors(value: unknown, optional: OptionalMode): string[] {
+  if (value === undefined || (optional === 'nullable' && value === null)) {
+    return [];
   }
-  return { ok: true, environments: normalized };
+  const isObject = typeof value === 'object' && value !== null;
+  const children = Array.isArray(value)
+    ? ruleEntryErrors('rules', value)
+    : isObject
+      ? ruleObjectErrors('rules', value)
+      : [];
+  if (children.length > 0) return children;
+  const errors: string[] = [];
+  if (!Array.isArray(value) || value.length > MAX_RULES) {
+    errors.push(`rules must contain no more than ${MAX_RULES} elements`);
+  }
+  if (!Array.isArray(value)) errors.push('rules must be an array');
+  if (!isObject) errors.push(NESTED_RULES_MESSAGE);
+  return errors;
+}
+
+// The fields that CreateFeatureFlagDto and UpdateFeatureFlagDto share, in
+// declaration order.
+function flagFieldErrors(body: UpdateFlagBody): string[] {
+  return [
+    ...stringErrors('description', body.description, {
+      max: 500,
+      optional: 'nullable'
+    }),
+    ...booleanErrors('enabled', body.enabled, 'definedOnly'),
+    ...environmentErrors(body.environments),
+    ...booleanErrors('public', body.public, 'definedOnly'),
+    ...rulesErrors(body.rules, 'definedOnly')
+  ];
 }
 
 type CreateData = {
@@ -174,37 +259,23 @@ type CreateData = {
 
 function validateCreate(
   body: CreateFlagBody
-): { ok: true; data: CreateData } | { ok: false; message: string | string[] } {
-  const keyFailures = keyErrors(body.key);
-  if (keyFailures.length > 0) return { ok: false, message: keyFailures };
-  const key = (body.key as string).trim();
-  if (body.description !== undefined && body.description !== null) {
-    if (typeof body.description !== 'string' || body.description.length > 500) {
-      return {
-        ok: false,
-        message: 'description must be a string (max 500 chars)'
-      };
-    }
-  }
-  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
-    return { ok: false, message: 'enabled must be a boolean' };
-  }
-  let environments: string[] = [];
-  if (body.environments !== undefined) {
-    const validated = validateEnvironments(body.environments);
-    if (!validated.ok) return validated;
-    environments = validated.environments;
-  }
-  if (body.public !== undefined && typeof body.public !== 'boolean') {
-    return { ok: false, message: 'public must be a boolean' };
-  }
+): { ok: true; data: CreateData } | { ok: false; message: string[] } {
+  const errors = [
+    ...unknownPropertyErrors(body, CREATE_BODY_KEYS),
+    ...keyErrors(body.key),
+    ...flagFieldErrors(body)
+  ];
+  if (errors.length > 0) return { ok: false, message: errors };
   return {
     ok: true,
     data: {
-      key,
+      key: (body.key as string).trim(),
       description: (body.description as string | null | undefined) ?? null,
       enabled: (body.enabled as boolean | undefined) ?? false,
-      environments,
+      environments:
+        body.environments === undefined
+          ? []
+          : normalizedEnvironments(body.environments),
       isPublic: (body.public as boolean | undefined) ?? false
     }
   };
@@ -214,40 +285,21 @@ type UpdatePatch = Partial<Omit<CreateData, 'key'>>;
 
 function validateUpdate(
   body: UpdateFlagBody
-):
-  { ok: true; patch: UpdatePatch } | { ok: false; message: string | string[] } {
-  const unknown = unknownPropertyErrors(body, UPDATE_BODY_KEYS);
-  if (unknown.length > 0) return { ok: false, message: unknown };
+): { ok: true; patch: UpdatePatch } | { ok: false; message: string[] } {
+  const errors = [
+    ...unknownPropertyErrors(body, UPDATE_BODY_KEYS),
+    ...flagFieldErrors(body)
+  ];
+  if (errors.length > 0) return { ok: false, message: errors };
   const patch: UpdatePatch = {};
   if (body.description !== undefined) {
-    if (
-      body.description !== null &&
-      (typeof body.description !== 'string' || body.description.length > 500)
-    ) {
-      return {
-        ok: false,
-        message: 'description must be a string (max 500 chars) or null'
-      };
-    }
     patch.description = body.description as string | null;
   }
-  if (body.enabled !== undefined) {
-    if (typeof body.enabled !== 'boolean') {
-      return { ok: false, message: 'enabled must be a boolean' };
-    }
-    patch.enabled = body.enabled;
-  }
+  if (body.enabled !== undefined) patch.enabled = body.enabled as boolean;
   if (body.environments !== undefined) {
-    const validated = validateEnvironments(body.environments);
-    if (!validated.ok) return validated;
-    patch.environments = validated.environments;
+    patch.environments = normalizedEnvironments(body.environments);
   }
-  if (body.public !== undefined) {
-    if (typeof body.public !== 'boolean') {
-      return { ok: false, message: 'public must be a boolean' };
-    }
-    patch.isPublic = body.public;
-  }
+  if (body.public !== undefined) patch.isPublic = body.public as boolean;
   return { ok: true, patch };
 }
 
@@ -257,80 +309,31 @@ interface IncomingRule {
   payload?: unknown;
 }
 
-// `source` says which server layer rejects the same input: 'dto' is a
-// class-validator failure on the `rules` field or on FeatureFlagRuleDto
-// (envelope carries `errors`), 'service' is a BadRequestException thrown by
-// the rule-payload validator (bare message).
-type RuleFailure = { ok: false; message: string; source: 'dto' | 'service' };
-
-const dtoFail = (message: string): RuleFailure => ({
-  ok: false,
-  message,
-  source: 'dto'
-});
-
-const serviceFail = (message: string): RuleFailure => ({
-  ok: false,
-  message,
-  source: 'service'
-});
-
-function validateRulePayload(
-  type: FeatureFlagRuleType,
-  payload: unknown
-): { ok: true; payload: FeatureFlagRulePayload } | RuleFailure {
-  if (payload === null || typeof payload !== 'object') {
-    // @IsObject() on FeatureFlagRuleDto.payload rejects this before the
-    // rule-payload validator ever runs.
-    return dtoFail('rule payload must be an object');
-  }
-  const result = parseFeatureFlagRulePayload(type, payload, KNOWN_CUSTOM_KEYS);
-  return result.ok ? result : serviceFail(result.message);
-}
-
 type ValidatedRule = {
   type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
 };
 
-function validateRules(
-  input: unknown
-): { ok: true; rules: ValidatedRule[] } | RuleFailure {
-  if (!Array.isArray(input)) {
-    return dtoFail('rules must be an array');
-  }
-  if (input.length > 64) {
-    return dtoFail('rules array can contain at most 64 entries');
-  }
+// The server runs the rule-payload validator in the service, after the
+// lookups, and answers the first rejected rule with a bare 400. Call it only on
+// a value that rulesErrors accepted.
+function parseRules(
+  value: unknown
+): { ok: true; rules: ValidatedRule[] } | { ok: false; message: string } {
   const out: ValidatedRule[] = [];
-  for (let i = 0; i < input.length; i++) {
-    const r = input[i] as IncomingRule;
-    if (
-      !FEATURE_FLAG_RULE_EFFECTS.includes(r.effect as FeatureFlagRuleEffect)
-    ) {
-      return dtoFail(
-        `rules[${i}].effect must be one of: ${FEATURE_FLAG_RULE_EFFECTS.join(', ')}`
-      );
-    }
-    if (!FEATURE_FLAG_RULE_TYPES.includes(r.type as FeatureFlagRuleType)) {
-      return dtoFail(
-        `rules[${i}].type must be one of: ${FEATURE_FLAG_RULE_TYPES.join(', ')}`
-      );
-    }
-    const validated = validateRulePayload(
-      r.type as FeatureFlagRuleType,
-      r.payload
+  for (const entry of value as IncomingRule[]) {
+    const type = entry.type as FeatureFlagRuleType;
+    const parsed = parseFeatureFlagRulePayload(
+      type,
+      entry.payload,
+      KNOWN_CUSTOM_KEYS
     );
-    if (!validated.ok) {
-      return validated.source === 'dto'
-        ? { ...validated, message: `rules[${i}]: ${validated.message}` }
-        : validated;
-    }
+    if (!parsed.ok) return parsed;
     out.push({
-      type: r.type as FeatureFlagRuleType,
-      effect: r.effect as FeatureFlagRuleEffect,
-      payload: validated.payload
+      type,
+      effect: entry.effect as FeatureFlagRuleEffect,
+      payload: parsed.payload
     });
   }
   return { ok: true, rules: out };
@@ -607,8 +610,10 @@ adminRouter.get(
 
 function rulesOf(body: {
   rules?: unknown;
-}): ReturnType<typeof validateRules> | null {
-  return body.rules === undefined ? null : validateRules(body.rules);
+}): ReturnType<typeof parseRules> | null {
+  return body.rules === undefined || body.rules === null
+    ? null
+    : parseRules(body.rules);
 }
 
 // Staggered createdAt keeps the request order, as clock_timestamp() does on the server.
@@ -644,10 +649,6 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
     return;
   }
   const rules = rulesOf(body);
-  if (rules && !rules.ok && rules.source === 'dto') {
-    res.status(400).json(validationError(rules.message));
-    return;
-  }
   // The record as the server writes it, defaults included.
   if (
     !assertInstancePermission(req, res, 'create', 'FeatureFlag', {
@@ -716,10 +717,6 @@ adminRouter.patch(
       return;
     }
     const rules = rulesOf(body);
-    if (rules && !rules.ok && rules.source === 'dto') {
-      res.status(400).json(validationError(rules.message));
-      return;
-    }
     const ifMatch = parseIfMatch(req.header('if-match') ?? undefined);
     if (!ifMatch.ok) {
       sendError(res, ifMatch.status, ifMatch.message, ifMatch.errorKey);
@@ -913,28 +910,12 @@ adminRouter.post(
     // runs, so every DTO-level rejection precedes the 404, and the pipe reports
     // all of them together. Only the rule-payload validator lives in the service,
     // below the lookup.
-    const errors = previewContextErrors(body);
-    const rulesValidation =
-      body['rules'] === undefined ? null : validateRules(body['rules']);
-    if (
-      rulesValidation &&
-      !rulesValidation.ok &&
-      rulesValidation.source === 'dto'
-    ) {
-      errors.push(rulesValidation.message);
-    }
-    if (body['enabled'] !== undefined && typeof body['enabled'] !== 'boolean') {
-      errors.push('enabled must be a boolean value');
-    }
-    let draftEnvironments: string[] | undefined;
-    if (body['environments'] !== undefined) {
-      const validated = validateEnvironments(body['environments']);
-      if (validated.ok) {
-        draftEnvironments = validated.environments;
-      } else {
-        errors.push(validated.message);
-      }
-    }
+    const errors = [
+      ...previewContextErrors(body),
+      ...rulesErrors(body['rules'], 'nullable'),
+      ...booleanErrors('enabled', body['enabled'], 'definedOnly'),
+      ...environmentErrors(body['environments'])
+    ];
     if (errors.length > 0) {
       res.status(400).json(validationError(errors));
       return;
@@ -954,10 +935,15 @@ adminRouter.post(
     if (!assertInstancePermission(req, res, 'read', 'FeatureFlag', flag)) {
       return;
     }
-    if (rulesValidation && !rulesValidation.ok) {
-      sendError(res, 400, rulesValidation.message);
+    const draftRules = rulesOf(body);
+    if (draftRules && !draftRules.ok) {
+      sendError(res, 400, draftRules.message);
       return;
     }
+    const draftEnvironments =
+      body['environments'] === undefined
+        ? undefined
+        : normalizedEnvironments(body['environments']);
     // Every field passed the checks above, so the reads below only pick the
     // default for an omitted or explicitly null value.
     const userId = typeof body['userId'] === 'string' ? body['userId'] : null;
@@ -968,8 +954,8 @@ adminRouter.post(
         ? body['env']
         : (process.env['ENVIRONMENT'] ?? 'production');
     const anonId = typeof body['anonId'] === 'string' ? body['anonId'] : null;
-    const rules: EvaluatorRule[] = rulesValidation?.ok
-      ? rulesValidation.rules.map((r) => ({
+    const rules: EvaluatorRule[] = draftRules?.ok
+      ? draftRules.rules.map((r) => ({
           effect: r.effect,
           payload: r.payload
         }))

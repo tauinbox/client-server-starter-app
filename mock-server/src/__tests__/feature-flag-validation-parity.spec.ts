@@ -735,6 +735,239 @@ describe('feature-flag validation parity with server', () => {
     });
   });
 
+  // The expected lists are the server output: the same bodies were sent through
+  // the application ValidationPipe on the three DTOs. The pipe reports every
+  // failing field, and it keeps only the leaf messages of a nested error.
+  describe('DTO error lists', () => {
+    const ABSENT_ID = '22222222-2222-4222-8222-222222222222';
+    const EFFECT = 'must be one of the following values: include, exclude';
+    const TYPE =
+      'must be one of the following values: user, role, percentage, attribute';
+    const ENVIRONMENT_ONE_OF =
+      'each value in environments must be one of the following values: local, development, staging, production';
+    const NESTED =
+      'each value in nested property rules must be either object or array';
+    const NOT_ARRAY = [
+      'rules must contain no more than 64 elements',
+      'rules must be an array',
+      NESTED
+    ];
+    const validRule = {
+      effect: 'include',
+      type: 'role',
+      payload: { type: 'role', roleNames: ['beta'] }
+    };
+
+    async function errorsOf(res: Response): Promise<string[]> {
+      expect(res.status).toBe(400);
+      return ((await res.json()) as { errors: string[] }).errors;
+    }
+
+    async function previewAbsent(body: unknown): Promise<Response> {
+      const token = await loginAsAdmin();
+      return fetch(
+        `${baseUrl}/api/v1/admin/feature-flags/${ABSENT_ID}/preview`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(body)
+        }
+      );
+    }
+
+    it.each([
+      [
+        'every failing field',
+        {
+          description: 7,
+          enabled: 'yes',
+          environments: ['moon'],
+          public: 'no',
+          rules: [{ effect: 'include', type: 'nope', payload: 'x' }]
+        },
+        [
+          'description must be shorter than or equal to 500 characters',
+          'description must be a string',
+          'enabled must be a boolean value',
+          ENVIRONMENT_ONE_OF,
+          'public must be a boolean value',
+          `rules.0.type ${TYPE}`,
+          'rules.0.payload must be an object'
+        ]
+      ],
+      [
+        'an explicit null on each field',
+        {
+          description: null,
+          enabled: null,
+          environments: null,
+          public: null,
+          rules: null
+        },
+        [
+          'enabled must be a boolean value',
+          ENVIRONMENT_ONE_OF,
+          'each value in environments must be a string',
+          'environments must contain no more than 4 elements',
+          'environments must be an array',
+          'public must be a boolean value',
+          ...NOT_ARRAY
+        ]
+      ],
+      ['a string rule set', { rules: 'nope' }, NOT_ARRAY],
+      [
+        'every bad rule entry',
+        {
+          rules: [
+            { effect: 'maybe', type: 'role', payload: {} },
+            { effect: 'include', type: 'nope', payload: null },
+            { effect: 'include', type: 'role', payload: [] },
+            { type: 'role' }
+          ]
+        },
+        [
+          `rules.0.effect ${EFFECT}`,
+          `rules.1.type ${TYPE}`,
+          'rules.1.payload must be an object',
+          'rules.2.payload must be an object',
+          `rules.3.effect ${EFFECT}`,
+          'rules.3.payload must be an object'
+        ]
+      ],
+      [
+        'primitive rule entries, with no index in the path',
+        { rules: [null, 5, 'x', [], {}] },
+        [
+          `rules.${NESTED}`,
+          `rules.${NESTED}`,
+          `rules.${NESTED}`,
+          `rules.4.effect ${EFFECT}`,
+          `rules.4.type ${TYPE}`,
+          'rules.4.payload must be an object'
+        ]
+      ],
+      [
+        'only the bad entry of a rule set over the cap',
+        { rules: [...Array.from({ length: 64 }, () => validRule), {}] },
+        [
+          `rules.64.effect ${EFFECT}`,
+          `rules.64.type ${TYPE}`,
+          'rules.64.payload must be an object'
+        ]
+      ],
+      [
+        'a rule set over the cap',
+        { rules: Array.from({ length: 65 }, () => validRule) },
+        ['rules must contain no more than 64 elements']
+      ],
+      [
+        'a valid rule sent as an object',
+        { rules: validRule },
+        [
+          'rules must contain no more than 64 elements',
+          'rules must be an array'
+        ]
+      ],
+      [
+        'an empty object sent as the rule set',
+        { rules: {} },
+        [
+          `rules.effect ${EFFECT}`,
+          `rules.type ${TYPE}`,
+          'rules.payload must be an object'
+        ]
+      ],
+      [
+        'nested rule arrays',
+        { rules: [[validRule], [5], [{ effect: 'x' }]] },
+        [
+          `rules.1.${NESTED}`,
+          `rules.2.0.effect ${EFFECT}`,
+          `rules.2.0.type ${TYPE}`,
+          'rules.2.0.payload must be an object'
+        ]
+      ],
+      [
+        'unknown rule properties ahead of the rule fields',
+        {
+          rules: [{ zeta: 1, effect: 'x', alpha: 2, type: 'role', payload: {} }]
+        },
+        [
+          'rules.0.property zeta should not exist',
+          'rules.0.property alpha should not exist',
+          `rules.0.effect ${EFFECT}`
+        ]
+      ],
+      [
+        'environments after normalization',
+        {
+          environments: [1, 'moon', ' Production ', 'production', 'x', 'y', 'z']
+        },
+        [
+          ENVIRONMENT_ONE_OF,
+          'each value in environments must be a string',
+          'environments must contain no more than 4 elements'
+        ]
+      ],
+      [
+        'a key sent on PATCH',
+        { key: 'new-key', enabled: 'x' },
+        ['property key should not exist', 'enabled must be a boolean value']
+      ]
+    ])('PATCH reports %s', async (_, body, expected) => {
+      await expect(
+        errorsOf(await patchFlag(ABSENT_ID, body, '1'))
+      ).resolves.toEqual(expected);
+    });
+
+    it('POST reports the key and the rule set together', async () => {
+      await expect(
+        errorsOf(await createFlag({ key: 'A', rules: 'nope' }))
+      ).resolves.toEqual([
+        'key must match /^[a-z0-9][a-z0-9-]*[a-z0-9]$/ regular expression',
+        'key must be longer than or equal to 2 characters',
+        ...NOT_ARRAY
+      ]);
+    });
+
+    it('POST rejects an unknown property', async () => {
+      await expect(
+        errorsOf(await createFlag({ key: 'ok-key', foo: 1, enabled: 'x' }))
+      ).resolves.toEqual([
+        'property foo should not exist',
+        'enabled must be a boolean value'
+      ]);
+    });
+
+    it('preview reports the context fields, then the draft fields', async () => {
+      await expect(
+        errorsOf(
+          await previewAbsent({
+            foo: 1,
+            userId: 'bad',
+            rules: 'nope',
+            enabled: 'x',
+            environments: ['moon']
+          })
+        )
+      ).resolves.toEqual([
+        'property foo should not exist',
+        'userId must be a UUID',
+        ...NOT_ARRAY,
+        'enabled must be a boolean value',
+        ENVIRONMENT_ONE_OF
+      ]);
+    });
+
+    it('preview accepts a null rule set and reaches the lookup', async () => {
+      const res = await previewAbsent({ rules: null });
+      expect(res.status).toBe(404);
+    });
+  });
+
   // The server runs the global ValidationPipe before the handler body, so a DTO
   // failure precedes the If-Match parse and both precede the service lookup.
   // The rule-payload validator is the exception: the service runs it after
