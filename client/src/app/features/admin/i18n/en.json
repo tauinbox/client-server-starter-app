@@ -38,10 +38,7 @@
     "errorCreateFailed": "Failed to create feature flag.",
     "errorUpdateFailed": "Failed to update feature flag.",
     "errorToggleFailed": "Failed to toggle feature flag.",
-    "errorDeleteFailed": "Failed to delete feature flag.",
-    "errorRulesFailedCreate": "Flag \"{{ key }}\" created, but the rules did not save. Reopen it to retry. Cause: {{ detail }}",
-    "errorRulesFailedUpdate": "Flag \"{{ key }}\" updated, but the rules did not save. Reopen it to retry. Cause: {{ detail }}",
-    "rulesFailedTooltip": "Rules failed to save — reopen the flag to retry."
+    "errorDeleteFailed": "Failed to delete feature flag."
   },
   "featureFlagForm": {
     "createTitle": "Create feature flag",

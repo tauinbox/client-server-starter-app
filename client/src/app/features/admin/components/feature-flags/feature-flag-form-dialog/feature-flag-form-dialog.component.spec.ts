@@ -315,7 +315,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('reports rules as unchanged when a payload only differs in key order', async () => {
+  it('leaves the rules out of the result when a payload only differs in key order', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
     cmp.updateRule(0, {
@@ -331,10 +331,10 @@ describe('FeatureFlagFormDialogComponent', () => {
     });
     cmp.submit();
     const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.rulesChanged).toBe(false);
+    expect(result.flag).not.toHaveProperty('rules');
   });
 
-  it('reports rules as changed when a payload value differs', async () => {
+  it('puts the full rule set in the result when a payload value differs', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
     cmp.updateRule(0, {
@@ -350,7 +350,36 @@ describe('FeatureFlagFormDialogComponent', () => {
     });
     cmp.submit();
     const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.rulesChanged).toBe(true);
+    expect(result.flag.rules).toEqual([
+      {
+        effect: 'include',
+        type: 'attribute',
+        payload: {
+          value: '@other.com',
+          op: 'endsWith',
+          field: 'emailDomain',
+          type: 'attribute'
+        }
+      }
+    ]);
+  });
+
+  it('puts an empty rule set in the result when every rule was removed', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    const cmp = fixture.componentInstance;
+    cmp.removeRule(0);
+    cmp.submit();
+    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
+    expect(result.flag.rules).toEqual([]);
+  });
+
+  it('leaves the rules out of a new flag that has none', async () => {
+    const fixture = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.submit();
+    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
+    expect(result.flag).not.toHaveProperty('rules');
   });
 
   it('submit() is a no-op while a rule the server would reject is present', async () => {

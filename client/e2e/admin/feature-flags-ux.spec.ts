@@ -30,7 +30,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await expect(card).toContainText('All environments');
   });
 
-  test('FF-UX-008: rules failure on update shows distinct snackbar and marks the row', async ({
+  test('FF-UX-008: removing every rule saves the flag and the rules in one PATCH', async ({
     _mockServer,
     page
   }) => {
@@ -40,34 +40,29 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
       roles: ['admin']
     });
 
-    // Force the rules-PUT to fail while letting the flag-PUT succeed. This is
-    // the partial-failure pattern the fix is supposed to surface clearly.
-    await page.route(
-      /\/api\/v1\/admin\/feature-flags\/[^/]+\/rules$/,
-      (route) =>
-        route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            statusCode: 500,
-            message: 'Internal Server Error'
-          })
-        })
-    );
+    const writes: { method: string; url: string; body: unknown }[] = [];
+    page.on('request', (req) => {
+      if (
+        req.url().includes('/api/v1/admin/feature-flags') &&
+        req.method() !== 'GET'
+      ) {
+        writes.push({
+          method: req.method(),
+          url: req.url(),
+          body: req.postDataJSON() as unknown
+        });
+      }
+    });
 
     await page.goto('/admin/feature-flags');
 
-    const betaRow = page.getByRole('row', { name: /beta-export/ });
-    await betaRow
-      .getByRole('button', { name: /Edit flag beta-export/ })
-      .click();
+    const editButton = page
+      .getByRole('row', { name: /beta-export/ })
+      .getByRole('button', { name: /Edit flag beta-export/ });
+    await editButton.click();
 
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-
-    // beta-export is seeded with one percentage rule — removing it flips
-    // rulesChanged to true, so Save triggers a rules PUT (which we've stubbed
-    // to 500).
+    let dialog = await openedDialog(page);
+    // beta-export is seeded with one percentage rule.
     await dialog.getByRole('button', { name: 'Remove rule' }).click();
     await dialog.getByRole('button', { name: 'Save' }).click();
 
@@ -77,19 +72,18 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
       .getByRole('button', { name: 'Confirm' })
       .click({ timeout: 5_000 });
 
-    // Composite outcome: NO "Feature flag updated" success snackbar, only the
-    // distinct rules-failure message carrying the flag key and the reason the
-    // server gave.
     await expect(
-      page.getByText(
-        'Flag "beta-export" updated, but the rules did not save. Reopen it to retry. Cause: Internal Server Error'
-      )
+      page.getByText('Feature flag "beta-export" updated')
     ).toBeVisible();
+    expect(writes).toHaveLength(1);
+    expect(writes[0].method).toBe('PATCH');
+    expect(writes[0].url).toMatch(/\/admin\/feature-flags\/[^/]+$/);
+    expect(writes[0].body).toMatchObject({ rules: [] });
 
-    // Persistent warning marker — survives after the snackbar dismisses.
-    await expect(
-      page.getByRole('row', { name: /beta-export/ }).locator('.rules-warning')
-    ).toBeVisible();
+    await page.reload();
+    await editButton.click();
+    dialog = await openedDialog(page);
+    await expect(dialog.locator('nxs-feature-flag-rule-row')).toHaveCount(0);
   });
 
   test('FF-UX-009: editing the value box of a boolean attribute rule leaves the flag on', async ({
@@ -127,7 +121,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     expect(body.flags['oauth-google']).toBe(true);
   });
 
-  test('FF-UX-010: a rule the server would reject blocks the save instead of half-applying it', async ({
+  test('FF-UX-010: a rule the server would reject blocks the save before the request', async ({
     _mockServer,
     page
   }) => {
@@ -154,8 +148,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await ruleRow.getByRole('combobox', { name: 'Operator' }).click();
     await page.getByRole('option', { name: 'before', exact: true }).click();
 
-    // `before` with no date is a 400 on PUT /rules, which would land after the
-    // flag itself was already written.
+    // `before` with no date is a 400 on save, so the dialog blocks it first.
     await expect(ruleRow.getByText('Pick a date.')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
@@ -183,8 +176,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
 
     await expect(keyInput).toHaveValue('oauthGoogleConfigured');
 
-    // An unregistered key is a 400 on PUT /rules, which would land after the
-    // flag itself was already written.
+    // An unregistered key is a 400 on save, so the dialog blocks it first.
     await keyInput.fill('plan');
     await expect(
       ruleRow.getByText(

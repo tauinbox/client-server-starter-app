@@ -20,21 +20,26 @@ import {
 
 const ADMIN_API_V1 = '/api/v1/admin/feature-flags';
 
+export type FeatureFlagRuleInput = {
+  type: FeatureFlagRuleType;
+  effect: FeatureFlagRuleEffect;
+  payload: FeatureFlagRulePayload;
+};
+
+/**
+ * `rules`, when present, replaces the stored rule set in the same write as the
+ * flag fields; when omitted, the stored rules stay.
+ */
 export type CreateFeatureFlag = {
   key: string;
   description?: string | null;
   enabled?: boolean;
   environments?: string[];
   public?: boolean;
+  rules?: FeatureFlagRuleInput[];
 };
 
 export type UpdateFeatureFlag = Partial<Omit<CreateFeatureFlag, 'key'>>;
-
-export type FeatureFlagRuleInput = {
-  type: FeatureFlagRuleType;
-  effect: FeatureFlagRuleEffect;
-  payload: FeatureFlagRulePayload;
-};
 
 export type PreviewFlagContext = {
   userId?: string;
@@ -109,15 +114,6 @@ export class FeatureFlagsAdminService {
 
   delete(id: string): Observable<void> {
     return this.#http.delete<void>(`${ADMIN_API_V1}/${id}`);
-  }
-
-  replaceRules(
-    id: string,
-    rules: FeatureFlagRuleInput[]
-  ): Observable<FeatureFlagResponse> {
-    return this.#http.put<FeatureFlagResponse>(`${ADMIN_API_V1}/${id}/rules`, {
-      rules
-    });
   }
 
   toggle(id: string): Observable<FeatureFlagResponse> {

@@ -172,9 +172,12 @@ describe('validation-error envelope parity with server', () => {
     it('feature-flags: a rules array whose entry has an unknown type', async () => {
       const token = await login('admin@example.com');
       const { status, body } = await send(
-        'PUT',
-        `/api/v1/admin/feature-flags/${mockId('flag-new-dashboard')}/rules`,
-        { rules: [{ effect: 'include', type: 'nope', payload: {} }] },
+        'POST',
+        '/api/v1/admin/feature-flags',
+        {
+          key: 'envelope-rule-type',
+          rules: [{ effect: 'include', type: 'nope', payload: {} }]
+        },
         token
       );
 
@@ -238,9 +241,10 @@ describe('validation-error envelope parity with server', () => {
     it('feature-flags: a rule payload the rule-payload validator rejects', async () => {
       const token = await login('admin@example.com');
       const { status, body } = await send(
-        'PUT',
-        `/api/v1/admin/feature-flags/${mockId('flag-new-dashboard')}/rules`,
+        'POST',
+        '/api/v1/admin/feature-flags',
         {
+          key: 'envelope-rule-payload',
           rules: [
             { effect: 'include', type: 'user', payload: { type: 'user' } }
           ]

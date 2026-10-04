@@ -31,7 +31,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, of } from 'rxjs';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
 import type {
-  FeatureFlagRuleInput,
   PreviewFlagDraft,
   UpdateFeatureFlag
 } from '../../../services/feature-flags-admin.service';
@@ -60,11 +59,11 @@ export type FeatureFlagFormDialogData = {
 };
 
 // `key` stays out of `flag` because the server rejects a key on update.
+// `flag.rules` is present only when the rule set changed, so an unchanged set
+// is not rewritten.
 export type FeatureFlagFormDialogResult = {
   key: string;
   flag: UpdateFeatureFlag;
-  rules: FeatureFlagRuleInput[];
-  rulesChanged: boolean;
 };
 
 type FlagFormData = {
@@ -144,8 +143,8 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     ...(this.#customKeys() ?? [])
   ]);
 
-  // A rules rejection arrives after the flag itself is already written, so the
-  // incomplete drafts the editor can produce are blocked before either request.
+  // A rules rejection fails the whole save, so the incomplete drafts the
+  // editor can produce are blocked before the request.
   readonly ruleErrors = computed<(string | null)[]>(() =>
     this.rules().map((r) => featureFlagRuleError(r.payload, this.#customKeys()))
   );
@@ -271,14 +270,17 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
         description: formData.description.trim() || null,
         enabled: this.enabled(),
         environments: this.environments().map((c) => c.value),
-        public: this.isPublic()
-      },
-      rules: this.rules().map((r) => ({
-        effect: r.effect,
-        type: r.type,
-        payload: r.payload
-      })),
-      rulesChanged: this.#rulesChanged()
+        public: this.isPublic(),
+        ...(this.#rulesChanged()
+          ? {
+              rules: this.rules().map((r) => ({
+                effect: r.effect,
+                type: r.type,
+                payload: r.payload
+              }))
+            }
+          : {})
+      }
     };
     this.#dialogRef.close(result);
   }

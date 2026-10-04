@@ -21,19 +21,7 @@
           <mat-card appearance="outlined" class="flag-card">
             <div class="flag-card-head">
               <div class="flag-card-titles">
-                <div class="flag-key">
-                  {{ flag.key }}
-                  @if (rulesFailedFlagIds().has(flag.id)) {
-                    <mat-icon
-                      class="rules-warning"
-                      [matTooltip]="t('admin.featureFlags.rulesFailedTooltip')"
-                      [attr.aria-label]="
-                        t('admin.featureFlags.rulesFailedTooltip')
-                      "
-                      >warning_amber</mat-icon
-                    >
-                  }
-                </div>
+                <div class="flag-key">{{ flag.key }}</div>
                 @if (flag.enabled) {
                   <mat-chip highlighted>{{
                     t('admin.featureFlags.statusEnabled')
@@ -130,14 +118,6 @@
             </th>
             <td mat-cell *matCellDef="let flag">
               <span class="flag-key">{{ flag.key }}</span>
-              @if (rulesFailedFlagIds().has(flag.id)) {
-                <mat-icon
-                  class="rules-warning"
-                  [matTooltip]="t('admin.featureFlags.rulesFailedTooltip')"
-                  [attr.aria-label]="t('admin.featureFlags.rulesFailedTooltip')"
-                  >warning_amber</mat-icon
-                >
-              }
             </td>
           </ng-container>
 

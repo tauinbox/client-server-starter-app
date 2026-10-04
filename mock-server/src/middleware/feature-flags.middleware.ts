@@ -96,6 +96,7 @@ interface CreateFlagBody {
   enabled?: unknown;
   environments?: unknown;
   public?: unknown;
+  rules?: unknown;
 }
 
 type UpdateFlagBody = Omit<CreateFlagBody, 'key'>;
@@ -104,12 +105,9 @@ const UPDATE_BODY_KEYS = [
   'description',
   'enabled',
   'environments',
-  'public'
+  'public',
+  'rules'
 ] as const;
-
-interface ReplaceRulesBody {
-  rules?: unknown;
-}
 
 // Mirrors CreateFeatureFlagDto.key: the trim runs first, then the decorators
 // report bottom-up, so `@Matches` comes ahead of the length and type rules.
@@ -250,9 +248,9 @@ interface IncomingRule {
 }
 
 // `source` says which server layer rejects the same input: 'dto' is a
-// class-validator failure on ReplaceRulesDto/FeatureFlagRuleDto (envelope
-// carries `errors`), 'service' is a BadRequestException thrown by the
-// rule-payload validator (bare message).
+// class-validator failure on the `rules` field or on FeatureFlagRuleDto
+// (envelope carries `errors`), 'service' is a BadRequestException thrown by
+// the rule-payload validator (bare message).
 type RuleFailure = { ok: false; message: string; source: 'dto' | 'service' };
 
 const dtoFail = (message: string): RuleFailure => ({
@@ -574,10 +572,53 @@ adminRouter.get('/:id', requireUuid('id'), (req, res) => {
   res.json(toFeatureFlagResponse(flag));
 });
 
+// A body without `rules` keeps the stored rules. A 'dto' failure belongs to
+// the ValidationPipe, which runs before the handler; a 'service' failure is
+// reported only after the lookups, as the server validates the payloads after
+// them and before its transaction.
+function rulesOf(body: {
+  rules?: unknown;
+}): ReturnType<typeof validateRules> | null {
+  return body.rules === undefined ? null : validateRules(body.rules);
+}
+
+// Mirrors the server write: the new set replaces the old one, and createdAt is
+// staggered per index so the rules keep the request order (the server column
+// defaults to clock_timestamp()).
+function writeRules(
+  flagId: string,
+  rules: ValidatedRule[],
+  updatedAt: string
+): void {
+  const state = getState();
+  state.featureFlagRules = state.featureFlagRules.filter(
+    (r) => r.flagId !== flagId
+  );
+  const start = Date.parse(updatedAt);
+  rules.forEach((r, i) => {
+    const rule: MockFeatureFlagRule = {
+      id: randomUUID(),
+      flagId,
+      type: r.type,
+      effect: r.effect,
+      payload: r.payload,
+      createdAt: new Date(start + i).toISOString(),
+      updatedAt
+    };
+    state.featureFlagRules.push(rule);
+  });
+}
+
 adminRouter.post('/', (req, res) => {
-  const validation = validateCreate(req.body as CreateFlagBody);
+  const body = req.body as CreateFlagBody;
+  const validation = validateCreate(body);
   if (!validation.ok) {
     res.status(400).json(validationError(validation.message));
+    return;
+  }
+  const rules = rulesOf(body);
+  if (rules && !rules.ok && rules.source === 'dto') {
+    res.status(400).json(validationError(rules.message));
     return;
   }
   if (findFlagByKey(validation.data.key)) {
@@ -587,6 +628,10 @@ adminRouter.post('/', (req, res) => {
       'Feature flag with this key already exists',
       ErrorKeys.FEATURE_FLAGS.KEY_EXISTS
     );
+    return;
+  }
+  if (rules && !rules.ok) {
+    sendError(res, 400, rules.message);
     return;
   }
   const now = nowIso();
@@ -603,11 +648,16 @@ adminRouter.post('/', (req, res) => {
     updatedAt: now
   };
   getState().featureFlags.set(flag.id, flag);
+  if (rules) writeRules(flag.id, rules.rules, now);
   logAudit('FEATURE_FLAG_CREATE', {
     actorId: actorIdFromReq(req),
     targetId: flag.id,
     targetType: 'FeatureFlag',
-    details: { key: flag.key, flagId: flag.id }
+    details: {
+      key: flag.key,
+      flagId: flag.id,
+      ...(rules ? { ruleCount: rules.rules.length } : {})
+    }
   });
   broadcastFlagsUpdated();
   res.status(201).json(toFeatureFlagResponse(flag));
@@ -616,9 +666,15 @@ adminRouter.post('/', (req, res) => {
 adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
   // Order mirrors the server: the global ValidationPipe rejects the body
   // before the handler reads If-Match, and both precede the service lookup.
-  const validation = validateUpdate(req.body as UpdateFlagBody);
+  const body = req.body as UpdateFlagBody;
+  const validation = validateUpdate(body);
   if (!validation.ok) {
     res.status(400).json(validationError(validation.message));
+    return;
+  }
+  const rules = rulesOf(body);
+  if (rules && !rules.ok && rules.source === 'dto') {
+    res.status(400).json(validationError(rules.message));
     return;
   }
   const ifMatch = parseIfMatch(req.header('if-match') ?? undefined);
@@ -634,6 +690,10 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
       'Feature flag not found',
       ErrorKeys.FEATURE_FLAGS.NOT_FOUND
     );
+    return;
+  }
+  if (rules && !rules.ok) {
+    sendError(res, 400, rules.message);
     return;
   }
   if (flag.version !== ifMatch.version) {
@@ -664,11 +724,15 @@ adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
   flag.version += 1;
   flag.updatedAt = nowIso();
   flag.updatedByUserId = actorIdFromReq(req);
+  if (rules) writeRules(flag.id, rules.rules, flag.updatedAt);
   logAudit('FEATURE_FLAG_UPDATE', {
     actorId: actorIdFromReq(req),
     targetId: flag.id,
     targetType: 'FeatureFlag',
-    details: { changedFields: changed }
+    details: {
+      changedFields: changed,
+      ...(rules ? { ruleCount: rules.rules.length } : {})
+    }
   });
   broadcastFlagsUpdated();
   res.json(toFeatureFlagResponse(flag));
@@ -699,65 +763,6 @@ adminRouter.delete('/:id', requireUuid('id'), (req, res) => {
   });
   broadcastFlagsUpdated();
   res.status(204).end();
-});
-
-adminRouter.put('/:id/rules', requireUuid('id'), (req, res) => {
-  const body = req.body as ReplaceRulesBody;
-  const validation = validateRules(body.rules);
-  // The two failure sources sit on opposite sides of the lookup on the server:
-  // the ValidationPipe rejects a 'dto' failure before replaceRules runs, while
-  // the rule-payload validator runs after findOne has already thrown the 404.
-  if (!validation.ok && validation.source === 'dto') {
-    res.status(400).json(validationError(validation.message));
-    return;
-  }
-  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
-  if (!flag) {
-    sendError(
-      res,
-      404,
-      'Feature flag not found',
-      ErrorKeys.FEATURE_FLAGS.NOT_FOUND
-    );
-    return;
-  }
-  if (!validation.ok) {
-    sendError(res, 400, validation.message);
-    return;
-  }
-  const state = getState();
-  state.featureFlagRules = state.featureFlagRules.filter(
-    (r) => r.flagId !== flag.id
-  );
-  const now = Date.now();
-  const updatedAt = new Date(now).toISOString();
-  for (let i = 0; i < validation.rules.length; i++) {
-    const r = validation.rules[i];
-    // Stagger createdAt per index so admin GET returns rules in insertion order
-    // (mirrors server-side clock_timestamp() default).
-    const createdAt = new Date(now + i).toISOString();
-    const rule: MockFeatureFlagRule = {
-      id: randomUUID(),
-      flagId: flag.id,
-      type: r.type,
-      effect: r.effect,
-      payload: r.payload,
-      createdAt,
-      updatedAt
-    };
-    state.featureFlagRules.push(rule);
-  }
-  flag.version += 1;
-  flag.updatedAt = updatedAt;
-  flag.updatedByUserId = actorIdFromReq(req);
-  logAudit('FEATURE_FLAG_RULES_REPLACE', {
-    actorId: actorIdFromReq(req),
-    targetId: flag.id,
-    targetType: 'FeatureFlag',
-    details: { ruleCount: validation.rules.length }
-  });
-  broadcastFlagsUpdated();
-  res.json(toFeatureFlagResponse(flag));
 });
 
 const MAX_ATTRIBUTE_KEYS = 32;

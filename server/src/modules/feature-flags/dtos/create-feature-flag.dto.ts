@@ -8,10 +8,11 @@ import {
   Matches,
   MaxLength,
   MinLength,
-  ValidateIf
+  ValidateIf,
+  ValidateNested
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   APP_ENVIRONMENTS,
   FEATURE_FLAG_KEY_MAX_LENGTH,
@@ -20,6 +21,7 @@ import {
   normalizeEnvironmentList
 } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
+import { FeatureFlagRuleDto } from './feature-flag-rule.dto';
 
 export class CreateFeatureFlagDto {
   @ApiProperty({
@@ -71,4 +73,16 @@ export class CreateFeatureFlagDto {
   @ValidateIf(propertyIsDefined)
   @IsBoolean()
   public?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'The full rule set. When present, it replaces the stored rules in the same transaction as the flag write. When omitted, the rules stay unchanged.',
+    type: [FeatureFlagRuleDto]
+  })
+  @ValidateIf(propertyIsDefined)
+  @IsArray()
+  @ArrayMaxSize(64)
+  @ValidateNested({ each: true })
+  @Type(() => FeatureFlagRuleDto)
+  rules?: FeatureFlagRuleDto[];
 }

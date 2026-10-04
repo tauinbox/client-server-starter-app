@@ -167,7 +167,9 @@ src/app/
 │       │       │                             # only), enabled and public. The dialog uses the
 │       │       │                             # Wide size on a desktop and the
 │       │       │                             # .app-dialog-fullscreen-mobile panel class on a
-│       │       │                             # handset.
+│       │       │                             # handset. The flag and its rules save in one
+│       │       │                             # POST or PATCH; the rules go in the body only
+│       │       │                             # when the rule set changed.
 │       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent edits one rule. Each
 │       │                                     # rule type has its own payload editor. A user rule
 │       │                                     # uses a chip field with an autocomplete fed by

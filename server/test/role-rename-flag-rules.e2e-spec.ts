@@ -113,26 +113,28 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     await roleService.assignRoleToUser(holder.id, role.id);
 
     const key = `${tag}-flag`;
-    const flag = await flagService.create({ key, enabled: true }, null);
-    await flagService.replaceRules(
-      flag.id,
-      [
-        {
-          type: 'role',
-          effect: 'include',
-          payload: { type: 'role', roleNames: [roleName, otherName] }
-        },
-        {
-          type: 'role',
-          effect: 'include',
-          payload: { type: 'role', roleNames: [renamed, roleName] }
-        },
-        {
-          type: 'user',
-          effect: 'include',
-          payload: { type: 'user', userIds: [] }
-        }
-      ],
+    const flag = await flagService.create(
+      {
+        key,
+        enabled: true,
+        rules: [
+          {
+            type: 'role',
+            effect: 'include',
+            payload: { type: 'role', roleNames: [roleName, otherName] }
+          },
+          {
+            type: 'role',
+            effect: 'include',
+            payload: { type: 'role', roleNames: [renamed, roleName] }
+          },
+          {
+            type: 'user',
+            effect: 'include',
+            payload: { type: 'user', userIds: [] }
+          }
+        ]
+      },
       null
     );
     const versionBefore = (await flagService.findOne(flag.id)).version;
@@ -162,16 +164,18 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
   it('leaves the flags alone when no rule names the role', async () => {
     const role = await roleService.create({ name: `${tag}-unused` });
     const key = `${tag}-other`;
-    const flag = await flagService.create({ key, enabled: true }, null);
-    await flagService.replaceRules(
-      flag.id,
-      [
-        {
-          type: 'role',
-          effect: 'include',
-          payload: { type: 'role', roleNames: [otherName] }
-        }
-      ],
+    const flag = await flagService.create(
+      {
+        key,
+        enabled: true,
+        rules: [
+          {
+            type: 'role',
+            effect: 'include',
+            payload: { type: 'role', roleNames: [otherName] }
+          }
+        ]
+      },
       null
     );
     const versionBefore = (await flagService.findOne(flag.id)).version;
@@ -187,18 +191,17 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     const name = `${tag}-atomic`;
     const role = await roleService.create({ name });
     const flag = await flagService.create(
-      { key: `${tag}-atomic-flag`, enabled: true },
-      null
-    );
-    await flagService.replaceRules(
-      flag.id,
-      [
-        {
-          type: 'role',
-          effect: 'include',
-          payload: { type: 'role', roleNames: [name] }
-        }
-      ],
+      {
+        key: `${tag}-atomic-flag`,
+        enabled: true,
+        rules: [
+          {
+            type: 'role',
+            effect: 'include',
+            payload: { type: 'role', roleNames: [name] }
+          }
+        ]
+      },
       null
     );
     const rewrite = jest

@@ -13,7 +13,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Put,
   Query,
   Req,
   UseInterceptors
@@ -44,7 +43,6 @@ import { JwtAuthRequest } from '../../auth/types/auth.request';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
-import { ReplaceRulesDto } from '../dtos/replace-rules.dto';
 import { FeatureFlagResponseDto } from '../dtos/feature-flag-response.dto';
 import { PreviewFlagContextDto } from '../dtos/preview-flag-context.dto';
 import { PreviewFlagResponseDto } from '../dtos/preview-flag-response.dto';
@@ -118,10 +116,14 @@ export class FeatureFlagsAdminController {
     action: AuditAction.FEATURE_FLAG_CREATE,
     targetType: 'FeatureFlag',
     targetIdFromResponse: (response) => (response as { id?: string })?.id,
-    details: ({ body, response }) => ({
-      key: (body as CreateFeatureFlagDto).key,
-      flagId: (response as { id?: string })?.id
-    })
+    details: ({ body, response }) => {
+      const { key, rules } = body as CreateFeatureFlagDto;
+      return {
+        key,
+        flagId: (response as { id?: string })?.id,
+        ...(rules ? { ruleCount: rules.length } : {})
+      };
+    }
   })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a feature flag' })
@@ -156,8 +158,10 @@ export class FeatureFlagsAdminController {
   ) {
     const expectedVersion = this.parseIfMatch(ifMatch);
     // The update is conditional on the version, so when it succeeds this read
-    // is exactly the state that it replaced.
-    const changed = changedFields(await this.flagService.findOne(id), dto);
+    // is exactly the state that it replaced. The rules are reported as a
+    // count: rule rows and rule DTOs do not compare field by field.
+    const { rules, ...fields } = dto;
+    const changed = changedFields(await this.flagService.findOne(id), fields);
     const flag = await this.flagService.update(
       id,
       dto,
@@ -174,7 +178,10 @@ export class FeatureFlagsAdminController {
       actorEmail: req.user?.email ?? null,
       targetId: id,
       targetType: 'FeatureFlag',
-      details: { changedFields: changed },
+      details: {
+        changedFields: changed,
+        ...(rules ? { ruleCount: rules.length } : {})
+      },
       context: extractAuditContext(req)
     });
     return flag;
@@ -208,37 +215,6 @@ export class FeatureFlagsAdminController {
       details: { key: flag.key },
       context: extractAuditContext(req)
     });
-  }
-
-  @Put(':id/rules')
-  @Authorize(['manage', 'FeatureFlag'])
-  @LogAudit({
-    action: AuditAction.FEATURE_FLAG_RULES_REPLACE,
-    targetType: 'FeatureFlag',
-    details: ({ body }) => ({
-      ruleCount: (body as ReplaceRulesDto).rules.length
-    })
-  })
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Replace the full rule set for a feature flag' })
-  @ApiParam({ name: 'id' })
-  @ApiBody({ type: ReplaceRulesDto })
-  @ApiOkResponse({ type: FeatureFlagResponseDto })
-  async replaceRules(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ReplaceRulesDto,
-    @Req() req: JwtAuthRequest
-  ) {
-    const flag = await this.flagService.replaceRules(
-      id,
-      dto.rules,
-      req.user?.userId ?? null
-    );
-    this.eventEmitter.emit(
-      FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent(flag.key, 'rules-replaced')
-    );
-    return flag;
   }
 
   @Post(':id/preview')

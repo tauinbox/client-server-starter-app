@@ -4,12 +4,10 @@ import {
   Component,
   computed,
   DestroyRef,
-  inject,
-  signal
+  inject
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
-import type { HttpErrorResponse } from '@angular/common/http';
 import {
   MatCard,
   MatCardContent,
@@ -50,7 +48,6 @@ import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
-import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { FeatureFlagsAdminStore } from '../../../store/feature-flags-admin.store';
 import type {
   FeatureFlagFormDialogData,
@@ -112,12 +109,6 @@ export class FeatureFlagListComponent implements OnInit {
     this.#store.loadMore();
   }
   readonly flags = this.#store.entities;
-
-  // Flags whose `replaceRules` call failed after a successful flag create/update
-  // in this session. Surfaces a warning marker so the admin can spot the
-  // partial-save state after the snackbar has dismissed.
-  readonly #rulesFailedFlagIds = signal<ReadonlySet<string>>(new Set());
-  readonly rulesFailedFlagIds = this.#rulesFailedFlagIds.asReadonly();
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [
     'medium',
@@ -263,103 +254,26 @@ export class FeatureFlagListComponent implements OnInit {
     existing: FeatureFlagResponse | undefined,
     result: FeatureFlagFormDialogResult
   ): void {
-    if (!existing) {
-      this.#store
-        .createFlag({ key: result.key, ...result.flag })
-        .pipe(takeUntilDestroyed(this.#destroyRef))
-        .subscribe({
-          next: (created) => {
-            // No rules on a brand-new flag → nothing to PUT, success is final.
-            if (result.rules.length === 0) {
-              this.#notify.success('admin.featureFlags.successCreated', {
-                key: created.key
-              });
-              return;
-            }
-            this.#applyRules(
-              created,
-              result.rules,
-              'admin.featureFlags.successCreated',
-              'admin.featureFlags.errorRulesFailedCreate'
-            );
-          },
-          error: (err) => {
-            this.#notify.error(err, 'admin.featureFlags.errorCreateFailed');
-          }
-        });
-      return;
-    }
-
-    this.#store
-      .updateFlag(existing.id, result.flag, existing.version)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: (updated) => {
-          // `rulesChanged` covers both "rules edited" and "all rules removed";
-          // the latter still needs a replaceRules([]) to clear them server-side,
-          // so we always go through #applyRules when the flag is true.
-          if (!result.rulesChanged) {
-            this.#notify.success('admin.featureFlags.successUpdated', {
-              key: updated.key
-            });
-            return;
-          }
-          this.#applyRules(
-            updated,
-            result.rules,
-            'admin.featureFlags.successUpdated',
-            'admin.featureFlags.errorRulesFailedUpdate'
-          );
-        },
-        error: (err) => {
-          this.#notify.error(err, 'admin.featureFlags.errorUpdateFailed');
-        }
-      });
-  }
-
-  // Saves rules after a successful create/update. Defers the success snackbar
-  // until both steps resolve so the user never sees "Flag saved" while rules
-  // silently failed. Tracks failed flag ids so the row can surface a warning
-  // marker after the snackbar dismisses.
-  #applyRules(
-    flag: FeatureFlagResponse,
-    rules: FeatureFlagFormDialogResult['rules'],
-    successKey: string,
-    rulesErrorKey: string
-  ): void {
-    this.#store
-      .replaceRules(flag.id, rules)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: () => {
-          this.#notify.success(successKey, { key: flag.key });
-          this.#clearRulesFailed(flag.id);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.#markRulesFailed(flag.id);
-          // The flag itself is already saved, so the snackbar has to name both
-          // the flag and the reason the rules were rejected.
-          this.#notify.error(rulesErrorKey, {
-            key: flag.key,
-            detail: parseHttpErrorMessage(err, this.#transloco)
-          });
-        }
-      });
-  }
-
-  #markRulesFailed(flagId: string): void {
-    const current = this.#rulesFailedFlagIds();
-    if (current.has(flagId)) return;
-    const next = new Set(current);
-    next.add(flagId);
-    this.#rulesFailedFlagIds.set(next);
-  }
-
-  #clearRulesFailed(flagId: string): void {
-    const current = this.#rulesFailedFlagIds();
-    if (!current.has(flagId)) return;
-    const next = new Set(current);
-    next.delete(flagId);
-    this.#rulesFailedFlagIds.set(next);
+    const save$ = existing
+      ? this.#store.updateFlag(existing.id, result.flag, existing.version)
+      : this.#store.createFlag({ key: result.key, ...result.flag });
+    save$.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe({
+      next: (saved) => {
+        this.#notify.success(
+          existing
+            ? 'admin.featureFlags.successUpdated'
+            : 'admin.featureFlags.successCreated',
+          { key: saved.key }
+        );
+      },
+      error: (err) => {
+        this.#notify.error(
+          err,
+          existing
+            ? 'admin.featureFlags.errorUpdateFailed'
+            : 'admin.featureFlags.errorCreateFailed'
+        );
+      }
+    });
   }
 }

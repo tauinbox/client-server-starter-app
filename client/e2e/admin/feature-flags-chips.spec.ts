@@ -83,29 +83,27 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
         r.request().method() === 'POST' &&
         r.status() === 201
     );
-    const rulesResp = page.waitForResponse(
-      (r) =>
-        /\/api\/v1\/admin\/feature-flags\/[^/]+\/rules$/.test(r.url()) &&
-        r.request().method() === 'PUT'
-    );
-
     await dialog.getByRole('button', { name: /^Create$/ }).click();
 
-    const created = (await (await createResp).json()) as {
+    const response = await createResp;
+    const created = (await response.json()) as {
       environments: string[];
       key: string;
+      rules: { payload: { type: string; roleNames?: string[] } }[];
     };
     expect(created.key).toBe('chips-rollout');
     expect(created.environments.sort()).toEqual(['production', 'staging']);
 
-    const rulesBody = (await (await rulesResp).request().postDataJSON()) as {
+    // The rules travel in the create request itself.
+    const createBody = response.request().postDataJSON() as {
       rules: {
         type: string;
         payload: { type: string; roleNames?: string[] };
       }[];
     };
-    expect(rulesBody.rules).toHaveLength(1);
-    expect(rulesBody.rules[0].type).toBe('role');
-    expect(rulesBody.rules[0].payload.roleNames).toEqual(['user']);
+    expect(createBody.rules).toHaveLength(1);
+    expect(createBody.rules[0].type).toBe('role');
+    expect(createBody.rules[0].payload.roleNames).toEqual(['user']);
+    expect(created.rules[0].payload.roleNames).toEqual(['user']);
   });
 });

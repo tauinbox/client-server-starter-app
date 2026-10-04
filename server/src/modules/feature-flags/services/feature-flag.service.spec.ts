@@ -130,6 +130,33 @@ describe('FeatureFlagService', () => {
     });
   });
 
+  interface MockEm {
+    create: jest.Mock;
+    save: jest.Mock;
+    delete: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  }
+
+  function mockTransaction(overrides: Partial<MockEm> = {}): MockEm {
+    const em: MockEm = {
+      create: jest.fn((_e: unknown, v: unknown) => v),
+      save: jest.fn((_e: unknown, v: unknown) => Promise.resolve(v)),
+      delete: jest.fn().mockResolvedValue({}),
+      createQueryBuilder: jest.fn(),
+      ...overrides
+    };
+    dataSource.transaction.mockImplementation(
+      (cb: (em: MockEm) => Promise<unknown>) => cb(em)
+    );
+    return em;
+  }
+
+  const percentRule = (percent: number) => ({
+    type: 'percentage' as const,
+    effect: 'include' as const,
+    payload: { type: 'percentage' as const, percent }
+  });
+
   describe('create', () => {
     it('rejects duplicate key with 409', async () => {
       flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
@@ -142,14 +169,16 @@ describe('FeatureFlagService', () => {
       flagRepo.findOne
         .mockResolvedValueOnce(null) // duplicate check
         .mockResolvedValueOnce({ ...sampleFlag, id: 'new-id', rules: [] }); // findOne after save
-      flagRepo.create.mockReturnValue({ ...sampleFlag, id: 'new-id' });
-      flagRepo.save.mockResolvedValue({ ...sampleFlag, id: 'new-id' });
+      const em = mockTransaction({
+        save: jest.fn().mockResolvedValue({ ...sampleFlag, id: 'new-id' })
+      });
       const result = await service.create(
         { key: 'beta-export', enabled: true },
         'actor-1'
       );
       expect(result.id).toBe('new-id');
-      expect(flagRepo.create).toHaveBeenCalledWith(
+      expect(em.create).toHaveBeenCalledWith(
+        FeatureFlag,
         expect.objectContaining({
           key: 'beta-export',
           enabled: true,
@@ -157,12 +186,50 @@ describe('FeatureFlagService', () => {
           updatedByUserId: 'actor-1'
         })
       );
+      expect(em.delete).not.toHaveBeenCalled();
+    });
+
+    it('writes the rules in the same transaction as the flag', async () => {
+      flagRepo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ ...sampleFlag, id: 'new-id' });
+      const em = mockTransaction({
+        save: jest
+          .fn()
+          .mockResolvedValueOnce({ ...sampleFlag, id: 'new-id' })
+          .mockResolvedValue({})
+      });
+      await service.create(
+        { key: 'beta-export', rules: [percentRule(25), percentRule(50)] },
+        'actor-1'
+      );
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
+        flagId: 'new-id'
+      });
+      expect(em.create).toHaveBeenCalledWith(FeatureFlagRule, {
+        flagId: 'new-id',
+        ...percentRule(50)
+      });
+      expect(em.save).toHaveBeenCalledTimes(3);
+    });
+
+    it('rejects an invalid rule payload before the transaction opens', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(null);
+      await expect(
+        service.create(
+          { key: 'beta-export', rules: [percentRule(150)] },
+          'actor-1'
+        )
+      ).rejects.toBeInstanceOf(HttpException);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
     it('maps a lost duplicate-key race to 409 with the flag-specific key', async () => {
       flagRepo.findOne.mockResolvedValueOnce(null); // duplicate check passes
-      flagRepo.create.mockReturnValue({ ...sampleFlag });
-      flagRepo.save.mockRejectedValue({ code: '23505' });
+      mockTransaction({
+        save: jest.fn().mockRejectedValue({ code: '23505' })
+      });
 
       await expect(
         service.create({ key: sampleFlag.key }, 'actor-1')
@@ -174,8 +241,9 @@ describe('FeatureFlagService', () => {
 
     it('reads the unique-violation code from a wrapped driver error', async () => {
       flagRepo.findOne.mockResolvedValueOnce(null);
-      flagRepo.create.mockReturnValue({ ...sampleFlag });
-      flagRepo.save.mockRejectedValue({ driverError: { code: '23505' } });
+      mockTransaction({
+        save: jest.fn().mockRejectedValue({ driverError: { code: '23505' } })
+      });
 
       await expect(
         service.create({ key: sampleFlag.key }, 'actor-1')
@@ -184,8 +252,9 @@ describe('FeatureFlagService', () => {
 
     it('rethrows non-unique database errors untouched', async () => {
       flagRepo.findOne.mockResolvedValueOnce(null);
-      flagRepo.create.mockReturnValue({ ...sampleFlag });
-      flagRepo.save.mockRejectedValue(new Error('connection reset'));
+      mockTransaction({
+        save: jest.fn().mockRejectedValue(new Error('connection reset'))
+      });
 
       await expect(
         service.create({ key: sampleFlag.key }, 'actor-1')
@@ -196,16 +265,19 @@ describe('FeatureFlagService', () => {
   describe('update — optimistic lock', () => {
     it('returns 409 when version does not match (affected = 0)', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
-      const qb = createQueryBuilder(0);
-      flagRepo.createQueryBuilder.mockReturnValue(qb);
+      const em = mockTransaction({
+        createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(0))
+      });
       await expect(
         service.update(
           'flag-1',
-          { enabled: true },
+          { enabled: true, rules: [percentRule(25)] },
           /* expected */ 999,
           'actor-1'
         )
       ).rejects.toMatchObject({ status: 409 });
+      expect(em.delete).not.toHaveBeenCalled();
+      expect(em.save).not.toHaveBeenCalled();
     });
 
     it('updates and increments version when match (affected = 1)', async () => {
@@ -213,7 +285,9 @@ describe('FeatureFlagService', () => {
         .mockResolvedValueOnce(sampleFlag) // findOne preload
         .mockResolvedValueOnce({ ...sampleFlag, enabled: true, version: 2 }); // final findOne
       const qb = createQueryBuilder(1);
-      flagRepo.createQueryBuilder.mockReturnValue(qb);
+      const em = mockTransaction({
+        createQueryBuilder: jest.fn().mockReturnValue(qb)
+      });
       const result = await service.update(
         'flag-1',
         { enabled: true },
@@ -225,6 +299,29 @@ describe('FeatureFlagService', () => {
         { id: 'flag-1', expected: 1 }
       );
       expect(result.version).toBe(2);
+      expect(em.delete).not.toHaveBeenCalled();
+    });
+
+    it('replaces the rules after the version-checked write', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      const qb = createQueryBuilder(1);
+      const em = mockTransaction({
+        createQueryBuilder: jest.fn().mockReturnValue(qb)
+      });
+      await service.update('flag-1', { rules: [] }, 1, 'actor-1');
+      expect(qb.execute).toHaveBeenCalledTimes(1);
+      expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
+        flagId: 'flag-1'
+      });
+      expect(em.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid rule payload before the transaction opens', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
+      await expect(
+        service.update('flag-1', { rules: [percentRule(150)] }, 1, 'actor-1')
+      ).rejects.toBeInstanceOf(HttpException);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -306,67 +403,6 @@ describe('FeatureFlagService', () => {
       }
       expect(a).toBeDefined();
       expect(b).toBeDefined();
-    });
-  });
-
-  describe('replaceRules', () => {
-    it('validates each payload and writes in a transaction', async () => {
-      flagRepo.findOne
-        .mockResolvedValueOnce(sampleFlag)
-        .mockResolvedValueOnce({ ...sampleFlag, rules: [] });
-      interface MockEm {
-        delete: jest.Mock;
-        create: jest.Mock;
-        save: jest.Mock;
-        update: jest.Mock;
-      }
-      const em: MockEm = {
-        delete: jest.fn().mockResolvedValue({}),
-        create: jest.fn((_e: unknown, v: unknown) => v),
-        save: jest.fn().mockResolvedValue([]),
-        update: jest.fn().mockResolvedValue({})
-      };
-      dataSource.transaction.mockImplementation(
-        (cb: (em: MockEm) => Promise<unknown>) => cb(em)
-      );
-      await service.replaceRules(
-        'flag-1',
-        [
-          {
-            type: 'percentage',
-            effect: 'include',
-            payload: { type: 'percentage', percent: 25 }
-          }
-        ],
-        'actor-1'
-      );
-      expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
-        flagId: 'flag-1'
-      });
-      expect(em.save).toHaveBeenCalled();
-      expect(em.update).toHaveBeenCalledWith(
-        FeatureFlag,
-        { id: 'flag-1' },
-        expect.objectContaining({ updatedByUserId: 'actor-1' })
-      );
-    });
-
-    it('rejects an invalid payload before writing', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
-      await expect(
-        service.replaceRules(
-          'flag-1',
-          [
-            {
-              type: 'percentage',
-              effect: 'include',
-              payload: { type: 'percentage', percent: 150 }
-            }
-          ],
-          'actor-1'
-        )
-      ).rejects.toBeInstanceOf(HttpException);
-      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 
