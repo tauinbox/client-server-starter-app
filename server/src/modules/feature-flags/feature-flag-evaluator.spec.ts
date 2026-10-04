@@ -668,7 +668,7 @@ describe('percentageBucket — stability and distribution', () => {
     );
   });
 
-  it('returns different buckets for the same id across different flagKeys (mostly)', () => {
+  it('returns different buckets for the same id across different flag keys (mostly)', () => {
     const ids = Array.from({ length: 100 }, (_, i) => `user-${i}`);
     let diffs = 0;
     for (const id of ids) {
