@@ -9,8 +9,8 @@ import { AttributeRegistryService } from '../../feature-flags/services/attribute
  * `conditionalProvider` uses to register the passport strategy). The seeded
  * `oauth-*` flags carry an `attribute / custom / eq true` rule against these
  * keys, so a provider button is shown only when env-configured AND the flag is
- * enabled. The value is read once at startup (env is request-stable), honoring
- * the attribute-registry's request-stable contract.
+ * enabled. The value is read once at startup, so each evaluation reads a
+ * constant.
  *
  * Wired in `CoreModule` rather than `AuthModule`: `FeatureFlagsModule` already
  * imports `AuthModule`, so `AuthModule` cannot import it back without a cycle.

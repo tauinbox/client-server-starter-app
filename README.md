@@ -236,9 +236,8 @@ management and theming.
   broadcast of `{ type: 'feature_flags_updated' }`, thus a burst of changes causes one synchronized
   client refetch. The flag-list reload behind those refetches is single-flight.
 
-  The per-user cache is keyed by a global version counter. Thus a change orphans each per-user entry
-  and needs no Redis `SCAN MATCH`. A deployment with Redis increases the counter with an atomic
-  `INCR`, thus simultaneous invalidations across instances cannot collapse into one version.
+  The server does not cache an evaluated result. Each check evaluates the cached flag list against the
+  user as the database holds it now, thus a change of email or roles applies on the next check.
 
   The `environments` of a flag are restricted to the names that the server can run as, and the server
   normalizes them on a write. The `value` of an `attribute` rule must have a shape that its operator
@@ -1842,8 +1841,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2751 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 551 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 541 pass and 10 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2744 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 548 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 541 pass and 10 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1473 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 294 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 958 tests pass |

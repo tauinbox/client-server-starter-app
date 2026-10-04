@@ -137,10 +137,10 @@ describe('MetricsService', () => {
     });
 
     it('increments the counter for a cache miss', () => {
-      service.recordCacheAccess('feature_flags', 'miss');
+      service.recordCacheAccess('feature_flags_all', 'miss');
 
       expect(mockCounter.inc).toHaveBeenCalledWith({
-        cache: 'feature_flags',
+        cache: 'feature_flags_all',
         outcome: 'miss'
       });
     });

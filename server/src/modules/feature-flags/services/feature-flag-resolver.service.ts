@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
@@ -15,7 +15,6 @@ import {
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
 import type { EvaluatedFeatureFlagsResponse } from '@app/shared/types';
-import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { AttributeRegistryService } from './attribute-registry.service';
@@ -50,17 +49,12 @@ interface CachedFlag {
 }
 
 const ALL_FLAGS_KEY = 'featureflags:all';
-const VERSION_KEY = 'featureflags:version';
-const VERSION_COUNTER_KEY = 'featureflags:version:counter';
 const ALL_FLAGS_TTL_MS = 300_000;
-const USER_FLAGS_TTL_MS = 60_000;
 
 @Injectable()
 export class FeatureFlagResolverService {
   #loadAllInFlight: Promise<CachedFlag[]> | null = null;
   #loadAllGeneration = 0;
-  readonly #logger = new Logger(FeatureFlagResolverService.name);
-  readonly #version: CacheVersionCounter;
 
   constructor(
     @InjectRepository(FeatureFlag)
@@ -73,14 +67,7 @@ export class FeatureFlagResolverService {
     private readonly permissionService: PermissionService,
     private readonly usersService: UsersService,
     private readonly metrics: MetricsService
-  ) {
-    this.#version = new CacheVersionCounter(
-      cacheManager,
-      VERSION_COUNTER_KEY,
-      VERSION_KEY,
-      this.#logger
-    );
-  }
+  ) {}
 
   /**
    * Assembles the evaluation context for a user id: looks up the user record
@@ -109,9 +96,7 @@ export class FeatureFlagResolverService {
 
   /**
    * Evaluates every flag for a signed-in caller. The rollout id is read, and
-   * minted when absent, only while a live rule buckets by `device`. That map
-   * depends on the browser, so it skips the per-user cache: `invalidateUser`
-   * could not reach one cache entry per device.
+   * minted when absent, only while a live rule buckets by `device`.
    */
   async evaluateSignedIn(
     user: ResolverUser,
@@ -141,18 +126,9 @@ export class FeatureFlagResolverService {
     user: ResolverUser,
     req: Request | null
   ): Promise<EvaluatedFeatureFlagsResponse> {
-    const version = await this.getVersion();
-    const cacheKey = `featureflags:user:${user.userId}:v${version}`;
-    const cached =
-      await this.cacheManager.get<EvaluatedFeatureFlagsResponse>(cacheKey);
-    this.metrics.recordCacheAccess('feature_flags', cached ? 'hit' : 'miss');
-    if (cached) return cached;
-
     const flags = await this.loadAllFlags();
     const ctx = this.buildContext(user, null, req);
-    const result = this.evaluate(flags, ctx, /* publicOnly */ false);
-    await this.cacheManager.set(cacheKey, result, USER_FLAGS_TTL_MS);
-    return result;
+    return this.evaluate(flags, ctx, /* publicOnly */ false);
   }
 
   /**
@@ -181,8 +157,10 @@ export class FeatureFlagResolverService {
     req: Request | null,
     key: string
   ): Promise<boolean> {
-    const evaluated = await this.evaluateForUser(user, req);
-    return evaluated.flags[key] === true;
+    const flag = (await this.loadAllFlags()).find((f) => f.key === key);
+    if (!flag) return false;
+    const ctx = this.buildContext(user, null, req);
+    return this.evaluateOne(flag, ctx);
   }
 
   /**
@@ -194,10 +172,6 @@ export class FeatureFlagResolverService {
     return this.isEnabledForUser(user, null, key);
   }
 
-  /**
-   * Invalidates the cached flag list. Per-user caches are keyed by the global
-   * version counter, so they orphan naturally without an explicit SCAN+DEL.
-   */
   async invalidateAll(): Promise<void> {
     // A load that started before this invalidation holds pre-change rows: bump
     // the generation so its cache write is skipped, and detach the in-flight
@@ -205,12 +179,6 @@ export class FeatureFlagResolverService {
     this.#loadAllGeneration++;
     this.#loadAllInFlight = null;
     await this.cacheManager.del(ALL_FLAGS_KEY);
-    await this.bumpVersion();
-  }
-
-  async invalidateUser(userId: string): Promise<void> {
-    const version = await this.getVersion();
-    await this.cacheManager.del(`featureflags:user:${userId}:v${version}`);
   }
 
   private async loadAllFlags(): Promise<CachedFlag[]> {
@@ -307,16 +275,7 @@ export class FeatureFlagResolverService {
     const result: Record<string, boolean> = {};
     for (const flag of flags) {
       if (publicOnly && !flag.public) continue;
-      const evalFlag: EvaluatorFlag = {
-        key: flag.key,
-        enabled: flag.enabled,
-        environments: flag.environments
-      };
-      const evalRules: EvaluatorRule[] = flag.rules.map((r) => ({
-        effect: r.effect,
-        payload: r.payload
-      }));
-      const value = evaluateFeatureFlag(evalFlag, evalRules, ctx);
+      const value = this.evaluateOne(flag, ctx);
       // Authenticated callers receive all flags, but a disabled non-public flag
       // would leak an internal/unfinished feature key. Omit it: the client's
       // isEnabled() treats an absent key as false, so this is transparent.
@@ -329,11 +288,19 @@ export class FeatureFlagResolverService {
     };
   }
 
-  private getVersion(): Promise<number> {
-    return this.#version.read();
-  }
-
-  private bumpVersion(): Promise<void> {
-    return this.#version.bump();
+  private evaluateOne(
+    flag: CachedFlag,
+    ctx: FeatureFlagEvaluationContext
+  ): boolean {
+    const evalFlag: EvaluatorFlag = {
+      key: flag.key,
+      enabled: flag.enabled,
+      environments: flag.environments
+    };
+    const evalRules: EvaluatorRule[] = flag.rules.map((r) => ({
+      effect: r.effect,
+      payload: r.payload
+    }));
+    return evaluateFeatureFlag(evalFlag, evalRules, ctx);
   }
 }

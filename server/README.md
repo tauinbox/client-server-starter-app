@@ -2232,7 +2232,7 @@ These are the counters and the histograms:
 | `mail_queue_jobs` | gauge | `state`, one of `waiting`, `active`, `completed`, `failed`, `delayed` | The depth of the BullMQ mail queue, by job state. The metric stays absent when no queue is configured, that is when `REDIS_URL` is empty and `MailService` sends the mail in the process |
 | `mail_jobs_processed_total` | counter | `outcome`, one of `completed` or `failed` | The mail jobs that the queue worker processed. `failed` counts each failed attempt, and a retry is one attempt |
 | `db_pool_connections` | gauge | `state`, one of `total`, `idle`, `waiting` | The size of the PostgreSQL connection pool, by state. The metric reads the pg pool on the injected `DataSource` object. A `waiting` value above 0 for a long time means that the pool is exhausted and the requests are in a queue |
-| `cache_requests_total` | counter | `cache`, one of `permissions`, `roles`, `resources`, `feature_flags`, `feature_flags_all`; and `outcome`, one of `hit` or `miss` | The lookups in each Redis-backed cache, by logical cache and by outcome. The hit ratio of a cache is `hit / (hit + miss)`. A ratio that stays low means that the invalidation is faster than the hits |
+| `cache_requests_total` | counter | `cache`, one of `permissions`, `roles`, `resources`, `feature_flags_all`, `entitlements`; and `outcome`, one of `hit` or `miss` | The lookups in each Redis-backed cache, by logical cache and by outcome. The hit ratio of a cache is `hit / (hit + miss)`. A ratio that stays low means that the invalidation is faster than the hits |
 | `dependency_up` | gauge | `dependency`, one of `smtp` or `redis` | The health of an external dependency, as `/health/ready` last observed it. `1` is healthy, and `0` is degraded or down. A series appears only after its indicator runs. Thus a deployment with no SMTP configuration never emits `dependency="smtp"`. This is the only machine-readable signal for a degradation that readiness intentionally reports as up. Refer to [Alerting](../README.md#alerting) |
 | `billing_usage_records_unrated_total` | counter | `meter` | The usage records that the system stored under a meter that the current plan of the customer does not price. A value above zero is expected while a customer meters a product that they do not subscribe to. A rise that continues on one `meter` means that a producer uses an incorrect key, and its units silently do not bill. The plan catalog bounds the label cardinality, because the ingest refuses a meter that no plan declares |
 
@@ -2466,16 +2466,14 @@ The base URL is `/api/v1`.
 | DELETE | `/admin/feature-flags/:id` | `delete:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
 | POST | `/admin/feature-flags/:id/preview` | `read:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 400. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
 
-**Caching.** The system uses three keys:
+**Caching.** `featureflags:all` holds the full set of flags and rules, with a TTL of 300 s. A reload
+is single-flight: two concurrent misses share one load from the database. A load that an
+invalidation overlaps skips its cache write, through a generation guard. Thus the cache never holds a
+row from before the change.
 
-- `featureflags:all` holds the full set of flags and rules, with a TTL of 300 s. A reload is
-  single-flight: two concurrent misses share one load from the database. A load that an invalidation
-  overlaps skips its cache write, through a generation guard. Thus the cache never holds a row from
-  before the change.
-- `featureflags:version` is a monotonic counter. Each change increases it. The value goes at the end
-  of each per-user key, thus an old entry orphans itself.
-- `featureflags:user:<userId>:v<version>` holds the evaluated map, with a TTL of 60 s. The system
-  caches nothing for an anonymous caller.
+The system does not cache an evaluated result. Each check evaluates the cached flag list against the
+user as the database holds it now. Thus a change of email or roles applies on the next check. An
+evaluation costs less than two Redis round trips (0.05 ms for 10 flags, 0.7 ms for 200).
 
 **Real-time updates.** `FeatureFlagChangedListener` broadcasts `{ type: 'feature_flags_updated' }`
 over SSE at each change of a flag.
@@ -2563,16 +2561,10 @@ write time rejects a `customKey` value that nobody registered.
 rule editor of the client with no change there. That route reports the keys only. It never reports a
 resolved value, because a resolver can carry personal data.
 
-> **The resolver contract is request-stable.** A resolver MUST return a stable value for a given user
-> across requests. It can use the `user` argument. It MUST NOT branch on per-request data, such as
-> the IP address, a header, the query string or the country.
->
-> `evaluateForUser` caches the full evaluated set for each user for 60 s, under
-> `featureflags:user:<id>:v<version>`. Thus an attribute that comes from the request freezes the
-> value of the first request for the full TTL, and the attribute rules then give a different result
-> for each request.
->
-> The resolver gets `req` for stable enrichment that does not depend on the request.
+> **A resolver runs on every evaluation.** Keep it cheap and synchronous. A service that checks a flag
+> outside an HTTP request (`isEnabledForUserId`) passes `req` as null. Thus a rule on a value that
+> comes from the request never matches there, and a server gate and the flag list can disagree for
+> one user.
 
 **Audit trail.** Each mutating administrator endpoint writes to `audit_logs` under one of the
 `FEATURE_FLAG_*` enum values. Those are `FEATURE_FLAG_CREATE`, `FEATURE_FLAG_UPDATE`,

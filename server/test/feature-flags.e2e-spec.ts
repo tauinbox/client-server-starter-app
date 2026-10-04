@@ -497,8 +497,8 @@ describe('Feature flags end-to-end', () => {
     });
   });
 
-  it('UserRoleChangedEvent invalidates only the affected user', async () => {
-    await listener.handleUserRoleChanged({ userId: 'u-42' });
+  it('UserRoleChangedEvent notifies only the affected user', () => {
+    listener.handleUserRoleChanged({ userId: 'u-42' });
     expect(notifications.push).toHaveBeenCalledWith('u-42', {
       type: 'feature_flags_updated'
     });
