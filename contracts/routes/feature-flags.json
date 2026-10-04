@@ -26,11 +26,6 @@
       "expectedStatus": 401
     },
     {
-      "method": "POST",
-      "path": "/api/v1/admin/feature-flags/1/toggle",
-      "expectedStatus": 401
-    },
-    {
       "method": "GET",
       "path": "/api/v1/feature-flags",
       "expectedStatus": 200

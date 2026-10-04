@@ -478,16 +478,16 @@ orphans each per-user entry with no Redis `SCAN`.
 `services/attribute-registry.service.ts` is the extensibility seam. Another module calls
 `registerAttribute(key, resolver)` from its `onModuleInit` method.
 
-`controllers/feature-flags-admin.controller.ts` holds 9 administrator endpoints below
+`controllers/feature-flags-admin.controller.ts` holds 8 administrator endpoints below
 `/admin/feature-flags`. The two list endpoints and `GET attribute-keys` check `search`,
-`GET :id` and `POST :id/preview` check `read`, and the create, the update, the toggle and the
-delete check `create`, `update`, `update` and `delete` on `FeatureFlag`. All five actions are
+`GET :id` and `POST :id/preview` check `read`, and the create, the update and the
+delete check `create`, `update` and `delete` on `FeatureFlag`. All five actions are
 `conditionalActions`: the two lists filter in SQL with `applyAbilityToFeatureFlagQuery`
 (`GET attribute-keys` returns no flag data), and each route on one flag runs `assertCan` on it.
-The create checks the record with the defaults that the service writes. The update and the toggle
-also check the record as it is after the write, so a grant scoped by a writable field (`enabled`,
-`public`) cannot move a flag out of its own scope. The 5 mutating
-endpoints each write an audit entry. Three of them use `@LogAudit`. The delete calls
+The create checks the record with the defaults that the service writes. The update
+also checks the record as it is after the write, so a grant scoped by a writable field (`enabled`,
+`public`) cannot move a flag out of its own scope. The 3 mutating
+endpoints each write an audit entry. The create uses `@LogAudit`. The delete calls
 `AuditService.log` itself, to record `details: { key }` of the flag that it removed. The update
 calls it too, because `changedFields` compares the request with the flag read before the write. The 3 read
 endpoints and `POST :id/preview` write nothing, thus they make no audit entry.
@@ -2464,7 +2464,6 @@ The base URL is `/api/v1`.
 | POST | `/admin/feature-flags` | `create:FeatureFlag` | Create a flag. An optional `rules` array is written in the same transaction. The audit action is `FEATURE_FLAG_CREATE` |
 | PATCH | `/admin/feature-flags/:id` | `update:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. An optional `rules` array replaces the full rule set in the same transaction as the flag fields, with one version increase; without `rules` the stored rules stay. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict` and writes no rule. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
 | DELETE | `/admin/feature-flags/:id` | `delete:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
-| POST | `/admin/feature-flags/:id/toggle` | `update:FeatureFlag` | Change `enabled` and increase the version. The audit action is `FEATURE_FLAG_TOGGLE` |
 | POST | `/admin/feature-flags/:id/preview` | `read:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 400. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
 
 **Caching.** The system uses three keys:
@@ -2577,9 +2576,9 @@ resolved value, because a resolver can carry personal data.
 
 **Audit trail.** Each mutating administrator endpoint writes to `audit_logs` under one of the
 `FEATURE_FLAG_*` enum values. Those are `FEATURE_FLAG_CREATE`, `FEATURE_FLAG_UPDATE`,
-`FEATURE_FLAG_DELETE` and `FEATURE_FLAG_TOGGLE`. A create or an update that carries `rules` adds
-`ruleCount` to its details. `FEATURE_FLAG_RULES_REPLACE` stays in the enum for the historical rows of
-the removed `PUT /:id/rules` route.
+and `FEATURE_FLAG_DELETE`. A create or an update that carries `rules` adds
+`ruleCount` to its details. `FEATURE_FLAG_TOGGLE` and `FEATURE_FLAG_RULES_REPLACE` stay in the enum for the historical rows of
+the removed `POST /:id/toggle` and `PUT /:id/rules` routes.
 
 The `details` JSONB column holds `key`, `changedFields`, `ruleCount` or `enabled`, and the action
 decides which one. `changedFields` names only the fields whose stored value changed, so a resubmit

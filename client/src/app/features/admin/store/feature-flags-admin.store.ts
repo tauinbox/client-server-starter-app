@@ -50,8 +50,8 @@ export const FeatureFlagsAdminStore = signalStore(
         );
       },
 
-      toggleFlag(id: string): Observable<FeatureFlagResponse> {
-        return service.toggle(id).pipe(
+      reloadFlag(id: string): Observable<FeatureFlagResponse> {
+        return service.getOne(id).pipe(
           tap((flag) => {
             patchState(store, setEntity(flag));
           })

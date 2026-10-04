@@ -33,7 +33,6 @@ describe('FeatureFlagsAdminController', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
-    toggle: jest.Mock;
     delete: jest.Mock;
     getAttributeCustomKeys: jest.Mock;
     newFlagFields: FeatureFlagService['newFlagFields'];
@@ -59,9 +58,6 @@ describe('FeatureFlagsAdminController', () => {
       newFlagFields: FeatureFlagService.prototype.newFlagFields,
       create: jest.fn().mockResolvedValue(sampleFlag),
       update: jest
-        .fn()
-        .mockResolvedValue({ ...sampleFlag, enabled: true, version: 2 }),
-      toggle: jest
         .fn()
         .mockResolvedValue({ ...sampleFlag, enabled: true, version: 2 }),
       delete: jest.fn().mockResolvedValue(undefined),
@@ -145,14 +141,6 @@ describe('FeatureFlagsAdminController', () => {
     );
   });
 
-  it('toggle emits a change event', async () => {
-    await controller.toggle('flag-1', req, fullAbility);
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      FeatureFlagChangedEvent.name,
-      expect.any(FeatureFlagChangedEvent)
-    );
-  });
-
   it('update audits a rule set as a count, not as a changed field', async () => {
     const rules = [
       {
@@ -223,7 +211,6 @@ describe('FeatureFlagsAdminController', () => {
     it.each([
       ['findOne', () => controller.findOne('flag-1', req, scoped)],
       ['preview', () => controller.preview('flag-1', {}, req, scoped)],
-      ['toggle', () => controller.toggle('flag-1', req, scoped)],
       ['remove', () => controller.remove('flag-1', req, scoped)],
       [
         'update',
@@ -234,7 +221,6 @@ describe('FeatureFlagsAdminController', () => {
       await expect(call()).rejects.toBeInstanceOf(ForbiddenException);
       expect(flagService.create).not.toHaveBeenCalled();
       expect(flagService.update).not.toHaveBeenCalled();
-      expect(flagService.toggle).not.toHaveBeenCalled();
       expect(flagService.delete).not.toHaveBeenCalled();
     });
 
@@ -270,14 +256,6 @@ describe('FeatureFlagsAdminController', () => {
         disabledOnly
       );
       expect(flagService.update).toHaveBeenCalledTimes(1);
-    });
-
-    it('toggle refuses a flip that moves the flag out of the condition', async () => {
-      const disabledOnly = abilityFor(['update'], { enabled: false });
-      await expect(
-        controller.toggle('flag-1', req, disabledOnly)
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(flagService.toggle).not.toHaveBeenCalled();
     });
   });
 });

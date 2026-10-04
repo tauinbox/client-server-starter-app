@@ -285,41 +285,6 @@ export class FeatureFlagsAdminController {
     return this.flagService.preview(id, dto);
   }
 
-  @Post(':id/toggle')
-  @Authorize(['update', 'FeatureFlag'])
-  @LogAudit({
-    action: AuditAction.FEATURE_FLAG_TOGGLE,
-    targetType: 'FeatureFlag',
-    details: ({ response }) => ({
-      enabled: (response as { enabled?: boolean })?.enabled
-    })
-  })
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Toggle a feature flag on/off' })
-  @ApiParam({ name: 'id' })
-  @ApiOkResponse({ type: FeatureFlagResponseDto })
-  async toggle(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: JwtAuthRequest,
-    @CurrentAbility() ability: AppAbility
-  ) {
-    const current = await this.flagService.findOne(id);
-    this.assertCanFlag(ability, 'update', current, req, id);
-    this.assertCanFlag(
-      ability,
-      'update',
-      { ...current, enabled: !current.enabled },
-      req,
-      id
-    );
-    const flag = await this.flagService.toggle(id, req.user?.userId ?? null);
-    this.eventEmitter.emit(
-      FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent()
-    );
-    return flag;
-  }
-
   /**
    * The route-level @Authorize check is type-level and ignores conditions, so
    * a conditional grant is re-evaluated against the record.

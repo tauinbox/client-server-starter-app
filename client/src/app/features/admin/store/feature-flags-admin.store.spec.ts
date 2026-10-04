@@ -30,7 +30,7 @@ describe('FeatureFlagsAdminStore', () => {
     getAllCursor: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
-    toggle: ReturnType<typeof vi.fn>;
+    getOne: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
   let notify: {
@@ -48,7 +48,7 @@ describe('FeatureFlagsAdminStore', () => {
       ),
       create: vi.fn(),
       update: vi.fn(),
-      toggle: vi.fn(),
+      getOne: vi.fn(),
       delete: vi.fn()
     };
     notify = { error: vi.fn(), success: vi.fn() };
@@ -125,15 +125,16 @@ describe('FeatureFlagsAdminStore', () => {
     ).rejects.toBe(conflict);
   });
 
-  it('toggleFlag() updates the entity locally', async () => {
-    service.toggle.mockReturnValue(
+  it('reloadFlag() replaces the entity with the stored row', async () => {
+    service.getOne.mockReturnValue(
       of(sampleFlag({ enabled: true, version: 2 }))
     );
     const store = TestBed.inject(FeatureFlagsAdminStore);
     store.load();
     await vi.waitFor(() => expect(store.entities().length).toBe(1));
-    await firstValueFrom(store.toggleFlag('flag-1'));
-    expect(store.entities()[0].enabled).toBe(true);
+    await firstValueFrom(store.reloadFlag('flag-1'));
+    expect(service.getOne).toHaveBeenCalledWith('flag-1');
+    expect(store.entities()[0]).toMatchObject({ enabled: true, version: 2 });
   });
 
   it('deleteFlag() removes the entity from the store', async () => {
