@@ -34,23 +34,7 @@ export function evaluateFeatureFlag(
   rules: readonly EvaluatorRule[],
   ctx: FeatureFlagEvaluationContext
 ): boolean {
-  if (!flag.enabled) return false;
-  if (flag.environments.length > 0 && !flag.environments.includes(ctx.env)) {
-    return false;
-  }
-
-  for (const rule of rules) {
-    if (rule.effect !== 'exclude') continue;
-    if (matchesRule(rule.payload, flag.key, ctx)) return false;
-  }
-
-  const includes = rules.filter((r) => r.effect === 'include');
-  if (includes.length === 0) return true;
-
-  for (const rule of includes) {
-    if (matchesRule(rule.payload, flag.key, ctx)) return true;
-  }
-  return false;
+  return previewFeatureFlag(flag, rules, ctx).result;
 }
 
 export type RolloutEvaluatorFlag = EvaluatorFlag & {
@@ -61,11 +45,12 @@ export type AnonymousEvaluatorFlag = RolloutEvaluatorFlag & {
   public: boolean;
 };
 
+function matchesEnvironment(flag: EvaluatorFlag, env: string): boolean {
+  return flag.environments.length === 0 || flag.environments.includes(env);
+}
+
 function isLiveIn(flag: EvaluatorFlag, env: string): boolean {
-  return (
-    flag.enabled &&
-    (flag.environments.length === 0 || flag.environments.includes(env))
-  );
+  return flag.enabled && matchesEnvironment(flag, env);
 }
 
 /**
@@ -166,10 +151,6 @@ function matchesAttributeOp(
   }
 }
 
-/**
- * Canonical parser for the `before` / `after` operands. Exported so payload
- * validation accepts exactly the shapes evaluation can compare.
- */
 export function percentageBucket(id: string, flagKey: string): number {
   // `% 100` skews buckets 0..95 by ~2e-8 (2^32 leaves a remainder of 96).
   // Correcting it would re-bucket every existing user for no measurable gain.
@@ -185,7 +166,7 @@ export function previewFeatureFlag(
   if (!flag.enabled) {
     return { result: false, reason: 'disabled', matchedRule: null };
   }
-  if (flag.environments.length > 0 && !flag.environments.includes(ctx.env)) {
+  if (!matchesEnvironment(flag, ctx.env)) {
     return { result: false, reason: 'env-mismatch', matchedRule: null };
   }
 
