@@ -5,7 +5,13 @@ import {
   ResourceMetadata
 } from './register-resource.decorator';
 
-@RegisterResource({ name: 'users', subject: 'User', displayName: 'Users' })
+@RegisterResource({
+  name: 'users',
+  subject: 'User',
+  displayName: 'Users',
+  actions: ['read', 'update'],
+  conditionalActions: ['update']
+})
 class DecoratedController {}
 
 class UndecoratedController {}
@@ -26,7 +32,9 @@ describe('RegisterResource decorator', () => {
     expect(meta).toEqual({
       name: 'users',
       subject: 'User',
-      displayName: 'Users'
+      displayName: 'Users',
+      actions: ['read', 'update'],
+      conditionalActions: ['update']
     });
   });
 
@@ -47,7 +55,9 @@ describe('RegisterResource decorator', () => {
     @RegisterResource({
       name: 'permissions',
       subject: 'Permission',
-      displayName: 'Permissions'
+      displayName: 'Permissions',
+      actions: ['read'],
+      conditionalActions: []
     })
     class AnotherController {}
 
@@ -59,5 +69,6 @@ describe('RegisterResource decorator', () => {
     expect(meta.name).toBe('permissions');
     expect(meta.subject).toBe('Permission');
     expect(meta.displayName).toBe('Permissions');
+    expect(meta.actions).toEqual(['read']);
   });
 });

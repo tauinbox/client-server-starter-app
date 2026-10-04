@@ -2,7 +2,7 @@
   <mat-card-header>
     <mat-card-title>{{ t('admin.featureFlags.title') }}</mat-card-title>
     <div class="spacer"></div>
-    @if (canManage() && !layout.isHandset()) {
+    @if (canCreate() && !layout.isHandset()) {
       <button matButton="filled" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
         {{ t('admin.featureFlags.addFlag') }}
@@ -68,41 +68,45 @@
                 <dd>{{ flag.updatedAt | localizedDate: 'medium' }}</dd>
               </dl>
 
-              @if (canManage()) {
+              @if (canUpdate() || canDelete()) {
                 <div class="flag-card-actions">
-                  <button
-                    matIconButton
-                    (click)="toggleFlag(flag)"
-                    [matTooltip]="t('admin.featureFlags.toggleFlag')"
-                    [attr.aria-label]="
-                      t('admin.featureFlags.toggleFlag') + ' ' + flag.key
-                    "
-                  >
-                    <mat-icon>{{
-                      flag.enabled ? 'toggle_on' : 'toggle_off'
-                    }}</mat-icon>
-                  </button>
-                  <button
-                    matIconButton
-                    (click)="openEditDialog(flag)"
-                    [matTooltip]="t('admin.featureFlags.editFlag')"
-                    [attr.aria-label]="
-                      t('admin.featureFlags.editFlag') + ' ' + flag.key
-                    "
-                  >
-                    <mat-icon>edit</mat-icon>
-                  </button>
-                  <button
-                    matIconButton
-                    class="app-btn-danger"
-                    (click)="confirmDelete(flag)"
-                    [matTooltip]="t('admin.featureFlags.deleteFlag')"
-                    [attr.aria-label]="
-                      t('admin.featureFlags.deleteFlag') + ' ' + flag.key
-                    "
-                  >
-                    <mat-icon>delete</mat-icon>
-                  </button>
+                  @if (canUpdate()) {
+                    <button
+                      matIconButton
+                      (click)="toggleFlag(flag)"
+                      [matTooltip]="t('admin.featureFlags.toggleFlag')"
+                      [attr.aria-label]="
+                        t('admin.featureFlags.toggleFlag') + ' ' + flag.key
+                      "
+                    >
+                      <mat-icon>{{
+                        flag.enabled ? 'toggle_on' : 'toggle_off'
+                      }}</mat-icon>
+                    </button>
+                    <button
+                      matIconButton
+                      (click)="openEditDialog(flag)"
+                      [matTooltip]="t('admin.featureFlags.editFlag')"
+                      [attr.aria-label]="
+                        t('admin.featureFlags.editFlag') + ' ' + flag.key
+                      "
+                    >
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                  }
+                  @if (canDelete()) {
+                    <button
+                      matIconButton
+                      class="app-btn-danger"
+                      (click)="confirmDelete(flag)"
+                      [matTooltip]="t('admin.featureFlags.deleteFlag')"
+                      [attr.aria-label]="
+                        t('admin.featureFlags.deleteFlag') + ' ' + flag.key
+                      "
+                    >
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  }
                 </div>
               }
             </mat-card-content>
@@ -193,7 +197,7 @@
               {{ t('admin.featureFlags.tableHeaderActions') }}
             </th>
             <td mat-cell *matCellDef="let flag">
-              @if (canManage()) {
+              @if (canUpdate()) {
                 <button
                   matIconButton
                   (click)="toggleFlag(flag)"
@@ -216,6 +220,8 @@
                 >
                   <mat-icon>edit</mat-icon>
                 </button>
+              }
+              @if (canDelete()) {
                 <button
                   matIconButton
                   class="app-btn-danger"
@@ -254,7 +260,7 @@
     }
   </mat-card-content>
 
-  @if (canManage() && layout.isHandset()) {
+  @if (canCreate() && layout.isHandset()) {
     <button
       matFab
       extended

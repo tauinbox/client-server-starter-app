@@ -56,7 +56,13 @@ import type { JwtAuthRequest } from '../types/auth.request';
   path: 'roles',
   version: '1'
 })
-@RegisterResource({ name: 'roles', subject: 'Role', displayName: 'Roles' })
+@RegisterResource({
+  name: 'roles',
+  subject: 'Role',
+  displayName: 'Roles',
+  actions: ['create', 'read', 'update', 'delete', 'assign'],
+  conditionalActions: ['create', 'update', 'delete']
+})
 @UseInterceptors(ClassSerializerInterceptor)
 @SerializeOptions({ groups: ['privileged'] })
 export class RolesController {

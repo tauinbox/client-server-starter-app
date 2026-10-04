@@ -17,5 +17,6 @@ export type KnownActions =
   | 'delete'
   | 'manage'
   | 'read'
+  | 'refund'
   | 'search'
   | 'update';

@@ -78,7 +78,9 @@ import { SignInCompletionService } from '../services/sign-in-completion.service'
 @RegisterResource({
   name: 'profile',
   subject: 'Profile',
-  displayName: 'Profile'
+  displayName: 'Profile',
+  actions: ['update'],
+  conditionalActions: []
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {

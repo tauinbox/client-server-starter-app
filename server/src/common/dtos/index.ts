@@ -7,6 +7,5 @@ export {
 export {
   RoleCursorQueryDto,
   ResourceCursorQueryDto,
-  ActionCursorQueryDto,
   FeatureFlagCursorQueryDto
 } from './entity-cursor-query.dto';

@@ -93,46 +93,9 @@ test.describe('Admin Resources page', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
-  // The picker offers every action, so it must read the unpaginated catalog:
-  // sourcing it from a page of the cursor list drops whatever falls off the
-  // first page, and the "Custom" seed then writes an incomplete allowed list.
-  test('builds the allowed-actions picker from the full catalog', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
-
-    const actionRequests: string[] = [];
-    page.on('request', (request) => {
-      if (request.url().includes('/rbac/actions')) {
-        actionRequests.push(request.url());
-      }
-    });
-
-    await page.goto('/admin/resources');
-    await expect(page.locator('table tbody tr').first()).toBeVisible();
-
-    // Profile allows only read and update, so the picker opens in custom mode
-    // with a partial selection and must still offer every action there is.
-    await page.getByRole('button', { name: 'Edit Resource Profile' }).click();
-    await openedDialog(page);
-
-    await expect(page.locator('mat-dialog-content mat-checkbox')).toHaveCount(
-      6
-    );
-    await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(2);
-    await expect(page.getByRole('checkbox', { name: 'Read' })).toBeChecked();
-    await expect(
-      page.getByRole('checkbox', { name: /^Assign/ })
-    ).not.toBeChecked();
-
-    expect(actionRequests).toHaveLength(1);
-    expect(actionRequests[0]).not.toContain('/cursor');
-  });
-
-  // Switching a resource with no explicit list into custom mode seeds it from
-  // the default actions, so that seed has to see the whole catalog.
-  test('seeds custom mode from every default action', async ({
+  // The picker offers the actions the code checks on the resource, read from
+  // the resource itself, so nothing outside that list can be offered.
+  test('offers only the actions the resource declares', async ({
     _mockServer,
     page
   }) => {
@@ -140,20 +103,41 @@ test.describe('Admin Resources page', () => {
     await page.goto('/admin/resources');
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
-    // Users has no allowed list, so the dialog opens in default mode.
     await page.getByRole('button', { name: 'Edit Resource Users' }).click();
     await openedDialog(page);
 
+    await expect(page.getByRole('dialog')).toContainText(
+      'Create, Read, Update, Delete, Search'
+    );
+
     const customToggle = page.getByRole('switch', { name: 'Custom' });
-    await expect(customToggle).toBeEnabled();
     await customToggle.click();
     await expect(customToggle).toBeChecked();
 
-    // The five default actions are pre-selected; the non-default one is not.
+    await expect(page.locator('mat-dialog-content mat-checkbox')).toHaveCount(
+      5
+    );
     await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(5);
-    await expect(
-      page.getByRole('checkbox', { name: /^Assign/ })
-    ).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Assign' })).toHaveCount(0);
+  });
+
+  test('offers a single action for a resource that checks one', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/admin/resources');
+    await expect(page.locator('table tbody tr').first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Edit Resource Profile' }).click();
+    await openedDialog(page);
+
+    await page.getByRole('switch', { name: 'Custom' }).click();
+
+    await expect(page.locator('mat-dialog-content mat-checkbox')).toHaveCount(
+      1
+    );
+    await expect(page.getByRole('checkbox', { name: 'Update' })).toBeChecked();
   });
 
   test('should save resource changes and show success notification', async ({

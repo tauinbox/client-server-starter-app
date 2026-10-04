@@ -33,15 +33,14 @@ const mockPermissionA = {
     isSystem: true,
     isOrphaned: false,
     isRegistered: true,
+    actionNames: ['create', 'read', 'update', 'delete', 'search'],
+    conditionalActionNames: ['create', 'read', 'update', 'delete', 'search'],
     allowedActionNames: null,
     createdAt: '2025-01-01T00:00:00.000Z'
   },
   action: {
     id: 'act-1',
     name: 'read',
-    displayName: 'Read',
-    description: 'Read access',
-    isDefault: true,
     createdAt: '2025-01-01T00:00:00.000Z'
   },
   description: null,
@@ -54,9 +53,6 @@ const mockPermissionB = {
   action: {
     id: 'act-2',
     name: 'create',
-    displayName: 'Create',
-    description: 'Create access',
-    isDefault: true,
     createdAt: '2025-01-01T00:00:00.000Z'
   },
   description: null,
@@ -88,12 +84,14 @@ function textareaBlurEvent(value: string): Event {
 
 function setup(
   rolePermItems: RolePermissionItem[],
-  options: { readonly?: boolean } = {}
+  options: { readonly?: boolean; allPermissions?: unknown[] } = {}
 ) {
   const roleServiceMock = {
     getAllPermissions: vi
       .fn()
-      .mockReturnValue(of([mockPermissionA, mockPermissionB])),
+      .mockReturnValue(
+        of(options.allPermissions ?? [mockPermissionA, mockPermissionB])
+      ),
     getRolePermissions: vi.fn().mockReturnValue(of(rolePermItems)),
     setPermissions: vi.fn().mockReturnValue(of(undefined))
   };
@@ -134,11 +132,70 @@ function setup(
   };
 }
 
+// A resource whose checks never read the record: no action takes a condition.
+const billingResource = {
+  ...mockPermissionA.resource,
+  id: 'res-billing',
+  name: 'billing',
+  subject: 'Billing',
+  displayName: 'Billing',
+  actionNames: ['search', 'update', 'refund'],
+  conditionalActionNames: [],
+  allowedActionNames: ['search', 'update']
+};
+
+const billingPermission = (name: string) => ({
+  id: `perm-billing-${name}`,
+  resource: billingResource,
+  action: { id: `act-${name}`, name, createdAt: '2025-01-01T00:00:00.000Z' },
+  description: null,
+  createdAt: '2025-01-01T00:00:00.000Z'
+});
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('RolePermissionsDialogComponent', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
+  });
+
+  describe('declared action lists', () => {
+    it('shows only the actions a resource offers, translated', () => {
+      const { fixture } = setup([], {
+        allPermissions: ['search', 'update', 'refund'].map(billingPermission)
+      });
+
+      const labels = Array.from(
+        fixture.nativeElement.querySelectorAll(
+          '.permission-items mat-checkbox'
+        ) as NodeListOf<Element>
+      ).map((el) => el.textContent?.trim());
+      expect(labels).toEqual(['Search', 'Update']);
+    });
+
+    it('offers a restriction only where the checks read the record', () => {
+      const { component } = setup([]);
+
+      expect(component.supportsConditions(mockPermissionA)).toBe(true);
+      expect(component.supportsConditions(billingPermission('update'))).toBe(
+        false
+      );
+    });
+
+    it('clears a stored restriction and keeps the effect', () => {
+      const { component } = setup([
+        {
+          ...makeRolePermItem('perm-a'),
+          conditions: { effect: 'deny', fieldMatch: { locale: ['ru'] } }
+        }
+      ]);
+
+      component.clearRestrictions('perm-a');
+
+      expect(component.conditionsMap().get('perm-a')).toEqual({
+        effect: 'deny'
+      });
+    });
   });
 
   describe('initialisation from server response', () => {

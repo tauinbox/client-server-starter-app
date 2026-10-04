@@ -32,6 +32,9 @@ function grant(
     resource_name: 'users',
     resource_subject: 'User',
     is_orphaned: false,
+    action_names: ['create', 'read', 'update', 'delete', 'search'],
+    allowed_action_names: null,
+    conditional_action_names: ['create', 'read', 'update', 'delete', 'search'],
     conditions
   };
 }
@@ -134,6 +137,38 @@ describe('analyzeGrants', () => {
     expect(report.inert[0].role_name).toBe('inert-role');
     // No audit row, so it is unattributed as well - the two axes overlap.
     expect(report.unattributed).toBe(1);
+  });
+
+  it('reports a grant the declared lists make inert', () => {
+    const offeredWithoutConditions = {
+      action_names: ['read', 'update'],
+      allowed_action_names: ['read'],
+      conditional_action_names: []
+    };
+    const report = analyzeGrants({
+      grants: [
+        {
+          ...grant('role-hidden', 'hidden-allow', null),
+          ...offeredWithoutConditions
+        },
+        {
+          ...grant('role-cond', 'unread-condition', OWNERSHIP),
+          ...offeredWithoutConditions,
+          action_name: 'read'
+        },
+        {
+          ...grant('role-deny', 'hidden-deny', { effect: 'deny' }),
+          ...offeredWithoutConditions
+        }
+      ],
+      userRoles: [],
+      auditRows: []
+    });
+
+    expect(report.inert.map((row) => row.role_name)).toEqual([
+      'hidden-allow',
+      'unread-condition'
+    ]);
   });
 
   it('marks a grant as self-reachable when the author holds the role', () => {

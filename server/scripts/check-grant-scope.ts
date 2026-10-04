@@ -79,7 +79,8 @@ async function main(): Promise<void> {
       SELECT rp.role_id, r.name AS role_name, r.is_super AS role_is_super,
              rp.permission_id, act.name AS action_name,
              res.name AS resource_name, res.subject AS resource_subject,
-             res.is_orphaned, rp.conditions
+             res.is_orphaned, res.action_names, res.allowed_action_names,
+             res.conditional_action_names, rp.conditions
       FROM role_permissions rp
       JOIN roles r ON r.id = rp.role_id
       JOIN permissions p ON p.id = rp.permission_id
@@ -116,11 +117,11 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `A. Inert grants - condition vetoed by the resolver: ${report.inert.length}`
+    `A. Inert grants - not applied as authored: ${report.inert.length}`
   );
   if (report.inert.length > 0) {
     console.log(
-      `   These register nothing at runtime today and the grant rule rejects them on rewrite.`
+      `   An allow registers nothing and a deny denies everything at runtime; the grant rule rejects them on rewrite.`
     );
     for (const row of report.inert) {
       console.log(`   - ${grantLabel(row)}`);

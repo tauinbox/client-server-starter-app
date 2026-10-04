@@ -16,8 +16,6 @@ const MODERATOR_ROLE_ID = mockId('role-moderator');
 const SUPPORT_ROLE_ID = mockId('role-support');
 const USERS_RESOURCE_ID = mockId('res-users');
 const ROLES_RESOURCE_ID = mockId('res-roles');
-const READ_ACTION_ID = mockId('act-read');
-const UPDATE_ACTION_ID = mockId('act-update');
 
 beforeAll(async () => {
   resetState();
@@ -172,34 +170,6 @@ describe('permission-based route authorization', () => {
       expect(allowed.status).toBe(201);
 
       const denied = await createRole('unblessed');
-      expect(denied.status).toBe(403);
-      expect(await readMessage(denied)).toBe('Insufficient permissions');
-    });
-
-    it('applies a conditional create:Permission grant to POST /rbac/actions', async () => {
-      delegateToRegularUser([
-        {
-          permissionId: permissionId('res-permissions', 'act-create'),
-          conditions: { fieldMatch: { name: ['publish'] } }
-        }
-      ]);
-      const token = await login('user@example.com');
-
-      async function createAction(name: string): Promise<Response> {
-        return fetch(`${baseUrl}/api/v1/rbac/actions`, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ name, displayName: 'Any' })
-        });
-      }
-
-      const allowed = await createAction('publish');
-      expect(allowed.status).toBe(201);
-
-      const denied = await createAction('archive');
       expect(denied.status).toBe(403);
       expect(await readMessage(denied)).toBe('Insufficient permissions');
     });
@@ -429,7 +399,9 @@ describe('permission-based route authorization', () => {
       );
     });
 
-    it('applies a conditional read:Role grant to the two role read routes', async () => {
+    // The role lists ignore a read condition, so `read` on Role takes none: a
+    // stored conditional grant (written before the rule) grants nothing.
+    it('fails closed on a conditional read:Role grant', async () => {
       const token = await delegate([
         {
           permissionId: permissionId('res-roles', 'act-read'),
@@ -437,29 +409,10 @@ describe('permission-based route authorization', () => {
         }
       ]);
 
-      expect(
-        (await send(token, 'GET', `/api/v1/roles/${EDITOR_ROLE_ID}`)).status
-      ).toBe(200);
       await expectRefused(
-        await send(token, 'GET', `/api/v1/roles/${MODERATOR_ROLE_ID}`)
+        await send(token, 'GET', `/api/v1/roles/${EDITOR_ROLE_ID}`)
       );
-
-      expect(
-        (
-          await send(
-            token,
-            'GET',
-            `/api/v1/roles/${EDITOR_ROLE_ID}/permissions`
-          )
-        ).status
-      ).toBe(200);
-      await expectRefused(
-        await send(
-          token,
-          'GET',
-          `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`
-        )
-      );
+      await expectRefused(await send(token, 'GET', '/api/v1/roles/cursor'));
     });
 
     it('applies a conditional update:Role grant to PATCH /roles/:id', async () => {
@@ -509,7 +462,7 @@ describe('permission-based route authorization', () => {
           conditions: { fieldMatch: { name: ['moderator'] } }
         }
       ]);
-      const granted = permissionId('res-profile', 'act-read');
+      const granted = permissionId('res-profile', 'act-update');
 
       expect(
         (
@@ -652,94 +605,51 @@ describe('permission-based route authorization', () => {
         )
       );
     });
-
-    it('applies a conditional update:Permission grant to PATCH /rbac/actions/:id', async () => {
-      const token = await delegate([
-        {
-          permissionId: permissionId('res-permissions', 'act-update'),
-          conditions: { fieldMatch: { name: ['read'] } }
-        }
-      ]);
-
-      const allowed = await send(
-        token,
-        'PATCH',
-        `/api/v1/rbac/actions/${READ_ACTION_ID}`,
-        { displayName: 'Renamed' }
-      );
-      expect(allowed.status).toBe(200);
-
-      await expectRefused(
-        await send(token, 'PATCH', `/api/v1/rbac/actions/${UPDATE_ACTION_ID}`, {
-          displayName: 'Renamed'
-        })
-      );
-    });
-
-    it('applies a conditional delete:Permission grant to DELETE /rbac/actions/:id', async () => {
-      const adminToken = await login('admin@example.com');
-      const created: Record<string, string> = {};
-      for (const name of ['publish', 'archive']) {
-        const res = await send(adminToken, 'POST', '/api/v1/rbac/actions', {
-          name,
-          displayName: name
-        });
-        expect(res.status).toBe(201);
-        created[name] = ((await res.json()) as { id: string }).id;
-      }
-
-      const token = await delegate([
-        {
-          permissionId: permissionId('res-permissions', 'act-delete'),
-          conditions: { fieldMatch: { name: ['publish'] } }
-        }
-      ]);
-
-      expect(
-        (
-          await send(
-            token,
-            'DELETE',
-            `/api/v1/rbac/actions/${created['publish']}`
-          )
-        ).status
-      ).toBe(200);
-      await expectRefused(
-        await send(
-          token,
-          'DELETE',
-          `/api/v1/rbac/actions/${created['archive']}`
-        )
-      );
-    });
   });
 
-  // `manage` is a reserved CASL action name, so no permission row can carry it
-  // on either side. The billing and feature-flag administration routes are
-  // therefore reachable by a super role only, on the mock as on the server.
-  describe('reserved manage tuple', () => {
-    it('refuses the feature-flag administration router for a delegated role', async () => {
+  // The billing and feature-flag administration routes check ordinary
+  // actions, so a delegated role reaches exactly the routes it is granted.
+  describe('billing and feature-flag administration', () => {
+    it('admits the flag list on search:FeatureFlag and not on read', async () => {
       delegateToRegularUser([
         { permissionId: permissionId('res-feature-flags', 'act-read') }
       ]);
+      const readOnly = await login('user@example.com');
+      const refused = await fetch(`${baseUrl}/api/v1/admin/feature-flags`, {
+        headers: { authorization: `Bearer ${readOnly}` }
+      });
+      expect(refused.status).toBe(403);
+
+      delegateToRegularUser([
+        { permissionId: permissionId('res-feature-flags', 'act-search') }
+      ]);
+      const searcher = await login('user@example.com');
+      const admitted = await fetch(`${baseUrl}/api/v1/admin/feature-flags`, {
+        headers: { authorization: `Bearer ${searcher}` }
+      });
+      expect(admitted.status).toBe(200);
+    });
+
+    it('keeps a refund out of reach of update:Billing', async () => {
+      delegateToRegularUser([
+        { permissionId: permissionId('res-billing', 'act-update') }
+      ]);
       const token = await login('user@example.com');
 
-      const res = await fetch(`${baseUrl}/api/v1/admin/feature-flags`, {
-        headers: { authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(
+        `${baseUrl}/api/v1/admin/billing/invoices/${OTHER_ID}/refund`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({})
+        }
+      );
 
       expect(res.status).toBe(403);
       expect(await readMessage(res)).toBe('Insufficient permissions');
-    });
-
-    it('admits the feature-flag administration router for the administrator', async () => {
-      const token = await login('admin@example.com');
-
-      const res = await fetch(`${baseUrl}/api/v1/admin/feature-flags`, {
-        headers: { authorization: `Bearer ${token}` }
-      });
-
-      expect(res.status).toBe(200);
     });
 
     it('admits the billing administration router for the administrator', async () => {
@@ -753,9 +663,9 @@ describe('permission-based route authorization', () => {
     });
   });
 
-  // ResourceSyncService registers six resources on the server and auto-creates
-  // a permission for each one against every action, so the seeded catalog of
-  // the mock has to carry the same six.
+  // ResourceSyncService registers six resources on the server and creates a
+  // permission for each action a resource declares, so the seeded catalog of
+  // the mock has to carry the same six and the same pairs.
   describe('resource catalog', () => {
     it('seeds every subject the server registers', async () => {
       const token = await login('admin@example.com');
@@ -776,7 +686,7 @@ describe('permission-based route authorization', () => {
       ]);
     });
 
-    it('pairs every resource with every action', async () => {
+    it('creates a permission only for each declared pair', async () => {
       const token = await login('admin@example.com');
 
       const res = await fetch(`${baseUrl}/api/v1/roles/permissions`, {
@@ -785,7 +695,8 @@ describe('permission-based route authorization', () => {
 
       expect(res.status).toBe(200);
       const permissions = (await res.json()) as unknown[];
-      expect(permissions).toHaveLength(36);
+      // users 5 + roles 5 + permissions 2 + profile 1 + billing 4 + flags 5
+      expect(permissions).toHaveLength(22);
     });
   });
   // Parity with the two server layers that audit a denial before they throw:
@@ -864,17 +775,17 @@ describe('permission-based route authorization', () => {
 
     // The rbac routes authorize the `Permission` subject while the server
     // audits the entity the record belongs to.
-    it('audits an rbac action denial as targetType Action', async () => {
+    it('audits an rbac resource denial as targetType Resource', async () => {
       delegateToRegularUser([
         {
           permissionId: permissionId('res-permissions', 'act-update'),
-          conditions: { fieldMatch: { name: ['publish'] } }
+          conditions: { fieldMatch: { name: ['users'] } }
         }
       ]);
       const token = await login('user@example.com');
 
       const res = await fetch(
-        `${baseUrl}/api/v1/rbac/actions/${READ_ACTION_ID}`,
+        `${baseUrl}/api/v1/rbac/resources/${ROLES_RESOURCE_ID}`,
         {
           method: 'PATCH',
           headers: {
@@ -890,8 +801,8 @@ describe('permission-based route authorization', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         actorId: REGULAR_ID,
-        targetId: READ_ACTION_ID,
-        targetType: 'Action',
+        targetId: ROLES_RESOURCE_ID,
+        targetType: 'Resource',
         details: {
           instanceCheck: true,
           deniedAction: 'update',

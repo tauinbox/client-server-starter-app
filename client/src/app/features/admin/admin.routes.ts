@@ -7,7 +7,6 @@ import {
 import { adminPanelGuard } from './guards/admin-panel.guard';
 import { UsersStore } from '@features/users/store/users.store';
 import { RolesStore } from './store/roles.store';
-import { ActionsStore } from './store/actions.store';
 import { ResourcesStore } from './store/resources.store';
 import { FeatureFlagsAdminStore } from './store/feature-flags-admin.store';
 import { BillingInvoicesStore } from './store/billing-invoices.store';
@@ -26,7 +25,6 @@ export const adminRoutes: Routes = [
       UsersStore,
       RolesStore,
       ResourcesStore,
-      ActionsStore,
       FeatureFlagsAdminStore,
       BillingSubscriptionsStore,
       BillingInvoicesStore
@@ -106,20 +104,12 @@ export const adminRoutes: Routes = [
         canActivate: [permissionGuard('read', 'Permission')]
       },
       {
-        path: 'actions',
-        loadComponent: () =>
-          import('./components/resources/action-list/action-list.component').then(
-            (c) => c.ActionListComponent
-          ),
-        canActivate: [permissionGuard('read', 'Permission')]
-      },
-      {
         path: 'feature-flags',
         loadComponent: () =>
           import('./components/feature-flags/feature-flag-list/feature-flag-list.component').then(
             (c) => c.FeatureFlagListComponent
           ),
-        canActivate: [permissionGuard('manage', 'FeatureFlag')]
+        canActivate: [permissionGuard('search', 'FeatureFlag')]
       },
       {
         path: 'billing',
@@ -127,7 +117,7 @@ export const adminRoutes: Routes = [
           import('./components/billing/billing-admin-list.component').then(
             (c) => c.BillingAdminListComponent
           ),
-        canActivate: [permissionGuard('manage', 'Billing')]
+        canActivate: [permissionGuard('search', 'Billing')]
       }
     ]
   }

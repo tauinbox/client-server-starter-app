@@ -122,6 +122,48 @@ export function findUserAttrShapeError(value: unknown): string | null {
  * a stored value, so they can only be evaluated on a record that already
  * exists.
  */
+export const RESTRICTION_CONDITION_BRANCHES = [
+  'ownership',
+  'fieldMatch',
+  'userAttr',
+  'custom'
+] as const;
+
+/**
+ * Returns the first branch that restricts a grant to some records, or null.
+ * A condition with no such branch (only `effect`) is an unconditional rule.
+ */
+export function findRestrictionBranch(value: unknown): string | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+  return (
+    RESTRICTION_CONDITION_BRANCHES.find(
+      (branch) => value[branch] !== undefined && value[branch] !== null
+    ) ?? null
+  );
+}
+
+/**
+ * Rejects a restriction on an action whose checks never read the record.
+ *
+ * A route check on a subject type ignores conditions: CASL answers it from
+ * the rule alone, so a conditional allow passes as an unconditional one and a
+ * conditional deny stops nothing. Only the actions a resource lists in
+ * `conditionalActionNames` evaluate the condition on the record.
+ */
+export function findConditionSupportError(
+  actionName: string,
+  conditionalActionNames: readonly string[],
+  conditions: unknown
+): string | null {
+  const branch = findRestrictionBranch(conditions);
+  if (!branch || conditionalActionNames.includes(actionName)) {
+    return null;
+  }
+  return `conditions.${branch} cannot apply to "${actionName}": no check of this action reads the record`;
+}
+
 export const IDENTITY_BOUND_CONDITION_BRANCHES = [
   'ownership',
   'userAttr'

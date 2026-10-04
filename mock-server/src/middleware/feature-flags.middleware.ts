@@ -522,34 +522,40 @@ publicRouter.get('/', (req, res) => {
 // ── Admin router ───────────────────────────────────────────────────────────
 const adminRouter = Router();
 
-adminRouter.use(permissionGuard('manage', 'FeatureFlag'));
-
-adminRouter.get('/cursor', (req, res) => {
-  const query = req.query as Record<string, unknown>;
-  const errors = cursorQueryErrors(query, {
-    sortColumns: ALLOWED_FEATURE_FLAG_SORT_COLUMNS
-  });
-  if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
-    return;
+adminRouter.get(
+  '/cursor',
+  permissionGuard('search', 'FeatureFlag'),
+  (req, res) => {
+    const query = req.query as Record<string, unknown>;
+    const errors = cursorQueryErrors(query, {
+      sortColumns: ALLOWED_FEATURE_FLAG_SORT_COLUMNS
+    });
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
+    const page = cursorPaginate(
+      Array.from(getState().featureFlags.values()),
+      parseCursorQuery(query)
+    );
+    res.json({ data: page.data.map(toFeatureFlagResponse), meta: page.meta });
   }
-  const page = cursorPaginate(
-    Array.from(getState().featureFlags.values()),
-    parseCursorQuery(query)
-  );
-  res.json({ data: page.data.map(toFeatureFlagResponse), meta: page.meta });
-});
+);
 
 // Mirrors GET /admin/feature-flags/attribute-keys. Declared above the /:id
 // handler so the literal segment wins, as /cursor is.
-adminRouter.get('/attribute-keys', (_req, res) => {
-  const body: FeatureFlagAttributeKeysResponse = {
-    customKeys: Array.from(KNOWN_CUSTOM_KEYS).sort()
-  };
-  res.json(body);
-});
+adminRouter.get(
+  '/attribute-keys',
+  permissionGuard('search', 'FeatureFlag'),
+  (_req, res) => {
+    const body: FeatureFlagAttributeKeysResponse = {
+      customKeys: Array.from(KNOWN_CUSTOM_KEYS).sort()
+    };
+    res.json(body);
+  }
+);
 
-adminRouter.get('/', (_req, res) => {
+adminRouter.get('/', permissionGuard('search', 'FeatureFlag'), (_req, res) => {
   const flags: FeatureFlagResponse[] = [];
   for (const flag of getState().featureFlags.values()) {
     flags.push(toFeatureFlagResponse(flag));
@@ -558,19 +564,26 @@ adminRouter.get('/', (_req, res) => {
   res.json(flags);
 });
 
-adminRouter.get('/:id', requireUuid('id'), (req, res) => {
-  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
-  if (!flag) {
-    sendError(
-      res,
-      404,
-      'Feature flag not found',
-      ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+adminRouter.get(
+  '/:id',
+  permissionGuard('read', 'FeatureFlag'),
+  requireUuid('id'),
+  (req, res) => {
+    const flag = getState().featureFlags.get(
+      (req.params['id'] as string) ?? ''
     );
-    return;
+    if (!flag) {
+      sendError(
+        res,
+        404,
+        'Feature flag not found',
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+      );
+      return;
+    }
+    res.json(toFeatureFlagResponse(flag));
   }
-  res.json(toFeatureFlagResponse(flag));
-});
+);
 
 function rulesOf(body: {
   rules?: unknown;
@@ -603,7 +616,7 @@ function writeRules(
   });
 }
 
-adminRouter.post('/', (req, res) => {
+adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
   const body = req.body as CreateFlagBody;
   const validation = validateCreate(body);
   if (!validation.ok) {
@@ -657,107 +670,119 @@ adminRouter.post('/', (req, res) => {
   res.status(201).json(toFeatureFlagResponse(flag));
 });
 
-adminRouter.patch('/:id', requireUuid('id'), (req, res) => {
-  // Order mirrors the server: the global ValidationPipe rejects the body
-  // before the handler reads If-Match, and both precede the service lookup.
-  const body = req.body as UpdateFlagBody;
-  const validation = validateUpdate(body);
-  if (!validation.ok) {
-    res.status(400).json(validationError(validation.message));
-    return;
-  }
-  const rules = rulesOf(body);
-  if (rules && !rules.ok && rules.source === 'dto') {
-    res.status(400).json(validationError(rules.message));
-    return;
-  }
-  const ifMatch = parseIfMatch(req.header('if-match') ?? undefined);
-  if (!ifMatch.ok) {
-    sendError(res, ifMatch.status, ifMatch.message, ifMatch.errorKey);
-    return;
-  }
-  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
-  if (!flag) {
-    sendError(
-      res,
-      404,
-      'Feature flag not found',
-      ErrorKeys.FEATURE_FLAGS.NOT_FOUND
-    );
-    return;
-  }
-  if (rules && !rules.ok) {
-    sendError(res, 400, rules.message);
-    return;
-  }
-  if (flag.version !== ifMatch.version) {
-    sendError(
-      res,
-      409,
-      'Feature flag was modified by another request — reload and retry',
-      ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
-    );
-    return;
-  }
-  const changed = changedFields(flag, {
-    description: validation.patch.description,
-    enabled: validation.patch.enabled,
-    environments: validation.patch.environments,
-    public: validation.patch.isPublic
-  });
-  if (validation.patch.description !== undefined) {
-    flag.description = validation.patch.description;
-  }
-  if (validation.patch.enabled !== undefined)
-    flag.enabled = validation.patch.enabled;
-  if (validation.patch.environments !== undefined) {
-    flag.environments = validation.patch.environments;
-  }
-  if (validation.patch.isPublic !== undefined)
-    flag.public = validation.patch.isPublic;
-  flag.version += 1;
-  flag.updatedAt = nowIso();
-  flag.updatedByUserId = actorIdFromReq(req);
-  if (rules) writeRules(flag.id, rules.rules, flag.updatedAt);
-  logAudit('FEATURE_FLAG_UPDATE', {
-    actorId: actorIdFromReq(req),
-    targetId: flag.id,
-    targetType: 'FeatureFlag',
-    details: {
-      changedFields: changed,
-      ...(rules ? { ruleCount: rules.rules.length } : {})
+adminRouter.patch(
+  '/:id',
+  permissionGuard('update', 'FeatureFlag'),
+  requireUuid('id'),
+  (req, res) => {
+    // Order mirrors the server: the global ValidationPipe rejects the body
+    // before the handler reads If-Match, and both precede the service lookup.
+    const body = req.body as UpdateFlagBody;
+    const validation = validateUpdate(body);
+    if (!validation.ok) {
+      res.status(400).json(validationError(validation.message));
+      return;
     }
-  });
-  broadcastFlagsUpdated();
-  res.json(toFeatureFlagResponse(flag));
-});
-
-adminRouter.delete('/:id', requireUuid('id'), (req, res) => {
-  const id = (req.params['id'] as string) ?? '';
-  const flag = getState().featureFlags.get(id);
-  if (!flag) {
-    sendError(
-      res,
-      404,
-      'Feature flag not found',
-      ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+    const rules = rulesOf(body);
+    if (rules && !rules.ok && rules.source === 'dto') {
+      res.status(400).json(validationError(rules.message));
+      return;
+    }
+    const ifMatch = parseIfMatch(req.header('if-match') ?? undefined);
+    if (!ifMatch.ok) {
+      sendError(res, ifMatch.status, ifMatch.message, ifMatch.errorKey);
+      return;
+    }
+    const flag = getState().featureFlags.get(
+      (req.params['id'] as string) ?? ''
     );
-    return;
+    if (!flag) {
+      sendError(
+        res,
+        404,
+        'Feature flag not found',
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+      );
+      return;
+    }
+    if (rules && !rules.ok) {
+      sendError(res, 400, rules.message);
+      return;
+    }
+    if (flag.version !== ifMatch.version) {
+      sendError(
+        res,
+        409,
+        'Feature flag was modified by another request — reload and retry',
+        ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+      );
+      return;
+    }
+    const changed = changedFields(flag, {
+      description: validation.patch.description,
+      enabled: validation.patch.enabled,
+      environments: validation.patch.environments,
+      public: validation.patch.isPublic
+    });
+    if (validation.patch.description !== undefined) {
+      flag.description = validation.patch.description;
+    }
+    if (validation.patch.enabled !== undefined)
+      flag.enabled = validation.patch.enabled;
+    if (validation.patch.environments !== undefined) {
+      flag.environments = validation.patch.environments;
+    }
+    if (validation.patch.isPublic !== undefined)
+      flag.public = validation.patch.isPublic;
+    flag.version += 1;
+    flag.updatedAt = nowIso();
+    flag.updatedByUserId = actorIdFromReq(req);
+    if (rules) writeRules(flag.id, rules.rules, flag.updatedAt);
+    logAudit('FEATURE_FLAG_UPDATE', {
+      actorId: actorIdFromReq(req),
+      targetId: flag.id,
+      targetType: 'FeatureFlag',
+      details: {
+        changedFields: changed,
+        ...(rules ? { ruleCount: rules.rules.length } : {})
+      }
+    });
+    broadcastFlagsUpdated();
+    res.json(toFeatureFlagResponse(flag));
   }
-  const state = getState();
-  state.featureFlags.delete(id);
-  state.featureFlagRules = state.featureFlagRules.filter(
-    (r) => r.flagId !== id
-  );
-  logAudit('FEATURE_FLAG_DELETE', {
-    actorId: actorIdFromReq(req),
-    targetId: flag.id,
-    targetType: 'FeatureFlag',
-    details: { key: flag.key }
-  });
-  broadcastFlagsUpdated();
-  res.status(204).end();
-});
+);
+
+adminRouter.delete(
+  '/:id',
+  permissionGuard('delete', 'FeatureFlag'),
+  requireUuid('id'),
+  (req, res) => {
+    const id = (req.params['id'] as string) ?? '';
+    const flag = getState().featureFlags.get(id);
+    if (!flag) {
+      sendError(
+        res,
+        404,
+        'Feature flag not found',
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+      );
+      return;
+    }
+    const state = getState();
+    state.featureFlags.delete(id);
+    state.featureFlagRules = state.featureFlagRules.filter(
+      (r) => r.flagId !== id
+    );
+    logAudit('FEATURE_FLAG_DELETE', {
+      actorId: actorIdFromReq(req),
+      targetId: flag.id,
+      targetType: 'FeatureFlag',
+      details: { key: flag.key }
+    });
+    broadcastFlagsUpdated();
+    res.status(204).end();
+  }
+);
 
 const MAX_ATTRIBUTE_KEYS = 32;
 const MAX_ATTRIBUTE_KEY_LENGTH = 64;
@@ -821,106 +846,120 @@ function previewContextErrors(body: Record<string, unknown>): string[] {
   ];
 }
 
-adminRouter.post('/:id/preview', requireUuid('id'), (req, res) => {
-  const body = (req.body ?? {}) as Record<string, unknown>;
-  // The server resolves the body through the ValidationPipe before the handler
-  // runs, so every DTO-level rejection precedes the 404, and the pipe reports
-  // all of them together. Only the rule-payload validator lives in the service,
-  // below the lookup.
-  const errors = previewContextErrors(body);
-  const rulesValidation =
-    body['rules'] === undefined ? null : validateRules(body['rules']);
-  if (
-    rulesValidation &&
-    !rulesValidation.ok &&
-    rulesValidation.source === 'dto'
-  ) {
-    errors.push(rulesValidation.message);
-  }
-  if (body['enabled'] !== undefined && typeof body['enabled'] !== 'boolean') {
-    errors.push('enabled must be a boolean value');
-  }
-  let draftEnvironments: string[] | undefined;
-  if (body['environments'] !== undefined) {
-    const validated = validateEnvironments(body['environments']);
-    if (validated.ok) {
-      draftEnvironments = validated.environments;
-    } else {
-      errors.push(validated.message);
+adminRouter.post(
+  '/:id/preview',
+  permissionGuard('read', 'FeatureFlag'),
+  requireUuid('id'),
+  (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    // The server resolves the body through the ValidationPipe before the handler
+    // runs, so every DTO-level rejection precedes the 404, and the pipe reports
+    // all of them together. Only the rule-payload validator lives in the service,
+    // below the lookup.
+    const errors = previewContextErrors(body);
+    const rulesValidation =
+      body['rules'] === undefined ? null : validateRules(body['rules']);
+    if (
+      rulesValidation &&
+      !rulesValidation.ok &&
+      rulesValidation.source === 'dto'
+    ) {
+      errors.push(rulesValidation.message);
     }
-  }
-  if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
-    return;
-  }
-  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
-  if (!flag) {
-    sendError(
-      res,
-      404,
-      'Feature flag not found',
-      ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+    if (body['enabled'] !== undefined && typeof body['enabled'] !== 'boolean') {
+      errors.push('enabled must be a boolean value');
+    }
+    let draftEnvironments: string[] | undefined;
+    if (body['environments'] !== undefined) {
+      const validated = validateEnvironments(body['environments']);
+      if (validated.ok) {
+        draftEnvironments = validated.environments;
+      } else {
+        errors.push(validated.message);
+      }
+    }
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
+    const flag = getState().featureFlags.get(
+      (req.params['id'] as string) ?? ''
     );
-    return;
+    if (!flag) {
+      sendError(
+        res,
+        404,
+        'Feature flag not found',
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+      );
+      return;
+    }
+    if (rulesValidation && !rulesValidation.ok) {
+      sendError(res, 400, rulesValidation.message);
+      return;
+    }
+    // Every field passed the checks above, so the reads below only pick the
+    // default for an omitted or explicitly null value.
+    const userId = typeof body['userId'] === 'string' ? body['userId'] : null;
+    const roles = isStringArray(body['roles']) ? body['roles'] : [];
+    const attributes = sanitizeAttributes(body['attributes']);
+    const env =
+      typeof body['env'] === 'string'
+        ? body['env']
+        : (process.env['ENVIRONMENT'] ?? 'production');
+    const anonId = typeof body['anonId'] === 'string' ? body['anonId'] : null;
+    const rules: EvaluatorRule[] = rulesValidation?.ok
+      ? rulesValidation.rules.map((r) => ({
+          effect: r.effect,
+          payload: r.payload
+        }))
+      : getState()
+          .featureFlagRules.filter((r) => r.flagId === flag.id)
+          .map((r) => ({ effect: r.effect, payload: r.payload }));
+    const result = previewFeatureFlag(
+      {
+        key: flag.key,
+        enabled: (body['enabled'] as boolean | undefined) ?? flag.enabled,
+        environments: draftEnvironments ?? flag.environments
+      },
+      rules,
+      { userId, anonId, roles, attributes, env }
+    );
+    res.json(result);
   }
-  if (rulesValidation && !rulesValidation.ok) {
-    sendError(res, 400, rulesValidation.message);
-    return;
-  }
-  // Every field passed the checks above, so the reads below only pick the
-  // default for an omitted or explicitly null value.
-  const userId = typeof body['userId'] === 'string' ? body['userId'] : null;
-  const roles = isStringArray(body['roles']) ? body['roles'] : [];
-  const attributes = sanitizeAttributes(body['attributes']);
-  const env =
-    typeof body['env'] === 'string'
-      ? body['env']
-      : (process.env['ENVIRONMENT'] ?? 'production');
-  const anonId = typeof body['anonId'] === 'string' ? body['anonId'] : null;
-  const rules: EvaluatorRule[] = rulesValidation?.ok
-    ? rulesValidation.rules.map((r) => ({
-        effect: r.effect,
-        payload: r.payload
-      }))
-    : getState()
-        .featureFlagRules.filter((r) => r.flagId === flag.id)
-        .map((r) => ({ effect: r.effect, payload: r.payload }));
-  const result = previewFeatureFlag(
-    {
-      key: flag.key,
-      enabled: (body['enabled'] as boolean | undefined) ?? flag.enabled,
-      environments: draftEnvironments ?? flag.environments
-    },
-    rules,
-    { userId, anonId, roles, attributes, env }
-  );
-  res.json(result);
-});
+);
 
-adminRouter.post('/:id/toggle', requireUuid('id'), (req, res) => {
-  const flag = getState().featureFlags.get((req.params['id'] as string) ?? '');
-  if (!flag) {
-    sendError(
-      res,
-      404,
-      'Feature flag not found',
-      ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+adminRouter.post(
+  '/:id/toggle',
+  permissionGuard('update', 'FeatureFlag'),
+  requireUuid('id'),
+  (req, res) => {
+    const flag = getState().featureFlags.get(
+      (req.params['id'] as string) ?? ''
     );
-    return;
+    if (!flag) {
+      sendError(
+        res,
+        404,
+        'Feature flag not found',
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+      );
+      return;
+    }
+    flag.enabled = !flag.enabled;
+    flag.version += 1;
+    flag.updatedAt = nowIso();
+    flag.updatedByUserId = actorIdFromReq(req);
+    logAudit('FEATURE_FLAG_TOGGLE', {
+      actorId: actorIdFromReq(req),
+      targetId: flag.id,
+      targetType: 'FeatureFlag',
+      details: { enabled: flag.enabled }
+    });
+    broadcastFlagsUpdated();
+    res.json(toFeatureFlagResponse(flag));
   }
-  flag.enabled = !flag.enabled;
-  flag.version += 1;
-  flag.updatedAt = nowIso();
-  flag.updatedByUserId = actorIdFromReq(req);
-  logAudit('FEATURE_FLAG_TOGGLE', {
-    actorId: actorIdFromReq(req),
-    targetId: flag.id,
-    targetType: 'FeatureFlag',
-    details: { enabled: flag.enabled }
-  });
-  broadcastFlagsUpdated();
-  res.json(toFeatureFlagResponse(flag));
-});
+);
 
 export {
   publicRouter as featureFlagsRouter,

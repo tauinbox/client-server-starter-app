@@ -1,14 +1,24 @@
 /**
- * Verifies that @Authorize usages reference subjects that are actually registered
- * via @RegisterResource decorators.
+ * Verifies that the actions a resource offers in the permission matrix are the
+ * actions that the code checks.
  *
- * Catches the class of bug where a developer adds @Authorize(['read', 'Foo'])
- * but either forgets to add @RegisterResource to the controller or misspells the
- * subject name — causing silent permission bypass at runtime.
+ * Fails on:
+ *  - a subject used in @Authorize with no matching @RegisterResource
+ *  - two resources with one subject
+ *  - an @Authorize, client or mock-server check on a reserved CASL action
+ *    ('manage', 'all'): only a super role satisfies it, so every grant of the
+ *    resource gives nothing
+ *  - a @RegisterResource `actions` list that differs from the set of actions
+ *    its subject is checked with in @Authorize: an extra entry is a matrix
+ *    checkbox that grants nothing, a missing one is a check no role can pass
+ *  - a `conditionalActions` entry missing from `actions`
+ *  - a declared action with no `rbacActions.<name>` label in a client
+ *    translation file: the permission matrix would show a raw key
+ *  - a client or mock-server check on an action/subject pair that the
+ *    resource does not declare: the UI or the mock then disagrees with the API
  *
- * Reports:
- *  - Subjects used in @Authorize with no matching @RegisterResource
- *  - Resources registered via @RegisterResource but never referenced in any @Authorize
+ * Client and mock-server checks are found by pattern, so only literal
+ * `permissionGuard('a', 'S')` and `{ action: 'a', subject: 'S' }` forms count.
  *
  * Usage (from server/): npm run check:permissions
  */
@@ -20,16 +30,43 @@ import * as ts from 'typescript';
 // ─── config ──────────────────────────────────────────────────────────────────
 
 const CONTROLLERS_ROOT = path.resolve(__dirname, '../src/modules');
+const REPO_ROOT = path.resolve(__dirname, '../..');
+
+/** Source roots whose permission checks must match the server's. */
+const CHECK_ROOTS = [
+  path.join(REPO_ROOT, 'client/src/app'),
+  path.join(REPO_ROOT, 'mock-server/src')
+];
 
 /** Controller subdirectories to skip entirely. */
 const EXCLUDE_DIRS = new Set(['feature']);
+
+const ACTION_LABEL_FILES = ['en', 'ru'].map((lang) =>
+  path.join(REPO_ROOT, `client/src/assets/i18n/${lang}.json`)
+);
+
+/** Kept in step with CASL_RESERVED_ACTION_NAMES in src/modules/auth/casl. */
+const RESERVED_ACTIONS = new Set(['manage', 'all']);
+
+const CHECK_PATTERNS = [
+  /permissionGuard\(\s*'([\w-]+)'\s*,\s*'(\w+)'\s*\)/g,
+  /action:\s*'([\w-]+)'\s*,\s*subject:\s*'(\w+)'/g
+];
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
 interface RegisteredResource {
   name: string;
   subject: string;
+  actions: string[] | undefined;
+  conditionalActions: string[] | undefined;
   file: string;
+}
+
+interface CodeCheck {
+  action: string;
+  subject: string;
+  location: string;
 }
 
 interface AuthorizeUsage {
@@ -58,12 +95,20 @@ function stringLiteral(node: ts.Expression): string | undefined {
   return ts.isStringLiteral(node) ? node.text : undefined;
 }
 
+function stringArray(node: ts.Expression): string[] | undefined {
+  if (!ts.isArrayLiteralExpression(node)) return undefined;
+  return node.elements
+    .map(stringLiteral)
+    .filter((a): a is string => a !== undefined);
+}
+
 /**
- * Extract { name, subject } from @RegisterResource({ name: '...', subject: '...' })
+ * Extract { name, subject, actions, conditionalActions } from
+ * @RegisterResource({ name: '...', subject: '...', actions: [...], ... })
  */
 function parseRegisterResource(
   d: ts.Decorator
-): { name: string; subject: string } | undefined {
+): Omit<RegisteredResource, 'file'> | undefined {
   const args = decoratorArgs(d);
   if (!args?.length) return undefined;
 
@@ -72,14 +117,22 @@ function parseRegisterResource(
 
   let name: string | undefined;
   let subject: string | undefined;
+  let actions: string[] | undefined;
+  let conditionalActions: string[] | undefined;
 
   for (const prop of arg.properties) {
     if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) continue;
     if (prop.name.text === 'name') name = stringLiteral(prop.initializer);
     if (prop.name.text === 'subject') subject = stringLiteral(prop.initializer);
+    if (prop.name.text === 'actions') actions = stringArray(prop.initializer);
+    if (prop.name.text === 'conditionalActions') {
+      conditionalActions = stringArray(prop.initializer);
+    }
   }
 
-  return name && subject ? { name, subject } : undefined;
+  return name && subject
+    ? { name, subject, actions, conditionalActions }
+    : undefined;
 }
 
 /**
@@ -174,6 +227,43 @@ function scanFile(filePath: string): {
   return { resources, authorizeUsages };
 }
 
+function findSourceFiles(dir: string): string[] {
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== '__tests__') results.push(...findSourceFiles(full));
+    } else if (
+      /\.(ts|html)$/.test(entry.name) &&
+      !/\.spec\.ts$/.test(entry.name)
+    ) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+function scanCodeChecks(filePath: string): CodeCheck[] {
+  const source = fs.readFileSync(filePath, 'utf-8');
+  const relPath = path.relative(REPO_ROOT, filePath).replace(/\\/g, '/');
+  const checks: CodeCheck[] = [];
+  for (const pattern of CHECK_PATTERNS) {
+    for (const match of source.matchAll(pattern)) {
+      const line = source.slice(0, match.index).split('\n').length;
+      checks.push({
+        action: match[1],
+        subject: match[2],
+        location: `${relPath}:${line}`
+      });
+    }
+  }
+  return checks;
+}
+
+function sameSet(a: Set<string>, b: Set<string>): boolean {
+  return a.size === b.size && [...a].every((x) => b.has(x));
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 function main(): void {
@@ -204,22 +294,92 @@ function main(): void {
     subjectToResource.set(r.subject, r);
   }
 
-  // Track which registered subjects are actually used in @Authorize
-  const usedSubjects = new Set<string>();
+  // subject -> actions it is checked with in @Authorize
+  const checkedActions = new Map<string, Set<string>>();
 
   for (const usage of allAuthorizeUsages) {
-    usedSubjects.add(usage.subject);
+    if (RESERVED_ACTIONS.has(usage.action)) {
+      errors.push(
+        `  ${usage.file}: @Authorize(['${usage.action}', '${usage.subject}']) — "${usage.action}" is a reserved CASL action that only a super role passes; check an ordinary action instead`
+      );
+    }
     if (!subjectToResource.has(usage.subject)) {
       errors.push(
         `  ${usage.file}: @Authorize(['${usage.action}', '${usage.subject}']) — subject "${usage.subject}" has no matching @RegisterResource`
       );
     }
+    const actions = checkedActions.get(usage.subject) ?? new Set<string>();
+    actions.add(usage.action);
+    checkedActions.set(usage.subject, actions);
   }
 
-  // Registered subjects never used in @Authorize (informational warning)
-  const unusedResources = allResources.filter(
-    (r) => !usedSubjects.has(r.subject)
+  for (const r of subjectToResource.values()) {
+    if (!r.actions) {
+      errors.push(
+        `  ${r.file}: @RegisterResource "${r.name}" has no literal \`actions\` list`
+      );
+      continue;
+    }
+    if (!r.conditionalActions) {
+      errors.push(
+        `  ${r.file}: @RegisterResource "${r.name}" has no literal \`conditionalActions\` list`
+      );
+    } else {
+      for (const action of r.conditionalActions) {
+        if (!r.actions.includes(action)) {
+          errors.push(
+            `  ${r.file}: @RegisterResource "${r.name}" lists "${action}" in conditionalActions but not in actions`
+          );
+        }
+      }
+    }
+    const declared = new Set(r.actions);
+    const checked = checkedActions.get(r.subject) ?? new Set<string>();
+    if (!sameSet(declared, checked)) {
+      errors.push(
+        `  ${r.file}: @RegisterResource "${r.name}" declares actions [${[...declared].sort().join(', ')}], but @Authorize checks "${r.subject}" with [${[...checked].sort().join(', ')}]`
+      );
+    }
+  }
+
+  const declaredActions = new Set(allResources.flatMap((r) => r.actions ?? []));
+  for (const file of ACTION_LABEL_FILES) {
+    const labels = (
+      JSON.parse(fs.readFileSync(file, 'utf-8')) as {
+        rbacActions?: Record<string, unknown>;
+      }
+    ).rbacActions;
+    for (const action of declaredActions) {
+      if (typeof labels?.[action] !== 'string') {
+        errors.push(
+          `  ${path.relative(REPO_ROOT, file)}: no label rbacActions.${action} for a declared action`
+        );
+      }
+    }
+  }
+
+  const codeChecks = CHECK_ROOTS.flatMap((root) =>
+    findSourceFiles(root).flatMap(scanCodeChecks)
   );
+  for (const check of codeChecks) {
+    const label = `'${check.action}' on '${check.subject}'`;
+    if (RESERVED_ACTIONS.has(check.action)) {
+      errors.push(
+        `  ${check.location}: check of ${label} — "${check.action}" is a reserved CASL action that only a super role passes`
+      );
+      continue;
+    }
+    const resource = subjectToResource.get(check.subject);
+    if (!resource) {
+      errors.push(
+        `  ${check.location}: check of ${label} — no @RegisterResource has subject "${check.subject}"`
+      );
+    } else if (!resource.actions?.includes(check.action)) {
+      errors.push(
+        `  ${check.location}: check of ${label} — resource "${resource.name}" does not declare action "${check.action}"`
+      );
+    }
+  }
 
   if (errors.length > 0) {
     console.error(
@@ -227,26 +387,14 @@ function main(): void {
     );
     errors.forEach((e) => console.error(e));
     console.error(
-      '\n  → Add @RegisterResource to the controller for that subject, fix the subject name in @Authorize, or give the colliding resources distinct subjects.\n'
+      '\n  → Make each @RegisterResource `actions` list equal the actions its @Authorize decorators check, and make client and mock-server checks use only those actions.\n'
     );
     process.exit(1);
   }
 
   console.log(
-    `✓ All @Authorize usages reference registered resources (${allResources.length} registered, ${allAuthorizeUsages.length} usages checked)`
+    `✓ Resource actions match their checks (${allResources.length} resources, ${allAuthorizeUsages.length} @Authorize usages, ${codeChecks.length} client and mock-server checks)`
   );
-
-  if (unusedResources.length > 0) {
-    console.warn(
-      `\n  ⚠ Resources registered but never referenced in @Authorize:`
-    );
-    for (const r of unusedResources) {
-      console.warn(`    "${r.subject}" (${r.name}) in ${r.file}`);
-    }
-    console.warn(
-      '  → These may be intentional (resources protected by role-level guards or super-admin only).\n'
-    );
-  }
 }
 
 main();

@@ -77,8 +77,6 @@ const GUARDED_ROUTES: ReadonlyArray<readonly [string, string]> = [
 
   ['POST', `/api/v1/rbac/resources/${BAD_ID}/restore`],
   ['PATCH', `/api/v1/rbac/resources/${BAD_ID}`],
-  ['PATCH', `/api/v1/rbac/actions/${BAD_ID}`],
-  ['DELETE', `/api/v1/rbac/actions/${BAD_ID}`],
 
   ['GET', `/api/v1/admin/feature-flags/${BAD_ID}`],
   ['PATCH', `/api/v1/admin/feature-flags/${BAD_ID}`],

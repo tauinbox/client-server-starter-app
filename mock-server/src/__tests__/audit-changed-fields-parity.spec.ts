@@ -145,33 +145,6 @@ describe('audit changedFields parity', () => {
     ]);
   });
 
-  it('action: a resubmit logs [] and a description edit logs ["description"]', async () => {
-    const action = await send<{ id: string }>(
-      'POST',
-      'rbac/actions',
-      { name: 'audit-fields-action', displayName: 'Audit', description: 'old' },
-      201
-    );
-
-    await send(
-      'PATCH',
-      `rbac/actions/${action.id}`,
-      { displayName: 'Audit', description: 'old' },
-      200
-    );
-    expect(lastChangedFields('ACTION_UPDATE', action.id)).toEqual([]);
-
-    await send(
-      'PATCH',
-      `rbac/actions/${action.id}`,
-      { displayName: 'Audit', description: 'new' },
-      200
-    );
-    expect(lastChangedFields('ACTION_UPDATE', action.id)).toEqual([
-      'description'
-    ]);
-  });
-
   it('user: a resubmit logs [] and a name edit logs ["firstName"]', async () => {
     const id = mockId('user-3');
     const user = getState().users.get(id)!;

@@ -82,6 +82,15 @@
     "strong": "Strong",
     "requirements": "Longer is stronger. Aim for at least 12 characters, and note that a password found in a public data breach is refused."
   },
+  "rbacActions": {
+    "create": "Create",
+    "read": "Read",
+    "update": "Update",
+    "delete": "Delete",
+    "search": "Search",
+    "assign": "Assign",
+    "refund": "Refund"
+  },
   "errors": {
     "auth": {
       "invalidCredentials": "Invalid credentials",
@@ -147,19 +156,16 @@
       "cannotGrantPermission": "You cannot grant a permission that you do not hold",
       "cannotLiftDeny": "You cannot remove a restriction on a permission that you do not hold without restriction yourself",
       "conditionNotApplicable": "This condition cannot be used with a create permission: it matches the acting user's id, which a new record can never carry",
+      "conditionNotSupported": "This permission cannot carry a condition: no check of this action reads the record, so the condition would restrict nothing",
+      "actionNotGrantable": "This action is not offered for the resource, so it cannot be granted",
       "conditionBroaderThanCaller": "You cannot grant a permission with a condition broader than the one you hold yourself",
       "conditionUnresolvable": "This condition cannot be applied as written, so it would not restrict the permission"
-    },
-    "actions": {
-      "nameReserved": "Action name is reserved and cannot be used",
-      "nameExists": "Action with this name already exists",
-      "cannotDeleteDefault": "Cannot delete default actions",
-      "assignedToRoles": "Cannot delete action that is assigned to roles. Remove it from all roles first."
     },
     "resources": {
       "notFound": "Resource not found",
       "cannotRestore": "Cannot restore resource: its controller is not registered. Restore the controller code first.",
-      "subjectReserved": "Resource subject is reserved and cannot be used"
+      "subjectReserved": "Resource subject is reserved and cannot be used",
+      "actionNotDeclared": "Only the actions that the code checks for this resource can be offered"
     },
     "featureFlags": {
       "notFound": "Feature flag not found",

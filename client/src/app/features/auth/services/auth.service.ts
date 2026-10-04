@@ -584,7 +584,7 @@ export class AuthService {
     const load = () =>
       firstValueFrom(this.#rbacMetadataService.getMetadata())
         .then((data) => {
-          this.#rbacMetadataStore.setMetadata(data.resources, data.actions);
+          this.#rbacMetadataStore.setMetadata(data.resources);
         })
         .catch(
           () => undefined /* silently ignore — app functions without metadata */

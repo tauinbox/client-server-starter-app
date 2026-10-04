@@ -12,6 +12,7 @@ import {
   CASL_RESERVED_SUBJECT_NAMES
 } from './constants';
 import type { SubjectMaps } from '../services/resource.service';
+import { findConditionSupportError } from '@app/shared/utils/permission-condition-shape';
 
 /**
  * Builds a user's ability from already-loaded permissions and resource maps.
@@ -94,8 +95,39 @@ export function buildAbility(
       continue;
     }
 
+    // An allow on an action the resource does not offer is invisible in the
+    // permission matrix, so it must grant nothing.
+    if (
+      !isDeny &&
+      !subjectMaps.grantableActions[p.resource]?.includes(action)
+    ) {
+      continue;
+    }
+
     if (!p.conditions) {
       register(action, subject);
+      continue;
+    }
+
+    // The route check of this action ignores conditions (CASL answers a
+    // subject-type check from the rule alone), so a restriction here would
+    // pass as a full grant. Fail closed as for an unusable condition: the
+    // allow grants nothing, the deny denies everything.
+    if (
+      findConditionSupportError(
+        action,
+        subjectMaps.conditionalActions[p.resource] ?? [],
+        p.conditions
+      )
+    ) {
+      logger.error(
+        `Permission "${p.permission}" for user ${userId} carries a condition that no check of "${action}" on "${subject}" reads - ${
+          isDeny ? 'registered as a blanket deny' : 'not registered'
+        }`
+      );
+      if (isDeny) {
+        register(action, subject);
+      }
       continue;
     }
 

@@ -37,7 +37,12 @@ export class CaslAbilityFactory {
     const isSuper = roles.some((r) => r.isSuper);
     // A super role resolves no resource, so it skips the lookup.
     const subjectMaps = isSuper
-      ? { active: {}, orphaned: {} }
+      ? {
+          active: {},
+          orphaned: {},
+          grantableActions: {},
+          conditionalActions: {}
+        }
       : await this.resourceService.getSubjectMaps();
     return buildAbility(userId, isSuper, permissions, subjectMaps, this.logger);
   }

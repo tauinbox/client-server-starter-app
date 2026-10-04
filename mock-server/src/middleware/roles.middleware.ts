@@ -14,10 +14,11 @@ import {
 import type { PermissionCondition } from '@app/shared/types';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import { changedFields } from '@app/shared/utils/changed-fields';
+import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import {
   findConditionActionError,
+  findConditionSupportError,
   findFieldMatchShapeError,
-  findIdentityBoundBranch,
   findOwnershipShapeError,
   findUserAttrShapeError
 } from '@app/shared/utils/permission-condition-shape';
@@ -138,25 +139,49 @@ function findConditionShapeError(conditions: unknown): string | null {
   return null;
 }
 
-// Mirrors RoleService.assertConditionsApplicable: an identity-bound branch on
-// a `create` grant can never match a record that does not exist yet, so it is
-// rejected on write instead of being stored as a dead restriction. Unknown
+// Mirrors RoleService.assertGrantsApplicable, in the same order: a grant that
+// would enforce nothing is rejected on write instead of being stored. Unknown
 // permission ids fall through to the unknown-id 400, as on the server.
-function findGrantConditionError(
+function findGrantError(
   permissionId: string,
   conditions: unknown
-): string | null {
-  if (findIdentityBoundBranch(conditions) === null) return null;
+): { message: string; errorKey: string } | null {
   const state = getState();
   const permission = state.permissions.get(permissionId);
   if (!permission) return null;
   const resource = state.resources.get(permission.resourceId);
   const action = state.actions.get(permission.actionId);
   if (!resource || !action) return null;
-  const error = findConditionActionError(action.name, conditions);
-  return error === null
-    ? null
-    : `Cannot grant ${action.name}:${resource.subject} - ${error}`;
+  const label = `${action.name}:${resource.subject}`;
+
+  if (
+    (conditions as PermissionCondition | null)?.effect !== 'deny' &&
+    !grantableActionNames(resource).includes(action.name)
+  ) {
+    return {
+      message: `Cannot grant ${label} - the resource does not offer this action`,
+      errorKey: ErrorKeys.ROLES.ACTION_NOT_GRANTABLE
+    };
+  }
+  const supportError = findConditionSupportError(
+    action.name,
+    resource.conditionalActionNames,
+    conditions
+  );
+  if (supportError) {
+    return {
+      message: `Cannot grant ${label} - ${supportError}`,
+      errorKey: ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED
+    };
+  }
+  const actionError = findConditionActionError(action.name, conditions);
+  if (actionError) {
+    return {
+      message: `Cannot grant ${label} - ${actionError}`,
+      errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+    };
+  }
+  return null;
 }
 
 // Notify every connected holder of a role that its effective permission set
@@ -585,13 +610,9 @@ router.put(
     }
 
     for (const item of items) {
-      const error = findGrantConditionError(item.permissionId, item.conditions);
+      const error = findGrantError(item.permissionId, item.conditions);
       if (error) {
-        res.status(400).json({
-          message: error,
-          statusCode: 400,
-          errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
-        });
+        res.status(400).json({ ...error, statusCode: 400 });
         return;
       }
     }
@@ -731,13 +752,9 @@ router.post(
     }
 
     for (const permissionId of permissionIds as string[]) {
-      const error = findGrantConditionError(permissionId, conditions);
+      const error = findGrantError(permissionId, conditions);
       if (error) {
-        res.status(400).json({
-          message: error,
-          statusCode: 400,
-          errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
-        });
+        res.status(400).json({ ...error, statusCode: 400 });
         return;
       }
     }

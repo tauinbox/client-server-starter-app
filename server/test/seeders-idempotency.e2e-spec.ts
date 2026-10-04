@@ -49,7 +49,11 @@ runWithInfra('seeder idempotency (e2e)', () => {
     permissions: await ds.getRepository(Permission).count(),
     rolePermissions: await ds.getRepository(RolePermission).count(),
     flags: await ds.getRepository(FeatureFlag).count(),
-    flagRules: await ds.getRepository(FeatureFlagRule).count()
+    flagRules: await ds.getRepository(FeatureFlagRule).count(),
+    declaredPairs: (await ds.getRepository(Resource).find()).reduce(
+      (total, resource) => total + resource.actionNames.length,
+      0
+    )
   });
 
   beforeAll(async () => {
@@ -75,11 +79,13 @@ runWithInfra('seeder idempotency (e2e)', () => {
     for (const seeder of seeders()) await seeder.run(ds);
     const afterFirstRun = await counts();
 
-    // Sanity floor so an empty run cannot pass silently.
+    // Sanity floor so an empty run cannot pass silently: the seed writes
+    // one permission per declared pair, and the schema holds no migration
+    // rows, so every pair comes from the controller declarations.
     expect(afterFirstRun.resources).toBeGreaterThan(0);
-    expect(afterFirstRun.permissions).toBe(
-      afterFirstRun.resources * afterFirstRun.actions
-    );
+    expect(afterFirstRun.actions).toBeGreaterThan(0);
+    expect(afterFirstRun.declaredPairs).toBeGreaterThan(0);
+    expect(afterFirstRun.permissions).toBe(afterFirstRun.declaredPairs);
     expect(afterFirstRun.flagRules).toBeGreaterThan(0);
 
     for (const seeder of seeders()) await seeder.run(ds);
@@ -98,7 +104,7 @@ runWithInfra('seeder idempotency (e2e)', () => {
 
     const restored = await counts();
     expect(restored.actions).toBeGreaterThan(0);
-    expect(restored.permissions).toBe(restored.resources * restored.actions);
+    expect(restored.permissions).toBe(restored.declaredPairs);
     expect(restored.flagRules).toBeGreaterThan(0);
   }, 60000);
 });

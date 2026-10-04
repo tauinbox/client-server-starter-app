@@ -38,14 +38,19 @@ describe('canAccessAdminPanel', () => {
     expect(canAccessAdminPanel(store)).toBe(true);
   });
 
-  it('returns true when user can manage FeatureFlag', () => {
-    const store = makeAuthStore([{ action: 'manage', subject: 'FeatureFlag' }]);
+  it('returns true when user can search FeatureFlag', () => {
+    const store = makeAuthStore([{ action: 'search', subject: 'FeatureFlag' }]);
     expect(canAccessAdminPanel(store)).toBe(true);
   });
 
-  it('returns true when user can manage Billing', () => {
-    const store = makeAuthStore([{ action: 'manage', subject: 'Billing' }]);
+  it('returns true when user can search Billing', () => {
+    const store = makeAuthStore([{ action: 'search', subject: 'Billing' }]);
     expect(canAccessAdminPanel(store)).toBe(true);
+  });
+
+  it('returns false for a grant that opens no admin list', () => {
+    const store = makeAuthStore([{ action: 'refund', subject: 'Billing' }]);
+    expect(canAccessAdminPanel(store)).toBe(false);
   });
 
   it('returns false when user has none of the required permissions', () => {

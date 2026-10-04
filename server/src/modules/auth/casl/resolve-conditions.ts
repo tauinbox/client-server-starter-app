@@ -4,6 +4,7 @@ import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
   findFieldMatchShapeError,
   findOwnershipShapeError,
+  findRestrictionBranch,
   findUserAttrShapeError
 } from '@app/shared/utils/permission-condition-shape';
 
@@ -135,13 +136,10 @@ export function resolveConditions(
     Object.assign(query, parsed);
   }
 
-  const hasRestrictionBranches =
-    (ownership !== undefined && ownership !== null) ||
-    (fieldMatch !== undefined && fieldMatch !== null) ||
-    (userAttr !== undefined && userAttr !== null) ||
-    (custom !== undefined && custom !== null);
-
-  if (hasRestrictionBranches && Object.keys(query).length === 0) {
+  if (
+    findRestrictionBranch(conditions) !== null &&
+    Object.keys(query).length === 0
+  ) {
     return veto('resolved to an empty query');
   }
 

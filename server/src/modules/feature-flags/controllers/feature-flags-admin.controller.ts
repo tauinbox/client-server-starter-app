@@ -57,7 +57,9 @@ import type { FeatureFlagAttributeKeysResponse } from '@app/shared/types';
 @RegisterResource({
   name: 'feature-flags',
   subject: 'FeatureFlag',
-  displayName: 'Feature Flags'
+  displayName: 'Feature Flags',
+  actions: ['create', 'read', 'update', 'delete', 'search'],
+  conditionalActions: []
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class FeatureFlagsAdminController {
@@ -68,7 +70,7 @@ export class FeatureFlagsAdminController {
   ) {}
 
   @Get('cursor')
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['search', 'FeatureFlag'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cursor-paginated feature flags for the list page' })
   @ApiOkResponse({ description: 'Cursor-paginated list of feature flags' })
@@ -78,7 +80,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Get('attribute-keys')
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['search', 'FeatureFlag'])
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Custom attribute keys accepted in a rule payload'
@@ -90,7 +92,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Get()
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['search', 'FeatureFlag'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all feature flags' })
   @ApiOkResponse({ type: [FeatureFlagResponseDto] })
@@ -100,7 +102,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Get(':id')
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['read', 'FeatureFlag'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a feature flag by ID' })
   @ApiParam({ name: 'id' })
@@ -111,7 +113,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Post()
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['create', 'FeatureFlag'])
   @LogAudit({
     action: AuditAction.FEATURE_FLAG_CREATE,
     targetType: 'FeatureFlag',
@@ -139,7 +141,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Patch(':id')
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['update', 'FeatureFlag'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a feature flag (optimistic locking)' })
   @ApiHeader({
@@ -188,7 +190,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Delete(':id')
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['delete', 'FeatureFlag'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a feature flag' })
   @ApiParam({ name: 'id' })
@@ -218,7 +220,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Post(':id/preview')
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['read', 'FeatureFlag'])
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
@@ -239,7 +241,7 @@ export class FeatureFlagsAdminController {
   }
 
   @Post(':id/toggle')
-  @Authorize(['manage', 'FeatureFlag'])
+  @Authorize(['update', 'FeatureFlag'])
   @LogAudit({
     action: AuditAction.FEATURE_FLAG_TOGGLE,
     targetType: 'FeatureFlag',

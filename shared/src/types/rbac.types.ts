@@ -7,6 +7,11 @@ export type ResourceResponse = {
   isSystem: boolean;
   isOrphaned: boolean;
   isRegistered: boolean;
+  /** Actions the code checks on this subject. Owned by the code. */
+  actionNames: string[];
+  /** Actions whose checks evaluate a grant condition on the record. */
+  conditionalActionNames: string[];
+  /** Admin narrowing of `actionNames`; null offers every declared action. */
   allowedActionNames: string[] | null;
   createdAt: string;
 };
@@ -14,13 +19,9 @@ export type ResourceResponse = {
 export type ActionResponse = {
   id: string;
   name: string;
-  displayName: string;
-  description: string;
-  isDefault: boolean;
   createdAt: string;
 };
 
 export type RbacMetadataResponse = {
   resources: ResourceResponse[];
-  actions: ActionResponse[];
 };

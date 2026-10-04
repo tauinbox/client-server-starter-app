@@ -149,12 +149,11 @@ src/app/
 │       │   │                                # matrix. It holds the CASL condition editors and an
 │       │   │                                # Allow and Deny toggle (effect) for each permission.
 │       │   └── resources/
-│       │       ├── resource-list/       # ResourceListComponent has two sections: a Resources
-│       │       │                        # table and an Actions table.
-│       │       ├── resource-form-dialog/ # ResourceFormDialogComponent edits the displayName and
-│       │       │                         # description of a resource.
-│       │       └── action-form-dialog/  # ActionFormDialogComponent creates and edits an action.
-│       │                                # It validates the name pattern.
+│       │       ├── resource-list/       # ResourceListComponent is the Resources table.
+│       │       └── resource-form-dialog/ # ResourceFormDialogComponent edits the displayName,
+│       │                                 # the description and the offered actions of a resource.
+│       │                                 # It offers only resource.actionNames, labelled through
+│       │                                 # the rbacActions.<name> translations.
 │       │   └── feature-flags/
 │       │       ├── feature-flag-list/        # FeatureFlagListComponent shows a mat-table on a
 │       │       │                             # desktop and a card list on a handset, through
@@ -418,15 +417,15 @@ src/app/
 | `/users` | UserListComponent | permissionGuard('search', 'User') |
 | `/users/:id` | UserDetailComponent | authGuard |
 | `/users/:id/edit` | UserEditComponent | authGuard |
-| `/admin` | AdminPanelComponent | adminPanelGuard (search/User OR read/Role OR read/Permission) |
+| `/admin` | AdminPanelComponent | adminPanelGuard (search/User OR read/Role OR read/Permission OR search/FeatureFlag OR search/Billing) |
 | `/admin/users` | UserListComponent | permissionGuard('search', 'User') |
 | `/admin/users/:id` | UserDetailComponent | permissionGuard('read', 'User') |
 | `/admin/users/:id/edit` | UserEditComponent | instancePermissionGuard('update', 'User') |
 | `/admin/users/:id/permissions` | UserPermissionsComponent | permissionGuard('read', 'User') |
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
-| `/admin/feature-flags` | FeatureFlagListComponent | permissionGuard('manage', 'FeatureFlag') |
-| `/admin/billing` | BillingAdminListComponent | permissionGuard('manage', 'Billing') |
+| `/admin/feature-flags` | FeatureFlagListComponent | permissionGuard('search', 'FeatureFlag') |
+| `/admin/billing` | BillingAdminListComponent | permissionGuard('search', 'Billing') |
 | `/billing` | PricingPageComponent | billingAvailableGuard (public: anonymous pricing) |
 | `/billing/settings` | BillingSettingsComponent | billingAvailableGuard + authGuard |
 | `/billing/success` | CheckoutReturnComponent | billingAvailableGuard + authGuard |
@@ -845,8 +844,9 @@ role-bound rule can change for that user when their roles change.
 
 ### Admin
 
-`/admin/feature-flags` is the management UI. It uses `permissionGuard('manage', 'FeatureFlag')`. It
-is the fifth tab of `AdminPanelComponent`. Its components are in
+`/admin/feature-flags` is the management UI. It uses `permissionGuard('search', 'FeatureFlag')`, and
+the list shows the create, toggle, edit and delete controls only for `create`, `update` and `delete`
+on `FeatureFlag`. It is the fourth tab of `AdminPanelComponent`. Its components are in
 `features/admin/components/feature-flags/`.
 
 **`FeatureFlagListComponent`** shows a `mat-table` on a desktop. On a handset it shows a `mat-card`

@@ -6,79 +6,39 @@ import { Permission } from '../modules/auth/entities/permission.entity';
 import { RolePermission } from '../modules/auth/entities/role-permission.entity';
 import { Resource } from '../modules/auth/entities/resource.entity';
 import { Action } from '../modules/auth/entities/action.entity';
+import {
+  RESOURCE_METADATA_KEY,
+  type ResourceMetadata
+} from '../modules/auth/decorators/register-resource.decorator';
+import { UsersController } from '../modules/users/controllers/users.controller';
+import { RolesController } from '../modules/auth/controllers/roles.controller';
+import { RbacController } from '../modules/auth/controllers/rbac.controller';
+import { AuthController } from '../modules/auth/controllers/auth.controller';
 
-const DEFAULT_RESOURCES: {
-  name: string;
-  subject: string;
-  displayName: string;
-  description: string;
-  allowedActionNames?: string[];
-}[] = [
+// The names, subjects and action lists come from the @RegisterResource of each
+// controller, which is the declaration the startup sync reads too. Thus a seed
+// before the first start, or on a schema that no migration filled, still
+// writes every declared action and permission.
+const SEEDED_RESOURCES: { controller: object; description: string }[] = [
+  { controller: UsersController, description: 'User accounts management' },
+  { controller: RolesController, description: 'Role management' },
   {
-    name: 'users',
-    subject: 'User',
-    displayName: 'Users',
-    description: 'User accounts management'
-  },
-  {
-    name: 'roles',
-    subject: 'Role',
-    displayName: 'Roles',
-    description: 'Role management',
-    allowedActionNames: [
-      'create',
-      'read',
-      'update',
-      'delete',
-      'search',
-      'assign'
-    ]
-  },
-  {
-    name: 'permissions',
-    subject: 'Permission',
-    displayName: 'Permissions',
+    controller: RbacController,
     description: 'Permission and RBAC metadata management'
   },
-  {
-    name: 'profile',
-    subject: 'Profile',
-    displayName: 'Profile',
-    description: 'User own profile',
-    allowedActionNames: ['read', 'update']
-  }
+  { controller: AuthController, description: 'User own profile' }
 ];
 
-const DEFAULT_ACTIONS: {
-  name: string;
-  displayName: string;
-  description: string;
-  isDefault?: boolean;
-}[] = [
-  { name: 'create', displayName: 'Create', description: 'Create a new record' },
-  {
-    name: 'read',
-    displayName: 'Read',
-    description: 'Read a single record by ID'
-  },
-  {
-    name: 'update',
-    displayName: 'Update',
-    description: 'Modify an existing record'
-  },
-  { name: 'delete', displayName: 'Delete', description: 'Remove a record' },
-  {
-    name: 'search',
-    displayName: 'Search',
-    description: 'Query and list records, with optional filters'
-  },
-  {
-    name: 'assign',
-    displayName: 'Assign',
-    description: 'Assign relationships between records',
-    isDefault: false
+function declarationOf(controller: object): ResourceMetadata {
+  const meta = Reflect.getMetadata(RESOURCE_METADATA_KEY, controller) as
+    ResourceMetadata | undefined;
+  if (!meta) {
+    throw new Error(
+      'RBAC seeder: a seeded controller has no @RegisterResource'
+    );
   }
-];
+  return meta;
+}
 
 const DEFAULT_ROLES = [
   {
@@ -143,17 +103,39 @@ export default class RbacSeeder extends Seeder {
     const resourceRepo = dataSource.getRepository(Resource);
     const actionRepo = dataSource.getRepository(Action);
 
+    const declared = SEEDED_RESOURCES.map(({ controller, description }) => ({
+      meta: declarationOf(controller),
+      description
+    }));
     const resources = await ensureRows(
       resourceRepo,
-      DEFAULT_RESOURCES.map((r) => ({
-        ...r,
+      declared.map(({ meta, description }) => ({
+        name: meta.name,
+        subject: meta.subject,
+        displayName: meta.displayName,
+        description,
+        actionNames: [...meta.actions],
+        conditionalActionNames: [...meta.conditionalActions],
         isSystem: true,
         lastSyncedAt: new Date()
       }))
     );
+    // A stored row keeps its admin edits, but its declared lists follow the
+    // code, as the sync rewrites them.
+    for (const resource of resources) {
+      const meta = declared.find((d) => d.meta.name === resource.name)?.meta;
+      if (meta) {
+        resource.actionNames = [...meta.actions];
+        resource.conditionalActionNames = [...meta.conditionalActions];
+      }
+    }
+    await resourceRepo.save(resources);
+
     const actions = await ensureRows(
       actionRepo,
-      DEFAULT_ACTIONS.map((a) => ({ ...a, isDefault: a.isDefault ?? true }))
+      [...new Set(declared.flatMap(({ meta }) => meta.actions))].map(
+        (name) => ({ name })
+      )
     );
     const roles = await ensureRows(roleRepo, DEFAULT_ROLES);
 
@@ -163,15 +145,17 @@ export default class RbacSeeder extends Seeder {
       throw new Error('RBAC seeder: system roles could not be resolved');
     }
 
-    // Full resource x action matrix.
+    // One permission per pair the code checks.
     const permissionsByKey = new Map(
       (await permissionRepo.find()).map((p) => [
         permissionKey(p.resourceId, p.actionId),
         p
       ])
     );
+    const declaredActions = (resource: Resource) =>
+      actions.filter((action) => resource.actionNames.includes(action.name));
     const missingPermissions = resources.flatMap((resource) =>
-      actions
+      declaredActions(resource)
         .filter(
           (action) =>
             !permissionsByKey.has(permissionKey(resource.id, action.id))
@@ -193,7 +177,7 @@ export default class RbacSeeder extends Seeder {
       );
     }
     const seededPermissions = resources.flatMap((resource) =>
-      actions
+      declaredActions(resource)
         .map((action) =>
           permissionsByKey.get(permissionKey(resource.id, action.id))
         )
@@ -204,16 +188,14 @@ export default class RbacSeeder extends Seeder {
       (permission) => ({ roleId: adminRole.id, permissionId: permission.id })
     );
 
-    // User gets profile:read, profile:update, and update:User (own record only)
+    // User gets profile:update and update:User (own record only)
     const profileResource = resources.find((r) => r.name === 'profile');
     const usersResource = resources.find((r) => r.name === 'users');
-    const readAction = actions.find((a) => a.name === 'read');
     const updateAction = actions.find((a) => a.name === 'update');
     for (const permission of seededPermissions) {
       if (
         permission.resourceId === profileResource?.id &&
-        (permission.actionId === readAction?.id ||
-          permission.actionId === updateAction?.id)
+        permission.actionId === updateAction?.id
       ) {
         grants.push({ roleId: userRole.id, permissionId: permission.id });
       }

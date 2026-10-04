@@ -3,7 +3,6 @@
     "manageUsers": "Users",
     "manageRoles": "Roles",
     "manageResources": "Resources",
-    "manageActions": "Actions",
     "manageFeatureFlags": "Feature Flags",
     "manageBilling": "Billing"
   },
@@ -221,7 +220,9 @@
     "effectDenyBadge": "Deny",
     "effectDenyBadgeHint": "This permission is a deny rule — it revokes matching access granted by other rules",
     "errorLoadFailed": "Failed to load permissions. Please try again.",
-    "errorSaveFailed": "Failed to save permissions."
+    "errorSaveFailed": "Failed to save permissions.",
+    "conditionsNotSupported": "No check of this action reads the record, so it takes no restriction. It can be allowed or denied as a whole.",
+    "clearRestrictions": "Remove the restriction"
   },
   "resources": {
     "title": "Resources",
@@ -252,51 +253,11 @@
     "descriptionPlaceholder": "Optional description",
     "allowedActions": "Allowed Actions",
     "customToggle": "Custom",
-    "customBadge": "custom",
-    "defaultActionsHint": "All default actions are shown: create, read, update, delete, search.",
-    "errorActionsFailed": "Could not load the action catalog. Reopen the dialog to try again."
-  },
-  "actions": {
-    "title": "Actions",
-    "tableHeaderDisplayName": "Display Name",
-    "tableHeaderName": "Name",
-    "tableHeaderDescription": "Description",
-    "tableHeaderDefault": "Default",
-    "typeDefault": "Default",
-    "tableHeaderCreated": "Created",
-    "tableHeaderActions": "Actions",
-    "editAction": "Edit Action",
-    "deleteAction": "Delete Action",
-    "successCreated": "Action created successfully",
-    "errorCreateFailed": "Failed to create action.",
-    "successUpdated": "Action updated successfully",
-    "errorUpdateFailed": "Failed to update action.",
-    "confirmDeleteTitle": "Delete Action",
-    "confirmDeleteMessage": "Are you sure you want to delete the action \"{{ name }}\"?",
-    "successDeleted": "Action deleted successfully",
-    "errorDeleteFailed": "Failed to delete action."
-  },
-  "actionForm": {
-    "editTitle": "Edit Action",
-    "addTitle": "Add Action",
-    "nameLabel": "Internal Name",
-    "namePlaceholder": "e.g. publish",
-    "nameImmutableHint": "Internal name cannot be changed after creation",
-    "nameRequired": "Name is required",
-    "nameMaxLength": "Name must be at most 50 characters",
-    "namePattern": "Must start with a letter; only lowercase letters, digits, and underscores allowed",
-    "displayNameLabel": "Display Name",
-    "displayNamePlaceholder": "Display name",
-    "displayNameRequired": "Display name is required",
-    "displayNameMaxLength": "Display name must be at most 100 characters",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Optional description",
-    "descriptionMaxLength": "Description must be at most 500 characters"
+    "allActionsHint": "Every action this resource checks is offered: {{ actions }}."
   },
   "store": {
     "errorLoadRolesFailed": "Failed to load roles. Please try again.",
-    "errorLoadResourcesFailed": "Failed to load resources. Please try again.",
-    "errorLoadActionsFailed": "Failed to load actions. Please try again."
+    "errorLoadResourcesFailed": "Failed to load resources. Please try again."
   },
   "billing": {
     "subscriptionsTitle": "Subscriptions",

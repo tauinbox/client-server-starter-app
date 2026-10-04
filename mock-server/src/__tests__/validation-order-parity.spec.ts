@@ -361,16 +361,6 @@ describe('body validation precedes the entity lookup', () => {
       notFoundKey: ErrorKeys.RESOURCES.NOT_FOUND
     },
     {
-      name: 'PATCH /rbac/actions/:id',
-      method: 'PATCH',
-      path: `/api/v1/rbac/actions/${UNKNOWN}`,
-      malformed: { description: 'x'.repeat(501) },
-      malformedMessage:
-        'description must be shorter than or equal to 500 characters',
-      wellFormed: { description: 'Valid' },
-      notFoundKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-    },
-    {
       name: 'POST /admin/billing/invoices/:id/refund',
       method: 'POST',
       path: `/api/v1/admin/billing/invoices/${UNKNOWN}/refund`,

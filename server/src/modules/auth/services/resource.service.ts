@@ -18,11 +18,12 @@ import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
 import { ErrorKeys } from '@app/shared/constants';
 import { ResourceRegistryService } from './resource-registry.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 
-// Key is versioned: the cached value's shape changed from a flat
-// resource -> subject record to the split maps below, and a Redis entry
-// written by a previous release outlives the deploy.
-const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map:v2';
+// Key is versioned: the cached value's shape changes between releases (a flat
+// resource -> subject record, then the split maps, then conditionalActions),
+// and a Redis entry written by a previous release outlives the deploy.
+const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map:v3';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
 
 /**
@@ -36,6 +37,14 @@ const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
 export interface SubjectMaps {
   active: Record<string, string>;
   orphaned: Record<string, string>;
+  /**
+   * Resource name -> actions a role may hold on it: the admin's narrowing, or
+   * every declared action. buildAbility registers no allow outside this set,
+   * so a grant hidden from the permission matrix grants nothing.
+   */
+  grantableActions: Record<string, string[]>;
+  /** Resource name -> actions whose checks read the record (see buildAbility). */
+  conditionalActions: Record<string, string[]>;
 }
 
 @Injectable()
@@ -108,6 +117,18 @@ export class ResourceService {
         HttpStatus.NOT_FOUND
       );
     }
+    const undeclared = (data.allowedActionNames ?? []).filter(
+      (name) => !resource.actionNames.includes(name)
+    );
+    if (undeclared.length > 0) {
+      throw new HttpException(
+        {
+          message: `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`,
+          errorKey: ErrorKeys.RESOURCES.ACTION_NOT_DECLARED
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
     Object.assign(resource, data);
     const saved = await this.resourceRepository.save(resource);
     await this.invalidateSubjectMapCache();
@@ -124,8 +145,15 @@ export class ResourceService {
     }
 
     const resources = await this.resourceRepository.find();
-    const maps: SubjectMaps = { active: {}, orphaned: {} };
+    const maps: SubjectMaps = {
+      active: {},
+      orphaned: {},
+      grantableActions: {},
+      conditionalActions: {}
+    };
     for (const r of resources) {
+      maps.grantableActions[r.name] = grantableActionNames(r);
+      maps.conditionalActions[r.name] = r.conditionalActionNames;
       if (r.isOrphaned) {
         maps.orphaned[r.name] = r.subject;
       } else {
@@ -173,6 +201,8 @@ export class ResourceService {
     subject: string;
     displayName: string;
     isSystem?: boolean;
+    actionNames: string[];
+    conditionalActionNames: string[];
   }): Promise<Resource> {
     // Normalize to PascalCase: CASL subjects are case-sensitive, so 'user' ≠ 'User'
     const normalizedSubject =
@@ -192,9 +222,13 @@ export class ResourceService {
       where: { name: data.name }
     });
 
+    // The declared action lists belong to the code and are rewritten on every
+    // sync. allowedActionNames is the admin's narrowing and is kept.
     if (existing) {
       existing.subject = normalizedSubject;
       existing.displayName = data.displayName;
+      existing.actionNames = data.actionNames;
+      existing.conditionalActionNames = data.conditionalActionNames;
       existing.lastSyncedAt = new Date();
       return this.resourceRepository.save(existing);
     }

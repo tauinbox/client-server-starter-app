@@ -9,7 +9,6 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { PermissionService } from '../services/permission.service';
 import { CaslAbilityFactory } from './casl-ability.factory';
 import { ResourceService } from '../services/resource.service';
-import { ActionService } from '../services/action.service';
 import { ResourceSyncService } from '../services/resource-sync.service';
 import { ResourceRegistryService } from '../services/resource-registry.service';
 import { MfaPolicyService } from '../services/mfa-policy.service';
@@ -17,7 +16,7 @@ import { CryptoModule } from '../../../common/crypto/crypto.module';
 
 /**
  * Shared CASL module — provides PermissionService, CaslAbilityFactory,
- * ResourceService, ActionService, and ResourceSyncService.
+ * ResourceService, and ResourceSyncService.
  * Its own module so that PermissionsGuard (applied via @Authorize) resolves
  * its deps in every module that carries a controller, without a circular
  * dependency between AuthModule and UsersModule.
@@ -41,7 +40,6 @@ import { CryptoModule } from '../../../common/crypto/crypto.module';
     MfaPolicyService,
     CaslAbilityFactory,
     ResourceService,
-    ActionService,
     ResourceSyncService,
     ResourceRegistryService
   ],
@@ -50,7 +48,6 @@ import { CryptoModule } from '../../../common/crypto/crypto.module';
     MfaPolicyService,
     CaslAbilityFactory,
     ResourceService,
-    ActionService,
     ResourceRegistryService
   ]
 })

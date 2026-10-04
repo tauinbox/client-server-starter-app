@@ -127,7 +127,7 @@ describe('PermissionService', () => {
         }
       ]);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'permissions:user-1',
+        'permissions:v2:user-1',
         result,
         120_000
       );
@@ -371,7 +371,9 @@ describe('PermissionService', () => {
     it('should delete both permissions and roles cache entries', async () => {
       await service.invalidateUserCache('user-1');
 
-      expect(mockCacheManager.del).toHaveBeenCalledWith('permissions:user-1');
+      expect(mockCacheManager.del).toHaveBeenCalledWith(
+        'permissions:v2:user-1'
+      );
       expect(mockCacheManager.del).toHaveBeenCalledWith('roles:user-1');
       expect(mockCacheManager.del).toHaveBeenCalledTimes(2);
     });

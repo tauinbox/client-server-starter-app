@@ -407,17 +407,11 @@ describe('AuthService', () => {
     it('loads and stores metadata when the user has read Permission', async () => {
       authStoreMock.hasPermissions.mockReturnValue(true);
       const resources = [{ id: 'r1', name: 'users' }];
-      const actions = [{ id: 'a1', name: 'read' }];
-      rbacMetadataServiceMock.getMetadata.mockReturnValue(
-        of({ resources, actions })
-      );
+      rbacMetadataServiceMock.getMetadata.mockReturnValue(of({ resources }));
 
       await service.fetchRbacMetadata();
 
-      expect(rbacMetadataStoreMock.setMetadata).toHaveBeenCalledWith(
-        resources,
-        actions
-      );
+      expect(rbacMetadataStoreMock.setMetadata).toHaveBeenCalledWith(resources);
     });
   });
 

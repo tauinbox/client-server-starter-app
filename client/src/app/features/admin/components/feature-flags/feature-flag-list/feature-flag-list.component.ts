@@ -130,8 +130,14 @@ export class FeatureFlagListComponent implements OnInit {
     'actions'
   ];
 
-  readonly canManage = computed(() =>
-    this.authStore.hasPermissions({ action: 'manage', subject: 'FeatureFlag' })
+  readonly canCreate = computed(() =>
+    this.authStore.hasPermissions({ action: 'create', subject: 'FeatureFlag' })
+  );
+  readonly canUpdate = computed(() =>
+    this.authStore.hasPermissions({ action: 'update', subject: 'FeatureFlag' })
+  );
+  readonly canDelete = computed(() =>
+    this.authStore.hasPermissions({ action: 'delete', subject: 'FeatureFlag' })
   );
 
   ngOnInit(): void {

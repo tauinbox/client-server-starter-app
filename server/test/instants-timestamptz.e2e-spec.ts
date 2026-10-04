@@ -1,7 +1,6 @@
 import { DataSource } from 'typeorm';
 import type { EntityTarget, ObjectLiteral } from 'typeorm';
 import {
-  ALLOWED_ACTION_SORT_COLUMNS,
   ALLOWED_FEATURE_FLAG_SORT_COLUMNS,
   ALLOWED_INVOICE_SORT_COLUMNS,
   ALLOWED_RESOURCE_SORT_COLUMNS,
@@ -10,7 +9,6 @@ import {
   ALLOWED_USER_SORT_COLUMNS
 } from '@app/shared/constants';
 import { postgresConfig } from '../src/postgres.config';
-import { Action } from '../src/modules/auth/entities/action.entity';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
@@ -33,7 +31,6 @@ const SORTABLE_COLUMNS: ReadonlyArray<
   [User, ALLOWED_USER_SORT_COLUMNS],
   [Role, ALLOWED_ROLE_SORT_COLUMNS],
   [Resource, ALLOWED_RESOURCE_SORT_COLUMNS],
-  [Action, ALLOWED_ACTION_SORT_COLUMNS],
   [FeatureFlag, ALLOWED_FEATURE_FLAG_SORT_COLUMNS],
   [Invoice, ALLOWED_INVOICE_SORT_COLUMNS],
   [Subscription, ALLOWED_SUBSCRIPTION_SORT_COLUMNS]
@@ -120,9 +117,9 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
 
     expect(offenders).toEqual([]);
 
-    // Sanity floor: the seven `createdAt` defaults plus
+    // Sanity floor: the six `createdAt` defaults plus
     // `subscriptions.current_period_end`.
-    expect(checked).toBe(8);
+    expect(checked).toBe(7);
   });
 
   it('preserves an instant across a non-UTC session timezone', async () => {

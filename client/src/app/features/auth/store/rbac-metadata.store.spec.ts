@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { RbacMetadataStore } from './rbac-metadata.store';
-import type { ActionResponse, ResourceResponse } from '@app/shared/types';
+import type { ResourceResponse } from '@app/shared/types';
 
 const RBAC_CACHE_KEY = 'rbac_metadata';
 
@@ -14,18 +14,9 @@ function createResource(): ResourceResponse {
     isSystem: true,
     isOrphaned: false,
     isRegistered: true,
+    actionNames: ['create', 'read', 'update', 'delete', 'search'],
+    conditionalActionNames: ['update'],
     allowedActionNames: null,
-    createdAt: '2024-01-01T00:00:00.000Z'
-  };
-}
-
-function createAction(): ActionResponse {
-  return {
-    id: 'act-1',
-    name: 'read',
-    displayName: 'Read',
-    description: 'Read access',
-    isDefault: true,
     createdAt: '2024-01-01T00:00:00.000Z'
   };
 }
@@ -47,26 +38,21 @@ describe('RbacMetadataStore', () => {
 
   it('should restore a well-formed cache', () => {
     const resource = createResource();
-    const action = createAction();
     localStorage.setItem(
       RBAC_CACHE_KEY,
-      JSON.stringify({ resources: [resource], actions: [action] })
+      JSON.stringify({ resources: [resource] })
     );
 
     const store = createStore();
 
     expect(store.resources()).toEqual([resource]);
-    expect(store.actions()).toEqual([action]);
     expect(store.subjectMap()).toEqual({ users: 'User' });
     // The cache never counts as loaded - the metadata is always refetched.
     expect(store.loaded()).toBe(false);
   });
 
   it('should ignore a cache whose resources is not an array', () => {
-    localStorage.setItem(
-      RBAC_CACHE_KEY,
-      JSON.stringify({ resources: 'nope', actions: [] })
-    );
+    localStorage.setItem(RBAC_CACHE_KEY, JSON.stringify({ resources: 'nope' }));
 
     const store = createStore();
 
@@ -77,7 +63,7 @@ describe('RbacMetadataStore', () => {
   it('should ignore a cache whose resources hold the wrong shape', () => {
     localStorage.setItem(
       RBAC_CACHE_KEY,
-      JSON.stringify({ resources: [{ name: 'users' }], actions: [] })
+      JSON.stringify({ resources: [{ name: 'users' }] })
     );
 
     const store = createStore();
@@ -92,6 +78,5 @@ describe('RbacMetadataStore', () => {
     const store = createStore();
 
     expect(store.resources()).toEqual([]);
-    expect(store.actions()).toEqual([]);
   });
 });

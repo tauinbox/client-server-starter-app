@@ -40,6 +40,7 @@ import { NotifyService } from '@core/services/notify.service';
 import type { RolePermissionItem } from '../../../services/role.service';
 import { RoleService } from '../../../services/role.service';
 import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
+import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 
 export type RolePermissionsDialogData = {
   role: RoleAdminResponse;
@@ -263,6 +264,29 @@ export class RolePermissionsDialogComponent implements OnInit {
     if (c.userAttr) types.push('userAttr');
     if (c.custom) types.push('custom');
     return types;
+  }
+
+  /**
+   * Whether every check of this action reads the record. Elsewhere a
+   * restriction would grant the whole subject, so the server refuses it and
+   * the editor offers only allow / deny.
+   */
+  supportsConditions(permission: PermissionResponse): boolean {
+    return permission.resource.conditionalActionNames.includes(
+      permission.action.name
+    );
+  }
+
+  /** Drops every restriction branch and keeps the effect. */
+  clearRestrictions(permissionId: string): void {
+    if (this.role.isSystem || this.isReadonly()) return;
+    const map = new Map(this.conditionsMap());
+    const effect = map.get(permissionId)?.effect;
+    map.set(permissionId, effect === 'deny' ? { effect } : null);
+    this.conditionsMap.set(map);
+    for (const type of Object.keys(CONDITION_TYPE_LABEL_KEYS)) {
+      this.#clearJsonError(permissionId, type);
+    }
   }
 
   // ─── Effect (allow / deny) ────────────────────────────────────────────
@@ -649,12 +673,7 @@ export class RolePermissionsDialogComponent implements OnInit {
   #groupByResource(permissions: PermissionResponse[]): PermissionGroup[] {
     const map = new Map<string, PermissionResponse[]>();
     for (const p of permissions) {
-      const { allowedActionNames } = p.resource;
-      const allowed =
-        allowedActionNames !== null
-          ? allowedActionNames.includes(p.action.name)
-          : p.action.isDefault;
-      if (!allowed) continue;
+      if (!grantableActionNames(p.resource).includes(p.action.name)) continue;
 
       const resourceName = p.resource.displayName || p.resource.name;
       if (!map.has(resourceName)) map.set(resourceName, []);

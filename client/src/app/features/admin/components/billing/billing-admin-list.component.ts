@@ -161,8 +161,11 @@ export class BillingAdminListComponent implements OnInit {
     'actions'
   ];
 
-  readonly canManage = computed(() =>
-    this.authStore.hasPermissions({ action: 'manage', subject: 'Billing' })
+  readonly hasCancelAccess = computed(() =>
+    this.authStore.hasPermissions({ action: 'update', subject: 'Billing' })
+  );
+  readonly hasRefundAccess = computed(() =>
+    this.authStore.hasPermissions({ action: 'refund', subject: 'Billing' })
   );
 
   ngOnInit(): void {

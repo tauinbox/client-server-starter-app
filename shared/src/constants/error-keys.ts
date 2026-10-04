@@ -72,19 +72,16 @@ export const ErrorKeys = {
     CANNOT_GRANT_PERMISSION: 'errors.roles.cannotGrantPermission',
     CANNOT_LIFT_DENY: 'errors.roles.cannotLiftDeny',
     CONDITION_NOT_APPLICABLE: 'errors.roles.conditionNotApplicable',
+    CONDITION_NOT_SUPPORTED: 'errors.roles.conditionNotSupported',
+    ACTION_NOT_GRANTABLE: 'errors.roles.actionNotGrantable',
     CONDITION_BROADER_THAN_CALLER: 'errors.roles.conditionBroaderThanCaller',
     CONDITION_UNRESOLVABLE: 'errors.roles.conditionUnresolvable'
-  },
-  ACTIONS: {
-    NAME_RESERVED: 'errors.actions.nameReserved',
-    NAME_EXISTS: 'errors.actions.nameExists',
-    CANNOT_DELETE_DEFAULT: 'errors.actions.cannotDeleteDefault',
-    ASSIGNED_TO_ROLES: 'errors.actions.assignedToRoles'
   },
   RESOURCES: {
     NOT_FOUND: 'errors.resources.notFound',
     CANNOT_RESTORE: 'errors.resources.cannotRestore',
-    SUBJECT_RESERVED: 'errors.resources.subjectReserved'
+    SUBJECT_RESERVED: 'errors.resources.subjectReserved',
+    ACTION_NOT_DECLARED: 'errors.resources.actionNotDeclared'
   },
   FEATURE_FLAGS: {
     NOT_FOUND: 'errors.featureFlags.notFound',

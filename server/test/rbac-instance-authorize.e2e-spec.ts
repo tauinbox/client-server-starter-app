@@ -32,7 +32,6 @@ import { RbacController } from '../src/modules/auth/controllers/rbac.controller'
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { ResourceService } from '../src/modules/auth/services/resource.service';
-import { ActionService } from '../src/modules/auth/services/action.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -92,11 +91,6 @@ interface FixtureMocks {
     update: jest.Mock;
     restore: jest.Mock;
   };
-  actionService: {
-    findOne: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-  };
 }
 
 describe('Instance-level @Authorize re-check', () => {
@@ -119,11 +113,6 @@ describe('Instance-level @Authorize re-check', () => {
         findOne: jest.fn(),
         update: jest.fn(),
         restore: jest.fn()
-      },
-      actionService: {
-        findOne: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn()
       }
     };
 
@@ -141,7 +130,6 @@ describe('Instance-level @Authorize re-check', () => {
         { provide: UsersService, useValue: mocks.usersService },
         { provide: RoleService, useValue: mocks.roleService },
         { provide: ResourceService, useValue: mocks.resourceService },
-        { provide: ActionService, useValue: mocks.actionService },
         {
           provide: PermissionService,
           useValue: {
@@ -328,48 +316,40 @@ describe('Instance-level @Authorize re-check', () => {
     });
   });
 
-  // ── RBAC actions: PATCH /rbac/actions/:id ───────────────────────
+  // ── RBAC resources: PATCH /rbac/resources/:id ───────────────────
 
-  describe('PATCH /api/v1/rbac/actions/:id with fieldMatch isDefault=false', () => {
-    const DEFAULT_ACTION = '77777777-7777-7777-7777-777777777777';
-    const CUSTOM_ACTION = '88888888-8888-8888-8888-888888888888';
+  describe('PATCH /api/v1/rbac/resources/:id with fieldMatch on name', () => {
+    const USERS_RESOURCE = '77777777-7777-7777-7777-777777777777';
+    const ROLES_RESOURCE = '88888888-8888-8888-8888-888888888888';
 
     beforeEach(() => {
-      mocks.actionService.findOne.mockImplementation((id: string) => {
-        if (id === DEFAULT_ACTION)
-          return Promise.resolve({
-            id: DEFAULT_ACTION,
-            name: 'read',
-            isDefault: true
-          });
-        if (id === CUSTOM_ACTION)
-          return Promise.resolve({
-            id: CUSTOM_ACTION,
-            name: 'export',
-            isDefault: false
-          });
-        return Promise.reject(new Error('not found'));
+      mocks.resourceService.findOne.mockImplementation((id: string) => {
+        if (id === USERS_RESOURCE)
+          return Promise.resolve({ id: USERS_RESOURCE, name: 'users' });
+        if (id === ROLES_RESOURCE)
+          return Promise.resolve({ id: ROLES_RESOURCE, name: 'roles' });
+        return Promise.resolve(null);
       });
-      mocks.actionService.update.mockResolvedValue({ id: CUSTOM_ACTION });
+      mocks.resourceService.update.mockResolvedValue({ id: USERS_RESOURCE });
       holder.current = abilityWithRule('update', 'Permission', {
-        isDefault: false
+        name: { $in: ['users'] }
       });
     });
 
-    it('returns 403 when updating a default action (instance check fails)', async () => {
+    it('returns 403 when the resource does not satisfy the condition', async () => {
       await request(http())
-        .patch(`/rbac/actions/${DEFAULT_ACTION}`)
-        .send({ displayName: 'Read' })
+        .patch(`/rbac/resources/${ROLES_RESOURCE}`)
+        .send({ displayName: 'Roles' })
         .expect(403);
-      expect(mocks.actionService.update).not.toHaveBeenCalled();
+      expect(mocks.resourceService.update).not.toHaveBeenCalled();
     });
 
-    it('returns 200 when updating a non-default action', async () => {
+    it('returns 200 when the resource satisfies the condition', async () => {
       await request(http())
-        .patch(`/rbac/actions/${CUSTOM_ACTION}`)
-        .send({ displayName: 'Export Data' })
+        .patch(`/rbac/resources/${USERS_RESOURCE}`)
+        .send({ displayName: 'Accounts' })
         .expect(200);
-      expect(mocks.actionService.update).toHaveBeenCalled();
+      expect(mocks.resourceService.update).toHaveBeenCalled();
     });
   });
 });
