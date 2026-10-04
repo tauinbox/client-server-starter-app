@@ -39,7 +39,12 @@ import {
 } from '../helpers/pagination.helpers';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { changedFields } from '@app/shared/utils/changed-fields';
-import { authenticateRequest, permissionGuard } from '../helpers/auth.helpers';
+import {
+  assertInstancePermission,
+  authenticateRequest,
+  permissionGuard
+} from '../helpers/auth.helpers';
+import { filterByAbility } from '../helpers/ability-filter.helpers';
 import {
   requireUuid,
   validationError
@@ -53,7 +58,12 @@ import {
 } from '../utils/validation';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
-import type { MockFeatureFlag, MockFeatureFlagRule, MockUser } from '../types';
+import type {
+  AuthenticatedRequest,
+  MockFeatureFlag,
+  MockFeatureFlagRule,
+  MockUser
+} from '../types';
 import { readAnonId, writeAnonId } from '../helpers/anon-id.helpers';
 
 // Mirrors the server's attribute registry. The custom attributes are the
@@ -535,7 +545,12 @@ adminRouter.get(
       return;
     }
     const page = cursorPaginate(
-      Array.from(getState().featureFlags.values()),
+      filterByAbility(
+        Array.from(getState().featureFlags.values()),
+        (req as AuthenticatedRequest).user,
+        'search',
+        'FeatureFlag'
+      ),
       parseCursorQuery(query)
     );
     res.json({ data: page.data.map(toFeatureFlagResponse), meta: page.meta });
@@ -555,11 +570,13 @@ adminRouter.get(
   }
 );
 
-adminRouter.get('/', permissionGuard('search', 'FeatureFlag'), (_req, res) => {
-  const flags: FeatureFlagResponse[] = [];
-  for (const flag of getState().featureFlags.values()) {
-    flags.push(toFeatureFlagResponse(flag));
-  }
+adminRouter.get('/', permissionGuard('search', 'FeatureFlag'), (req, res) => {
+  const flags: FeatureFlagResponse[] = filterByAbility(
+    Array.from(getState().featureFlags.values()),
+    (req as AuthenticatedRequest).user,
+    'search',
+    'FeatureFlag'
+  ).map(toFeatureFlagResponse);
   flags.sort((a, b) => a.key.localeCompare(b.key));
   res.json(flags);
 });
@@ -579,6 +596,9 @@ adminRouter.get(
         'Feature flag not found',
         ErrorKeys.FEATURE_FLAGS.NOT_FOUND
       );
+      return;
+    }
+    if (!assertInstancePermission(req, res, 'read', 'FeatureFlag', flag)) {
       return;
     }
     res.json(toFeatureFlagResponse(flag));
@@ -626,6 +646,18 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
   const rules = rulesOf(body);
   if (rules && !rules.ok && rules.source === 'dto') {
     res.status(400).json(validationError(rules.message));
+    return;
+  }
+  // The record as the server writes it, defaults included.
+  if (
+    !assertInstancePermission(req, res, 'create', 'FeatureFlag', {
+      key: validation.data.key,
+      description: validation.data.description,
+      enabled: validation.data.enabled,
+      environments: validation.data.environments,
+      public: validation.data.isPublic
+    })
+  ) {
     return;
   }
   if (findFlagByKey(validation.data.key)) {
@@ -705,6 +737,28 @@ adminRouter.patch(
       );
       return;
     }
+    // The record after the write is checked too, as on the server.
+    const after = {
+      ...flag,
+      ...(validation.patch.description !== undefined
+        ? { description: validation.patch.description }
+        : {}),
+      ...(validation.patch.enabled !== undefined
+        ? { enabled: validation.patch.enabled }
+        : {}),
+      ...(validation.patch.environments !== undefined
+        ? { environments: validation.patch.environments }
+        : {}),
+      ...(validation.patch.isPublic !== undefined
+        ? { public: validation.patch.isPublic }
+        : {})
+    };
+    if (
+      !assertInstancePermission(req, res, 'update', 'FeatureFlag', flag) ||
+      !assertInstancePermission(req, res, 'update', 'FeatureFlag', after)
+    ) {
+      return;
+    }
     if (rules && !rules.ok) {
       sendError(res, 400, rules.message);
       return;
@@ -766,6 +820,9 @@ adminRouter.delete(
         'Feature flag not found',
         ErrorKeys.FEATURE_FLAGS.NOT_FOUND
       );
+      return;
+    }
+    if (!assertInstancePermission(req, res, 'delete', 'FeatureFlag', flag)) {
       return;
     }
     const state = getState();
@@ -894,6 +951,9 @@ adminRouter.post(
       );
       return;
     }
+    if (!assertInstancePermission(req, res, 'read', 'FeatureFlag', flag)) {
+      return;
+    }
     if (rulesValidation && !rulesValidation.ok) {
       sendError(res, 400, rulesValidation.message);
       return;
@@ -944,6 +1004,15 @@ adminRouter.post(
         'Feature flag not found',
         ErrorKeys.FEATURE_FLAGS.NOT_FOUND
       );
+      return;
+    }
+    if (
+      !assertInstancePermission(req, res, 'update', 'FeatureFlag', flag) ||
+      !assertInstancePermission(req, res, 'update', 'FeatureFlag', {
+        ...flag,
+        enabled: !flag.enabled
+      })
+    ) {
       return;
     }
     flag.enabled = !flag.enabled;

@@ -56,6 +56,7 @@ const METADATA_CACHE_TTL = 60_000; // 1 minute
   name: 'permissions',
   subject: 'Permission',
   displayName: 'Permissions',
+  description: 'Permission and RBAC metadata management',
   actions: ['read', 'update'],
   conditionalActions: ['update']
 })

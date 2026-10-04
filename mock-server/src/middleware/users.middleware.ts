@@ -53,6 +53,7 @@ import {
   stepUpError
 } from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
+import { filterByAbility } from '../helpers/ability-filter.helpers';
 import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
 import {
@@ -217,7 +218,12 @@ function listUsers(req: Request, res: Response): void {
     res.status(400).json(validationError(queryErrors));
     return;
   }
-  const users = filterUsers(query).map(toAdminUserResponse);
+  const users = filterByAbility(
+    filterUsers(query),
+    (req as AuthenticatedRequest).user,
+    'search',
+    'User'
+  ).map(toAdminUserResponse);
   res.json(cursorPaginate(users, parseCursorQuery(query)));
 }
 

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { HttpException } from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import { FeatureFlagsAdminController } from './feature-flags-admin.controller';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
@@ -9,6 +9,23 @@ import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { MfaRequiredGuard } from '../../auth/guards/mfa-required.guard';
+import { MetricsService } from '../../core/metrics/metrics.service';
+import {
+  AbilityBuilder,
+  createMongoAbility
+} from '../../auth/casl/app-ability';
+import type { AppAbility } from '../../auth/casl/app-ability';
+
+function abilityFor(
+  actions: string[],
+  conditions?: Record<string, unknown>
+): AppAbility {
+  const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+  for (const action of actions) can(action, 'FeatureFlag', conditions);
+  return build();
+}
+
+const fullAbility = abilityFor(['create', 'read', 'update', 'delete']);
 
 describe('FeatureFlagsAdminController', () => {
   let controller: FeatureFlagsAdminController;
@@ -63,7 +80,11 @@ describe('FeatureFlagsAdminController', () => {
       providers: [
         { provide: FeatureFlagService, useValue: flagService },
         { provide: EventEmitter2, useValue: eventEmitter },
-        { provide: AuditService, useValue: auditService }
+        { provide: AuditService, useValue: auditService },
+        {
+          provide: MetricsService,
+          useValue: { recordPermissionDenied: jest.fn() }
+        }
       ]
     })
       .overrideGuard(PermissionsGuard)
@@ -83,7 +104,7 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('create emits a "created" change event', async () => {
-    await controller.create({ key: 'new-dashboard' }, req);
+    await controller.create({ key: 'new-dashboard' }, req, fullAbility);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
       expect.objectContaining({
@@ -95,18 +116,30 @@ describe('FeatureFlagsAdminController', () => {
 
   it('update requires If-Match header', async () => {
     await expect(
-      controller.update('flag-1', { enabled: true }, undefined, req)
+      controller.update(
+        'flag-1',
+        { enabled: true },
+        undefined,
+        req,
+        fullAbility
+      )
     ).rejects.toBeInstanceOf(HttpException);
   });
 
   it('update rejects non-integer If-Match', async () => {
     await expect(
-      controller.update('flag-1', { enabled: true }, 'abc', req)
+      controller.update('flag-1', { enabled: true }, 'abc', req, fullAbility)
     ).rejects.toBeInstanceOf(HttpException);
   });
 
   it('update strips quoted ETag and passes parsed version', async () => {
-    await controller.update('flag-1', { enabled: true }, '"5"', req);
+    await controller.update(
+      'flag-1',
+      { enabled: true },
+      '"5"',
+      req,
+      fullAbility
+    );
     expect(flagService.update).toHaveBeenCalledWith(
       'flag-1',
       { enabled: true },
@@ -116,7 +149,7 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('toggle emits a "toggled" change event', async () => {
-    await controller.toggle('flag-1', req);
+    await controller.toggle('flag-1', req, fullAbility);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
       expect.objectContaining({ changeType: 'toggled' })
@@ -131,7 +164,13 @@ describe('FeatureFlagsAdminController', () => {
         payload: { type: 'role' as const, roleNames: ['beta'] }
       }
     ];
-    await controller.update('flag-1', { enabled: true, rules }, '1', req);
+    await controller.update(
+      'flag-1',
+      { enabled: true, rules },
+      '1',
+      req,
+      fullAbility
+    );
     expect(flagService.update).toHaveBeenCalledWith(
       'flag-1',
       { enabled: true, rules },
@@ -147,7 +186,7 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('update without rules leaves the rule count out of the audit', async () => {
-    await controller.update('flag-1', { enabled: true }, '1', req);
+    await controller.update('flag-1', { enabled: true }, '1', req, fullAbility);
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({
         details: { changedFields: ['enabled'] }
@@ -156,7 +195,7 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('delete emits a "deleted" change event with the flag key', async () => {
-    await controller.remove('flag-1', req);
+    await controller.remove('flag-1', req, fullAbility);
     expect(flagService.delete).toHaveBeenCalledWith('flag-1');
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
@@ -168,7 +207,7 @@ describe('FeatureFlagsAdminController', () => {
   });
 
   it('delete records the flag key in the audit details', async () => {
-    await controller.remove('flag-1', req);
+    await controller.remove('flag-1', req, fullAbility);
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.FEATURE_FLAG_DELETE,
@@ -179,5 +218,71 @@ describe('FeatureFlagsAdminController', () => {
         details: { key: 'new-dashboard' }
       })
     );
+  });
+
+  describe('a grant with a condition', () => {
+    const scoped = abilityFor(['read', 'update', 'delete', 'create'], {
+      key: 'other-flag'
+    });
+
+    it.each([
+      ['findOne', () => controller.findOne('flag-1', req, scoped)],
+      ['preview', () => controller.preview('flag-1', {}, req, scoped)],
+      ['toggle', () => controller.toggle('flag-1', req, scoped)],
+      ['remove', () => controller.remove('flag-1', req, scoped)],
+      [
+        'update',
+        () => controller.update('flag-1', { enabled: true }, '1', req, scoped)
+      ],
+      ['create', () => controller.create({ key: 'new-dashboard' }, req, scoped)]
+    ])('%s refuses a flag outside the condition', async (_name, call) => {
+      await expect(call()).rejects.toBeInstanceOf(ForbiddenException);
+      expect(flagService.create).not.toHaveBeenCalled();
+      expect(flagService.update).not.toHaveBeenCalled();
+      expect(flagService.toggle).not.toHaveBeenCalled();
+      expect(flagService.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows a flag inside the condition', async () => {
+      const own = abilityFor(['read'], { key: 'new-dashboard' });
+      await expect(controller.findOne('flag-1', req, own)).resolves.toBe(
+        sampleFlag
+      );
+    });
+
+    it('create checks the record with the defaults the service writes', async () => {
+      const disabledOnly = abilityFor(['create'], { enabled: false });
+      await controller.create({ key: 'new-dashboard' }, req, disabledOnly);
+      await expect(
+        controller.create(
+          { key: 'new-dashboard', enabled: true },
+          req,
+          disabledOnly
+        )
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('update refuses a write that moves the flag out of the condition', async () => {
+      const disabledOnly = abilityFor(['update'], { enabled: false });
+      await expect(
+        controller.update('flag-1', { enabled: true }, '1', req, disabledOnly)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await controller.update(
+        'flag-1',
+        { description: 'x' },
+        '1',
+        req,
+        disabledOnly
+      );
+      expect(flagService.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('toggle refuses a flip that moves the flag out of the condition', async () => {
+      const disabledOnly = abilityFor(['update'], { enabled: false });
+      await expect(
+        controller.toggle('flag-1', req, disabledOnly)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(flagService.toggle).not.toHaveBeenCalled();
+    });
   });
 });

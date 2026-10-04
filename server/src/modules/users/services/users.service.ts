@@ -22,7 +22,7 @@ import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import { escapeLikePattern } from '../../../common/utils/escape-like';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
 import type { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
-import { applyAbilityToUserQuery } from '../utils/apply-ability.util';
+import { applyAbilityToUserQuery } from '../../../common/utils/apply-ability.util';
 
 const USER_SORT_COLUMN_MAP: Record<string, string> = {
   email: 'user.email',

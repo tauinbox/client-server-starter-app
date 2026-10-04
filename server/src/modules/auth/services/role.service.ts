@@ -522,6 +522,14 @@ export class RoleService {
         actorId,
         this.metricsService
       );
+      assertCan(
+        ability,
+        'assign',
+        subject('Role', role),
+        this.auditService,
+        { actorId, targetId: roleId, targetType: 'Role' },
+        this.metricsService
+      );
 
       // Prevent indirect escalation: caller must hold every permission
       // carried by the role they are assigning.
@@ -577,6 +585,14 @@ export class RoleService {
         targetUser,
         this.auditService,
         actorId,
+        this.metricsService
+      );
+      assertCan(
+        ability,
+        'assign',
+        subject('Role', role),
+        this.auditService,
+        { actorId, targetId: roleId, targetType: 'Role' },
         this.metricsService
       );
       if (this.isScopeChecked(ability)) {

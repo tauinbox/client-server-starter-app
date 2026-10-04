@@ -30,11 +30,16 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { subject } from '@casl/ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
+import { assertCan } from '../../../common/utils/assert-can.util';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
+import { CurrentAbility } from '../../auth/decorators/current-ability.decorator';
+import type { AppAbility } from '../../auth/casl/app-ability';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { AuditService } from '../../audit/audit.service';
@@ -47,6 +52,7 @@ import { FeatureFlagResponseDto } from '../dtos/feature-flag-response.dto';
 import { PreviewFlagContextDto } from '../dtos/preview-flag-context.dto';
 import { PreviewFlagResponseDto } from '../dtos/preview-flag-response.dto';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
+import type { FeatureFlag } from '../entities/feature-flag.entity';
 import type { FeatureFlagAttributeKeysResponse } from '@app/shared/types';
 
 @ApiTags('Feature Flags Admin API')
@@ -58,15 +64,17 @@ import type { FeatureFlagAttributeKeysResponse } from '@app/shared/types';
   name: 'feature-flags',
   subject: 'FeatureFlag',
   displayName: 'Feature Flags',
+  description: 'Feature flag administration',
   actions: ['create', 'read', 'update', 'delete', 'search'],
-  conditionalActions: []
+  conditionalActions: ['create', 'read', 'update', 'delete', 'search']
 })
 @UseInterceptors(ClassSerializerInterceptor)
 export class FeatureFlagsAdminController {
   constructor(
     private readonly flagService: FeatureFlagService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService
   ) {}
 
   @Get('cursor')
@@ -75,8 +83,11 @@ export class FeatureFlagsAdminController {
   @ApiOperation({ summary: 'Cursor-paginated feature flags for the list page' })
   @ApiOkResponse({ description: 'Cursor-paginated list of feature flags' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  findAllCursor(@Query() query: FeatureFlagCursorQueryDto) {
-    return this.flagService.findCursorPaginated(query);
+  findAllCursor(
+    @Query() query: FeatureFlagCursorQueryDto,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    return this.flagService.findCursorPaginated(query, ability);
   }
 
   @Get('attribute-keys')
@@ -97,8 +108,8 @@ export class FeatureFlagsAdminController {
   @ApiOperation({ summary: 'List all feature flags' })
   @ApiOkResponse({ type: [FeatureFlagResponseDto] })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  findAll() {
-    return this.flagService.findAll();
+  findAll(@CurrentAbility() ability: AppAbility) {
+    return this.flagService.findAll(ability);
   }
 
   @Get(':id')
@@ -108,8 +119,14 @@ export class FeatureFlagsAdminController {
   @ApiParam({ name: 'id' })
   @ApiOkResponse({ type: FeatureFlagResponseDto })
   @ApiNotFoundResponse({ description: 'Feature flag not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.flagService.findOne(id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    const flag = await this.flagService.findOne(id);
+    this.assertCanFlag(ability, 'read', flag, req, id);
+    return flag;
   }
 
   @Post()
@@ -131,7 +148,25 @@ export class FeatureFlagsAdminController {
   @ApiOperation({ summary: 'Create a feature flag' })
   @ApiBody({ type: CreateFeatureFlagDto })
   @ApiCreatedResponse({ type: FeatureFlagResponseDto })
-  async create(@Body() dto: CreateFeatureFlagDto, @Req() req: JwtAuthRequest) {
+  async create(
+    @Body() dto: CreateFeatureFlagDto,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
+  ) {
+    // The record as the service will write it, defaults included.
+    const { rules: _rules, ...fields } = dto;
+    this.assertCanFlag(
+      ability,
+      'create',
+      {
+        ...fields,
+        description: fields.description ?? null,
+        enabled: fields.enabled ?? false,
+        environments: fields.environments ?? [],
+        public: fields.public ?? false
+      },
+      req
+    );
     const flag = await this.flagService.create(dto, req.user?.userId ?? null);
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
@@ -156,14 +191,31 @@ export class FeatureFlagsAdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateFeatureFlagDto,
     @Headers('if-match') ifMatch: string | undefined,
-    @Req() req: JwtAuthRequest
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
     const expectedVersion = this.parseIfMatch(ifMatch);
     // The update is conditional on the version, so when it succeeds this read
     // is exactly the state that it replaced. The rules are reported as a
     // count: rule rows and rule DTOs do not compare field by field.
     const { rules, ...fields } = dto;
-    const changed = changedFields(await this.flagService.findOne(id), fields);
+    const current = await this.flagService.findOne(id);
+    // The record after the write is checked too: else a grant scoped by a
+    // writable field lets the caller move a flag out of its own scope.
+    this.assertCanFlag(ability, 'update', current, req, id);
+    this.assertCanFlag(
+      ability,
+      'update',
+      {
+        ...current,
+        ...Object.fromEntries(
+          Object.entries(fields).filter(([, value]) => value !== undefined)
+        )
+      },
+      req,
+      id
+    );
+    const changed = changedFields(current, fields);
     const flag = await this.flagService.update(
       id,
       dto,
@@ -198,9 +250,11 @@ export class FeatureFlagsAdminController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: JwtAuthRequest
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
     const flag = await this.flagService.findOne(id);
+    this.assertCanFlag(ability, 'delete', flag, req, id);
     await this.flagService.delete(id);
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
@@ -233,10 +287,19 @@ export class FeatureFlagsAdminController {
   @ApiBody({ type: PreviewFlagContextDto })
   @ApiOkResponse({ type: PreviewFlagResponseDto })
   @ApiNotFoundResponse({ description: 'Feature flag not found' })
-  preview(
+  async preview(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: PreviewFlagContextDto
+    @Body() dto: PreviewFlagContextDto,
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    this.assertCanFlag(
+      ability,
+      'read',
+      await this.flagService.findOne(id),
+      req,
+      id
+    );
     return this.flagService.preview(id, dto);
   }
 
@@ -255,14 +318,45 @@ export class FeatureFlagsAdminController {
   @ApiOkResponse({ type: FeatureFlagResponseDto })
   async toggle(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: JwtAuthRequest
+    @Req() req: JwtAuthRequest,
+    @CurrentAbility() ability: AppAbility
   ) {
+    const current = await this.flagService.findOne(id);
+    this.assertCanFlag(ability, 'update', current, req, id);
+    this.assertCanFlag(
+      ability,
+      'update',
+      { ...current, enabled: !current.enabled },
+      req,
+      id
+    );
     const flag = await this.flagService.toggle(id, req.user?.userId ?? null);
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent(flag.key, 'toggled')
     );
     return flag;
+  }
+
+  /**
+   * The route-level @Authorize check is type-level and ignores conditions, so
+   * a conditional grant is re-evaluated against the record.
+   */
+  private assertCanFlag(
+    ability: AppAbility,
+    action: string,
+    record: Partial<FeatureFlag>,
+    req: JwtAuthRequest,
+    targetId?: string
+  ): void {
+    assertCan(
+      ability,
+      action,
+      subject('FeatureFlag', record),
+      this.auditService,
+      { actorId: req.user?.userId, targetId, targetType: 'FeatureFlag' },
+      this.metricsService
+    );
   }
 
   private parseIfMatch(header: string | undefined): number {

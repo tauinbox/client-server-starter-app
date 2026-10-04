@@ -13,6 +13,11 @@ export interface ResourceMetadata {
   subject: string;
   displayName: string;
   /**
+   * Written on the first sync, and on a later sync only while the stored
+   * description is empty, so an admin's edit survives a restart.
+   */
+  description: string;
+  /**
    * The actions that `@Authorize()` checks for this subject. These are the
    * only actions a role can be granted on it. `npm run check:permissions`
    * fails when the list and the checks drift apart.

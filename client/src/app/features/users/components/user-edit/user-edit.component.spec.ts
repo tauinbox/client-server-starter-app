@@ -418,6 +418,19 @@ describe('UserEditComponent', () => {
     });
   });
 
+  describe('canAssignRole (instance-level)', () => {
+    it('passes the role as the instance', () => {
+      const role = { id: 'role-2', name: 'editor' };
+      // @ts-expect-error a partial role is enough for the permission check
+      component.canAssignRole(role);
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith({
+        action: 'assign',
+        subject: 'Role',
+        instance: role
+      });
+    });
+  });
+
   describe('canManageUser (instance-level)', () => {
     it('should return false when user is not loaded', () => {
       expect(component['canManageUser']()).toBe(false);

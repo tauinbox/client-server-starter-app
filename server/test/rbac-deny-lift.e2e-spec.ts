@@ -114,6 +114,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
     };
     updateUser = find('update', 'User');
     const updateRole = find('update', 'Role');
+    const assignRole = find('assign', 'Role');
 
     const userRepository = dataSource.getRepository(User);
     for (const key of Object.keys(emails) as (keyof typeof emails)[]) {
@@ -131,7 +132,8 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
     adminRole = await createRole('admin');
     await roleService.setPermissionsForRole(adminRole.id, [
       { permissionId: updateUser.id },
-      { permissionId: updateRole.id }
+      { permissionId: updateRole.id },
+      { permissionId: assignRole.id }
     ]);
     restrictRole = await createRole('restrict');
     await roleService.setPermissionsForRole(restrictRole.id, [

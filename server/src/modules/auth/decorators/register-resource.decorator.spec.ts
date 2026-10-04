@@ -9,6 +9,7 @@ import {
   name: 'users',
   subject: 'User',
   displayName: 'Users',
+  description: 'User accounts management',
   actions: ['read', 'update'],
   conditionalActions: ['update']
 })
@@ -33,6 +34,7 @@ describe('RegisterResource decorator', () => {
       name: 'users',
       subject: 'User',
       displayName: 'Users',
+      description: 'User accounts management',
       actions: ['read', 'update'],
       conditionalActions: ['update']
     });
@@ -56,6 +58,7 @@ describe('RegisterResource decorator', () => {
       name: 'permissions',
       subject: 'Permission',
       displayName: 'Permissions',
+      description: 'Permission management',
       actions: ['read'],
       conditionalActions: []
     })

@@ -76,6 +76,7 @@ import { maskEmail } from '../../../common/utils/escape-html';
   name: 'users',
   subject: 'User',
   displayName: 'Users',
+  description: 'User accounts management',
   actions: ['create', 'read', 'update', 'delete', 'search'],
   conditionalActions: ['create', 'read', 'update', 'delete', 'search']
 })

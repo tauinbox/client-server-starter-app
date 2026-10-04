@@ -79,6 +79,7 @@ import { SignInCompletionService } from '../services/sign-in-completion.service'
   name: 'profile',
   subject: 'Profile',
   displayName: 'Profile',
+  description: 'User own profile',
   actions: ['update'],
   conditionalActions: []
 })

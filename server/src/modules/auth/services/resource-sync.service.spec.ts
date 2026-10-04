@@ -41,6 +41,7 @@ describe('ResourceSyncService', () => {
     name: 'users',
     subject: 'User',
     displayName: 'Users',
+    description: 'Users management',
     actions: ['read', 'search'],
     conditionalActions: ['read']
   };
@@ -48,6 +49,7 @@ describe('ResourceSyncService', () => {
     name: 'roles',
     subject: 'Role',
     displayName: 'Roles',
+    description: 'Roles management',
     actions: ['assign'],
     conditionalActions: []
   };
@@ -229,6 +231,7 @@ describe('ResourceSyncService', () => {
         name: 'users',
         subject: 'User',
         displayName: 'Users',
+        description: 'Users management',
         isSystem: true,
         actionNames: ['read', 'search'],
         conditionalActionNames: ['read']

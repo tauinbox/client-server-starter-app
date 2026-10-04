@@ -103,6 +103,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         name: meta.name,
         subject: meta.subject,
         displayName: meta.displayName,
+        description: meta.description,
         isSystem: true,
         actionNames: [...meta.actions],
         conditionalActionNames: [...meta.conditionalActions]

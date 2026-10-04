@@ -35,6 +35,7 @@ describe('FeatureFlagListComponent', () => {
   let notifySuccess: ReturnType<typeof vi.fn>;
   let notifyError: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
+  let hasPermissions: ReturnType<typeof vi.fn>;
   let serviceMock: {
     getAll: ReturnType<typeof vi.fn>;
     getAllCursor: ReturnType<typeof vi.fn>;
@@ -68,6 +69,7 @@ describe('FeatureFlagListComponent', () => {
     };
 
     dialogOpen = vi.fn();
+    hasPermissions = vi.fn().mockReturnValue(true);
 
     await TestBed.configureTestingModule({
       imports: [FeatureFlagListComponent, TranslocoTestingModuleWithLangs],
@@ -97,7 +99,7 @@ describe('FeatureFlagListComponent', () => {
         },
         {
           provide: AuthStore,
-          useValue: { hasPermissions: vi.fn().mockReturnValue(true) }
+          useValue: { hasPermissions }
         }
       ]
     })
@@ -122,6 +124,28 @@ describe('FeatureFlagListComponent', () => {
     expect(rows.length).toBe(1);
     expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain(
       'new-dashboard'
+    );
+  });
+
+  it('decides the row buttons with the flag itself', async () => {
+    hasPermissions.mockImplementation(
+      (check: { instance?: unknown }) => check.instance === undefined
+    );
+    const fixture = TestBed.createComponent(FeatureFlagListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const row = (fixture.nativeElement as HTMLElement).querySelector(
+      'table tbody tr'
+    );
+    expect(row?.querySelectorAll('button').length).toBe(0);
+    expect(hasPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'update',
+        subject: 'FeatureFlag',
+        instance: expect.objectContaining({ key: 'new-dashboard' })
+      })
     );
   });
 

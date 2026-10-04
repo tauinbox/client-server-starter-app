@@ -493,7 +493,56 @@ describe('RoleService', () => {
     });
   });
 
+  function assignAbility(roleName: string): AppAbility {
+    const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+    builder.can('update', 'User');
+    builder.can('assign', 'Role', { name: roleName });
+    return builder.build();
+  }
+
   describe('assignRoleToUser', () => {
+    it('refuses a role outside a conditional assign grant', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: []
+      });
+
+      await expect(
+        service.assignRoleToUser(
+          'user-1',
+          'role-2',
+          assignAbility('support'),
+          'actor-1'
+        )
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorId: 'actor-1',
+          targetId: 'role-2',
+          targetType: 'Role'
+        })
+      );
+    });
+
+    it('assigns a role inside a conditional assign grant', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: []
+      });
+      mockRolePermissionRepo.find.mockResolvedValue([]);
+
+      await service.assignRoleToUser(
+        'user-1',
+        'role-2',
+        assignAbility('editor')
+      );
+
+      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+    });
+
     it('should assign role and invalidate cache', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await service.assignRoleToUser('user-1', 'role-2');
@@ -569,6 +618,36 @@ describe('RoleService', () => {
   });
 
   describe('removeRoleFromUser', () => {
+    it('refuses a role outside a conditional assign grant', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: []
+      });
+
+      await expect(
+        service.removeRoleFromUser('user-1', 'role-2', assignAbility('support'))
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRelationQueryBuilder.remove).not.toHaveBeenCalled();
+    });
+
+    it('removes a role inside a conditional assign grant', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRoleRepo.manager.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: []
+      });
+      mockRolePermissionRepo.find.mockResolvedValue([]);
+
+      await service.removeRoleFromUser(
+        'user-1',
+        'role-2',
+        assignAbility('editor')
+      );
+
+      expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
+    });
+
     it('should remove role and invalidate cache', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
@@ -1243,7 +1322,8 @@ describe('RoleService', () => {
       ]);
       mockPermissionRepo.find.mockResolvedValue([permCreateRole]);
       const { ability } = abilityMock({
-        canMatrix: { 'update:*': true } // can update target user, but not create:Role
+        // can update the target user and assign the role, but not create:Role
+        canMatrix: { 'update:*': true, 'assign:*': true }
       });
 
       await expect(
@@ -1476,6 +1556,7 @@ describe('RoleService', () => {
     ): AppAbility {
       const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
       builder.can('update', 'Role');
+      builder.can('assign', 'Role');
       define(builder);
       return builder.build();
     }

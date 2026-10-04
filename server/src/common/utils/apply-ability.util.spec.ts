@@ -1,19 +1,19 @@
 import { Logger } from '@nestjs/common';
+import { applyAbilityToUserQuery } from './apply-ability.util';
 import {
-  applyAbilityToUserQuery,
   COMPARISON_OPERATORS,
   LIST_OPERATORS,
   LOGICAL_OPERATORS
-} from './apply-ability.util';
+} from '@app/shared/utils/ability-sql-translation';
 import { ALLOWED_MONGO_OPERATORS } from '@app/shared/utils/mongo-query-safety';
 import { subject } from '@casl/ability';
 import {
   AbilityBuilder,
   createMongoAbility
-} from '../../auth/casl/app-ability';
-import type { AppAbility } from '../../auth/casl/app-ability';
+} from '../../modules/auth/casl/app-ability';
+import type { AppAbility } from '../../modules/auth/casl/app-ability';
 import type { SelectQueryBuilder } from 'typeorm';
-import type { User } from '../entities/user.entity';
+import type { User } from '../../modules/users/entities/user.entity';
 
 type Connector = 'where' | 'andWhere' | 'orWhere';
 

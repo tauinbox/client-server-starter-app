@@ -200,6 +200,7 @@ export class ResourceService {
     name: string;
     subject: string;
     displayName: string;
+    description: string;
     isSystem?: boolean;
     actionNames: string[];
     conditionalActionNames: string[];
@@ -227,6 +228,7 @@ export class ResourceService {
     if (existing) {
       existing.subject = normalizedSubject;
       existing.displayName = data.displayName;
+      existing.description ??= data.description;
       existing.actionNames = data.actionNames;
       existing.conditionalActionNames = data.conditionalActionNames;
       existing.lastSyncedAt = new Date();

@@ -55,7 +55,9 @@ export {
 export {
   SYSTEM_ROLES,
   ROLE_NAME_MAX_LENGTH,
-  type SystemRole
+  ABILITY_FILTER_FIELDS,
+  type SystemRole,
+  type AbilityFilterSubject
 } from './permission.constants';
 
 export { BODY_UUID_PATTERN } from './uuid.constants';

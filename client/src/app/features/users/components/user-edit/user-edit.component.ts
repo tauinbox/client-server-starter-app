@@ -227,6 +227,18 @@ export class UserEditComponent implements OnInit, OnDestroy {
     this.#authStore.hasPermissions({ action: 'assign', subject: 'Role' })
   );
 
+  /**
+   * A grant on `assign` can be limited to some roles. A role outside it stays
+   * visible but cannot be added or removed.
+   */
+  canAssignRole(role: RoleAdminResponse): boolean {
+    return this.#authStore.hasPermissions({
+      action: 'assign',
+      subject: 'Role',
+      instance: role
+    });
+  }
+
   readonly #isSelf = computed(() => this.id() === this.#authStore.user()?.id);
 
   /**

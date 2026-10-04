@@ -347,7 +347,36 @@ describe('ResourceService', () => {
   });
 
   describe('upsertResource', () => {
-    const declared = { actionNames: ['read'], conditionalActionNames: [] };
+    const declared = {
+      description: 'Declared description',
+      actionNames: ['read'],
+      conditionalActionNames: []
+    };
+
+    it('fills an empty description and keeps a stored one', async () => {
+      mockResourceRepo.save.mockImplementation(
+        (data: Record<string, unknown>) => Promise.resolve(data)
+      );
+      const empty = { ...resource1, description: null };
+      mockResourceRepo.findOne.mockResolvedValue(empty);
+      await service.upsertResource({
+        ...declared,
+        name: 'users',
+        subject: 'User',
+        displayName: 'Users'
+      });
+      expect(empty.description).toBe('Declared description');
+
+      const edited = { ...resource1, description: 'Edited by an admin' };
+      mockResourceRepo.findOne.mockResolvedValue(edited);
+      await service.upsertResource({
+        ...declared,
+        name: 'users',
+        subject: 'User',
+        displayName: 'Users'
+      });
+      expect(edited.description).toBe('Edited by an admin');
+    });
 
     it('should update existing resource if found by name', async () => {
       const existing = { ...resource1 };
@@ -405,6 +434,7 @@ describe('ResourceService', () => {
         name: 'users',
         subject: 'User',
         displayName: 'Users',
+        description: 'User management',
         actionNames: ['read', 'update'],
         conditionalActionNames: ['update']
       });
