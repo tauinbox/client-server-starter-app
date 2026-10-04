@@ -3,7 +3,6 @@ import {
   FeatureFlagChangedListener,
   FLAGS_BROADCAST_COALESCE_MS
 } from './feature-flag-changed.listener';
-import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { UserRoleChangedEvent } from '../../auth/events/user-role-changed.event';
@@ -44,9 +43,7 @@ describe('FeatureFlagChangedListener', () => {
     });
 
     it('invalidates all caches and broadcasts once after the coalesce window', async () => {
-      await listener.handleFeatureFlagChanged(
-        new FeatureFlagChangedEvent('new-dashboard', 'updated')
-      );
+      await listener.handleFeatureFlagChanged();
       expect(resolver.invalidateAll).toHaveBeenCalled();
       expect(notifications.pushToAll).not.toHaveBeenCalled();
 
@@ -58,12 +55,8 @@ describe('FeatureFlagChangedListener', () => {
     });
 
     it('collapses a burst of changes into one broadcast but invalidates per event', async () => {
-      await listener.handleFeatureFlagChanged(
-        new FeatureFlagChangedEvent('new-dashboard', 'updated')
-      );
-      await listener.handleFeatureFlagChanged(
-        new FeatureFlagChangedEvent('new-dashboard', 'rules-replaced')
-      );
+      await listener.handleFeatureFlagChanged();
+      await listener.handleFeatureFlagChanged();
       expect(resolver.invalidateAll).toHaveBeenCalledTimes(2);
 
       jest.advanceTimersByTime(FLAGS_BROADCAST_COALESCE_MS);
@@ -71,23 +64,17 @@ describe('FeatureFlagChangedListener', () => {
     });
 
     it('broadcasts again for a change after the window has elapsed', async () => {
-      await listener.handleFeatureFlagChanged(
-        new FeatureFlagChangedEvent('new-dashboard', 'toggled')
-      );
+      await listener.handleFeatureFlagChanged();
       jest.advanceTimersByTime(FLAGS_BROADCAST_COALESCE_MS);
       expect(notifications.pushToAll).toHaveBeenCalledTimes(1);
 
-      await listener.handleFeatureFlagChanged(
-        new FeatureFlagChangedEvent('beta-export', 'toggled')
-      );
+      await listener.handleFeatureFlagChanged();
       jest.advanceTimersByTime(FLAGS_BROADCAST_COALESCE_MS);
       expect(notifications.pushToAll).toHaveBeenCalledTimes(2);
     });
 
     it('cancels a pending broadcast on module destroy', async () => {
-      await listener.handleFeatureFlagChanged(
-        new FeatureFlagChangedEvent('new-dashboard', 'deleted')
-      );
+      await listener.handleFeatureFlagChanged();
       listener.onModuleDestroy();
       jest.advanceTimersByTime(FLAGS_BROADCAST_COALESCE_MS);
       expect(notifications.pushToAll).not.toHaveBeenCalled();

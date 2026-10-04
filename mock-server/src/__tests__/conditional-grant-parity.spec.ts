@@ -112,13 +112,12 @@ async function userEmails(): Promise<string[]> {
     .sort();
 }
 
-async function flagKeys(path: string): Promise<string[]> {
-  const res = await call('GET', path);
+async function flagKeys(): Promise<string[]> {
+  const res = await call('GET', '/admin/feature-flags/cursor?limit=100');
   expect(res.status).toBe(200);
-  const rows = Array.isArray(res.json)
-    ? (res.json as { key: string }[])
-    : (res.json as { data: { key: string }[] }).data;
-  return rows.map((f) => f.key).sort();
+  return (res.json as { data: { key: string }[] }).data
+    .map((f) => f.key)
+    .sort();
 }
 
 describe('conditional search:User on the user list', () => {
@@ -171,12 +170,9 @@ describe('conditional grants on FeatureFlag', () => {
     fieldMatch: { key: ['new-dashboard'] }
   };
 
-  it('filters both flag lists', async () => {
+  it('filters the flag list', async () => {
     grant([['feature-flags', 'search', onlyNewDashboard]]);
-    expect(await flagKeys('/admin/feature-flags')).toEqual(['new-dashboard']);
-    expect(await flagKeys('/admin/feature-flags/cursor?limit=100')).toEqual([
-      'new-dashboard'
-    ]);
+    expect(await flagKeys()).toEqual(['new-dashboard']);
   });
 
   it('refuses read, preview, toggle and delete outside the condition', async () => {

@@ -86,10 +86,6 @@ export class FeatureFlagsAdminService {
     );
   }
 
-  getAll(): Observable<FeatureFlagResponse[]> {
-    return this.#http.get<FeatureFlagResponse[]>(ADMIN_API_V1);
-  }
-
   getOne(id: string): Observable<FeatureFlagResponse> {
     return this.#http.get<FeatureFlagResponse>(`${ADMIN_API_V1}/${id}`);
   }

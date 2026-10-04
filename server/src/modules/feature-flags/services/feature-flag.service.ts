@@ -75,20 +75,9 @@ export class FeatureFlagService {
     };
   }
 
-  /** The flags the ability may search, for the reference load. */
-  async findAll(ability: AppAbility): Promise<FeatureFlag[]> {
-    const qb = this.flagRepo
-      .createQueryBuilder('flag')
-      .orderBy('flag.key', 'ASC');
-    applyAbilityToFeatureFlagQuery(qb, ability, 'search');
-    const flags = await qb.getMany();
-    await this.#attachRules(flags);
-    return flags;
-  }
-
   /**
    * Cursor-paginated flags for the admin list page, each with its rules
-   * hydrated exactly as findAll does. The ability filter is SQL, so the
+   * hydrated exactly as findOne does. The ability filter is SQL, so the
    * keyset pages stay complete.
    */
   async findCursorPaginated(
@@ -250,8 +239,7 @@ export class FeatureFlagService {
     return this.findOne(id);
   }
 
-  async delete(id: string): Promise<void> {
-    const flag = await this.findOne(id);
+  async delete(flag: FeatureFlag): Promise<void> {
     await this.flagRepo.remove(flag);
   }
 

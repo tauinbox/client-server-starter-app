@@ -102,16 +102,6 @@ export class FeatureFlagsAdminController {
     return this.flagService.getAttributeCustomKeys();
   }
 
-  @Get()
-  @Authorize(['search', 'FeatureFlag'])
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'List all feature flags' })
-  @ApiOkResponse({ type: [FeatureFlagResponseDto] })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  findAll(@CurrentAbility() ability: AppAbility) {
-    return this.flagService.findAll(ability);
-  }
-
   @Get(':id')
   @Authorize(['read', 'FeatureFlag'])
   @ApiBearerAuth()
@@ -162,7 +152,7 @@ export class FeatureFlagsAdminController {
     const flag = await this.flagService.create(dto, req.user?.userId ?? null);
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent(flag.key, 'created')
+      new FeatureFlagChangedEvent()
     );
     return flag;
   }
@@ -216,7 +206,7 @@ export class FeatureFlagsAdminController {
     );
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent(flag.key, 'updated')
+      new FeatureFlagChangedEvent()
     );
     await this.auditService.log({
       action: AuditAction.FEATURE_FLAG_UPDATE,
@@ -247,10 +237,10 @@ export class FeatureFlagsAdminController {
   ) {
     const flag = await this.flagService.findOne(id);
     this.assertCanFlag(ability, 'delete', flag, req, id);
-    await this.flagService.delete(id);
+    await this.flagService.delete(flag);
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent(flag.key, 'deleted')
+      new FeatureFlagChangedEvent()
     );
     // The row is gone after the delete, so the key is recorded here: a bare
     // targetId resolves to nothing once the flag no longer exists.
@@ -325,7 +315,7 @@ export class FeatureFlagsAdminController {
     const flag = await this.flagService.toggle(id, req.user?.userId ?? null);
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent(flag.key, 'toggled')
+      new FeatureFlagChangedEvent()
     );
     return flag;
   }

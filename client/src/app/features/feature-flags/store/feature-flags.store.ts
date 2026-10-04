@@ -1,11 +1,5 @@
 import { computed, inject, type Signal } from '@angular/core';
-import {
-  patchState,
-  signalStore,
-  withComputed,
-  withMethods,
-  withState
-} from '@ngrx/signals';
+import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { firstValueFrom } from 'rxjs';
 import { FeatureFlagService } from '../services/feature-flag.service';
 
@@ -17,9 +11,6 @@ type FeatureFlagsState = {
 export const FeatureFlagsStore = signalStore(
   { providedIn: 'root' },
   withState<FeatureFlagsState>({ flags: {}, loaded: false }),
-  withComputed((store) => ({
-    flagKeys: computed(() => Object.keys(store.flags()))
-  })),
   withMethods((store) => {
     const service = inject(FeatureFlagService);
 

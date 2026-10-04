@@ -18,9 +18,7 @@ export class FeatureFlagChangedListener implements OnModuleDestroy {
   ) {}
 
   @OnEvent(FeatureFlagChangedEvent.name)
-  async handleFeatureFlagChanged(
-    _event: FeatureFlagChangedEvent
-  ): Promise<void> {
+  async handleFeatureFlagChanged(): Promise<void> {
     await this.resolver.invalidateAll();
     // Every broadcast makes all connected clients refetch their flag set at
     // once, so a burst of changes (e.g. one dialog save emitting update +

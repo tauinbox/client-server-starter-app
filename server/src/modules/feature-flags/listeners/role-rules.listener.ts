@@ -39,15 +39,13 @@ export class RoleRulesListener {
 
   // A cache reset before the commit lets a concurrent read cache the old rules
   // again, so the flags are announced only after it.
-  #announceAfter(committed: Promise<void>, flagKeys: string[]): void {
-    if (flagKeys.length === 0) return;
+  #announceAfter(committed: Promise<void>, changedKeys: string[]): void {
+    if (changedKeys.length === 0) return;
     void committed.then(() => {
-      for (const key of flagKeys) {
-        this.eventEmitter.emit(
-          FeatureFlagChangedEvent.name,
-          new FeatureFlagChangedEvent(key, 'rules-replaced')
-        );
-      }
+      this.eventEmitter.emit(
+        FeatureFlagChangedEvent.name,
+        new FeatureFlagChangedEvent()
+      );
     });
   }
 }
