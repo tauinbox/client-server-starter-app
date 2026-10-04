@@ -7,7 +7,6 @@ import type { FeatureFlagResponse } from '@app/shared/types';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import type {
   CreateFeatureFlag,
-  FeatureFlagRuleInput,
   UpdateFeatureFlag
 } from '../services/feature-flags-admin.service';
 import { FeatureFlagsAdminService } from '../services/feature-flags-admin.service';
@@ -53,17 +52,6 @@ export const FeatureFlagsAdminStore = signalStore(
 
       toggleFlag(id: string): Observable<FeatureFlagResponse> {
         return service.toggle(id).pipe(
-          tap((flag) => {
-            patchState(store, setEntity(flag));
-          })
-        );
-      },
-
-      replaceRules(
-        id: string,
-        rules: FeatureFlagRuleInput[]
-      ): Observable<FeatureFlagResponse> {
-        return service.replaceRules(id, rules).pipe(
           tap((flag) => {
             patchState(store, setEntity(flag));
           })

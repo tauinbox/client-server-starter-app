@@ -79,7 +79,7 @@ export class PreviewFlagContextDto {
 
   @ApiPropertyOptional({
     description:
-      'Unsaved rule set to evaluate instead of the persisted rules. Validated with the same rules as PUT /:id/rules.',
+      'Unsaved rule set to evaluate instead of the persisted rules. Validated with the same rules as the `rules` field of a save.',
     type: [FeatureFlagRuleDto]
   })
   @IsOptional()

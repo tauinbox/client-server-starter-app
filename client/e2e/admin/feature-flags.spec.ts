@@ -128,18 +128,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
         body: JSON.stringify({
           key: 'public-rollout',
           enabled: true,
-          public: true
-        })
-      }
-    );
-    expect(created.status).toBe(201);
-    const { id } = (await created.json()) as { id: string };
-    const rules = await fetch(
-      `${_mockServer.url}/api/v1/admin/feature-flags/${id}/rules`,
-      {
-        method: 'PUT',
-        headers: adminHeaders,
-        body: JSON.stringify({
+          public: true,
           rules: [
             {
               type: 'percentage',
@@ -150,7 +139,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
         })
       }
     );
-    expect(rules.status).toBe(200);
+    expect(created.status).toBe(201);
 
     const first = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
     expect(first.status).toBe(200);

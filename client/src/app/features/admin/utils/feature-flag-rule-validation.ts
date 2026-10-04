@@ -14,8 +14,8 @@ const VALUE_ERROR_KEYS: Record<FeatureFlagAttributeOp, string> = {
 };
 
 /**
- * Translation key for the reason `PUT /admin/feature-flags/:id/rules` would
- * reject this draft, or null when the server accepts it. The value check is
+ * Translation key for the reason a flag save would reject this rule draft, or
+ * null when the server accepts it. The value check is
  * delegated to the shared `attributeValueError`, so the two cannot drift.
  *
  * `knownCustomKeys` is the set `GET /admin/feature-flags/attribute-keys`

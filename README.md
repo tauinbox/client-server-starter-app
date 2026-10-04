@@ -992,7 +992,7 @@ A header is not a body. Thus the handler parses `If-Match` after the DTO-shape c
 One helper can hold checks of the two classes. The rule-payload validator of a feature flag is an
 example. Its `source` field tells which server layer rejects the same input. A `dto` failure is a 400
 above the 404. A `service` failure is a 400 below the 404, because the server runs that validator
-inside `replaceRules`, after the lookup.
+in the flag service, after the lookup.
 
 The pipe also runs with `whitelist` and `forbidNonWhitelisted`. Thus a property that no DTO declares
 is a 400 by itself.
@@ -1571,10 +1571,9 @@ The base URL of the API is `/api/v1`.
 | GET | `/admin/feature-flags` | `feature-flags:manage` | List each feature flag |
 | GET | `/admin/feature-flags/:id` | `feature-flags:manage` | Get a feature flag by ID |
 | GET | `/admin/feature-flags/attribute-keys` | `feature-flags:manage` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
-| POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag |
-| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. The key is immutable after create. Uses optimistic locking through `If-Match` |
+| POST | `/admin/feature-flags` | `feature-flags:manage` | Create a feature flag, optionally with its targeting rules in the same write |
+| PATCH | `/admin/feature-flags/:id` | `feature-flags:manage` | Update a feature flag. The key is immutable after create. An optional `rules` array replaces the targeting rules in the same write. Uses optimistic locking through `If-Match` |
 | DELETE | `/admin/feature-flags/:id` | `feature-flags:manage` | Delete a feature flag |
-| PUT | `/admin/feature-flags/:id/rules` | `feature-flags:manage` | Replace the targeting rules of a flag |
 | POST | `/admin/feature-flags/:id/preview` | `feature-flags:manage` | Show how a flag evaluates for given attributes, and save nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag |
 | POST | `/admin/feature-flags/:id/toggle` | `feature-flags:manage` | Enable or disable a flag |
 
@@ -1831,11 +1830,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2772 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 548 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 538 pass and 10 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1499 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2775 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 553 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 543 pass and 10 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1496 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 301 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 954 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 960 tests pass |
 
 ## CI/CD
 

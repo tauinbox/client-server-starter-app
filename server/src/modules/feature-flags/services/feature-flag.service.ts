@@ -142,21 +142,28 @@ export class FeatureFlagService {
     if (existing) {
       throw keyExistsConflict();
     }
-    const flag = this.flagRepo.create({
-      key: dto.key,
-      description: dto.description ?? null,
-      enabled: dto.enabled ?? false,
-      environments: dto.environments ?? [],
-      public: dto.public ?? false,
-      version: 1,
-      updatedByUserId: actorId
-    });
+    const rules = this.#validateRules(dto.rules);
     // The check above races a concurrent create against UQ_feature_flags_key.
     // The loser gets a unique violation, which the global filter would report
     // as a generic conflict - map it to the flag-specific key instead.
     let saved: FeatureFlag;
     try {
-      saved = await this.flagRepo.save(flag);
+      saved = await this.dataSource.transaction(async (em) => {
+        const flag = await em.save(
+          FeatureFlag,
+          em.create(FeatureFlag, {
+            key: dto.key,
+            description: dto.description ?? null,
+            enabled: dto.enabled ?? false,
+            environments: dto.environments ?? [],
+            public: dto.public ?? false,
+            version: 1,
+            updatedByUserId: actorId
+          })
+        );
+        if (rules) await this.#writeRules(em, flag.id, rules);
+        return flag;
+      });
     } catch (error: unknown) {
       if (isUniqueViolation(error)) throw keyExistsConflict();
       throw error;
@@ -171,37 +178,41 @@ export class FeatureFlagService {
     actorId: string | null
   ): Promise<FeatureFlag> {
     await this.findOne(id);
-    const result = await this.flagRepo
-      .createQueryBuilder()
-      .update(FeatureFlag)
-      .set({
-        ...(dto.description !== undefined
-          ? { description: dto.description }
-          : {}),
-        ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
-        ...(dto.environments !== undefined
-          ? { environments: dto.environments }
-          : {}),
-        ...(dto.public !== undefined ? { public: dto.public } : {}),
-        updatedByUserId: actorId,
-        version: () => `version + 1`
-      })
-      .where('id = :id AND version = :expected', {
-        id,
-        expected: expectedVersion
-      })
-      .execute();
+    const rules = this.#validateRules(dto.rules);
+    await this.dataSource.transaction(async (em) => {
+      const result = await em
+        .createQueryBuilder()
+        .update(FeatureFlag)
+        .set({
+          ...(dto.description !== undefined
+            ? { description: dto.description }
+            : {}),
+          ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+          ...(dto.environments !== undefined
+            ? { environments: dto.environments }
+            : {}),
+          ...(dto.public !== undefined ? { public: dto.public } : {}),
+          updatedByUserId: actorId,
+          version: () => `version + 1`
+        })
+        .where('id = :id AND version = :expected', {
+          id,
+          expected: expectedVersion
+        })
+        .execute();
 
-    if (result.affected === 0) {
-      throw new HttpException(
-        {
-          message:
-            'Feature flag was modified by another request — reload and retry',
-          errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
-        },
-        HttpStatus.CONFLICT
-      );
-    }
+      if (result.affected === 0) {
+        throw new HttpException(
+          {
+            message:
+              'Feature flag was modified by another request — reload and retry',
+            errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+          },
+          HttpStatus.CONFLICT
+        );
+      }
+      if (rules) await this.#writeRules(em, id, rules);
+    });
     return this.findOne(id);
   }
 
@@ -241,7 +252,7 @@ export class FeatureFlagService {
       environments: dto.environments ?? flag.environments
     };
     // A supplied rule set goes through the same validator the save path uses,
-    // so preview never accepts a payload `PUT /:id/rules` would reject.
+    // so preview never accepts a payload that a save would reject.
     const customKeys = this.attributeRegistry.getKnownCustomKeys();
     const evalRules: EvaluatorRule[] = dto.rules
       ? dto.rules.map((r) => ({
@@ -264,43 +275,41 @@ export class FeatureFlagService {
     return previewFeatureFlag(evalFlag, evalRules, ctx);
   }
 
-  async replaceRules(
-    id: string,
-    rules: FeatureFlagRuleDto[],
-    actorId: string | null
-  ): Promise<FeatureFlag> {
-    await this.findOne(id);
+  /**
+   * Runs every rule payload through the rule-payload validator before the
+   * transaction opens, so a rejected rule writes nothing.
+   */
+  #validateRules(
+    rules: FeatureFlagRuleDto[] | undefined
+  ): FeatureFlagRuleDto[] | undefined {
+    if (!rules) return undefined;
     const customKeys = this.attributeRegistry.getKnownCustomKeys();
-    const validatedPayloads = rules.map((r) =>
-      validateRulePayload(r.type, r.payload, customKeys)
-    );
+    return rules.map((r) => ({
+      type: r.type,
+      effect: r.effect,
+      payload: validateRulePayload(r.type, r.payload, customKeys)
+    }));
+  }
 
-    await this.dataSource.transaction(async (em) => {
-      await em.delete(FeatureFlagRule, { flagId: id });
-      if (rules.length > 0) {
-        // Insert sequentially so clock_timestamp() advances per row and
-        // preserves request-array order via the created_at column.
-        for (let i = 0; i < rules.length; i++) {
-          const r = rules[i];
-          const record = em.create(FeatureFlagRule, {
-            flagId: id,
-            type: r.type,
-            effect: r.effect,
-            payload: validatedPayloads[i]
-          });
-          await em.save(FeatureFlagRule, record);
-        }
-      }
-      await em.update(
-        FeatureFlag,
-        { id },
-        {
-          updatedByUserId: actorId,
-          version: () => `version + 1`
-        }
+  async #writeRules(
+    em: EntityManager,
+    flagId: string,
+    rules: FeatureFlagRuleDto[]
+  ): Promise<void> {
+    await em.delete(FeatureFlagRule, { flagId });
+    // Insert sequentially so clock_timestamp() advances per row and
+    // preserves request-array order via the created_at column.
+    for (const r of rules) {
+      await em.save(
+        FeatureFlagRule,
+        em.create(FeatureFlagRule, {
+          flagId,
+          type: r.type,
+          effect: r.effect,
+          payload: r.payload
+        })
       );
-    });
-    return this.findOne(id);
+    }
   }
 
   /**

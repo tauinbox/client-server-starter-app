@@ -42,7 +42,6 @@ describe('FeatureFlagListComponent', () => {
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     toggle: ReturnType<typeof vi.fn>;
-    replaceRules: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -65,8 +64,7 @@ describe('FeatureFlagListComponent', () => {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      toggle: toggleSpy,
-      replaceRules: vi.fn()
+      toggle: toggleSpy
     };
 
     dialogOpen = vi.fn();
@@ -260,46 +258,45 @@ describe('FeatureFlagListComponent', () => {
     });
   });
 
-  describe('FF-UX-008 — composite outcome for create + replaceRules', () => {
-    const createdFlag = { ...flag, id: 'flag-new', key: 'just-created' };
-    const dialogResult: FeatureFlagFormDialogResult = {
-      key: 'just-created',
-      flag: {
-        description: null,
-        enabled: false,
-        environments: [],
-        public: false
-      },
-      rules: [
-        {
-          effect: 'include',
-          type: 'role',
-          payload: { type: 'role', roleNames: ['beta'] }
-        }
-      ],
-      rulesChanged: true
+  describe('save in one request', () => {
+    const rules = [
+      {
+        effect: 'include' as const,
+        type: 'role' as const,
+        payload: { type: 'role' as const, roleNames: ['beta'] }
+      }
+    ];
+    const flagFields = {
+      description: 'updated',
+      enabled: true,
+      environments: ['production'],
+      public: false
     };
 
-    it('defers success snackbar until replaceRules resolves', async () => {
-      serviceMock.create.mockReturnValue(of(createdFlag));
-      serviceMock.replaceRules.mockReturnValue(of(createdFlag));
-      stubDialogResult(dialogResult);
-
+    async function openList(): Promise<FeatureFlagListComponent> {
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
-      fixture.componentInstance.openCreateDialog();
+      return fixture.componentInstance;
+    }
 
+    it('creates a flag with its rules in one call', async () => {
+      const created = { ...flag, id: 'flag-new', key: 'just-created' };
+      serviceMock.create.mockReturnValue(of(created));
+      stubDialogResult({
+        key: 'just-created',
+        flag: { ...flagFields, rules }
+      });
+
+      (await openList()).openCreateDialog();
+
+      expect(serviceMock.create).toHaveBeenCalledTimes(1);
       expect(serviceMock.create).toHaveBeenCalledWith({
         key: 'just-created',
-        ...dialogResult.flag
+        ...flagFields,
+        rules
       });
-      expect(serviceMock.replaceRules).toHaveBeenCalledWith(
-        'flag-new',
-        dialogResult.rules
-      );
-      expect(notifySuccess).toHaveBeenCalledTimes(1);
       expect(notifySuccess).toHaveBeenCalledWith(
         'admin.featureFlags.successCreated',
         { key: 'just-created' }
@@ -307,251 +304,72 @@ describe('FeatureFlagListComponent', () => {
       expect(notifyError).not.toHaveBeenCalled();
     });
 
-    it('fires success snackbar immediately when there are no rules to save', async () => {
-      serviceMock.create.mockReturnValue(of(createdFlag));
-      stubDialogResult({ ...dialogResult, rules: [] });
-
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openCreateDialog();
-
-      expect(serviceMock.replaceRules).not.toHaveBeenCalled();
-      expect(notifySuccess).toHaveBeenCalledWith(
-        'admin.featureFlags.successCreated',
-        { key: 'just-created' }
-      );
-    });
-
-    it('on replaceRules failure: no success snackbar, distinct error snackbar, flag marked', async () => {
-      serviceMock.create.mockReturnValue(of(createdFlag));
-      serviceMock.replaceRules.mockReturnValue(
-        throwError(() => new Error('boom'))
-      );
-      stubDialogResult(dialogResult);
-
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openCreateDialog();
-
-      expect(notifySuccess).not.toHaveBeenCalled();
-      expect(notifyError).toHaveBeenCalledWith(
-        'admin.featureFlags.errorRulesFailedCreate',
-        { key: 'just-created', detail: 'boom' }
-      );
-      expect(
-        fixture.componentInstance.rulesFailedFlagIds().has('flag-new')
-      ).toBe(true);
-    });
-
-    it('successful re-save clears the rules-failed marker', async () => {
-      serviceMock.create.mockReturnValueOnce(of(createdFlag));
-      serviceMock.replaceRules.mockReturnValueOnce(
-        throwError(() => new Error('boom'))
-      );
-      stubDialogResult(dialogResult);
-
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openCreateDialog();
-      expect(
-        fixture.componentInstance.rulesFailedFlagIds().has('flag-new')
-      ).toBe(true);
-
-      serviceMock.update.mockReturnValue(of(createdFlag));
-      serviceMock.replaceRules.mockReturnValueOnce(of(createdFlag));
-      stubDialogResult(dialogResult);
-      fixture.componentInstance.openEditDialog(createdFlag);
-
-      expect(
-        fixture.componentInstance.rulesFailedFlagIds().has('flag-new')
-      ).toBe(false);
-    });
-  });
-
-  describe('FF-UX-008 — composite outcome for update + replaceRules', () => {
-    const dialogResult: FeatureFlagFormDialogResult = {
-      key: 'new-dashboard',
-      flag: {
-        description: 'updated',
-        enabled: true,
-        environments: ['production'],
-        public: false
-      },
-      rules: [
-        {
-          effect: 'include',
-          type: 'percentage',
-          payload: { type: 'percentage', percent: 50 }
-        }
-      ],
-      rulesChanged: true
-    };
-
-    it('defers success snackbar until replaceRules resolves', async () => {
+    it('updates a flag with its rules in one call, without the key', async () => {
       serviceMock.update.mockReturnValue(of(flag));
-      serviceMock.replaceRules.mockReturnValue(of(flag));
-      stubDialogResult(dialogResult);
+      stubDialogResult({ key: flag.key, flag: { ...flagFields, rules } });
 
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openEditDialog(flag);
+      (await openList()).openEditDialog(flag);
 
+      expect(serviceMock.update).toHaveBeenCalledTimes(1);
       expect(serviceMock.update).toHaveBeenCalledWith(
         'flag-1',
-        dialogResult.flag,
+        { ...flagFields, rules },
         flag.version
       );
       expect(serviceMock.update.mock.calls[0][1]).not.toHaveProperty('key');
-      expect(notifySuccess).toHaveBeenCalledTimes(1);
       expect(notifySuccess).toHaveBeenCalledWith(
         'admin.featureFlags.successUpdated',
         { key: 'new-dashboard' }
       );
     });
 
-    it('on replaceRules failure: no success snackbar, distinct error snackbar, flag marked', async () => {
+    it('sends an empty rule set when the admin removed every rule', async () => {
       serviceMock.update.mockReturnValue(of(flag));
-      serviceMock.replaceRules.mockReturnValue(
-        throwError(() => new Error('boom'))
-      );
-      stubDialogResult(dialogResult);
+      stubDialogResult({ key: flag.key, flag: { ...flagFields, rules: [] } });
 
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openEditDialog(flag);
+      (await openList()).openEditDialog(flag);
+
+      expect(serviceMock.update.mock.calls[0][1]).toEqual({
+        ...flagFields,
+        rules: []
+      });
+    });
+
+    it('reports a rejected create once, with the server text', async () => {
+      const error = new HttpErrorResponse({
+        status: 400,
+        error: { message: 'user rule requires userIds: an array' }
+      });
+      serviceMock.create.mockReturnValue(throwError(() => error));
+      stubDialogResult({
+        key: 'just-created',
+        flag: { ...flagFields, rules }
+      });
+
+      (await openList()).openCreateDialog();
+
+      expect(notifySuccess).not.toHaveBeenCalled();
+      expect(notifyError).toHaveBeenCalledTimes(1);
+      expect(notifyError).toHaveBeenCalledWith(
+        error,
+        'admin.featureFlags.errorCreateFailed'
+      );
+    });
+
+    it('reports a rejected update once and keeps the stored row', async () => {
+      const error = new HttpErrorResponse({ status: 400 });
+      serviceMock.update.mockReturnValue(throwError(() => error));
+      stubDialogResult({ key: flag.key, flag: { ...flagFields, rules } });
+
+      const list = await openList();
+      list.openEditDialog(flag);
 
       expect(notifySuccess).not.toHaveBeenCalled();
       expect(notifyError).toHaveBeenCalledWith(
-        'admin.featureFlags.errorRulesFailedUpdate',
-        { key: 'new-dashboard', detail: 'boom' }
+        error,
+        'admin.featureFlags.errorUpdateFailed'
       );
-      expect(fixture.componentInstance.rulesFailedFlagIds().has('flag-1')).toBe(
-        true
-      );
-    });
-
-    it('puts the server rejection text in the error snackbar', async () => {
-      serviceMock.update.mockReturnValue(of(flag));
-      serviceMock.replaceRules.mockReturnValue(
-        throwError(
-          () =>
-            new HttpErrorResponse({
-              status: 400,
-              error: {
-                message:
-                  'attribute rule with op=before requires value: an ISO date string or an epoch-millisecond number'
-              }
-            })
-        )
-      );
-      stubDialogResult(dialogResult);
-
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openEditDialog(flag);
-
-      expect(notifyError).toHaveBeenCalledWith(
-        'admin.featureFlags.errorRulesFailedUpdate',
-        {
-          key: 'new-dashboard',
-          detail:
-            'attribute rule with op=before requires value: an ISO date string or an epoch-millisecond number'
-        }
-      );
-    });
-
-    it('fires success snackbar immediately when rulesChanged is false', async () => {
-      serviceMock.update.mockReturnValue(of(flag));
-      stubDialogResult({ ...dialogResult, rulesChanged: false });
-
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openEditDialog(flag);
-
-      expect(serviceMock.replaceRules).not.toHaveBeenCalled();
-      expect(notifySuccess).toHaveBeenCalledWith(
-        'admin.featureFlags.successUpdated',
-        { key: 'new-dashboard' }
-      );
-    });
-
-    // Clearing every rule via the dialog produces rules=[] AND rulesChanged=true.
-    // We MUST still PUT the empty array so the server-side rules are wiped —
-    // an earlier refactor short-circuited on rules.length===0 and silently
-    // dropped the clear-all operation.
-    it('calls replaceRules with empty array when user removed all rules', async () => {
-      serviceMock.update.mockReturnValue(of(flag));
-      serviceMock.replaceRules.mockReturnValue(of(flag));
-      stubDialogResult({ ...dialogResult, rules: [], rulesChanged: true });
-
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      fixture.componentInstance.openEditDialog(flag);
-
-      expect(serviceMock.replaceRules).toHaveBeenCalledWith('flag-1', []);
-      expect(notifySuccess).toHaveBeenCalledWith(
-        'admin.featureFlags.successUpdated',
-        { key: 'new-dashboard' }
-      );
-    });
-  });
-
-  describe('FF-UX-008 — warning marker in desktop table', () => {
-    it('renders the warning icon next to the key when rules failed', async () => {
-      const fixture = TestBed.createComponent(FeatureFlagListComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const before = (fixture.nativeElement as HTMLElement).querySelector(
-        'td .rules-warning'
-      );
-      expect(before).toBeNull();
-
-      serviceMock.update.mockReturnValue(of(flag));
-      serviceMock.replaceRules.mockReturnValue(
-        throwError(() => new Error('boom'))
-      );
-      stubDialogResult({
-        key: flag.key,
-        flag: {
-          description: flag.description,
-          enabled: flag.enabled,
-          environments: flag.environments,
-          public: flag.public
-        },
-        rules: [
-          {
-            effect: 'include',
-            type: 'percentage',
-            payload: { type: 'percentage', percent: 10 }
-          }
-        ],
-        rulesChanged: true
-      });
-      fixture.componentInstance.openEditDialog(flag);
-      fixture.detectChanges();
-
-      const after = (fixture.nativeElement as HTMLElement).querySelector(
-        'td .rules-warning'
-      );
-      expect(after).not.toBeNull();
+      expect(list.flags()).toEqual([flag]);
     });
   });
 });

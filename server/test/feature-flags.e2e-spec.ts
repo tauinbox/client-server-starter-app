@@ -49,6 +49,18 @@ import * as cookieParser from 'cookie-parser';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
+import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
+
+// Saves a full rule set through the update path at the current version.
+async function setRules(
+  service: FeatureFlagService,
+  id: string,
+  rules: FeatureFlagRuleDto[],
+  actorId: string
+): Promise<FeatureFlag> {
+  const { version } = await service.findOne(id);
+  return service.update(id, { rules }, version, actorId);
+}
 
 // ── In-memory repository stand-ins ─────────────────────────────────────────
 
@@ -191,91 +203,55 @@ function makeRuleRepoMock(stores: Stores) {
   };
 }
 
-function makeDataSourceMock(stores: Stores): DataSource {
-  const dataSource = {
-    transaction: jest.fn(
-      async (cb: (em: TransactionalEntityManager) => Promise<unknown>) => {
-        const em: TransactionalEntityManager = {
-          delete(
-            _entity: unknown,
-            where: { flagId: string }
-          ): Promise<{ affected: number }> {
-            let affected = 0;
-            for (const r of Array.from(stores.rules.values())) {
-              if (r.flagId === where.flagId) {
-                stores.rules.delete(r.id);
-                affected++;
-              }
-            }
-            return Promise.resolve({ affected });
-          },
-          create(
-            _entity: unknown,
-            data: Partial<FeatureFlagRule>
-          ): FeatureFlagRule {
-            const r = new FeatureFlagRule();
-            Object.assign(r, data);
-            return r;
-          },
-          save(
-            _entity: unknown,
-            recordOrRecords: FeatureFlagRule | FeatureFlagRule[]
-          ): Promise<FeatureFlagRule | FeatureFlagRule[]> {
-            const records = Array.isArray(recordOrRecords)
-              ? recordOrRecords
-              : [recordOrRecords];
-            for (const r of records) {
-              if (!r.id) r.id = `rule-${stores.rules.size + 1}`;
-              if (!r.createdAt) r.createdAt = nowDate();
-              r.updatedAt = nowDate();
-              stores.rules.set(r.id, r);
-            }
-            return Promise.resolve(recordOrRecords);
-          },
-          update(
-            _entity: unknown,
-            where: { id: string },
-            patch: Partial<FeatureFlag> & { version?: unknown }
-          ): Promise<{ affected: number }> {
-            const existing = stores.flags.get(where.id);
-            if (!existing) return Promise.resolve({ affected: 0 });
-            const versionExpr = patch.version;
-            const versionValue =
-              typeof versionExpr === 'function'
-                ? existing.version + 1
-                : typeof versionExpr === 'number'
-                  ? versionExpr
-                  : existing.version;
-            Object.assign(existing, patch, {
-              version: versionValue,
-              updatedAt: nowDate()
-            });
-            return Promise.resolve({ affected: 1 });
-          }
-        };
-        return cb(em);
+// The stand-in has no rollback: atomicity is covered on real Postgres in
+// feature-flag-atomic-rules.e2e-spec.ts.
+function makeDataSourceMock(
+  stores: Stores,
+  flagRepo: ReturnType<typeof makeFlagRepoMock>
+): DataSource {
+  const em = {
+    delete(
+      _entity: unknown,
+      where: { flagId: string }
+    ): Promise<{ affected: number }> {
+      let affected = 0;
+      for (const r of Array.from(stores.rules.values())) {
+        if (r.flagId === where.flagId) {
+          stores.rules.delete(r.id);
+          affected++;
+        }
       }
+      return Promise.resolve({ affected });
+    },
+    create(
+      entity: unknown,
+      data: Partial<FeatureFlag> & Partial<FeatureFlagRule>
+    ): FeatureFlag | FeatureFlagRule {
+      if (entity === FeatureFlag) return flagRepo.create(data);
+      const r = new FeatureFlagRule();
+      Object.assign(r, data);
+      return r;
+    },
+    save(
+      entity: unknown,
+      record: FeatureFlag | FeatureFlagRule
+    ): Promise<FeatureFlag | FeatureFlagRule> {
+      if (record instanceof FeatureFlag) return flagRepo.save(record);
+      if (!record.id) record.id = `rule-${stores.rules.size + 1}`;
+      if (!record.createdAt) record.createdAt = nowDate();
+      record.updatedAt = nowDate();
+      stores.rules.set(record.id, record);
+      return Promise.resolve(record);
+    },
+    createQueryBuilder: () => flagRepo.createQueryBuilder()
+  };
+  const dataSource = {
+    transaction: jest.fn((cb: (manager: typeof em) => Promise<unknown>) =>
+      cb(em)
     )
   };
   // @ts-expect-error - partial DataSource fake: only transaction is used
   return dataSource;
-}
-
-interface TransactionalEntityManager {
-  delete(
-    entity: unknown,
-    where: { flagId: string }
-  ): Promise<{ affected: number }>;
-  create(entity: unknown, data: Partial<FeatureFlagRule>): FeatureFlagRule;
-  save(
-    entity: unknown,
-    recordOrRecords: FeatureFlagRule | FeatureFlagRule[]
-  ): Promise<FeatureFlagRule | FeatureFlagRule[]>;
-  update(
-    entity: unknown,
-    where: { id: string },
-    patch: Partial<FeatureFlag> & { version?: unknown }
-  ): Promise<{ affected: number }>;
 }
 
 function makeCacheMock(): {
@@ -317,7 +293,7 @@ describe('Feature flags end-to-end', () => {
 
     const flagRepo = makeFlagRepoMock(stores);
     const ruleRepo = makeRuleRepoMock(stores);
-    const dataSource = makeDataSourceMock(stores);
+    const dataSource = makeDataSourceMock(stores, flagRepo);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -386,7 +362,8 @@ describe('Feature flags end-to-end', () => {
       throw new Error('expected at least one id below bucket 10');
     })();
 
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [
         {
@@ -413,7 +390,8 @@ describe('Feature flags end-to-end', () => {
     expect('beta-export' in outsider.flags).toBe(false);
 
     // Bump to 100% — everyone gets true.
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [
         {
@@ -438,7 +416,8 @@ describe('Feature flags end-to-end', () => {
       { key: 'risky-feature', enabled: true },
       'actor-1'
     );
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [
         {
@@ -534,7 +513,8 @@ describe('Feature flags end-to-end', () => {
       { key: 'beta-preview', enabled: true },
       'actor-1'
     );
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [
         {
@@ -566,7 +546,8 @@ describe('Feature flags end-to-end', () => {
       { key: 'gated-preview', enabled: true },
       'actor-1'
     );
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [
         {
@@ -600,7 +581,8 @@ describe('Feature flags end-to-end', () => {
       { key: 'unmatched-preview', enabled: true },
       'actor-1'
     );
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [
         {
@@ -628,7 +610,8 @@ describe('Feature flags end-to-end', () => {
       'actor-1'
     );
     await expect(
-      flagService.replaceRules(
+      setRules(
+        flagService,
         flag.id,
         [
           {
@@ -672,7 +655,8 @@ describe('Feature flags end-to-end', () => {
       'actor-1'
     );
     await expect(
-      flagService.replaceRules(
+      setRules(
+        flagService,
         flag.id,
         [{ type: payload.type, effect: 'include', payload }],
         'actor-1'
@@ -690,7 +674,8 @@ describe('Feature flags end-to-end', () => {
       { key: 'new-accounts', enabled: true },
       'actor-1'
     );
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [
         {
@@ -871,6 +856,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
 
   beforeEach(async () => {
     const stores = createStores();
+    const flagRepo = makeFlagRepoMock(stores);
     const moduleRef = await Test.createTestingModule({
       controllers: [FeatureFlagsController, TestFeatureController],
       providers: [
@@ -878,15 +864,15 @@ describe('GET /feature-flags anonymous rollout id', () => {
         FeatureFlagResolverService,
         AttributeRegistryService,
         FeatureFlagGuard,
-        {
-          provide: getRepositoryToken(FeatureFlag),
-          useValue: makeFlagRepoMock(stores)
-        },
+        { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
         {
           provide: getRepositoryToken(FeatureFlagRule),
           useValue: makeRuleRepoMock(stores)
         },
-        { provide: DataSource, useValue: makeDataSourceMock(stores) },
+        {
+          provide: DataSource,
+          useValue: makeDataSourceMock(stores, flagRepo)
+        },
         { provide: CACHE_MANAGER, useValue: makeCacheMock().manager },
         {
           provide: ConfigService,
@@ -954,7 +940,8 @@ describe('GET /feature-flags anonymous rollout id', () => {
       { key, enabled: true, public: isPublic },
       'actor-1'
     );
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       flag.id,
       [{ type: 'percentage', effect: 'include', payload }],
       'actor-1'
@@ -983,7 +970,8 @@ describe('GET /feature-flags anonymous rollout id', () => {
       { key: 'private-rollout', enabled: true, public: false },
       'actor-1'
     );
-    await flagService.replaceRules(
+    await setRules(
+      flagService,
       hidden.id,
       [
         {

@@ -457,9 +457,12 @@ files.
 `services/feature-flag.service.ts` holds the CRUD operations. A PATCH with `If-Match` gives a 409 on
 an optimistic-lock conflict. The key check sits above the version comparison, because the version
 goes into the `UPDATE ... WHERE` clause. Thus a request that is stale and duplicate-keyed gives
-`errors.featureFlags.keyExists`. `replaceRules` runs in one transaction, and it validates each rule
-payload after the 404 of `findOne`. The shape of a rule is validated above that point, by the
-`ValidationPipe` on `ReplaceRulesDto`.
+`errors.featureFlags.keyExists`. `create` and `update` accept an optional `rules` array. When it is
+present, the flag row and the full rule set are written in one transaction, so a failed rule write
+also rolls back the flag write. The service validates each rule payload after the lookup (the 404 of
+`findOne`, or the 409 of a taken key) and before the transaction opens. The shape of a rule is
+validated above that point, by the `ValidationPipe` on the `rules` field of `CreateFeatureFlagDto`.
+A request without `rules` keeps the stored rules.
 
 `services/feature-flag-resolver.service.ts` does the cached evaluation. A per-user key ends with the
 shared `CacheVersionCounter` value (`common/utils/cache-version-counter.ts`). Thus a flag change
@@ -2434,12 +2437,11 @@ The base URL is `/api/v1`.
 | GET | `/feature-flags` | Optional | The evaluated flags of the caller. An authenticated caller gets each flag that resolves `true` plus each `public` flag, and the server omits a disabled non-public flag. An anonymous caller gets the flags with `public: true`. It returns `{ flags: Record<string, boolean>, evaluatedAt: string }`. An anonymous call sets the `nxs_anon_id` cookie only when a live public flag has a percentage rule and the caller holds no valid one. A signed-in call sets it only when a live flag has a percentage rule with `bucketBy: 'device'` and the caller holds no valid one |
 | GET | `/admin/feature-flags` | `manage:FeatureFlag` | List each flag with its rules |
 | GET | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Get a flag by ID |
-| POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag. The audit action is `FEATURE_FLAG_CREATE` |
-| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict`. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
+| POST | `/admin/feature-flags` | `manage:FeatureFlag` | Create a flag. An optional `rules` array is written in the same transaction. The audit action is `FEATURE_FLAG_CREATE` |
+| PATCH | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. An optional `rules` array replaces the full rule set in the same transaction as the flag fields, with one version increase; without `rules` the stored rules stay. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict` and writes no rule. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired` |
 | DELETE | `/admin/feature-flags/:id` | `manage:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
-| PUT | `/admin/feature-flags/:id/rules` | `manage:FeatureFlag` | Replace the full rule set in one transaction. The audit action is `FEATURE_FLAG_RULES_REPLACE` |
 | POST | `/admin/feature-flags/:id/toggle` | `manage:FeatureFlag` | Change `enabled` and increase the version. The audit action is `FEATURE_FLAG_TOGGLE` |
-| POST | `/admin/feature-flags/:id/preview` | `manage:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of `PUT /:id/rules`, thus it gets the same 400. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
+| POST | `/admin/feature-flags/:id/preview` | `manage:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 400. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
 
 **Caching.** The system uses three keys:
 
@@ -2551,7 +2553,9 @@ resolved value, because a resolver can carry personal data.
 
 **Audit trail.** Each mutating administrator endpoint writes to `audit_logs` under one of the
 `FEATURE_FLAG_*` enum values. Those are `FEATURE_FLAG_CREATE`, `FEATURE_FLAG_UPDATE`,
-`FEATURE_FLAG_DELETE`, `FEATURE_FLAG_TOGGLE` and `FEATURE_FLAG_RULES_REPLACE`.
+`FEATURE_FLAG_DELETE` and `FEATURE_FLAG_TOGGLE`. A create or an update that carries `rules` adds
+`ruleCount` to its details. `FEATURE_FLAG_RULES_REPLACE` stays in the enum for the historical rows of
+the removed `PUT /:id/rules` route.
 
 The `details` JSONB column holds `key`, `changedFields`, `ruleCount` or `enabled`, and the action
 decides which one. `changedFields` names only the fields whose stored value changed, so a resubmit

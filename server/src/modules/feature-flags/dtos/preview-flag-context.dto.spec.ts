@@ -1,6 +1,6 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { PreviewFlagContextDto } from './preview-flag-context.dto';
-import { ReplaceRulesDto } from './replace-rules.dto';
+import { UpdateFeatureFlagDto } from './update-feature-flag.dto';
 
 // The preview body accepts an unsaved rule set. It must be validated with the
 // same shape rules as the save path, so exercise both DTOs through the real
@@ -14,7 +14,7 @@ describe('PreviewFlagContextDto draft fields', () => {
 
   async function transform<T>(
     body: Record<string, unknown>,
-    metatype: typeof PreviewFlagContextDto | typeof ReplaceRulesDto
+    metatype: typeof PreviewFlagContextDto | typeof UpdateFeatureFlagDto
   ): Promise<T> {
     return (await pipe.transform(body, { type: 'body', metatype })) as T;
   }
@@ -23,7 +23,7 @@ describe('PreviewFlagContextDto draft fields', () => {
     body: Record<string, unknown>,
     metatype:
       | typeof PreviewFlagContextDto
-      | typeof ReplaceRulesDto = PreviewFlagContextDto
+      | typeof UpdateFeatureFlagDto = PreviewFlagContextDto
   ): Promise<string> {
     const error = await transform(body, metatype).then(
       () => null,
@@ -75,14 +75,14 @@ describe('PreviewFlagContextDto draft fields', () => {
 
   it('rejects a non-array rule set with the same message as the save path', async () => {
     const preview = await messagesFor({ rules: 'nope' });
-    const save = await messagesFor({ rules: 'nope' }, ReplaceRulesDto);
+    const save = await messagesFor({ rules: 'nope' }, UpdateFeatureFlagDto);
     expect(preview).toBe(save);
   });
 
   it('rejects an unknown rule effect with the same message as the save path', async () => {
     const bad = { ...validRule, effect: 'maybe' };
     const preview = await messagesFor({ rules: [bad] });
-    const save = await messagesFor({ rules: [bad] }, ReplaceRulesDto);
+    const save = await messagesFor({ rules: [bad] }, UpdateFeatureFlagDto);
     expect(preview).toBe(save);
   });
 

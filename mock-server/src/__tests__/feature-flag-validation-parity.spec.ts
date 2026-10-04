@@ -45,16 +45,20 @@ async function createFlag(body: unknown): Promise<Response> {
   });
 }
 
-async function replaceRules(flagId: string, rules: unknown): Promise<Response> {
+// Saves a full rule set through PATCH at the current version. An absent flag
+// gets version 1, so the request reaches the lookup instead of stopping at 428.
+async function saveRules(flagId: string, rules: unknown): Promise<Response> {
   const token = await loginAsAdmin();
-  return fetch(`${baseUrl}/api/v1/admin/feature-flags/${flagId}/rules`, {
-    method: 'PUT',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({ rules })
-  });
+  const current = await fetch(
+    `${baseUrl}/api/v1/admin/feature-flags/${flagId}`,
+    {
+      headers: { authorization: `Bearer ${token}` }
+    }
+  );
+  const version = current.ok
+    ? ((await current.json()) as { version: number }).version
+    : 1;
+  return patchFlag(flagId, { rules }, String(version));
 }
 
 async function patchFlag(
@@ -189,7 +193,7 @@ describe('feature-flag validation parity with server', () => {
       const created = await createFlag({ key });
       expect(created.status).toBe(201);
       const flag = (await created.json()) as { id: string };
-      return { res: await replaceRules(flag.id, [rule]), flagId: flag.id };
+      return { res: await saveRules(flag.id, [rule]), flagId: flag.id };
     }
 
     it('returns the server text for an unregistered customKey', async () => {
@@ -332,7 +336,7 @@ describe('feature-flag validation parity with server', () => {
       ).toISOString();
       const created = await createFlag({ key: 'created-after', enabled: true });
       const flag = (await created.json()) as { id: string };
-      const res = await replaceRules(flag.id, [
+      const res = await saveRules(flag.id, [
         {
           type: 'attribute',
           effect: 'include',
@@ -400,7 +404,7 @@ describe('feature-flag validation parity with server', () => {
       });
       expect(created.status).toBe(201);
       flagId = ((await created.json()) as { id: string }).id;
-      const stored = await replaceRules(flagId, [
+      const stored = await saveRules(flagId, [
         {
           type: 'role',
           effect: 'include',
@@ -465,7 +469,7 @@ describe('feature-flag validation parity with server', () => {
         }
       ];
       const previewRes = await preview({ rules });
-      const saveRes = await replaceRules(flagId, rules);
+      const saveRes = await saveRules(flagId, rules);
       expect(previewRes.status).toBe(400);
       expect(saveRes.status).toBe(400);
       const previewBody = (await previewRes.json()) as { message: string };
@@ -704,7 +708,7 @@ describe('feature-flag validation parity with server', () => {
     // The server slices the first 32 entries and only then drops the bad keys,
     // so a dropped key still consumes one of the 32 slots.
     it('counts a dropped attribute key against the 32-entry cap', async () => {
-      const stored = await replaceRules(flagId, [
+      const stored = await saveRules(flagId, [
         {
           type: 'attribute',
           effect: 'include',
@@ -733,8 +737,9 @@ describe('feature-flag validation parity with server', () => {
 
   // The server runs the global ValidationPipe before the handler body, so a DTO
   // failure precedes the If-Match parse and both precede the service lookup.
-  // The rule-payload validator is the exception: it runs inside replaceRules,
-  // after findOne has already thrown the 404.
+  // The rule-payload validator is the exception: the service runs it after
+  // the lookups (404 on PATCH, 409 for a taken key on POST) and before the
+  // version check, so a rejected rule on a stale version is a 400.
   describe('rejection order', () => {
     const ABSENT_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -760,26 +765,148 @@ describe('feature-flag validation parity with server', () => {
     });
 
     it('rejects a non-array rule set on an absent flag with 400, not 404', async () => {
-      const res = await replaceRules(ABSENT_ID, 'nope');
+      const res = await saveRules(ABSENT_ID, 'nope');
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors: string[] };
       expect(body.errors).toContain('rules must be an array');
     });
 
     it('rejects a non-object rule payload on an absent flag with 400, not 404', async () => {
-      const res = await replaceRules(ABSENT_ID, [
+      const res = await saveRules(ABSENT_ID, [
         { type: 'user', effect: 'include', payload: 'nope' }
       ]);
       expect(res.status).toBe(400);
     });
 
     it('answers 404 for a payload the rule validator rejects on an absent flag', async () => {
-      const res = await replaceRules(ABSENT_ID, [
+      const res = await saveRules(ABSENT_ID, [
         { type: 'user', effect: 'include', payload: { type: 'user' } }
       ]);
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
       expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.NOT_FOUND);
+    });
+
+    it('answers 400 for a rejected rule payload on a stale version, not 409', async () => {
+      const created = await createFlag({ key: 'order-stale-rules' });
+      const flag = (await created.json()) as { id: string };
+      const res = await patchFlag(
+        flag.id,
+        { rules: [{ type: 'user', effect: 'include', payload: {} }] },
+        '7'
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a non-array rule set on a taken key with 400, not 409', async () => {
+      await createFlag({ key: 'order-taken-key' });
+      const res = await createFlag({ key: 'order-taken-key', rules: 'nope' });
+      expect(res.status).toBe(400);
+    });
+
+    it('answers 409 for a rejected rule payload on a taken key', async () => {
+      await createFlag({ key: 'order-taken-payload' });
+      const res = await createFlag({
+        key: 'order-taken-payload',
+        rules: [{ type: 'user', effect: 'include', payload: { type: 'user' } }]
+      });
+      expect(res.status).toBe(409);
+    });
+  });
+
+  describe('flag and rules save together', () => {
+    const roleRule = (name: string) => ({
+      type: 'role',
+      effect: 'include',
+      payload: { type: 'role', roleNames: [name] }
+    });
+
+    it('creates a flag with its rules in request order', async () => {
+      const res = await createFlag({
+        key: 'atomic-create',
+        rules: [roleRule('a'), roleRule('b')]
+      });
+      expect(res.status).toBe(201);
+      const flag = (await res.json()) as {
+        version: number;
+        rules: { payload: { roleNames: string[] } }[];
+      };
+      expect(flag.version).toBe(1);
+      expect(flag.rules.map((r) => r.payload.roleNames)).toEqual([
+        ['a'],
+        ['b']
+      ]);
+    });
+
+    it('creates no flag when a rule payload is rejected', async () => {
+      const res = await createFlag({
+        key: 'atomic-create-rejected',
+        rules: [roleRule('a'), { type: 'user', effect: 'include', payload: {} }]
+      });
+      expect(res.status).toBe(400);
+      const keys = [...getState().featureFlags.values()].map((f) => f.key);
+      expect(keys).not.toContain('atomic-create-rejected');
+    });
+
+    it('changes nothing when a PATCH carries a rejected rule', async () => {
+      const created = await createFlag({
+        key: 'atomic-patch-rejected',
+        rules: [roleRule('a')]
+      });
+      const flag = (await created.json()) as { id: string };
+      const res = await patchFlag(
+        flag.id,
+        {
+          enabled: true,
+          rules: [
+            roleRule('b'),
+            { type: 'user', effect: 'include', payload: {} }
+          ]
+        },
+        '1'
+      );
+      expect(res.status).toBe(400);
+      const stored = getState().featureFlags.get(flag.id);
+      expect(stored).toMatchObject({ enabled: false, version: 1 });
+      const rules = getState().featureFlagRules.filter(
+        (r) => r.flagId === flag.id
+      );
+      expect(rules.map((r) => r.payload)).toEqual([roleRule('a').payload]);
+    });
+
+    it('replaces the rules and bumps the version once', async () => {
+      const created = await createFlag({
+        key: 'atomic-patch',
+        rules: [roleRule('a')]
+      });
+      const flag = (await created.json()) as { id: string };
+      const res = await patchFlag(
+        flag.id,
+        { enabled: true, rules: [roleRule('b'), roleRule('c')] },
+        '1'
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        enabled: boolean;
+        version: number;
+        rules: { payload: { roleNames: string[] } }[];
+      };
+      expect(body).toMatchObject({ enabled: true, version: 2 });
+      expect(body.rules.map((r) => r.payload.roleNames)).toEqual([
+        ['b'],
+        ['c']
+      ]);
+    });
+
+    it('keeps the rules when a PATCH carries none', async () => {
+      const created = await createFlag({
+        key: 'atomic-patch-keep',
+        rules: [roleRule('a')]
+      });
+      const flag = (await created.json()) as { id: string };
+      const res = await patchFlag(flag.id, { enabled: true }, '1');
+      const body = (await res.json()) as { rules: unknown[] };
+      expect(body.rules).toHaveLength(1);
     });
   });
 });

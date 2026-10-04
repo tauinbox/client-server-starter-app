@@ -19,7 +19,6 @@ describe('FeatureFlagsAdminController', () => {
     update: jest.Mock;
     toggle: jest.Mock;
     delete: jest.Mock;
-    replaceRules: jest.Mock;
     getAttributeCustomKeys: jest.Mock;
   };
   let eventEmitter: { emit: jest.Mock };
@@ -49,7 +48,6 @@ describe('FeatureFlagsAdminController', () => {
         .fn()
         .mockResolvedValue({ ...sampleFlag, enabled: true, version: 2 }),
       delete: jest.fn().mockResolvedValue(undefined),
-      replaceRules: jest.fn().mockResolvedValue(sampleFlag),
       getAttributeCustomKeys: jest
         .fn()
         .mockReturnValue({ customKeys: ['billingConfigured'] })
@@ -125,11 +123,35 @@ describe('FeatureFlagsAdminController', () => {
     );
   });
 
-  it('replaceRules emits a "rules-replaced" change event', async () => {
-    await controller.replaceRules('flag-1', { rules: [] }, req);
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      FeatureFlagChangedEvent.name,
-      expect.objectContaining({ changeType: 'rules-replaced' })
+  it('update audits a rule set as a count, not as a changed field', async () => {
+    const rules = [
+      {
+        type: 'role' as const,
+        effect: 'include' as const,
+        payload: { type: 'role' as const, roleNames: ['beta'] }
+      }
+    ];
+    await controller.update('flag-1', { enabled: true, rules }, '1', req);
+    expect(flagService.update).toHaveBeenCalledWith(
+      'flag-1',
+      { enabled: true, rules },
+      1,
+      'actor-1'
+    );
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.FEATURE_FLAG_UPDATE,
+        details: { changedFields: ['enabled'], ruleCount: 1 }
+      })
+    );
+  });
+
+  it('update without rules leaves the rule count out of the audit', async () => {
+    await controller.update('flag-1', { enabled: true }, '1', req);
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: { changedFields: ['enabled'] }
+      })
     );
   });
 

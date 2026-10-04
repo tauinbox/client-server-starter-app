@@ -85,23 +85,15 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
     const key = 'beta-feature';
     const flagRes = await call(admin, 'POST', '/admin/feature-flags', {
       key,
-      enabled: true
+      enabled: true,
+      rules: roleNames.map((names) => ({
+        type: 'role',
+        effect: 'include',
+        payload: { type: 'role', roleNames: names }
+      }))
     });
     expect(flagRes.status).toBe(201);
     const flagId = ((await flagRes.json()) as { id: string }).id;
-    const rulesRes = await call(
-      admin,
-      'PUT',
-      `/admin/feature-flags/${flagId}/rules`,
-      {
-        rules: roleNames.map((names) => ({
-          type: 'role',
-          effect: 'include',
-          payload: { type: 'role', roleNames: names }
-        }))
-      }
-    );
-    expect(rulesRes.status).toBe(200);
     return { admin, user, roleId, flagId, key };
   }
 

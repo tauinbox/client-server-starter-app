@@ -33,7 +33,6 @@ describe('FeatureFlagsAdminStore', () => {
     update: ReturnType<typeof vi.fn>;
     toggle: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
-    replaceRules: ReturnType<typeof vi.fn>;
   };
   let notify: {
     error: ReturnType<typeof vi.fn>;
@@ -52,8 +51,7 @@ describe('FeatureFlagsAdminStore', () => {
       create: vi.fn(),
       update: vi.fn(),
       toggle: vi.fn(),
-      delete: vi.fn(),
-      replaceRules: vi.fn()
+      delete: vi.fn()
     };
     notify = { error: vi.fn(), success: vi.fn() };
 
