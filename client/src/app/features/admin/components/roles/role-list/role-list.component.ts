@@ -4,7 +4,8 @@ import {
   Component,
   computed,
   DestroyRef,
-  inject
+  inject,
+  ViewContainerRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
@@ -50,10 +51,7 @@ import { AuthService } from '@features/auth/services/auth.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { RolesStore } from '../../../store/roles.store';
-import type {
-  RoleFormDialogData,
-  RoleFormDialogResult
-} from '../role-form-dialog/role-form-dialog.component';
+import type { RoleFormDialogData } from '../role-form-dialog/role-form-dialog.component';
 import { RoleFormDialogComponent } from '../role-form-dialog/role-form-dialog.component';
 import type { RolePermissionsDialogData } from '../role-permissions-dialog/role-permissions-dialog.component';
 import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-permissions-dialog.component';
@@ -99,6 +97,7 @@ export class RoleListComponent implements OnInit {
   readonly #destroyRef = inject(DestroyRef);
   readonly #authService = inject(AuthService);
   readonly #translocoService = inject(TranslocoService);
+  readonly #viewContainerRef = inject(ViewContainerRef);
   protected readonly authStore = inject(AuthStore);
 
   readonly loading = this.#rolesStore.loading;
@@ -163,54 +162,24 @@ export class RoleListComponent implements OnInit {
   }
 
   openCreateDialog(): void {
-    const data: RoleFormDialogData = {};
-    this.#dialog
-      .open(RoleFormDialogComponent, {
-        ...dialogSizeConfig(DialogSize.Form),
-        data
-      })
-      .afterClosed()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: RoleFormDialogResult | undefined) => {
-        if (result) {
-          this.#rolesStore
-            .createRole(result)
-            .pipe(takeUntilDestroyed(this.#destroyRef))
-            .subscribe({
-              next: () => {
-                this.#notify.success('admin.roles.successCreated');
-              },
-              error: (err) => {
-                this.#notify.error(err, 'admin.roles.errorCreateFailed');
-              }
-            });
-        }
-      });
+    this.#openFormDialog({}, 'admin.roles.successCreated');
   }
 
   openEditDialog(role: RoleAdminResponse): void {
-    const data: RoleFormDialogData = { role };
+    this.#openFormDialog({ role }, 'admin.roles.successUpdated');
+  }
+
+  #openFormDialog(data: RoleFormDialogData, successKey: string): void {
     this.#dialog
       .open(RoleFormDialogComponent, {
         ...dialogSizeConfig(DialogSize.Form),
+        viewContainerRef: this.#viewContainerRef,
         data
       })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: RoleFormDialogResult | undefined) => {
-        if (result) {
-          this.#rolesStore
-            .updateRole(role.id, result)
-            .pipe(takeUntilDestroyed(this.#destroyRef))
-            .subscribe({
-              next: () => {
-                this.#notify.success('admin.roles.successUpdated');
-              },
-              error: (err) => {
-                this.#notify.error(err, 'admin.roles.errorUpdateFailed');
-              }
-            });
-        }
+      .subscribe((saved: RoleAdminResponse | undefined) => {
+        if (saved) this.#notify.success(successKey);
       });
   }
 

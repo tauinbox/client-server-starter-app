@@ -5,7 +5,7 @@ import {
   MatSlideToggle,
   MatSlideToggleChange
 } from '@angular/material/slide-toggle';
-import { signal } from '@angular/core';
+import { signal, ViewContainerRef } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
@@ -16,7 +16,8 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { AuthStore } from '@features/auth/store/auth.store';
 import { FeatureFlagsAdminStore } from '../../../store/feature-flags-admin.store';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
-import type { FeatureFlagFormDialogResult } from '../feature-flag-form-dialog/feature-flag-form-dialog.component';
+import type { FeatureFlagResponse } from '@app/shared/types';
+import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feature-flag-form-dialog.component';
 import { FeatureFlagListComponent } from './feature-flag-list.component';
 
 describe('FeatureFlagListComponent', () => {
@@ -112,7 +113,7 @@ describe('FeatureFlagListComponent', () => {
       .compileComponents();
   });
 
-  function stubDialogResult(result: FeatureFlagFormDialogResult): void {
+  function stubDialogResult(result: FeatureFlagResponse | undefined): void {
     dialogOpen.mockReturnValue({ afterClosed: () => of(result) });
   }
 
@@ -411,21 +412,7 @@ describe('FeatureFlagListComponent', () => {
     });
   });
 
-  describe('save in one request', () => {
-    const rules = [
-      {
-        effect: 'include' as const,
-        type: 'role' as const,
-        payload: { type: 'role' as const, roleNames: ['beta'] }
-      }
-    ];
-    const flagFields = {
-      description: 'updated',
-      enabled: true,
-      environments: ['production'],
-      public: false
-    };
-
+  describe('the form dialog', () => {
     async function openList(): Promise<FeatureFlagListComponent> {
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
       fixture.detectChanges();
@@ -434,95 +421,46 @@ describe('FeatureFlagListComponent', () => {
       return fixture.componentInstance;
     }
 
-    it('creates a flag with its rules in one call', async () => {
-      const created = { ...flag, id: 'flag-new', key: 'just-created' };
-      serviceMock.create.mockReturnValue(of(created));
-      stubDialogResult({
-        key: 'just-created',
-        flag: { ...flagFields, rules }
-      });
+    it('reports a created flag by the key the server saved', async () => {
+      stubDialogResult({ ...flag, id: 'flag-new', key: 'just-created' });
 
       (await openList()).openCreateDialog();
 
-      expect(serviceMock.create).toHaveBeenCalledTimes(1);
-      expect(serviceMock.create).toHaveBeenCalledWith({
-        key: 'just-created',
-        ...flagFields,
-        rules
-      });
-      expect(notifySuccess).toHaveBeenCalledWith(
+      expect(notifySuccess).toHaveBeenCalledExactlyOnceWith(
         'admin.featureFlags.successCreated',
         { key: 'just-created' }
       );
-      expect(notifyError).not.toHaveBeenCalled();
     });
 
-    it('updates a flag with its rules in one call, without the key', async () => {
-      serviceMock.update.mockReturnValue(of(flag));
-      stubDialogResult({ key: flag.key, flag: { ...flagFields, rules } });
+    it('reports an updated flag and passes the flag to the dialog', async () => {
+      stubDialogResult(flag);
 
       (await openList()).openEditDialog(flag);
 
-      expect(serviceMock.update).toHaveBeenCalledTimes(1);
-      expect(serviceMock.update).toHaveBeenCalledWith(
-        'flag-1',
-        { ...flagFields, rules },
-        flag.version
+      expect(dialogOpen).toHaveBeenCalledWith(
+        FeatureFlagFormDialogComponent,
+        // The store is provided on the admin route, so the dialog needs the
+        // injector of the list to reach it.
+        expect.objectContaining({
+          data: { flag },
+          viewContainerRef: expect.any(ViewContainerRef)
+        })
       );
-      expect(serviceMock.update.mock.calls[0][1]).not.toHaveProperty('key');
-      expect(notifySuccess).toHaveBeenCalledWith(
+      expect(notifySuccess).toHaveBeenCalledExactlyOnceWith(
         'admin.featureFlags.successUpdated',
         { key: 'new-dashboard' }
       );
     });
 
-    it('sends an empty rule set when the admin removed every rule', async () => {
-      serviceMock.update.mockReturnValue(of(flag));
-      stubDialogResult({ key: flag.key, flag: { ...flagFields, rules: [] } });
+    it('reports nothing and sends no request when the dialog is cancelled', async () => {
+      stubDialogResult(undefined);
 
       (await openList()).openEditDialog(flag);
 
-      expect(serviceMock.update.mock.calls[0][1]).toEqual({
-        ...flagFields,
-        rules: []
-      });
-    });
-
-    it('reports a rejected create once, with the server text', async () => {
-      const error = new HttpErrorResponse({
-        status: 400,
-        error: { message: 'user rule requires userIds: an array' }
-      });
-      serviceMock.create.mockReturnValue(throwError(() => error));
-      stubDialogResult({
-        key: 'just-created',
-        flag: { ...flagFields, rules }
-      });
-
-      (await openList()).openCreateDialog();
-
       expect(notifySuccess).not.toHaveBeenCalled();
-      expect(notifyError).toHaveBeenCalledTimes(1);
-      expect(notifyError).toHaveBeenCalledWith(
-        error,
-        'admin.featureFlags.errorCreateFailed'
-      );
-    });
-
-    it('reports a rejected update once and keeps the stored row', async () => {
-      const error = new HttpErrorResponse({ status: 400 });
-      serviceMock.update.mockReturnValue(throwError(() => error));
-      stubDialogResult({ key: flag.key, flag: { ...flagFields, rules } });
-
-      const list = await openList();
-      list.openEditDialog(flag);
-
-      expect(notifySuccess).not.toHaveBeenCalled();
-      expect(notifyError).toHaveBeenCalledWith(
-        error,
-        'admin.featureFlags.errorUpdateFailed'
-      );
-      expect(list.flags()).toEqual([flag]);
+      expect(notifyError).not.toHaveBeenCalled();
+      expect(serviceMock.create).not.toHaveBeenCalled();
+      expect(serviceMock.update).not.toHaveBeenCalled();
     });
   });
 });

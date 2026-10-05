@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal } from '@angular/core';
+import { signal, ViewContainerRef } from '@angular/core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
@@ -12,6 +12,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { RolesStore } from '../../../store/roles.store';
 import { RoleListComponent } from './role-list.component';
 import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-permissions-dialog.component';
+import { RoleFormDialogComponent } from '../role-form-dialog/role-form-dialog.component';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,38 @@ describe('RoleListComponent — openPermissionsDialog', () => {
         data: { role: mockRole, readonly: true }
       })
     );
+  });
+
+  it('reports a role the form dialog saved', async () => {
+    dialogMock.open.mockReturnValue({ afterClosed: () => of(mockRole) });
+
+    const component = await setupComponent();
+    component.openEditDialog(mockRole);
+    component.openCreateDialog();
+
+    expect(dialogMock.open).toHaveBeenCalledWith(
+      RoleFormDialogComponent,
+      // The store is provided on the admin route, so the dialog needs the
+      // injector of the list to reach it.
+      expect.objectContaining({
+        data: { role: mockRole },
+        viewContainerRef: expect.any(ViewContainerRef)
+      })
+    );
+    expect(notifyMock.success.mock.calls).toEqual([
+      ['admin.roles.successUpdated'],
+      ['admin.roles.successCreated']
+    ]);
+    expect(rolesStoreMock.updateRole).not.toHaveBeenCalled();
+    expect(rolesStoreMock.createRole).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing when the form dialog is cancelled', async () => {
+    const component = await setupComponent();
+    component.openEditDialog(mockRole);
+
+    expect(notifyMock.success).not.toHaveBeenCalled();
+    expect(notifyMock.error).not.toHaveBeenCalled();
   });
 
   it('renders a disabled locked-actions marker (and no action buttons) for super-system roles', async () => {

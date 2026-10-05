@@ -2,9 +2,12 @@ import type { OnDestroy, OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   inject,
   signal
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { HttpErrorResponse } from '@angular/common/http';
 import {
   form,
   maxLength,
@@ -17,18 +20,16 @@ import {
   MatDialogRef,
   MAT_DIALOG_DATA
 } from '@angular/material/dialog';
-import { TranslocoDirective } from '@jsverse/transloco';
+import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
+import { RolesStore } from '../../../store/roles.store';
 
 export type RoleFormDialogData = {
   role?: RoleAdminResponse;
-};
-
-export type RoleFormDialogResult = {
-  name: string;
-  description: string | null;
 };
 
 type RoleFormData = {
@@ -41,6 +42,7 @@ type RoleFormData = {
   imports: [
     MatDialogModule,
     MatButtonModule,
+    MatProgressSpinner,
     TranslocoDirective,
     NxsFormFieldComponent
   ],
@@ -49,13 +51,20 @@ type RoleFormData = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RoleFormDialogComponent implements OnInit, OnDestroy {
-  readonly #dialogRef = inject(MatDialogRef<RoleFormDialogComponent>);
+  readonly #dialogRef = inject(
+    MatDialogRef<RoleFormDialogComponent, RoleAdminResponse>
+  );
+  readonly #rolesStore = inject(RolesStore);
   readonly #shortcuts = inject(KeyboardShortcutsService);
+  readonly #translocoService = inject(TranslocoService);
+  readonly #destroyRef = inject(DestroyRef);
   protected readonly data = inject<RoleFormDialogData>(MAT_DIALOG_DATA);
 
   #cleanupSave: (() => void) | null = null;
 
   protected readonly isEdit = !!this.data.role;
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
 
   readonly roleModel = signal<RoleFormData>({
     name: this.data.role?.name ?? '',
@@ -97,14 +106,41 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
   }
 
   submit(): void {
-    if (this.roleForm().invalid()) return;
+    if (
+      this.isSystemRole ||
+      this.roleForm().invalid() ||
+      !this.formChanged ||
+      this.isLoading()
+    )
+      return;
 
     const { name, description } = this.roleModel();
-    const result: RoleFormDialogResult = {
+    const dto = {
       name: name.trim(),
       description: description.trim() || null
     };
-    this.#dialogRef.close(result);
+    const role = this.data.role;
+    const save$ = role
+      ? this.#rolesStore.updateRole(role.id, dto)
+      : this.#rolesStore.createRole(dto);
+
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+    save$.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe({
+      next: (saved) => this.#dialogRef.close(saved),
+      error: (err: HttpErrorResponse) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(
+          parseHttpErrorMessage(
+            err,
+            this.#translocoService,
+            role
+              ? 'admin.roles.errorUpdateFailed'
+              : 'admin.roles.errorCreateFailed'
+          )
+        );
+      }
+    });
   }
 
   cancel(): void {
