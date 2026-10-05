@@ -5,7 +5,11 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import type { ComponentRef } from '@angular/core';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
-import { COLUMN_TO_SORT_MAP, UserTableComponent } from './user-table.component';
+import {
+  COLUMN_TO_SORT_MAP,
+  SORT_TO_COLUMN_MAP,
+  UserTableComponent
+} from './user-table.component';
 import { AuthStore } from '../../../auth/store/auth.store';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
@@ -133,6 +137,44 @@ describe('UserTableComponent', () => {
 
     it('should map createdAt column to createdAt sort key', () => {
       expect(COLUMN_TO_SORT_MAP['createdAt']).toBe('createdAt');
+    });
+
+    it('maps each sort key back to its column', () => {
+      expect(SORT_TO_COLUMN_MAP).toEqual({
+        email: 'email',
+        firstName: 'name',
+        isActive: 'status',
+        createdAt: 'createdAt'
+      });
+    });
+
+    it('offers a sort header only on a column that has a sort key', () => {
+      componentRef.setInput('users', [mockUser]);
+      fixture.detectChanges();
+      const sortable = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          'th[mat-sort-header]'
+        )
+      ).map((header) => header.classList.value);
+
+      expect(sortable).toHaveLength(Object.keys(COLUMN_TO_SORT_MAP).length);
+      for (const column of Object.keys(COLUMN_TO_SORT_MAP)) {
+        expect(
+          sortable.some((classes) => classes.includes(`mat-column-${column}`))
+        ).toBe(true);
+      }
+    });
+
+    it('marks the sorted column from its inputs', () => {
+      componentRef.setInput('users', [mockUser]);
+      componentRef.setInput('sortActive', 'email');
+      componentRef.setInput('sortDirection', 'asc');
+      fixture.detectChanges();
+      const email = (fixture.nativeElement as HTMLElement).querySelector(
+        'th.mat-column-email'
+      );
+
+      expect(email?.getAttribute('aria-sort')).toBe('ascending');
     });
   });
 

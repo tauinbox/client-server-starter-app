@@ -1,4 +1,3 @@
-import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -33,6 +32,7 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
+import { MatSort, MatSortHeader, type Sort } from '@angular/material/sort';
 import type { ResourceResponse } from '@app/shared/types';
 import type { ResourceListQuery } from '@app/shared/constants';
 import {
@@ -44,6 +44,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { ResourcesStore } from '../../../store/resources.store';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import { bindListToUrl } from '@shared/store/bind-list-to-url';
 import {
   ListSkeletonComponent,
   type ListSkeletonCell
@@ -75,6 +76,8 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
+    MatSort,
+    MatSortHeader,
     NxsListFiltersComponent,
     TranslocoDirective
   ],
@@ -82,7 +85,7 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
   styleUrl: './resource-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ResourceListComponent implements OnInit {
+export class ResourceListComponent {
   readonly #resourcesStore = inject(ResourcesStore);
   readonly #dialog = inject(MatDialog);
   readonly #notify = inject(NotifyService);
@@ -127,9 +130,15 @@ export class ResourceListComponent implements OnInit {
     }
   ];
 
+  readonly #list = bindListToUrl(this.#resourcesStore);
+  readonly sort = this.#list.sort;
+
   applyFilters(filters: ResourceListQuery): void {
-    this.#resourcesStore.setFilters(filters);
-    this.#resourcesStore.load();
+    this.#list.setFilters(filters);
+  }
+
+  sortData(sort: Sort): void {
+    this.#list.setSort(sort.active, sort.direction);
   }
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [
@@ -153,10 +162,6 @@ export class ResourceListComponent implements OnInit {
   readonly canUpdate = computed(() =>
     this.authStore.hasPermissions({ action: 'update', subject: 'Permission' })
   );
-
-  ngOnInit(): void {
-    this.#resourcesStore.load();
-  }
 
   restoreResource(resource: ResourceResponse): void {
     this.#resourcesStore

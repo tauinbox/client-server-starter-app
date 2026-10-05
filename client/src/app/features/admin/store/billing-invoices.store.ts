@@ -7,19 +7,24 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
-import { updateEntity, withEntities } from '@ngrx/signals/entities';
+import { updateEntity } from '@ngrx/signals/entities';
 import type { HttpErrorResponse } from '@angular/common/http';
-import type { InvoiceResponse } from '@app/shared/types';
+import { INVOICE_LIST_QUERY } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
-import { withCursorList } from '@shared/store/with-cursor-list';
+import { withList } from '@shared/store/with-list';
 import { BillingAdminService } from '../services/billing-admin.service';
 
 /** Admin-side invoice list; see `BillingSubscriptionsStore` for the pattern. */
 export const BillingInvoicesStore = signalStore(
-  withEntities<InvoiceResponse>(),
   withState({ working: false }),
-  withCursorList<InvoiceResponse>({
-    fallbackKey: 'admin.billing.errors.loadFailed'
+  withList({
+    spec: INVOICE_LIST_QUERY,
+    urlKey: 'invoices',
+    fallbackKey: 'admin.billing.errors.loadFailed',
+    fetcher: () => {
+      const billing = inject(BillingAdminService);
+      return (request) => billing.listInvoices(request);
+    }
   }),
   withComputed((store) => ({
     invoices: computed(() => store.entities())
@@ -29,14 +34,6 @@ export const BillingInvoicesStore = signalStore(
     const notify = inject(NotifyService);
 
     return {
-      load(): void {
-        void store.loadFirstPage((request) => billing.listInvoices(request));
-      },
-
-      loadMore(): void {
-        void store.loadNextPage((request) => billing.listInvoices(request));
-      },
-
       async refundInvoice(id: string, amountMinor?: number): Promise<boolean> {
         patchState(store, { working: true });
         try {

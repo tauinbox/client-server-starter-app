@@ -23,11 +23,13 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { LayoutService } from '@core/services/layout.service';
 import { NotificationsService } from '@core/services/notifications.service';
 import { NotifyService } from '@core/services/notify.service';
-import type { User, UserSearch, UserSortColumn } from '../../models/user.types';
+import type { User, UserSearch } from '../../models/user.types';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
+import { bindListToUrl } from '@shared/store/bind-list-to-url';
 import { UsersStore } from '../../store/users.store';
 import {
   COLUMN_TO_SORT_MAP,
+  SORT_TO_COLUMN_MAP,
   UserTableComponent
 } from '../user-table/user-table.component';
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
@@ -75,8 +77,16 @@ export class UserListComponent implements OnInit {
 
   readonly layout = inject(LayoutService);
 
+  readonly #list = bindListToUrl(this.#usersStore);
+
   readonly roles = signal<RoleAdminResponse[]>([]);
   readonly filters = this.#usersStore.filters;
+
+  /** The table marks a sort only when it is not the default one. */
+  readonly sort = computed(() => {
+    const { active, direction } = this.#list.sort();
+    return { active: SORT_TO_COLUMN_MAP[active] ?? '', direction };
+  });
 
   readonly filterControls = computed<readonly ListFilterControl<UserSearch>[]>(
     () => [
@@ -172,7 +182,6 @@ export class UserListComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.#usersStore.load();
     this.#roleCatalog
       .getAll()
       .pipe(
@@ -188,19 +197,11 @@ export class UserListComponent implements OnInit {
   }
 
   sortData(sort: Sort): void {
-    if (!sort.active || sort.direction === '') {
-      this.#usersStore.setSorting('createdAt', 'desc');
-    } else {
-      const sortBy =
-        (COLUMN_TO_SORT_MAP[sort.active] as UserSortColumn) ?? 'createdAt';
-      this.#usersStore.setSorting(sortBy, sort.direction);
-    }
-    this.#usersStore.load();
+    this.#list.setSort(COLUMN_TO_SORT_MAP[sort.active] ?? '', sort.direction);
   }
 
   applyFilters(filters: UserSearch): void {
-    this.#usersStore.setFilters(filters);
-    this.#usersStore.load();
+    this.#list.setFilters(filters);
   }
 
   confirmDelete(user: User): void {

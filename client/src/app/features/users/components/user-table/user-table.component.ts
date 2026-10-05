@@ -16,7 +16,7 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
-import type { Sort } from '@angular/material/sort';
+import type { Sort, SortDirection } from '@angular/material/sort';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIconButton } from '@angular/material/button';
@@ -40,6 +40,10 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
   status: 'isActive',
   createdAt: 'createdAt'
 };
+
+export const SORT_TO_COLUMN_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(COLUMN_TO_SORT_MAP).map(([column, sortBy]) => [sortBy, column])
+);
 
 @Component({
   selector: 'nxs-user-table',
@@ -72,6 +76,9 @@ export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
 })
 export class UserTableComponent {
   readonly users = input.required<User[]>();
+  /** The sorted column; empty for the default sort, which marks none. */
+  readonly sortActive = input('');
+  readonly sortDirection = input<SortDirection>('');
 
   readonly sortChange = output<Sort>();
   readonly deleteUser = output<User>();

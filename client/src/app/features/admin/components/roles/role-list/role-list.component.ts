@@ -1,4 +1,3 @@
-import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -33,7 +32,9 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
+import { MatSort, MatSortHeader, type Sort } from '@angular/material/sort';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import { bindListToUrl } from '@shared/store/bind-list-to-url';
 import {
   ListSkeletonComponent,
   type ListSkeletonCell
@@ -80,6 +81,8 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
+    MatSort,
+    MatSortHeader,
     InfiniteScrollDirective,
     ListSkeletonComponent,
     NxsListFiltersComponent,
@@ -89,7 +92,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
   styleUrl: './role-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class RoleListComponent implements OnInit {
+export class RoleListComponent {
   readonly #rolesStore = inject(RolesStore);
   readonly #dialog = inject(MatDialog);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
@@ -126,9 +129,15 @@ export class RoleListComponent implements OnInit {
     }
   ];
 
+  readonly #list = bindListToUrl(this.#rolesStore);
+  readonly sort = this.#list.sort;
+
   applyFilters(filters: RoleListQuery): void {
-    this.#rolesStore.setFilters(filters);
-    this.#rolesStore.load();
+    this.#list.setFilters(filters);
+  }
+
+  sortData(sort: Sort): void {
+    this.#list.setSort(sort.active, sort.direction);
   }
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [
@@ -156,10 +165,6 @@ export class RoleListComponent implements OnInit {
   readonly canDelete = computed(() =>
     this.authStore.hasPermissions({ action: 'delete', subject: 'Role' })
   );
-
-  ngOnInit(): void {
-    this.#rolesStore.load();
-  }
 
   openCreateDialog(): void {
     this.#openFormDialog({}, 'admin.roles.successCreated');

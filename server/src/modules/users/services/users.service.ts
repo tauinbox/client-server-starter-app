@@ -22,26 +22,17 @@ import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util'
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
-import { CursorPaginatedResponseDto } from '../../../common/dtos';
-import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import type { CursorPaginatedResponseDto } from '../../../common/dtos';
 import {
-  applyListQuery,
-  type ListQueryColumns
+  applyList,
+  type ListColumns
 } from '../../../common/utils/apply-list-query.util';
 import type { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 import { applyAbilityToUserQuery } from '../../../common/utils/apply-ability.util';
 
-const USER_SORT_COLUMN_MAP: Record<string, string> = {
-  email: 'user.email',
-  firstName: 'user.firstName',
-  lastName: 'user.lastName',
-  isActive: 'user.isActive',
-  createdAt: 'user.createdAt'
-};
-
 // The search casts the uuid to text to match a part of it; the ids filter
 // compares the column itself so that it keeps the primary key index.
-const USER_LIST_COLUMNS: ListQueryColumns<typeof USER_LIST_QUERY> = {
+const USER_LIST_COLUMNS: ListColumns<typeof USER_LIST_QUERY> = {
   search: {
     email: 'user.email',
     firstName: 'user.firstName',
@@ -58,7 +49,15 @@ const USER_LIST_COLUMNS: ListQueryColumns<typeof USER_LIST_QUERY> = {
     mfaEnabled: 'user.totpEnabledAt',
     hasPassword: 'user.password',
     isLocked: 'user.lockedUntil'
-  }
+  },
+  sort: {
+    email: 'user.email',
+    firstName: 'user.firstName',
+    lastName: 'user.lastName',
+    isActive: 'user.isActive',
+    createdAt: 'user.createdAt'
+  },
+  id: 'user.id'
 };
 
 @Injectable()
@@ -139,14 +138,11 @@ export class UsersService {
     query: SearchUsersCursorQueryDto,
     ability: AbilityOrSystem
   ): Promise<CursorPaginatedResponseDto<User>> {
-    const { cursor, limit, sortBy, sortOrder, includeDeleted, ...filters } =
-      query;
-
     const qb = this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.roles', 'role');
 
-    if (includeDeleted) {
+    if (query.includeDeleted) {
       qb.withDeleted();
     }
 
@@ -154,26 +150,15 @@ export class UsersService {
       applyAbilityToUserQuery(qb, ability, 'search');
     }
 
-    applyListQuery(qb, USER_LIST_QUERY, USER_LIST_COLUMNS, filters);
-
-    if (filters.role) {
+    if (query.role) {
       // Separate inner join (not AndSelect) so the filter narrows the user set
       // without trimming the roles loaded for display via leftJoinAndSelect.
       qb.innerJoin('user.roles', 'roleFilter', 'roleFilter.name = :role', {
-        role: filters.role
+        role: query.role
       });
     }
 
-    const { data, nextCursor } = await applyKeysetPagination(qb, {
-      cursor,
-      limit,
-      sortBy,
-      sortOrder,
-      sortColumnMap: USER_SORT_COLUMN_MAP,
-      idColumn: 'user.id'
-    });
-
-    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+    return applyList(qb, USER_LIST_QUERY, USER_LIST_COLUMNS, query);
   }
 
   async findOne(id: string): Promise<User> {

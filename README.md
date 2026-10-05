@@ -714,8 +714,12 @@ the same permission both apply.
   `shared/src/constants/sort-columns.constants.ts`. Each endpoint answers
   `{ data, meta: { nextCursor, hasMore, limit } }`.
 
-  On the server, `applyKeysetPagination` works on a tuple of `(sortColumn, id)`. On the client,
-  `withCursorList` works with the `nxsInfiniteScroll` sentinel, and each list has one store.
+  One definition for each list (`shared/src/constants/list-query.constants.ts`) holds its search,
+  filters and sort whitelist. The server builds the query DTO from it (`ListCursorQueryDto`) and
+  `applyList` runs the filters and `applyKeysetPagination`, which works on a tuple of
+  `(sortColumn, id)`. On the client, each list has one store composed with `withList`, which works
+  with the `nxsInfiniteScroll` sentinel. The filters and the sort of a list are in the URL, with
+  the prefix of the list (`users.q`, `flags.sortBy`); the cursor is not.
 
   A sortable column must be NOT NULL. It must also hold no precision that the cursor cannot carry.
   Thus a timestamp sort key is a `timestamptz(3)` column, because the cursor encodes the value with
@@ -1843,10 +1847,10 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2771 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2773 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 566 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 560 pass and 6 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1500 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 302 tests |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1519 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 307 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 987 tests pass |
 
 ## CI/CD

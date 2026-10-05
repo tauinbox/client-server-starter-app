@@ -1,5 +1,5 @@
 import { applyDecorators, type Type } from '@nestjs/common';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, IntersectionType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -11,14 +11,20 @@ import {
   IsUUID,
   MaxLength
 } from 'class-validator';
-import { MAX_LIST_FILTER_LENGTH, MAX_PAGE_SIZE } from '@app/shared/constants';
+import {
+  DEFAULT_SORT_BY,
+  MAX_LIST_FILTER_LENGTH,
+  MAX_PAGE_SIZE
+} from '@app/shared/constants';
 import type {
   ListFilterDefinition,
   ListFilterKind,
+  ListParams,
   ListQuery,
   ListQuerySpec
 } from '@app/shared/types';
 import { toIdList, toOptionalBoolean } from '../utils/query-transforms';
+import { CursorPaginationQueryDto } from './cursor-pagination-query.dto';
 
 // The validators of one property are listed in reverse: applyDecorators runs
 // them in array order, while stacked decorators run bottom-up, and the order
@@ -80,22 +86,60 @@ const FILTER_DECORATORS: Record<
 };
 
 /**
- * Builds the search and filter half of a list query DTO from its shared
- * definition. Combine it with `CursorPaginationQueryDto` through
- * `IntersectionType`, and pass the same definition to `applyListQuery`.
+ * Builds the search, filter and param half of a list query DTO from its shared
+ * definition. `ListCursorQueryDto` combines it with the paging params.
  */
 export function ListQueryDto<S extends ListQuerySpec>(
   spec: S
-): Type<ListQuery<S>> {
+): Type<ListQuery<S> & ListParams<S>> {
   class ListQueryHost {}
   const target = ListQueryHost.prototype;
 
-  textParam(
-    `Case-insensitive substring search across ${spec.search.join(', ')}. Combined with the other filters via AND.`
-  )(target, 'q');
+  if (spec.search.length > 0) {
+    textParam(
+      `Case-insensitive substring search across ${spec.search.join(', ')}. Combined with the other filters via AND.`
+    )(target, 'q');
+  }
   for (const [name, definition] of Object.entries(spec.filters)) {
     FILTER_DECORATORS[definition.kind](name, definition)(target, name);
   }
+  if (!spec.params) return ListQueryHost;
 
-  return ListQueryHost;
+  // The params sit on a subclass: class-validator reports the own properties
+  // of a class before the inherited ones, so they come before `q`.
+  class ListParamsHost extends ListQueryHost {}
+  for (const [name, definition] of Object.entries(spec.params)) {
+    FILTER_DECORATORS[definition.kind](name, definition)(
+      ListParamsHost.prototype,
+      name
+    );
+  }
+  return ListParamsHost;
+}
+
+export type ListCursorQuery<S extends ListQuerySpec> =
+  CursorPaginationQueryDto & ListQuery<S> & ListParams<S>;
+
+/**
+ * The query DTO of a cursor-paginated list endpoint: the paging params, the
+ * list params of `spec`, and `sortBy` limited to `spec.sort`. The whitelist is
+ * required because the keyset helper mints the next cursor from the named
+ * property - an unlisted column yields a cursor that cannot resolve a page.
+ */
+export function ListCursorQueryDto<S extends ListQuerySpec>(
+  spec: S
+): Type<ListCursorQuery<S>> {
+  const listParams: Type<object> = ListQueryDto(spec);
+  class ListCursorQueryHost extends IntersectionType(
+    CursorPaginationQueryDto,
+    listParams
+  ) {}
+  applyDecorators(
+    IsIn(spec.sort),
+    IsOptional(),
+    ApiPropertyOptional({ default: DEFAULT_SORT_BY, enum: spec.sort })
+  )(ListCursorQueryHost.prototype, 'sortBy');
+  // TypeScript cannot extend an intersection over a generic `spec`, so the
+  // list params of the class are typed here; ListQueryDto(spec) declares them.
+  return ListCursorQueryHost as Type<ListCursorQuery<S>>;
 }

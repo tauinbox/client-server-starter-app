@@ -7,10 +7,16 @@ import type {
   ListFilterDefinition,
   ListFilterKind,
   ListFilterValueMap,
+  ListFilters,
   ListQuery,
   ListQuerySpec
 } from '@app/shared/types';
-import { cursorQueryErrors } from './pagination.helpers';
+import {
+  cursorPaginate,
+  cursorQueryErrors,
+  parseCursorQuery,
+  type CursorPaginatedBody
+} from './pagination.helpers';
 
 /** Mirrors the boolean @Transform: an empty param reads as unset. */
 export function parseOptionalBoolean(value: unknown): boolean | undefined {
@@ -123,54 +129,47 @@ const FILTER_KINDS: { [K in ListFilterKind]: FilterKindHandler<K> } = {
   }
 };
 
-/**
- * The messages of one param of `kind`, as the server reports them. For a param
- * a route carries outside its list definition (the user list's `role`).
- */
-export function filterParamErrors(
-  definition: ListFilterDefinition,
-  name: string,
-  value: unknown
+/** The messages of one param of `kind`, as the server reports them. */
+function paramErrors(
+  definitions: Readonly<Record<string, ListFilterDefinition>> | undefined,
+  query: Record<string, unknown>
 ): string[] {
-  return value === undefined
-    ? []
-    : FILTER_KINDS[definition.kind].errors(name, value, definition);
+  return Object.entries(definitions ?? {}).flatMap(([name, definition]) =>
+    query[name] === undefined
+      ? []
+      : FILTER_KINDS[definition.kind].errors(name, query[name], definition)
+  );
 }
 
 /** Every query param a list built from `spec` accepts beside the paging ones. */
 export function listQueryKeys(spec: ListQuerySpec): string[] {
-  return ['q', ...Object.keys(spec.filters)];
+  return [
+    ...(spec.search.length > 0 ? ['q'] : []),
+    ...Object.keys(spec.filters),
+    ...Object.keys(spec.params ?? {})
+  ];
 }
 
 /**
- * Mirrors `ListQueryDto(spec)` intersected with `CursorPaginationQueryDto`
- * under the server's ValidationPipe: the paging messages first, then `q`, then
- * each filter in definition order.
- *
- * `extra` holds the messages of params the route declares on its own DTO. The
- * server reports those before the inherited list params, so they go between.
+ * Mirrors `ListCursorQueryDto(spec)` under the server's ValidationPipe: the
+ * paging messages first (with `sortBy` limited to `spec.sort`), then the
+ * `params` (the server declares them on a subclass, and reports own
+ * properties first), then `q`, then each filter in definition order.
  */
 export function listQueryErrors(
   query: Record<string, unknown>,
-  spec: ListQuerySpec,
-  options: {
-    sortColumns: readonly string[];
-    extraAllowed?: readonly string[];
-    extra?: string[];
-  }
+  spec: ListQuerySpec
 ): string[] {
-  const { sortColumns, extraAllowed = [], extra = [] } = options;
-  const filterErrors = Object.entries(spec.filters).flatMap(
-    ([name, definition]) => filterParamErrors(definition, name, query[name])
-  );
   return [
     ...cursorQueryErrors(query, {
-      extraAllowed: [...listQueryKeys(spec), ...extraAllowed],
-      sortColumns
+      extraAllowed: listQueryKeys(spec),
+      sortColumns: spec.sort
     }),
-    ...extra,
-    ...(query['q'] === undefined ? [] : textErrors('q', query['q'])),
-    ...filterErrors
+    ...paramErrors(spec.params, query),
+    ...(spec.search.length === 0 || query['q'] === undefined
+      ? []
+      : textErrors('q', query['q'])),
+    ...paramErrors(spec.filters, query)
   ];
 }
 
@@ -178,17 +177,18 @@ export function listQueryErrors(
 export function parseListQuery<S extends ListQuerySpec>(
   query: Record<string, unknown>,
   spec: S
-): ListQuery<S> {
+): ListFilters<S> {
   const parsed: Record<string, unknown> = {};
   if (typeof query['q'] === 'string' && query['q'] !== '') {
     parsed['q'] = query['q'];
   }
-  for (const [name, definition] of Object.entries(spec.filters)) {
+  const definitions = { ...spec.filters, ...spec.params };
+  for (const [name, definition] of Object.entries(definitions)) {
     if (query[name] === undefined) continue;
     parsed[name] = FILTER_KINDS[definition.kind].parse(query[name]);
   }
   // Each key was parsed by the handler of the kind that `spec` gives it.
-  return parsed as ListQuery<S>;
+  return parsed as ListFilters<S>;
 }
 
 function matchesFilter<K extends ListFilterKind>(
@@ -231,4 +231,20 @@ export function filterByListQuery<T extends object, S extends ListQuerySpec>(
       );
     });
   });
+}
+
+/**
+ * Mirrors `applyList`: the search and filters of `query`, then the keyset
+ * page that `query` asks for. Filter `items` by ability and by the list's own
+ * `params` first. Call it only after `listQueryErrors` returned none.
+ */
+export function listPage<T extends { id: string }, S extends ListQuerySpec>(
+  items: T[],
+  spec: S,
+  query: Record<string, unknown>
+): CursorPaginatedBody<T> {
+  return cursorPaginate(
+    filterByListQuery(items, spec, parseListQuery(query, spec)),
+    parseCursorQuery(query)
+  );
 }

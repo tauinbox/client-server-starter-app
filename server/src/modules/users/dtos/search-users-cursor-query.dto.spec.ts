@@ -2,7 +2,7 @@ import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { MAX_PAGE_SIZE, MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
 import { SearchUsersCursorQueryDto } from './search-users-cursor-query.dto';
 
-// The DTO pulls its filters from UserFiltersQueryDto through IntersectionType,
+// The DTO is built from the shared list definition through IntersectionType,
 // so every case below proves the composition actually carries the validation
 // and transformation metadata.
 describe('SearchUsersCursorQueryDto filters', () => {

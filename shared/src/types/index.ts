@@ -29,7 +29,10 @@ export type {
   ListFilterKind,
   ListFilterDefinition,
   ListQuerySpec,
-  ListQuery
+  ListQuery,
+  ListParams,
+  ListFilters,
+  ListSortColumn
 } from './list-query.types';
 
 export type {

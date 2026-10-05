@@ -136,6 +136,29 @@ describe('NxsListFiltersComponent', () => {
       expect(host.changes).toEqual([]);
     });
 
+    it('shows a q that the value gets from outside (Back) and emits nothing for it', async () => {
+      await render();
+      await search('beta');
+
+      host.value.set({ q: 'alpha' });
+      fixture.detectChanges();
+      vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
+      await fixture.whenStable();
+
+      expect(host.filters().searchModel()).toEqual({ q: 'alpha' });
+      expect(host.changes).toEqual([{ q: 'beta' }]);
+    });
+
+    it('keeps what the user types while the value echoes the last emitted term', async () => {
+      await render();
+      await search('beta');
+
+      host.filters().searchModel.set({ q: 'beta-2' });
+      fixture.detectChanges();
+
+      expect(host.filters().searchModel()).toEqual({ q: 'beta-2' });
+    });
+
     it('does not send a term longer than the cap the API validates', async () => {
       await render();
 

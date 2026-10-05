@@ -1,4 +1,4 @@
-// Parity with the server's UserFiltersQueryDto: the mock must reject the same
+// Parity with the server's SearchUsersCursorQueryDto: the mock must reject the same
 // filter inputs with 400 instead of coercing or silently dropping them.
 
 import type { Server } from 'http';

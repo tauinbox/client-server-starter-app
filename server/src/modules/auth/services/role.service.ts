@@ -10,14 +10,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { Role } from '../entities/role.entity';
-import { CursorPaginatedResponseDto } from '../../../common/dtos';
-import type { RoleCursorQueryDto } from '../../../common/dtos';
-import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
-import { applyListQuery } from '../../../common/utils/apply-list-query.util';
-import {
-  ROLE_LIST_COLUMNS,
-  ROLE_SORT_COLUMN_MAP
-} from '../utils/rbac-sort-columns.util';
+import type {
+  CursorPaginatedResponseDto,
+  RoleCursorQueryDto
+} from '../../../common/dtos';
+import { applyList } from '../../../common/utils/apply-list-query.util';
+import { ROLE_LIST_COLUMNS } from '../utils/rbac-sort-columns.util';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
@@ -302,18 +300,12 @@ export class RoleService {
   async findCursorPaginated(
     query: RoleCursorQueryDto
   ): Promise<CursorPaginatedResponseDto<Role>> {
-    const { cursor, limit, sortBy, sortOrder } = query;
-    const qb = this.roleRepository.createQueryBuilder('role');
-    applyListQuery(qb, ROLE_LIST_QUERY, ROLE_LIST_COLUMNS, query);
-    const { data, nextCursor } = await applyKeysetPagination(qb, {
-      cursor,
-      limit,
-      sortBy,
-      sortOrder,
-      sortColumnMap: ROLE_SORT_COLUMN_MAP,
-      idColumn: 'role.id'
-    });
-    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+    return applyList(
+      this.roleRepository.createQueryBuilder('role'),
+      ROLE_LIST_QUERY,
+      ROLE_LIST_COLUMNS,
+      query
+    );
   }
 
   async findOne(id: string): Promise<Role> {

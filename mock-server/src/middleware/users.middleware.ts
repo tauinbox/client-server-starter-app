@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
-  ALLOWED_USER_SORT_COLUMNS,
   ErrorKeys,
   MAX_NAME_LENGTH,
   STEP_UP_OPERATION,
@@ -18,15 +17,9 @@ import {
   validateMaxLength
 } from '../utils/validation';
 import {
-  cursorPaginate,
-  parseCursorQuery
-} from '../helpers/pagination.helpers';
-import {
-  filterByListQuery,
-  filterParamErrors,
+  listPage,
   listQueryErrors,
-  parseListQuery,
-  parseOptionalBoolean
+  parseListQuery
 } from '../helpers/list-query.helpers';
 import {
   findUserByEmail,
@@ -58,7 +51,7 @@ import {
 } from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import { filterByAbility } from '../helpers/ability-filter.helpers';
-import type { AuthenticatedRequest, MockUser } from '../types';
+import type { AuthenticatedRequest } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
 import {
   requireUuid,
@@ -79,58 +72,32 @@ function pushUserCrudEvent(action: UserCrudAction, userId: string): void {
 }
 
 /**
- * Mirrors the server's SearchUsersCursorQueryDto: the shared user list
- * definition plus `role` and `includeDeleted`, which UserFiltersQueryDto
- * declares itself and which the server therefore reports first.
- */
-function userQueryErrors(query: Record<string, unknown>): string[] {
-  return listQueryErrors(query, USER_LIST_QUERY, {
-    sortColumns: ALLOWED_USER_SORT_COLUMNS,
-    extraAllowed: ['role', 'includeDeleted'],
-    extra: [
-      ...filterParamErrors({ kind: 'contains' }, 'role', query['role']),
-      ...filterParamErrors(
-        { kind: 'boolean' },
-        'includeDeleted',
-        query['includeDeleted']
-      )
-    ]
-  });
-}
-
-/**
  * Both list routes share one DTO and one query on the server, so both apply
- * every filter. Call it only after `userQueryErrors` returned none.
+ * every filter and both `params`: `role` (a join on the server) and
+ * `includeDeleted` (a scope switch), applied here before the list query.
  */
-function filterUsers(query: Record<string, unknown>): MockUser[] {
-  const includeDeleted = parseOptionalBoolean(query['includeDeleted']) === true;
-  const role = query['role'];
-  const users = Array.from(getState().users.values()).filter(
-    (u) =>
-      (includeDeleted || !u.deletedAt) &&
-      (!role || u.roles.includes(String(role)))
-  );
-  return filterByListQuery(
-    users,
-    USER_LIST_QUERY,
-    parseListQuery(query, USER_LIST_QUERY)
-  );
-}
-
 function listUsers(req: Request, res: Response): void {
   const query = req.query as Record<string, unknown>;
-  const queryErrors = userQueryErrors(query);
+  const queryErrors = listQueryErrors(query, USER_LIST_QUERY);
   if (queryErrors.length > 0) {
     res.status(400).json(validationError(queryErrors));
     return;
   }
-  const users = filterByAbility(
-    filterUsers(query),
-    (req as AuthenticatedRequest).user,
-    'search',
-    'User'
-  ).map(toAdminUserResponse);
-  res.json(cursorPaginate(users, parseCursorQuery(query)));
+  const { role, includeDeleted } = parseListQuery(query, USER_LIST_QUERY);
+  const users = Array.from(getState().users.values()).filter(
+    (u) => (includeDeleted || !u.deletedAt) && (!role || u.roles.includes(role))
+  );
+  const page = listPage(
+    filterByAbility(
+      users,
+      (req as AuthenticatedRequest).user,
+      'search',
+      'User'
+    ),
+    USER_LIST_QUERY,
+    query
+  );
+  res.json({ data: page.data.map(toAdminUserResponse), meta: page.meta });
 }
 
 const router = Router();

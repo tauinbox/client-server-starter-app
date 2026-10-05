@@ -1,4 +1,3 @@
-import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -43,7 +42,9 @@ import {
   MatRowDef,
   MatTable
 } from '@angular/material/table';
+import { MatSort, MatSortHeader, type Sort } from '@angular/material/sort';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
+import { bindListToUrl } from '@shared/store/bind-list-to-url';
 import { TemplateRowOfDirective } from '@shared/directives/template-row-of.directive';
 import {
   ListSkeletonComponent,
@@ -100,6 +101,8 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
+    MatSort,
+    MatSortHeader,
     InfiniteScrollDirective,
     TemplateRowOfDirective,
     ListSkeletonComponent,
@@ -110,7 +113,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
   styleUrl: './feature-flag-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class FeatureFlagListComponent implements OnInit {
+export class FeatureFlagListComponent {
   readonly #store = inject(FeatureFlagsAdminStore);
   readonly #dialog = inject(MatDialog);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
@@ -170,9 +173,15 @@ export class FeatureFlagListComponent implements OnInit {
       }
     ];
 
+  readonly #list = bindListToUrl(this.#store);
+  readonly sort = this.#list.sort;
+
   applyFilters(filters: FeatureFlagListQuery): void {
-    this.#store.setFilters(filters);
-    this.#store.load();
+    this.#list.setFilters(filters);
+  }
+
+  sortData(sort: Sort): void {
+    this.#list.setSort(sort.active, sort.direction);
   }
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [
@@ -210,10 +219,6 @@ export class FeatureFlagListComponent implements OnInit {
       subject: 'FeatureFlag',
       instance: flag
     });
-  }
-
-  ngOnInit(): void {
-    this.#store.load();
   }
 
   openCreateDialog(): void {

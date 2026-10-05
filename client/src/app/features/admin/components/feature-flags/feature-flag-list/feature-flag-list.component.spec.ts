@@ -8,6 +8,7 @@ import {
 import { signal, ViewContainerRef } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { HttpErrorResponse } from '@angular/common/http';
+import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { LayoutService } from '@core/services/layout.service';
@@ -79,6 +80,7 @@ describe('FeatureFlagListComponent', () => {
       imports: [FeatureFlagListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
+        provideRouter([]),
         FeatureFlagsAdminStore,
         { provide: FeatureFlagsAdminService, useValue: serviceMock },
         {
@@ -197,6 +199,50 @@ describe('FeatureFlagListComponent', () => {
     expect(rows.length).toBe(1);
     expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain(
       'new-dashboard'
+    );
+  });
+
+  it('opens a link with its filters and sort, and pages on with the same ones', async () => {
+    serviceMock.getAllCursor
+      .mockReturnValueOnce(
+        of({
+          data: [flag],
+          meta: { nextCursor: 'cursor-1', hasMore: true, limit: 20 }
+        })
+      )
+      .mockReturnValueOnce(
+        of({
+          data: [{ ...flag, id: 'flag-2', key: 'other' }],
+          meta: { nextCursor: null, hasMore: false, limit: 20 }
+        })
+      );
+    await TestBed.inject(Router).navigateByUrl(
+      '/?flags.enabled=false&flags.sortBy=key&flags.sortOrder=asc&flags.junk=1'
+    );
+
+    const fixture = TestBed.createComponent(FeatureFlagListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.loadMore();
+    await fixture.whenStable();
+
+    expect(serviceMock.getAllCursor.mock.calls).toEqual([
+      [
+        { cursor: null, limit: 20, sortBy: 'key', sortOrder: 'asc' },
+        { enabled: false }
+      ],
+      [
+        { cursor: 'cursor-1', limit: 20, sortBy: 'key', sortOrder: 'asc' },
+        { enabled: false }
+      ]
+    ]);
+    expect(fixture.componentInstance.flags().map((f) => f.id)).toEqual([
+      'flag-1',
+      'flag-2'
+    ]);
+    // The unknown param is dropped from the address; the list's own stay.
+    expect(TestBed.inject(Router).url).toBe(
+      '/?flags.enabled=false&flags.sortBy=key&flags.sortOrder=asc'
     );
   });
 

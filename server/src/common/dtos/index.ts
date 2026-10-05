@@ -4,7 +4,11 @@ export {
   CursorPaginationMeta
 } from './cursor-paginated-response.dto';
 
-export { ListQueryDto } from './list-query.dto';
+export {
+  ListQueryDto,
+  ListCursorQueryDto,
+  type ListCursorQuery
+} from './list-query.dto';
 
 export {
   RoleCursorQueryDto,

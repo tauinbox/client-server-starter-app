@@ -214,8 +214,7 @@ src/app/
 │                           # FeatureFlagsAdminStore (route level: signalStore with
 │                           # withEntities<FeatureFlagResponse>).
 │                           # BillingSubscriptionsStore and BillingInvoicesStore (route level, one
-│                           # store for each list: withEntities with withCursorList, plus cancel
-│                           # and refund).
+│                           # store for each list: withList, plus cancel and refund).
 │   └── billing/            # Self-service billing: pricing, checkout return and settings. The
 │       │                   # routes and the navigation entry are gated on the public `billing`
 │       │                   # flag, thus they stay hidden until a provider is configured.
@@ -398,13 +397,14 @@ src/app/
     │                       # switch changes the dates at runtime. It is impure for this reason.
     ├── services/           # AdaptiveDialogService opens a confirm dialog as a bottom sheet on a
     │                       # handset and as a dialog on a desktop.
-    ├── store/              # withListFilters<F>(initial) holds the filters of a list store:
-    │                       # filters, hasActiveFilters and setFilters. The store's load() sends
-    │                       # filters() through listQueryParams (shared/utils/pagination.utils).
-    │                       # withCursorList<T>({ fallbackKey }) is the shared cursor-list feature
-    │                       # that each list store composes. It owns the cursor bookkeeping, the
+    ├── store/              # withList({ spec, urlKey, fallbackKey, fetcher }) is the feature that
+    │                       # each list store composes: withEntities, withCursorList, withListFilters
+    │                       # and load()/loadMore(). withCursorList owns the cursor bookkeeping, the
     │                       # in-flight guards, the append of the next page and the stale-response
-    │                       # guard.
+    │                       # guard. withListFilters holds filters and hasActiveFilters; load()
+    │                       # sends filters() through listQueryParams (shared/utils/pagination.utils).
+    │                       # bindListToUrl(store) keeps the filters and the sort of a list in the
+    │                       # URL (<urlKey>.<param>, list-url-state.ts); the page calls it.
     └── utils/              # css.utils.
                             # dialog.utils holds the DialogSize enum and dialogSizeConfig().
                             # http-error.utils holds parseHttpErrorMessage, the single funnel for
@@ -633,16 +633,18 @@ background.
 
 #### UsersStore
 
-`UsersStore` is a route-level store at `/users`. It uses `withEntities<User>()`.
-
-It composes `withListFilters<UserSearch>()`, which holds `filters`. An empty filter shows all
-users. A filled filter starts a search through `GET /users/search/cursor`.
+`UsersStore` is a route-level store at `/users`. It composes
+`withList({ spec: USER_LIST_QUERY, urlKey: 'users' })`, which holds the entities and `filters`.
+An empty filter shows all users. A filled filter starts a search through
+`GET /users/search/cursor`.
 
 The store has one `load()` and `loadMore()` pair with **infinite scroll**. The page size is 20.
 `upsertEntities` appends each page. The `hasMore` computed signal controls the sentinel. The
 `isLoadingMore` signal shows the spinner.
 
-`setFilters()` and `setSorting()` change the state. The component calls `load()` after each change.
+The filters and the sort live in the URL (`users.q`, `users.sortBy`, ...). The component calls
+`bindListToUrl(store)`: the filter bar and the table sort write the URL, and the binding calls
+`setFilters()`, `setSorting()` and `load()` once for each URL change.
 
 The list renders its filters with `<nxs-list-filters>`: the search, the selects Role, Status,
 Email, Two-factor, Lock and Sign-in, and the Include deleted checkbox. Each change applies at once

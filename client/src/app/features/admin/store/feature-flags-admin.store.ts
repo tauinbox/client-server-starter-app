@@ -2,11 +2,10 @@ import { inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { tap } from 'rxjs';
 import { patchState, signalStore, withMethods } from '@ngrx/signals';
-import { removeEntity, setEntity, withEntities } from '@ngrx/signals/entities';
+import { removeEntity, setEntity } from '@ngrx/signals/entities';
 import type { FeatureFlagResponse } from '@app/shared/types';
-import type { FeatureFlagListQuery } from '@app/shared/constants';
-import { withCursorList } from '@shared/store/with-cursor-list';
-import { withListFilters } from '@shared/store/with-list-filters';
+import { FEATURE_FLAG_LIST_QUERY } from '@app/shared/constants';
+import { withList } from '@shared/store/with-list';
 import type {
   CreateFeatureFlag,
   UpdateFeatureFlag
@@ -14,29 +13,19 @@ import type {
 import { FeatureFlagsAdminService } from '../services/feature-flags-admin.service';
 
 export const FeatureFlagsAdminStore = signalStore(
-  withEntities<FeatureFlagResponse>(),
-  withCursorList<FeatureFlagResponse>({
-    fallbackKey: 'admin.featureFlags.errorLoadFailed'
+  withList({
+    spec: FEATURE_FLAG_LIST_QUERY,
+    urlKey: 'flags',
+    fallbackKey: 'admin.featureFlags.errorLoadFailed',
+    fetcher: () => {
+      const service = inject(FeatureFlagsAdminService);
+      return (request, filters) => service.getAllCursor(request, filters);
+    }
   }),
-  withListFilters<FeatureFlagListQuery>({}),
   withMethods((store) => {
     const service = inject(FeatureFlagsAdminService);
 
     return {
-      /** First page; a filter or sort change re-enters through here. */
-      load(): void {
-        void store.loadFirstPage((request) =>
-          service.getAllCursor(request, store.filters())
-        );
-      },
-
-      /** Appends the next page; wired to the list's scroll sentinel. */
-      loadMore(): void {
-        void store.loadNextPage((request) =>
-          service.getAllCursor(request, store.filters())
-        );
-      },
-
       createFlag(data: CreateFeatureFlag): Observable<FeatureFlagResponse> {
         return service.create(data).pipe(
           tap((flag) => {

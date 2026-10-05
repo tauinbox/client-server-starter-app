@@ -9,21 +9,18 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
-import {
-  removeEntity,
-  setEntity,
-  updateEntity,
-  withEntities
-} from '@ngrx/signals/entities';
+import { removeEntity, setEntity, updateEntity } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import { USER_LIST_QUERY } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
-import { withCursorList } from '@shared/store/with-cursor-list';
-import { withListFilters } from '@shared/store/with-list-filters';
-import type { CursorPageRequest } from '@shared/utils/pagination.utils';
+import { type ListFetcher, withList } from '@shared/store/with-list';
+import {
+  type CursorPageRequest,
+  isActiveFilterValue
+} from '@shared/utils/pagination.utils';
 import { UserService } from '../services/user.service';
 import type { MfaResetRequest } from '../services/user.service';
 import type {
-  CursorPaginatedResponse,
   UpdateUser,
   User,
   UserCursorListParams,
@@ -36,14 +33,36 @@ type UsersState = {
   detailError: string | null;
 };
 
+/**
+ * Filters decide which of the two cursor endpoints answers, so the endpoint is
+ * chosen per page rather than captured once.
+ */
+function userFetcher(): ListFetcher<User, typeof USER_LIST_QUERY> {
+  const userService = inject(UserService);
+  return (request: CursorPageRequest, filters: UserSearch) => {
+    const params: UserCursorListParams = {
+      cursor: request.cursor ?? undefined,
+      limit: request.limit ?? 20,
+      sortBy: (request.sortBy as UserSortColumn) ?? 'createdAt',
+      sortOrder: request.sortOrder ?? 'desc'
+    };
+    return Object.values(filters).some(isActiveFilterValue)
+      ? userService.searchCursor(filters, params)
+      : userService.getAllCursor(params);
+  };
+}
+
 export const UsersStore = signalStore(
-  withEntities<User>(),
   withState<UsersState>({
     detailLoading: false,
     detailError: null
   }),
-  withCursorList<User>({ fallbackKey: 'users.store.errorLoadFailed' }),
-  withListFilters<UserSearch>({}),
+  withList({
+    spec: USER_LIST_QUERY,
+    urlKey: 'users',
+    fallbackKey: 'users.store.errorLoadFailed',
+    fetcher: userFetcher
+  }),
   withComputed((store) => ({
     displayedUsers: computed(() => store.entities()),
     // Keyset pagination reports no total, so the count shown is what has been
@@ -54,34 +73,7 @@ export const UsersStore = signalStore(
     const userService = inject(UserService);
     const notify = inject(NotifyService);
 
-    /**
-     * Filters decide which of the two cursor endpoints answers, so the fetcher
-     * is rebuilt per call rather than captured once.
-     */
-    function fetchPage(
-      request: CursorPageRequest
-    ): Observable<CursorPaginatedResponse<User>> {
-      const filters = store.filters();
-      const params: UserCursorListParams = {
-        cursor: request.cursor ?? undefined,
-        limit: request.limit ?? 20,
-        sortBy: (request.sortBy as UserSortColumn) ?? 'createdAt',
-        sortOrder: request.sortOrder ?? 'desc'
-      };
-      return store.hasActiveFilters()
-        ? userService.searchCursor(filters, params)
-        : userService.getAllCursor(params);
-    }
-
     return {
-      load(): void {
-        void store.loadFirstPage(fetchPage);
-      },
-
-      loadMore(): void {
-        void store.loadNextPage(fetchPage);
-      },
-
       loadOne: rxMethod<string>(
         pipe(
           tap(() =>

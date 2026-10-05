@@ -7,11 +7,11 @@ import {
   withMethods,
   withState
 } from '@ngrx/signals';
-import { updateEntity, withEntities } from '@ngrx/signals/entities';
+import { updateEntity } from '@ngrx/signals/entities';
 import type { HttpErrorResponse } from '@angular/common/http';
-import type { SubscriptionResponse } from '@app/shared/types';
+import { SUBSCRIPTION_LIST_QUERY } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
-import { withCursorList } from '@shared/store/with-cursor-list';
+import { withList } from '@shared/store/with-list';
 import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingAdminService } from '../services/billing-admin.service';
 
@@ -22,10 +22,15 @@ import { BillingAdminService } from '../services/billing-admin.service';
  * collections into one.
  */
 export const BillingSubscriptionsStore = signalStore(
-  withEntities<SubscriptionResponse>(),
   withState({ working: false }),
-  withCursorList<SubscriptionResponse>({
-    fallbackKey: 'admin.billing.errors.loadFailed'
+  withList({
+    spec: SUBSCRIPTION_LIST_QUERY,
+    urlKey: 'subs',
+    fallbackKey: 'admin.billing.errors.loadFailed',
+    fetcher: () => {
+      const billing = inject(BillingAdminService);
+      return (request) => billing.listSubscriptions(request);
+    }
   }),
   withComputed((store) => ({
     subscriptions: computed(() => store.entities())
@@ -35,18 +40,6 @@ export const BillingSubscriptionsStore = signalStore(
     const notify = inject(NotifyService);
 
     return {
-      load(): void {
-        void store.loadFirstPage((request) =>
-          billing.listSubscriptions(request)
-        );
-      },
-
-      loadMore(): void {
-        void store.loadNextPage((request) =>
-          billing.listSubscriptions(request)
-        );
-      },
-
       async cancelSubscription(
         id: string,
         mode: CancelMode = 'period_end'

@@ -10,14 +10,12 @@ import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Resource } from '../entities/resource.entity';
-import { CursorPaginatedResponseDto } from '../../../common/dtos';
-import type { ResourceCursorQueryDto } from '../../../common/dtos';
-import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
-import { applyListQuery } from '../../../common/utils/apply-list-query.util';
-import {
-  RESOURCE_LIST_COLUMNS,
-  RESOURCE_SORT_COLUMN_MAP
-} from '../utils/rbac-sort-columns.util';
+import type {
+  CursorPaginatedResponseDto,
+  ResourceCursorQueryDto
+} from '../../../common/dtos';
+import { applyList } from '../../../common/utils/apply-list-query.util';
+import { RESOURCE_LIST_COLUMNS } from '../utils/rbac-sort-columns.util';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
 import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
 import { ResourceRegistryService } from './resource-registry.service';
@@ -71,21 +69,16 @@ export class ResourceService {
   async findCursorPaginated(
     query: ResourceCursorQueryDto
   ): Promise<CursorPaginatedResponseDto<Resource>> {
-    const { cursor, limit, sortBy, sortOrder } = query;
-    const qb = this.resourceRepository.createQueryBuilder('resource');
-    applyListQuery(qb, RESOURCE_LIST_QUERY, RESOURCE_LIST_COLUMNS, query);
-    const { data, nextCursor } = await applyKeysetPagination(qb, {
-      cursor,
-      limit,
-      sortBy,
-      sortOrder,
-      sortColumnMap: RESOURCE_SORT_COLUMN_MAP,
-      idColumn: 'resource.id'
-    });
-    for (const resource of data) {
+    const page = await applyList(
+      this.resourceRepository.createQueryBuilder('resource'),
+      RESOURCE_LIST_QUERY,
+      RESOURCE_LIST_COLUMNS,
+      query
+    );
+    for (const resource of page.data) {
       resource.isRegistered = this.registry.isRegistered(resource.name);
     }
-    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+    return page;
   }
 
   async findAll(): Promise<Resource[]> {
