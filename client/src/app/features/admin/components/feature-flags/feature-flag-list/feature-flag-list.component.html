@@ -194,13 +194,16 @@
 
   <ng-template #rowActions [nxsTemplateRowOf]="flags()" let-flag>
     <div class="row-actions">
-      @if (canUpdate(flag)) {
-        <mat-slide-toggle
-          [checked]="flag.enabled"
-          (change)="toggleFlag(flag, $event)"
-          [matTooltip]="t('admin.featureFlags.toggleFlag')"
-          [aria-label]="t('admin.featureFlags.toggleFlag') + ' ' + flag.key"
-        />
+      @let canEdit = canUpdate(flag);
+      <mat-slide-toggle
+        [checked]="flag.enabled"
+        [disabled]="!canEdit"
+        (change)="toggleFlag(flag, $event)"
+        [matTooltip]="t('admin.featureFlags.toggleFlag')"
+        [matTooltipDisabled]="!canEdit"
+        [aria-label]="t('admin.featureFlags.toggleFlag') + ' ' + flag.key"
+      />
+      @if (canEdit) {
         <button
           matIconButton
           (click)="openEditDialog(flag)"

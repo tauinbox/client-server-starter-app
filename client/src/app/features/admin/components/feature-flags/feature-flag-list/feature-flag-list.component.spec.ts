@@ -211,7 +211,10 @@ describe('FeatureFlagListComponent', () => {
     const row = (fixture.nativeElement as HTMLElement).querySelector(
       'table tbody tr'
     );
-    expect(row?.querySelectorAll('button').length).toBe(0);
+    expect(row?.querySelectorAll('button:not([role="switch"])').length).toBe(0);
+    const toggle = row?.querySelector('button[role="switch"]');
+    expect(toggle?.getAttribute('aria-checked')).toBe('false');
+    expect(toggle?.hasAttribute('disabled')).toBe(true);
     expect(hasPermissions).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'update',
