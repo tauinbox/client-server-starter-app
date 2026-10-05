@@ -31,9 +31,7 @@ import {
 } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { subject } from '@casl/ability';
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
-import { changedFields } from '@app/shared/utils/changed-fields';
 import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
@@ -41,11 +39,13 @@ import { CurrentAbility } from '../../auth/decorators/current-ability.decorator'
 import type { AppAbility } from '../../auth/casl/app-ability';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
-import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { AuditService } from '../../audit/audit.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
-import { FeatureFlagService } from '../services/feature-flag.service';
+import {
+  FeatureFlagService,
+  type FlagAuditActor
+} from '../services/feature-flag.service';
 import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { FeatureFlagResponseDto } from '../dtos/feature-flag-response.dto';
@@ -121,19 +121,6 @@ export class FeatureFlagsAdminController {
 
   @Post()
   @Authorize(['create', 'FeatureFlag'])
-  @LogAudit({
-    action: AuditAction.FEATURE_FLAG_CREATE,
-    targetType: 'FeatureFlag',
-    targetIdFromResponse: (response) => (response as { id?: string })?.id,
-    details: ({ body, response }) => {
-      const { key, rules } = body as CreateFeatureFlagDto;
-      return {
-        key,
-        flagId: (response as { id?: string })?.id,
-        ...(rules ? { ruleCount: rules.length } : {})
-      };
-    }
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a feature flag' })
   @ApiBody({ type: CreateFeatureFlagDto })
@@ -149,7 +136,7 @@ export class FeatureFlagsAdminController {
       this.flagService.newFlagFields(dto),
       req
     );
-    const flag = await this.flagService.create(dto, req.user?.userId ?? null);
+    const flag = await this.flagService.create(dto, this.auditActor(req));
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()
@@ -177,10 +164,6 @@ export class FeatureFlagsAdminController {
     @CurrentAbility() ability: AppAbility
   ) {
     const expectedVersion = this.parseIfMatch(ifMatch);
-    // The update is conditional on the version, so when it succeeds this read
-    // is exactly the state that it replaced. The rules are reported as a
-    // count: rule rows and rule DTOs do not compare field by field.
-    const { rules, ...fields } = dto;
     const current = await this.flagService.findOne(id);
     // The record after the write is checked too: else a grant scoped by a
     // writable field lets the caller move a flag out of its own scope.
@@ -191,35 +174,24 @@ export class FeatureFlagsAdminController {
       {
         ...current,
         ...Object.fromEntries(
-          Object.entries(fields).filter(([, value]) => value !== undefined)
+          Object.entries(dto).filter(
+            ([field, value]) => field !== 'rules' && value !== undefined
+          )
         )
       },
       req,
       id
     );
-    const changed = changedFields(current, fields);
     const flag = await this.flagService.update(
       id,
       dto,
       expectedVersion,
-      req.user?.userId ?? null
+      this.auditActor(req)
     );
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()
     );
-    await this.auditService.log({
-      action: AuditAction.FEATURE_FLAG_UPDATE,
-      actorId: req.user?.userId ?? null,
-      actorEmail: req.user?.email ?? null,
-      targetId: id,
-      targetType: 'FeatureFlag',
-      details: {
-        changedFields: changed,
-        ...(rules ? { ruleCount: rules.length } : {})
-      },
-      context: extractAuditContext(req)
-    });
     return flag;
   }
 
@@ -237,22 +209,11 @@ export class FeatureFlagsAdminController {
   ) {
     const flag = await this.flagService.findOne(id);
     this.assertCanFlag(ability, 'delete', flag, req, id);
-    await this.flagService.delete(flag);
+    await this.flagService.delete(flag, this.auditActor(req));
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()
     );
-    // The row is gone after the delete, so the key is recorded here: a bare
-    // targetId resolves to nothing once the flag no longer exists.
-    await this.auditService.log({
-      action: AuditAction.FEATURE_FLAG_DELETE,
-      actorId: req.user?.userId ?? null,
-      actorEmail: req.user?.email ?? null,
-      targetId: id,
-      targetType: 'FeatureFlag',
-      details: { key: flag.key },
-      context: extractAuditContext(req)
-    });
   }
 
   @Post(':id/preview')
@@ -304,6 +265,14 @@ export class FeatureFlagsAdminController {
       { actorId: req.user?.userId, targetId, targetType: 'FeatureFlag' },
       this.metricsService
     );
+  }
+
+  private auditActor(req: JwtAuthRequest): FlagAuditActor {
+    return {
+      actorId: req.user?.userId ?? null,
+      actorEmail: req.user?.email ?? null,
+      context: extractAuditContext(req)
+    };
   }
 
   private parseIfMatch(header: string | undefined): number {

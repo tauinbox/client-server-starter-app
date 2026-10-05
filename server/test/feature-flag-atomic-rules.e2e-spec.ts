@@ -6,6 +6,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
+import { flagAuditActor } from './flag-audit-actor';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
 
 // A flag and its rules save in one transaction: a rejected or failed rule
@@ -96,7 +97,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   async function seed(name: string): Promise<FeatureFlag> {
     return flagService.create(
       { key: `${tag}-${name}`, enabled: false, rules: [percentRule(10)] },
-      null
+      flagAuditActor()
     );
   }
 
@@ -107,7 +108,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
       flag.id,
       { enabled: true, rules: [percentRule(20), percentRule(30)] },
       flag.version,
-      null
+      flagAuditActor()
     );
 
     expect(updated).toMatchObject({ enabled: true, version: flag.version + 1 });
@@ -117,7 +118,12 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   it('keeps the rules when the update carries none', async () => {
     const flag = await seed('keep');
 
-    await flagService.update(flag.id, { enabled: true }, flag.version, null);
+    await flagService.update(
+      flag.id,
+      { enabled: true },
+      flag.version,
+      flagAuditActor()
+    );
 
     expect(await percentsOf(flag.id)).toEqual([10]);
   });
@@ -130,7 +136,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
         flag.id,
         { enabled: true, rules: [percentRule(20), percentRule(150)] },
         flag.version,
-        null
+        flagAuditActor()
       )
     ).rejects.toMatchObject({ status: 400 });
 
@@ -143,14 +149,19 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
   it('writes no rule on a stale version', async () => {
     const flag = await seed('stale');
-    await flagService.update(flag.id, { enabled: true }, flag.version, null);
+    await flagService.update(
+      flag.id,
+      { enabled: true },
+      flag.version,
+      flagAuditActor()
+    );
 
     await expect(
       flagService.update(
         flag.id,
         { rules: [percentRule(20)] },
         flag.version,
-        null
+        flagAuditActor()
       )
     ).rejects.toMatchObject({ status: 409 });
 
@@ -169,7 +180,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
           rules: [percentRule(20), percentRule(FAILING_PERCENT)]
         },
         flag.version,
-        null
+        flagAuditActor()
       )
     ).rejects.toThrow('rule insert failed');
 
@@ -187,7 +198,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await expect(
       flagService.create(
         { key, rules: [percentRule(20), percentRule(FAILING_PERCENT)] },
-        null
+        flagAuditActor()
       )
     ).rejects.toThrow('rule insert failed');
 

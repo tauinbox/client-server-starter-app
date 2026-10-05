@@ -8,6 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import type {
   FeatureFlagAttributeKeysResponse,
   FeatureFlagPreviewResult
@@ -24,6 +26,8 @@ import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagina
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { applyAbilityToFeatureFlagQuery } from '../../../common/utils/apply-ability.util';
 import type { AppAbility } from '../../auth/casl/app-ability';
+import { AuditService } from '../../audit/audit.service';
+import type { AuditContext } from '../../audit/audit.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 
@@ -51,6 +55,13 @@ function keyExistsConflict(): HttpException {
   );
 }
 
+/** The actor of a flag write, as its audit row records it. */
+export interface FlagAuditActor {
+  actorId: string | null;
+  actorEmail: string | null;
+  context: AuditContext;
+}
+
 @Injectable()
 export class FeatureFlagService {
   constructor(
@@ -60,7 +71,8 @@ export class FeatureFlagService {
     private readonly ruleRepo: Repository<FeatureFlagRule>,
     private readonly dataSource: DataSource,
     private readonly attributeRegistry: AttributeRegistryService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly auditService: AuditService
   ) {}
 
   /**
@@ -143,7 +155,7 @@ export class FeatureFlagService {
 
   async create(
     dto: CreateFeatureFlagDto,
-    actorId: string | null
+    actor: FlagAuditActor
   ): Promise<FeatureFlag> {
     const existing = await this.flagRepo.findOne({ where: { key: dto.key } });
     if (existing) {
@@ -161,10 +173,15 @@ export class FeatureFlagService {
           em.create(FeatureFlag, {
             ...this.newFlagFields(dto),
             version: 1,
-            updatedByUserId: actorId
+            updatedByUserId: actor.actorId
           })
         );
         if (rules) await this.#writeRules(em, flag.id, rules);
+        await this.#audit(em, actor, AuditAction.FEATURE_FLAG_CREATE, flag.id, {
+          key: flag.key,
+          flagId: flag.id,
+          ...(rules ? { ruleCount: rules.length } : {})
+        });
         return flag;
       });
     } catch (error: unknown) {
@@ -178,10 +195,14 @@ export class FeatureFlagService {
     id: string,
     dto: UpdateFeatureFlagDto,
     expectedVersion: number,
-    actorId: string | null
+    actor: FlagAuditActor
   ): Promise<FeatureFlag> {
-    await this.findOne(id);
-    const rules = this.#validateRules(dto.rules);
+    // The update is conditional on the version, so when it succeeds this read
+    // is exactly the state that it replaced. The rules are reported as a
+    // count: rule rows and rule DTOs do not compare field by field.
+    const current = await this.findOne(id);
+    const { rules: ruleDtos, ...fields } = dto;
+    const rules = this.#validateRules(ruleDtos);
     await this.dataSource.transaction(async (em) => {
       const result = await em
         .createQueryBuilder()
@@ -195,7 +216,7 @@ export class FeatureFlagService {
             ? { environments: dto.environments }
             : {}),
           ...(dto.public !== undefined ? { public: dto.public } : {}),
-          updatedByUserId: actorId,
+          updatedByUserId: actor.actorId,
           version: () => `version + 1`
         })
         .where('id = :id AND version = :expected', {
@@ -215,12 +236,49 @@ export class FeatureFlagService {
         );
       }
       if (rules) await this.#writeRules(em, id, rules);
+      await this.#audit(em, actor, AuditAction.FEATURE_FLAG_UPDATE, id, {
+        changedFields: changedFields(current, fields),
+        ...(rules ? { ruleCount: rules.length } : {})
+      });
     });
     return this.findOne(id);
   }
 
-  async delete(flag: FeatureFlag): Promise<void> {
-    await this.flagRepo.remove(flag);
+  async delete(flag: FeatureFlag, actor: FlagAuditActor): Promise<void> {
+    // The row is gone after the delete, so the key is recorded: a bare
+    // targetId resolves to nothing once the flag no longer exists.
+    const { id, key } = flag;
+    await this.dataSource.transaction(async (em) => {
+      await em.remove(FeatureFlag, flag);
+      await this.#audit(em, actor, AuditAction.FEATURE_FLAG_DELETE, id, {
+        key
+      });
+    });
+  }
+
+  /**
+   * Writes the audit row through the transaction of the change, so a change
+   * never commits without its row and a failed row rolls the change back.
+   */
+  #audit(
+    em: EntityManager,
+    actor: FlagAuditActor,
+    action: AuditAction,
+    flagId: string,
+    details: Record<string, unknown>
+  ): Promise<void> {
+    return this.auditService.log(
+      {
+        action,
+        actorId: actor.actorId,
+        actorEmail: actor.actorEmail,
+        targetId: flagId,
+        targetType: 'FeatureFlag',
+        details,
+        context: actor.context
+      },
+      em
+    );
   }
 
   async preview(

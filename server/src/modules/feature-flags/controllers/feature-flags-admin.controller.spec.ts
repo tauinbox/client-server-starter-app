@@ -6,7 +6,6 @@ import { FeatureFlagService } from '../services/feature-flag.service';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { AuditService } from '../../audit/audit.service';
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { MfaRequiredGuard } from '../../auth/guards/mfa-required.guard';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -45,6 +44,11 @@ describe('FeatureFlagsAdminController', () => {
     ip: '127.0.0.1',
     headers: {}
   } as JwtAuthRequest;
+  const actor = {
+    actorId: 'actor-1',
+    actorEmail: 'a@b.com',
+    context: { ip: '127.0.0.1', requestId: undefined }
+  };
   const sampleFlag = {
     id: 'flag-1',
     key: 'new-dashboard',
@@ -99,8 +103,13 @@ describe('FeatureFlagsAdminController', () => {
     expect(flagService.getAttributeCustomKeys).toHaveBeenCalled();
   });
 
-  it('create emits a change event', async () => {
+  it('create passes the audit actor and emits a change event', async () => {
     await controller.create({ key: 'new-dashboard' }, req, fullAbility);
+    expect(flagService.create).toHaveBeenCalledWith(
+      { key: 'new-dashboard' },
+      actor
+    );
+    expect(auditService.log).not.toHaveBeenCalled();
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
       expect.any(FeatureFlagChangedEvent)
@@ -125,7 +134,7 @@ describe('FeatureFlagsAdminController', () => {
     ).rejects.toBeInstanceOf(HttpException);
   });
 
-  it('update strips quoted ETag and passes parsed version', async () => {
+  it('update strips quoted ETag and passes parsed version and audit actor', async () => {
     await controller.update(
       'flag-1',
       { enabled: true },
@@ -137,69 +146,19 @@ describe('FeatureFlagsAdminController', () => {
       'flag-1',
       { enabled: true },
       5,
-      'actor-1'
+      actor
     );
-  });
-
-  it('update audits a rule set as a count, not as a changed field', async () => {
-    const rules = [
-      {
-        type: 'role' as const,
-        effect: 'include' as const,
-        payload: { type: 'role' as const, roleNames: ['beta'] }
-      }
-    ];
-    await controller.update(
-      'flag-1',
-      { enabled: true, rules },
-      '1',
-      req,
-      fullAbility
-    );
-    expect(flagService.update).toHaveBeenCalledWith(
-      'flag-1',
-      { enabled: true, rules },
-      1,
-      'actor-1'
-    );
-    expect(auditService.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: AuditAction.FEATURE_FLAG_UPDATE,
-        details: { changedFields: ['enabled'], ruleCount: 1 }
-      })
-    );
-  });
-
-  it('update without rules leaves the rule count out of the audit', async () => {
-    await controller.update('flag-1', { enabled: true }, '1', req, fullAbility);
-    expect(auditService.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        details: { changedFields: ['enabled'] }
-      })
-    );
+    expect(auditService.log).not.toHaveBeenCalled();
   });
 
   it('delete removes the loaded flag and emits a change event', async () => {
     await controller.remove('flag-1', req, fullAbility);
     expect(flagService.findOne).toHaveBeenCalledTimes(1);
-    expect(flagService.delete).toHaveBeenCalledWith(sampleFlag);
+    expect(flagService.delete).toHaveBeenCalledWith(sampleFlag, actor);
+    expect(auditService.log).not.toHaveBeenCalled();
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       FeatureFlagChangedEvent.name,
       expect.any(FeatureFlagChangedEvent)
-    );
-  });
-
-  it('delete records the flag key in the audit details', async () => {
-    await controller.remove('flag-1', req, fullAbility);
-    expect(auditService.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: AuditAction.FEATURE_FLAG_DELETE,
-        actorId: 'actor-1',
-        actorEmail: 'a@b.com',
-        targetId: 'flag-1',
-        targetType: 'FeatureFlag',
-        details: { key: 'new-dashboard' }
-      })
     );
   });
 

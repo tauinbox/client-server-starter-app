@@ -5,6 +5,7 @@ import { CoreModule } from '../src/modules/core/core.module';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
+import { flagAuditActor } from './flag-audit-actor';
 import { FeatureFlagResolverService } from '../src/modules/feature-flags/services/feature-flag-resolver.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -78,7 +79,7 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
           }
         ]
       },
-      null
+      flagAuditActor()
     );
     const resolver = app.get(FeatureFlagResolverService);
     await resolver.invalidateAll();
