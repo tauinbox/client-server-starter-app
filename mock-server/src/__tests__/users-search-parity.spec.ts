@@ -2,7 +2,7 @@
 // filter inputs with 400 instead of coercing or silently dropping them.
 
 import type { Server } from 'http';
-import { MAX_PAGE_SIZE, MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import { MAX_PAGE_SIZE, MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -57,10 +57,35 @@ describe('User list/search filter-param validation parity with server', () => {
       const res = await getUsers(token, `/search/cursor?${field}=a&${field}=b`);
 
       expect(res.status).toBe(400);
-      const body = (await res.json()) as { message: string };
-      expect(body.message).toBe(`${field} must be a string`);
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors).toEqual([
+        `${field} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
+        `${field} must be a string`
+      ]);
     }
   );
+
+  // The order is pinned on the server by search-users-cursor-query.dto.spec.ts.
+  it('reports the messages in the order the server does', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await getUsers(
+      token,
+      '/search/cursor?includeDeleted=maybe&role=a&role=b&isActive=maybe&ids=nope&q=a&q=b'
+    );
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { errors: string[] };
+    expect(body.errors).toEqual([
+      `role must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
+      'role must be a string',
+      'includeDeleted must be a boolean value',
+      `q must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
+      'q must be a string',
+      'each value in ids must be a UUID',
+      'isActive must be a boolean value'
+    ]);
+  });
 
   it.each([
     ['/cursor?q=a&q=b'],
@@ -81,13 +106,13 @@ describe('User list/search filter-param validation parity with server', () => {
 
       const res = await getUsers(
         token,
-        `/search/cursor?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
+        `/search/cursor?${field}=${'x'.repeat(MAX_LIST_FILTER_LENGTH + 1)}`
       );
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(
-        `${field} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`
+        `${field} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`
       );
     }
   );
@@ -108,7 +133,7 @@ describe('User list/search filter-param validation parity with server', () => {
   it.each([
     ['/cursor?includeDeleted=maybe'],
     ['/cursor?isActive=maybe'],
-    ['/search/cursor?q=' + 'x'.repeat(MAX_USER_FILTER_LENGTH + 1)]
+    ['/search/cursor?q=' + 'x'.repeat(MAX_LIST_FILTER_LENGTH + 1)]
   ])('rejects an invalid filter on GET /users%s with 400', async (url) => {
     const token = await loginAsAdmin();
 
@@ -134,7 +159,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
     const res = await getUsers(
       token,
-      `/search/cursor?q=${'x'.repeat(MAX_USER_FILTER_LENGTH)}`
+      `/search/cursor?q=${'x'.repeat(MAX_LIST_FILTER_LENGTH)}`
     );
 
     expect(res.status).toBe(200);

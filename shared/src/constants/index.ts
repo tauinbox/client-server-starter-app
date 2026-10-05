@@ -48,9 +48,20 @@ export {
   ALLOWED_USER_SORT_COLUMNS,
   MAX_EMAIL_LENGTH,
   MAX_NAME_LENGTH,
-  MAX_USER_FILTER_LENGTH,
   type UserSortColumn
 } from './user.constants';
+
+export {
+  MAX_LIST_FILTER_LENGTH,
+  USER_LIST_QUERY,
+  FEATURE_FLAG_LIST_QUERY,
+  ROLE_LIST_QUERY,
+  RESOURCE_LIST_QUERY,
+  type UserListQuery,
+  type FeatureFlagListQuery,
+  type RoleListQuery,
+  type ResourceListQuery
+} from './list-query.constants';
 
 export {
   SYSTEM_ROLES,

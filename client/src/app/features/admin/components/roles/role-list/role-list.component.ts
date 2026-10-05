@@ -39,6 +39,11 @@ import {
 } from '@shared/components/list-skeleton/list-skeleton.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types';
+import type { RoleListQuery } from '@app/shared/constants';
+import {
+  NxsListFiltersComponent,
+  type ListFilterControl
+} from '@shared/forms/nxs-list-filters/nxs-list-filters.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
@@ -79,6 +84,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatCell,
     InfiniteScrollDirective,
     ListSkeletonComponent,
+    NxsListFiltersComponent,
     TranslocoDirective
   ],
   templateUrl: './role-list.component.html',
@@ -106,6 +112,25 @@ export class RoleListComponent implements OnInit {
     this.#rolesStore.loadMore();
   }
   readonly roles = this.#rolesStore.entities;
+  readonly filters = this.#rolesStore.filters;
+
+  readonly filterControls: readonly ListFilterControl<RoleListQuery>[] = [
+    {
+      kind: 'select',
+      key: 'isSystem',
+      label: 'admin.roles.tableHeaderType',
+      allLabel: 'common.all',
+      options: [
+        { value: true, label: 'admin.roles.typeSystem' },
+        { value: false, label: 'admin.roles.typeCustom' }
+      ]
+    }
+  ];
+
+  applyFilters(filters: RoleListQuery): void {
+    this.#rolesStore.setFilters(filters);
+    this.#rolesStore.load();
+  }
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [
     'medium',

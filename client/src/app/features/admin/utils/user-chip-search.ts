@@ -8,13 +8,11 @@ import {
   switchMap
 } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import { MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
 import type { ChipOption } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
+import { LIST_SEARCH_DEBOUNCE_MS } from '@shared/utils/pagination.utils';
 import type { UserService } from '@features/users/services/user.service';
 import type { User } from '@features/users/models/user.types';
-
-/** Idle time before a typed term reaches the users search endpoint. */
-export const USER_SEARCH_DEBOUNCE_MS = 350;
 
 /** Shortest term worth a request - anything shorter yields no options. */
 export const USER_SEARCH_MIN_CHARS = 3;
@@ -27,7 +25,7 @@ export const USER_SEARCH_MIN_CHARS = 3;
 export function isSearchableTerm(term: string): boolean {
   return (
     term.length >= USER_SEARCH_MIN_CHARS &&
-    term.length <= MAX_USER_FILTER_LENGTH
+    term.length <= MAX_LIST_FILTER_LENGTH
   );
 }
 
@@ -82,7 +80,7 @@ export function debouncedUserSearch(
 ): OperatorFunction<string, User[]> {
   return (terms$) =>
     terms$.pipe(
-      debounceTime(USER_SEARCH_DEBOUNCE_MS),
+      debounceTime(LIST_SEARCH_DEBOUNCE_MS),
       distinctUntilChanged(),
       switchMap((term) => search(term).pipe(catchError(() => of([] as User[]))))
     );

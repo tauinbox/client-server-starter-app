@@ -1,0 +1,43 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/functions' as func;
+
+:host {
+  display: block;
+}
+
+// The number of filters differs per list, so the tracks are not counted:
+// auto-fill makes as many as the width holds and the selects wrap onto the
+// next row. The search box takes two tracks.
+.filter-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(func.rem(180), 1fr));
+  column-gap: vars.$spacing-md; // NxsFormFieldComponent host margin owns row rhythm
+  align-items: start;
+
+  > nxs-form-field {
+    grid-column: span 2;
+  }
+
+  // A raw <mat-form-field> select does not carry the NxsFormFieldComponent
+  // :host margin-bottom, so it would sit flush against the next row. The `>`
+  // keeps this off the search field's own mat-form-field.
+  > mat-form-field {
+    margin-bottom: vars.$space-form-row-gap;
+  }
+
+  // Below two tracks a span of two would add an implicit column and overflow.
+  @media (max-width: vars.$breakpoint-xs) {
+    grid-template-columns: 1fr;
+
+    > nxs-form-field {
+      grid-column: auto;
+    }
+  }
+}
+
+.filter-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: vars.$spacing-md;
+  margin-bottom: vars.$space-form-row-gap;
+}

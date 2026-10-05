@@ -7,8 +7,10 @@ import type {
   PermissionResponse,
   RoleAdminResponse
 } from '@app/shared/types';
+import type { RoleListQuery } from '@app/shared/constants';
 import {
   cursorParams,
+  listQueryParams,
   type CursorPageRequest
 } from '@shared/utils/pagination.utils';
 import { ROLES_API_V1 } from '@core/services/role-catalog.service';
@@ -42,11 +44,12 @@ export class RoleService {
   readonly #http = inject(HttpClient);
 
   getAllCursor(
-    request: CursorPageRequest
+    request: CursorPageRequest,
+    query: RoleListQuery = {}
   ): Observable<CursorPaginatedResponse<RoleAdminResponse>> {
     return this.#http.get<CursorPaginatedResponse<RoleAdminResponse>>(
       `${ROLES_API_V1}/cursor`,
-      { params: cursorParams(request) }
+      { params: listQueryParams(cursorParams(request), query) }
     );
   }
 

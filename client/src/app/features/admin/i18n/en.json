@@ -22,6 +22,7 @@
     "tableHeaderActions": "Actions",
     "statusEnabled": "Enabled",
     "statusDisabled": "Disabled",
+    "filterStatus": "Status",
     "environmentsAll": "All",
     "confirmDeleteTitle": "Delete feature flag",
     "confirmDeleteMessage": "Delete the feature flag \"{{ key }}\"? This also removes all its rules.",

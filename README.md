@@ -680,8 +680,10 @@ the same permission both apply.
 
 ### User Management (Admin)
 
-- **One Manage Users page.** An inline filter form is on the same page as the user list. It has one
-  unified search field, a role select and a status select. Empty filters load all users. Filled
+- **One Manage Users page.** The shared filter bar is on the same page as the user list. It has one
+  unified search field and the selects Role, Status, Email (verified), Two-factor, Lock and Sign-in
+  (has a password or provider only), plus Include deleted. Each filter applies at once (the search
+  after 350 ms of idle time), with no Search button. Empty filters load all users. Filled
   filters start a search through `GET /users/search/cursor`. The `q` value matches with an OR across
   the id, the email, the first name and the last name. The `role` filter narrows the list to the users
   that have a role with that exact name.
@@ -1552,7 +1554,7 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
 | GET | `/users/cursor` | `users:search` | List the users with cursor (keyset) pagination. `includeDeleted=true` adds the soft-deleted rows |
-| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids) and `isActive`. `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
+| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids), `isActive`, `isEmailVerified`, `mfaEnabled`, `hasPassword` and `isLocked` (`lockedUntil` later than now). `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
@@ -1579,7 +1581,7 @@ The base URL of the API is `/api/v1`.
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 400 for an action that the code does not check |
 | POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 400 when no controller registers it |
 | GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
-| GET | `/admin/feature-flags/cursor` | `feature-flags:search` | List the feature flags, cursor paginated |
+| GET | `/admin/feature-flags/cursor` | `feature-flags:search` | List the feature flags, cursor paginated. Filters: `q` (key or description), `enabled`, `public`, `environment` (a flag with no environments applies in every one) |
 | GET | `/admin/feature-flags/:id` | `feature-flags:read` | Get a feature flag by ID |
 | GET | `/admin/feature-flags/attribute-keys` | `feature-flags:search` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
 | POST | `/admin/feature-flags` | `feature-flags:create` | Create a feature flag, optionally with its targeting rules in the same write |
@@ -1841,11 +1843,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2746 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 552 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 546 pass and 6 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1478 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 294 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 958 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2771 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 566 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 560 pass and 6 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1494 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 299 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 987 tests pass |
 
 ## CI/CD
 

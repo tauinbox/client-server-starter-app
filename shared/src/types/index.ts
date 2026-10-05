@@ -25,6 +25,14 @@ export type {
 } from './pagination.types';
 
 export type {
+  ListFilterValueMap,
+  ListFilterKind,
+  ListFilterDefinition,
+  ListQuerySpec,
+  ListQuery
+} from './list-query.types';
+
+export type {
   RoleResponse,
   RoleAdminResponse,
   PermissionResponse,

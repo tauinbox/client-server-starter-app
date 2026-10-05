@@ -4,13 +4,13 @@ import { toArray } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { UserService } from '@features/users/services/user.service';
 import type { User } from '@features/users/models/user.types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import { MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
+import { LIST_SEARCH_DEBOUNCE_MS } from '@shared/utils/pagination.utils';
 import {
   debouncedUserSearch,
   isSearchableTerm,
   roleToChip,
   searchUsersPage,
-  USER_SEARCH_DEBOUNCE_MS,
   USER_SEARCH_LIMIT,
   USER_SEARCH_MIN_CHARS,
   userToChip
@@ -86,8 +86,8 @@ describe('isSearchableTerm', () => {
   });
 
   it('rejects a term the search endpoint would answer with a 400', () => {
-    expect(isSearchableTerm('x'.repeat(MAX_USER_FILTER_LENGTH))).toBe(true);
-    expect(isSearchableTerm('x'.repeat(MAX_USER_FILTER_LENGTH + 1))).toBe(
+    expect(isSearchableTerm('x'.repeat(MAX_LIST_FILTER_LENGTH))).toBe(true);
+    expect(isSearchableTerm('x'.repeat(MAX_LIST_FILTER_LENGTH + 1))).toBe(
       false
     );
   });
@@ -134,9 +134,9 @@ describe('debouncedUserSearch', () => {
 
     terms$.next('ad');
     terms$.next('ada');
-    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+    vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
     terms$.next('ada');
-    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+    vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
 
     expect(search).toHaveBeenCalledTimes(1);
     expect(search).toHaveBeenCalledWith('ada');
@@ -154,9 +154,9 @@ describe('debouncedUserSearch', () => {
     );
 
     terms$.next('ada');
-    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+    vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
     terms$.next('adam');
-    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+    vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
 
     slow.next([makeUser({ id: 'stale' })]);
     terms$.complete();
@@ -176,9 +176,9 @@ describe('debouncedUserSearch', () => {
     terms$.pipe(debouncedUserSearch(search)).subscribe((u) => seen.push(u));
 
     terms$.next('ann');
-    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+    vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
     terms$.next('bob');
-    vi.advanceTimersByTime(USER_SEARCH_DEBOUNCE_MS);
+    vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
 
     expect(search).toHaveBeenCalledTimes(2);
     expect(seen).toEqual([[], [makeUser({ id: 'bob' })]]);

@@ -4,7 +4,9 @@ import { tap } from 'rxjs';
 import { patchState, signalStore, withMethods } from '@ngrx/signals';
 import { removeEntity, setEntity, withEntities } from '@ngrx/signals/entities';
 import type { RoleAdminResponse } from '@app/shared/types';
+import type { RoleListQuery } from '@app/shared/constants';
 import { withCursorList } from '@shared/store/with-cursor-list';
+import { withListFilters } from '@shared/store/with-list-filters';
 import type { CreateRole, UpdateRole } from '../services/role.service';
 import { RoleService } from '../services/role.service';
 
@@ -13,6 +15,7 @@ export const RolesStore = signalStore(
   withCursorList<RoleAdminResponse>({
     fallbackKey: 'admin.store.errorLoadRolesFailed'
   }),
+  withListFilters<RoleListQuery>({}),
   withMethods((store) => {
     const roleService = inject(RoleService);
 
@@ -20,13 +23,15 @@ export const RolesStore = signalStore(
       /** First page; a filter or sort change re-enters through here. */
       load(): void {
         void store.loadFirstPage((request) =>
-          roleService.getAllCursor(request)
+          roleService.getAllCursor(request, store.filters())
         );
       },
 
       /** Appends the next page; wired to the list's scroll sentinel. */
       loadMore(): void {
-        void store.loadNextPage((request) => roleService.getAllCursor(request));
+        void store.loadNextPage((request) =>
+          roleService.getAllCursor(request, store.filters())
+        );
       },
 
       createRole(data: CreateRole): Observable<RoleAdminResponse> {

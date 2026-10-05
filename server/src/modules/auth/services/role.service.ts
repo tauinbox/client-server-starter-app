@@ -13,14 +13,18 @@ import { Role } from '../entities/role.entity';
 import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import type { RoleCursorQueryDto } from '../../../common/dtos';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
-import { ROLE_SORT_COLUMN_MAP } from '../utils/rbac-sort-columns.util';
+import { applyListQuery } from '../../../common/utils/apply-list-query.util';
+import {
+  ROLE_LIST_COLUMNS,
+  ROLE_SORT_COLUMN_MAP
+} from '../utils/rbac-sort-columns.util';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
 import { PermissionService } from './permission.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import { PermissionCondition } from '@app/shared/types';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, ROLE_LIST_QUERY } from '@app/shared/constants';
 import type { AppAbility } from '../casl/app-ability';
 import {
   assertCanGrantPermissions,
@@ -299,17 +303,16 @@ export class RoleService {
     query: RoleCursorQueryDto
   ): Promise<CursorPaginatedResponseDto<Role>> {
     const { cursor, limit, sortBy, sortOrder } = query;
-    const { data, nextCursor } = await applyKeysetPagination(
-      this.roleRepository.createQueryBuilder('role'),
-      {
-        cursor,
-        limit,
-        sortBy,
-        sortOrder,
-        sortColumnMap: ROLE_SORT_COLUMN_MAP,
-        idColumn: 'role.id'
-      }
-    );
+    const qb = this.roleRepository.createQueryBuilder('role');
+    applyListQuery(qb, ROLE_LIST_QUERY, ROLE_LIST_COLUMNS, query);
+    const { data, nextCursor } = await applyKeysetPagination(qb, {
+      cursor,
+      limit,
+      sortBy,
+      sortOrder,
+      sortColumnMap: ROLE_SORT_COLUMN_MAP,
+      idColumn: 'role.id'
+    });
     return new CursorPaginatedResponseDto(data, nextCursor, limit);
   }
 

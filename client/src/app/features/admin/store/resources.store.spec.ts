@@ -104,7 +104,8 @@ describe('ResourcesStore', () => {
       await vi.waitFor(() => expect(store.loading()).toBe(false));
 
       expect(rbacServiceMock.getResourcesCursor).toHaveBeenCalledWith(
-        expect.objectContaining({ cursor: null })
+        expect.objectContaining({ cursor: null }),
+        {}
       );
       expect(store.resources()).toEqual([mockResource]);
       expect(store.hasMore()).toBe(false);
@@ -125,7 +126,8 @@ describe('ResourcesStore', () => {
       await vi.waitFor(() => expect(store.resources()).toHaveLength(2));
 
       expect(rbacServiceMock.getResourcesCursor).toHaveBeenLastCalledWith(
-        expect.objectContaining({ cursor: 'cur-1' })
+        expect.objectContaining({ cursor: 'cur-1' }),
+        {}
       );
       expect(store.hasMore()).toBe(false);
     });

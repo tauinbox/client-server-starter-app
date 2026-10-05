@@ -15,12 +15,7 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { form, maxLength } from '@angular/forms/signals';
-import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
-import { MatOption, MatSelect } from '@angular/material/select';
-import { MatButton } from '@angular/material/button';
-import { MatCheckbox } from '@angular/material/checkbox';
 import { MatDivider } from '@angular/material/divider';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
@@ -36,7 +31,10 @@ import {
   UserTableComponent
 } from '../user-table/user-table.component';
 import { UserCardListComponent } from '../user-card-list/user-card-list.component';
-import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import {
+  NxsListFiltersComponent,
+  type ListFilterControl
+} from '@shared/forms/nxs-list-filters/nxs-list-filters.component';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import {
   ListSkeletonComponent,
@@ -44,15 +42,6 @@ import {
 } from '@shared/components/list-skeleton/list-skeleton.component';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import type { RoleAdminResponse } from '@app/shared/types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
-
-type FilterModel = {
-  q: string;
-};
-
-const INITIAL_FILTER: FilterModel = {
-  q: ''
-};
 
 @Component({
   selector: 'nxs-user-list',
@@ -61,19 +50,13 @@ const INITIAL_FILTER: FilterModel = {
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
-    MatFormField,
-    MatLabel,
     MatIcon,
-    MatSelect,
-    MatOption,
-    MatButton,
-    MatCheckbox,
     MatDivider,
     MatProgressSpinner,
     UserTableComponent,
     UserCardListComponent,
     TranslocoDirective,
-    NxsFormFieldComponent,
+    NxsListFiltersComponent,
     InfiniteScrollDirective,
     ListSkeletonComponent
   ],
@@ -92,15 +75,79 @@ export class UserListComponent implements OnInit {
 
   readonly layout = inject(LayoutService);
 
-  readonly filterModel = signal<FilterModel>({ ...INITIAL_FILTER });
-  readonly filterForm = form(this.filterModel, (path) => {
-    maxLength(path.q, MAX_USER_FILTER_LENGTH);
-  });
-
-  readonly isActiveFilter = signal('');
-  readonly roleFilter = signal('');
-  readonly includeDeletedFilter = signal(false);
   readonly roles = signal<RoleAdminResponse[]>([]);
+  readonly filters = this.#usersStore.filters;
+
+  readonly filterControls = computed<readonly ListFilterControl<UserSearch>[]>(
+    () => [
+      {
+        kind: 'select',
+        key: 'role',
+        label: 'users.list.filterRole',
+        allLabel: 'users.list.roleAll',
+        options: this.roles().map((role) => ({
+          value: role.name,
+          label: role.name,
+          literal: true
+        }))
+      },
+      {
+        kind: 'select',
+        key: 'isActive',
+        label: 'users.list.filterStatus',
+        allLabel: 'users.list.statusAll',
+        options: [
+          { value: true, label: 'common.active' },
+          { value: false, label: 'common.inactive' }
+        ]
+      },
+      {
+        kind: 'select',
+        key: 'isEmailVerified',
+        label: 'users.list.filterEmail',
+        allLabel: 'users.list.statusAll',
+        options: [
+          { value: true, label: 'users.list.emailVerified' },
+          { value: false, label: 'users.list.emailNotVerified' }
+        ]
+      },
+      {
+        kind: 'select',
+        key: 'mfaEnabled',
+        label: 'users.list.filterMfa',
+        allLabel: 'users.list.statusAll',
+        options: [
+          { value: true, label: 'users.list.mfaOn' },
+          { value: false, label: 'users.list.mfaOff' }
+        ]
+      },
+      {
+        kind: 'select',
+        key: 'isLocked',
+        label: 'users.list.filterLock',
+        allLabel: 'users.list.statusAll',
+        options: [
+          { value: true, label: 'users.list.locked' },
+          { value: false, label: 'users.list.notLocked' }
+        ]
+      },
+      {
+        kind: 'select',
+        key: 'hasPassword',
+        label: 'users.list.filterSignIn',
+        allLabel: 'users.list.statusAll',
+        options: [
+          { value: true, label: 'users.list.signInPassword' },
+          { value: false, label: 'users.list.signInOAuthOnly' }
+        ]
+      },
+      {
+        kind: 'checkbox',
+        key: 'includeDeleted',
+        label: 'users.list.filterIncludeDeleted'
+      }
+    ]
+  );
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [
     'narrow',
@@ -151,33 +198,8 @@ export class UserListComponent implements OnInit {
     this.#usersStore.load();
   }
 
-  onSubmit(): void {
-    if (this.filterForm().invalid()) return;
-
-    const filters: UserSearch = {};
-
-    const q = this.filterModel().q.trim();
-    if (q) filters.q = q;
-
-    const role = this.roleFilter();
-    if (role) filters.role = role;
-
-    const isActive = this.isActiveFilter();
-    if (isActive !== '') filters.isActive = isActive === 'true';
-
-    if (this.includeDeletedFilter()) filters.includeDeleted = true;
-
+  applyFilters(filters: UserSearch): void {
     this.#usersStore.setFilters(filters);
-    this.#usersStore.load();
-  }
-
-  resetForm(): void {
-    this.filterModel.set({ ...INITIAL_FILTER });
-    this.isActiveFilter.set('');
-    this.roleFilter.set('');
-    this.includeDeletedFilter.set(false);
-    this.filterForm().reset();
-    this.#usersStore.setFilters({});
     this.#usersStore.load();
   }
 

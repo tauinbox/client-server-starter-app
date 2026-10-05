@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import type { RoleAdminResponse } from '@app/shared/types';
+import type { RoleListQuery } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { RolesStore } from '../../../store/roles.store';
@@ -43,6 +44,8 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     loading: ReturnType<typeof signal<boolean>>;
     isLoadingMore: ReturnType<typeof signal<boolean>>;
     hasMore: ReturnType<typeof signal<boolean>>;
+    filters: ReturnType<typeof signal<RoleListQuery>>;
+    setFilters: ReturnType<typeof vi.fn>;
     load: ReturnType<typeof vi.fn>;
     loadMore: ReturnType<typeof vi.fn>;
     createRole: ReturnType<typeof vi.fn>;
@@ -63,6 +66,8 @@ describe('RoleListComponent — openPermissionsDialog', () => {
       loading: signal(false),
       isLoadingMore: signal(false),
       hasMore: signal(false),
+      filters: signal({}),
+      setFilters: vi.fn(),
       load: vi.fn(),
       loadMore: vi.fn(),
       createRole: vi.fn(),

@@ -11,6 +11,7 @@ import type {
   UserCursorListParams,
   UserSearch
 } from '../models/user.types';
+import { listQueryParams } from '@shared/utils/pagination.utils';
 
 export const USERS_API_V1 = '/api/v1/users';
 
@@ -90,7 +91,7 @@ export class UserService {
     criteria: UserSearch,
     params: UserCursorListParams
   ): Observable<CursorPaginatedResponse<User>> {
-    const httpParams = this.#applySearchCriteria(
+    const httpParams = listQueryParams(
       this.#buildCursorPaginationParams(params),
       criteria
     );
@@ -99,47 +100,6 @@ export class UserService {
       `${USERS_API_V1}/search/cursor`,
       { params: httpParams }
     );
-  }
-
-  #applySearchCriteria(
-    httpParams: HttpParams,
-    criteria: UserSearch
-  ): HttpParams {
-    let next = httpParams;
-
-    if (criteria.q) {
-      next = next.set('q', criteria.q);
-    }
-
-    if (criteria.email) {
-      next = next.set('email', criteria.email);
-    }
-
-    if (criteria.firstName) {
-      next = next.set('firstName', criteria.firstName);
-    }
-
-    if (criteria.lastName) {
-      next = next.set('lastName', criteria.lastName);
-    }
-
-    if (criteria.role) {
-      next = next.set('role', criteria.role);
-    }
-
-    if (criteria.ids?.length) {
-      next = next.set('ids', criteria.ids.join(','));
-    }
-
-    if (criteria.isActive !== undefined) {
-      next = next.set('isActive', criteria.isActive.toString());
-    }
-
-    if (criteria.includeDeleted) {
-      next = next.set('includeDeleted', 'true');
-    }
-
-    return next;
   }
 
   #buildCursorPaginationParams(params: UserCursorListParams): HttpParams {

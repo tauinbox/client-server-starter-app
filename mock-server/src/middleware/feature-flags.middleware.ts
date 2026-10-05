@@ -20,6 +20,7 @@ import {
   BILLING_PROVIDER_FLAGS,
   ErrorKeys,
   FEATURE_FLAG_KEY_MAX_LENGTH,
+  FEATURE_FLAG_LIST_QUERY,
   FEATURE_FLAG_KEY_MIN_LENGTH,
   FEATURE_FLAG_KEY_PATTERN,
   FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
@@ -33,9 +34,13 @@ import {
 } from '@app/shared/constants';
 import {
   cursorPaginate,
-  cursorQueryErrors,
   parseCursorQuery
 } from '../helpers/pagination.helpers';
+import {
+  filterByListQuery,
+  listQueryErrors,
+  parseListQuery
+} from '../helpers/list-query.helpers';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import {
@@ -539,7 +544,7 @@ adminRouter.get(
   permissionGuard('search', 'FeatureFlag'),
   (req, res) => {
     const query = req.query as Record<string, unknown>;
-    const errors = cursorQueryErrors(query, {
+    const errors = listQueryErrors(query, FEATURE_FLAG_LIST_QUERY, {
       sortColumns: ALLOWED_FEATURE_FLAG_SORT_COLUMNS
     });
     if (errors.length > 0) {
@@ -547,11 +552,15 @@ adminRouter.get(
       return;
     }
     const page = cursorPaginate(
-      filterByAbility(
-        Array.from(getState().featureFlags.values()),
-        (req as AuthenticatedRequest).user,
-        'search',
-        'FeatureFlag'
+      filterByListQuery(
+        filterByAbility(
+          Array.from(getState().featureFlags.values()),
+          (req as AuthenticatedRequest).user,
+          'search',
+          'FeatureFlag'
+        ),
+        FEATURE_FLAG_LIST_QUERY,
+        parseListQuery(query, FEATURE_FLAG_LIST_QUERY)
       ),
       parseCursorQuery(query)
     );

@@ -255,11 +255,13 @@ export { defaultUser } from './mock-data';
 
 // Re-export helpers
 export {
+  chooseOption,
   loginViaUi,
   loginViaUiKeepSse,
   markOAuthRoundTripStarted,
   expectAuthRedirect,
   expectForbiddenRedirect,
+  listResponse,
   openedDialog,
   routeApiToMockServer
 } from './helpers';

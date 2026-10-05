@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type {
+  FeatureFlagListQuery,
   FeatureFlagRuleEffect,
   FeatureFlagRuleType
 } from '@app/shared/constants';
@@ -15,6 +16,7 @@ import type {
 import type { CursorPaginatedResponse } from '@app/shared/types';
 import {
   cursorParams,
+  listQueryParams,
   type CursorPageRequest
 } from '@shared/utils/pagination.utils';
 
@@ -67,11 +69,12 @@ export class FeatureFlagsAdminService {
 
   /** One page of flags for the admin list page. */
   getAllCursor(
-    request: CursorPageRequest
+    request: CursorPageRequest,
+    query: FeatureFlagListQuery = {}
   ): Observable<CursorPaginatedResponse<FeatureFlagResponse>> {
     return this.#http.get<CursorPaginatedResponse<FeatureFlagResponse>>(
       `${ADMIN_API_V1}/cursor`,
-      { params: cursorParams(request) }
+      { params: listQueryParams(cursorParams(request), query) }
     );
   }
 

@@ -4,8 +4,16 @@
   </mat-card-header>
 
   <mat-card-content>
+    <nxs-list-filters
+      [value]="filters()"
+      [controls]="filterControls"
+      (valueChange)="applyFilters($event)"
+    />
+
     @if (loading() && resources().length === 0) {
       <nxs-list-skeleton [cells]="skeletonCells" />
+    } @else if (resources().length === 0) {
+      <p class="empty-state">{{ t('common.noFilterResults') }}</p>
     } @else {
       <div class="table-wrapper">
         <table mat-table [dataSource]="resources()" class="resources-table">

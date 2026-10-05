@@ -5,68 +5,12 @@
     </mat-card-header>
 
     <mat-card-content>
-      <form (submit)="$event.preventDefault(); onSubmit()">
-        <div class="filter-fields">
-          <nxs-form-field
-            [field]="filterForm.q"
-            label="users.list.filterSearch"
-            prefixIcon="search"
-          />
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>{{ t('users.list.filterRole') }}</mat-label>
-            <mat-select
-              [value]="roleFilter()"
-              (selectionChange)="roleFilter.set($event.value)"
-            >
-              <mat-option value="">{{ t('users.list.roleAll') }}</mat-option>
-              @for (role of roles(); track role.id) {
-                <mat-option [value]="role.name">{{ role.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>{{ t('users.list.filterStatus') }}</mat-label>
-            <mat-select
-              [value]="isActiveFilter()"
-              (selectionChange)="isActiveFilter.set($event.value)"
-            >
-              <mat-option value="">{{ t('users.list.statusAll') }}</mat-option>
-              <mat-option value="true">{{ t('common.active') }}</mat-option>
-              <mat-option value="false">{{ t('common.inactive') }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-        </div>
-
-        <div class="filter-actions">
-          @let isLoading = loading();
-          <mat-checkbox
-            class="include-deleted-toggle"
-            [checked]="includeDeletedFilter()"
-            (change)="includeDeletedFilter.set($event.checked)"
-            [disabled]="isLoading"
-          >
-            {{ t('users.list.filterIncludeDeleted') }}
-          </mat-checkbox>
-
-          <div class="filter-buttons">
-            <button matButton="filled" type="submit" [disabled]="isLoading">
-              <mat-icon>search</mat-icon>
-              {{ t('common.search') }}
-            </button>
-
-            <button
-              matButton="text"
-              type="button"
-              (click)="resetForm()"
-              [disabled]="isLoading"
-            >
-              {{ t('common.clear') }}
-            </button>
-          </div>
-        </div>
-      </form>
+      <nxs-list-filters
+        [value]="filters()"
+        [controls]="filterControls()"
+        searchLabel="users.list.filterSearch"
+        (valueChange)="applyFilters($event)"
+      />
 
       <mat-divider></mat-divider>
 

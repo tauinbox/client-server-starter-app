@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, FEATURE_FLAG_LIST_QUERY } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import type {
@@ -23,6 +23,10 @@ import {
 import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import type { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import {
+  applyListQuery,
+  type ListQueryColumns
+} from '../../../common/utils/apply-list-query.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { applyAbilityToFeatureFlagQuery } from '../../../common/utils/apply-ability.util';
 import type { AppAbility } from '../../auth/casl/app-ability';
@@ -31,10 +35,6 @@ import type { AuditContext } from '../../audit/audit.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 
-const FEATURE_FLAG_SORT_COLUMN_MAP: Record<string, string> = {
-  createdAt: 'flag.createdAt',
-  key: 'flag.key'
-};
 import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { FeatureFlagRuleDto } from '../dtos/feature-flag-rule.dto';
@@ -43,6 +43,22 @@ import {
   sanitizeAttributes
 } from '../dtos/preview-flag-context.dto';
 import { validateRulePayload } from '../utils/validate-rule-payload.util';
+
+const FEATURE_FLAG_SORT_COLUMN_MAP: Record<string, string> = {
+  createdAt: 'flag.createdAt',
+  key: 'flag.key'
+};
+
+const FEATURE_FLAG_LIST_COLUMNS: ListQueryColumns<
+  typeof FEATURE_FLAG_LIST_QUERY
+> = {
+  search: { key: 'flag.key', description: 'flag.description' },
+  filters: {
+    enabled: 'flag.enabled',
+    public: 'flag.public',
+    environment: 'flag.environments'
+  }
+};
 import { AttributeRegistryService } from './attribute-registry.service';
 
 function keyExistsConflict(): HttpException {
@@ -99,6 +115,12 @@ export class FeatureFlagService {
     const { cursor, limit, sortBy, sortOrder } = query;
     const qb = this.flagRepo.createQueryBuilder('flag');
     applyAbilityToFeatureFlagQuery(qb, ability, 'search');
+    applyListQuery(
+      qb,
+      FEATURE_FLAG_LIST_QUERY,
+      FEATURE_FLAG_LIST_COLUMNS,
+      query
+    );
     const { data, nextCursor } = await applyKeysetPagination(qb, {
       cursor,
       limit,

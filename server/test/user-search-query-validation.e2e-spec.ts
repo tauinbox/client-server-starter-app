@@ -24,7 +24,7 @@ import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import { MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
 
 const EMPTY_PAGE = {
   data: [],
@@ -124,14 +124,14 @@ describe('User search query DTO validation (e2e)', () => {
     async (field) => {
       const res = await request(server)
         .get(
-          `/api/v1/users/search/cursor?${field}=${'x'.repeat(MAX_USER_FILTER_LENGTH + 1)}`
+          `/api/v1/users/search/cursor?${field}=${'x'.repeat(MAX_LIST_FILTER_LENGTH + 1)}`
         )
         .expect(400);
 
       const body = res.body as { message: string[] };
       expect(body.message).toEqual(
         expect.arrayContaining([
-          `${field} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`
+          `${field} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`
         ])
       );
       expect(usersService.findCursorPaginated).not.toHaveBeenCalled();

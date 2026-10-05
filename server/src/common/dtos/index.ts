@@ -4,6 +4,8 @@ export {
   CursorPaginationMeta
 } from './cursor-paginated-response.dto';
 
+export { ListQueryDto } from './list-query.dto';
+
 export {
   RoleCursorQueryDto,
   ResourceCursorQueryDto,

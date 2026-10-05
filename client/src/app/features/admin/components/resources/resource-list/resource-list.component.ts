@@ -34,6 +34,11 @@ import {
   MatTable
 } from '@angular/material/table';
 import type { ResourceResponse } from '@app/shared/types';
+import type { ResourceListQuery } from '@app/shared/constants';
+import {
+  NxsListFiltersComponent,
+  type ListFilterControl
+} from '@shared/forms/nxs-list-filters/nxs-list-filters.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
@@ -70,6 +75,7 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
     MatHeaderRowDef,
     MatRowDef,
     MatCell,
+    NxsListFiltersComponent,
     TranslocoDirective
   ],
   templateUrl: './resource-list.component.html',
@@ -94,6 +100,36 @@ export class ResourceListComponent implements OnInit {
 
   loadMore(): void {
     this.#resourcesStore.loadMore();
+  }
+
+  readonly filters = this.#resourcesStore.filters;
+
+  readonly filterControls: readonly ListFilterControl<ResourceListQuery>[] = [
+    {
+      kind: 'select',
+      key: 'isSystem',
+      label: 'admin.roles.tableHeaderType',
+      allLabel: 'common.all',
+      options: [
+        { value: true, label: 'admin.roles.typeSystem' },
+        { value: false, label: 'admin.roles.typeCustom' }
+      ]
+    },
+    {
+      kind: 'select',
+      key: 'isOrphaned',
+      label: 'admin.resources.tableHeaderStatus',
+      allLabel: 'common.all',
+      options: [
+        { value: false, label: 'common.active' },
+        { value: true, label: 'admin.resources.statusOrphaned' }
+      ]
+    }
+  ];
+
+  applyFilters(filters: ResourceListQuery): void {
+    this.#resourcesStore.setFilters(filters);
+    this.#resourcesStore.load();
   }
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [

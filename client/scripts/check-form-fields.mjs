@@ -3,9 +3,8 @@
  * nxs-form-field wrapper (shared/forms/) or in documented exceptions.
  *
  * Allowed locations:
- *  - shared/forms/          — the wrapper itself + tests
- *  - user-list              — mat-select filter (no text input)
- *  - user-edit              — mat-select for roles
+ *  - shared/forms/          - the wrapper itself, the list filter selects + tests
+ *  - user-edit             — mat-select for roles
  *  - role-permissions-dialog — mat-select fields in admin
  *  - condition-builder      — mat-select/input in admin condition builder
  *  - feature-flag-rule-row  — admin rule editor; all fields set subscriptSizing="dynamic", no nxs-form-field siblings
@@ -24,7 +23,6 @@ const srcDir = resolve(__dirname, '..', 'src');
 
 const ALLOWED_PATTERNS = [
   /shared[\\/]forms[\\/]/,
-  /user-list[\\/]/,
   /user-edit[\\/]/,
   /role-permissions-dialog[\\/]/,
   /condition-builder[\\/]/,

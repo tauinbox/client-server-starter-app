@@ -359,8 +359,8 @@ describe('UsersService', () => {
       );
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'user.email ILIKE :email',
-        { email: '%test%' }
+        'user.email ILIKE :listFilter_email',
+        { listFilter_email: '%test%' }
       );
     });
 
@@ -410,14 +410,12 @@ describe('UsersService', () => {
 
       // `_` is a LIKE wildcard and MUST be escaped in the bound parameter.
       const expectedPattern = '%al\\_ice%';
+      const params = { listSearch: expectedPattern };
       expect(subCalls).toEqual([
-        { sql: 'user.email ILIKE :q', params: { q: expectedPattern } },
-        { sql: 'user.firstName ILIKE :q', params: { q: expectedPattern } },
-        { sql: 'user.lastName ILIKE :q', params: { q: expectedPattern } },
-        {
-          sql: 'CAST(user.id AS text) ILIKE :q',
-          params: { q: expectedPattern }
-        }
+        { sql: 'user.email ILIKE :listSearch', params },
+        { sql: 'user.firstName ILIKE :listSearch', params },
+        { sql: 'user.lastName ILIKE :listSearch', params },
+        { sql: 'CAST(user.id AS text) ILIKE :listSearch', params }
       ]);
     });
 
