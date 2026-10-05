@@ -14,6 +14,7 @@ import {
   type CursorPageRequest
 } from '@shared/utils/pagination.utils';
 import { ROLES_API_V1 } from '@core/services/role-catalog.service';
+import { silentContext } from '@core/context-tokens/error-notifications';
 
 export type CreateRole = {
   name: string;
@@ -63,12 +64,17 @@ export class RoleService {
     );
   }
 
+  // The role form dialog shows the refusal inline.
   create(role: CreateRole): Observable<RoleAdminResponse> {
-    return this.#http.post<RoleAdminResponse>(ROLES_API_V1, role);
+    return this.#http.post<RoleAdminResponse>(ROLES_API_V1, role, {
+      context: silentContext()
+    });
   }
 
   update(id: string, role: UpdateRole): Observable<RoleAdminResponse> {
-    return this.#http.patch<RoleAdminResponse>(`${ROLES_API_V1}/${id}`, role);
+    return this.#http.patch<RoleAdminResponse>(`${ROLES_API_V1}/${id}`, role, {
+      context: silentContext()
+    });
   }
 
   delete(id: string): Observable<void> {

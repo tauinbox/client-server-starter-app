@@ -1,10 +1,12 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError, type Observable } from 'rxjs';
+import { NEVER, of, throwError, type Observable } from 'rxjs';
 import type {
   FeatureFlagAttributeKeysResponse,
+  FeatureFlagResponse,
   FeatureFlagRulePayload,
   FeatureFlagRuleResponse
 } from '@app/shared/types';
@@ -17,13 +19,47 @@ import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.serv
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
+import type {
+  CreateFeatureFlag,
+  UpdateFeatureFlag
+} from '../../../services/feature-flags-admin.service';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
-import type { FeatureFlagFormDialogResult } from './feature-flag-form-dialog.component';
+import { FeatureFlagsAdminStore } from '../../../store/feature-flags-admin.store';
 import { FeatureFlagFormDialogComponent } from './feature-flag-form-dialog.component';
 
 describe('FeatureFlagFormDialogComponent', () => {
+  const savedFlag: FeatureFlagResponse = {
+    id: 'flag-1',
+    key: 'new-dashboard',
+    description: null,
+    enabled: false,
+    environments: [],
+    public: false,
+    version: 2,
+    updatedByUserId: null,
+    createdAt: '2026-05-19T10:00:00Z',
+    updatedAt: '2026-05-19T10:00:00Z',
+    rules: []
+  };
+
   let closeSpy: ReturnType<typeof vi.fn>;
   let confirmSpy: ReturnType<typeof vi.fn>;
+  let createSpy: ReturnType<
+    typeof vi.fn<(data: CreateFeatureFlag) => Observable<FeatureFlagResponse>>
+  >;
+  let updateSpy: ReturnType<
+    typeof vi.fn<
+      (
+        id: string,
+        data: UpdateFeatureFlag,
+        expectedVersion: number
+      ) => Observable<FeatureFlagResponse>
+    >
+  >;
+
+  // The body of the one save request, create or update.
+  const sentFlag = (): UpdateFeatureFlag | CreateFeatureFlag | undefined =>
+    createSpy.mock.calls[0]?.[0] ?? updateSpy.mock.calls[0]?.[1];
 
   const setup = async (
     data: Record<string, unknown> = {},
@@ -33,6 +69,10 @@ describe('FeatureFlagFormDialogComponent', () => {
   ): Promise<ComponentFixture<FeatureFlagFormDialogComponent>> => {
     closeSpy = vi.fn();
     confirmSpy = vi.fn(() => of(true));
+    // jsdom has no layout, so it does not implement scrollIntoView.
+    Element.prototype.scrollIntoView = vi.fn();
+    createSpy = vi.fn(() => of(savedFlag));
+    updateSpy = vi.fn(() => of(savedFlag));
     await TestBed.configureTestingModule({
       imports: [
         FeatureFlagFormDialogComponent,
@@ -60,6 +100,10 @@ describe('FeatureFlagFormDialogComponent', () => {
         {
           provide: FeatureFlagsAdminService,
           useValue: { getAttributeKeys: vi.fn(() => attributeKeys$) }
+        },
+        {
+          provide: FeatureFlagsAdminStore,
+          useValue: { createFlag: createSpy, updateFlag: updateSpy }
         },
         {
           provide: UserService,
@@ -187,9 +231,8 @@ describe('FeatureFlagFormDialogComponent', () => {
       { value: 'staging', label: 'staging' }
     ]);
     cmp.submit();
-    expect(closeSpy).toHaveBeenCalledTimes(1);
-    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.flag.environments).toEqual(['production', 'staging']);
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(sentFlag()?.environments).toEqual(['production', 'staging']);
   });
 
   it('renders rules without drag handles', async () => {
@@ -202,17 +245,77 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(root.querySelector('.drag-handle')).toBeNull();
   });
 
-  it('submit() closes with the form result when the form is valid', async () => {
+  it('submit() creates the flag and closes with the saved flag', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
     cmp.model.set({ key: 'new-dashboard', description: 'rollout' });
     cmp.onEnabledChange(true);
     cmp.submit();
-    expect(closeSpy).toHaveBeenCalledTimes(1);
-    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.key).toBe('new-dashboard');
-    expect(result.flag.enabled).toBe(true);
-    expect(result.flag.environments).toEqual([]);
+    expect(createSpy).toHaveBeenCalledWith({
+      key: 'new-dashboard',
+      description: 'rollout',
+      enabled: true,
+      environments: [],
+      public: false
+    });
+    expect(closeSpy).toHaveBeenCalledExactlyOnceWith(savedFlag);
+  });
+
+  it('keeps the dialog open with the input and shows the error when the save fails', async () => {
+    const fixture = await setup(flagWithAttributeRule());
+    updateSpy.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: {
+              message: 'Feature flag was modified by another request',
+              errorKey: 'errors.featureFlags.versionConflict'
+            }
+          })
+      )
+    );
+    const cmp = fixture.componentInstance;
+    cmp.model.update((m) => ({ ...m, description: 'paused' }));
+    cmp.addRule();
+    await fixture.whenStable();
+
+    cmp.submit();
+    fixture.detectChanges();
+
+    expect(updateSpy).toHaveBeenCalledWith('flag-1', expect.anything(), 3);
+    expect(closeSpy).not.toHaveBeenCalled();
+    expect(cmp.model().description).toBe('paused');
+    expect(cmp.rules().length).toBe(2);
+    const host = fixture.nativeElement as HTMLElement;
+    const error = host.querySelector('.form-error');
+    expect(error?.textContent?.trim()).toBe(
+      'Feature flag was modified by another request. Reload and retry.'
+    );
+    await fixture.whenStable();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    const save = host.querySelector<HTMLButtonElement>(
+      'mat-dialog-actions button[matButton="filled"]'
+    );
+    expect(save?.disabled).toBe(false);
+  });
+
+  it('sends one request while a save is in flight', async () => {
+    const fixture = await setup({});
+    createSpy.mockReturnValue(NEVER);
+    const cmp = fixture.componentInstance;
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.submit();
+    cmp.submit();
+    fixture.detectChanges();
+
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    const buttons = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      'mat-dialog-actions button'
+    );
+    expect(Array.from(buttons).every((b) => b.hasAttribute('disabled'))).toBe(
+      true
+    );
   });
 
   it.each(BILLING_PROVIDER_FLAGS.map((p) => p.enabledFlagKey))(
@@ -237,10 +340,10 @@ describe('FeatureFlagFormDialogComponent', () => {
       cmp.model.update((m) => ({ ...m, description: 'paused' }));
       await fixture.whenStable();
       cmp.submit();
+      expect(updateSpy).toHaveBeenCalledTimes(1);
+      expect(updateSpy.mock.calls[0][0]).toBe('flag-1');
+      expect(sentFlag()).not.toHaveProperty('key');
       expect(closeSpy).toHaveBeenCalledTimes(1);
-      const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-      expect(result.key).toBe(key);
-      expect(result.flag).not.toHaveProperty('key');
     }
   );
 
@@ -256,14 +359,16 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.model.update((m) => ({ ...m, description: 'paused' }));
     await fixture.whenStable();
     cmp.submit();
-    expect(closeSpy).toHaveBeenCalledTimes(1);
-    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.flag).toEqual({
-      description: 'paused',
-      enabled: true,
-      environments: ['production'],
-      public: false
-    });
+    expect(updateSpy).toHaveBeenCalledExactlyOnceWith(
+      'flag-1',
+      {
+        description: 'paused',
+        enabled: true,
+        environments: ['production'],
+        public: false
+      },
+      3
+    );
   });
 
   it('keeps the key editable on create', async () => {
@@ -315,7 +420,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves the rules out of the result when a payload only differs in key order', async () => {
+  it('leaves the rules out of the request when a payload only differs in key order', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
     cmp.updateRule(0, {
@@ -330,11 +435,10 @@ describe('FeatureFlagFormDialogComponent', () => {
       }
     });
     cmp.submit();
-    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.flag).not.toHaveProperty('rules');
+    expect(sentFlag()).not.toHaveProperty('rules');
   });
 
-  it('puts the full rule set in the result when a payload value differs', async () => {
+  it('sends the full rule set when a payload value differs', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
     cmp.updateRule(0, {
@@ -349,8 +453,7 @@ describe('FeatureFlagFormDialogComponent', () => {
       }
     });
     cmp.submit();
-    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.flag.rules).toEqual([
+    expect(sentFlag()?.rules).toEqual([
       {
         effect: 'include',
         type: 'attribute',
@@ -364,13 +467,12 @@ describe('FeatureFlagFormDialogComponent', () => {
     ]);
   });
 
-  it('puts an empty rule set in the result when every rule was removed', async () => {
+  it('sends an empty rule set when every rule was removed', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
     cmp.removeRule(0);
     cmp.submit();
-    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.flag.rules).toEqual([]);
+    expect(sentFlag()?.rules).toEqual([]);
   });
 
   it('leaves the rules out of a new flag that has none', async () => {
@@ -378,8 +480,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     const cmp = fixture.componentInstance;
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.submit();
-    const result = closeSpy.mock.calls[0][0] as FeatureFlagFormDialogResult;
-    expect(result.flag).not.toHaveProperty('rules');
+    expect(sentFlag()).not.toHaveProperty('rules');
   });
 
   it('submit() is a no-op while a rule the server would reject is present', async () => {

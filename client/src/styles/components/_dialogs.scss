@@ -55,6 +55,15 @@
   --mat-dialog-with-actions-content-padding: 0;
 }
 
+// The inline error of a dialog that saves by itself and stays open when the
+// save fails.
+.mat-mdc-dialog-content .form-error {
+  margin-top: vars.$spacing-sm;
+  margin-bottom: 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-error);
+}
+
 // ── Fullscreen-mobile variant ──────────────────────────────────────────────
 // Opt-in panelClass for dialogs that should fill the screen on handset
 // (rich admin dialogs with embedded editors — feature-flag form-dialog, etc).

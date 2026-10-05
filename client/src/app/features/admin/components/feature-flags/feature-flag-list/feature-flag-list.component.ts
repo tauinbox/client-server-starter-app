@@ -4,7 +4,8 @@ import {
   Component,
   computed,
   DestroyRef,
-  inject
+  inject,
+  ViewContainerRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
@@ -69,10 +70,7 @@ import {
   confirmEnableForEveryone,
   hasIncludeRule
 } from '../../../utils/feature-flag-enable-confirm';
-import type {
-  FeatureFlagFormDialogData,
-  FeatureFlagFormDialogResult
-} from '../feature-flag-form-dialog/feature-flag-form-dialog.component';
+import type { FeatureFlagFormDialogData } from '../feature-flag-form-dialog/feature-flag-form-dialog.component';
 import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feature-flag-form-dialog.component';
 
 @Component({
@@ -119,6 +117,7 @@ export class FeatureFlagListComponent implements OnInit {
   readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #transloco = inject(TranslocoService);
+  readonly #viewContainerRef = inject(ViewContainerRef);
   protected readonly layout = inject(LayoutService);
   protected readonly authStore = inject(AuthStore);
 
@@ -322,40 +321,19 @@ export class FeatureFlagListComponent implements OnInit {
       .open(FeatureFlagFormDialogComponent, {
         ...sizing,
         panelClass,
+        viewContainerRef: this.#viewContainerRef,
         data
       })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((result: FeatureFlagFormDialogResult | undefined) => {
-        if (!result) return;
-        this.#applyDialogResult(data.flag, result);
-      });
-  }
-
-  #applyDialogResult(
-    existing: FeatureFlagResponse | undefined,
-    result: FeatureFlagFormDialogResult
-  ): void {
-    const save$ = existing
-      ? this.#store.updateFlag(existing.id, result.flag, existing.version)
-      : this.#store.createFlag({ key: result.key, ...result.flag });
-    save$.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe({
-      next: (saved) => {
+      .subscribe((saved: FeatureFlagResponse | undefined) => {
+        if (!saved) return;
         this.#notify.success(
-          existing
+          data.flag
             ? 'admin.featureFlags.successUpdated'
             : 'admin.featureFlags.successCreated',
           { key: saved.key }
         );
-      },
-      error: (err) => {
-        this.#notify.error(
-          err,
-          existing
-            ? 'admin.featureFlags.errorUpdateFailed'
-            : 'admin.featureFlags.errorCreateFailed'
-        );
-      }
-    });
+      });
   }
 }

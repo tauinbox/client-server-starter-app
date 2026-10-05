@@ -14,6 +14,7 @@ import type {
 } from '@app/shared/types';
 
 import type { CursorPaginatedResponse } from '@app/shared/types';
+import { silentContext } from '@core/context-tokens/error-notifications';
 import {
   cursorParams,
   listQueryParams,
@@ -93,8 +94,12 @@ export class FeatureFlagsAdminService {
     return this.#http.get<FeatureFlagResponse>(`${ADMIN_API_V1}/${id}`);
   }
 
+  // Each caller shows the refusal itself: the form dialog inline, the row
+  // switch in a snackbar.
   create(data: CreateFeatureFlag): Observable<FeatureFlagResponse> {
-    return this.#http.post<FeatureFlagResponse>(ADMIN_API_V1, data);
+    return this.#http.post<FeatureFlagResponse>(ADMIN_API_V1, data, {
+      context: silentContext()
+    });
   }
 
   update(
@@ -106,7 +111,8 @@ export class FeatureFlagsAdminService {
       `${ADMIN_API_V1}/${id}`,
       data,
       {
-        headers: new HttpHeaders({ 'If-Match': String(expectedVersion) })
+        headers: new HttpHeaders({ 'If-Match': String(expectedVersion) }),
+        context: silentContext()
       }
     );
   }

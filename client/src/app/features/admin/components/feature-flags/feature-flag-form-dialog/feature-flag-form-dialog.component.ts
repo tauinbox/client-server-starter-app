@@ -1,5 +1,6 @@
 import type { OnDestroy, OnInit } from '@angular/core';
 import {
+  afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -26,10 +27,14 @@ import {
 } from '@angular/material/dialog';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIcon } from '@angular/material/icon';
+import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { HttpErrorResponse } from '@angular/common/http';
 import { catchError, of } from 'rxjs';
+import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
+import { FeatureFlagsAdminStore } from '../../../store/feature-flags-admin.store';
 import type {
   PreviewFlagDraft,
   UpdateFeatureFlag
@@ -62,14 +67,6 @@ export type FeatureFlagFormDialogData = {
   flag?: FeatureFlagResponse;
 };
 
-// `key` stays out of `flag` because the server rejects a key on update.
-// `flag.rules` is present only when the rule set changed, so an unchanged set
-// is not rewritten.
-export type FeatureFlagFormDialogResult = {
-  key: string;
-  flag: UpdateFeatureFlag;
-};
-
 type FlagFormData = {
   key: string;
   description: string;
@@ -87,6 +84,7 @@ function envToChip(name: string): ChipOption {
     MatCheckbox,
     MatExpansionModule,
     MatIcon,
+    MatProgressSpinner,
     TranslocoDirective,
     NxsFormFieldComponent,
     NxsChipsAutocompleteComponent,
@@ -99,8 +97,9 @@ function envToChip(name: string): ChipOption {
 })
 export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   readonly #dialogRef = inject(
-    MatDialogRef<FeatureFlagFormDialogComponent, FeatureFlagFormDialogResult>
+    MatDialogRef<FeatureFlagFormDialogComponent, FeatureFlagResponse>
   );
+  readonly #store = inject(FeatureFlagsAdminStore);
   readonly #shortcuts = inject(KeyboardShortcutsService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
   readonly #transloco = inject(TranslocoService);
@@ -111,6 +110,19 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   #cleanupSave: (() => void) | null = null;
 
   protected readonly isEdit = !!this.data.flag;
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
+
+  private readonly formErrorEl = viewChild('formError', { read: ElementRef });
+
+  constructor() {
+    // The error line sits below the rules and the preview, out of view of a
+    // long form, so it is brought on screen when it appears.
+    afterRenderEffect(() => {
+      const el = this.formErrorEl()?.nativeElement as HTMLElement | undefined;
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 
   readonly model = signal<FlagFormData>({
     key: this.data.flag?.key ?? '',
@@ -236,7 +248,8 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   }
 
   submit(): void {
-    if (this.flagForm().invalid() || this.hasRuleErrors()) return;
+    if (this.flagForm().invalid() || this.hasRuleErrors() || this.isLoading())
+      return;
     if (this.enabled() && !hasIncludeRule(this.rules())) {
       confirmEnableForEveryone(
         this.#adaptiveDialog,
@@ -245,34 +258,55 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
       )
         .pipe(takeUntilDestroyed(this.#destroyRef))
         .subscribe((confirmed) => {
-          if (confirmed) this.#close();
+          if (confirmed) this.#save();
         });
       return;
     }
-    this.#close();
+    this.#save();
   }
 
-  #close(): void {
+  // `key` goes to create only, because the server rejects a key on update.
+  // `rules` is sent only when the rule set changed, so an unchanged set is not
+  // rewritten.
+  #save(): void {
     const formData = this.model();
-    const result: FeatureFlagFormDialogResult = {
-      key: formData.key.trim(),
-      flag: {
-        description: formData.description.trim() || null,
-        enabled: this.enabled(),
-        environments: this.environments().map((c) => c.value),
-        public: this.isPublic(),
-        ...(this.#rulesChanged()
-          ? {
-              rules: this.rules().map((r) => ({
-                effect: r.effect,
-                type: r.type,
-                payload: r.payload
-              }))
-            }
-          : {})
-      }
+    const flag: UpdateFeatureFlag = {
+      description: formData.description.trim() || null,
+      enabled: this.enabled(),
+      environments: this.environments().map((c) => c.value),
+      public: this.isPublic(),
+      ...(this.#rulesChanged()
+        ? {
+            rules: this.rules().map((r) => ({
+              effect: r.effect,
+              type: r.type,
+              payload: r.payload
+            }))
+          }
+        : {})
     };
-    this.#dialogRef.close(result);
+    const existing = this.data.flag;
+    const save$ = existing
+      ? this.#store.updateFlag(existing.id, flag, existing.version)
+      : this.#store.createFlag({ key: formData.key.trim(), ...flag });
+
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+    save$.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe({
+      next: (saved) => this.#dialogRef.close(saved),
+      error: (err: HttpErrorResponse) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(
+          parseHttpErrorMessage(
+            err,
+            this.#transloco,
+            existing
+              ? 'admin.featureFlags.errorUpdateFailed'
+              : 'admin.featureFlags.errorCreateFailed'
+          )
+        );
+      }
+    });
   }
 
   cancel(): void {
