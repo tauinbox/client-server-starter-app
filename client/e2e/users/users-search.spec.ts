@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import {
+  chooseOption,
   expect,
   listResponse,
   loginViaUi,
@@ -143,8 +144,7 @@ test.describe('Inline user search (User Management page)', () => {
     await page.goto('/users');
 
     const response = listResponse(page, SEARCH_PATH, { isActive: 'true' });
-    await page.getByLabel('Status').click();
-    await page.getByRole('option', { name: 'Active', exact: true }).click();
+    await chooseOption(page, 'Status', 'Active');
     await response;
 
     await expect(
@@ -166,8 +166,7 @@ test.describe('Inline user search (User Management page)', () => {
       q: 'admin@example.com',
       mfaEnabled: 'false'
     });
-    await page.getByRole('combobox', { name: 'Two-factor' }).click();
-    await page.getByRole('option', { name: 'Off', exact: true }).click();
+    await chooseOption(page, 'Two-factor', 'Off');
     await twoFactor;
 
     const both = listResponse(page, SEARCH_PATH, {
@@ -175,8 +174,7 @@ test.describe('Inline user search (User Management page)', () => {
       mfaEnabled: 'false',
       hasPassword: 'true'
     });
-    await page.getByRole('combobox', { name: 'Sign-in' }).click();
-    await page.getByRole('option', { name: 'Has a password' }).click();
+    await chooseOption(page, 'Sign-in', 'Has a password');
     await both;
 
     await expect(
@@ -188,8 +186,7 @@ test.describe('Inline user search (User Management page)', () => {
       q: 'admin@example.com',
       hasPassword: 'false'
     });
-    await page.getByRole('combobox', { name: 'Sign-in' }).click();
-    await page.getByRole('option', { name: 'Provider only' }).click();
+    await chooseOption(page, 'Sign-in', 'Provider only');
     await providerOnly;
     await expect(page.getByText('No Users Found')).toBeVisible();
   });
@@ -202,8 +199,7 @@ test.describe('Inline user search (User Management page)', () => {
     await page.goto('/users');
 
     const response = listResponse(page, SEARCH_PATH, { role: 'admin' });
-    await page.getByLabel('Role').click();
-    await page.getByRole('option', { name: 'admin', exact: true }).click();
+    await chooseOption(page, 'Role', 'admin');
     await response;
 
     // Seeded admin appears; a user-only account is filtered out.

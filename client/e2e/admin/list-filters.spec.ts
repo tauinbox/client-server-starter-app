@@ -1,4 +1,5 @@
 import {
+  chooseOption,
   expect,
   listResponse,
   loginViaUi,
@@ -6,9 +7,7 @@ import {
 } from '../fixtures/base.fixture';
 
 // The admin lists share one search-and-filter bar: the search applies after a
-// pause in typing, a select at once, and neither has a button. A select opens
-// through its combobox role: while a closed panel animates out, the label
-// also names that listbox.
+// pause in typing, a select at once, and neither has a button.
 
 test.describe('Admin list search and filters', () => {
   test.beforeEach(async ({ _mockServer, page }) => {
@@ -32,21 +31,18 @@ test.describe('Admin list search and filters', () => {
       q: 'dashboard',
       enabled: 'false'
     });
-    await page.getByRole('combobox', { name: 'Status' }).click();
-    await page.getByRole('option', { name: 'Disabled' }).click();
+    await chooseOption(page, 'Status', 'Disabled');
     await disabled;
     await expect(page.getByText('new-dashboard')).toBeVisible();
 
     // The seeded flags list no environment, so they apply in every one.
     const staging = listResponse(page, path, { environment: 'staging' });
-    await page.getByRole('combobox', { name: 'Environments' }).click();
-    await page.getByRole('option', { name: 'staging' }).click();
+    await chooseOption(page, 'Environments', 'staging');
     await staging;
     await expect(page.getByText('new-dashboard')).toBeVisible();
 
     const enabled = listResponse(page, path, { enabled: 'true' });
-    await page.getByRole('combobox', { name: 'Status' }).click();
-    await page.getByRole('option', { name: 'Enabled' }).click();
+    await chooseOption(page, 'Status', 'Enabled');
     await enabled;
     await expect(
       page.getByText('Nothing matches these filters.')
@@ -62,8 +58,7 @@ test.describe('Admin list search and filters', () => {
     await expect(editor).toBeVisible();
 
     const custom = listResponse(page, path, { isSystem: 'false' });
-    await page.getByRole('combobox', { name: 'Type' }).click();
-    await page.getByRole('option', { name: 'Custom' }).click();
+    await chooseOption(page, 'Type', 'Custom');
     await custom;
     await expect(editor).toBeVisible();
     await expect(
@@ -87,8 +82,7 @@ test.describe('Admin list search and filters', () => {
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
     const orphaned = listResponse(page, path, { isOrphaned: 'true' });
-    await page.getByRole('combobox', { name: 'Status' }).click();
-    await page.getByRole('option', { name: 'Orphaned' }).click();
+    await chooseOption(page, 'Status', 'Orphaned');
     await orphaned;
 
     // The mock seeds no orphaned resource.
@@ -97,8 +91,7 @@ test.describe('Admin list search and filters', () => {
     ).toBeVisible();
 
     const active = listResponse(page, path, { isOrphaned: 'false' });
-    await page.getByRole('combobox', { name: 'Status' }).click();
-    await page.getByRole('option', { name: 'Active' }).click();
+    await chooseOption(page, 'Status', 'Active');
     await active;
     await expect(page.locator('table tbody tr').first()).toBeVisible();
   });

@@ -72,6 +72,23 @@ export function listResponse(
 }
 
 /**
+ * Picks an option of a mat-select and waits until its panel is gone. A select
+ * reopened while its last panel still animates out does not open, and the
+ * option it finds is the one of the closing panel, which never becomes
+ * stable: the test then times out on a slow runner only.
+ */
+export async function chooseOption(
+  page: Page,
+  select: string,
+  option: string
+): Promise<void> {
+  await page.getByRole('combobox', { name: select, exact: true }).click();
+  const panel = page.getByRole('listbox', { name: select, exact: true });
+  await panel.getByRole('option', { name: option, exact: true }).click();
+  await expect(panel).toHaveCount(0);
+}
+
+/**
  * Point a page's `/api` traffic at the worker's mock server and stub the SSE
  * stream with an empty body. `base.fixture` applies this to the fixture `page`;
  * a test that opens a second tab must apply it to that tab itself, because
