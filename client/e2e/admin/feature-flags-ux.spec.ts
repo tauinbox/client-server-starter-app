@@ -7,12 +7,12 @@ import {
 import { mockId } from '../fixtures/ids';
 
 test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => {
-  test('FF-UX-007: handset card shows "All environments" when the flag has no environments configured', async ({
+  test('FF-UX-007: handset card shows "All" when the flag has no environments configured', async ({
     _mockServer,
     page
   }) => {
     // Both seeded flags (new-dashboard, beta-export) have environments: []. On
-    // handset, the card should render the "Environments — All environments"
+    // handset, the card should render the "Environments — All"
     // dt/dd pair instead of omitting the row entirely.
     await page.setViewportSize({ width: 375, height: 667 });
 
@@ -27,7 +27,9 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     const card = page.locator('.flag-card', { hasText: 'new-dashboard' });
     await expect(card).toBeVisible();
     await expect(card).toContainText('Environments');
-    await expect(card).toContainText('All environments');
+    await expect(card.locator('.flag-card-fields dd').first()).toHaveText(
+      'All'
+    );
   });
 
   test('FF-UX-008: removing every rule saves the flag and the rules in one PATCH', async ({

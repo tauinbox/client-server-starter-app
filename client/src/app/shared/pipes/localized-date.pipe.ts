@@ -1,10 +1,11 @@
 import { inject, Pipe, type PipeTransform } from '@angular/core';
 import { LanguageService } from '@core/services/language.service';
 
-export type LocalizedDateFormat = 'medium' | 'mediumDate';
+export type LocalizedDateFormat = 'short' | 'medium' | 'mediumDate';
 
 const FORMAT_OPTIONS: Record<LocalizedDateFormat, Intl.DateTimeFormatOptions> =
   {
+    short: { dateStyle: 'short', timeStyle: 'short' },
     medium: { dateStyle: 'medium', timeStyle: 'medium' },
     mediumDate: { dateStyle: 'medium' }
   };

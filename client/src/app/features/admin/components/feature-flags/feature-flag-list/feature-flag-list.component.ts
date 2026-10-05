@@ -25,6 +25,10 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatChip } from '@angular/material/chips';
+import {
+  MatSlideToggle,
+  type MatSlideToggleChange
+} from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import {
   MatCell,
@@ -79,6 +83,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
     MatProgressSpinner,
     MatTooltip,
     MatChip,
+    MatSlideToggle,
     MatTable,
     MatColumnDef,
     MatHeaderCell,
@@ -125,7 +130,6 @@ export class FeatureFlagListComponent implements OnInit {
     'wide',
     'chip',
     'chip',
-    'chip',
     'medium',
     'actions'
   ];
@@ -133,7 +137,6 @@ export class FeatureFlagListComponent implements OnInit {
   readonly displayedColumns = [
     'key',
     'description',
-    'enabled',
     'environments',
     'public',
     'updatedAt',
@@ -171,19 +174,23 @@ export class FeatureFlagListComponent implements OnInit {
     this.#openDialog({ flag });
   }
 
-  toggleFlag(flag: FeatureFlagResponse): void {
+  toggleFlag(flag: FeatureFlagResponse, change: MatSlideToggleChange): void {
+    // The switch moves on click, before the write; put it back when the
+    // write does not happen or fails.
+    const revert = () => (change.source.checked = flag.enabled);
     if (!flag.enabled && !hasIncludeRule(flag.rules)) {
       confirmEnableForEveryone(this.#adaptiveDialog, this.#transloco, flag.key)
         .pipe(takeUntilDestroyed(this.#destroyRef))
         .subscribe((confirmed) => {
-          if (confirmed) this.#applyToggle(flag);
+          if (confirmed) this.#applyToggle(flag, revert);
+          else revert();
         });
       return;
     }
-    this.#applyToggle(flag);
+    this.#applyToggle(flag, revert);
   }
 
-  #applyToggle(flag: FeatureFlagResponse): void {
+  #applyToggle(flag: FeatureFlagResponse, revert: () => void): void {
     // The target value is absolute and the write is conditional on the
     // version, so a stale row ends in a conflict instead of the wrong state.
     this.#store
@@ -199,6 +206,7 @@ export class FeatureFlagListComponent implements OnInit {
           );
         },
         error: (err: HttpErrorResponse) => {
+          revert();
           this.#notify.error(err, 'admin.featureFlags.errorToggleFailed');
           if (
             err.error?.errorKey === ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT

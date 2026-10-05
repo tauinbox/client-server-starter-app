@@ -1,5 +1,10 @@
-import { TestBed } from '@angular/core/testing';
+import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import {
+  MatSlideToggle,
+  MatSlideToggleChange
+} from '@angular/material/slide-toggle';
 import { signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -111,6 +116,75 @@ describe('FeatureFlagListComponent', () => {
     dialogOpen.mockReturnValue({ afterClosed: () => of(result) });
   }
 
+  function changeOf(
+    fixture: ComponentFixture<FeatureFlagListComponent>
+  ): MatSlideToggleChange {
+    fixture.detectChanges();
+    const toggle: MatSlideToggle = fixture.debugElement.query(
+      By.directive(MatSlideToggle)
+    ).componentInstance;
+    return new MatSlideToggleChange(toggle, !toggle.checked);
+  }
+
+  async function clickSwitch(
+    fixture: ComponentFixture<FeatureFlagListComponent>
+  ): Promise<string | null> {
+    const host = fixture.nativeElement as HTMLElement;
+    host.querySelector<HTMLButtonElement>('button[role="switch"]')?.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return (
+      host
+        .querySelector('button[role="switch"]')
+        ?.getAttribute('aria-checked') ?? null
+    );
+  }
+
+  describe('the row switch', () => {
+    async function renderList(): Promise<
+      ComponentFixture<FeatureFlagListComponent>
+    > {
+      const fixture = TestBed.createComponent(FeatureFlagListComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('shows the flag state', async () => {
+      const fixture = await renderList();
+      const toggle = (fixture.nativeElement as HTMLElement).querySelector(
+        'button[role="switch"]'
+      );
+      expect(toggle?.getAttribute('aria-checked')).toBe('false');
+      expect(toggle?.getAttribute('aria-label')).toBe(
+        'Toggle flag new-dashboard'
+      );
+    });
+
+    it('stays on after a successful enable', async () => {
+      const fixture = await renderList();
+      expect(await clickSwitch(fixture)).toBe('true');
+      expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
+    });
+
+    it('moves back when the confirmation is cancelled', async () => {
+      confirmSpy.mockReturnValue(of(false));
+      const fixture = await renderList();
+      expect(await clickSwitch(fixture)).toBe('false');
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it('moves back when the write fails', async () => {
+      updateSpy.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 }))
+      );
+      const fixture = await renderList();
+      expect(await clickSwitch(fixture)).toBe('false');
+      expect(notifyError).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('renders the desktop table with one row per flag', async () => {
     const fixture = TestBed.createComponent(FeatureFlagListComponent);
     fixture.detectChanges();
@@ -181,7 +255,7 @@ describe('FeatureFlagListComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
-    fixture.componentInstance.toggleFlag(includedFlag);
+    fixture.componentInstance.toggleFlag(includedFlag, changeOf(fixture));
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
     expect(notifySuccess).toHaveBeenCalledWith(
@@ -205,7 +279,10 @@ describe('FeatureFlagListComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    fixture.componentInstance.toggleFlag({ ...flag, enabled: true });
+    fixture.componentInstance.toggleFlag(
+      { ...flag, enabled: true },
+      changeOf(fixture)
+    );
 
     expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: false }, 1);
     expect(notifyError).toHaveBeenCalledWith(
@@ -223,7 +300,10 @@ describe('FeatureFlagListComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    fixture.componentInstance.toggleFlag({ ...flag, enabled: true });
+    fixture.componentInstance.toggleFlag(
+      { ...flag, enabled: true },
+      changeOf(fixture)
+    );
 
     expect(notifyError).toHaveBeenCalledWith(
       error,
@@ -238,7 +318,7 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
-      fixture.componentInstance.toggleFlag(flag); // disabled, rules: []
+      fixture.componentInstance.toggleFlag(flag, changeOf(fixture)); // disabled, rules: []
       expect(confirmSpy).toHaveBeenCalledTimes(1);
       expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
     });
@@ -249,7 +329,7 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
-      fixture.componentInstance.toggleFlag(flag);
+      fixture.componentInstance.toggleFlag(flag, changeOf(fixture));
       expect(confirmSpy).toHaveBeenCalledTimes(1);
       expect(updateSpy).not.toHaveBeenCalled();
     });
@@ -272,7 +352,7 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
-      fixture.componentInstance.toggleFlag(includedFlag);
+      fixture.componentInstance.toggleFlag(includedFlag, changeOf(fixture));
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
     });
@@ -283,14 +363,14 @@ describe('FeatureFlagListComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
-      fixture.componentInstance.toggleFlag(enabledNoRules);
+      fixture.componentInstance.toggleFlag(enabledNoRules, changeOf(fixture));
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(updateSpy).toHaveBeenCalledWith('flag-1', { enabled: false }, 1);
     });
   });
 
-  describe('FF-UX-007 — handset shows "All environments" when list is empty', () => {
-    it('renders the environments dt/dd pair with "All environments" label', async () => {
+  describe('FF-UX-007 — handset shows "All" when list is empty', () => {
+    it('renders the environments dt/dd pair with the "All" label', async () => {
       const flagAllEnvs = { ...flag, id: 'flag-all', environments: [] };
       serviceMock.getAllCursor.mockReturnValue(
         of({
@@ -309,20 +389,22 @@ describe('FeatureFlagListComponent', () => {
       expect(card).not.toBeNull();
       const cardText = card?.textContent ?? '';
       expect(cardText).toContain('Environments');
-      expect(cardText).toContain('All environments');
+      expect(
+        card?.querySelector('.flag-card-fields dd')?.textContent?.trim()
+      ).toBe('All');
     });
 
-    it('omits the "All environments" label when the flag has specific environments', async () => {
+    it('omits the "All" label when the flag has specific environments', async () => {
       layoutHandset.set(true);
       const fixture = TestBed.createComponent(FeatureFlagListComponent);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
-      const cardText =
-        (fixture.nativeElement as HTMLElement).querySelector('.flag-card')
-          ?.textContent ?? '';
-      expect(cardText).toContain('production');
-      expect(cardText).not.toContain('All environments');
+      const envCell = (fixture.nativeElement as HTMLElement).querySelector(
+        '.flag-card .flag-card-fields dd'
+      );
+      expect(envCell?.textContent).toContain('production');
+      expect(envCell?.textContent).not.toContain('All');
     });
   });
 

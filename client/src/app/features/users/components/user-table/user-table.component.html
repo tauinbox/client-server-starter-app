@@ -89,8 +89,12 @@
       <th mat-header-cell *matHeaderCellDef mat-sort-header>
         {{ t('users.table.columnCreated') }}
       </th>
-      <td mat-cell *matCellDef="let user">
-        {{ user.createdAt | localizedDate: 'medium' }}
+      <td
+        mat-cell
+        *matCellDef="let user"
+        [matTooltip]="user.createdAt | localizedDate: 'medium'"
+      >
+        {{ user.createdAt | localizedDate: 'short' }}
       </td>
     </ng-container>
 
