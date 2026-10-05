@@ -33,11 +33,11 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     await page.goto('/admin/feature-flags');
     await expect(page.getByText('new-dashboard')).toBeVisible();
 
-    // The toggle button carries an aria-label like "Toggle flag new-dashboard".
-    const toggleBtn = page.getByRole('button', {
+    // The row switch carries an aria-label like "Toggle flag new-dashboard".
+    const toggleBtn = page.getByRole('switch', {
       name: /Toggle flag new-dashboard/i
     });
-    await expect(toggleBtn).toBeVisible();
+    await expect(toggleBtn).not.toBeChecked();
 
     // Wait for the SSE-driven re-fetch that follows the toggle. The bootstrap
     // call already happened; the next /feature-flags hit can only come from
@@ -63,13 +63,8 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     expect(body.flags['new-dashboard']).toBe(true);
 
     // List itself reflects the change too — admin store has been updated by
-    // the toggle response, switching the row's status chip to "Enabled".
-    const newDashboardRow = page.getByRole('row', {
-      name: /new-dashboard/
-    });
-    await expect(newDashboardRow.getByText('Enabled')).toBeVisible({
-      timeout: 5_000
-    });
+    // the toggle response, so the row switch stays on.
+    await expect(toggleBtn).toBeChecked({ timeout: 5_000 });
   });
 
   test('GET /feature-flags as anonymous returns only public flags and issues no nxs_anon_id', async ({

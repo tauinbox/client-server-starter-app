@@ -63,6 +63,16 @@ describe('LocalizedDatePipe', () => {
     expect(text()).toBe('Nov 2, 2026, 4:57:13 AM');
   });
 
+  it('formats a short date and time in English and Russian', () => {
+    expect(render((host) => host.format.set('short'))()).toBe(
+      '11/2/26, 4:57 AM'
+    );
+    language.set('ru');
+    expect(render((host) => host.format.set('short'))()).toBe(
+      '02.11.2026, 04:57'
+    );
+  });
+
   it('applies the time zone argument', () => {
     const text = render((host) => {
       host.value.set('2026-11-01T23:30:00.000Z');

@@ -32,6 +32,19 @@
 
 .flags-table {
   width: 100%;
+
+  /* stylelint-disable selector-class-pattern */
+  td.mat-column-key,
+  td.mat-column-updatedAt {
+    white-space: nowrap;
+  }
+  /* stylelint-enable selector-class-pattern */
+}
+
+.row-actions {
+  display: flex;
+  gap: vars.$spacing-xs;
+  align-items: center;
 }
 
 .flag-key {
@@ -101,8 +114,6 @@
 }
 
 .flag-card-actions {
-  display: flex;
-  gap: vars.$spacing-xs;
   margin-top: vars.$spacing-sm;
 }
 
