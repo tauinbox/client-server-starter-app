@@ -18,7 +18,9 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
@@ -147,5 +149,21 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
       .expect(500);
 
     expect(await storedFlag(flagKey)).not.toBeNull();
+  });
+
+  it('delete with a working audit removes the flag and writes its row', async () => {
+    jest.restoreAllMocks();
+
+    await request(http())
+      .delete(`/api/v1/admin/feature-flags/${flag.id}`)
+      .auth(token, { type: 'bearer' })
+      .expect(204);
+
+    expect(await storedFlag(flagKey)).toBeNull();
+    const row = await dataSource.getRepository(AuditLog).findOneByOrFail({
+      action: AuditAction.FEATURE_FLAG_DELETE,
+      targetId: flag.id
+    });
+    expect(row.details).toEqual({ key: flagKey });
   });
 });
