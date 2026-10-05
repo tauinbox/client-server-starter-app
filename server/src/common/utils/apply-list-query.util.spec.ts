@@ -12,7 +12,8 @@ const SPEC = {
     region: { kind: 'scopeIncludes', field: 'regions', values: ['eu', 'us'] },
     hasOwner: { kind: 'isSet', field: 'ownerId' },
     isExpired: { kind: 'inFuture', field: 'expiresAt' }
-  }
+  },
+  sort: ['createdAt']
 } as const satisfies ListQuerySpec;
 
 const COLUMNS: ListQueryColumns<typeof SPEC> = {

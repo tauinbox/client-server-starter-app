@@ -33,21 +33,50 @@ export type ListFilterDefinition = {
 };
 
 /**
- * The search and filter params of one list endpoint. The server builds its
- * query DTO and its SQL from it, the mock builds its validation and its
- * filtering from it, and the client builds its filter state type from it, so
- * one definition keeps the three in step.
+ * One list endpoint: its search, its filters, its other params and its sort
+ * columns. The server builds its query DTO and its SQL from it, the mock builds
+ * its validation and its filtering from it, and the client builds its filter
+ * state and its URL params from it, so one definition keeps the three in step.
  */
 export type ListQuerySpec = {
-  /** Fields that `q` matches: a row matches when any of them contains `q`. */
+  /**
+   * Fields that `q` matches: a row matches when any of them contains `q`. An
+   * empty list means the endpoint has no `q` param.
+   */
   search: readonly string[];
   /** Filter param name -> definition. Every filter set is ANDed. */
   filters: Readonly<Record<string, ListFilterDefinition>>;
+  /**
+   * Params that are validated like a filter of the same kind but that are not
+   * a condition on one column (a join, a scope switch). The service applies
+   * each one itself.
+   */
+  params?: Readonly<Record<string, ListFilterDefinition>>;
+  /**
+   * The `sortBy` whitelist. Keyset pagination needs NOT NULL columns only; see
+   * `sort-columns.constants.ts`.
+   */
+  sort: readonly string[];
 };
 
+type ListParamValues<D extends Readonly<Record<string, ListFilterDefinition>>> =
+  {
+    -readonly [P in keyof D]?: ListFilterValueMap[D[P]['kind']];
+  };
+
 /** The parsed search and filter params of a list built from `S`. */
-export type ListQuery<S extends ListQuerySpec> = { q?: string } & {
-  -readonly [
-    P in keyof S['filters']
-  ]?: ListFilterValueMap[S['filters'][P]['kind']];
-};
+export type ListQuery<S extends ListQuerySpec> = {
+  q?: string;
+} & ListParamValues<S['filters']>;
+
+/** The parsed `params` of a list built from `S`. */
+export type ListParams<S extends ListQuerySpec> =
+  S['params'] extends Readonly<Record<string, ListFilterDefinition>>
+    ? ListParamValues<S['params']>
+    : Record<never, never>;
+
+/** Everything that narrows a list built from `S`: the state of its filter bar. */
+export type ListFilters<S extends ListQuerySpec> = ListQuery<S> & ListParams<S>;
+
+/** A `sortBy` value that a list built from `S` accepts. */
+export type ListSortColumn<S extends ListQuerySpec> = S['sort'][number];

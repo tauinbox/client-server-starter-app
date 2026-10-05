@@ -714,8 +714,12 @@ the same permission both apply.
   `shared/src/constants/sort-columns.constants.ts`. Each endpoint answers
   `{ data, meta: { nextCursor, hasMore, limit } }`.
 
-  On the server, `applyKeysetPagination` works on a tuple of `(sortColumn, id)`. On the client,
-  `withCursorList` works with the `nxsInfiniteScroll` sentinel, and each list has one store.
+  One definition for each list (`shared/src/constants/list-query.constants.ts`) holds its search,
+  filters and sort whitelist. The server builds the query DTO from it (`ListCursorQueryDto`) and
+  `applyList` runs the filters and `applyKeysetPagination`, which works on a tuple of
+  `(sortColumn, id)`. On the client, each list has one store composed with `withList`, which works
+  with the `nxsInfiniteScroll` sentinel. The filters and the sort of a list are in the URL, with
+  the prefix of the list (`users.q`, `flags.sortBy`); the cursor is not.
 
   A sortable column must be NOT NULL. It must also hold no precision that the cursor cannot carry.
   Thus a timestamp sort key is a `timestamptz(3)` column, because the cursor encodes the value with

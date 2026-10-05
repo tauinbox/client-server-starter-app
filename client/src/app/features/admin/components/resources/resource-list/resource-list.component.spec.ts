@@ -12,7 +12,12 @@ import { ResourcesStore } from '../../../store/resources.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
 import type { ResourceResponse } from '@app/shared/types';
-import type { ResourceListQuery } from '@app/shared/constants';
+import {
+  RESOURCE_LIST_QUERY,
+  type ResourceListQuery
+} from '@app/shared/constants';
+import { provideRouter } from '@angular/router';
+import { listUrlStoreMock } from '../../../../../../test-utils/list-store-mock';
 
 const mockResource: ResourceResponse = {
   id: 'res-1',
@@ -32,18 +37,20 @@ const mockResource: ResourceResponse = {
 describe('ResourceListComponent', () => {
   let component: ResourceListComponent;
   let fixture: ComponentFixture<ResourceListComponent>;
-  let resourcesStoreMock: {
-    loading: ReturnType<typeof signal<boolean>>;
-    isLoadingMore: ReturnType<typeof signal<boolean>>;
-    hasMore: ReturnType<typeof signal<boolean>>;
-    resources: ReturnType<typeof signal<ResourceResponse[]>>;
-    filters: ReturnType<typeof signal<ResourceListQuery>>;
-    setFilters: ReturnType<typeof vi.fn>;
-    load: ReturnType<typeof vi.fn>;
-    loadMore: ReturnType<typeof vi.fn>;
-    updateResource: ReturnType<typeof vi.fn>;
-    restoreResource: ReturnType<typeof vi.fn>;
-  };
+  function createResourcesStoreMock() {
+    return {
+      ...listUrlStoreMock(RESOURCE_LIST_QUERY, 'resources'),
+      loading: signal(false),
+      isLoadingMore: signal(false),
+      hasMore: signal(false),
+      resources: signal<ResourceResponse[]>([mockResource]),
+      filters: signal<ResourceListQuery>({}),
+      loadMore: vi.fn(),
+      updateResource: vi.fn().mockReturnValue(of({} as ResourceResponse)),
+      restoreResource: vi.fn().mockReturnValue(of({} as ResourceResponse))
+    };
+  }
+  let resourcesStoreMock: ReturnType<typeof createResourcesStoreMock>;
   let authStoreMock: { hasPermissions: ReturnType<typeof vi.fn> };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
   let notifyMock: {
@@ -58,6 +65,7 @@ describe('ResourceListComponent', () => {
       imports: [ResourceListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
+        provideRouter([]),
         { provide: ResourcesStore, useValue: resourcesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatDialog, useValue: dialogMock },
@@ -70,18 +78,7 @@ describe('ResourceListComponent', () => {
   }
 
   beforeEach(() => {
-    resourcesStoreMock = {
-      loading: signal(false),
-      isLoadingMore: signal(false),
-      hasMore: signal(false),
-      resources: signal([mockResource]),
-      filters: signal({}),
-      setFilters: vi.fn(),
-      load: vi.fn(),
-      loadMore: vi.fn(),
-      updateResource: vi.fn().mockReturnValue(of({} as ResourceResponse)),
-      restoreResource: vi.fn().mockReturnValue(of({} as ResourceResponse))
-    };
+    resourcesStoreMock = createResourcesStoreMock();
     authStoreMock = { hasPermissions: vi.fn().mockReturnValue(false) };
     dialogMock = { open: vi.fn() };
     notifyMock = {

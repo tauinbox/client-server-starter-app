@@ -1,11 +1,12 @@
-import type { OnInit } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   input,
   output,
-  signal
+  signal,
+  untracked
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { form, maxLength } from '@angular/forms/signals';
@@ -68,9 +69,7 @@ export type ListFilterControl<F> = ListFilterSelect<F> | ListFilterCheckbox<F>;
   styleUrl: './nxs-list-filters.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class NxsListFiltersComponent<
-  F extends { q?: string }
-> implements OnInit {
+export class NxsListFiltersComponent<F extends { q?: string }> {
   /** The filters the list shows now. */
   readonly value = input.required<F>();
 
@@ -98,7 +97,20 @@ export class NxsListFiltersComponent<
     )
   );
 
+  /** The search term this field last emitted or last took from `value`. */
+  #searchTerm: string | null = null;
+
   constructor() {
+    // `value` changes after each emit and also on its own (Back, a link). The
+    // field takes the term only in the second case, so it never overwrites
+    // what the user is typing.
+    effect(() => {
+      const q = this.value().q ?? '';
+      if (q === untracked(() => this.#searchTerm)) return;
+      this.#searchTerm = q;
+      this.searchModel.set({ q });
+    });
+
     toObservable(this.searchModel)
       .pipe(
         map((model) => model.q.trim()),
@@ -108,11 +120,10 @@ export class NxsListFiltersComponent<
         filter(() => this.searchForm().valid()),
         takeUntilDestroyed()
       )
-      .subscribe((q) => this.#emit('q', q || undefined));
-  }
-
-  ngOnInit(): void {
-    this.searchModel.set({ q: this.value().q ?? '' });
+      .subscribe((q) => {
+        this.#searchTerm = q;
+        this.#emit('q', q || undefined);
+      });
   }
 
   /** The select works on option positions, so any option value type fits it. */

@@ -4,8 +4,11 @@ import type {
   ListFilterKind,
   ListFilterValueMap,
   ListQuery,
-  ListQuerySpec
+  ListQuerySpec,
+  ListSortColumn
 } from '@app/shared/types';
+import { CursorPaginatedResponseDto, type ListCursorQuery } from '../dtos';
+import { applyKeysetPagination } from './apply-keyset-pagination.util';
 import { escapeLikePattern } from './escape-like';
 
 /**
@@ -62,6 +65,17 @@ function filterCondition<K extends ListFilterKind>(
 }
 
 /**
+ * The columns of a list for `applyList`: the search and filter columns, the
+ * column behind each `sortBy` value, and the id column that breaks a tie in
+ * the keyset. A sort column added to the definition fails to compile here
+ * until it has a column.
+ */
+export type ListColumns<S extends ListQuerySpec> = ListQueryColumns<S> & {
+  sort: Record<ListSortColumn<S>, string>;
+  id: string;
+};
+
+/**
  * ANDs the search and the filters of `query` onto `qb`. Call it after the
  * ability filter and before `applyKeysetPagination`: every condition is an
  * `andWhere`, so it can only narrow what the ability already allows, and the
@@ -106,4 +120,31 @@ export function applyListQuery<
     );
     qb.andWhere(condition, parameters);
   }
+}
+
+/**
+ * One page of a list: the search and filters of `query`, then the keyset page
+ * that `query` asks for. Add the ability filter and every condition of the
+ * list's own `params` to `qb` before the call.
+ */
+export async function applyList<
+  T extends ObjectLiteral,
+  S extends ListQuerySpec
+>(
+  qb: SelectQueryBuilder<T>,
+  spec: S,
+  columns: ListColumns<S>,
+  query: ListCursorQuery<S>
+): Promise<CursorPaginatedResponseDto<T>> {
+  applyListQuery(qb, spec, columns, query);
+  const { cursor, limit, sortBy, sortOrder } = query;
+  const { data, nextCursor } = await applyKeysetPagination(qb, {
+    cursor,
+    limit,
+    sortBy,
+    sortOrder,
+    sortColumnMap: columns.sort,
+    idColumn: columns.id
+  });
+  return new CursorPaginatedResponseDto(data, nextCursor, limit);
 }

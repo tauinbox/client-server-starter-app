@@ -5,6 +5,10 @@ import {
   ResourceCursorQueryDto,
   RoleCursorQueryDto
 } from './entity-cursor-query.dto';
+import {
+  InvoiceCursorQueryDto,
+  SubscriptionCursorQueryDto
+} from '../../modules/billing/dtos/billing-cursor-query.dto';
 
 // The pipe options mirror main.ts. Every case goes through IntersectionType, so
 // it also proves that the composition carries the generated metadata.
@@ -97,6 +101,26 @@ describe('list query DTOs', () => {
     ).resolves.toEqual([
       'environment must be one of the following values: local, development, staging, production'
     ]);
+  });
+
+  it('limits sortBy to the sort columns of the definition', async () => {
+    await expect(
+      validate(RoleCursorQueryDto, { sortBy: 'name' })
+    ).resolves.toMatchObject({ sortBy: 'name' });
+    await expect(
+      messages(RoleCursorQueryDto, { sortBy: 'key' })
+    ).resolves.toEqual([
+      'sortBy must be one of the following values: createdAt, name'
+    ]);
+  });
+
+  it('has no q for a list with no search fields', async () => {
+    await expect(messages(InvoiceCursorQueryDto, { q: 'x' })).resolves.toEqual([
+      'property q should not exist'
+    ]);
+    await expect(
+      validate(SubscriptionCursorQueryDto, { sortBy: 'currentPeriodEnd' })
+    ).resolves.toMatchObject({ sortBy: 'currentPeriodEnd', limit: 20 });
   });
 
   it('caps q and accepts it at the cap', async () => {

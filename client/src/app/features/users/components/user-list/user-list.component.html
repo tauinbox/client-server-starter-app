@@ -31,6 +31,8 @@
       } @else {
         <nxs-user-table
           [users]="displayedUsers()"
+          [sortActive]="sort().active"
+          [sortDirection]="sort().direction"
           (sortChange)="sortData($event)"
           (deleteUser)="confirmDelete($event)"
           (restoreUser)="confirmRestore($event)"

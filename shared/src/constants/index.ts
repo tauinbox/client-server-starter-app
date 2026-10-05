@@ -57,7 +57,10 @@ export {
   FEATURE_FLAG_LIST_QUERY,
   ROLE_LIST_QUERY,
   RESOURCE_LIST_QUERY,
+  SUBSCRIPTION_LIST_QUERY,
+  INVOICE_LIST_QUERY,
   type UserListQuery,
+  type UserListFilters,
   type FeatureFlagListQuery,
   type RoleListQuery,
   type ResourceListQuery

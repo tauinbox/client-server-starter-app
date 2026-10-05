@@ -6,7 +6,9 @@ import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import type { RoleAdminResponse } from '@app/shared/types';
-import type { RoleListQuery } from '@app/shared/constants';
+import { ROLE_LIST_QUERY, type RoleListQuery } from '@app/shared/constants';
+import { provideRouter } from '@angular/router';
+import { listUrlStoreMock } from '../../../../../../test-utils/list-store-mock';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { RolesStore } from '../../../store/roles.store';
@@ -36,23 +38,26 @@ const mockSuperSystemRole: RoleAdminResponse = {
   updatedAt: '2025-01-01T00:00:00.000Z'
 };
 
+function createRolesStoreMock() {
+  return {
+    ...listUrlStoreMock(ROLE_LIST_QUERY, 'roles'),
+    entities: signal<RoleAdminResponse[]>([]),
+    loading: signal(false),
+    isLoadingMore: signal(false),
+    hasMore: signal(false),
+    filters: signal<RoleListQuery>({}),
+    loadMore: vi.fn(),
+    createRole: vi.fn(),
+    updateRole: vi.fn(),
+    deleteRole: vi.fn()
+  };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('RoleListComponent — openPermissionsDialog', () => {
   let authStoreMock: { hasPermissions: ReturnType<typeof vi.fn> };
-  let rolesStoreMock: {
-    entities: ReturnType<typeof signal<RoleAdminResponse[]>>;
-    loading: ReturnType<typeof signal<boolean>>;
-    isLoadingMore: ReturnType<typeof signal<boolean>>;
-    hasMore: ReturnType<typeof signal<boolean>>;
-    filters: ReturnType<typeof signal<RoleListQuery>>;
-    setFilters: ReturnType<typeof vi.fn>;
-    load: ReturnType<typeof vi.fn>;
-    loadMore: ReturnType<typeof vi.fn>;
-    createRole: ReturnType<typeof vi.fn>;
-    updateRole: ReturnType<typeof vi.fn>;
-    deleteRole: ReturnType<typeof vi.fn>;
-  };
+  let rolesStoreMock: ReturnType<typeof createRolesStoreMock>;
   let dialogMock: { open: ReturnType<typeof vi.fn> };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
@@ -62,19 +67,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
   };
 
   beforeEach(() => {
-    rolesStoreMock = {
-      entities: signal([]),
-      loading: signal(false),
-      isLoadingMore: signal(false),
-      hasMore: signal(false),
-      filters: signal({}),
-      setFilters: vi.fn(),
-      load: vi.fn(),
-      loadMore: vi.fn(),
-      createRole: vi.fn(),
-      updateRole: vi.fn(),
-      deleteRole: vi.fn()
-    };
+    rolesStoreMock = createRolesStoreMock();
 
     authStoreMock = { hasPermissions: vi.fn().mockReturnValue(false) };
 
@@ -101,6 +94,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
       imports: [RoleListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
+        provideRouter([]),
         { provide: RolesStore, useValue: rolesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatDialog, useValue: dialogMock },
@@ -193,6 +187,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
       imports: [RoleListComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideNoopAnimations(),
+        provideRouter([]),
         { provide: RolesStore, useValue: rolesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: MatDialog, useValue: dialogMock },

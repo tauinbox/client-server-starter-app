@@ -16,7 +16,15 @@
       <p class="empty-state">{{ t('common.noFilterResults') }}</p>
     } @else {
       <div class="table-wrapper">
-        <table mat-table [dataSource]="resources()" class="resources-table">
+        <table
+          mat-table
+          [dataSource]="resources()"
+          class="resources-table"
+          matSort
+          [matSortActive]="sort().active"
+          [matSortDirection]="sort().direction"
+          (matSortChange)="sortData($event)"
+        >
           <!-- Display Name Column -->
           <ng-container matColumnDef="displayName">
             <th mat-header-cell *matHeaderCellDef>
@@ -29,7 +37,7 @@
 
           <!-- Name Column -->
           <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
               {{ t('admin.resources.tableHeaderName') }}
             </th>
             <td mat-cell *matCellDef="let resource">

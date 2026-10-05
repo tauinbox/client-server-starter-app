@@ -1,5 +1,5 @@
 import type { AdminUserResponse, SortOrder } from '@app/shared/types';
-import type { UserListQuery, UserSortColumn } from '@app/shared/constants';
+import type { UserListFilters, UserSortColumn } from '@app/shared/constants';
 
 export type {
   CursorPaginationMeta,
@@ -12,11 +12,8 @@ export type { UserSortColumn } from '@app/shared/constants';
 // Auth profile responses omit lockedUntil at runtime but the type is a safe superset.
 export type User = AdminUserResponse;
 
-/** The shared list query plus the two params the user DTO declares itself. */
-export type UserSearch = UserListQuery & {
-  role?: string;
-  includeDeleted?: boolean;
-};
+/** The search, the filters and the `params` of the shared user list. */
+export type UserSearch = UserListFilters;
 
 export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {
   password: string;

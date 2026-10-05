@@ -20,12 +20,13 @@ import {
   type EvaluatorRule,
   type FeatureFlagEvaluationContext
 } from '@app/shared/utils/feature-flag-evaluator';
-import { CursorPaginatedResponseDto } from '../../../common/dtos';
-import type { FeatureFlagCursorQueryDto } from '../../../common/dtos';
-import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import type {
+  CursorPaginatedResponseDto,
+  FeatureFlagCursorQueryDto
+} from '../../../common/dtos';
 import {
-  applyListQuery,
-  type ListQueryColumns
+  applyList,
+  type ListColumns
 } from '../../../common/utils/apply-list-query.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { applyAbilityToFeatureFlagQuery } from '../../../common/utils/apply-ability.util';
@@ -44,20 +45,15 @@ import {
 } from '../dtos/preview-flag-context.dto';
 import { validateRulePayload } from '../utils/validate-rule-payload.util';
 
-const FEATURE_FLAG_SORT_COLUMN_MAP: Record<string, string> = {
-  createdAt: 'flag.createdAt',
-  key: 'flag.key'
-};
-
-const FEATURE_FLAG_LIST_COLUMNS: ListQueryColumns<
-  typeof FEATURE_FLAG_LIST_QUERY
-> = {
+const FEATURE_FLAG_LIST_COLUMNS: ListColumns<typeof FEATURE_FLAG_LIST_QUERY> = {
   search: { key: 'flag.key', description: 'flag.description' },
   filters: {
     enabled: 'flag.enabled',
     public: 'flag.public',
     environment: 'flag.environments'
-  }
+  },
+  sort: { createdAt: 'flag.createdAt', key: 'flag.key' },
+  id: 'flag.id'
 };
 import { AttributeRegistryService } from './attribute-registry.service';
 
@@ -112,25 +108,16 @@ export class FeatureFlagService {
     query: FeatureFlagCursorQueryDto,
     ability: AppAbility
   ): Promise<CursorPaginatedResponseDto<FeatureFlag>> {
-    const { cursor, limit, sortBy, sortOrder } = query;
     const qb = this.flagRepo.createQueryBuilder('flag');
     applyAbilityToFeatureFlagQuery(qb, ability, 'search');
-    applyListQuery(
+    const page = await applyList(
       qb,
       FEATURE_FLAG_LIST_QUERY,
       FEATURE_FLAG_LIST_COLUMNS,
       query
     );
-    const { data, nextCursor } = await applyKeysetPagination(qb, {
-      cursor,
-      limit,
-      sortBy,
-      sortOrder,
-      sortColumnMap: FEATURE_FLAG_SORT_COLUMN_MAP,
-      idColumn: 'flag.id'
-    });
-    await this.#attachRules(data);
-    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+    await this.#attachRules(page.data);
+    return page;
   }
 
   /** Loads every rule of the given flags in one query and attaches them. */

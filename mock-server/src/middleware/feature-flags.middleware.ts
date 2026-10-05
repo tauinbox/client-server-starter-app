@@ -14,7 +14,6 @@ import type {
   FeatureFlagRulePayload
 } from '@app/shared/types';
 import {
-  ALLOWED_FEATURE_FLAG_SORT_COLUMNS,
   APP_ENVIRONMENTS,
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_PROVIDER_FLAGS,
@@ -32,15 +31,7 @@ import {
   type FeatureFlagRuleEffect,
   type FeatureFlagRuleType
 } from '@app/shared/constants';
-import {
-  cursorPaginate,
-  parseCursorQuery
-} from '../helpers/pagination.helpers';
-import {
-  filterByListQuery,
-  listQueryErrors,
-  parseListQuery
-} from '../helpers/list-query.helpers';
+import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import {
@@ -544,25 +535,20 @@ adminRouter.get(
   permissionGuard('search', 'FeatureFlag'),
   (req, res) => {
     const query = req.query as Record<string, unknown>;
-    const errors = listQueryErrors(query, FEATURE_FLAG_LIST_QUERY, {
-      sortColumns: ALLOWED_FEATURE_FLAG_SORT_COLUMNS
-    });
+    const errors = listQueryErrors(query, FEATURE_FLAG_LIST_QUERY);
     if (errors.length > 0) {
       res.status(400).json(validationError(errors));
       return;
     }
-    const page = cursorPaginate(
-      filterByListQuery(
-        filterByAbility(
-          Array.from(getState().featureFlags.values()),
-          (req as AuthenticatedRequest).user,
-          'search',
-          'FeatureFlag'
-        ),
-        FEATURE_FLAG_LIST_QUERY,
-        parseListQuery(query, FEATURE_FLAG_LIST_QUERY)
+    const page = listPage(
+      filterByAbility(
+        Array.from(getState().featureFlags.values()),
+        (req as AuthenticatedRequest).user,
+        'search',
+        'FeatureFlag'
       ),
-      parseCursorQuery(query)
+      FEATURE_FLAG_LIST_QUERY,
+      query
     );
     res.json({ data: page.data.map(toFeatureFlagResponse), meta: page.meta });
   }

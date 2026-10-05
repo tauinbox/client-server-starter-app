@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { config, of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
@@ -14,7 +14,9 @@ import { NotifyService } from '@core/services/notify.service';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
+import { USER_LIST_QUERY } from '@app/shared/constants';
 import type { UserSearch } from '../../models/user.types';
+import { listUrlStoreMock } from '../../../../../test-utils/list-store-mock';
 
 const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
@@ -48,20 +50,22 @@ describe('UserListComponent', () => {
   let fixture: ComponentFixture<UserListComponent>;
   let observeSpy: ReturnType<typeof vi.fn>;
   let disconnectSpy: ReturnType<typeof vi.fn>;
-  let usersStoreMock: {
-    loading: ReturnType<typeof signal<boolean>>;
-    isLoadingMore: ReturnType<typeof signal<boolean>>;
-    totalUsers: ReturnType<typeof signal<number>>;
-    displayedUsers: ReturnType<typeof signal<User[]>>;
-    hasMore: ReturnType<typeof signal<boolean>>;
-    filters: ReturnType<typeof signal<UserSearch>>;
-    load: ReturnType<typeof vi.fn>;
-    loadMore: ReturnType<typeof vi.fn>;
-    setSorting: ReturnType<typeof vi.fn>;
-    setFilters: ReturnType<typeof vi.fn>;
-    deleteUser: ReturnType<typeof vi.fn>;
-    restoreUser: ReturnType<typeof vi.fn>;
-  };
+  function createUsersStoreMock() {
+    return {
+      ...listUrlStoreMock(USER_LIST_QUERY, 'users'),
+      loading: signal(false),
+      isLoadingMore: signal(false),
+      totalUsers: signal(0),
+      displayedUsers: signal<User[]>([]),
+      hasMore: signal(false),
+      filters: signal<UserSearch>({}),
+      loadMore: vi.fn(),
+      deleteUser: vi.fn().mockReturnValue(of(void 0)),
+      restoreUser: vi.fn().mockReturnValue(of(mockUser))
+    };
+  }
+  let usersStoreMock: ReturnType<typeof createUsersStoreMock>;
+  let navigateSpy: ReturnType<typeof vi.spyOn>;
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
@@ -84,20 +88,7 @@ describe('UserListComponent', () => {
     }
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
 
-    usersStoreMock = {
-      loading: signal(false),
-      isLoadingMore: signal(false),
-      totalUsers: signal(0),
-      displayedUsers: signal([]),
-      hasMore: signal(false),
-      filters: signal({}),
-      load: vi.fn(),
-      loadMore: vi.fn(),
-      setSorting: vi.fn(),
-      setFilters: vi.fn(),
-      deleteUser: vi.fn().mockReturnValue(of(void 0)),
-      restoreUser: vi.fn().mockReturnValue(of(mockUser))
-    };
+    usersStoreMock = createUsersStoreMock();
 
     notifyMock = {
       success: vi.fn(),
@@ -120,6 +111,7 @@ describe('UserListComponent', () => {
       ]
     }).compileComponents();
 
+    navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate');
     fixture = TestBed.createComponent(UserListComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -129,8 +121,20 @@ describe('UserListComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should call load on init', () => {
-    expect(usersStoreMock.load).toHaveBeenCalled();
+  it('loads the first page once on init, with the state of the URL', () => {
+    expect(usersStoreMock.setFilters).toHaveBeenCalledWith({});
+    expect(usersStoreMock.setSorting).toHaveBeenCalledWith('createdAt', 'desc');
+    expect(usersStoreMock.load).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a list param that the URL gets later, and loads once more', async () => {
+    await TestBed.inject(Router).navigate([], {
+      queryParams: { 'users.q': 'bob', 'users.sortBy': 'email' }
+    });
+
+    expect(usersStoreMock.setFilters).toHaveBeenLastCalledWith({ q: 'bob' });
+    expect(usersStoreMock.setSorting).toHaveBeenLastCalledWith('email', 'desc');
+    expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
   });
 
   it('should fetch roles on init and expose them for the filter select', () => {
@@ -158,59 +162,81 @@ describe('UserListComponent', () => {
     }
   });
 
+  function lastNavigation(): {
+    queryParams: Record<string, string | null>;
+    replaceUrl: boolean;
+  } {
+    return navigateSpy.mock.lastCall?.[1] as {
+      queryParams: Record<string, string | null>;
+      replaceUrl: boolean;
+    };
+  }
+
   describe('sortData', () => {
-    it('should reset to default sort when direction is empty', () => {
-      const sort: Sort = { active: 'email', direction: '' };
+    it('writes the default sort (no sort params) when direction is empty', () => {
+      component.sortData({ active: 'email', direction: '' } satisfies Sort);
 
-      component.sortData(sort);
-
-      expect(usersStoreMock.setSorting).toHaveBeenCalledWith(
-        'createdAt',
-        'desc'
-      );
-      expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
+      expect(lastNavigation().queryParams).toMatchObject({
+        'users.sortBy': null,
+        'users.sortOrder': null
+      });
+      expect(lastNavigation().replaceUrl).toBe(false);
     });
 
-    it('should sort by email column', () => {
-      const sort: Sort = { active: 'email', direction: 'asc' };
+    it('writes the sort of the email column', () => {
+      component.sortData({ active: 'email', direction: 'asc' });
 
-      component.sortData(sort);
-
-      expect(usersStoreMock.setSorting).toHaveBeenCalledWith('email', 'asc');
+      expect(lastNavigation().queryParams).toMatchObject({
+        'users.sortBy': 'email',
+        'users.sortOrder': 'asc'
+      });
     });
 
-    it('should sort by name column (mapped to firstName)', () => {
-      const sort: Sort = { active: 'name', direction: 'desc' };
+    it('maps the name column to firstName', () => {
+      component.sortData({ active: 'name', direction: 'desc' });
 
-      component.sortData(sort);
-
-      expect(usersStoreMock.setSorting).toHaveBeenCalledWith(
-        'firstName',
-        'desc'
-      );
+      expect(lastNavigation().queryParams).toMatchObject({
+        'users.sortBy': 'firstName',
+        'users.sortOrder': null
+      });
     });
 
-    it('should fall back to createdAt for unknown column', () => {
-      const sort: Sort = { active: 'unknown', direction: 'asc' };
+    it('writes the default sort for a column with no sort key', () => {
+      component.sortData({ active: 'unknown', direction: 'asc' });
 
-      component.sortData(sort);
+      expect(lastNavigation().queryParams).toMatchObject({
+        'users.sortBy': null,
+        'users.sortOrder': null
+      });
+    });
 
-      expect(usersStoreMock.setSorting).toHaveBeenCalledWith(
-        'createdAt',
-        'asc'
-      );
+    it('marks the sorted column in the table, and none for the default sort', () => {
+      expect(component.sort()).toEqual({ active: '', direction: '' });
+
+      usersStoreMock.sortBy.set('firstName');
+      usersStoreMock.sortOrder.set('asc');
+
+      expect(component.sort()).toEqual({ active: 'name', direction: 'asc' });
     });
   });
 
   describe('filters', () => {
-    it('stores the next filters and reloads from the first page', () => {
+    it('writes the next filters to the URL and does not load by itself', () => {
       component.applyFilters({ q: 'alice', isActive: false });
 
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith({
-        q: 'alice',
-        isActive: false
+      expect(lastNavigation().queryParams).toMatchObject({
+        'users.q': 'alice',
+        'users.isActive': 'false',
+        'users.role': null
       });
-      expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
+      expect(lastNavigation().replaceUrl).toBe(false);
+      expect(usersStoreMock.load).toHaveBeenCalledTimes(1);
+    });
+
+    it('replaces the history entry when only the search changes', () => {
+      component.applyFilters({ q: 'alice' });
+
+      expect(lastNavigation().replaceUrl).toBe(true);
     });
 
     it('offers the catalog roles as literal options, then the account-state selects and the deleted toggle', () => {

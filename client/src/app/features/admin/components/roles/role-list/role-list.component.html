@@ -23,10 +23,18 @@
       <p class="empty-state">{{ t('common.noFilterResults') }}</p>
     } @else {
       <div class="table-wrapper">
-        <table mat-table [dataSource]="roles()" class="roles-table">
+        <table
+          mat-table
+          [dataSource]="roles()"
+          class="roles-table"
+          matSort
+          [matSortActive]="sort().active"
+          [matSortDirection]="sort().direction"
+          (matSortChange)="sortData($event)"
+        >
           <!-- Name Column -->
           <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
               {{ t('admin.roles.tableHeaderName') }}
             </th>
             <td mat-cell *matCellDef="let role">
@@ -62,7 +70,7 @@
 
           <!-- Created At Column -->
           <ng-container matColumnDef="createdAt">
-            <th mat-header-cell *matHeaderCellDef>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
               {{ t('admin.roles.tableHeaderCreated') }}
             </th>
             <td mat-cell *matCellDef="let role">

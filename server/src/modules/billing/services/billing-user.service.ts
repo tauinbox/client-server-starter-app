@@ -27,6 +27,7 @@ import {
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
+  INVOICE_LIST_QUERY,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import type {
@@ -40,7 +41,7 @@ import type {
   PurchaseSessionResponse
 } from '@app/shared/types';
 import { CursorPaginatedResponseDto } from '../../../common/dtos';
-import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import { applyList } from '../../../common/utils/apply-list-query.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
@@ -82,7 +83,7 @@ import {
   remainingRefundable,
   reserveRefund
 } from '../utils/refund-reservation.util';
-import { INVOICE_SORT_COLUMN_MAP } from '../utils/list-order.util';
+import { INVOICE_LIST_COLUMNS } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { PLAN_CHANGE_LEASE_MS } from '../renewals/renewal-queue.constants';
 import { RenewalService } from '../renewals/renewal.service';
@@ -225,25 +226,15 @@ export class BillingUserService {
     userId: string,
     query: InvoiceCursorQueryDto
   ): Promise<CursorPaginatedResponseDto<Invoice>> {
-    const { cursor, limit, sortBy, sortOrder } = query;
     const customer = await this.customerFor(userId);
     if (!customer) {
-      return new CursorPaginatedResponseDto<Invoice>([], null, limit);
+      return new CursorPaginatedResponseDto<Invoice>([], null, query.limit);
     }
 
     const qb = this.invoices
       .createQueryBuilder('invoice')
       .where('invoice.customerId = :customerId', { customerId: customer.id });
-
-    const { data, nextCursor } = await applyKeysetPagination(qb, {
-      cursor,
-      limit,
-      sortBy,
-      sortOrder,
-      sortColumnMap: INVOICE_SORT_COLUMN_MAP,
-      idColumn: 'invoice.id'
-    });
-    return new CursorPaginatedResponseDto(data, nextCursor, limit);
+    return applyList(qb, INVOICE_LIST_QUERY, INVOICE_LIST_COLUMNS, query);
   }
 
   /**

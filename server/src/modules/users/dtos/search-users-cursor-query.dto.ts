@@ -1,18 +1,11 @@
-import { ApiPropertyOptional, IntersectionType } from '@nestjs/swagger';
-import { IsIn, IsOptional } from 'class-validator';
-import { ALLOWED_USER_SORT_COLUMNS } from '@app/shared/constants';
-import { CursorPaginationQueryDto } from '../../../common/dtos';
-import { UserFiltersQueryDto } from './user-filters-query.dto';
+import { USER_LIST_QUERY } from '@app/shared/constants';
+import { ListCursorQueryDto } from '../../../common/dtos';
 
-export class SearchUsersCursorQueryDto extends IntersectionType(
-  CursorPaginationQueryDto,
-  UserFiltersQueryDto
-) {
-  @ApiPropertyOptional({
-    default: 'createdAt',
-    enum: ALLOWED_USER_SORT_COLUMNS
-  })
-  @IsOptional()
-  @IsIn(ALLOWED_USER_SORT_COLUMNS)
-  override sortBy: string = 'createdAt';
-}
+/**
+ * Both user list routes take this DTO. `role` (a join) and `includeDeleted` (a
+ * scope switch) are `params` of the list definition: validated here, applied
+ * by the service.
+ */
+export class SearchUsersCursorQueryDto extends ListCursorQueryDto(
+  USER_LIST_QUERY
+) {}

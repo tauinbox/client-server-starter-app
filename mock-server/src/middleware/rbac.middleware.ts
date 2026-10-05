@@ -1,19 +1,7 @@
 import { Router } from 'express';
 import { changedFields } from '@app/shared/utils/changed-fields';
-import {
-  ALLOWED_RESOURCE_SORT_COLUMNS,
-  ErrorKeys,
-  RESOURCE_LIST_QUERY
-} from '@app/shared/constants';
-import {
-  cursorPaginate,
-  parseCursorQuery
-} from '../helpers/pagination.helpers';
-import {
-  filterByListQuery,
-  listQueryErrors,
-  parseListQuery
-} from '../helpers/list-query.helpers';
+import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
+import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
 
 import { getState, logAudit, toResourceResponse } from '../state';
 import {
@@ -49,20 +37,15 @@ router.get(
   permissionGuard('read', 'Permission'),
   (req, res) => {
     const query = req.query as Record<string, unknown>;
-    const errors = listQueryErrors(query, RESOURCE_LIST_QUERY, {
-      sortColumns: ALLOWED_RESOURCE_SORT_COLUMNS
-    });
+    const errors = listQueryErrors(query, RESOURCE_LIST_QUERY);
     if (errors.length > 0) {
       res.status(400).json(validationError(errors));
       return;
     }
-    const page = cursorPaginate(
-      filterByListQuery(
-        Array.from(getState().resources.values()),
-        RESOURCE_LIST_QUERY,
-        parseListQuery(query, RESOURCE_LIST_QUERY)
-      ),
-      parseCursorQuery(query)
+    const page = listPage(
+      Array.from(getState().resources.values()),
+      RESOURCE_LIST_QUERY,
+      query
     );
     res.json({ data: page.data.map(toResourceResponse), meta: page.meta });
   }

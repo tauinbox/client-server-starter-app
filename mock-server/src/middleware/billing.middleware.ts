@@ -12,13 +12,13 @@ import type {
   UsageSummaryResponse
 } from '@app/shared/types';
 import {
-  ALLOWED_INVOICE_SORT_COLUMNS,
-  ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
   BILLING_PROVIDER_FLAGS,
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
-  OPEN_SUBSCRIPTION_STATUSES
+  INVOICE_LIST_QUERY,
+  OPEN_SUBSCRIPTION_STATUSES,
+  SUBSCRIPTION_LIST_QUERY
 } from '@app/shared/constants';
 import {
   getState,
@@ -38,11 +38,7 @@ import {
   sumPlanMeterUnits
 } from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
-import {
-  cursorPaginate,
-  cursorQueryErrors,
-  parseCursorQuery
-} from '../helpers/pagination.helpers';
+import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
 import { addInterval } from '../utils/period';
 import type {
   AuthenticatedRequest,
@@ -390,11 +386,8 @@ billingRouter.get('/subscription', authGuard, (req: Request, res: Response) => {
 // GET /billing/invoices — caller's invoices, newest first (paginated).
 billingRouter.get('/invoices', authGuard, (req: Request, res: Response) => {
   const query = req.query as Record<string, unknown>;
-  const errors = cursorQueryErrors(query, {
-    sortColumns: ALLOWED_INVOICE_SORT_COLUMNS
-  });
+  const errors = listQueryErrors(query, INVOICE_LIST_QUERY);
   if (rejectInvalidBody(res, errors)) return;
-  const params = parseCursorQuery(query);
 
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
@@ -403,7 +396,7 @@ billingRouter.get('/invoices', authGuard, (req: Request, res: Response) => {
         (i) => i.customerId === customer.id
       )
     : [];
-  const page = cursorPaginate(invoices, params);
+  const page = listPage(invoices, INVOICE_LIST_QUERY, query);
   res.json({ data: page.data.map(toInvoiceResponse), meta: page.meta });
 });
 
@@ -1244,15 +1237,13 @@ billingAdminRouter.get(
   permissionGuard('search', 'Billing'),
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
-    const errors = cursorQueryErrors(query, {
-      sortColumns: ALLOWED_SUBSCRIPTION_SORT_COLUMNS
-    });
+    const errors = listQueryErrors(query, SUBSCRIPTION_LIST_QUERY);
     if (rejectInvalidBody(res, errors)) return;
-    const params = parseCursorQuery(query);
 
-    const page = cursorPaginate(
+    const page = listPage(
       [...getState().billingSubscriptions.values()],
-      params
+      SUBSCRIPTION_LIST_QUERY,
+      query
     );
     res.json({
       data: page.data.map(toSubscriptionResponse),
@@ -1266,15 +1257,13 @@ billingAdminRouter.get(
   permissionGuard('search', 'Billing'),
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
-    const errors = cursorQueryErrors(query, {
-      sortColumns: ALLOWED_INVOICE_SORT_COLUMNS
-    });
+    const errors = listQueryErrors(query, INVOICE_LIST_QUERY);
     if (rejectInvalidBody(res, errors)) return;
-    const params = parseCursorQuery(query);
 
-    const page = cursorPaginate(
+    const page = listPage(
       [...getState().billingInvoices.values()],
-      params
+      INVOICE_LIST_QUERY,
+      query
     );
     res.json({ data: page.data.map(toInvoiceResponse), meta: page.meta });
   }
