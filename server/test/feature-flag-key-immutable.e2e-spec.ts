@@ -119,7 +119,7 @@ describe('Feature flag key is immutable after create (e2e)', () => {
       FLAG_ID,
       { enabled: true },
       1,
-      'admin-1'
+      expect.objectContaining({ actorId: 'admin-1' })
     );
   });
 });

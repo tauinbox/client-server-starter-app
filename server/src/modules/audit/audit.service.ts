@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuditLog } from './entities/audit-log.entity';
 
@@ -44,8 +44,11 @@ export class AuditService {
     private readonly auditLogRepository: Repository<AuditLog>
   ) {}
 
-  async log(params: AuditLogParams): Promise<void> {
-    const entry = this.auditLogRepository.create({
+  /** With a manager, the row is written in the transaction of that manager. */
+  async log(params: AuditLogParams, manager?: EntityManager): Promise<void> {
+    const repository =
+      manager?.getRepository(AuditLog) ?? this.auditLogRepository;
+    const entry = repository.create({
       action: params.action,
       actorId: params.actorId ?? null,
       actorEmail: capAuditField(params.actorEmail),
@@ -55,7 +58,7 @@ export class AuditService {
       ipAddress: capAuditField(params.context?.ip),
       requestId: capAuditField(params.context?.requestId)
     });
-    await this.auditLogRepository.save(entry);
+    await repository.save(entry);
   }
 
   logFireAndForget(params: AuditLogParams): void {

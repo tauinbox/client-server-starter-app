@@ -49,16 +49,19 @@ import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
+import type { FlagAuditActor } from '../src/modules/feature-flags/services/feature-flag.service';
+import { AuditService } from '../src/modules/audit/audit.service';
+import { flagAuditActor } from './flag-audit-actor';
 
 // Saves a full rule set through the update path at the current version.
 async function setRules(
   service: FeatureFlagService,
   id: string,
   rules: FeatureFlagRuleDto[],
-  actorId: string
+  actor: FlagAuditActor
 ): Promise<FeatureFlag> {
   const { version } = await service.findOne(id);
-  return service.update(id, { rules }, version, actorId);
+  return service.update(id, { rules }, version, actor);
 }
 
 // ── In-memory repository stand-ins ─────────────────────────────────────────
@@ -320,6 +323,10 @@ describe('Feature flags end-to-end', () => {
         {
           provide: MetricsService,
           useValue: { recordCacheAccess: jest.fn() }
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn().mockResolvedValue(undefined) }
         }
       ]
     }).compile();
@@ -332,7 +339,7 @@ describe('Feature flags end-to-end', () => {
   it('happy path: admin creates flag, adds 10% rule, bucketed user sees true after bump to 100%', async () => {
     const flag = await flagService.create(
       { key: 'beta-export', enabled: true, public: false },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
 
     const user = {
@@ -371,7 +378,7 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'percentage', percent: 10 }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await resolver.invalidateAll();
 
@@ -399,7 +406,7 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'percentage', percent: 100 }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await resolver.invalidateAll();
 
@@ -413,7 +420,7 @@ describe('Feature flags end-to-end', () => {
   it('deny-overrides: exclude rule beats include rule for the same user', async () => {
     const flag = await flagService.create(
       { key: 'risky-feature', enabled: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await setRules(
       flagService,
@@ -430,7 +437,7 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'role', roleNames: ['banned'] }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await resolver.invalidateAll();
 
@@ -456,7 +463,7 @@ describe('Feature flags end-to-end', () => {
   it('PATCH /:id rejects a stale version with HTTP 409', async () => {
     const flag = await flagService.create(
       { key: 'v-lock', enabled: false },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     expect(flag.version).toBe(1);
 
@@ -465,13 +472,18 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       { enabled: true },
       1,
-      'actor-2'
+      flagAuditActor('actor-2')
     );
     expect(next.version).toBe(2);
 
     // Stale PATCH at v1 → 409.
     await expect(
-      flagService.update(flag.id, { enabled: false }, 1, 'actor-3')
+      flagService.update(
+        flag.id,
+        { enabled: false },
+        1,
+        flagAuditActor('actor-3')
+      )
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -508,7 +520,7 @@ describe('Feature flags end-to-end', () => {
   it('preview() returns included-by-rule with matchedRule index for a synthetic role context', async () => {
     const flag = await flagService.create(
       { key: 'beta-preview', enabled: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await setRules(
       flagService,
@@ -525,7 +537,7 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'role', roleNames: ['beta-tester'] }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
 
     const result = await flagService.preview(flag.id, {
@@ -541,7 +553,7 @@ describe('Feature flags end-to-end', () => {
   it('preview() returns excluded when an exclude rule fires before any include', async () => {
     const flag = await flagService.create(
       { key: 'gated-preview', enabled: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await setRules(
       flagService,
@@ -558,7 +570,7 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'role', roleNames: ['banned'] }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
 
     const result = await flagService.preview(flag.id, {
@@ -576,7 +588,7 @@ describe('Feature flags end-to-end', () => {
   it('preview() reports not-included when no include rule matched', async () => {
     const flag = await flagService.create(
       { key: 'unmatched-preview', enabled: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await setRules(
       flagService,
@@ -588,7 +600,7 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'role', roleNames: ['beta'] }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
 
     const result = await flagService.preview(flag.id, {
@@ -604,7 +616,7 @@ describe('Feature flags end-to-end', () => {
   it('rejects a createdAt rule with an operator that can never match', async () => {
     const flag = await flagService.create(
       { key: 'created-eq', enabled: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await expect(
       setRules(
@@ -622,7 +634,7 @@ describe('Feature flags end-to-end', () => {
             }
           }
         ],
-        'actor-1'
+        flagAuditActor('actor-1')
       )
     ).rejects.toMatchObject({
       status: 400,
@@ -649,14 +661,14 @@ describe('Feature flags end-to-end', () => {
   ])('rejects a rule with %s', async (_label, payload, message) => {
     const flag = await flagService.create(
       { key: `bad-payload-${payload.type}`, enabled: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await expect(
       setRules(
         flagService,
         flag.id,
         [{ type: payload.type, effect: 'include', payload }],
-        'actor-1'
+        flagAuditActor('actor-1')
       )
     ).rejects.toMatchObject({ status: 400, message });
     await expect(flagService.findOne(flag.id)).resolves.toMatchObject({
@@ -669,7 +681,7 @@ describe('Feature flags end-to-end', () => {
     const dayBefore = new Date(createdAt.getTime() - 24 * 60 * 60 * 1000);
     const flag = await flagService.create(
       { key: 'new-accounts', enabled: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await setRules(
       flagService,
@@ -686,7 +698,7 @@ describe('Feature flags end-to-end', () => {
           }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await resolver.invalidateAll();
 
@@ -705,7 +717,7 @@ describe('Feature flags end-to-end', () => {
   it('preview() reports disabled when the flag itself is off', async () => {
     const flag = await flagService.create(
       { key: 'off-preview', enabled: false },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     const result = await flagService.preview(flag.id, {
       roles: ['anyone']
@@ -720,11 +732,11 @@ describe('Feature flags end-to-end', () => {
   it('authenticated evaluation omits disabled non-public flag keys', async () => {
     await flagService.create(
       { key: 'unreleased-internal', enabled: false, public: false },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await flagService.create(
       { key: 'shipped-internal', enabled: true, public: false },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
 
     const evaluated = await resolver.evaluateForUser(
@@ -739,11 +751,11 @@ describe('Feature flags end-to-end', () => {
   it('anonymous evaluation filters to public flags only', async () => {
     await flagService.create(
       { key: 'public-banner', enabled: true, public: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await flagService.create(
       { key: 'private-tool', enabled: true, public: false },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
 
     const { result: anon } = await resolver.evaluateAnonymous(
@@ -886,6 +898,10 @@ describe('GET /feature-flags anonymous rollout id', () => {
         {
           provide: MetricsService,
           useValue: { recordCacheAccess: jest.fn() }
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn().mockResolvedValue(undefined) }
         }
       ]
     }).compile();
@@ -935,13 +951,13 @@ describe('GET /feature-flags anonymous rollout id', () => {
   ): Promise<void> {
     const flag = await flagService.create(
       { key, enabled: true, public: isPublic },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await setRules(
       flagService,
       flag.id,
       [{ type: 'percentage', effect: 'include', payload }],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await resolver.invalidateAll();
   }
@@ -961,11 +977,11 @@ describe('GET /feature-flags anonymous rollout id', () => {
   it('issues no cookie while no public flag has a percentage rule', async () => {
     await flagService.create(
       { key: 'public-banner', enabled: true, public: true },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     const hidden = await flagService.create(
       { key: 'private-rollout', enabled: true, public: false },
-      'actor-1'
+      flagAuditActor('actor-1')
     );
     await setRules(
       flagService,
@@ -977,7 +993,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
           payload: { type: 'percentage', percent: 50 }
         }
       ],
-      'actor-1'
+      flagAuditActor('actor-1')
     );
 
     const res = await request(server).get('/feature-flags').expect(200);

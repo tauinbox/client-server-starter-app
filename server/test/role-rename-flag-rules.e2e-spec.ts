@@ -12,6 +12,7 @@ import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
+import { flagAuditActor } from './flag-audit-actor';
 import { FeatureFlagResolverService } from '../src/modules/feature-flags/services/feature-flag-resolver.service';
 import { User } from '../src/modules/users/entities/user.entity';
 
@@ -135,7 +136,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
           }
         ]
       },
-      null
+      flagAuditActor()
     );
     const versionBefore = (await flagService.findOne(flag.id)).version;
     expect(await holderSees(key)).toBe(true);
@@ -176,7 +177,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
           }
         ]
       },
-      null
+      flagAuditActor()
     );
     const versionBefore = (await flagService.findOne(flag.id)).version;
 
@@ -202,7 +203,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
           }
         ]
       },
-      null
+      flagAuditActor()
     );
     const rewrite = jest
       .spyOn(flagService, 'rewriteRoleName')

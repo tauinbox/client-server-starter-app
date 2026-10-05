@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { HttpException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { AuditService } from '../../audit/audit.service';
 import { FeatureFlagService } from './feature-flag.service';
 import { AttributeRegistryService } from './attribute-registry.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
@@ -41,6 +43,19 @@ describe('FeatureFlagService', () => {
   let dataSource: { transaction: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
   let configService: { get: jest.Mock };
+  let auditService: { log: jest.Mock };
+
+  const actor = {
+    actorId: 'actor-1',
+    actorEmail: 'a@b.com',
+    context: { ip: '127.0.0.1', requestId: 'req-1' }
+  };
+  const auditFields = {
+    actorId: 'actor-1',
+    actorEmail: 'a@b.com',
+    targetType: 'FeatureFlag',
+    context: { ip: '127.0.0.1', requestId: 'req-1' }
+  };
 
   const sampleFlag: FeatureFlag = {
     id: 'flag-1',
@@ -77,6 +92,7 @@ describe('FeatureFlagService', () => {
         key === 'ENVIRONMENT' ? 'production' : undefined
       )
     };
+    auditService = { log: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -85,7 +101,8 @@ describe('FeatureFlagService', () => {
         { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: AttributeRegistryService, useValue: attributeRegistry },
-        { provide: ConfigService, useValue: configService }
+        { provide: ConfigService, useValue: configService },
+        { provide: AuditService, useValue: auditService }
       ]
     }).compile();
 
@@ -134,6 +151,7 @@ describe('FeatureFlagService', () => {
     create: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    remove: jest.Mock;
     createQueryBuilder: jest.Mock;
   }
 
@@ -142,6 +160,7 @@ describe('FeatureFlagService', () => {
       create: jest.fn((_e: unknown, v: unknown) => v),
       save: jest.fn((_e: unknown, v: unknown) => Promise.resolve(v)),
       delete: jest.fn().mockResolvedValue({}),
+      remove: jest.fn().mockResolvedValue({}),
       createQueryBuilder: jest.fn(),
       ...overrides
     };
@@ -161,7 +180,7 @@ describe('FeatureFlagService', () => {
     it('rejects duplicate key with 409', async () => {
       flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
       await expect(
-        service.create({ key: sampleFlag.key }, 'actor-1')
+        service.create({ key: sampleFlag.key }, actor)
       ).rejects.toMatchObject({ status: 409 });
     });
 
@@ -174,7 +193,7 @@ describe('FeatureFlagService', () => {
       });
       const result = await service.create(
         { key: 'beta-export', enabled: true },
-        'actor-1'
+        actor
       );
       expect(result.id).toBe('new-id');
       expect(em.create).toHaveBeenCalledWith(
@@ -187,6 +206,25 @@ describe('FeatureFlagService', () => {
         })
       );
       expect(em.delete).not.toHaveBeenCalled();
+      expect(auditService.log).toHaveBeenCalledWith(
+        {
+          ...auditFields,
+          action: AuditAction.FEATURE_FLAG_CREATE,
+          targetId: 'new-id',
+          details: { key: sampleFlag.key, flagId: 'new-id' }
+        },
+        em
+      );
+    });
+
+    it('fails the create when the audit row cannot be written', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(null);
+      mockTransaction();
+      auditService.log.mockRejectedValueOnce(new Error('audit down'));
+
+      await expect(
+        service.create({ key: 'beta-export' }, actor)
+      ).rejects.toThrow('audit down');
     });
 
     it('writes the rules in the same transaction as the flag', async () => {
@@ -201,9 +239,15 @@ describe('FeatureFlagService', () => {
       });
       await service.create(
         { key: 'beta-export', rules: [percentRule(25), percentRule(50)] },
-        'actor-1'
+        actor
       );
       expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: { key: sampleFlag.key, flagId: 'new-id', ruleCount: 2 }
+        }),
+        em
+      );
       expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
         flagId: 'new-id'
       });
@@ -217,10 +261,7 @@ describe('FeatureFlagService', () => {
     it('rejects an invalid rule payload before the transaction opens', async () => {
       flagRepo.findOne.mockResolvedValueOnce(null);
       await expect(
-        service.create(
-          { key: 'beta-export', rules: [percentRule(150)] },
-          'actor-1'
-        )
+        service.create({ key: 'beta-export', rules: [percentRule(150)] }, actor)
       ).rejects.toBeInstanceOf(HttpException);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
@@ -232,7 +273,7 @@ describe('FeatureFlagService', () => {
       });
 
       await expect(
-        service.create({ key: sampleFlag.key }, 'actor-1')
+        service.create({ key: sampleFlag.key }, actor)
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS }
@@ -246,7 +287,7 @@ describe('FeatureFlagService', () => {
       });
 
       await expect(
-        service.create({ key: sampleFlag.key }, 'actor-1')
+        service.create({ key: sampleFlag.key }, actor)
       ).rejects.toMatchObject({ status: 409 });
     });
 
@@ -257,7 +298,7 @@ describe('FeatureFlagService', () => {
       });
 
       await expect(
-        service.create({ key: sampleFlag.key }, 'actor-1')
+        service.create({ key: sampleFlag.key }, actor)
       ).rejects.toThrow('connection reset');
     });
   });
@@ -273,11 +314,12 @@ describe('FeatureFlagService', () => {
           'flag-1',
           { enabled: true, rules: [percentRule(25)] },
           /* expected */ 999,
-          'actor-1'
+          actor
         )
       ).rejects.toMatchObject({ status: 409 });
       expect(em.delete).not.toHaveBeenCalled();
       expect(em.save).not.toHaveBeenCalled();
+      expect(auditService.log).not.toHaveBeenCalled();
     });
 
     it('updates and increments version when match (affected = 1)', async () => {
@@ -292,7 +334,7 @@ describe('FeatureFlagService', () => {
         'flag-1',
         { enabled: true },
         1,
-        'actor-1'
+        actor
       );
       expect(qb.where).toHaveBeenCalledWith(
         'id = :id AND version = :expected',
@@ -300,6 +342,15 @@ describe('FeatureFlagService', () => {
       );
       expect(result.version).toBe(2);
       expect(em.delete).not.toHaveBeenCalled();
+      expect(auditService.log).toHaveBeenCalledWith(
+        {
+          ...auditFields,
+          action: AuditAction.FEATURE_FLAG_UPDATE,
+          targetId: 'flag-1',
+          details: { changedFields: ['enabled'] }
+        },
+        em
+      );
     });
 
     it('replaces the rules after the version-checked write', async () => {
@@ -308,7 +359,7 @@ describe('FeatureFlagService', () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(qb)
       });
-      await service.update('flag-1', { rules: [] }, 1, 'actor-1');
+      await service.update('flag-1', { rules: [] }, 1, actor);
       expect(qb.execute).toHaveBeenCalledTimes(1);
       expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
         flagId: 'flag-1'
@@ -316,10 +367,41 @@ describe('FeatureFlagService', () => {
       expect(em.save).not.toHaveBeenCalled();
     });
 
+    it('audits a rule set as a count, not as a changed field', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      const em = mockTransaction({
+        createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(1))
+      });
+      await service.update(
+        'flag-1',
+        { enabled: true, rules: [percentRule(25)] },
+        1,
+        actor
+      );
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: { changedFields: ['enabled'], ruleCount: 1 }
+        }),
+        em
+      );
+    });
+
+    it('fails the update when the audit row cannot be written', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      mockTransaction({
+        createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(1))
+      });
+      auditService.log.mockRejectedValueOnce(new Error('audit down'));
+
+      await expect(
+        service.update('flag-1', { enabled: true }, 1, actor)
+      ).rejects.toThrow('audit down');
+    });
+
     it('rejects an invalid rule payload before the transaction opens', async () => {
       flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
       await expect(
-        service.update('flag-1', { rules: [percentRule(150)] }, 1, 'actor-1')
+        service.update('flag-1', { rules: [percentRule(150)] }, 1, actor)
       ).rejects.toBeInstanceOf(HttpException);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
@@ -494,11 +576,29 @@ describe('FeatureFlagService', () => {
   });
 
   describe('delete', () => {
-    it('removes the given flag without loading it again', async () => {
-      flagRepo.remove.mockResolvedValue({});
-      await service.delete(sampleFlag);
+    it('removes the given flag and audits its key in one transaction', async () => {
+      const em = mockTransaction();
+      await service.delete(sampleFlag, actor);
       expect(flagRepo.findOne).not.toHaveBeenCalled();
-      expect(flagRepo.remove).toHaveBeenCalledWith(sampleFlag);
+      expect(em.remove).toHaveBeenCalledWith(FeatureFlag, sampleFlag);
+      expect(auditService.log).toHaveBeenCalledWith(
+        {
+          ...auditFields,
+          action: AuditAction.FEATURE_FLAG_DELETE,
+          targetId: 'flag-1',
+          details: { key: sampleFlag.key }
+        },
+        em
+      );
+    });
+
+    it('fails the delete when the audit row cannot be written', async () => {
+      mockTransaction();
+      auditService.log.mockRejectedValueOnce(new Error('audit down'));
+
+      await expect(service.delete(sampleFlag, actor)).rejects.toThrow(
+        'audit down'
+      );
     });
   });
 });

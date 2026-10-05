@@ -78,6 +78,26 @@ describe('AuditService', () => {
       });
       expect(mockRepository.save).toHaveBeenCalled();
     });
+
+    it('writes through the transaction of a given manager', async () => {
+      const txRepository = {
+        create: jest.fn((data: Record<string, unknown>) => data),
+        save: jest.fn().mockResolvedValue(undefined)
+      };
+      const manager = { getRepository: jest.fn(() => txRepository) };
+
+      await service.log(
+        { action: AuditAction.FEATURE_FLAG_UPDATE },
+        // @ts-expect-error a manager that implements only getRepository
+        manager
+      );
+
+      expect(manager.getRepository).toHaveBeenCalledWith(AuditLog);
+      expect(txRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.FEATURE_FLAG_UPDATE })
+      );
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('log - field caps', () => {
