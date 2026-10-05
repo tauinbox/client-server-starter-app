@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type { ResourceResponse } from '@app/shared/types';
+import { silentContext } from '@core/context-tokens/error-notifications';
 
 export type UpdateResource = {
   displayName?: string;
@@ -36,13 +37,15 @@ export class RbacAdminService {
     );
   }
 
+  // The resource form dialog shows the refusal inline.
   updateResource(
     id: string,
     dto: UpdateResource
   ): Observable<ResourceResponse> {
     return this.#http.patch<ResourceResponse>(
       `${RBAC_API_V1}/resources/${id}`,
-      dto
+      dto,
+      { context: silentContext() }
     );
   }
 

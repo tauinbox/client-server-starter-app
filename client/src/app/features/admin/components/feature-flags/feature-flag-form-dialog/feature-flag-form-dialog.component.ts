@@ -1,5 +1,6 @@
 import type { OnDestroy, OnInit } from '@angular/core';
 import {
+  afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -111,6 +112,17 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   protected readonly isEdit = !!this.data.flag;
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+
+  private readonly formErrorEl = viewChild('formError', { read: ElementRef });
+
+  constructor() {
+    // The error line sits below the rules and the preview, out of view of a
+    // long form, so it is brought on screen when it appears.
+    afterRenderEffect(() => {
+      const el = this.formErrorEl()?.nativeElement as HTMLElement | undefined;
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 
   readonly model = signal<FlagFormData>({
     key: this.data.flag?.key ?? '',

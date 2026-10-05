@@ -4,6 +4,13 @@ import {
   openedDialog,
   test
 } from '../fixtures/base.fixture';
+import type { Page } from '@playwright/test';
+
+// A one-shot count: the global error snackbar opens before the alert renders,
+// and a retrying toHaveCount(0) would pass once the snackbar dismissed itself.
+async function expectNoSnackbar(page: Page): Promise<void> {
+  expect(await page.locator('mat-snack-bar-container').count()).toBe(0);
+}
 
 // A rejected save must leave the edit on screen, because a rule set or a long
 // description can take minutes to build.
@@ -48,9 +55,13 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
 
     await dialog.getByRole('button', { name: 'Save' }).click();
 
-    await expect(dialog.getByRole('alert')).toHaveText(
+    const alert = dialog.getByRole('alert');
+    await expect(alert).toHaveText(
       'Feature flag was modified by another request. Reload and retry.'
     );
+    // The line sits below the rule rows, so the dialog has to scroll to it.
+    await expect(alert).toBeInViewport();
+    await expectNoSnackbar(page);
     expect(patches).toBe(1);
     await expect(dialog).toBeVisible();
     await expect(description).toHaveValue('Rolled out to the beta group');
@@ -76,10 +87,45 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     await expect(dialog.getByRole('alert')).toHaveText(
       'Role with this name already exists'
     );
+    await expectNoSnackbar(page);
     await expect(dialog).toBeVisible();
     await expect(name).toHaveValue('moderator');
     await expect(dialog.getByLabel('Description')).toHaveValue(
       'Edits and moderates content'
     );
+  });
+
+  test('a rejected resource save is reported once, inside the dialog', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/admin/resources');
+
+    await page.getByRole('button', { name: 'Edit Resource Users' }).click();
+    const dialog = await openedDialog(page);
+    await dialog.getByLabel('Display Name').fill('People');
+
+    await page.route('**/api/v1/rbac/resources/*', async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          statusCode: 404,
+          message: 'Resource not found',
+          errorKey: 'errors.rbac.resourceNotFound'
+        })
+      });
+    });
+
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    await expectNoSnackbar(page);
+    await expect(dialog.getByLabel('Display Name')).toHaveValue('People');
   });
 });

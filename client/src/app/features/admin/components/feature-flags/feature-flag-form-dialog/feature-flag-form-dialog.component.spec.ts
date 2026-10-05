@@ -69,6 +69,8 @@ describe('FeatureFlagFormDialogComponent', () => {
   ): Promise<ComponentFixture<FeatureFlagFormDialogComponent>> => {
     closeSpy = vi.fn();
     confirmSpy = vi.fn(() => of(true));
+    // jsdom has no layout, so it does not implement scrollIntoView.
+    Element.prototype.scrollIntoView = vi.fn();
     createSpy = vi.fn(() => of(savedFlag));
     updateSpy = vi.fn(() => of(savedFlag));
     await TestBed.configureTestingModule({
@@ -286,9 +288,12 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(cmp.model().description).toBe('paused');
     expect(cmp.rules().length).toBe(2);
     const host = fixture.nativeElement as HTMLElement;
-    expect(host.querySelector('.form-error')?.textContent?.trim()).toBe(
+    const error = host.querySelector('.form-error');
+    expect(error?.textContent?.trim()).toBe(
       'Feature flag was modified by another request. Reload and retry.'
     );
+    await fixture.whenStable();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     const save = host.querySelector<HTMLButtonElement>(
       'mat-dialog-actions button[matButton="filled"]'
     );

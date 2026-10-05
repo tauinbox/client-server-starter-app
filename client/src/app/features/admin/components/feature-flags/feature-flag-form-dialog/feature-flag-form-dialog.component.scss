@@ -60,10 +60,3 @@
   // margin extends the content box so the shadow renders inside the clip.
   margin-bottom: vars.$spacing-xs;
 }
-
-.form-error {
-  margin-top: vars.$spacing-sm;
-  margin-bottom: 0;
-  font-size: vars.$font-size-sm;
-  color: var(--mat-sys-error);
-}
