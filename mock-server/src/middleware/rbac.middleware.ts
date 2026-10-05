@@ -2,13 +2,18 @@ import { Router } from 'express';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import {
   ALLOWED_RESOURCE_SORT_COLUMNS,
-  ErrorKeys
+  ErrorKeys,
+  RESOURCE_LIST_QUERY
 } from '@app/shared/constants';
 import {
   cursorPaginate,
-  cursorQueryErrors,
   parseCursorQuery
 } from '../helpers/pagination.helpers';
+import {
+  filterByListQuery,
+  listQueryErrors,
+  parseListQuery
+} from '../helpers/list-query.helpers';
 
 import { getState, logAudit, toResourceResponse } from '../state';
 import {
@@ -44,7 +49,7 @@ router.get(
   permissionGuard('read', 'Permission'),
   (req, res) => {
     const query = req.query as Record<string, unknown>;
-    const errors = cursorQueryErrors(query, {
+    const errors = listQueryErrors(query, RESOURCE_LIST_QUERY, {
       sortColumns: ALLOWED_RESOURCE_SORT_COLUMNS
     });
     if (errors.length > 0) {
@@ -52,7 +57,11 @@ router.get(
       return;
     }
     const page = cursorPaginate(
-      Array.from(getState().resources.values()),
+      filterByListQuery(
+        Array.from(getState().resources.values()),
+        RESOURCE_LIST_QUERY,
+        parseListQuery(query, RESOURCE_LIST_QUERY)
+      ),
       parseCursorQuery(query)
     );
     res.json({ data: page.data.map(toResourceResponse), meta: page.meta });

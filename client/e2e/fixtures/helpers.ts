@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator, Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 import type { MockUser } from './mock-data';
@@ -47,6 +47,28 @@ export async function openedDialog(page: Page): Promise<Locator> {
     )
     .toBe(true);
   return dialog;
+}
+
+/**
+ * Waits for the list response whose request carries every one of `params`. A
+ * list filter applies by itself (the search after a pause in typing), so a test
+ * waits for this where it once clicked a Search button. Start the wait before
+ * the action that sends the request.
+ */
+export function listResponse(
+  page: Page,
+  path: string,
+  params: Readonly<Record<string, string>>
+): Promise<Response> {
+  return page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.pathname.endsWith(path) &&
+      Object.entries(params).every(
+        ([name, value]) => url.searchParams.get(name) === value
+      )
+    );
+  });
 }
 
 /**

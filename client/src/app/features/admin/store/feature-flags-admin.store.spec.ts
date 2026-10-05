@@ -77,8 +77,22 @@ describe('FeatureFlagsAdminStore', () => {
     expect(store.entities().length).toBe(1);
     expect(store.entities()[0].key).toBe('new-dashboard');
     expect(service.getAllCursor).toHaveBeenCalledWith(
-      expect.objectContaining({ cursor: null })
+      expect.objectContaining({ cursor: null }),
+      {}
     );
+  });
+
+  it('load() sends the filters set before it', async () => {
+    const store = TestBed.inject(FeatureFlagsAdminStore);
+    store.setFilters({ q: 'beta', enabled: false });
+    store.load();
+    await vi.waitFor(() => expect(store.loading()).toBe(false));
+
+    expect(service.getAllCursor).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: null }),
+      { q: 'beta', enabled: false }
+    );
+    expect(store.hasActiveFilters()).toBe(true);
   });
 
   it('load() notifies on failure and leaves the list empty', async () => {

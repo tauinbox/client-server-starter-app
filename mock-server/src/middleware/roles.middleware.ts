@@ -3,13 +3,18 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   ALLOWED_ROLE_SORT_COLUMNS,
   ErrorKeys,
+  ROLE_LIST_QUERY,
   ROLE_NAME_MAX_LENGTH
 } from '@app/shared/constants';
 import {
   cursorPaginate,
-  cursorQueryErrors,
   parseCursorQuery
 } from '../helpers/pagination.helpers';
+import {
+  filterByListQuery,
+  listQueryErrors,
+  parseListQuery
+} from '../helpers/list-query.helpers';
 
 import type { PermissionCondition } from '@app/shared/types';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
@@ -199,7 +204,7 @@ export function notifyRoleHolders(roleName: string): void {
 // GET /api/v1/roles/cursor
 router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
   const query = req.query as Record<string, unknown>;
-  const errors = cursorQueryErrors(query, {
+  const errors = listQueryErrors(query, ROLE_LIST_QUERY, {
     sortColumns: ALLOWED_ROLE_SORT_COLUMNS
   });
   if (errors.length > 0) {
@@ -208,7 +213,11 @@ router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
   }
   res.json(
     cursorPaginate(
-      Array.from(getState().roles.values()),
+      filterByListQuery(
+        Array.from(getState().roles.values()),
+        ROLE_LIST_QUERY,
+        parseListQuery(query, ROLE_LIST_QUERY)
+      ),
       parseCursorQuery(query)
     )
   );

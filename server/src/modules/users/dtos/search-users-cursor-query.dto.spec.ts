@@ -1,5 +1,5 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import { MAX_PAGE_SIZE, MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import { MAX_PAGE_SIZE, MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
 import { SearchUsersCursorQueryDto } from './search-users-cursor-query.dto';
 
 // The DTO pulls its filters from UserFiltersQueryDto through IntersectionType,
@@ -67,11 +67,11 @@ describe('SearchUsersCursorQueryDto filters', () => {
     'rejects a %s longer than the cap',
     async (field) => {
       const message = await expectMessage({
-        [field]: 'x'.repeat(MAX_USER_FILTER_LENGTH + 1)
+        [field]: 'x'.repeat(MAX_LIST_FILTER_LENGTH + 1)
       });
 
       expect(message).toContain(
-        `${field} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`
+        `${field} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`
       );
     }
   );
@@ -80,14 +80,37 @@ describe('SearchUsersCursorQueryDto filters', () => {
     'accepts a %s exactly at the cap',
     async (field) => {
       await expect(
-        validate({ [field]: 'x'.repeat(MAX_USER_FILTER_LENGTH) })
+        validate({ [field]: 'x'.repeat(MAX_LIST_FILTER_LENGTH) })
       ).resolves.toMatchObject({
-        [field]: 'x'.repeat(MAX_USER_FILTER_LENGTH)
+        [field]: 'x'.repeat(MAX_LIST_FILTER_LENGTH)
       });
     }
   );
 
-  it.each(['isActive', 'includeDeleted'])(
+  it('accepts the account-state filters as booleans', async () => {
+    await expect(
+      validate({
+        isEmailVerified: 'false',
+        mfaEnabled: 'true',
+        hasPassword: 'false',
+        isLocked: 'true'
+      })
+    ).resolves.toMatchObject({
+      isEmailVerified: false,
+      mfaEnabled: true,
+      hasPassword: false,
+      isLocked: true
+    });
+  });
+
+  it.each([
+    'isActive',
+    'includeDeleted',
+    'isEmailVerified',
+    'mfaEnabled',
+    'hasPassword',
+    'isLocked'
+  ])(
     'rejects a non-boolean %s instead of dropping the filter',
     async (field) => {
       const message = await expectMessage({ [field]: 'maybe' });
@@ -154,6 +177,32 @@ describe('SearchUsersCursorQueryDto filters', () => {
 
       expect(message).toBe('each value in ids must be a UUID');
     });
+  });
+
+  it('reports the messages in the order the mock reproduces', async () => {
+    const error = await validate({
+      includeDeleted: 'maybe',
+      role: ['a', 'b'],
+      isActive: 'maybe',
+      ids: 'nope',
+      q: ['a', 'b']
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+
+    expect(
+      ((error as BadRequestException).getResponse() as { message: string[] })
+        .message
+    ).toEqual([
+      `role must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
+      'role must be a string',
+      'includeDeleted must be a boolean value',
+      `q must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
+      'q must be a string',
+      'each value in ids must be a UUID',
+      'isActive must be a boolean value'
+    ]);
   });
 
   it.each(['q', 'email', 'firstName', 'lastName', 'role'])(

@@ -14,7 +14,7 @@ import { NotifyService } from '@core/services/notify.service';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
-import { MAX_USER_FILTER_LENGTH } from '@app/shared/constants';
+import type { UserSearch } from '../../models/user.types';
 
 const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
@@ -54,6 +54,7 @@ describe('UserListComponent', () => {
     totalUsers: ReturnType<typeof signal<number>>;
     displayedUsers: ReturnType<typeof signal<User[]>>;
     hasMore: ReturnType<typeof signal<boolean>>;
+    filters: ReturnType<typeof signal<UserSearch>>;
     load: ReturnType<typeof vi.fn>;
     loadMore: ReturnType<typeof vi.fn>;
     setSorting: ReturnType<typeof vi.fn>;
@@ -89,6 +90,7 @@ describe('UserListComponent', () => {
       totalUsers: signal(0),
       displayedUsers: signal([]),
       hasMore: signal(false),
+      filters: signal({}),
       load: vi.fn(),
       loadMore: vi.fn(),
       setSorting: vi.fn(),
@@ -200,128 +202,56 @@ describe('UserListComponent', () => {
     });
   });
 
-  describe('onSubmit', () => {
-    it('should set filters and load when isActive is "Active"', () => {
-      component.isActiveFilter.set('true');
-      component.onSubmit();
+  describe('filters', () => {
+    it('stores the next filters and reloads from the first page', () => {
+      component.applyFilters({ q: 'alice', isActive: false });
 
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.objectContaining({ isActive: true })
-      );
+      expect(usersStoreMock.setFilters).toHaveBeenCalledWith({
+        q: 'alice',
+        isActive: false
+      });
       expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
     });
 
-    it('should set filters and load when isActive is "Inactive"', () => {
-      component.isActiveFilter.set('false');
-      component.onSubmit();
+    it('offers the catalog roles as literal options, then the account-state selects and the deleted toggle', () => {
+      const controls = component.filterControls();
+      const [role, status] = controls;
+      const deleted = controls[controls.length - 1];
 
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.objectContaining({ isActive: false })
-      );
+      expect(controls.map((control) => control.key)).toEqual([
+        'role',
+        'isActive',
+        'isEmailVerified',
+        'mfaEnabled',
+        'isLocked',
+        'hasPassword',
+        'includeDeleted'
+      ]);
+
+      expect(role).toMatchObject({
+        kind: 'select',
+        key: 'role',
+        options: [{ value: 'user', label: 'user', literal: true }]
+      });
+      expect(status).toMatchObject({
+        kind: 'select',
+        key: 'isActive',
+        options: [
+          { value: true, label: 'common.active' },
+          { value: false, label: 'common.inactive' }
+        ]
+      });
+      expect(deleted).toMatchObject({
+        kind: 'checkbox',
+        key: 'includeDeleted'
+      });
     });
 
-    it('should exclude isActive when Status is "All"', () => {
-      component.isActiveFilter.set('');
-      component.onSubmit();
+    it('renders the search box and no Search or Clear button', () => {
+      const host = fixture.nativeElement as HTMLElement;
 
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.not.objectContaining({ isActive: expect.anything() })
-      );
-    });
-
-    it('should set q filter from the search field (trimmed)', () => {
-      component.filterModel.set({ q: '  alice  ' });
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.objectContaining({ q: 'alice' })
-      );
-    });
-
-    it('should exclude q when the search field is empty', () => {
-      component.filterModel.set({ q: '   ' });
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.not.objectContaining({ q: expect.anything() })
-      );
-    });
-
-    it('should not search when q exceeds the filter cap the API validates', () => {
-      usersStoreMock.load.mockClear();
-      component.filterModel.set({ q: 'x'.repeat(MAX_USER_FILTER_LENGTH + 1) });
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).not.toHaveBeenCalled();
-      expect(usersStoreMock.load).not.toHaveBeenCalled();
-    });
-
-    it('should search when q is exactly at the filter cap', () => {
-      component.filterModel.set({ q: 'x'.repeat(MAX_USER_FILTER_LENGTH) });
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.objectContaining({ q: 'x'.repeat(MAX_USER_FILTER_LENGTH) })
-      );
-    });
-
-    it('should set role filter when a role is selected', () => {
-      component.roleFilter.set('admin');
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.objectContaining({ role: 'admin' })
-      );
-    });
-
-    it('should exclude role when "All roles" is selected', () => {
-      component.roleFilter.set('');
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.not.objectContaining({ role: expect.anything() })
-      );
-    });
-
-    it('should set includeDeleted when the toggle is checked', () => {
-      component.includeDeletedFilter.set(true);
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.objectContaining({ includeDeleted: true })
-      );
-    });
-
-    it('should exclude includeDeleted when the toggle is unchecked', () => {
-      component.includeDeletedFilter.set(false);
-      component.onSubmit();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith(
-        expect.not.objectContaining({ includeDeleted: expect.anything() })
-      );
-    });
-  });
-
-  describe('resetForm', () => {
-    it('should clear filters and reload', () => {
-      component.filterModel.set({ q: 'alice' });
-      component.isActiveFilter.set('true');
-      component.roleFilter.set('admin');
-      component.resetForm();
-
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith({});
-      expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
-      expect(component.filterModel()).toEqual({ q: '' });
-      expect(component.isActiveFilter()).toBe('');
-      expect(component.roleFilter()).toBe('');
-    });
-
-    it('should clear the include-deleted toggle', () => {
-      component.includeDeletedFilter.set(true);
-      component.resetForm();
-
-      expect(component.includeDeletedFilter()).toBe(false);
-      expect(usersStoreMock.setFilters).toHaveBeenCalledWith({});
+      expect(host.querySelector('nxs-list-filters input')).not.toBeNull();
+      expect(host.querySelector('button[type="submit"]')).toBeNull();
     });
   });
 

@@ -11,6 +11,8 @@
     "delete": "Delete",
     "search": "Search",
     "clear": "Clear",
+    "all": "All",
+    "noFilterResults": "Nothing matches these filters.",
     "loading": "Loading...",
     "active": "Active",
     "inactive": "Inactive",

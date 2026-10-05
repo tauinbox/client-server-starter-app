@@ -13,9 +13,13 @@ import { Resource } from '../entities/resource.entity';
 import { CursorPaginatedResponseDto } from '../../../common/dtos';
 import type { ResourceCursorQueryDto } from '../../../common/dtos';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
-import { RESOURCE_SORT_COLUMN_MAP } from '../utils/rbac-sort-columns.util';
+import { applyListQuery } from '../../../common/utils/apply-list-query.util';
+import {
+  RESOURCE_LIST_COLUMNS,
+  RESOURCE_SORT_COLUMN_MAP
+} from '../utils/rbac-sort-columns.util';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
 import { ResourceRegistryService } from './resource-registry.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
@@ -68,17 +72,16 @@ export class ResourceService {
     query: ResourceCursorQueryDto
   ): Promise<CursorPaginatedResponseDto<Resource>> {
     const { cursor, limit, sortBy, sortOrder } = query;
-    const { data, nextCursor } = await applyKeysetPagination(
-      this.resourceRepository.createQueryBuilder('resource'),
-      {
-        cursor,
-        limit,
-        sortBy,
-        sortOrder,
-        sortColumnMap: RESOURCE_SORT_COLUMN_MAP,
-        idColumn: 'resource.id'
-      }
-    );
+    const qb = this.resourceRepository.createQueryBuilder('resource');
+    applyListQuery(qb, RESOURCE_LIST_QUERY, RESOURCE_LIST_COLUMNS, query);
+    const { data, nextCursor } = await applyKeysetPagination(qb, {
+      cursor,
+      limit,
+      sortBy,
+      sortOrder,
+      sortColumnMap: RESOURCE_SORT_COLUMN_MAP,
+      idColumn: 'resource.id'
+    });
     for (const resource of data) {
       resource.isRegistered = this.registry.isRegistered(resource.name);
     }

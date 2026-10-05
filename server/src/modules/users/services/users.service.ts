@@ -1,11 +1,15 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { hashPassword } from '../../../common/utils/password-hash';
-import { ErrorKeys, VERIFICATION_TOKEN_EXPIRY_MS } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  USER_LIST_QUERY,
+  VERIFICATION_TOKEN_EXPIRY_MS
+} from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
@@ -19,8 +23,11 @@ import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { CursorPaginatedResponseDto } from '../../../common/dtos';
-import { escapeLikePattern } from '../../../common/utils/escape-like';
 import { applyKeysetPagination } from '../../../common/utils/apply-keyset-pagination.util';
+import {
+  applyListQuery,
+  type ListQueryColumns
+} from '../../../common/utils/apply-list-query.util';
 import type { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
 import { applyAbilityToUserQuery } from '../../../common/utils/apply-ability.util';
 
@@ -30,6 +37,28 @@ const USER_SORT_COLUMN_MAP: Record<string, string> = {
   lastName: 'user.lastName',
   isActive: 'user.isActive',
   createdAt: 'user.createdAt'
+};
+
+// The search casts the uuid to text to match a part of it; the ids filter
+// compares the column itself so that it keeps the primary key index.
+const USER_LIST_COLUMNS: ListQueryColumns<typeof USER_LIST_QUERY> = {
+  search: {
+    email: 'user.email',
+    firstName: 'user.firstName',
+    lastName: 'user.lastName',
+    id: 'CAST(user.id AS text)'
+  },
+  filters: {
+    email: 'user.email',
+    firstName: 'user.firstName',
+    lastName: 'user.lastName',
+    ids: 'user.id',
+    isActive: 'user.isActive',
+    isEmailVerified: 'user.isEmailVerified',
+    mfaEnabled: 'user.totpEnabledAt',
+    hasPassword: 'user.password',
+    isLocked: 'user.lockedUntil'
+  }
 };
 
 @Injectable()
@@ -125,7 +154,15 @@ export class UsersService {
       applyAbilityToUserQuery(qb, ability, 'search');
     }
 
-    this.applyUserFilters(qb, filters);
+    applyListQuery(qb, USER_LIST_QUERY, USER_LIST_COLUMNS, filters);
+
+    if (filters.role) {
+      // Separate inner join (not AndSelect) so the filter narrows the user set
+      // without trimming the roles loaded for display via leftJoinAndSelect.
+      qb.innerJoin('user.roles', 'roleFilter', 'roleFilter.name = :role', {
+        role: filters.role
+      });
+    }
 
     const { data, nextCursor } = await applyKeysetPagination(qb, {
       cursor,
@@ -137,67 +174,6 @@ export class UsersService {
     });
 
     return new CursorPaginatedResponseDto(data, nextCursor, limit);
-  }
-
-  private applyUserFilters(
-    qb: ReturnType<typeof this.userRepository.createQueryBuilder>,
-    filters: {
-      q?: string;
-      email?: string;
-      firstName?: string;
-      lastName?: string;
-      role?: string;
-      ids?: string[];
-      isActive?: boolean;
-    }
-  ): void {
-    if (filters.ids) {
-      qb.andWhere('user.id IN (:...ids)', { ids: filters.ids });
-    }
-
-    if (filters.q) {
-      const pattern = `%${escapeLikePattern(filters.q)}%`;
-      qb.andWhere(
-        new Brackets((sb) => {
-          sb.where('user.email ILIKE :q', { q: pattern })
-            .orWhere('user.firstName ILIKE :q', { q: pattern })
-            .orWhere('user.lastName ILIKE :q', { q: pattern })
-            .orWhere('CAST(user.id AS text) ILIKE :q', { q: pattern });
-        })
-      );
-    }
-
-    if (filters.email) {
-      qb.andWhere('user.email ILIKE :email', {
-        email: `%${escapeLikePattern(filters.email)}%`
-      });
-    }
-
-    if (filters.firstName) {
-      qb.andWhere('user.firstName ILIKE :firstName', {
-        firstName: `%${escapeLikePattern(filters.firstName)}%`
-      });
-    }
-
-    if (filters.lastName) {
-      qb.andWhere('user.lastName ILIKE :lastName', {
-        lastName: `%${escapeLikePattern(filters.lastName)}%`
-      });
-    }
-
-    if (filters.role) {
-      // Separate inner join (not AndSelect) so the filter narrows the user set
-      // without trimming the roles loaded for display via leftJoinAndSelect.
-      qb.innerJoin('user.roles', 'roleFilter', 'roleFilter.name = :role', {
-        role: filters.role
-      });
-    }
-
-    if (filters.isActive !== undefined) {
-      qb.andWhere('user.isActive = :isActive', {
-        isActive: filters.isActive
-      });
-    }
   }
 
   async findOne(id: string): Promise<User> {

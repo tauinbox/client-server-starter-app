@@ -9,8 +9,10 @@ import {
 } from '@ngrx/signals';
 import { updateEntity, withEntities } from '@ngrx/signals/entities';
 import type { ResourceResponse } from '@app/shared/types';
+import type { ResourceListQuery } from '@app/shared/constants';
 import { AuthService } from '@features/auth/services/auth.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
+import { withListFilters } from '@shared/store/with-list-filters';
 import type { UpdateResource } from '../services/rbac-admin.service';
 import { RbacAdminService } from '../services/rbac-admin.service';
 
@@ -23,6 +25,7 @@ export const ResourcesStore = signalStore(
   withCursorList<ResourceResponse>({
     fallbackKey: 'admin.store.errorLoadResourcesFailed'
   }),
+  withListFilters<ResourceListQuery>({}),
   withComputed((store) => ({
     resources: computed(() => store.entities())
   })),
@@ -33,13 +36,13 @@ export const ResourcesStore = signalStore(
     return {
       load(): void {
         void store.loadFirstPage((request) =>
-          rbacService.getResourcesCursor(request)
+          rbacService.getResourcesCursor(request, store.filters())
         );
       },
 
       loadMore(): void {
         void store.loadNextPage((request) =>
-          rbacService.getResourcesCursor(request)
+          rbacService.getResourcesCursor(request, store.filters())
         );
       },
 

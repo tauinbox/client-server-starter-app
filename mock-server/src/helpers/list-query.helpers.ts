@@ -1,0 +1,234 @@
+import {
+  BODY_UUID_PATTERN,
+  MAX_LIST_FILTER_LENGTH,
+  MAX_PAGE_SIZE
+} from '@app/shared/constants';
+import type {
+  ListFilterDefinition,
+  ListFilterKind,
+  ListFilterValueMap,
+  ListQuery,
+  ListQuerySpec
+} from '@app/shared/types';
+import { cursorQueryErrors } from './pagination.helpers';
+
+/** Mirrors the boolean @Transform: an empty param reads as unset. */
+export function parseOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === 'true' || value === true) return true;
+  if (value === 'false' || value === false) return false;
+  return undefined;
+}
+
+/** Mirrors the `toIdList` @Transform: a comma-separated string is split. */
+function parseIdList(value: unknown): unknown {
+  return typeof value === 'string' ? value.split(',') : value;
+}
+
+type FilterKindHandler<K extends ListFilterKind> = {
+  /** The class-validator messages, in the order the server reports them. */
+  errors: (
+    name: string,
+    value: unknown,
+    definition: ListFilterDefinition
+  ) => string[];
+  /** Called only for a value that passed `errors`. */
+  parse: (value: unknown) => ListFilterValueMap[K] | undefined;
+  matches: (fieldValue: unknown, wanted: ListFilterValueMap[K]) => boolean;
+};
+
+function textErrors(name: string, value: unknown): string[] {
+  if (typeof value === 'string') {
+    return value.length > MAX_LIST_FILTER_LENGTH
+      ? [
+          `${name} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`
+        ]
+      : [];
+  }
+  return [
+    `${name} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
+    `${name} must be a string`
+  ];
+}
+
+/** Postgres `ILIKE '%x%'`: a NULL column never matches. */
+function containsText(fieldValue: unknown, wanted: string): boolean {
+  if (fieldValue === null || fieldValue === undefined) return false;
+  return String(fieldValue).toLowerCase().includes(wanted.toLowerCase());
+}
+
+function booleanErrors(name: string, value: unknown): string[] {
+  return value === '' || parseOptionalBoolean(value) !== undefined
+    ? []
+    : [`${name} must be a boolean value`];
+}
+
+function isSetValue(fieldValue: unknown): boolean {
+  return fieldValue !== null && fieldValue !== undefined;
+}
+
+const FILTER_KINDS: { [K in ListFilterKind]: FilterKindHandler<K> } = {
+  boolean: {
+    errors: booleanErrors,
+    parse: parseOptionalBoolean,
+    matches: (fieldValue, wanted) => fieldValue === wanted
+  },
+  isSet: {
+    errors: booleanErrors,
+    parse: parseOptionalBoolean,
+    matches: (fieldValue, wanted) => isSetValue(fieldValue) === wanted
+  },
+  inFuture: {
+    errors: booleanErrors,
+    parse: parseOptionalBoolean,
+    // Postgres `col > now()`: a NULL timestamp is not in the future.
+    matches: (fieldValue, wanted) =>
+      (isSetValue(fieldValue) &&
+        new Date(String(fieldValue)).getTime() > Date.now()) === wanted
+  },
+  scopeIncludes: {
+    errors: (name, value, { values = [] }) =>
+      typeof value === 'string' && values.includes(value)
+        ? []
+        : [`${name} must be one of the following values: ${values.join(', ')}`],
+    parse: String,
+    matches: (fieldValue, wanted) =>
+      Array.isArray(fieldValue) &&
+      (fieldValue.length === 0 || fieldValue.includes(wanted))
+  },
+  contains: {
+    errors: textErrors,
+    parse: (value) => (value === '' ? undefined : String(value)),
+    matches: containsText
+  },
+  uuidList: {
+    errors: (name, value) => {
+      const ids = parseIdList(value);
+      if (!Array.isArray(ids)) return [`${name} must be an array`];
+      const errors: string[] = [];
+      if (
+        !ids.every((id) => typeof id === 'string' && BODY_UUID_PATTERN.test(id))
+      ) {
+        errors.push(`each value in ${name} must be a UUID`);
+      }
+      if (ids.length > MAX_PAGE_SIZE) {
+        errors.push(
+          `${name} must contain no more than ${MAX_PAGE_SIZE} elements`
+        );
+      }
+      return errors;
+    },
+    parse: (value) => (parseIdList(value) as string[]).map(String),
+    matches: (fieldValue, wanted) =>
+      wanted.some((id) => id.toLowerCase() === String(fieldValue).toLowerCase())
+  }
+};
+
+/**
+ * The messages of one param of `kind`, as the server reports them. For a param
+ * a route carries outside its list definition (the user list's `role`).
+ */
+export function filterParamErrors(
+  definition: ListFilterDefinition,
+  name: string,
+  value: unknown
+): string[] {
+  return value === undefined
+    ? []
+    : FILTER_KINDS[definition.kind].errors(name, value, definition);
+}
+
+/** Every query param a list built from `spec` accepts beside the paging ones. */
+export function listQueryKeys(spec: ListQuerySpec): string[] {
+  return ['q', ...Object.keys(spec.filters)];
+}
+
+/**
+ * Mirrors `ListQueryDto(spec)` intersected with `CursorPaginationQueryDto`
+ * under the server's ValidationPipe: the paging messages first, then `q`, then
+ * each filter in definition order.
+ *
+ * `extra` holds the messages of params the route declares on its own DTO. The
+ * server reports those before the inherited list params, so they go between.
+ */
+export function listQueryErrors(
+  query: Record<string, unknown>,
+  spec: ListQuerySpec,
+  options: {
+    sortColumns: readonly string[];
+    extraAllowed?: readonly string[];
+    extra?: string[];
+  }
+): string[] {
+  const { sortColumns, extraAllowed = [], extra = [] } = options;
+  const filterErrors = Object.entries(spec.filters).flatMap(
+    ([name, definition]) => filterParamErrors(definition, name, query[name])
+  );
+  return [
+    ...cursorQueryErrors(query, {
+      extraAllowed: [...listQueryKeys(spec), ...extraAllowed],
+      sortColumns
+    }),
+    ...extra,
+    ...(query['q'] === undefined ? [] : textErrors('q', query['q'])),
+    ...filterErrors
+  ];
+}
+
+/** Call only after `listQueryErrors` returned none. */
+export function parseListQuery<S extends ListQuerySpec>(
+  query: Record<string, unknown>,
+  spec: S
+): ListQuery<S> {
+  const parsed: Record<string, unknown> = {};
+  if (typeof query['q'] === 'string' && query['q'] !== '') {
+    parsed['q'] = query['q'];
+  }
+  for (const [name, definition] of Object.entries(spec.filters)) {
+    if (query[name] === undefined) continue;
+    parsed[name] = FILTER_KINDS[definition.kind].parse(query[name]);
+  }
+  // Each key was parsed by the handler of the kind that `spec` gives it.
+  return parsed as ListQuery<S>;
+}
+
+function matchesFilter<K extends ListFilterKind>(
+  kind: K,
+  fieldValue: unknown,
+  wanted: unknown
+): boolean {
+  // parseListQuery produced `wanted` for this kind.
+  return FILTER_KINDS[kind].matches(
+    fieldValue,
+    wanted as ListFilterValueMap[K]
+  );
+}
+
+/**
+ * Mirrors `applyListQuery`: a row passes when any search field contains `q`
+ * and every filter that is set matches.
+ */
+export function filterByListQuery<T extends object, S extends ListQuerySpec>(
+  items: T[],
+  spec: S,
+  query: ListQuery<S>
+): T[] {
+  const values: Readonly<Record<string, unknown>> = query;
+  const { q } = query;
+  return items.filter((item) => {
+    if (
+      q &&
+      !spec.search.some((field) => containsText(Reflect.get(item, field), q))
+    ) {
+      return false;
+    }
+    return Object.entries(spec.filters).every(([name, definition]) => {
+      const wanted = values[name];
+      if (wanted === undefined) return true;
+      return matchesFilter(
+        definition.kind,
+        Reflect.get(item, definition.field ?? name),
+        wanted
+      );
+    });
+  });
+}

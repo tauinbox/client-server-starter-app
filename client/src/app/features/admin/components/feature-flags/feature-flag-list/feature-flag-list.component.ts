@@ -50,7 +50,15 @@ import {
 } from '@shared/components/list-skeleton/list-skeleton.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { FeatureFlagResponse } from '@app/shared/types';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  APP_ENVIRONMENTS,
+  ErrorKeys,
+  type FeatureFlagListQuery
+} from '@app/shared/constants';
+import {
+  NxsListFiltersComponent,
+  type ListFilterControl
+} from '@shared/forms/nxs-list-filters/nxs-list-filters.component';
 import { LayoutService } from '@core/services/layout.service';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -97,6 +105,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
     InfiniteScrollDirective,
     TemplateRowOfDirective,
     ListSkeletonComponent,
+    NxsListFiltersComponent,
     TranslocoDirective
   ],
   templateUrl: './feature-flag-list.component.html',
@@ -124,6 +133,48 @@ export class FeatureFlagListComponent implements OnInit {
     this.#store.loadMore();
   }
   readonly flags = this.#store.entities;
+  readonly filters = this.#store.filters;
+  readonly hasActiveFilters = this.#store.hasActiveFilters;
+
+  readonly filterControls: readonly ListFilterControl<FeatureFlagListQuery>[] =
+    [
+      {
+        kind: 'select',
+        key: 'enabled',
+        label: 'admin.featureFlags.filterStatus',
+        allLabel: 'common.all',
+        options: [
+          { value: true, label: 'admin.featureFlags.statusEnabled' },
+          { value: false, label: 'admin.featureFlags.statusDisabled' }
+        ]
+      },
+      {
+        kind: 'select',
+        key: 'public',
+        label: 'admin.featureFlags.tableHeaderPublic',
+        allLabel: 'common.all',
+        options: [
+          { value: true, label: 'common.yes' },
+          { value: false, label: 'common.no' }
+        ]
+      },
+      {
+        kind: 'select',
+        key: 'environment',
+        label: 'admin.featureFlags.tableHeaderEnvironments',
+        allLabel: 'common.all',
+        options: APP_ENVIRONMENTS.map((environment) => ({
+          value: environment,
+          label: environment,
+          literal: true
+        }))
+      }
+    ];
+
+  applyFilters(filters: FeatureFlagListQuery): void {
+    this.#store.setFilters(filters);
+    this.#store.load();
+  }
 
   readonly skeletonCells: readonly ListSkeletonCell[] = [
     'medium',

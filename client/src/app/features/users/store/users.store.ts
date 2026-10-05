@@ -18,6 +18,7 @@ import {
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { NotifyService } from '@core/services/notify.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
+import { withListFilters } from '@shared/store/with-list-filters';
 import type { CursorPageRequest } from '@shared/utils/pagination.utils';
 import { UserService } from '../services/user.service';
 import type { MfaResetRequest } from '../services/user.service';
@@ -33,17 +34,16 @@ import type {
 type UsersState = {
   detailLoading: boolean;
   detailError: string | null;
-  filters: UserSearch;
 };
 
 export const UsersStore = signalStore(
   withEntities<User>(),
   withState<UsersState>({
     detailLoading: false,
-    detailError: null,
-    filters: {}
+    detailError: null
   }),
   withCursorList<User>({ fallbackKey: 'users.store.errorLoadFailed' }),
+  withListFilters<UserSearch>({}),
   withComputed((store) => ({
     displayedUsers: computed(() => store.entities()),
     // Keyset pagination reports no total, so the count shown is what has been
@@ -68,13 +68,7 @@ export const UsersStore = signalStore(
         sortBy: (request.sortBy as UserSortColumn) ?? 'createdAt',
         sortOrder: request.sortOrder ?? 'desc'
       };
-      const hasFilters = !!(
-        filters.q ||
-        filters.role ||
-        filters.isActive !== undefined ||
-        filters.includeDeleted
-      );
-      return hasFilters
+      return store.hasActiveFilters()
         ? userService.searchCursor(filters, params)
         : userService.getAllCursor(params);
     }
@@ -155,10 +149,6 @@ export const UsersStore = signalStore(
             patchState(store, setEntity(user));
           })
         );
-      },
-
-      setFilters(filters: UserSearch): void {
-        patchState(store, { filters });
       }
     };
   })

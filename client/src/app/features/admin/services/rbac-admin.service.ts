@@ -10,8 +10,10 @@ export type UpdateResource = {
 };
 
 import type { CursorPaginatedResponse } from '@app/shared/types';
+import type { ResourceListQuery } from '@app/shared/constants';
 import {
   cursorParams,
+  listQueryParams,
   type CursorPageRequest
 } from '@shared/utils/pagination.utils';
 
@@ -25,11 +27,12 @@ export class RbacAdminService {
 
   /** One page of resources for the admin list page. */
   getResourcesCursor(
-    request: CursorPageRequest
+    request: CursorPageRequest,
+    query: ResourceListQuery = {}
   ): Observable<CursorPaginatedResponse<ResourceResponse>> {
     return this.#http.get<CursorPaginatedResponse<ResourceResponse>>(
       `${RBAC_API_V1}/resources/cursor`,
-      { params: cursorParams(request) }
+      { params: listQueryParams(cursorParams(request), query) }
     );
   }
 

@@ -12,6 +12,7 @@ import { ResourcesStore } from '../../../store/resources.store';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
 import type { ResourceResponse } from '@app/shared/types';
+import type { ResourceListQuery } from '@app/shared/constants';
 
 const mockResource: ResourceResponse = {
   id: 'res-1',
@@ -36,6 +37,8 @@ describe('ResourceListComponent', () => {
     isLoadingMore: ReturnType<typeof signal<boolean>>;
     hasMore: ReturnType<typeof signal<boolean>>;
     resources: ReturnType<typeof signal<ResourceResponse[]>>;
+    filters: ReturnType<typeof signal<ResourceListQuery>>;
+    setFilters: ReturnType<typeof vi.fn>;
     load: ReturnType<typeof vi.fn>;
     loadMore: ReturnType<typeof vi.fn>;
     updateResource: ReturnType<typeof vi.fn>;
@@ -72,6 +75,8 @@ describe('ResourceListComponent', () => {
       isLoadingMore: signal(false),
       hasMore: signal(false),
       resources: signal([mockResource]),
+      filters: signal({}),
+      setFilters: vi.fn(),
       load: vi.fn(),
       loadMore: vi.fn(),
       updateResource: vi.fn().mockReturnValue(of({} as ResourceResponse)),

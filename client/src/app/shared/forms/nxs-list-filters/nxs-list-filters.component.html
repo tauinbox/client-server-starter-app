@@ -1,0 +1,39 @@
+<div *transloco="let t">
+  <div class="filter-fields">
+    <nxs-form-field
+      [field]="searchForm.q"
+      [label]="searchLabel()"
+      prefixIcon="search"
+    />
+
+    @for (control of selects(); track control.key) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ t(control.label) }}</mat-label>
+        <mat-select
+          [value]="selectedIndex(control)"
+          (selectionChange)="onSelect(control, $event.value)"
+        >
+          <mat-option value="">{{ t(control.allLabel) }}</mat-option>
+          @for (option of control.options; track $index) {
+            <mat-option [value]="'' + $index">{{
+              option.literal ? option.label : t(option.label)
+            }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+  </div>
+
+  @if (checkboxes().length > 0) {
+    <div class="filter-toggles">
+      @for (control of checkboxes(); track control.key) {
+        <mat-checkbox
+          [checked]="isChecked(control)"
+          (change)="onCheck(control, $event.checked)"
+        >
+          {{ t(control.label) }}
+        </mat-checkbox>
+      }
+    </div>
+  }
+</div>

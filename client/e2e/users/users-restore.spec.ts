@@ -1,7 +1,12 @@
 import type { Page } from '@playwright/test';
 import { mockId } from '../fixtures/ids';
 
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  listResponse,
+  loginViaUi,
+  test
+} from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import type { MockUser } from '../fixtures/mock-data';
 
@@ -44,11 +49,17 @@ async function search(
   q: string,
   opts: { includeDeleted: boolean }
 ): Promise<void> {
-  await page.getByLabel('Search').fill(q);
+  // The checkbox sends its request at once and the search after a pause, so
+  // the wait starts first and matches whichever request carries both.
+  const response = listResponse(page, '/api/v1/users/search/cursor', {
+    q,
+    ...(opts.includeDeleted ? { includeDeleted: 'true' } : {})
+  });
   await page
     .getByRole('checkbox', { name: 'Include deleted users' })
     .setChecked(opts.includeDeleted);
-  await page.getByRole('button', { name: 'Search' }).click();
+  await page.getByLabel('Search').fill(q);
+  await response;
 }
 
 const restoreButton = (page: Page, row: ReturnType<Page['getByRole']>) =>

@@ -2,13 +2,11 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
   ALLOWED_USER_SORT_COLUMNS,
-  BODY_UUID_PATTERN,
   ErrorKeys,
   MAX_NAME_LENGTH,
-  MAX_PAGE_SIZE,
-  MAX_USER_FILTER_LENGTH,
   STEP_UP_OPERATION,
-  TOTP_DIGITS
+  TOTP_DIGITS,
+  USER_LIST_QUERY
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { changedFields } from '@app/shared/utils/changed-fields';
@@ -21,9 +19,15 @@ import {
 } from '../utils/validation';
 import {
   cursorPaginate,
-  cursorQueryErrors,
   parseCursorQuery
 } from '../helpers/pagination.helpers';
+import {
+  filterByListQuery,
+  filterParamErrors,
+  listQueryErrors,
+  parseListQuery,
+  parseOptionalBoolean
+} from '../helpers/list-query.helpers';
 import {
   findUserByEmail,
   findUserById,
@@ -74,88 +78,24 @@ function pushUserCrudEvent(action: UserCrudAction, userId: string): void {
   );
 }
 
-// Mirrors the real server's UserFiltersQueryDto: an array-valued query param
-// (?q[]=a&q[]=b) must be rejected 400 rather than coerced, a filter longer
-// than the shared cap is a 400, and a boolean param that spells neither
-// "true" nor "false" is a 400 rather than a silently dropped filter.
-const STRING_FILTER_PARAMS = ['q', 'email', 'firstName', 'lastName', 'role'];
-const BOOLEAN_FILTER_PARAMS = ['isActive', 'includeDeleted'];
-
-/** Filters the user list routes carry on top of the shared paging params. */
-const USER_QUERY_KEYS = [
-  ...STRING_FILTER_PARAMS,
-  ...BOOLEAN_FILTER_PARAMS,
-  'ids'
-];
-
-/** Mirrors the DTO's `ids` @Transform: a comma-separated string is split. */
-function parseIds(value: unknown): unknown {
-  return typeof value === 'string' ? value.split(',') : value;
-}
-
-/** Mirrors `@IsArray`, `@IsUUID('all', { each: true })`, `@ArrayMaxSize`. */
-function idsErrors(value: unknown): string[] {
-  if (value === undefined) return [];
-  const ids = parseIds(value);
-  if (!Array.isArray(ids)) return ['ids must be an array'];
-  const errors: string[] = [];
-  if (
-    !ids.every((id) => typeof id === 'string' && BODY_UUID_PATTERN.test(id))
-  ) {
-    errors.push('each value in ids must be a UUID');
-  }
-  if (ids.length > MAX_PAGE_SIZE) {
-    errors.push(`ids must contain no more than ${MAX_PAGE_SIZE} elements`);
-  }
-  return errors;
-}
-
-/** Mirrors the DTO's boolean @Transform: an empty param reads as unset. */
-function parseOptionalBoolean(value: unknown): boolean | undefined {
-  if (value === 'true' || value === true) return true;
-  if (value === 'false' || value === false) return false;
-  return undefined;
-}
-
-function findFilterValidationError(
-  query: Record<string, unknown>
-): string | null {
-  for (const key of STRING_FILTER_PARAMS) {
-    const value = query[key];
-    if (value === undefined) continue;
-    if (typeof value !== 'string') return `${key} must be a string`;
-    if (value.length > MAX_USER_FILTER_LENGTH) {
-      return `${key} must be shorter than or equal to ${MAX_USER_FILTER_LENGTH} characters`;
-    }
-  }
-
-  for (const key of BOOLEAN_FILTER_PARAMS) {
-    const value = query[key];
-    if (value === undefined || value === '') continue;
-    if (parseOptionalBoolean(value) === undefined) {
-      return `${key} must be a boolean value`;
-    }
-  }
-
-  return null;
-}
-
 /**
- * Every user list route validates the shared paging params on top of its own
- * filters. Filter messages come first so the existing envelope order is
- * unchanged for a request that only trips a filter rule.
+ * Mirrors the server's SearchUsersCursorQueryDto: the shared user list
+ * definition plus `role` and `includeDeleted`, which UserFiltersQueryDto
+ * declares itself and which the server therefore reports first.
  */
 function userQueryErrors(query: Record<string, unknown>): string[] {
-  const filterError = findFilterValidationError(query);
-  const pagingErrors = cursorQueryErrors(query, {
-    extraAllowed: USER_QUERY_KEYS,
-    sortColumns: ALLOWED_USER_SORT_COLUMNS
+  return listQueryErrors(query, USER_LIST_QUERY, {
+    sortColumns: ALLOWED_USER_SORT_COLUMNS,
+    extraAllowed: ['role', 'includeDeleted'],
+    extra: [
+      ...filterParamErrors({ kind: 'contains' }, 'role', query['role']),
+      ...filterParamErrors(
+        { kind: 'boolean' },
+        'includeDeleted',
+        query['includeDeleted']
+      )
+    ]
   });
-  return [
-    ...(filterError ? [filterError] : []),
-    ...idsErrors(query['ids']),
-    ...pagingErrors
-  ];
 }
 
 /**
@@ -163,52 +103,18 @@ function userQueryErrors(query: Record<string, unknown>): string[] {
  * every filter. Call it only after `userQueryErrors` returned none.
  */
 function filterUsers(query: Record<string, unknown>): MockUser[] {
-  const { q, email, firstName, lastName, role, isActive } = query;
-  const includeDeleted = String(query['includeDeleted']) === 'true';
-  let users = Array.from(getState().users.values());
-
-  if (!includeDeleted) {
-    users = users.filter((u) => !u.deletedAt);
-  }
-
-  const ids = parseIds(query['ids']);
-  if (Array.isArray(ids)) {
-    const wanted = new Set(ids.map((id) => String(id).toLowerCase()));
-    users = users.filter((u) => wanted.has(u.id.toLowerCase()));
-  }
-
-  if (q) {
-    const qStr = String(q).toLowerCase();
-    users = users.filter(
-      (u) =>
-        u.email.toLowerCase().includes(qStr) ||
-        u.firstName.toLowerCase().includes(qStr) ||
-        u.lastName.toLowerCase().includes(qStr) ||
-        u.id.toLowerCase().includes(qStr)
-    );
-  }
-  if (email) {
-    const emailStr = String(email).toLowerCase();
-    users = users.filter((u) => u.email.toLowerCase().includes(emailStr));
-  }
-  if (firstName) {
-    const fnStr = String(firstName).toLowerCase();
-    users = users.filter((u) => u.firstName.toLowerCase().includes(fnStr));
-  }
-  if (lastName) {
-    const lnStr = String(lastName).toLowerCase();
-    users = users.filter((u) => u.lastName.toLowerCase().includes(lnStr));
-  }
-  if (role) {
-    const roleStr = String(role);
-    users = users.filter((u) => u.roles.includes(roleStr));
-  }
-  const activeBool = parseOptionalBoolean(isActive);
-  if (activeBool !== undefined) {
-    users = users.filter((u) => u.isActive === activeBool);
-  }
-
-  return users;
+  const includeDeleted = parseOptionalBoolean(query['includeDeleted']) === true;
+  const role = query['role'];
+  const users = Array.from(getState().users.values()).filter(
+    (u) =>
+      (includeDeleted || !u.deletedAt) &&
+      (!role || u.roles.includes(String(role)))
+  );
+  return filterByListQuery(
+    users,
+    USER_LIST_QUERY,
+    parseListQuery(query, USER_LIST_QUERY)
+  );
 }
 
 function listUsers(req: Request, res: Response): void {

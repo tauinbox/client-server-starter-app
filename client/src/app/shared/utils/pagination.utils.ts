@@ -20,6 +20,9 @@ export type CursorPageRequest = {
 
 export const CURSOR_PAGE_SIZE = DEFAULT_CURSOR_PAGE_SIZE;
 
+/** Idle time before a typed search term reaches the server. */
+export const LIST_SEARCH_DEBOUNCE_MS = 350;
+
 /**
  * Only the params the caller set are sent, so an omitted value keeps the
  * server's own default rather than the client duplicating it. A null cursor is
@@ -45,4 +48,30 @@ export function cursorParams({
     params = params.set('sortOrder', sortOrder);
   }
   return params;
+}
+
+/** A filter value that narrows a list: an empty string or array does not. */
+export function isActiveFilterValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === '') return false;
+  return !Array.isArray(value) || value.length > 0;
+}
+
+/**
+ * Adds the search and filter params of a list query to `params`. A value that
+ * narrows nothing is left off, so the server applies no filter for it; a list
+ * is sent comma-separated, the form the server splits.
+ */
+export function listQueryParams(
+  params: HttpParams,
+  query: Readonly<Record<string, unknown>>
+): HttpParams {
+  let next = params;
+  for (const [name, value] of Object.entries(query)) {
+    if (!isActiveFilterValue(value)) continue;
+    next = next.set(
+      name,
+      Array.isArray(value) ? value.join(',') : String(value)
+    );
+  }
+  return next;
 }

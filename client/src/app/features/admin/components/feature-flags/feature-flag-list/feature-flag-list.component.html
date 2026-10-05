@@ -11,10 +11,22 @@
   </mat-card-header>
 
   <mat-card-content>
+    <nxs-list-filters
+      [value]="filters()"
+      [controls]="filterControls"
+      (valueChange)="applyFilters($event)"
+    />
+
     @if (loading() && flags().length === 0) {
       <nxs-list-skeleton [cells]="skeletonCells" />
     } @else if (flags().length === 0) {
-      <p class="empty-state">{{ t('admin.featureFlags.empty') }}</p>
+      <p class="empty-state">
+        {{
+          hasActiveFilters()
+            ? t('common.noFilterResults')
+            : t('admin.featureFlags.empty')
+        }}
+      </p>
     } @else if (layout.isHandset()) {
       <div class="flag-card-list">
         @for (flag of flags(); track flag.id) {

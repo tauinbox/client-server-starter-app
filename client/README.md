@@ -374,6 +374,10 @@ src/app/
     │                       # (<nxs-chips-autocomplete>) is a mat-chip-grid with a
     │                       # mat-autocomplete. It has a free-text mode and a mode with static or
     │                       # asynchronous option lists. DEFAULT_ERROR_KEYS is the error registry.
+    │                       # NxsListFiltersComponent (<nxs-list-filters>) is the search and filter
+    │                       # bar of every list page. It renders a search field and one select or
+    │                       # checkbox per ListFilterControl, and emits the next filters: the
+    │                       # search after LIST_SEARCH_DEBOUNCE_MS (350 ms), a control at once.
     │                       # This directory has no barrel. Import each module directly. Refer to
     │                       # "Import hygiene and barrels" in the root README.
     ├── models/             # user.types
@@ -394,7 +398,10 @@ src/app/
     │                       # switch changes the dates at runtime. It is impure for this reason.
     ├── services/           # AdaptiveDialogService opens a confirm dialog as a bottom sheet on a
     │                       # handset and as a dialog on a desktop.
-    ├── store/              # withCursorList<T>({ fallbackKey }) is the shared cursor-list feature
+    ├── store/              # withListFilters<F>(initial) holds the filters of a list store:
+    │                       # filters, hasActiveFilters and setFilters. The store's load() sends
+    │                       # filters() through listQueryParams (shared/utils/pagination.utils).
+    │                       # withCursorList<T>({ fallbackKey }) is the shared cursor-list feature
     │                       # that each list store composes. It owns the cursor bookkeeping, the
     │                       # in-flight guards, the append of the next page and the stale-response
     │                       # guard.
@@ -628,8 +635,8 @@ background.
 
 `UsersStore` is a route-level store at `/users`. It uses `withEntities<User>()`.
 
-Its state holds `filters: UserSearch`. An empty filter shows all users. A filled filter starts a
-search through `GET /users/search/cursor`.
+It composes `withListFilters<UserSearch>()`, which holds `filters`. An empty filter shows all
+users. A filled filter starts a search through `GET /users/search/cursor`.
 
 The store has one `load()` and `loadMore()` pair with **infinite scroll**. The page size is 20.
 `upsertEntities` appends each page. The `hasMore` computed signal controls the sentinel. The
@@ -637,8 +644,11 @@ The store has one `load()` and `loadMore()` pair with **infinite scroll**. The p
 
 `setFilters()` and `setSorting()` change the state. The component calls `load()` after each change.
 
-The search field of the list has a limit of 255 characters (`MAX_USER_FILTER_LENGTH`). The search
-endpoint answers a longer filter with a 400. Thus the form blocks the submit instead.
+The list renders its filters with `<nxs-list-filters>`: the search, the selects Role, Status,
+Email, Two-factor, Lock and Sign-in, and the Include deleted checkbox. Each change applies at once
+(the search after 350 ms of idle time); there is no Search or Clear button. The search field has a
+limit of 255 characters (`MAX_LIST_FILTER_LENGTH`). The search endpoint answers a longer filter with
+a 400, thus the bar does not send it and the field shows the error.
 
 #### RbacMetadataStore
 
