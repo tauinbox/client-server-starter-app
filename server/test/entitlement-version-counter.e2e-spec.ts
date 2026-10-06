@@ -77,18 +77,18 @@ runWithRedis('entitlement version counter (real Redis)', () => {
 
     // The counter is deliberately outside the Keyv JSON envelope, which is what
     // makes INCR possible - reading it back through cache-manager must miss.
-    expect(await cache.get(COUNTER_KEY)).toBeNull();
+    expect(await cache.get(COUNTER_KEY)).toBeUndefined();
   });
 
   it('starts at version 0 with no write, then keys per-user entries by the counter', async () => {
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:v0')).not.toBeNull();
+    expect(await cache.get('entitlements:user:u1:v0')).toBeDefined();
     expect(await redis.exists(COUNTER_KEY)).toBe(0);
 
     await service.invalidateAll();
     // The bumped suffix orphans the previous entry instead of serving it.
-    expect(await cache.get('entitlements:user:u1:v1')).toBeNull();
+    expect(await cache.get('entitlements:user:u1:v1')).toBeUndefined();
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:v1')).not.toBeNull();
+    expect(await cache.get('entitlements:user:u1:v1')).toBeDefined();
   });
 });

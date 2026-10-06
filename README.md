@@ -14,7 +14,7 @@ management and theming.
 | Database | PostgreSQL (TypeORM) | 0.3.31 |
 | Language | TypeScript | 6.0.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
-| Client Tests | Vitest (unit), Playwright (e2e) | 4.1.11 / 1.63.0 |
+| Client Tests | Vitest (unit), Playwright (e2e) | 5.0.3 / 1.63.0 |
 | Server Tests | Jest (unit + e2e) | 30.5.2 |
 
 ## Features

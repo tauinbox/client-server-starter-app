@@ -2776,10 +2776,10 @@ version in `server/package.json` automatically.
 | PostgreSQL | through `pg` 8.23.1 |
 | Passport | 0.7.0 |
 | bcrypt | 6.0.0 |
-| class-validator | 0.14.4 |
+| class-validator | 0.15.1 |
 | @nestjs/swagger | 12.0.2 |
 | @nestjs/schedule | 12.0.2 |
-| cache-manager | 6.4.3 |
+| cache-manager | 7.2.9 |
 | @keyv/redis | 5.1.6 |
 | ioredis | 5.11.1 |
 | TypeScript | 6.0.3 |

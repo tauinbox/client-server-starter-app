@@ -12,7 +12,7 @@ export function createMockCache(): Cache {
 
   const cache = {
     stores: [],
-    get: jest.fn((key: string) => Promise.resolve(entries.get(key) ?? null)),
+    get: jest.fn((key: string) => Promise.resolve(entries.get(key))),
     set: jest.fn((key: string, value: unknown) => {
       entries.set(key, value);
       return Promise.resolve(value);

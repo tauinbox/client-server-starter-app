@@ -1,4 +1,4 @@
-import type { RedisOptions } from 'ioredis';
+import type { RedisOptions } from 'bullmq';
 
 /**
  * Splits a REDIS_URL into the host/port/credentials/database shape BullMQ
