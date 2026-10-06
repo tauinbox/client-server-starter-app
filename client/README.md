@@ -1275,10 +1275,10 @@ name that gets past the hook. It does this during the changelog generation, and 
 | @ngrx/signals | 22.0.1 |
 | @jsverse/transloco | 8.4.0 |
 | RxJS | 7.8.2 |
-| Vitest | 4.1.11 |
+| Vitest | 5.0.3 |
 | Playwright | 1.63.0 |
 | ESLint | 10.12.0 |
 | Prettier | 3.9.9 |
 | Stylelint | 17.16.0 |
-| commitlint | 20.5.3 |
-| commit-and-tag-version | 12.7.3 |
+| commitlint | 21.2.3 |
+| commit-and-tag-version | 13.2.1 |
