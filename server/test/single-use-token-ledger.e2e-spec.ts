@@ -76,6 +76,6 @@ runWithRedis('single-use token ledger (real Redis)', () => {
     await ledger.claim(CLAIM_ID, 60_000);
 
     expect(await redis.get(`${KEY_PREFIX}${CLAIM_ID}`)).toBe('1');
-    expect(await cache.get(`${KEY_PREFIX}${CLAIM_ID}`)).toBeNull();
+    expect(await cache.get(`${KEY_PREFIX}${CLAIM_ID}`)).toBeUndefined();
   });
 });
