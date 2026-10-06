@@ -10,11 +10,11 @@ management and theming.
 |-------|-----------|---------|
 | Frontend | Angular | 21.2.25 |
 | UI Library | Angular Material + CDK | 21.2.14 |
-| Backend | NestJS | 11.2.1 |
+| Backend | NestJS | 11.2.7 |
 | Database | PostgreSQL (TypeORM) | 0.3.31 |
 | Language | TypeScript | 5.9.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
-| Client Tests | Vitest (unit), Playwright (e2e) | 4.1.11 / 1.62.1 |
+| Client Tests | Vitest (unit), Playwright (e2e) | 4.1.11 / 1.63.0 |
 | Server Tests | Jest (unit + e2e) | 30.5.2 |
 
 ## Features
