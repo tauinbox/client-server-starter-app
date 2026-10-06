@@ -1,5 +1,5 @@
 import {
-  BODY_UUID_PATTERN,
+  UUID_PATTERN,
   MAX_LIST_FILTER_LENGTH,
   MAX_PAGE_SIZE
 } from '@app/shared/constants';
@@ -111,9 +111,7 @@ const FILTER_KINDS: { [K in ListFilterKind]: FilterKindHandler<K> } = {
       const ids = parseIdList(value);
       if (!Array.isArray(ids)) return [`${name} must be an array`];
       const errors: string[] = [];
-      if (
-        !ids.every((id) => typeof id === 'string' && BODY_UUID_PATTERN.test(id))
-      ) {
+      if (!ids.every((id) => typeof id === 'string' && UUID_PATTERN.test(id))) {
         errors.push(`each value in ${name} must be a UUID`);
       }
       if (ids.length > MAX_PAGE_SIZE) {

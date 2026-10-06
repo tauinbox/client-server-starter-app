@@ -596,9 +596,8 @@ describe('feature-flag validation parity with server', () => {
       ]);
     });
 
-    // `@IsUUID()` constrains the version and variant nibbles; the pattern
-    // ParseUUIDPipe applies to the `:id` route param does not.
-    it('rejects a body userId the route param pattern would accept', async () => {
+    // `@IsUUID()` constrains the version and variant nibbles.
+    it('rejects a body userId with no RFC version or variant', async () => {
       await expect(
         errorsOf({ userId: '11111111-1111-1111-1111-111111111111' })
       ).resolves.toEqual(['userId must be a UUID']);

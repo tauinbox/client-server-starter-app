@@ -1,6 +1,7 @@
 import { register } from 'prom-client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
+import { HealthIndicatorService } from '@nestjs/terminus';
 import {
   DEPENDENCY_HEALTH_REF,
   DEPENDENCY_UP_METRIC_NAME,
@@ -75,6 +76,7 @@ describe('dependency-up gauge', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           SmtpHealthIndicator,
+          HealthIndicatorService,
           { provide: MailService, useValue: mailService },
           { provide: DEPENDENCY_HEALTH_REF, useValue: ref }
         ]

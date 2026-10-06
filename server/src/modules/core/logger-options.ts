@@ -54,8 +54,9 @@ interface SerializedError {
  * allowlist, and mask addresses in the text that remains. Add a field here
  * only after you confirm that it cannot carry PII or a secret.
  *
- * pino-http runs the standard serializer before this one, but the logger that
- * nestjs-pino uses outside a request is plain pino and passes the raw Error.
+ * pino-http runs the standard serializer before this one. nestjs-pino also
+ * logs outside a request through the pino-http logger. A plain pino logger
+ * passes the raw Error, so the Error branch keeps the allowlist for that case.
  */
 export function serializeLoggedError(value: unknown): unknown {
   if (typeof value === 'string') return maskEmailsInText(value);

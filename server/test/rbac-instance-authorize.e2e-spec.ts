@@ -219,8 +219,8 @@ describe('Instance-level @Authorize re-check', () => {
   // ── Users: GET /users/:id ────────────────────────────────────────
 
   describe('GET /api/v1/users/:id with conditional read:User ownership rule', () => {
-    const SELF_ID = '11111111-1111-1111-1111-111111111111';
-    const OTHER_ID = '22222222-2222-2222-2222-222222222222';
+    const SELF_ID = '11111111-1111-4111-8111-111111111111';
+    const OTHER_ID = '22222222-2222-4222-8222-222222222222';
 
     beforeEach(() => {
       mocks.usersService.findOne.mockImplementation((id: string) => {
@@ -248,8 +248,8 @@ describe('Instance-level @Authorize re-check', () => {
   // ── Roles: GET /roles/:id ────────────────────────────────────────
 
   describe('GET /api/v1/roles/:id with fieldMatch isSystem=false', () => {
-    const SYSTEM_ROLE = '33333333-3333-3333-3333-333333333333';
-    const CUSTOM_ROLE = '44444444-4444-4444-4444-444444444444';
+    const SYSTEM_ROLE = '33333333-3333-4333-8333-333333333333';
+    const CUSTOM_ROLE = '44444444-4444-4444-8444-444444444444';
 
     beforeEach(() => {
       mocks.roleService.findOne.mockImplementation((id: string) => {
@@ -280,8 +280,8 @@ describe('Instance-level @Authorize re-check', () => {
   });
 
   describe('PATCH /api/v1/roles/:id with conditional update rule', () => {
-    const ROLE_A = '55555555-5555-5555-5555-555555555555';
-    const ROLE_B = '66666666-6666-6666-6666-666666666666';
+    const ROLE_A = '55555555-5555-4555-8555-555555555555';
+    const ROLE_B = '66666666-6666-4666-8666-666666666666';
 
     beforeEach(() => {
       mocks.roleService.findOne.mockImplementation((id: string) => {
@@ -319,8 +319,8 @@ describe('Instance-level @Authorize re-check', () => {
   // RBAC resources: PATCH /rbac/resources/:id
 
   describe('PATCH /api/v1/rbac/resources/:id with fieldMatch on name', () => {
-    const USERS_RESOURCE = '77777777-7777-7777-7777-777777777777';
-    const ROLES_RESOURCE = '88888888-8888-8888-8888-888888888888';
+    const USERS_RESOURCE = '77777777-7777-4777-8777-777777777777';
+    const ROLES_RESOURCE = '88888888-8888-4888-8888-888888888888';
 
     beforeEach(() => {
       mocks.resourceService.findOne.mockImplementation((id: string) => {

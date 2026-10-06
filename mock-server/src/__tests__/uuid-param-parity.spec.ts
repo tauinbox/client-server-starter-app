@@ -116,6 +116,18 @@ describe('ParseUUIDPipe parity with server', () => {
     expect(body['errors']).toBeUndefined();
   });
 
+  it('rejects an id with no RFC version or variant', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await send(
+      'GET',
+      '/api/v1/users/11111111-1111-1111-1111-111111111111',
+      token
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   it('runs after the auth guard, as the pipe does on the server', async () => {
     const res = await fetch(`${baseUrl}/api/v1/users/${BAD_ID}`);
 

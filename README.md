@@ -1,6 +1,6 @@
 # Fullstack Starter App
 
-A full-stack TypeScript monorepo. It has an **Angular 22** client and a **NestJS 11** server, and it
+A full-stack TypeScript monorepo. It has an **Angular 22** client and a **NestJS 12** server, and it
 uses PostgreSQL through TypeORM. It gives a production-ready foundation with authentication, user
 management and theming.
 
@@ -10,7 +10,7 @@ management and theming.
 |-------|-----------|---------|
 | Frontend | Angular | 22.2.1 |
 | UI Library | Angular Material + CDK | 22.2.1 |
-| Backend | NestJS | 11.2.7 |
+| Backend | NestJS | 12.1.2 |
 | Database | PostgreSQL (TypeORM) | 0.3.31 |
 | Language | TypeScript | 6.0.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
@@ -964,7 +964,7 @@ fullstack-starter-app/
 │   │   └── shared/         # Shared components (confirm dialog)
 │   ├── src/styles/         # SCSS architecture (themes, utilities, components)
 │   └── e2e/                # Playwright E2E tests (uses mock-server)
-├── server/                 # NestJS 11 API
+├── server/                 # NestJS 12 API
 │   ├── src/modules/
 │   │   ├── core/           # Config, caching, database, scheduling
 │   │   │   ├── auth/           # JWT + refresh token auth, lockout, verification, reset, permissions endpoint
@@ -1034,9 +1034,9 @@ calls, because a regular expression here accepted thirteen shapes that the serve
 unknown properties first, and then each property as the DTO declares it. Thus a handler composes its
 DTO from them and answers with the envelope of the server.
 
-Note that `@IsUUID()` on a body field is stricter than `ParseUUIDPipe` on a route parameter. It
-constrains the version nibble and the variant nibble. Thus an id can be a valid path parameter and an
-invalid body field.
+`@IsUUID()` on a body field and `ParseUUIDPipe` on a route parameter apply the same pattern
+(`UUID_PATTERN` in `shared/src/constants/uuid.constants.ts`). It constrains the version nibble and the
+variant nibble.
 
 The three workspaces import from the `@app/shared/*` path alias. Each workspace maps it to
 `../shared/src/*` in its `tsconfig.json`.

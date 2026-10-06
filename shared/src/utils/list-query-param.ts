@@ -1,6 +1,6 @@
 import { MAX_LIST_FILTER_LENGTH } from '../constants/list-query.constants';
 import { MAX_PAGE_SIZE } from '../constants/pagination.constants';
-import { BODY_UUID_PATTERN } from '../constants/uuid.constants';
+import { UUID_PATTERN } from '../constants/uuid.constants';
 import type {
   ListFilterDefinition,
   ListFilterKind,
@@ -32,7 +32,7 @@ const PARAM_PARSERS: { [K in ListFilterKind]: ParamParser<K> } = {
   uuidList: (raw) => {
     const ids = raw.split(',');
     return ids.length <= MAX_PAGE_SIZE &&
-      ids.every((id) => BODY_UUID_PATTERN.test(id))
+      ids.every((id) => UUID_PATTERN.test(id))
       ? ids
       : undefined;
   }

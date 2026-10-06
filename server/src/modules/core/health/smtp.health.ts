@@ -1,5 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
+import {
+  HealthIndicatorResult,
+  HealthIndicatorService
+} from '@nestjs/terminus';
 import { MailService } from '../../mail/mail.service';
 import {
   DEPENDENCY_HEALTH_REF,
@@ -13,31 +16,29 @@ import {
 const VERIFY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 @Injectable()
-export class SmtpHealthIndicator extends HealthIndicator {
+export class SmtpHealthIndicator {
   private readonly logger = new Logger(SmtpHealthIndicator.name);
   private cached?: { ok: boolean; at: number };
   private inFlight?: Promise<boolean>;
 
   constructor(
     private readonly mailService: MailService,
+    private readonly healthIndicatorService: HealthIndicatorService,
     @Inject(DEPENDENCY_HEALTH_REF)
     private readonly dependencyHealth: DependencyHealthRef
-  ) {
-    super();
-  }
+  ) {}
 
   // The API serves all traffic without working email, so a failed verify
   // degrades to healthy-with-warning (mirrors RedisHealthIndicator) and the
   // warning stays generic - /health/ready is public. Because the payload stays
   // green, the gauge is the only alertable signal of the degraded state.
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
+    const indicator = this.healthIndicatorService.check(key);
     const ok = await this.verify();
     this.dependencyHealth.statuses.set(key, ok);
     return ok
-      ? this.getStatus(key, true)
-      : this.getStatus(key, true, {
-          warning: 'SMTP verify failed'
-        });
+      ? indicator.up()
+      : indicator.up({ warning: 'SMTP verify failed' });
   }
 
   private verify(): Promise<boolean> {

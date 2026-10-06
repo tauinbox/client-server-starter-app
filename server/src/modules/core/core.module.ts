@@ -50,8 +50,10 @@ export class CoreModule implements NestModule {
           isGlobal: true,
           validationSchema: configValidationSchema,
           validationOptions: {
-            allowUnknown: true,
-            abortEarly: false
+            libraryOptions: {
+              allowUnknown: true,
+              abortEarly: false
+            }
           }
         }),
         LoggerModule.forRootAsync({
