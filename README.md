@@ -1620,7 +1620,7 @@ The base URL of the API is `/api/v1`.
 
 ```bash
 npm start                  # Start mock server (port 3000)
-npm run start:dev          # Start with watch mode (ts-node-dev)
+npm run start:dev          # Start with watch mode (node --watch + ts-node)
 npm run typecheck          # tsc --noEmit (no build script - this is the type gate)
 npm run lint               # Lint check
 npm run format:check       # Prettier check
@@ -1752,7 +1752,7 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
 | ESLint | Client (angular-eslint, unused-imports, import cycles) | `eslint.config.mjs` |
 | ESLint | Server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
 | ESLint | Mock server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
-| - | The three configurations need `settings['import/parsers']` to map `.ts` to `@typescript-eslint/parser`. Without that map, `import/no-cycle` passes on everything silently | - |
+| - | The three configurations use ESLint 10 with `eslint-plugin-import-x`. They need `settings['import-x/parsers']` to map `.ts` to `@typescript-eslint/parser`, and `settings['import-x/resolver-next']` with the TypeScript and Node resolvers. Without the parser map, `import-x/no-cycle` passes on everything silently | - |
 | ESLint | Shared rules for the workspaces. They include a `no-restricted-syntax` ban on an `as unknown as T` double cast. The client configuration adds two selectors: one bans the `'admin'` role literal, and one bans the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
 | Prettier | All workspaces (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order, no `px` unit outside a breakpoint, no `!important`, no `--mat-dialog-*` token outside `_dialogs.scss`) | `.stylelintrc.json` |
@@ -1809,7 +1809,7 @@ that is exactly where the two largest barrels are.
 The script carries a `--self-test` option. That option builds synthetic fixtures and fails if a
 detector stops working. CI runs the self-test before the check itself.
 
-`import/no-cycle` also runs in the three workspaces. Thus a cycle appears in the editor while a person
+`import-x/no-cycle` also runs in the three workspaces. Thus a cycle appears in the editor while a person
 writes it, and not later in CI. That rule is the fast feedback loop. `check-imports.mjs` is the
 enforcement, and it is the only one of the two that sees `shared/`. `server/` and `mock-server/`
 exempt `**/*.entity.ts` for the TypeORM reason above, thus they agree with the script.
