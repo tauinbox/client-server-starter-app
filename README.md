@@ -15,7 +15,7 @@ management and theming.
 | Language | TypeScript | 5.9.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
 | Client Tests | Vitest (unit), Playwright (e2e) | 4.1.11 / 1.62.1 |
-| Server Tests | Jest (unit + e2e) | 30.4.2 |
+| Server Tests | Jest (unit + e2e) | 30.5.2 |
 
 ## Features
 

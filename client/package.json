@@ -61,11 +61,14 @@
     "zone.js": "~0.16.2"
   },
   "overrides": {
-    "js-yaml@>=4.0.0 <4.3.2": "^4.3.2"
+    "js-yaml@>=4.0.0 <4.3.2": "^4.3.2",
+    "serve": {
+      "compression": "^1.8.2"
+    }
   },
   "devDependencies": {
-    "@angular/build": "^21.2.24",
-    "@angular/cli": "~21.2.24",
+    "@angular/build": "^21.2.25",
+    "@angular/cli": "~21.2.25",
     "@angular/compiler-cli": "^21.2.25",
     "@axe-core/playwright": "^4.13.0",
     "@commitlint/cli": "^20.5.3",
@@ -84,7 +87,7 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
-    "lint-staged": "^15.5.2",
+    "lint-staged": "^17.6.0",
     "postcss": "^8.5.26",
     "postcss-scss": "^4.0.9",
     "prettier": "^3.9.6",
@@ -98,5 +101,12 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "@parcel/watcher": false,
+    "lmdb": false,
+    "msgpackr-extract": false,
+    "unrs-resolver": false
   }
 }
