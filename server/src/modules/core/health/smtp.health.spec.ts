@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
+import { HealthIndicatorService } from '@nestjs/terminus';
 import { SmtpHealthIndicator } from './smtp.health';
 import { MailService } from '../../mail/mail.service';
 import {
@@ -24,6 +25,7 @@ describe('SmtpHealthIndicator', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SmtpHealthIndicator,
+        HealthIndicatorService,
         { provide: MailService, useValue: mockMailService },
         { provide: DEPENDENCY_HEALTH_REF, useValue: dependencyHealth }
       ]

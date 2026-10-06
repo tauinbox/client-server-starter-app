@@ -1,6 +1,6 @@
 # Server
 
-A NestJS 11 REST API. It has JWT authentication, PostgreSQL through TypeORM, and Swagger
+A NestJS 12 REST API. It has JWT authentication, PostgreSQL through TypeORM, and Swagger
 documentation.
 
 ## Getting Started
@@ -44,8 +44,8 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Lint fix | `npm run lint:fix` |
 | Format check | `npm run format:check` covers `src/`, `test/`, `scripts/` and the root configuration files. It also covers `shared/src/` and the root-level `*.mjs` configuration files |
 | Format | `npm run format` uses the same scope and writes the corrections |
-| Unit tests | `npm test` |
-| Single test | `npx jest --testPathPattern=<pattern>` |
+| Unit tests | `npm test`. It starts Jest with `--experimental-vm-modules`, because Jest can `require()` the ESM-only NestJS 12 packages only with that flag. Do not start `jest` directly |
+| Single test | `npm test -- --testPathPatterns=<pattern>` |
 | Test watch | `npm run test:watch` |
 | Test coverage | `npm run test:cov` |
 | E2E tests | `npm run test:e2e` |
@@ -2649,7 +2649,7 @@ repository.
 npm test                   # Run all
 npm run test:watch         # Watch mode
 npm run test:cov           # Coverage report
-npx jest --testPathPattern=auth   # Run specific tests
+npm test -- --testPathPatterns=auth   # Run specific tests
 ```
 
 ### E2E Tests (Jest)
@@ -2770,14 +2770,14 @@ version in `server/package.json` automatically.
 
 | Technology | Version |
 |------------|---------|
-| NestJS | 11.2.7 |
+| NestJS | 12.1.2 |
 | TypeORM | 0.3.31 |
 | PostgreSQL | through `pg` 8.23.1 |
 | Passport | 0.7.0 |
 | bcrypt | 6.0.0 |
 | class-validator | 0.14.4 |
-| @nestjs/swagger | 11.4.7 |
-| @nestjs/schedule | 6.1.3 |
+| @nestjs/swagger | 12.0.2 |
+| @nestjs/schedule | 12.0.2 |
 | cache-manager | 6.4.3 |
 | @keyv/redis | 5.1.6 |
 | ioredis | 5.11.1 |

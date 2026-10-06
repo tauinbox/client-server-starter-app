@@ -33,7 +33,10 @@ describe('validateRulePayload user and role lists', () => {
   it.each([
     ['a non-UUID', ['not-a-uuid']],
     ['an empty string', ['']],
-    ['a param-only UUID', ['11111111-1111-1111-1111-111111111111']],
+    [
+      'a UUID with no RFC version or variant',
+      ['11111111-1111-1111-1111-111111111111']
+    ],
     ['101 items', Array.from({ length: 101 }, (_, i) => uuid(i))]
   ])('rejects userIds with %s', (_label, userIds) => {
     expect(() =>

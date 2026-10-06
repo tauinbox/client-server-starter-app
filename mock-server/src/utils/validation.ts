@@ -1,5 +1,5 @@
 import {
-  BODY_UUID_PATTERN,
+  UUID_PATTERN,
   MAX_EMAIL_LENGTH,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
@@ -308,7 +308,7 @@ export function uuidErrors(
   optional?: OptionalMode
 ): string[] {
   if (isSkipped(value, optional)) return [];
-  return typeof value === 'string' && BODY_UUID_PATTERN.test(value)
+  return typeof value === 'string' && UUID_PATTERN.test(value)
     ? []
     : [`${field} must be a UUID`];
 }

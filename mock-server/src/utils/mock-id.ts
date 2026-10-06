@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { UUID_PATTERN } from '@app/shared/constants';
 
 /**
  * Derives a stable UUID from a readable slug. The real server's primary keys
@@ -23,14 +24,9 @@ export function mockId(slug: string): string {
 }
 
 /**
- * Byte-for-byte the `all` entry of `ParseUUIDPipe.uuidRegExps`. None of the
- * server's `@Param('...', ParseUUIDPipe)` sites passes a `version`, so the pipe
- * falls back to `all`, which does not constrain the version or variant nibbles.
- * A stricter pattern here would reject ids the server accepts.
+ * Mirrors `ParseUUIDPipe` with no `version`, which none of the server's
+ * `@Param('...', ParseUUIDPipe)` sites passes.
  */
-export const UUID_PATTERN =
-  /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
-
 export function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
 }

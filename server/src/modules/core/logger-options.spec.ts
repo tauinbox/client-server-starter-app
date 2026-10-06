@@ -2,14 +2,17 @@ import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { LoggerModule, Logger as PinoNestLogger } from 'nestjs-pino';
-import { __resetOutOfContextForTests } from 'nestjs-pino/PinoLogger';
 import { pinoHttp } from 'pino-http';
 import type { Options } from 'pino-http';
 import { IncomingMessage, ServerResponse } from 'http';
 import { Socket } from 'net';
 import { Writable } from 'stream';
 import { QueryFailedError } from 'typeorm';
-import { buildLoggerOptions, maskEmailsInText } from './logger-options';
+import {
+  buildLoggerOptions,
+  maskEmailsInText,
+  serializeLoggedError
+} from './logger-options';
 
 const ADDRESS = 'alice.private@example.com';
 const MASKED = 'a***e@example.com';
@@ -33,20 +36,6 @@ function collect(lines: LogLine[]): Writable {
 
 function productionOptions(): Options {
   return buildLoggerOptions('production').pinoHttp as Options;
-}
-
-// Outside a request, nestjs-pino logs through a plain pino instance.
-async function captureLogs(): Promise<LogLine[]> {
-  const lines: LogLine[] = [];
-  const stream = collect(lines);
-  const options = productionOptions();
-
-  __resetOutOfContextForTests();
-  const moduleRef = await Test.createTestingModule({
-    imports: [LoggerModule.forRoot({ pinoHttp: [options, stream] })]
-  }).compile();
-  moduleRef.useLogger(moduleRef.get(PinoNestLogger));
-  return lines;
 }
 
 function buildQueryFailedError(): QueryFailedError {
@@ -87,11 +76,24 @@ function buildSmtpRejection(): Error {
   );
 }
 
+// nestjs-pino builds its logger once per process and keeps the first stream,
+// so the module is compiled once and each test starts with an empty buffer.
 describe('buildLoggerOptions', () => {
-  let lines: LogLine[];
+  const lines: LogLine[] = [];
 
-  beforeEach(async () => {
-    lines = await captureLogs();
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        LoggerModule.forRoot({
+          pinoHttp: [productionOptions(), collect(lines)]
+        })
+      ]
+    }).compile();
+    moduleRef.useLogger(moduleRef.get(PinoNestLogger));
+  });
+
+  beforeEach(() => {
+    lines.length = 0;
   });
 
   it('writes an Error passed after the message as err, with its stack', () => {
@@ -223,6 +225,25 @@ describe('buildLoggerOptions inside a request', () => {
       'user-agent': 'Probe-UA',
       'x-request-id': 'rid-1'
     });
+  });
+});
+
+// A plain pino logger passes the raw Error, with no standard serializer first.
+describe('serializeLoggedError with a raw Error', () => {
+  it('writes only the allowlisted fields and the error type', () => {
+    const written = serializeLoggedError(buildQueryFailedError()) as Record<
+      string,
+      unknown
+    >;
+
+    expect(Object.keys(written).sort()).toEqual([
+      'code',
+      'message',
+      'stack',
+      'type'
+    ]);
+    expect(written['type']).toBe('QueryFailedError');
+    expect(JSON.stringify(written)).not.toContain(ADDRESS);
   });
 });
 

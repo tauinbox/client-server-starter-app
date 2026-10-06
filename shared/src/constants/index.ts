@@ -74,7 +74,7 @@ export {
   type AbilityFilterSubject
 } from './permission.constants';
 
-export { BODY_UUID_PATTERN } from './uuid.constants';
+export { UUID_PATTERN } from './uuid.constants';
 
 export {
   SUPPORTED_LOCALES,

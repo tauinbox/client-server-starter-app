@@ -12,28 +12,10 @@
   "globalSetup": "<rootDir>/global-setup.ts",
   "globalTeardown": "<rootDir>/global-teardown.ts",
   "transform": {
-    "^.+\\.ts$": "ts-jest",
-    "^.+\\.js$": [
-      "ts-jest",
-      {
-        "tsconfig": {
-          "allowJs": true
-        }
-      }
-    ]
+    "^.+\\.ts$": "ts-jest"
   },
   "moduleNameMapper": {
     "^@app/shared/(.*)$": "<rootDir>/../../shared/src/$1",
     "^temporal-polyfill$": "<rootDir>/../node_modules/temporal-polyfill"
-  },
-  "transformIgnorePatterns": [
-    "/node_modules/(?!.*(@scure|@noble))"
-  ],
-  "testEnvironmentOptions": {
-    "customExportConditions": [
-      "node",
-      "require",
-      "default"
-    ]
   }
 }

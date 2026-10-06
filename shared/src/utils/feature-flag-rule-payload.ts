@@ -11,7 +11,7 @@ import {
 } from '../constants/feature-flag.constants';
 import { MAX_PAGE_SIZE } from '../constants/pagination.constants';
 import { ROLE_NAME_MAX_LENGTH } from '../constants/permission.constants';
-import { BODY_UUID_PATTERN } from '../constants/uuid.constants';
+import { UUID_PATTERN } from '../constants/uuid.constants';
 import type { FeatureFlagRulePayload } from '../types/feature-flag.types';
 import { attributeValueError } from './feature-flag-attribute-value';
 
@@ -35,7 +35,7 @@ function isBoundedArray<T>(
 }
 
 const isUserId = (v: unknown): v is string =>
-  typeof v === 'string' && BODY_UUID_PATTERN.test(v);
+  typeof v === 'string' && UUID_PATTERN.test(v);
 
 const isRoleName = (v: unknown): v is string =>
   typeof v === 'string' && v.length > 0 && v.length <= ROLE_NAME_MAX_LENGTH;
