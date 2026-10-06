@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
@@ -183,7 +183,7 @@ describe('BillingSettingsComponent', () => {
     await TestBed.configureTestingModule({
       imports: [BillingSettingsComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideRouter([]),
         { provide: BillingStore, useValue: storeMock },
         { provide: AuthStore, useValue: { isAuthenticated: signal(true) } },

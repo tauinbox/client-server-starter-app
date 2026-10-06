@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of } from 'rxjs';
@@ -53,7 +53,7 @@ describe('ResourceFormDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [ResourceFormDialogComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: MatDialogRef, useValue: dialogRefMock },
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: ResourcesStore, useValue: resourcesStoreMock },

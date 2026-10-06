@@ -5,8 +5,8 @@ import type {
   RouterStateSnapshot
 } from '@angular/router';
 import { provideRouter, Router } from '@angular/router';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideHttpClient } from '@angular/common/http';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -87,7 +87,7 @@ describe('OAuthCallbackComponent', () => {
       imports: [OAuthCallbackComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: OAuthIntentService, useValue: oauthIntentMock }
       ]
@@ -354,8 +354,8 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
       imports: [OAuthCallbackComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideNoopAnimations(),
-        provideHttpClient(),
+        provideNoopMaterialAnimations(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         {
           provide: LocalStorageService,

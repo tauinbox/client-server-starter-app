@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import {
@@ -45,7 +45,7 @@ describe('PasswordStrengthComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [PasswordStrengthComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations()]
+      providers: [provideNoopMaterialAnimations()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(PasswordStrengthComponent);

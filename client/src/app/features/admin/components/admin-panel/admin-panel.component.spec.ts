@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -30,7 +30,7 @@ describe('AdminPanelComponent — auto-redirect on permission loss', () => {
     await TestBed.configureTestingModule({
       imports: [AdminPanelComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideRouter([]),
         { provide: AuthStore, useValue: authStoreMock }
       ]

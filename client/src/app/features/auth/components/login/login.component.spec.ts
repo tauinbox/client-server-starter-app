@@ -1,12 +1,12 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { LoginComponent } from './login.component';
@@ -88,9 +88,9 @@ describe('LoginComponent', () => {
       imports: [LoginComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: FeatureFlagService, useValue: featureFlagServiceMock },
         {
@@ -517,9 +517,9 @@ describe('LoginComponent', () => {
         imports: [LoginComponent, TranslocoTestingModuleWithLangs],
         providers: [
           provideRouter([]),
-          provideHttpClient(),
+          provideHttpClient(withXhr()),
           provideHttpClientTesting(),
-          provideNoopAnimations(),
+          provideNoopMaterialAnimations(),
           { provide: AuthService, useValue: authServiceMock },
           {
             provide: ActivatedRoute,
@@ -760,9 +760,9 @@ describe('LoginComponent', () => {
         imports: [LoginComponent, TranslocoTestingModuleWithLangs],
         providers: [
           provideRouter([]),
-          provideHttpClient(),
+          provideHttpClient(withXhr()),
           provideHttpClientTesting(),
-          provideNoopAnimations(),
+          provideNoopMaterialAnimations(),
           { provide: AuthService, useValue: authServiceMock },
           { provide: FeatureFlagService, useValue: featureFlagServiceMock },
           {

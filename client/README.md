@@ -1,6 +1,6 @@
 # Client
 
-Angular 21 SPA. It uses standalone components, an Angular Material M3 UI, JWT authentication, and a
+Angular 22 SPA. It uses standalone components, an Angular Material M3 UI, JWT authentication, and a
 light theme and a dark theme.
 
 ## Getting Started
@@ -1269,10 +1269,10 @@ name that gets past the hook. It does this during the changelog generation, and 
 
 | Technology | Version |
 |------------|---------|
-| Angular | 21.2.25 |
-| Angular Material | 21.2.14 |
-| TypeScript | 5.9.3 |
-| @ngrx/signals | 21.1.1 |
+| Angular | 22.2.1 |
+| Angular Material | 22.2.1 |
+| TypeScript | 6.0.3 |
+| @ngrx/signals | 22.0.1 |
 | @jsverse/transloco | 8.4.0 |
 | RxJS | 7.8.2 |
 | Vitest | 4.1.11 |

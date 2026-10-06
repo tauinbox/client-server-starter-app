@@ -1,8 +1,8 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
@@ -52,9 +52,9 @@ describe('LinkedProvidersComponent', () => {
     await TestBed.configureTestingModule({
       imports: [LinkedProvidersComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: NotifyService, useValue: notifyMock },
         { provide: FeatureFlagService, useValue: featureFlagServiceMock }

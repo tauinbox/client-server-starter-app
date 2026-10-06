@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
@@ -114,7 +114,7 @@ describe('UserPermissionsComponent', () => {
       imports: [UserPermissionsComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: UserService, useValue: userServiceMock },
         { provide: RbacMetadataStore, useValue: rbacMetadataStoreMock }
       ]

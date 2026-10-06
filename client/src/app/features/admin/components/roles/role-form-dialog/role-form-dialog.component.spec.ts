@@ -2,7 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { of, throwError } from 'rxjs';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
@@ -39,7 +39,7 @@ describe('RoleFormDialogComponent', () => {
     await TestBed.configureTestingModule({
       imports: [RoleFormDialogComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: { close: closeSpy } },
         { provide: RolesStore, useValue: storeMock },

@@ -1,18 +1,21 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { TranslocoService } from '@jsverse/transloco';
+import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import type { CatalogItem } from '../utils/catalog-text';
 import { CatalogTextPipe } from './catalog-text.pipe';
 
+// The pipe is impure and reads no signal, so an OnPush view re-runs it on a
+// language change only when `*transloco` marks the view. Every template that
+// uses the pipe has `*transloco`, and this host does the same.
 @Component({
-  imports: [CatalogTextPipe],
-  template: `<span class="name">{{
-      item() | catalogText: 'plans' : 'name'
-    }}</span
+  imports: [CatalogTextPipe, TranslocoDirective],
+  template: `<ng-container *transloco="let t"
+    ><span class="name">{{ item() | catalogText: 'plans' : 'name' }}</span
     ><span class="description">{{
       item() | catalogText: 'plans' : 'description'
-    }}</span>`
+    }}</span></ng-container
+  >`
 })
 class HostComponent {
   readonly item = signal<CatalogItem | null>(null);
@@ -26,6 +29,8 @@ describe('CatalogTextPipe', () => {
       imports: [TranslocoTestingModuleWithLangs]
     });
     transloco = TestBed.inject(TranslocoService);
+    // The value of app.config.ts. The shared testing module leaves it off.
+    transloco.config.reRenderOnLangChange = true;
     transloco.setTranslation(
       {
         'billing.catalog.plans.pro.name': 'Про',
@@ -39,7 +44,7 @@ describe('CatalogTextPipe', () => {
   function render(item: CatalogItem | null): {
     name: () => string;
     description: () => string;
-    detectChanges: () => void;
+    settle: () => Promise<void>;
   } {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.item.set(item);
@@ -48,7 +53,10 @@ describe('CatalogTextPipe', () => {
     return {
       name: () => el.querySelector('.name')?.textContent ?? '',
       description: () => el.querySelector('.description')?.textContent ?? '',
-      detectChanges: () => fixture.detectChanges()
+      settle: async () => {
+        await fixture.whenStable();
+        fixture.detectChanges();
+      }
     };
   }
 
@@ -62,10 +70,10 @@ describe('CatalogTextPipe', () => {
     expect(view.description()).toBe('For growing teams');
   });
 
-  it('follows the active language', () => {
+  it('follows the active language', async () => {
     const view = render({ key: 'pro', name: 'Pro', description: 'db text' });
     transloco.setActiveLang('ru');
-    view.detectChanges();
+    await view.settle();
     expect(view.name()).toBe('Про');
     expect(view.description()).toBe('Для растущих команд');
   });

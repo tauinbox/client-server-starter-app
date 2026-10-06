@@ -4,7 +4,8 @@ import {
   HttpClient,
   HttpContext,
   provideHttpClient,
-  withInterceptors
+  withInterceptors,
+  withXhr
 } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -46,7 +47,7 @@ describe('errorInterceptor', () => {
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModuleWithLangs],
       providers: [
-        provideHttpClient(withInterceptors([errorInterceptor])),
+        provideHttpClient(withXhr(), withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
         { provide: NotifyService, useValue: notifyMock },
         { provide: AuthStore, useValue: authStoreMock }

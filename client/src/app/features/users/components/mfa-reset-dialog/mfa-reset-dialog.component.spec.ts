@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -42,7 +42,7 @@ describe('MfaResetDialogComponent', () => {
     TestBed.configureTestingModule({
       imports: [MfaResetDialogComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: MatDialogRef, useValue: dialogRefMock },
         {
           provide: MAT_DIALOG_DATA,

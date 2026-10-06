@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { ConfirmDialogComponent } from './confirm-dialog.component';
@@ -26,7 +26,7 @@ describe('ConfirmDialogComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ConfirmDialogComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: MatDialogRef, useValue: dialogRefMock },
         { provide: MAT_DIALOG_DATA, useValue: mockDialogData }
       ]
@@ -57,7 +57,7 @@ describe('ConfirmDialogComponent', () => {
       await TestBed.configureTestingModule({
         imports: [ConfirmDialogComponent, TranslocoTestingModuleWithLangs],
         providers: [
-          provideNoopAnimations(),
+          provideNoopMaterialAnimations(),
           { provide: MatDialogRef, useValue: { close: vi.fn() } },
           {
             provide: MAT_DIALOG_DATA,

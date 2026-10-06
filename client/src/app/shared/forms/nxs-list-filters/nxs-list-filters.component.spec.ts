@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { Component, signal, viewChild } from '@angular/core';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
 import { MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
 import { LIST_SEARCH_DEBOUNCE_MS } from '@shared/utils/pagination.utils';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
@@ -85,7 +85,7 @@ describe('NxsListFiltersComponent', () => {
     vi.useFakeTimers();
     await TestBed.configureTestingModule({
       imports: [TestHostComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations()]
+      providers: [provideNoopMaterialAnimations()]
     }).compileComponents();
   });
 

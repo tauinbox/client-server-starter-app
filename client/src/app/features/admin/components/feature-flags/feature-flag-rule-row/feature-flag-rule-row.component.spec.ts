@@ -4,8 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import type { MatSelect } from '@angular/material/select';
 import { By } from '@angular/platform-browser';
 import { provideNativeDateAdapter } from '@angular/material/core';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideHttpClient } from '@angular/common/http';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -84,7 +84,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     await TestBed.configureTestingModule({
       imports: [HostComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideNativeDateAdapter(),
         { provide: RoleCatalogService, useValue: roleCatalogStub },
         { provide: UserService, useValue: userServiceStub }
@@ -1177,9 +1177,9 @@ describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
     await TestBed.configureTestingModule({
       imports: [HostComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideNativeDateAdapter(),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         { provide: RoleCatalogService, useValue: roleCatalogStub }
       ]

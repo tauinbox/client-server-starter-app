@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { signal } from '@angular/core';
 import type {
   BillingProviderId,
@@ -43,7 +43,7 @@ describe('RegionControlComponent', () => {
     await TestBed.configureTestingModule({
       imports: [RegionControlComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: BillingStore, useValue: storeMock },
         {
           provide: AuthStore,

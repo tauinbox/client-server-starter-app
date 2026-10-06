@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
@@ -33,7 +33,7 @@ describe('FeatureFlagPreviewComponent', () => {
     await TestBed.configureTestingModule({
       imports: [FeatureFlagPreviewComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         {
           provide: FeatureFlagsAdminService,
           useValue: { preview: previewSpy }
@@ -60,7 +60,7 @@ describe('FeatureFlagPreviewComponent', () => {
     await TestBed.configureTestingModule({
       imports: [FeatureFlagPreviewComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: FeatureFlagsAdminService, useValue: { preview: vi.fn() } },
         { provide: RoleCatalogService, useValue: { getAll: getAllRolesSpy } },
         {
