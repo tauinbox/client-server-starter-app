@@ -19,6 +19,12 @@ export function createApp() {
   // JSON only, as the server: a cross-site form can post a urlencoded body with
   // no preflight, and a login sent that way plants the sender's session.
   app.use(express.json({ limit: '100kb' }));
+  // Express 5 leaves `req.body` undefined when no JSON body was parsed. The
+  // handlers validate an empty object into the same 400 as the server.
+  app.use((req, _res, next) => {
+    req.body ??= {};
+    next();
+  });
 
   // Request ID middleware (mirrors server's RequestIdMiddleware)
   const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;

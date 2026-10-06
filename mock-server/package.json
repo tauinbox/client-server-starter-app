@@ -11,18 +11,17 @@
     "format": "prettier --write \"src/**/*.ts\" \"*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "jest",
+    "test": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
     "check:imports": "node ../scripts/check-imports.mjs",
     "audit:ci": "node ../scripts/audit-ci.mjs"
   },
   "dependencies": {
-    "@casl/ability": "^6.8.1",
+    "@casl/ability": "^7.0.1",
     "@faker-js/faker": "^10.6.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "express": "^4.22.3",
-    "temporal-polyfill": "0.3.2",
-    "uuid": "^11.1.1",
+    "express": "^5.2.1",
+    "temporal-polyfill": "^1.0.5",
     "validator": "^13.15.35"
   },
   "devDependencies": {
@@ -31,7 +30,6 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
-    "@types/uuid": "^10.0.0",
     "@types/validator": "^13.15.10",
     "@typescript-eslint/parser": "^8.71.1",
     "eslint": "^10.12.0",

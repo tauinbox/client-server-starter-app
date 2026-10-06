@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import {
   ErrorKeys,
   ROLE_LIST_QUERY,
@@ -343,7 +343,7 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
 
   const now = new Date().toISOString();
   const role = {
-    id: uuidv4(),
+    id: randomUUID(),
     name,
     description: description ?? null,
     isSystem: false,
@@ -657,7 +657,7 @@ router.put(
 
     for (const item of items) {
       state.rolePermissions.push({
-        id: uuidv4(),
+        id: randomUUID(),
         roleId: id,
         permissionId: item.permissionId,
         conditions: (item.conditions as null) ?? null
@@ -796,7 +796,7 @@ router.post(
 
     for (const permissionId of permissionIds as string[]) {
       state.rolePermissions.push({
-        id: uuidv4(),
+        id: randomUUID(),
         roleId: id,
         permissionId,
         conditions: conditions ?? null

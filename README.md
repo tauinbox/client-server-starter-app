@@ -374,9 +374,9 @@ management and theming.
 
 ### CASL Permission Conditions
 
-The project uses [CASL](https://casl.js.org) (`@casl/ability` v6) with `MongoAbility`. That variant
+The project uses [CASL](https://casl.js.org) (`@casl/ability` v7) with `MongoAbility`. That variant
 evaluates a condition with the **MongoDB query syntax**, which has operators such as `$in`, `$lt` and
-`$or`. This is a pure in-memory evaluation engine, through `@ucast/mongo2js` inside CASL v6. **No
+`$or`. This is a pure in-memory evaluation engine, through `@ucast/mongo2js` inside CASL v7. **No
 MongoDB database is involved.**
 
 #### How conditions work
