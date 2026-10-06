@@ -1276,9 +1276,9 @@ name that gets past the hook. It does this during the changelog generation, and 
 | @jsverse/transloco | 8.4.0 |
 | RxJS | 7.8.2 |
 | Vitest | 4.1.11 |
-| Playwright | 1.62.1 |
+| Playwright | 1.63.0 |
 | ESLint | 10.12.0 |
-| Prettier | 3.9.6 |
-| Stylelint | 17.14.1 |
+| Prettier | 3.9.9 |
+| Stylelint | 17.16.0 |
 | commitlint | 20.5.3 |
 | commit-and-tag-version | 12.7.3 |

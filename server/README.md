@@ -1994,15 +1994,19 @@ counters. Without it, the throttler uses `MemoryThrottlerStorage`, which serves 
 
 `MemoryThrottlerStorage` exists because the refund above needs a `decrement` method.
 `@nestjs/throttler` does not put that method on its `ThrottlerStorage` contract, and its own
-`ThrottlerStorageService` implements `increment` and nothing else.
+`ThrottlerStorageService` implements `increment` and nothing else. The project storage does not
+extend that class: since 6.6 the class keeps the hits in a private list and computes the counter
+from it on each `increment`, so a refund made outside the class is lost. `MemoryThrottlerStorage`
+uses the sliding window of `RedisThrottlerStorage` instead: one timestamp for each hit, and
+`decrement` removes the newest one. A timer removes idle keys once a minute.
 
 The two project storages implement `DecrementableThrottlerStorage`. `LoginThrottlerGuard` is typed
 against that interface. Thus a storage with no refund is a compile error, and not a refund that
 nobody applies.
 
-`MemoryThrottlerStorage` also clamps the counter at zero on its way into `increment`. The base class
-schedules one expiry timer for each hit, and that timer decreases the same counter. Thus a hit that
-the guard already refunded drives the counter negative and gives extra attempts in the next window.
+Both storages return `timeToExpire` and `timeToBlockExpire` in seconds (`msToSeconds`).
+`ThrottlerGuard` writes them unchanged into `X-RateLimit-Reset` and `Retry-After`, and the client
+shows the `Retry-After` value as seconds in the 429 message.
 
 The billing webhook receivers, that is `POST /billing/webhooks/paddle` and
 `POST /billing/webhooks/yookassa`, carry `@SkipThrottle()`.
@@ -2766,9 +2770,9 @@ version in `server/package.json` automatically.
 
 | Technology | Version |
 |------------|---------|
-| NestJS | 11.2.1 |
+| NestJS | 11.2.7 |
 | TypeORM | 0.3.31 |
-| PostgreSQL | through `pg` 8.23.0 |
+| PostgreSQL | through `pg` 8.23.1 |
 | Passport | 0.7.0 |
 | bcrypt | 6.0.0 |
 | class-validator | 0.14.4 |
@@ -2780,4 +2784,4 @@ version in `server/package.json` automatically.
 | TypeScript | 5.9.3 |
 | Jest | 30.5.2 |
 | ESLint | 10.12.0 |
-| Prettier | 3.9.6 |
+| Prettier | 3.9.9 |
