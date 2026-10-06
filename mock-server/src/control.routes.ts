@@ -46,7 +46,10 @@ import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
 import { addInterval, nextPeriodEnd } from './utils/period';
-import { notifyRoleHolders } from './middleware/roles.middleware';
+import {
+  notifyRoleHolders,
+  notifyUserRolesChanged
+} from './middleware/roles.middleware';
 
 const router = Router();
 
@@ -434,7 +437,7 @@ router.post('/change-user-roles', (req, res) => {
     return;
   }
   user.roles = newRoles;
-  pushToUser(userId, { type: 'permissions_updated', userId });
+  notifyUserRolesChanged(userId);
   res.json({ message: `roles updated for user ${userId}` });
 });
 
@@ -475,8 +478,8 @@ router.post('/change-role-permissions', (req, res) => {
 
 // POST /__control/revoke-user-sessions — full simulation of the server's
 // UserRoleChangedListener. Optionally swaps user.roles, deletes ALL refresh
-// tokens for the user, sets tokenRevokedAt, and pushes a `permissions_updated`
-// SSE event. Use to verify forced-logout semantics on role revocation.
+// tokens for the user, sets tokenRevokedAt, and pushes the `permissions_updated`
+// and `feature_flags_updated` SSE events. Use to verify forced-logout semantics on role revocation.
 router.post('/revoke-user-sessions', (req, res) => {
   const { userId, newRoles } = req.body as {
     userId?: string;
@@ -496,7 +499,7 @@ router.post('/revoke-user-sessions', (req, res) => {
     user.roles = newRoles;
   }
   revokeUserSessions(userId);
-  pushToUser(userId, { type: 'permissions_updated', userId });
+  notifyUserRolesChanged(userId);
   res.json({ message: `sessions revoked for user ${userId}` });
 });
 
