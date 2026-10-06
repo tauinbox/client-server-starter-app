@@ -191,6 +191,13 @@ export function notifyRoleHolders(roleName: string): void {
   }
 }
 
+// A role assignment changes the role names of the user, so it can change the
+// user's flags too. Mirrors the two server listeners of UserRoleChangedEvent.
+export function notifyUserRolesChanged(userId: string): void {
+  pushToUser(userId, { type: 'permissions_updated', userId });
+  pushToUser(userId, { type: 'feature_flags_updated' });
+}
+
 // GET /api/v1/roles
 // GET /api/v1/roles/cursor
 router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
@@ -958,7 +965,7 @@ router.post(
       ip: req.ip
     });
 
-    pushToUser(userId, { type: 'permissions_updated', userId });
+    notifyUserRolesChanged(userId);
     // The server route is a @Post with no @HttpCode, so Nest answers 201.
     res.status(201).send();
   }
@@ -1030,7 +1037,7 @@ router.delete(
       ip: req.ip
     });
 
-    pushToUser(userId, { type: 'permissions_updated', userId });
+    notifyUserRolesChanged(userId);
     res.send();
   }
 );

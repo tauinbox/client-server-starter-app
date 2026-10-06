@@ -75,8 +75,6 @@ export class AuthService {
         // Metadata fetch is permission-gated, so re-evaluate it after the
         // refreshed rules arrive (e.g. the user was just granted admin access).
         void this.fetchPermissions().then(() => this.fetchRbacMetadata());
-        // Role change can flip role-bound feature flags for this user.
-        void this.#featureFlagsStore.reload();
       });
 
     this.#notificationsService.featureFlagsUpdated$

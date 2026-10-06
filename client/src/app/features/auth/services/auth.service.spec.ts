@@ -6,7 +6,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { firstValueFrom, of, EMPTY, Subject } from 'rxjs';
+import { firstValueFrom, of, Subject } from 'rxjs';
 import type { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
@@ -107,6 +107,8 @@ describe('AuthService', () => {
     clear: ReturnType<typeof vi.fn>;
   };
   let entitlementsUpdated$: Subject<NotificationEvent>;
+  let permissionsUpdated$: Subject<NotificationEvent>;
+  let featureFlagsUpdated$: Subject<NotificationEvent>;
   let notifyMock: { error: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -152,6 +154,8 @@ describe('AuthService', () => {
       clear: vi.fn()
     };
     entitlementsUpdated$ = new Subject<NotificationEvent>();
+    permissionsUpdated$ = new Subject<NotificationEvent>();
+    featureFlagsUpdated$ = new Subject<NotificationEvent>();
     notifyMock = { error: vi.fn() };
 
     TestBed.configureTestingModule({
@@ -168,8 +172,8 @@ describe('AuthService', () => {
           useValue: {
             connect: vi.fn(),
             disconnect: vi.fn(),
-            permissionsUpdated$: EMPTY,
-            featureFlagsUpdated$: EMPTY,
+            permissionsUpdated$,
+            featureFlagsUpdated$,
             entitlementsUpdated$: entitlementsUpdated$
           }
         },
@@ -636,6 +640,27 @@ describe('AuthService', () => {
       });
 
       expect(entitlementsStoreMock.reload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('role change push', () => {
+    it('reloads the flags once when both role change events arrive', () => {
+      permissionsUpdated$.next({
+        type: 'permissions_updated',
+        userId: 'user-1'
+      });
+      featureFlagsUpdated$.next({ type: 'feature_flags_updated' });
+
+      expect(featureFlagsStoreMock.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reload the flags on a permission change alone', () => {
+      permissionsUpdated$.next({
+        type: 'permissions_updated',
+        userId: 'user-1'
+      });
+
+      expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();
     });
   });
 

@@ -2476,7 +2476,8 @@ user as the database holds it now. Thus a change of email or roles applies on th
 evaluation costs less than two Redis round trips (0.05 ms for 10 flags, 0.7 ms for 200).
 
 **Real-time updates.** `FeatureFlagChangedListener` broadcasts `{ type: 'feature_flags_updated' }`
-over SSE at each change of a flag.
+over SSE at each change of a flag. It also sends the event to one user when the roles of that user
+change.
 
 The system invalidates the cache at each change. It coalesces the broadcast in a window of 500 ms.
 Thus a burst of changes causes one synchronized refetch on the client, and not one refetch for each
