@@ -4,9 +4,9 @@ import tseslint from 'typescript-eslint';
 import angular from 'angular-eslint';
 import prettier from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier';
-import importPlugin from 'eslint-plugin-import';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
+import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
-import { fixupPluginRules } from '@eslint/compat';
 import baseRules from '../eslint.base.config.mjs';
 
 export default tseslint.config(
@@ -32,8 +32,7 @@ export default tseslint.config(
     ],
     plugins: {
       prettier: prettierPlugin,
-      // to fix type incompatibility
-      import: fixupPluginRules(importPlugin),
+      'import-x': importX,
       'unused-imports': unusedImportsPlugin
     },
     processor: angular.processInlineTemplates,
@@ -75,7 +74,7 @@ export default tseslint.config(
           style: 'kebab-case'
         }
       ],
-      'import/no-cycle': 'error',
+      'import-x/no-cycle': 'error',
       // Never compare a role.name against the raw 'admin' literal —
       // always go through SYSTEM_ROLES.ADMIN from @app/shared/constants so the
       // system role can be renamed without breaking client RBAC checks.
@@ -139,16 +138,16 @@ export default tseslint.config(
   {
     settings: {
       // Without this the plugin cannot parse an imported .ts file under flat
-      // config, builds an empty graph, and `import/no-cycle` silently passes
+      // config, builds an empty graph, and `import-x/no-cycle` silently passes
       // on everything. `npm run check:imports` is the workspace-independent
       // backstop for exactly that failure mode.
-      'import/parsers': {
+      'import-x/parsers': {
         '@typescript-eslint/parser': ['.ts']
       },
-      'import/resolver': {
-        typescript: true,
-        node: true
-      }
+      'import-x/resolver-next': [
+        createTypeScriptImportResolver(),
+        createNodeResolver()
+      ]
     }
   },
   {

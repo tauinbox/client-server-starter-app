@@ -78,7 +78,8 @@ export async function assertDatabaseReachable(
   } catch (error) {
     const reason = describeConnectionError(error);
     throw new Error(
-      `Cannot reach the e2e Postgres (${host}:${port}/${database}): ${reason}. The e2e run needs a database - start it (server/docker-compose.yml), run "npm run build && npm run migrations:run", then try again.`
+      `Cannot reach the e2e Postgres (${host}:${port}/${database}): ${reason}. The e2e run needs a database - start it (server/docker-compose.yml), run "npm run build && npm run migrations:run", then try again.`,
+      { cause: error }
     );
   } finally {
     await dataSource.destroy().catch(() => undefined);
