@@ -41,11 +41,19 @@
     "jest": "^30.5.2",
     "jiti": "^2.7.0",
     "prettier": "^3.9.6",
-    "ts-jest": "^29.4.12",
+    "ts-jest": "^29.4.14",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.67.0"
+  },
+  "overrides": {
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.3.2"
+    },
+    "babel-plugin-istanbul": {
+      "test-exclude": "^8.0.0"
+    }
   },
   "allowScripts": {
     "unrs-resolver": false,
