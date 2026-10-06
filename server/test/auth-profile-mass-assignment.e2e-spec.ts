@@ -12,7 +12,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import type { NextFunction, Request, Response } from 'express';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { AuthController } from '../src/modules/auth/controllers/auth.controller';
 import { AuthService } from '../src/modules/auth/services/auth.service';

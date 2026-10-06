@@ -13,7 +13,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import type { ICreatePayment } from '@a2seven/yoo-checkout';
 import { User } from '../src/modules/users/entities/user.entity';

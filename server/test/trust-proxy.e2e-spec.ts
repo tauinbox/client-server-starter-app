@@ -4,7 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import type { Request } from 'express';
 import type { Server } from 'http';
-import * as request from 'supertest';
+import request from 'supertest';
 import { applyTrustProxy } from '../src/modules/core/trust-proxy.util';
 
 interface WhoAmIBody {

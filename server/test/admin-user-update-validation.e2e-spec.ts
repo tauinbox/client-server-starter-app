@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { NextFunction, Request, Response } from 'express';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';

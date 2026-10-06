@@ -4,7 +4,7 @@ import {
   VersioningType
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';

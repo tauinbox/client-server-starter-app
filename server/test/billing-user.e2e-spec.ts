@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';

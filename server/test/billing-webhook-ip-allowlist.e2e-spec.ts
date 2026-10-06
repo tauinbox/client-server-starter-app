@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VersioningType } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';

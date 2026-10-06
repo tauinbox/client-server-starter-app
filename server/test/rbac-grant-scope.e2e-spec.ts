@@ -19,7 +19,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { Logger } from '@nestjs/common';
 import type { PermissionCondition } from '@app/shared/types';

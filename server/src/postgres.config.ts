@@ -1,5 +1,9 @@
-import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
-import { LoggerOptions } from 'typeorm';
+import { DataSourceOptions, LoggerOptions } from 'typeorm';
+
+type PostgresConnectionOptions = Extract<
+  DataSourceOptions,
+  { type: 'postgres' }
+>;
 
 const localConfig: Partial<PostgresConnectionOptions> = {
   host: '',

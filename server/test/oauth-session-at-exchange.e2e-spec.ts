@@ -11,8 +11,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
-import * as cookieParser from 'cookie-parser';
+import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import * as crypto from 'crypto';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';

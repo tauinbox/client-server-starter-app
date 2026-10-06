@@ -11,7 +11,7 @@ import type { INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Throttle, ThrottlerModule } from '@nestjs/throttler';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import {
   LOCKOUT_DURATION_MS,

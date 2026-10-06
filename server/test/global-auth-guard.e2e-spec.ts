@@ -11,7 +11,7 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule, PassportStrategy } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import { Strategy } from 'passport-jwt';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { Public } from '../src/modules/auth/decorators/public.decorator';

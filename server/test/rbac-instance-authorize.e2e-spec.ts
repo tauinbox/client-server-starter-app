@@ -19,7 +19,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import type { Subjects } from '../src/modules/auth/casl/app-ability';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';

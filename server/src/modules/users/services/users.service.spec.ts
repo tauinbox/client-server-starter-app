@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+import bcrypt from 'bcrypt';
 import {
   PasswordHashVersion,
   prehashPassword

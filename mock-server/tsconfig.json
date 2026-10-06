@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "commonjs",
     "lib": ["ES2022"],
+    "types": ["node", "jest"],
     "outDir": "./dist",
     "strict": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -13,11 +14,11 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": "./",
     "paths": {
       "@app/shared/*": ["../shared/src/*"],
-      "temporal-polyfill": ["node_modules/temporal-polyfill"]
-    }
+      "temporal-polyfill": ["./node_modules/temporal-polyfill"]
+    },
+    "rootDir": ".."
   },
   "include": ["src/**/*", "../shared/src/**/*", "eslint.config.ts"],
   "exclude": ["node_modules", "dist"]

@@ -2,7 +2,6 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
@@ -27,18 +26,19 @@
         "../shared/src/*"
       ],
       "@core/*": [
-        "src/app/core/*"
+        "./src/app/core/*"
       ],
       "@features/*": [
-        "src/app/features/*"
+        "./src/app/features/*"
       ],
       "@shared/*": [
-        "src/app/shared/*"
+        "./src/app/shared/*"
       ],
       "@environments/*": [
-        "src/environments/*"
+        "./src/environments/*"
       ]
-    }
+    },
+    "rootDir": ".."
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

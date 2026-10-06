@@ -7,7 +7,7 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { PlanService } from '../src/modules/billing/services/plan.service';

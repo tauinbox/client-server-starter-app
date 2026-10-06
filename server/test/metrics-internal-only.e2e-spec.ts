@@ -2,7 +2,7 @@ import { RequestMethod, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DataSource } from 'typeorm';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { CoreModule } from '../src/modules/core/core.module';
 import { applyTrustProxy } from '../src/modules/core/trust-proxy.util';
