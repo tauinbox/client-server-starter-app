@@ -2746,7 +2746,8 @@ The import covers:
   Note that `PERMISSIONS` and `Permission` are gone. The code uses a typed `[Actions, Subjects]`
   tuple instead.
 - **Utils.** `@app/shared/utils/time` is the single import site. It re-exports `Temporal` from the
-  `temporal-polyfill` package, which the project pins exactly until the native Temporal API ships.
+  `temporal-polyfill` package (1.x, ESM only, loaded through `require(esm)`). From 1.x the polyfill
+  defers to the native Temporal API when the runtime has it.
 
   `@app/shared/utils/money` holds `Money`. That is a BigInt value object over integer minor units.
   Its `toNumber()` method has an overflow guard for the JSON wire. There is no floating-point
