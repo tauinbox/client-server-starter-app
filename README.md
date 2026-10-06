@@ -1620,7 +1620,7 @@ The base URL of the API is `/api/v1`.
 
 ```bash
 npm start                  # Start mock server (port 3000)
-npm run start:dev          # Start with watch mode (ts-node-dev)
+npm run start:dev          # Start with watch mode (node --watch + ts-node)
 npm run typecheck          # tsc --noEmit (no build script - this is the type gate)
 npm run lint               # Lint check
 npm run format:check       # Prettier check
