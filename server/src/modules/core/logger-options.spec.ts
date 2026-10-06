@@ -8,7 +8,11 @@ import { IncomingMessage, ServerResponse } from 'http';
 import { Socket } from 'net';
 import { Writable } from 'stream';
 import { QueryFailedError } from 'typeorm';
-import { buildLoggerOptions, maskEmailsInText } from './logger-options';
+import {
+  buildLoggerOptions,
+  maskEmailsInText,
+  serializeLoggedError
+} from './logger-options';
 
 const ADDRESS = 'alice.private@example.com';
 const MASKED = 'a***e@example.com';
@@ -221,6 +225,25 @@ describe('buildLoggerOptions inside a request', () => {
       'user-agent': 'Probe-UA',
       'x-request-id': 'rid-1'
     });
+  });
+});
+
+// A plain pino logger passes the raw Error, with no standard serializer first.
+describe('serializeLoggedError with a raw Error', () => {
+  it('writes only the allowlisted fields and the error type', () => {
+    const written = serializeLoggedError(buildQueryFailedError()) as Record<
+      string,
+      unknown
+    >;
+
+    expect(Object.keys(written).sort()).toEqual([
+      'code',
+      'message',
+      'stack',
+      'type'
+    ]);
+    expect(written['type']).toBe('QueryFailedError');
+    expect(JSON.stringify(written)).not.toContain(ADDRESS);
   });
 });
 
