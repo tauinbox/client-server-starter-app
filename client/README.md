@@ -1277,7 +1277,7 @@ name that gets past the hook. It does this during the changelog generation, and 
 | RxJS | 7.8.2 |
 | Vitest | 4.1.11 |
 | Playwright | 1.62.1 |
-| ESLint | 9.39.5 |
+| ESLint | 10.12.0 |
 | Prettier | 3.9.6 |
 | Stylelint | 17.14.1 |
 | commitlint | 20.5.3 |

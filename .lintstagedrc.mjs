@@ -45,7 +45,7 @@ export default {
   'shared/src/**/*.ts': (files) => {
     return `${serverBin('prettier')} --write ${files.join(' ')}`;
   },
-  // Repo-root configs. lint-staged enables micromatch's `matchBase`, so a
+  // Repo-root configs. lint-staged enables picomatch's `matchBase`, so a
   // slash-free glob such as `*.mjs` would also match every nested .mjs file -
   // these are matched by their (repo-unique) basenames instead.
   '{.lintstagedrc.mjs,eslint.base.config.mjs}': (files) => {
