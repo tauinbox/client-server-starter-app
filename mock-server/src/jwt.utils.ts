@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import {
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   TOKEN_PURPOSE
@@ -52,7 +52,7 @@ export function generateMfaPendingToken(
 }
 
 export function generateRefreshToken(): string {
-  return uuidv4();
+  return randomUUID();
 }
 
 /**
@@ -73,7 +73,7 @@ export function generateTokens(
 }
 
 export function generateSessionId(): string {
-  return uuidv4();
+  return randomUUID();
 }
 
 export interface DecodedToken {

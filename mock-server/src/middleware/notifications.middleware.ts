@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { authGuard } from '../helpers/auth.helpers';
 import {
   pushToAll,
@@ -22,7 +22,7 @@ router.get('/stream', authGuard, (req, res) => {
   res.flushHeaders();
 
   const userId = (req as AuthenticatedRequest).user.id;
-  const connectionId = uuidv4();
+  const connectionId = randomUUID();
   registerSseConnection(userId, connectionId, res);
 
   // Keep-alive comment to prevent proxy timeouts

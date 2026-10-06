@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import {
   ErrorKeys,
   MAX_EMAIL_LENGTH,
@@ -155,7 +155,7 @@ export function buildMockUser(
 ): MockUser {
   const now = new Date().toISOString();
   return {
-    id: uuidv4(),
+    id: randomUUID(),
     email: fields.email,
     firstName: fields.firstName,
     lastName: fields.lastName,

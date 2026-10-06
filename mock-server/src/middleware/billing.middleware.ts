@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import type {
   BillingProviderId,
   BillingRegion,
@@ -343,7 +343,7 @@ function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
   const { country, currency } = geoFromLocale(locale);
   const now = new Date().toISOString();
   const customer: MockCustomer = {
-    id: uuidv4(),
+    id: randomUUID(),
     userId,
     provider: geoDefault(country),
     providerOverride: null,
@@ -501,10 +501,10 @@ billingRouter.post(
       }
     }
     const replacement: MockPaymentMethod = {
-      id: uuidv4(),
+      id: randomUUID(),
       customerId: customer.id,
       provider: sub.provider,
-      providerMethodRef: `pm_${uuidv4()}`,
+      providerMethodRef: `pm_${randomUUID()}`,
       brand: 'mastercard',
       last4: '4444',
       isDefault: true,
@@ -517,7 +517,7 @@ billingRouter.post(
     sub.paymentMethodId = replacement.id;
     sub.updatedAt = nowIso;
 
-    const sessionRef = uuidv4();
+    const sessionRef = randomUUID();
     res.json({
       provider: sub.provider,
       url: `https://mock-checkout.local/${sub.provider}/method/${sessionRef}`,
@@ -680,7 +680,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const sessionRef = uuidv4();
+  const sessionRef = randomUUID();
   getState().billingPurchaseSessions.set(sessionRef, {
     sessionRef,
     customerId: customer.id,
@@ -768,7 +768,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
       Object.assign(pending, fields);
     } else {
       const sub: MockSubscription = {
-        id: uuidv4(),
+        id: randomUUID(),
         customerId: customer.id,
         ...fields,
         createdAt: now.toISOString()
@@ -782,7 +782,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   }
   if (rejectMissingPaddlePrice(res, provider, plan)) return;
 
-  const sessionRef = uuidv4();
+  const sessionRef = randomUUID();
   res.json({
     provider,
     url: `https://mock-checkout.local/${provider}/${sessionRef}`,
@@ -994,11 +994,11 @@ billingRouter.post(
 
       if (quote.chargeMinor > 0) {
         const charge: MockInvoice = {
-          id: uuidv4(),
+          id: randomUUID(),
           customerId: customer.id,
           subscriptionId: sub.id,
           provider: sub.provider,
-          providerInvoiceRef: `in_${uuidv4()}`,
+          providerInvoiceRef: `in_${randomUUID()}`,
           amountMinor: quote.chargeMinor,
           currency: quote.currency,
           status: 'paid',
@@ -1017,7 +1017,7 @@ billingRouter.post(
 
       if (refundMinor > 0 && source) {
         const refund: MockInvoice = {
-          id: uuidv4(),
+          id: randomUUID(),
           customerId: customer.id,
           subscriptionId: sub.id,
           provider: sub.provider,
@@ -1539,7 +1539,7 @@ billingAdminRouter.post(
 
     const now = new Date().toISOString();
     const record: MockUsageRecord = {
-      id: uuidv4(),
+      id: randomUUID(),
       customerId,
       subscriptionId: subscription.id,
       meterKey,

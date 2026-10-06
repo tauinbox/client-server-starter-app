@@ -1,7 +1,7 @@
 import { Router, type Response } from 'express';
 import { completeSignIn } from '../helpers/sign-in.helpers';
 import { normalizeIpAddress } from '../utils/ip-address';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   EMAIL_CHANGE_TOKEN_EXPIRY_MS,
@@ -159,7 +159,7 @@ router.post('/register', (req, res) => {
   state.users.set(user.id, user);
 
   // Store a verification token (plain UUID — no hashing in mock)
-  const verificationToken = uuidv4();
+  const verificationToken = randomUUID();
   state.emailVerificationTokens.set(verificationToken, {
     userId: user.id,
     expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS).toISOString()
@@ -372,7 +372,7 @@ router.post('/resend-verification', (req, res) => {
   }
 
   // Create new verification token
-  const verificationToken = uuidv4();
+  const verificationToken = randomUUID();
   state.emailVerificationTokens.set(verificationToken, {
     userId: user.id,
     expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS).toISOString()
@@ -428,7 +428,7 @@ router.post('/forgot-password', (req, res) => {
   }
 
   // Create new reset token
-  const resetToken = uuidv4();
+  const resetToken = randomUUID();
   state.passwordResetTokens.set(resetToken, {
     userId: user.id,
     expiresAt: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS).toISOString()
@@ -986,7 +986,7 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
   }
 
   // No hashing in the mock — store the raw token directly.
-  const token = uuidv4();
+  const token = randomUUID();
   user.pendingEmail = newEmail;
   user.pendingEmailToken = token;
   user.pendingEmailExpiresAt = new Date(
