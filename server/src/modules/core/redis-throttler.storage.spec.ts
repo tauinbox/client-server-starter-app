@@ -126,6 +126,8 @@ describe('RedisThrottlerStorage', () => {
 
       expect(result.totalHits).toBe(15);
       expect(result.isBlocked).toBe(true);
+      expect(result.timeToExpire).toBe(60);
+      expect(result.timeToBlockExpire).toBe(5);
       expect(redisMock.set).toHaveBeenCalledWith(
         'key:block',
         expect.any(String),
@@ -147,7 +149,7 @@ describe('RedisThrottlerStorage', () => {
       const result = await storage.increment('key', 60000, 10, 5000, 'default');
 
       expect(result.isBlocked).toBe(true);
-      expect(result.timeToBlockExpire).toBeGreaterThan(0);
+      expect(result.timeToBlockExpire).toBe(10);
     });
 
     it('should return timeToBlockExpire=0 when not blocked and blockDuration=0', async () => {

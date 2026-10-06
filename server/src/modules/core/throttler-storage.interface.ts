@@ -10,3 +10,11 @@ import type { ThrottlerStorage } from '@nestjs/throttler';
 export interface DecrementableThrottlerStorage extends ThrottlerStorage {
   decrement(key: string): Promise<void>;
 }
+
+/**
+ * `ThrottlerGuard` writes `timeToExpire` and `timeToBlockExpire` unchanged into
+ * the `X-RateLimit-Reset` and `Retry-After` headers, which count seconds.
+ */
+export function msToSeconds(ms: number): number {
+  return Math.ceil(ms / 1000);
+}

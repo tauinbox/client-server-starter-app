@@ -1,5 +1,6 @@
 import type { OnModuleDestroy } from '@nestjs/common';
 import type { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface';
+import { msToSeconds } from './throttler-storage.interface';
 import type { DecrementableThrottlerStorage } from './throttler-storage.interface';
 import Redis from 'ioredis';
 
@@ -66,14 +67,15 @@ export class RedisThrottlerStorage
 
     return {
       totalHits,
-      timeToExpire: ttl,
+      timeToExpire: msToSeconds(ttl),
       isBlocked,
-      timeToBlockExpire:
+      timeToBlockExpire: msToSeconds(
         blockExpiry != null
           ? Math.max(0, blockExpiry - now)
           : isBlocked
             ? blockDuration
             : 0
+      )
     };
   }
 }

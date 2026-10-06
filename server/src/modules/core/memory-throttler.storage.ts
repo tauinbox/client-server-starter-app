@@ -1,46 +1,94 @@
-import { ThrottlerStorageService } from '@nestjs/throttler';
+import type { OnApplicationShutdown } from '@nestjs/common';
 import type { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface';
+import { msToSeconds } from './throttler-storage.interface';
 import type { DecrementableThrottlerStorage } from './throttler-storage.interface';
 
+const SWEEP_INTERVAL_MS = 60000;
+
+interface Entry {
+  hits: number[];
+  expiresAt: number;
+  blockExpiresAt: number | null;
+}
+
 /**
- * The single-instance storage, used whenever no Redis URL is configured.
- * `ThrottlerStorageService` covers the counting; this adds the `decrement`
- * that `LoginThrottlerGuard` needs to refund a successful login.
+ * The single-instance storage, used whenever no Redis URL is configured. It
+ * uses the sliding window of `RedisThrottlerStorage`: one timestamp for each
+ * hit, so `decrement` removes exactly the hit that it refunds.
  */
 export class MemoryThrottlerStorage
-  extends ThrottlerStorageService
-  implements DecrementableThrottlerStorage
+  implements DecrementableThrottlerStorage, OnApplicationShutdown
 {
-  override async increment(
+  private readonly entries = new Map<string, Entry>();
+  private sweepTimer: NodeJS.Timeout | undefined;
+
+  increment(
     key: string,
     ttl: number,
     limit: number,
     blockDuration: number,
-    throttlerName: string
+    _throttlerName: string
   ): Promise<ThrottlerStorageRecord> {
-    // Every hit schedules a timer that decrements the same counter once the
-    // ttl elapses. A hit already refunded by `decrement` still has its timer
-    // pending, so the counter can fall below zero and hand out extra attempts
-    // in the next window. Clamp before the new hit is counted.
-    const record = this.storage.get(key);
-    const hits = record?.totalHits.get(throttlerName);
-    if (record && hits !== undefined && hits < 0) {
-      record.totalHits.set(throttlerName, 0);
+    const now = Date.now();
+    this.ensureSweep();
+
+    const entry = this.entries.get(key) ?? {
+      hits: [],
+      expiresAt: 0,
+      blockExpiresAt: null
+    };
+    entry.hits = entry.hits.filter((at) => at > now - ttl);
+    entry.hits.push(now);
+    entry.expiresAt = now + ttl;
+    if (entry.blockExpiresAt !== null && entry.blockExpiresAt <= now) {
+      entry.blockExpiresAt = null;
+    }
+    this.entries.set(key, entry);
+
+    const totalHits = entry.hits.length;
+    const blockExpiry = entry.blockExpiresAt;
+    const isBlocked =
+      blockExpiry !== null ? blockExpiry > now : totalHits > limit;
+
+    if (totalHits > limit && blockExpiry === null && blockDuration > 0) {
+      entry.blockExpiresAt = now + blockDuration;
     }
 
-    return super.increment(key, ttl, limit, blockDuration, throttlerName);
+    const blockRemaining =
+      blockExpiry !== null ? blockExpiry - now : isBlocked ? blockDuration : 0;
+
+    return Promise.resolve({
+      totalHits,
+      timeToExpire: msToSeconds(ttl),
+      isBlocked,
+      timeToBlockExpire: msToSeconds(blockRemaining)
+    });
   }
 
   decrement(key: string): Promise<void> {
-    const record = this.storage.get(key);
-    if (record) {
-      // `ThrottlerGuard.generateKey` hashes the throttler name into the key,
-      // so a record carries exactly one entry.
-      for (const [throttlerName, hits] of record.totalHits) {
-        record.totalHits.set(throttlerName, Math.max(0, hits - 1));
+    this.entries.get(key)?.hits.pop();
+    return Promise.resolve();
+  }
+
+  onApplicationShutdown(): void {
+    clearInterval(this.sweepTimer);
+    this.sweepTimer = undefined;
+    this.entries.clear();
+  }
+
+  private ensureSweep(): void {
+    if (this.sweepTimer) {
+      return;
+    }
+    this.sweepTimer = setInterval(() => this.sweep(), SWEEP_INTERVAL_MS);
+    this.sweepTimer.unref();
+  }
+
+  private sweep(now = Date.now()): void {
+    for (const [key, entry] of this.entries) {
+      if (entry.expiresAt <= now && (entry.blockExpiresAt ?? 0) <= now) {
+        this.entries.delete(key);
       }
     }
-
-    return Promise.resolve();
   }
 }
