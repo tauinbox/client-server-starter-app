@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import type {
@@ -92,7 +92,7 @@ describe('CheckoutReturnComponent', () => {
     await TestBed.configureTestingModule({
       imports: [CheckoutReturnComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideRouter([]),
         { provide: BillingStore, useValue: storeMock },
         { provide: PaddleCheckoutService, useValue: { open: paddleOpen } }

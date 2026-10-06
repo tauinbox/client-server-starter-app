@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { signal } from '@angular/core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of } from 'rxjs';
@@ -64,7 +64,7 @@ describe('ResourceListComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ResourceListComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideRouter([]),
         { provide: ResourcesStore, useValue: resourcesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },

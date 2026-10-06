@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import type { UsageSummaryResponse } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { UsageMeterComponent } from './usage-meter.component';
@@ -24,7 +24,7 @@ describe('UsageMeterComponent', () => {
   async function setup(usage: UsageSummaryResponse): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       imports: [UsageMeterComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations()]
+      providers: [provideNoopMaterialAnimations()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(UsageMeterComponent);

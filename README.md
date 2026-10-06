@@ -1,6 +1,6 @@
 # Fullstack Starter App
 
-A full-stack TypeScript monorepo. It has an **Angular 21** client and a **NestJS 11** server, and it
+A full-stack TypeScript monorepo. It has an **Angular 22** client and a **NestJS 11** server, and it
 uses PostgreSQL through TypeORM. It gives a production-ready foundation with authentication, user
 management and theming.
 
@@ -8,11 +8,11 @@ management and theming.
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Frontend | Angular | 21.2.25 |
-| UI Library | Angular Material + CDK | 21.2.14 |
+| Frontend | Angular | 22.2.1 |
+| UI Library | Angular Material + CDK | 22.2.1 |
 | Backend | NestJS | 11.2.7 |
 | Database | PostgreSQL (TypeORM) | 0.3.31 |
-| Language | TypeScript | 6.0.3 (server, mock-server) / 5.9.3 (client) |
+| Language | TypeScript | 6.0.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
 | Client Tests | Vitest (unit), Playwright (e2e) | 4.1.11 / 1.63.0 |
 | Server Tests | Jest (unit + e2e) | 30.5.2 |
@@ -954,7 +954,7 @@ fullstack-starter-app/
 │       │                   # time (Temporal barrel), money (BigInt value object)
 │       └── test-fixtures/  # email-address-corpus - the address verdicts the server and the mock
 │                           # must agree on (test data, imported by no production module)
-├── client/                 # Angular 21 SPA
+├── client/                 # Angular 22 SPA
 │   ├── src/app/
 │   │   ├── core/           # Header, theme, storage, error interceptor, 404
 │   │   ├── features/

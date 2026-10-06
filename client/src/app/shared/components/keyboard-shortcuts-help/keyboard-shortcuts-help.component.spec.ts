@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
 import { MatDialogRef } from '@angular/material/dialog';
 import { describe, it, expect, vi } from 'vitest';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
@@ -30,7 +30,7 @@ describe('KeyboardShortcutsHelpComponent', () => {
         TranslocoTestingModuleWithLangs
       ],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: KeyboardShortcutsService, useValue: mockService },
         { provide: MatDialogRef, useValue: { close: vi.fn() } }
       ]

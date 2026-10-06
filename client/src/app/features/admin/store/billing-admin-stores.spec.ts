@@ -1,5 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  provideHttpClient,
+  withInterceptors,
+  withXhr
+} from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -43,7 +47,7 @@ describe('Admin billing requests through the error interceptor', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withInterceptors([errorInterceptor])),
+        provideHttpClient(withXhr(), withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
         BillingSubscriptionsStore,
         BillingInvoicesStore,

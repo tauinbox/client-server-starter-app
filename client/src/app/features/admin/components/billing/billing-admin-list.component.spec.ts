@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import type { InvoiceResponse, SubscriptionResponse } from '@app/shared/types';
@@ -96,7 +96,7 @@ describe('BillingAdminListComponent', () => {
     await TestBed.configureTestingModule({
       imports: [BillingAdminListComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: BillingSubscriptionsStore, useValue: subscriptionsMock },
         { provide: BillingInvoicesStore, useValue: invoicesMock },
         {

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../../test-utils/material-animations';
 import { Component, viewChild } from '@angular/core';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../../test-utils/transloco-testing';
 import { ConditionBuilderComponent } from './condition-builder.component';
@@ -30,7 +30,7 @@ class TestHostComponent {
 function setup(value = '', readonly = false) {
   TestBed.configureTestingModule({
     imports: [TestHostComponent, TranslocoTestingModuleWithLangs],
-    providers: [provideNoopAnimations()]
+    providers: [provideNoopMaterialAnimations()]
   });
 
   const fixture = TestBed.createComponent(TestHostComponent);

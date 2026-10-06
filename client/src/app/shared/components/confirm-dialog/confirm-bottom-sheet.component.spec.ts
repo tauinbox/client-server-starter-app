@@ -4,7 +4,7 @@ import {
   MAT_BOTTOM_SHEET_DATA,
   MatBottomSheetRef
 } from '@angular/material/bottom-sheet';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 import { ConfirmBottomSheetComponent } from './confirm-bottom-sheet.component';
@@ -29,7 +29,7 @@ describe('ConfirmBottomSheetComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ConfirmBottomSheetComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: MatBottomSheetRef, useValue: bottomSheetRefMock },
         { provide: MAT_BOTTOM_SHEET_DATA, useValue: mockData }
       ]

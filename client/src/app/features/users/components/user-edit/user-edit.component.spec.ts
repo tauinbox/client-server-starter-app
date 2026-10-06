@@ -1,12 +1,12 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialog } from '@angular/material/dialog';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
@@ -132,9 +132,9 @@ describe('UserEditComponent', () => {
       imports: [UserEditComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: UserService, useValue: userServiceMock },
         { provide: RoleCatalogService, useValue: roleCatalogMock },
         { provide: UserRoleService, useValue: userRoleServiceMock },

@@ -8,7 +8,7 @@ import {
   maxLength,
   minLength
 } from '@angular/forms/signals';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { NxsFormFieldComponent } from './nxs-form-field.component';
 
@@ -19,9 +19,9 @@ import { NxsFormFieldComponent } from './nxs-form-field.component';
     <nxs-form-field
       [field]="testForm.email"
       [label]="label"
-      [type]="type"
-      [errors]="errors"
-      [prefixIcon]="prefixIcon"
+      [type]="type()"
+      [errors]="errors()"
+      [prefixIcon]="prefixIcon()"
       [autocomplete]="autocomplete"
     >
       <button formFieldSuffix type="button" class="test-suffix">Toggle</button>
@@ -35,9 +35,9 @@ class TestHostComponent {
     email(path.email, { message: 'forms.errors.email' });
   });
   label = 'forms.errors.email';
-  type: 'text' | 'email' | 'password' | 'textarea' = 'email';
-  errors: Record<string, string> = {};
-  prefixIcon = 'email';
+  readonly type = signal<'text' | 'email' | 'password' | 'textarea'>('email');
+  readonly errors = signal<Record<string, string>>({});
+  readonly prefixIcon = signal('email');
   autocomplete = 'on';
 
   readonly formField = viewChild(NxsFormFieldComponent);
@@ -65,7 +65,7 @@ describe('NxsFormFieldComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [TestHostComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations()]
+      providers: [provideNoopMaterialAnimations()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(TestHostComponent);
@@ -110,7 +110,7 @@ describe('NxsFormFieldComponent', () => {
 
   describe('error key override', () => {
     it('should use per-field error override instead of schema message', () => {
-      host.errors = { required: 'auth.login.passwordRequired' };
+      host.errors.set({ required: 'auth.login.passwordRequired' });
       host.testForm.email().markAsTouched();
       fixture.detectChanges();
 
@@ -155,7 +155,7 @@ describe('NxsFormFieldComponent', () => {
     });
 
     it('should not render prefix icon when not provided', () => {
-      host.prefixIcon = '';
+      host.prefixIcon.set('');
       fixture.detectChanges();
 
       const icons = fixture.nativeElement.querySelectorAll(
@@ -182,7 +182,7 @@ describe('NxsFormFieldComponent', () => {
 
   describe('textarea mode', () => {
     it('should render textarea when type is textarea', () => {
-      host.type = 'textarea';
+      host.type.set('textarea');
       fixture.detectChanges();
 
       const textarea = fixture.nativeElement.querySelector('textarea');
@@ -200,7 +200,7 @@ describe('NxsFormFieldComponent length errors without a schema message', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [LengthHostComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations()]
+      providers: [provideNoopMaterialAnimations()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(LengthHostComponent);

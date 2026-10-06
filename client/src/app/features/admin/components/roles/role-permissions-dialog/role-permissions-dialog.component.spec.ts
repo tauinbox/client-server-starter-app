@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of } from 'rxjs';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import type { PermissionCondition, RoleAdminResponse } from '@app/shared/types';
@@ -111,7 +111,7 @@ function setup(
   TestBed.configureTestingModule({
     imports: [RolePermissionsDialogComponent, TranslocoTestingModuleWithLangs],
     providers: [
-      provideNoopAnimations(),
+      provideNoopMaterialAnimations(),
       { provide: MAT_DIALOG_DATA, useValue: dialogData },
       { provide: MatDialogRef, useValue: dialogRefMock },
       { provide: RoleService, useValue: roleServiceMock },
@@ -573,7 +573,7 @@ describe('RolePermissionsDialogComponent', () => {
           TranslocoTestingModuleWithLangs
         ],
         providers: [
-          provideNoopAnimations(),
+          provideNoopMaterialAnimations(),
           { provide: MAT_DIALOG_DATA, useValue: { role: systemRole } },
           { provide: MatDialogRef, useValue: { close: vi.fn() } },
           { provide: RoleService, useValue: roleServiceMock },

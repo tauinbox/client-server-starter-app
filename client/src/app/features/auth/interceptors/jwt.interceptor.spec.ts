@@ -5,7 +5,8 @@ import {
   HttpRequest,
   HttpResponse,
   provideHttpClient,
-  withInterceptors
+  withInterceptors,
+  withXhr
 } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -42,7 +43,7 @@ describe('jwtInterceptor', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withInterceptors([jwtInterceptor])),
+        provideHttpClient(withXhr(), withInterceptors([jwtInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: AuthStore, useValue: authStoreMock },

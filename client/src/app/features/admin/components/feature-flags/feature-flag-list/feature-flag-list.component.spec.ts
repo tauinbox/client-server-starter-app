@@ -1,6 +1,6 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import {
   MatSlideToggle,
   MatSlideToggleChange
@@ -79,7 +79,7 @@ describe('FeatureFlagListComponent', () => {
     await TestBed.configureTestingModule({
       imports: [FeatureFlagListComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideRouter([]),
         FeatureFlagsAdminStore,
         { provide: FeatureFlagsAdminService, useValue: serviceMock },

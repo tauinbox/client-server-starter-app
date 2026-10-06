@@ -1,5 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, HttpEventType } from '@angular/common/http';
+import {
+  provideHttpClient,
+  HttpEventType,
+  withXhr
+} from '@angular/common/http';
 import type { HttpDownloadProgressEvent } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -38,7 +42,7 @@ describe('NotificationsService', () => {
     TestBed.configureTestingModule({
       providers: [
         NotificationsService,
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         {
           provide: AuthStore,

@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import type { RoleResponse, UserResponse } from '@app/shared/types';
@@ -64,7 +64,7 @@ describe('PreferencesCardComponent', () => {
     await TestBed.configureTestingModule({
       imports: [PreferencesCardComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: NotifyService, useValue: notifyMock },
         { provide: LanguageService, useValue: languageServiceMock },

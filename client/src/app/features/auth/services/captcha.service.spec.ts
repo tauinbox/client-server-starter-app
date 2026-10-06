@@ -3,7 +3,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { CaptchaService } from './captcha.service';
 import { AuthApiEnum } from '../constants/auth-api.const';
 
@@ -15,7 +15,7 @@ describe('CaptchaService', () => {
     TestBed.configureTestingModule({
       providers: [
         CaptchaService,
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting()
       ]
     });

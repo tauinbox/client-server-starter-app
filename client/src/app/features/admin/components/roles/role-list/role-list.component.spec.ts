@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { signal, ViewContainerRef } from '@angular/core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { of } from 'rxjs';
@@ -93,7 +93,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     await TestBed.configureTestingModule({
       imports: [RoleListComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideRouter([]),
         { provide: RolesStore, useValue: rolesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },
@@ -186,7 +186,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     await TestBed.configureTestingModule({
       imports: [RoleListComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         provideRouter([]),
         { provide: RolesStore, useValue: rolesStoreMock },
         { provide: AuthStore, useValue: authStoreMock },

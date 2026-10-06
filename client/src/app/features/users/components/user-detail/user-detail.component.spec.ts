@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
@@ -69,7 +69,7 @@ describe('UserDetailComponent', () => {
       imports: [UserDetailComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: UsersStore, useValue: usersStoreMock },
         { provide: AuthStore, useValue: authStoreMock }
       ]

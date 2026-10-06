@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import type { ProductResponse } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { DonationCardComponent } from './donation-card.component';
@@ -28,7 +28,7 @@ describe('DonationCardComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [DonationCardComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations()]
+      providers: [provideNoopMaterialAnimations()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(DonationCardComponent);

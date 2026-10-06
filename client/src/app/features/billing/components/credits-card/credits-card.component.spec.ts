@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { provideRouter } from '@angular/router';
 import type { CreditBalanceResponse } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
@@ -20,7 +20,7 @@ describe('CreditsCardComponent', () => {
   async function setup(credits: CreditBalanceResponse | null): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [CreditsCardComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations(), provideRouter([])]
+      providers: [provideNoopMaterialAnimations(), provideRouter([])]
     }).compileComponents();
 
     fixture = TestBed.createComponent(CreditsCardComponent);

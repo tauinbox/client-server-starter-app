@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { of, throwError } from 'rxjs';
 import { ErrorKeys } from '@app/shared/constants';
 import type { AuthResponse, RoleResponse } from '@app/shared/types';
@@ -54,7 +54,7 @@ describe('MfaChallengeComponent', () => {
     await TestBed.configureTestingModule({
       imports: [MfaChallengeComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock }
       ]
     }).compileComponents();

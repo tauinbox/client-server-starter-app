@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import type { ChipOption } from './nxs-chips-autocomplete.component';
 import { NxsChipsAutocompleteComponent } from './nxs-chips-autocomplete.component';
@@ -49,7 +49,7 @@ describe('NxsChipsAutocompleteComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [HostComponent, TranslocoTestingModuleWithLangs],
-      providers: [provideNoopAnimations()]
+      providers: [provideNoopMaterialAnimations()]
     }).compileComponents();
   });
 

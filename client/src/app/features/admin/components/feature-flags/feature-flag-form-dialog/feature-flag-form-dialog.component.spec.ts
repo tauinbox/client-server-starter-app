@@ -2,7 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { NEVER, of, throwError, type Observable } from 'rxjs';
 import type {
   FeatureFlagAttributeKeysResponse,
@@ -79,7 +79,7 @@ describe('FeatureFlagFormDialogComponent', () => {
         TranslocoTestingModuleWithLangs
       ],
       providers: [
-        provideNoopAnimations(),
+        provideNoopMaterialAnimations(),
         { provide: MAT_DIALOG_DATA, useValue: data },
         {
           provide: MatDialogRef,
