@@ -16,7 +16,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { ErrorKeys } from '@app/shared/constants';
 import { Authorize } from '../src/modules/auth/decorators/authorize.decorator';

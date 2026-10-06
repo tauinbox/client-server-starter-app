@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
-import * as bcrypt from 'bcrypt';
+import bcrypt from 'bcrypt';
 import {
   PasswordHashVersion,
   prehashPassword

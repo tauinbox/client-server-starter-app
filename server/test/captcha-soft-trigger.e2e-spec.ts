@@ -10,7 +10,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule, Throttle } from '@nestjs/throttler';
 import { Test } from '@nestjs/testing';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { ErrorKeys } from '@app/shared/constants';
 import { CaptchaService } from '../src/modules/auth/captcha/captcha.service';

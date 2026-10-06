@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { NextFunction, Request, Response } from 'express';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { FeatureFlagsAdminController } from '../src/modules/feature-flags/controllers/feature-flags-admin.controller';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';

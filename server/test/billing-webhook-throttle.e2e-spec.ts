@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { LoginThrottlerGuard } from '../src/modules/core/login-throttler.guard';
 import { buildThrottlerOptions } from '../src/modules/core/throttler-options';

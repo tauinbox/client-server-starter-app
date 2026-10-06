@@ -2781,7 +2781,7 @@ version in `server/package.json` automatically.
 | cache-manager | 6.4.3 |
 | @keyv/redis | 5.1.6 |
 | ioredis | 5.11.1 |
-| TypeScript | 5.9.3 |
+| TypeScript | 6.0.3 |
 | Jest | 30.5.2 |
 | ESLint | 10.12.0 |
 | Prettier | 3.9.9 |

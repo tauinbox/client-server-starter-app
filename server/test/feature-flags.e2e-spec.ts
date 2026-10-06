@@ -22,7 +22,7 @@ import {
 import { APP_GUARD } from '@nestjs/core';
 import type { INestApplication } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -44,7 +44,7 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { FeatureFlagsController } from '../src/modules/feature-flags/controllers/feature-flags.controller';
 import { ANON_ID_COOKIE } from '../src/modules/feature-flags/utils/anon-id-cookie';
-import * as cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import type { FeatureFlagRulePayload } from '@app/shared/types';

@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { VersioningType, type INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { FindOperator } from 'typeorm';
 import type { NextFunction, Request, Response } from 'express';
 import type { Server } from 'http';

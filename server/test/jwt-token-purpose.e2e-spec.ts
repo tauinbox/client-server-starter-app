@@ -10,7 +10,7 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import * as request from 'supertest';
+import request from 'supertest';
 import type { Server } from 'http';
 import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';

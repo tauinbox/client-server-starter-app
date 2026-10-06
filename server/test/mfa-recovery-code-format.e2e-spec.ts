@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';

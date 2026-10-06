@@ -4,8 +4,8 @@ import {
   VersioningType
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
-import * as cookieParser from 'cookie-parser';
+import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';

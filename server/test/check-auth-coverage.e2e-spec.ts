@@ -8,7 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { CoreModule } from '../src/modules/core/core.module';
 
