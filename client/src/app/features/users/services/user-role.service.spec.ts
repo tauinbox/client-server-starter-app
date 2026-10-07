@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -16,7 +16,7 @@ describe('UserRoleService', () => {
     TestBed.configureTestingModule({
       providers: [
         UserRoleService,
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting()
       ]
     });

@@ -6,13 +6,5 @@
     "types": ["vitest/globals"],
     "lib": ["ES2022", "esnext.disposable", "dom"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"],
-  "angularCompilerOptions": {
-    "extendedDiagnostics": {
-      "checks": {
-        "nullishCoalescingNotNullable": "suppress",
-        "optionalChainNotNullable": "suppress"
-      }
-    }
-  }
+  "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

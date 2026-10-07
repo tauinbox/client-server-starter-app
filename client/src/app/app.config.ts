@@ -7,11 +7,7 @@ import {
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
-import {
-  provideHttpClient,
-  withInterceptors,
-  withXhr
-} from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideTransloco } from '@jsverse/transloco';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
@@ -34,10 +30,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     // Error interceptor must be registered before JWT interceptor:
     // JWT handles 401s (refresh + retry), error interceptor handles everything else
-    provideHttpClient(
-      withXhr(),
-      withInterceptors([errorInterceptor, jwtInterceptor])
-    ),
+    provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
     provideNativeDateAdapter(),
     provideAppInitializer(() => {
       const iconRegistry = inject(MatIconRegistry);

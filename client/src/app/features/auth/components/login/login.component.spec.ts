@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -88,7 +88,7 @@ describe('LoginComponent', () => {
       imports: [LoginComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock },
@@ -517,7 +517,7 @@ describe('LoginComponent', () => {
         imports: [LoginComponent, TranslocoTestingModuleWithLangs],
         providers: [
           provideRouter([]),
-          provideHttpClient(withXhr()),
+          provideHttpClient(),
           provideHttpClientTesting(),
           provideNoopMaterialAnimations(),
           { provide: AuthService, useValue: authServiceMock },
@@ -760,7 +760,7 @@ describe('LoginComponent', () => {
         imports: [LoginComponent, TranslocoTestingModuleWithLangs],
         providers: [
           provideRouter([]),
-          provideHttpClient(withXhr()),
+          provideHttpClient(),
           provideHttpClientTesting(),
           provideNoopMaterialAnimations(),
           { provide: AuthService, useValue: authServiceMock },

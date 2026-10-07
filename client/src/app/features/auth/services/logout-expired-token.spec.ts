@@ -1,10 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import {
-  provideHttpClient,
-  withInterceptors,
-  withXhr
-} from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -81,10 +77,7 @@ describe('logout with an expired access token', () => {
       imports: [TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideHttpClient(
-          withXhr(),
-          withInterceptors([errorInterceptor, jwtInterceptor])
-        ),
+        provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
         provideHttpClientTesting(),
         {
           provide: NotificationsService,

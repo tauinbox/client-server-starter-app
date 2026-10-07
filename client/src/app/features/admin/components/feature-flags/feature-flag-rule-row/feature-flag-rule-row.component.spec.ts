@@ -5,7 +5,7 @@ import type { MatSelect } from '@angular/material/select';
 import { By } from '@angular/platform-browser';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -1179,7 +1179,7 @@ describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
       providers: [
         provideNoopMaterialAnimations(),
         provideNativeDateAdapter(),
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting(),
         { provide: RoleCatalogService, useValue: roleCatalogStub }
       ]
