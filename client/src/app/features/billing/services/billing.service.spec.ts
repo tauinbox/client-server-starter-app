@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -14,7 +14,7 @@ describe('BillingService', () => {
     TestBed.configureTestingModule({
       providers: [
         BillingService,
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting()
       ]
     });

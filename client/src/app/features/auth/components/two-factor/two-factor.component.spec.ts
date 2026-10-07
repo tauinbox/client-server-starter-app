@@ -1,6 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -75,7 +75,7 @@ describe('TwoFactorComponent', () => {
     await TestBed.configureTestingModule({
       imports: [TwoFactorComponent, TranslocoTestingModuleWithLangs],
       providers: [
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock },

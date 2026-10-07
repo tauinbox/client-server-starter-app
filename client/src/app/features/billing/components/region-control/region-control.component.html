@@ -6,7 +6,7 @@
     </span>
     <mat-button-toggle-group
       aria-labelledby="region-label"
-      [value]="$safeNavigationMigration(store.region()?.region)"
+      [value]="store.region()?.region"
       [disabled]="store.working()"
       (change)="onRegionChange($event.value)"
     >

@@ -1,7 +1,7 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -161,7 +161,7 @@ describe('AuthService', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: authStoreMock },
         { provide: TokenService, useValue: tokenServiceMock },

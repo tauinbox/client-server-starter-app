@@ -6,7 +6,7 @@ import type {
 } from '@angular/router';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -355,7 +355,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
       providers: [
         provideRouter([]),
         provideNoopMaterialAnimations(),
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting(),
         {
           provide: LocalStorageService,

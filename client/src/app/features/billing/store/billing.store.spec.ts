@@ -2,8 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import {
   HttpErrorResponse,
   provideHttpClient,
-  withInterceptors,
-  withXhr
+  withInterceptors
 } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -560,7 +559,7 @@ describe('Billing requests through the error interceptor', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withXhr(), withInterceptors([errorInterceptor])),
+        provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
         BillingStore,
         { provide: NotifyService, useValue: notifyMock },

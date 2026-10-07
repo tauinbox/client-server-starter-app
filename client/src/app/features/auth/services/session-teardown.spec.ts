@@ -6,7 +6,7 @@ import type {
   RouterStateSnapshot
 } from '@angular/router';
 import { provideNoopMaterialAnimations } from '../../../../test-utils/material-animations';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -122,7 +122,7 @@ describe('session teardown', () => {
       imports: [TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopMaterialAnimations(),
         { provide: NotificationsService, useValue: notificationsServiceMock }

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
@@ -81,7 +81,7 @@ describe('TokenService', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        provideHttpClient(withXhr()),
+        provideHttpClient(),
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: authStoreMock }
       ]
@@ -274,7 +274,7 @@ describe('TokenService', () => {
       TestBed.configureTestingModule({
         providers: [
           provideRouter([]),
-          provideHttpClient(withXhr()),
+          provideHttpClient(),
           provideHttpClientTesting()
         ]
       });

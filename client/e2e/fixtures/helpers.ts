@@ -109,8 +109,8 @@ export async function routeApiToMockServer(
   });
 
   // A persistent SSE connection blocks waitForLoadState('networkidle') in
-  // loginViaUi() because Playwright counts streaming XHR as active until the
-  // connection closes. Registered after the general route so it takes priority
+  // loginViaUi() because Playwright counts a streaming request as active until
+  // the connection closes. Registered after the general route so it takes priority
   // (Playwright: last = first matched).
   await page.route(/\/api\/.*\/notifications\/stream/, (route) =>
     route.fulfill({
