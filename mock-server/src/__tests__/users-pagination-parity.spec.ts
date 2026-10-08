@@ -86,6 +86,31 @@ describe('user list routes reject out-of-range paging like the server', () => {
     }
   );
 
+  it.each(ALL_ROUTES)(
+    'reports the paging messages in the server order on %s',
+    async (path) => {
+      const token = await loginAdmin();
+
+      const res = await get(
+        token,
+        `${path}?limit=0&foo=1&sortOrder=up&sortBy=password`
+      );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors: string[] };
+      expect(body.errors).toHaveLength(4);
+      expect(body.errors.slice(0, 2)).toEqual([
+        'property foo should not exist',
+        'limit must not be less than 1'
+      ]);
+      expect(body.errors[2]).toMatch(
+        /^sortBy must be one of the following values: /
+      );
+      expect(body.errors[3]).toBe(
+        'sortOrder must be one of the following values: asc, desc'
+      );
+    }
+  );
+
   it('still accepts the documented filters alongside paging', async () => {
     const token = await loginAdmin();
 
