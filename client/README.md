@@ -909,6 +909,9 @@ draft into the request in both modes, thus the server evaluates the unsaved edit
 stored flag. The server validates a supplied rule set with the validator of the save path, so an
 incomplete rule gets the same 400 that a save would give.
 
+The environment field of the panel is a select. It gives the server default and the
+`APP_ENVIRONMENTS` names only, because the server rejects any other `env` with a 400.
+
 The panel shows the reason as a chip. The reason `excluded` and the reason `not-included` are
 different. The first one says that an exclude rule matched, and the chip beside it gives that
 rule. The second one says that include rules exist and that no rule matched the context.

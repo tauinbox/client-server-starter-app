@@ -14,6 +14,7 @@ import type {
   FeatureFlagRulePayload
 } from '@app/shared/types';
 import {
+  ANON_ID_PATTERN,
   APP_ENVIRONMENTS,
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_PROVIDER_FLAGS,
@@ -34,6 +35,7 @@ import {
 import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { changedFields } from '@app/shared/utils/changed-fields';
+import { findPreviewAttributesError } from '@app/shared/utils/feature-flag-preview-attributes';
 import { parseIfMatchVersion } from '@app/shared/utils/if-match';
 import {
   assertInstancePermission,
@@ -821,9 +823,6 @@ adminRouter.delete(
   }
 );
 
-const MAX_ATTRIBUTE_KEYS = 32;
-const MAX_ATTRIBUTE_KEY_LENGTH = 64;
-
 const PREVIEW_BODY_KEYS = [
   'userId',
   'roles',
@@ -834,26 +833,6 @@ const PREVIEW_BODY_KEYS = [
   'enabled',
   'environments'
 ];
-
-/**
- * Mirrors the server's `sanitizeAttributes`: it takes the first 32 entries and
- * only then drops the keys that are empty or over-long, so a rejected key still
- * consumes one of the 32 slots. Counting the accepted keys instead would let
- * the mock evaluate an attribute the server never sees.
- */
-function sanitizeAttributes(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null) return {};
-  const out: Record<string, unknown> = {};
-  const entries = Object.entries(value as Record<string, unknown>).slice(
-    0,
-    MAX_ATTRIBUTE_KEYS
-  );
-  for (const [key, entry] of entries) {
-    if (key.length === 0 || key.length > MAX_ATTRIBUTE_KEY_LENGTH) continue;
-    out[key] = entry;
-  }
-  return out;
-}
 
 /**
  * Mirrors the context half of `PreviewFlagContextDto` under the global
@@ -874,13 +853,27 @@ function previewContextErrors(body: Record<string, unknown>): string[] {
       maxItemLength: ROLE_NAME_MAX_LENGTH,
       optional: 'nullable'
     }),
-    ...objectErrors('attributes', body['attributes'], 'nullable'),
-    ...stringErrors('env', body['env'], { max: 32, optional: 'nullable' }),
-    ...stringErrors('anonId', body['anonId'], {
-      max: 128,
-      optional: 'nullable'
-    })
+    ...previewAttributesErrors(body['attributes']),
+    ...oneOfErrors('env', body['env'], APP_ENVIRONMENTS, 'nullable'),
+    ...anonIdErrors(body['anonId'])
   ];
+}
+
+/** Mirrors `@IsOptional() @IsObject() @Validate(PreviewAttributesConstraint)`. */
+function previewAttributesErrors(value: unknown): string[] {
+  const shapeError = findPreviewAttributesError(value);
+  return [
+    ...(shapeError === null ? [] : [shapeError]),
+    ...objectErrors('attributes', value, 'nullable')
+  ];
+}
+
+/** Mirrors `@IsOptional() @Matches(ANON_ID_PATTERN)` with its own message. */
+function anonIdErrors(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  return typeof value === 'string' && ANON_ID_PATTERN.test(value)
+    ? []
+    : ['anonId must be a UUID'];
 }
 
 adminRouter.post(
@@ -931,7 +924,7 @@ adminRouter.post(
     // default for an omitted or explicitly null value.
     const userId = typeof body['userId'] === 'string' ? body['userId'] : null;
     const roles = isStringArray(body['roles']) ? body['roles'] : [];
-    const attributes = sanitizeAttributes(body['attributes']);
+    const attributes = (body['attributes'] ?? {}) as Record<string, unknown>;
     const env =
       typeof body['env'] === 'string'
         ? body['env']

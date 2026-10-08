@@ -7,23 +7,38 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
+  Validate,
   ValidateIf,
-  ValidateNested
+  ValidateNested,
+  ValidatorConstraint,
+  type ValidationArguments,
+  type ValidatorConstraintInterface
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ANON_ID_PATTERN,
   APP_ENVIRONMENTS,
   FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
   ROLE_NAME_MAX_LENGTH,
   normalizeEnvironmentList
 } from '@app/shared/constants';
+import { findPreviewAttributesError } from '@app/shared/utils/feature-flag-preview-attributes';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 import { FeatureFlagRuleDto } from './feature-flag-rule.dto';
 
-const MAX_ATTRIBUTE_KEYS = 32;
-const MAX_ATTRIBUTE_KEY_LENGTH = 64;
+@ValidatorConstraint({ name: 'previewAttributes', async: false })
+class PreviewAttributesConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    return findPreviewAttributesError(value) === null;
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    return findPreviewAttributesError(args.value) ?? '';
+  }
+}
 
 export class PreviewFlagContextDto {
   @ApiPropertyOptional({
@@ -55,26 +70,26 @@ export class PreviewFlagContextDto {
   })
   @IsOptional()
   @IsObject()
+  @Validate(PreviewAttributesConstraint)
   attributes?: Record<string, unknown>;
 
   @ApiPropertyOptional({
     description:
-      'Synthetic environment label. Falls back to the active server environment when omitted.',
+      'Synthetic environment. Falls back to the active server environment when omitted.',
+    enum: APP_ENVIRONMENTS,
     example: 'staging'
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(32)
+  @IsIn(APP_ENVIRONMENTS)
   env?: string;
 
   @ApiPropertyOptional({
     description:
-      'Synthetic anonymous id (drives percentage-rule bucketing for guests).',
-    example: 'anon-42'
+      'Synthetic anonymous id (drives percentage-rule bucketing for guests). It has the UUID shape of the rollout cookie.',
+    example: '0b6f2c1e-7d4a-4c1b-9e2f-3a5d8c7b6e10'
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(128)
+  @Matches(ANON_ID_PATTERN, { message: 'anonId must be a UUID' })
   anonId?: string;
 
   @ApiPropertyOptional({
@@ -111,18 +126,4 @@ export class PreviewFlagContextDto {
   @IsString({ each: true })
   @IsIn(APP_ENVIRONMENTS, { each: true })
   environments?: string[];
-}
-
-export function sanitizeAttributes(
-  attrs: Record<string, unknown> | undefined
-): Record<string, unknown> {
-  if (!attrs) return {};
-  const entries = Object.entries(attrs).slice(0, MAX_ATTRIBUTE_KEYS);
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of entries) {
-    if (typeof key !== 'string') continue;
-    if (key.length === 0 || key.length > MAX_ATTRIBUTE_KEY_LENGTH) continue;
-    out[key] = value;
-  }
-  return out;
 }

@@ -15,9 +15,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { of, Subject } from 'rxjs';
+import { APP_ENVIRONMENTS, type AppEnvironment } from '@app/shared/constants';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import {
   NxsChipsAutocompleteComponent,
@@ -49,6 +51,7 @@ import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.
     MatIcon,
     MatInput,
     MatProgressSpinner,
+    MatSelectModule,
     MatCheckbox,
     TranslocoDirective,
     NxsChipsAutocompleteComponent
@@ -77,7 +80,9 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
 
   protected readonly selectedUser = signal<ChipOption[]>([]);
   protected readonly userOptions = signal<ChipOption[]>([]);
-  protected readonly env = signal('');
+  // An empty value leaves the environment to the server.
+  protected readonly env = signal<AppEnvironment | ''>('');
+  protected readonly environments = APP_ENVIRONMENTS;
   protected readonly attributesJson = signal('{}');
   protected readonly selectedRoles = signal<ChipOption[]>([]);
 
@@ -183,8 +188,8 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
     if (user) ctx.userId = user.value;
     const roles = this.selectedRoles().map((c) => c.value);
     if (roles.length > 0) ctx.roles = roles;
-    const trimmedEnv = this.env().trim();
-    if (trimmedEnv.length > 0) ctx.env = trimmedEnv;
+    const env = this.env();
+    if (env) ctx.env = env;
     const attrs = this.#parseJsonObject(this.attributesJson());
     if (attrs === null) return null;
     if (Object.keys(attrs).length > 0) ctx.attributes = attrs;

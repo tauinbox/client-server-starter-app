@@ -7,6 +7,8 @@ import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { NotifyService } from '@core/services/notify.service';
 import { By } from '@angular/platform-browser';
+import { MatSelect } from '@angular/material/select';
+import { APP_ENVIRONMENTS } from '@app/shared/constants';
 import { NxsChipsAutocompleteComponent } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
@@ -92,6 +94,39 @@ describe('FeatureFlagPreviewComponent', () => {
       reason: 'included-by-rule',
       matchedRule: { index: 0, type: 'role', effect: 'include' }
     });
+  });
+
+  it('offers the server default and only the deployable environments', async () => {
+    const fixture = await setup();
+    const select = fixture.debugElement.query(By.directive(MatSelect))
+      .componentInstance as MatSelect;
+    select.open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(select.options.map((o) => o.value as string)).toEqual([
+      '',
+      ...APP_ENVIRONMENTS
+    ]);
+  });
+
+  it('sends the chosen environment and omits the server default', async () => {
+    const fixture = await setup();
+    previewSpy.mockReturnValue(
+      of({
+        result: true,
+        reason: 'no-rules-default-on',
+        matchedRule: null
+      } satisfies FeatureFlagPreviewResult)
+    );
+    const cmp = fixture.componentInstance;
+    cmp['env'].set('staging');
+    cmp.run();
+    cmp['env'].set('');
+    cmp.run();
+    expect(previewSpy.mock.calls).toEqual([
+      ['flag-1', { env: 'staging' }],
+      ['flag-1', {}]
+    ]);
   });
 
   it('sends the unsaved draft alongside the context', async () => {
