@@ -996,6 +996,21 @@ describe('feature-flag validation parity with server', () => {
       expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED);
     });
 
+    it.each(['1abc', '1.5', '0', '2147483648'])(
+      'rejects If-Match %j with 400 and keeps the flag unchanged',
+      async (ifMatch) => {
+        const created = await createFlag({ key: 'order-if-match-junk' });
+        const flag = (await created.json()) as { id: string; version: number };
+        const res = await patchFlag(flag.id, { enabled: true }, ifMatch);
+        expect(res.status).toBe(400);
+        const body = (await res.json()) as { message: string };
+        expect(body.message).toBe('If-Match must be a positive integer');
+        const stored = getState().featureFlags.get(flag.id);
+        expect(stored?.enabled).toBe(false);
+        expect(stored?.version).toBe(flag.version);
+      }
+    );
+
     it('rejects a non-array rule set on an absent flag with 400, not 404', async () => {
       const res = await saveRules(ABSENT_ID, 'nope');
       expect(res.status).toBe(400);

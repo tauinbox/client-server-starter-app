@@ -32,6 +32,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { subject } from '@casl/ability';
 import { ErrorKeys } from '@app/shared/constants';
+import { parseIfMatchVersion } from '@app/shared/utils/if-match';
 import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
@@ -276,7 +277,8 @@ export class FeatureFlagsAdminController {
   }
 
   private parseIfMatch(header: string | undefined): number {
-    if (header === undefined || header === '') {
+    const version = parseIfMatchVersion(header);
+    if (version === 'missing') {
       throw new HttpException(
         {
           message: 'If-Match header is required for optimistic locking',
@@ -285,11 +287,9 @@ export class FeatureFlagsAdminController {
         HttpStatus.PRECONDITION_REQUIRED
       );
     }
-    const stripped = header.replace(/^"|"$/g, '').trim();
-    const parsed = Number.parseInt(stripped, 10);
-    if (!Number.isInteger(parsed) || parsed < 1) {
+    if (version === 'invalid') {
       throw new BadRequestException('If-Match must be a positive integer');
     }
-    return parsed;
+    return version;
   }
 }
