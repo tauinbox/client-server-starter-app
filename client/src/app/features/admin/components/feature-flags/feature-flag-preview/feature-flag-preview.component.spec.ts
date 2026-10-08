@@ -6,7 +6,8 @@ import { of, throwError } from 'rxjs';
 import type { FeatureFlagPreviewResult } from '@app/shared/types';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { NotifyService } from '@core/services/notify.service';
-import { RoleCatalogService } from '@core/services/role-catalog.service';
+import { By } from '@angular/platform-browser';
+import { NxsChipsAutocompleteComponent } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
@@ -14,7 +15,6 @@ import { FeatureFlagPreviewComponent } from './feature-flag-preview.component';
 
 describe('FeatureFlagPreviewComponent', () => {
   let previewSpy: ReturnType<typeof vi.fn>;
-  let getAllRolesSpy: ReturnType<typeof vi.fn>;
   let searchUsersSpy: ReturnType<typeof vi.fn>;
   let notifyError: ReturnType<typeof vi.fn>;
 
@@ -22,7 +22,6 @@ describe('FeatureFlagPreviewComponent', () => {
     flagId = 'flag-1'
   ): Promise<ComponentFixture<FeatureFlagPreviewComponent>> => {
     previewSpy = vi.fn();
-    getAllRolesSpy = vi.fn().mockReturnValue(of([]));
     searchUsersSpy = vi
       .fn()
       .mockReturnValue(
@@ -38,7 +37,6 @@ describe('FeatureFlagPreviewComponent', () => {
           provide: FeatureFlagsAdminService,
           useValue: { preview: previewSpy }
         },
-        { provide: RoleCatalogService, useValue: { getAll: getAllRolesSpy } },
         { provide: UserService, useValue: { searchCursor: searchUsersSpy } },
         { provide: NotifyService, useValue: { error: notifyError } }
       ]
@@ -50,40 +48,18 @@ describe('FeatureFlagPreviewComponent', () => {
     return fixture;
   };
 
-  it('loads role options on init', async () => {
-    getAllRolesSpy = vi.fn().mockReturnValue(
-      of([
-        { name: 'admin', description: 'System admins' },
-        { name: 'beta', description: null }
-      ])
-    );
-    await TestBed.configureTestingModule({
-      imports: [FeatureFlagPreviewComponent, TranslocoTestingModuleWithLangs],
-      providers: [
-        provideNoopMaterialAnimations(),
-        { provide: FeatureFlagsAdminService, useValue: { preview: vi.fn() } },
-        { provide: RoleCatalogService, useValue: { getAll: getAllRolesSpy } },
-        {
-          provide: UserService,
-          useValue: {
-            searchCursor: vi.fn().mockReturnValue(
-              of({
-                data: [] as User[],
-                meta: { nextCursor: null as string | null }
-              })
-            )
-          }
-        },
-        { provide: NotifyService, useValue: { error: vi.fn() } }
-      ]
-    }).compileComponents();
-    const fixture = TestBed.createComponent(FeatureFlagPreviewComponent);
-    fixture.componentRef.setInput('flagId', 'flag-1');
+  it('offers the roleOptions input in the role picker', async () => {
+    const fixture = await setup();
+    const roles = [
+      { value: 'admin', label: 'admin', sub: 'System admins' },
+      { value: 'beta', label: 'beta' }
+    ];
+    fixture.componentRef.setInput('roleOptions', roles);
     fixture.detectChanges();
-    expect(getAllRolesSpy).toHaveBeenCalledTimes(1);
-    expect(
-      fixture.componentInstance['roleOptions']().map((c) => c.value)
-    ).toEqual(['admin', 'beta']);
+    const pickers = fixture.debugElement
+      .queryAll(By.directive(NxsChipsAutocompleteComponent))
+      .map((el) => el.componentInstance as NxsChipsAutocompleteComponent);
+    expect(pickers.some((p) => p.options() === roles)).toBe(true);
   });
 
   it('builds a structured context from form fields and calls preview()', async () => {

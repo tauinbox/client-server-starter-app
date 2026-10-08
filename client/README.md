@@ -168,13 +168,15 @@ src/app/
 │       │       │                             # .app-dialog-fullscreen-mobile panel class on a
 │       │       │                             # handset. The flag and its rules save in one
 │       │       │                             # POST or PATCH; the rules go in the body only
-│       │       │                             # when the rule set changed.
+│       │       │                             # when the rule set changed. The dialog reads
+│       │       │                             # RoleCatalogService.getAll() once and gives the
+│       │       │                             # roles to each rule row and to the preview.
 │       │       └── feature-flag-rule-row/    # FeatureFlagRuleRowComponent edits one rule. Each
 │       │                                     # rule type has its own payload editor. A user rule
 │       │                                     # uses a chip field with an autocomplete fed by
 │       │                                     # UserService.searchCursor with a 250 ms debounce.
-│       │                                     # A role rule uses a chip field fed by
-│       │                                     # RoleCatalogService.getAll(). A percentage rule
+│       │                                     # A role rule uses a chip field fed by the
+│       │                                     # roleOptions input. A percentage rule
 │       │                                     # uses a discrete slider with a 5% step and a static
 │       │                                     # value label. An attribute rule has field, op,
 │       │                                     # value and customKey. The customKey box is an

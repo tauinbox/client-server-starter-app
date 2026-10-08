@@ -10,9 +10,9 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { config, of, throwError } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
-import { RoleCatalogService } from '@core/services/role-catalog.service';
+import type { ChipOption } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import type { FeatureFlagRuleDraft } from './feature-flag-rule-row.component';
@@ -24,6 +24,7 @@ import { FeatureFlagRuleRowComponent } from './feature-flag-rule-row.component';
     [(rule)]="rule"
     [error]="error()"
     [customKeyOptions]="customKeyOptions()"
+    [roleOptions]="roleOptions()"
     (remove)="onRemove()"
   />`
 })
@@ -35,36 +36,12 @@ class HostComponent {
   });
   readonly error = signal<string | null>(null);
   readonly customKeyOptions = signal<readonly string[]>([]);
+  readonly roleOptions = signal<ChipOption[]>([]);
   removed = 0;
   onRemove(): void {
     this.removed++;
   }
 }
-
-const roleCatalogStub = {
-  getAll: vi.fn(() =>
-    of([
-      {
-        id: 'r1',
-        name: 'beta-tester',
-        description: 'beta program members',
-        isSystem: false,
-        isSuper: false,
-        createdAt: '',
-        updatedAt: ''
-      },
-      {
-        id: 'r2',
-        name: 'admin',
-        description: null,
-        isSystem: true,
-        isSuper: false,
-        createdAt: '',
-        updatedAt: ''
-      }
-    ])
-  )
-};
 
 const userServiceStub: {
   searchCursor: ReturnType<typeof vi.fn>;
@@ -76,7 +53,6 @@ const userServiceStub: {
 
 describe('FeatureFlagRuleRowComponent', () => {
   beforeEach(async () => {
-    roleCatalogStub.getAll.mockClear();
     userServiceStub.searchCursor.mockReset();
     userServiceStub.searchCursor.mockImplementation(() =>
       of({ data: [] as User[], meta: { nextCursor: null as string | null } })
@@ -86,7 +62,6 @@ describe('FeatureFlagRuleRowComponent', () => {
       providers: [
         provideNoopMaterialAnimations(),
         provideNativeDateAdapter(),
-        { provide: RoleCatalogService, useValue: roleCatalogStub },
         { provide: UserService, useValue: userServiceStub }
       ]
     }).compileComponents();
@@ -850,29 +825,38 @@ describe('FeatureFlagRuleRowComponent', () => {
     });
   });
 
-  it('loads roles into the autocomplete options on init', () => {
+  it('labels role chips from the roleOptions input, and keeps unknown names', () => {
     const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.rule.set({
+      effect: 'include',
+      type: 'role',
+      payload: { type: 'role', roleNames: ['beta-tester', 'gone'] }
+    });
     fixture.detectChanges();
-    expect(roleCatalogStub.getAll).toHaveBeenCalledTimes(1);
-  });
+    const cmp = fixture.debugElement.children[0]
+      .componentInstance as FeatureFlagRuleRowComponent;
+    expect(cmp['roleChips']()).toEqual([
+      { value: 'beta-tester', label: 'beta-tester' },
+      { value: 'gone', label: 'gone' }
+    ]);
 
-  it('reports no unhandled error when the role catalog is refused', () => {
-    const unhandled = vi.fn();
-    config.onUnhandledError = unhandled;
-    vi.useFakeTimers();
-    try {
-      roleCatalogStub.getAll.mockReturnValueOnce(
-        throwError(() => new Error('503'))
-      );
-      const fixture = TestBed.createComponent(HostComponent);
-      fixture.detectChanges();
-      vi.runOnlyPendingTimers();
+    fixture.componentInstance.roleOptions.set([
+      {
+        value: 'beta-tester',
+        label: 'beta-tester',
+        sub: 'beta program members'
+      }
+    ]);
+    fixture.detectChanges();
 
-      expect(unhandled).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-      config.onUnhandledError = null;
-    }
+    expect(cmp['roleChips']()).toEqual([
+      {
+        value: 'beta-tester',
+        label: 'beta-tester',
+        sub: 'beta program members'
+      },
+      { value: 'gone', label: 'gone' }
+    ]);
   });
 
   it('searches again after a refused user search', async () => {
@@ -1180,8 +1164,7 @@ describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
         provideNoopMaterialAnimations(),
         provideNativeDateAdapter(),
         provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: RoleCatalogService, useValue: roleCatalogStub }
+        provideHttpClientTesting()
       ]
     }).compileComponents();
     const http = TestBed.inject(HttpTestingController);
