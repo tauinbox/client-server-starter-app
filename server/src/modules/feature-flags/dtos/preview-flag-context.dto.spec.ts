@@ -99,6 +99,78 @@ describe('PreviewFlagContextDto draft fields', () => {
     );
   });
 
+  it('rejects an env that no server can run as, like a save does', async () => {
+    const preview = await messagesFor({ env: 'prod' });
+    expect(preview).toBe(
+      'env must be one of the following values: local, development, staging, production'
+    );
+    await expect(
+      messagesFor({ environments: ['prod'] }, UpdateFeatureFlagDto)
+    ).resolves.toContain('one of the following values');
+  });
+
+  it('accepts every deployable env', async () => {
+    for (const env of ['local', 'development', 'staging', 'production']) {
+      const dto = await transform<PreviewFlagContextDto>(
+        { env },
+        PreviewFlagContextDto
+      );
+      expect(dto.env).toBe(env);
+    }
+  });
+
+  it('rejects a non-string env with the same single message', async () => {
+    await expect(messagesFor({ env: 7 })).resolves.toBe(
+      'env must be one of the following values: local, development, staging, production'
+    );
+  });
+
+  it.each(['anon-42', 7])(
+    'rejects the anonId %p, which the rollout cookie can never hold',
+    async (anonId) => {
+      await expect(messagesFor({ anonId })).resolves.toBe(
+        'anonId must be a UUID'
+      );
+    }
+  );
+
+  // The rollout cookie accepts any UUID shape, with no RFC version or variant.
+  it('accepts an anonId of the rollout cookie shape', async () => {
+    const anonId = '11111111-1111-1111-1111-111111111111';
+    const dto = await transform<PreviewFlagContextDto>(
+      { anonId },
+      PreviewFlagContextDto
+    );
+    expect(dto.anonId).toBe(anonId);
+  });
+
+  it('accepts 32 attribute keys of up to 64 characters', async () => {
+    const attributes: Record<string, unknown> = { ['k'.repeat(64)]: 1 };
+    for (let i = 1; i < 32; i++) attributes[`k${i}`] = i;
+    const dto = await transform<PreviewFlagContextDto>(
+      { attributes },
+      PreviewFlagContextDto
+    );
+    expect(dto.attributes).toEqual(attributes);
+  });
+
+  it('rejects 33 attribute keys instead of dropping the extra one', async () => {
+    const attributes: Record<string, unknown> = {};
+    for (let i = 0; i < 33; i++) attributes[`k${i}`] = i;
+    await expect(messagesFor({ attributes })).resolves.toBe(
+      'attributes must contain no more than 32 keys'
+    );
+  });
+
+  it('rejects an empty or over-long attribute key instead of dropping it', async () => {
+    const message =
+      'each key in attributes must be from 1 to 64 characters long';
+    await expect(messagesFor({ attributes: { '': 1 } })).resolves.toBe(message);
+    await expect(
+      messagesFor({ attributes: { ['k'.repeat(65)]: 1 } })
+    ).resolves.toBe(message);
+  });
+
   it('normalizes and validates draft environments', async () => {
     const dto = await transform<PreviewFlagContextDto>(
       { environments: [' Production ', 'production'] },

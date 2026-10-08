@@ -49,13 +49,14 @@
         <mat-label>{{
           t('admin.featureFlagPreview.environmentLabel')
         }}</mat-label>
-        <input
-          #envInput
-          matInput
-          [placeholder]="t('admin.featureFlagPreview.environmentPlaceholder')"
-          [value]="env()"
-          (input)="env.set(envInput.value)"
-        />
+        <mat-select [value]="env()" (selectionChange)="env.set($event.value)">
+          <mat-option value="">{{
+            t('admin.featureFlagPreview.environmentPlaceholder')
+          }}</mat-option>
+          @for (environment of environments; track environment) {
+            <mat-option [value]="environment">{{ environment }}</mat-option>
+          }
+        </mat-select>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="attributes-field">

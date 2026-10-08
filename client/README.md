@@ -909,6 +909,9 @@ draft into the request in both modes, thus the server evaluates the unsaved edit
 stored flag. The server validates a supplied rule set with the validator of the save path, so an
 incomplete rule gets the same 400 that a save would give.
 
+The environment field of the panel is a select. It gives the server default and the
+`APP_ENVIRONMENTS` names only, because the server rejects any other `env` with a 400.
+
 The panel shows the reason as a chip. The reason `excluded` and the reason `not-included` are
 different. The first one says that an exclude rule matched, and the chip beside it gives that
 rule. The second one says that include rules exist and that no rule matched the context.
@@ -1141,8 +1144,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 307 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1521 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 310 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1528 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

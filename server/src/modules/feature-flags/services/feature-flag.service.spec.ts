@@ -473,18 +473,6 @@ describe('FeatureFlagService', () => {
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('caps the attribute key set to bound DTO abuse', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      const huge: Record<string, unknown> = {};
-      for (let i = 0; i < 100; i++) huge[`k${i}`] = i;
-      const result = await service.preview('flag-1', {
-        roles: ['beta'],
-        attributes: huge
-      });
-      expect(result.result).toBe(true);
-    });
-
     it('evaluates a supplied rule set instead of the persisted one', async () => {
       flagRepo.findOne.mockResolvedValueOnce(previewFlag);
       ruleRepo.find.mockResolvedValueOnce([previewRule]);

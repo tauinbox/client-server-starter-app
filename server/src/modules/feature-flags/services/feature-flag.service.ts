@@ -39,10 +39,7 @@ import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { CreateFeatureFlagDto } from '../dtos/create-feature-flag.dto';
 import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { FeatureFlagRuleDto } from '../dtos/feature-flag-rule.dto';
-import {
-  PreviewFlagContextDto,
-  sanitizeAttributes
-} from '../dtos/preview-flag-context.dto';
+import { PreviewFlagContextDto } from '../dtos/preview-flag-context.dto';
 import { validateRulePayload } from '../utils/validate-rule-payload.util';
 
 const FEATURE_FLAG_LIST_COLUMNS: ListColumns<typeof FEATURE_FLAG_LIST_QUERY> = {
@@ -318,7 +315,7 @@ export class FeatureFlagService {
       userId: dto.userId ?? null,
       anonId: dto.anonId ?? null,
       roles: dto.roles ?? [],
-      attributes: sanitizeAttributes(dto.attributes),
+      attributes: dto.attributes ?? {},
       env
     };
     return previewFeatureFlag(evalFlag, evalRules, ctx);

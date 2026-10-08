@@ -639,23 +639,26 @@ describe('feature-flag validation parity with server', () => {
       ]);
     });
 
-    it('rejects an env over 32 characters', async () => {
-      await expect(errorsOf({ env: 'e'.repeat(33) })).resolves.toEqual([
-        'env must be shorter than or equal to 32 characters'
+    // A save rejects such an environment too, so a preview that answered
+    // env-mismatch for it would describe a flag that cannot exist.
+    it.each(['prod', 7])('rejects the env %p', async (env) => {
+      await expect(errorsOf({ env })).resolves.toEqual([
+        'env must be one of the following values: local, development, staging, production'
       ]);
     });
 
-    it('rejects a non-string env', async () => {
-      await expect(errorsOf({ env: 7 })).resolves.toEqual([
-        'env must be shorter than or equal to 32 characters',
-        'env must be a string'
+    it.each(['anon-42', 7])('rejects the anonId %p', async (anonId) => {
+      await expect(errorsOf({ anonId })).resolves.toEqual([
+        'anonId must be a UUID'
       ]);
     });
 
-    it('rejects an anonId over 128 characters', async () => {
-      await expect(errorsOf({ anonId: 'a'.repeat(129) })).resolves.toEqual([
-        'anonId must be shorter than or equal to 128 characters'
-      ]);
+    // The rollout cookie accepts any UUID shape, with no RFC version or variant.
+    it('accepts an anonId of the rollout cookie shape', async () => {
+      const res = await preview({
+        anonId: '11111111-1111-1111-1111-111111111111'
+      });
+      expect(res.status).toBe(200);
     });
 
     it('rejects an unknown property on its own', async () => {
@@ -691,22 +694,33 @@ describe('feature-flag validation parity with server', () => {
         roles: ['beta'],
         attributes: { email: 'tester@example.com' },
         env: 'staging',
-        anonId: 'anon-42'
+        anonId: '0b6f2c1e-7d4a-4c1b-9e2f-3a5d8c7b6e10'
       });
       expect(res.status).toBe(200);
     });
 
-    // sanitizeAttributes drops an over-long key instead of rejecting it.
-    it('drops an over-long attribute key without rejecting the request', async () => {
-      const res = await preview({
-        attributes: { ['k'.repeat(65)]: 1, email: 'tester@example.com' }
-      });
-      expect(res.status).toBe(200);
+    it('rejects an empty or over-long attribute key instead of dropping it', async () => {
+      const message =
+        'each key in attributes must be from 1 to 64 characters long';
+      await expect(errorsOf({ attributes: { '': 1 } })).resolves.toEqual([
+        message
+      ]);
+      await expect(
+        errorsOf({
+          attributes: { ['k'.repeat(65)]: 1, email: 'tester@example.com' }
+        })
+      ).resolves.toEqual([message]);
     });
 
-    // The server slices the first 32 entries and only then drops the bad keys,
-    // so a dropped key still consumes one of the 32 slots.
-    it('counts a dropped attribute key against the 32-entry cap', async () => {
+    it('rejects 33 attribute keys instead of dropping the extra one', async () => {
+      const attributes: Record<string, unknown> = {};
+      for (let i = 0; i < 33; i++) attributes[`k${i}`] = i;
+      await expect(errorsOf({ attributes })).resolves.toEqual([
+        'attributes must contain no more than 32 keys'
+      ]);
+    });
+
+    it('evaluates all 32 attribute keys', async () => {
       const stored = await saveRules(flagId, [
         {
           type: 'attribute',
@@ -721,15 +735,15 @@ describe('feature-flag validation parity with server', () => {
       ]);
       expect(stored.status).toBe(200);
 
-      const attributes: Record<string, unknown> = { ['k'.repeat(65)]: 1 };
-      for (let i = 0; i < 31; i++) attributes[`k${i}`] = i;
+      const attributes: Record<string, unknown> = { ['k'.repeat(64)]: 1 };
+      for (let i = 0; i < 30; i++) attributes[`k${i}`] = i;
       attributes['email'] = 'tester@example.com';
 
       const res = await preview({ attributes });
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
-        result: false,
-        matchedRule: null
+        result: true,
+        reason: 'included-by-rule'
       });
     });
   });
