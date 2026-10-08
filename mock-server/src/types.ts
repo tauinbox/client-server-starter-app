@@ -257,6 +257,17 @@ export interface MockPurchaseSession {
   createdAt: string;
 }
 
+/**
+ * A plan checkout or a payment-method update opened on the mock checkout page.
+ * The server keeps no such row: the provider holds the session.
+ */
+export type MockCheckoutSession = {
+  sessionRef: string;
+  customerId: string;
+  provider: import('@app/shared/types').BillingProviderId;
+  createdAt: string;
+} & ({ kind: 'plan'; planKey: string } | { kind: 'method' });
+
 export interface MockInvoice {
   id: string;
   customerId: string;
@@ -424,8 +435,11 @@ export interface State {
   billingUsageRecords: Map<string, MockUsageRecord>;
   // Entitlement grants from paid one-time sku purchases.
   billingCustomerGrants: Map<string, MockCustomerGrant>;
-  // Purchases opened but not yet settled by /__control/billing/complete-purchase.
+  // Purchases opened but not yet paid on the mock checkout page or settled by
+  // /__control/billing/complete-purchase.
   billingPurchaseSessions: Map<string, MockPurchaseSession>;
+  // Plan checkouts and payment-method updates open on the mock checkout page.
+  billingCheckoutSessions: Map<string, MockCheckoutSession>;
   // Prepaid credit balances keyed by customer id — topped up by paid credit
   // pack purchases, mirroring the server's balance row.
   billingCreditBalances: Map<string, MockCreditBalance>;

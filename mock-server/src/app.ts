@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { registerRoutes } from './middleware';
 import controlRouter from './control.routes';
+import mockCheckoutRouter, { MOCK_CHECKOUT_PATH } from './routes/mock-checkout';
 import {
   errorEnvelope,
   routeNotFound,
@@ -68,6 +69,8 @@ export function createApp() {
 
   // Control API (for E2E tests and debugging)
   app.use('/__control', controlRouter);
+
+  app.use(MOCK_CHECKOUT_PATH, mockCheckoutRouter);
 
   // Application routes
   registerRoutes(app);

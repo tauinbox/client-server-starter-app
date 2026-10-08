@@ -2,18 +2,13 @@ import type { Page } from '@playwright/test';
 import { test, expect, loginViaUi } from '../fixtures/base.fixture';
 
 const USER_ID = '200';
+const MOCK_CHECKOUT_URL = /\/api\/__mock-checkout\//;
 
-// The client redirects to the provider's hosted checkout via window.location.
-// That host is unreachable in tests, so intercept the navigation and fulfill it
-// with a blank page; the test then simulates the provider webhook via /__control.
-async function stubHostedCheckout(page: Page) {
-  await page.route('**/mock-checkout.local/**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'text/html',
-      body: '<html><body>checkout</body></html>'
-    })
-  );
+// The mock sends the browser to its own hosted-checkout page; Pay settles the
+// session the way the provider webhook would and returns to the client.
+async function payOnMockCheckout(page: Page) {
+  await expect(page).toHaveURL(MOCK_CHECKOUT_URL);
+  await page.getByRole('button', { name: 'Pay' }).click();
 }
 
 type SnackbarCounter = Window & { snackbarsOpened?: number };
@@ -313,7 +308,6 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-    await stubHostedCheckout(page);
 
     // Start checkout for Pro from the pricing page.
     await page.goto('/billing');
@@ -322,16 +316,9 @@ test.describe('Billing', () => {
       .getByRole('button', { name: 'Choose' })
       .click();
 
-    // The browser is redirected to the (stubbed) hosted checkout.
-    await expect(page).toHaveURL(/mock-checkout\.local/);
+    await payOnMockCheckout(page);
 
-    // Simulate the provider webhook activating the subscription, then return.
-    await _mockServer.activateBillingSubscription({
-      userId: USER_ID,
-      planKey: 'pro'
-    });
-
-    await page.goto('/billing/success');
+    await expect(page).toHaveURL(/\/billing\/success$/);
     await expect(
       page.getByRole('heading', { name: /You're on Pro/ })
     ).toBeVisible();
@@ -401,14 +388,15 @@ test.describe('Billing', () => {
       roles: ['user'],
       locale: 'ru'
     });
-    await stubHostedCheckout(page);
 
     await page.goto('/billing');
     await page
       .locator('nxs-plan-card', { hasText: 'Pro' })
       .getByRole('button', { name: 'Choose' })
       .click();
-    await expect(page).toHaveURL(/mock-checkout\.local/);
+    await expect(page).toHaveURL(MOCK_CHECKOUT_URL);
+    await page.getByRole('link', { name: 'Cancel' }).click();
+    await expect(page).toHaveURL(/\/billing\/cancel$/);
 
     await page.goto('/billing');
     const pro = page.locator('nxs-plan-card', { hasText: 'Pro' });
@@ -491,7 +479,6 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-    await stubHostedCheckout(page);
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -501,11 +488,11 @@ test.describe('Billing', () => {
     await expect(page.locator('.payment-method')).toContainText('4242');
 
     await page.getByRole('button', { name: 'Update' }).click();
-    await expect(page).toHaveURL(/mock-checkout\.local/);
+    await payOnMockCheckout(page);
 
-    // The mock settles the provider's success webhook synchronously, so the
-    // swapped default method is visible as soon as the user returns.
-    await page.goto('/billing/settings');
+    // The mock swaps the default method when the update starts, so the new
+    // card is visible as soon as the user returns.
+    await expect(page).toHaveURL(/\/billing\/settings$/);
     await expect(page.locator('.payment-method')).toContainText('mastercard');
     await expect(page.locator('.payment-method')).toContainText('4444');
   });
@@ -515,7 +502,6 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-    await stubHostedCheckout(page);
 
     // The one-time section renders the seeded catalog below the plans.
     await page.goto('/billing');
@@ -526,11 +512,8 @@ test.describe('Billing', () => {
     await expect(skuCard).toContainText('$5.00');
 
     await skuCard.getByRole('button', { name: 'Buy' }).click();
-    await expect(page).toHaveURL(/mock-checkout\.local/);
-
-    // Simulate the provider's paid webhook, then return from checkout.
-    await _mockServer.completeBillingPurchase({ userId: USER_ID });
-    await page.goto('/billing/success');
+    await payOnMockCheckout(page);
+    await expect(page).toHaveURL(/\/billing\/success$/);
 
     await expect(
       page.getByRole('heading', { name: 'Thank you for your purchase!' })
@@ -554,7 +537,6 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-    await stubHostedCheckout(page);
 
     await page.goto('/billing');
     const donationCard = page.locator('nxs-donation-card');
@@ -572,10 +554,8 @@ test.describe('Billing', () => {
       .fill('Keep it up');
     await donationCard.getByRole('button', { name: 'Pay $15.00' }).click();
 
-    await expect(page).toHaveURL(/mock-checkout\.local/);
-
-    await _mockServer.completeBillingPurchase({ userId: USER_ID });
-    await page.goto('/billing/success');
+    await payOnMockCheckout(page);
+    await expect(page).toHaveURL(/\/billing\/success$/);
 
     await expect(
       page.getByRole('heading', { name: 'Thank you for your purchase!' })
@@ -660,7 +640,6 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-    await stubHostedCheckout(page);
 
     // Before any purchase the wallet shows the confident zero state.
     await page.goto('/billing/settings');
@@ -677,10 +656,10 @@ test.describe('Billing', () => {
     });
     await expect(pack).toContainText('$9.00');
     await pack.getByRole('button', { name: 'Buy' }).click();
-    await expect(page).toHaveURL(/mock-checkout\.local/);
+    await payOnMockCheckout(page);
+    await expect(page).toHaveURL(/\/billing\/success$/);
 
-    // Settle the provider's paid webhook; the wallet reflects the pack.
-    await _mockServer.completeBillingPurchase({ userId: USER_ID });
+    // The wallet reflects the pack.
     await page.goto('/billing/settings');
     await expect(credits.locator('.credits-units')).toHaveText('1,000');
     await expect(credits.locator('.credits-hint')).toHaveCount(0);
@@ -694,7 +673,6 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-    await stubHostedCheckout(page);
 
     // Pay-as-you-go subscription + a 1000-unit pack in the wallet.
     const subscription = await _mockServer.activateBillingSubscription({
@@ -706,8 +684,8 @@ test.describe('Billing', () => {
       .locator('nxs-product-card', { hasText: '1000 credits' })
       .getByRole('button', { name: 'Buy' })
       .click();
-    await expect(page).toHaveURL(/mock-checkout\.local/);
-    await _mockServer.completeBillingPurchase({ userId: USER_ID });
+    await payOnMockCheckout(page);
+    await expect(page).toHaveURL(/\/billing\/success$/);
 
     // 142 metered units close the period: credits cover them one-for-one,
     // so the postpaid invoice is zero and the wallet drops to 858.

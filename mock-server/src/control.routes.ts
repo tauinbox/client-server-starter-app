@@ -14,11 +14,8 @@ import {
 } from './state';
 import type { StateSnapshot } from './control.types';
 import type {
-  MockCustomer,
-  MockCustomerGrant,
   MockInvoice,
   MockIssuedToken,
-  MockPaymentMethod,
   MockPermission,
   MockRole,
   MockRolePermission,
@@ -42,10 +39,14 @@ import {
   meteredWindowStart,
   sumPlanMeterUnits
 } from './helpers/billing.helpers';
-import type { BillingProviderId } from '@app/shared/types';
 import type { NotificationEvent } from '@app/shared/types';
 import { pushToAll, pushToUser } from './sse-hub';
-import { addInterval, nextPeriodEnd } from './utils/period';
+import {
+  activateSubscription,
+  notifyEntitlementsChanged,
+  settlePurchase
+} from './helpers/billing-settle.helpers';
+import { nextPeriodEnd } from './utils/period';
 import {
   notifyRoleHolders,
   notifyUserRolesChanged
@@ -99,6 +100,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     ),
     billingCustomerGrants: Array.from(state.billingCustomerGrants.values()),
     billingPurchaseSessions: Array.from(state.billingPurchaseSessions.values()),
+    billingCheckoutSessions: Array.from(state.billingCheckoutSessions.values()),
     billingCreditBalances: Array.from(state.billingCreditBalances.values())
   };
 }
@@ -586,22 +588,9 @@ router.post('/notify', (req, res) => {
   res.json({ ok: true });
 });
 
-/**
- * Mirrors the server's entitlement-changed listener: every billing change that
- * moves what a plan grants tells the affected client so its advisory mirror
- * does not sit stale. Scoped to the one owner - never a broadcast.
- */
-function notifyEntitlementsChanged(customerId: string): void {
-  const userId = getState().billingCustomers.get(customerId)?.userId;
-  if (!userId) return;
-  pushToUser(userId, { type: 'entitlements_updated', userId });
-}
-
-// POST /__control/billing/activate-subscription — simulate a successful
-// checkout + provider webhook for E2E (the real flow redirects to an external
-// hosted-checkout page Playwright can't visit). Idempotently brings a user's
-// subscription to an active state, attaching a default payment method and a
-// paid invoice so the settings/checkout-return pages render a complete state.
+// POST /__control/billing/activate-subscription — put a user on a plan for E2E
+// with no checkout, through the same settlement as the Pay button of the mock
+// checkout page.
 router.post('/billing/activate-subscription', (req, res) => {
   const {
     userId,
@@ -630,108 +619,7 @@ router.post('/billing/activate-subscription', (req, res) => {
     return;
   }
 
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const periodEnd = addInterval(now, plan.interval);
-
-  const isRu = (user.locale ?? 'en').toLowerCase().startsWith('ru');
-  const country = isRu ? 'RU' : 'US';
-  const provider: BillingProviderId = isRu ? 'yookassa' : 'paddle';
-
-  let customer = [...state.billingCustomers.values()].find(
-    (c) => c.userId === userId
-  );
-  if (!customer) {
-    customer = {
-      id: randomUUID(),
-      userId,
-      provider,
-      providerOverride: null,
-      country,
-      currency: isRu ? 'RUB' : 'USD',
-      defaultPaymentMethodId: null,
-      createdAt: nowIso,
-      updatedAt: nowIso
-    } satisfies MockCustomer;
-    state.billingCustomers.set(customer.id, customer);
-  }
-
-  // Default payment method (created once).
-  if (!customer.defaultPaymentMethodId) {
-    const method: MockPaymentMethod = {
-      id: randomUUID(),
-      customerId: customer.id,
-      provider: customer.provider,
-      providerMethodRef: `pm_${randomUUID()}`,
-      brand: 'visa',
-      last4: '4242',
-      isDefault: true,
-      createdAt: nowIso,
-      updatedAt: nowIso
-    };
-    state.billingPaymentMethods.set(method.id, method);
-    customer.defaultPaymentMethodId = method.id;
-  }
-
-  // Reuse the latest open subscription if present, else create one.
-  const existing = [...state.billingSubscriptions.values()]
-    .filter((s) => s.customerId === customer.id && s.status !== 'canceled')
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-
-  const subscription: MockSubscription = existing ?? {
-    id: randomUUID(),
-    customerId: customer.id,
-    planKey: plan.key,
-    provider: customer.provider,
-    billingMode: plan.billingMode,
-    status,
-    lifecycleOwner: customer.provider === 'yookassa' ? 'self' : 'provider',
-    currentPeriodStart: nowIso,
-    currentPeriodEnd: periodEnd.toISOString(),
-    cancelAtPeriodEnd: false,
-    trialEnd: null,
-    paymentMethodId: customer.defaultPaymentMethodId,
-    providerSubscriptionId: null,
-    createdAt: nowIso,
-    updatedAt: nowIso
-  };
-  subscription.planKey = plan.key;
-  subscription.billingMode = plan.billingMode;
-  subscription.status = status;
-  subscription.paymentMethodId = customer.defaultPaymentMethodId;
-  subscription.currentPeriodEnd = periodEnd.toISOString();
-  // The seeded boundary is re-derived from now, so the billing day is too.
-  if (subscription.lifecycleOwner === 'self') {
-    subscription.billingAnchorAt = nowIso;
-  }
-  subscription.updatedAt = nowIso;
-  state.billingSubscriptions.set(subscription.id, subscription);
-
-  // A paid invoice for the plan price on the resolved provider.
-  const price = plan.prices[customer.provider] ?? Object.values(plan.prices)[0];
-  const invoice: MockInvoice = {
-    id: randomUUID(),
-    customerId: customer.id,
-    subscriptionId: subscription.id,
-    provider: customer.provider,
-    providerInvoiceRef: `in_${randomUUID()}`,
-    amountMinor: price?.amountMinor ?? 0,
-    currency: price?.currency ?? 'USD',
-    status: 'paid',
-    billingMode: plan.billingMode,
-    kind: 'subscription',
-    productId: null,
-    periodStart: nowIso,
-    periodEnd: periodEnd.toISOString(),
-    paidAt: nowIso,
-    receiptRef: null,
-    createdAt: nowIso,
-    updatedAt: nowIso
-  };
-  state.billingInvoices.set(invoice.id, invoice);
-
-  notifyEntitlementsChanged(customer.id);
-  res.json(toSubscriptionResponse(subscription));
+  res.json(toSubscriptionResponse(activateSubscription(user, plan, status)));
 });
 
 // POST /__control/billing/seed-usage — pre-seed a usage record for E2E without
@@ -789,15 +677,9 @@ router.post('/billing/seed-usage', (req, res) => {
   res.json(toUsageResponse(record));
 });
 
-// POST /__control/billing/complete-purchase — simulate the provider's paid
-// webhook for a one-time purchase opened via POST /billing/purchase (the real
-// flow redirects to an external hosted-checkout page Playwright can't visit).
-// Settles a pending purchase session — by explicit `sessionRef`, or the
-// latest one for `userId` — exactly the way the server's webhook reducer
-// would: a paid `one_time` invoice keyed by the provider payment reference,
-// plus a CustomerGrant when the product is an entitlement-granting sku, plus
-// a credit-balance top-up when it is a credit pack. Settling deletes the
-// session, mirroring the reducer's once-per-payment idempotency.
+// POST /__control/billing/complete-purchase — settle a pending purchase for
+// E2E, by explicit `sessionRef` or the latest one for `userId`, through the
+// same settlement as the Pay button of the mock checkout page.
 router.post('/billing/complete-purchase', (req, res) => {
   const { userId, sessionRef } = req.body as {
     userId?: string;
@@ -827,65 +709,7 @@ router.post('/billing/complete-purchase', (req, res) => {
     return;
   }
 
-  const nowIso = new Date().toISOString();
-  const invoice: MockInvoice = {
-    id: randomUUID(),
-    customerId: session.customerId,
-    subscriptionId: null,
-    provider: session.provider,
-    providerInvoiceRef: session.sessionRef,
-    amountMinor: session.amountMinor,
-    currency: session.currency,
-    status: 'paid',
-    billingMode: 'fixed',
-    kind: 'one_time',
-    productId: session.productId,
-    periodStart: nowIso,
-    periodEnd: nowIso,
-    paidAt: nowIso,
-    receiptRef: null,
-    createdAt: nowIso,
-    updatedAt: nowIso
-  };
-  state.billingInvoices.set(invoice.id, invoice);
-
-  const product = state.billingProducts.get(session.productId);
-  if (product?.type === 'sku' && product.grant?.entitlement) {
-    const grant: MockCustomerGrant = {
-      id: randomUUID(),
-      customerId: session.customerId,
-      entitlement: product.grant.entitlement,
-      sourceInvoiceId: invoice.id,
-      expiresAt: product.grant.durationDays
-        ? new Date(
-            Date.now() + product.grant.durationDays * 86_400_000
-          ).toISOString()
-        : null,
-      revokedAt: null,
-      createdAt: nowIso
-    };
-    state.billingCustomerGrants.set(grant.id, grant);
-  }
-
-  // A paid credit pack tops up the prepaid balance, mirroring the server's
-  // webhook reducer.
-  if (product?.type === 'credits' && product.grant?.credits) {
-    const balance = state.billingCreditBalances.get(session.customerId);
-    if (balance) {
-      balance.balanceUnits += product.grant.credits;
-      balance.updatedAt = nowIso;
-    } else {
-      state.billingCreditBalances.set(session.customerId, {
-        customerId: session.customerId,
-        balanceUnits: product.grant.credits,
-        updatedAt: nowIso
-      });
-    }
-  }
-
-  state.billingPurchaseSessions.delete(session.sessionRef);
-  notifyEntitlementsChanged(session.customerId);
-  res.json(toInvoiceResponse(invoice));
+  res.json(toInvoiceResponse(settlePurchase(session)));
 });
 
 // Mirrors the server's dunning policy (renewal-queue.constants).

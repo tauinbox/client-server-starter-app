@@ -1,7 +1,6 @@
 import type { StepUpOperation } from '@app/shared/constants';
 import type {
   BillingProviderId,
-  InvoiceResponse,
   SubscriptionResponse,
   SubscriptionStatus,
   UsageResponse
@@ -110,14 +109,6 @@ export type ControlApi = {
     subscriptionId?: string;
     idempotencyKey?: string;
   }): Promise<UsageResponse>;
-  // Simulates the provider's paid webhook for a one-time purchase opened via
-  // POST /billing/purchase: settles the pending session (by sessionRef, or
-  // the latest one for userId) into a paid `one_time` invoice plus the sku's
-  // entitlement grant. Returns the settled invoice.
-  completeBillingPurchase(args: {
-    userId?: string;
-    sessionRef?: string;
-  }): Promise<InvoiceResponse>;
   // Mints the payload the real server's provider callback would have signed
   // into the `oauth_data` cookie, and returns its opaque value. The test sets
   // that cookie and loads /oauth/callback to drive POST /oauth/exchange - the
