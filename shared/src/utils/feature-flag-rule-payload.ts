@@ -168,7 +168,9 @@ export function parseFeatureFlagRulePayload(
           field: field as FeatureFlagAttributeField,
           op: op as FeatureFlagAttributeOp,
           value,
-          ...(typeof customKey === 'string' ? { customKey } : {})
+          ...(field === 'custom' && typeof customKey === 'string'
+            ? { customKey }
+            : {})
         }
       };
     }
