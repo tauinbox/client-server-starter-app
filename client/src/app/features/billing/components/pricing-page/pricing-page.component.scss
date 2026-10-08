@@ -20,6 +20,13 @@
   margin-bottom: vars.$spacing-xl;
 }
 
+.pricing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-md;
+  align-items: flex-end;
+}
+
 .pricing-intro {
   h1 {
     margin: 0;

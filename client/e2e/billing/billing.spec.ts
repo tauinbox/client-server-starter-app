@@ -49,6 +49,24 @@ test.describe('Billing', () => {
     ).toBeVisible();
     await expect(page.locator('nxs-plan-card')).toHaveCount(3);
     await expect(page.locator('.region-control')).toHaveCount(0);
+    await expect(
+      page.getByRole('link', { name: 'Manage billing' })
+    ).toHaveCount(0);
+  });
+
+  test('a signed-in user reaches billing settings from the pricing page', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.goto('/billing');
+
+    await page.getByRole('link', { name: 'Manage billing' }).click();
+
+    await expect(page).toHaveURL(/\/billing\/settings$/);
+    await expect(
+      page.getByRole('heading', { name: 'Billing', level: 1 })
+    ).toBeVisible();
   });
 
   test('anonymous "Choose" routes to login with a billing return url', async ({

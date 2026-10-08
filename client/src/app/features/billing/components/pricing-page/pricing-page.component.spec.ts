@@ -1,7 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
-import { Router } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import type {
   BillingRegionResponse,
@@ -78,7 +78,7 @@ describe('PricingPageComponent', () => {
     purchase: ReturnType<typeof vi.fn>;
   };
   let authMock: { isAuthenticated: ReturnType<typeof signal<boolean>> };
-  let routerMock: { navigate: ReturnType<typeof vi.fn> };
+  let router: Router;
   let redirectMock: { redirect: ReturnType<typeof vi.fn> };
 
   afterEach(() => {
@@ -106,7 +106,6 @@ describe('PricingPageComponent', () => {
       purchase: vi.fn().mockResolvedValue(null)
     };
     authMock = { isAuthenticated: signal(authenticated) };
-    routerMock = { navigate: vi.fn() };
     redirectMock = { redirect: vi.fn() };
 
     await TestBed.configureTestingModule({
@@ -115,10 +114,13 @@ describe('PricingPageComponent', () => {
         provideNoopMaterialAnimations(),
         { provide: BillingStore, useValue: storeMock },
         { provide: AuthStore, useValue: authMock },
-        { provide: Router, useValue: routerMock },
+        provideRouter([]),
         { provide: CheckoutRedirectService, useValue: redirectMock }
       ]
     }).compileComponents();
+
+    router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(PricingPageComponent);
     fixture.detectChanges();
@@ -209,6 +211,24 @@ describe('PricingPageComponent', () => {
     ).not.toBeNull();
   });
 
+  function manageBillingLink(): HTMLAnchorElement | null {
+    return (fixture.nativeElement as HTMLElement).querySelector(
+      '.pricing-header a[href="/billing/settings"]'
+    );
+  }
+
+  it('links a signed-in user to billing settings from the page header', async () => {
+    await setup(true);
+
+    expect(manageBillingLink()?.textContent).toContain('Manage billing');
+  });
+
+  it('shows no billing settings link to an anonymous visitor', async () => {
+    await setup(false);
+
+    expect(manageBillingLink()).toBeNull();
+  });
+
   // Plan "Choose" and product "Buy". The donation pay button also waits for an
   // amount, so its presets carry the disabled state instead.
   function actionButtons(): HTMLButtonElement[] {
@@ -284,7 +304,7 @@ describe('PricingPageComponent', () => {
   it('routes anonymous visitors to login on choose', async () => {
     await setup(false);
     fixture.componentInstance.onChoose('pro');
-    expect(routerMock.navigate).toHaveBeenCalledWith(
+    expect(router.navigate).toHaveBeenCalledWith(
       ['/login'],
       expect.objectContaining({ queryParams: { returnUrl: '/billing' } })
     );
@@ -331,7 +351,7 @@ describe('PricingPageComponent', () => {
     expect(redirectMock.redirect).toHaveBeenCalledWith(
       'https://mock-checkout.local/paddle/purchase/s9'
     );
-    expect(routerMock.navigate).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('renders the one-time section with product and donation cards for authed users', async () => {
@@ -378,7 +398,7 @@ describe('PricingPageComponent', () => {
     });
     // No hosted-checkout URL: the return page opens the Paddle.js checkout of
     // the transaction, then polls for the webhook confirmation.
-    expect(routerMock.navigate).toHaveBeenCalledWith(['/billing/success'], {
+    expect(router.navigate).toHaveBeenCalledWith(['/billing/success'], {
       queryParams: { _ptxn: 'session-7' }
     });
   });
@@ -421,6 +441,6 @@ describe('PricingPageComponent', () => {
     await fixture.whenStable();
 
     expect(readPendingPurchase()).toBeNull();
-    expect(routerMock.navigate).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });

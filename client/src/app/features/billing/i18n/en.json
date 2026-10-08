@@ -7,7 +7,8 @@
     "choose": "Choose",
     "current": "Current",
     "usageTeaser": "Pay as you go · {{ price }} / unit — only pay for what you use",
-    "paymentsUnavailable": "Payments are temporarily unavailable in your billing region."
+    "paymentsUnavailable": "Payments are temporarily unavailable in your billing region.",
+    "manageBilling": "Manage billing"
   },
   "oneTime": {
     "title": "One-time purchases",

@@ -750,7 +750,8 @@ the same permission both apply.
   payment completes, the page polls as above. When the buyer closes the overlay, the page goes to
   `/billing/cancel`. Without `PADDLE_CLIENT_TOKEN` the page says that the payment form is not
   available. The Paddle payment-method change opens in the same way on `/billing/settings`.
-- **Billing settings** (`/billing/settings`). The page shows the current plan with a semantic status
+- **Billing settings** (`/billing/settings`). An authenticated user opens it from the "Manage
+  billing" link in the header of the pricing page. The page shows the current plan with a semantic status
   chip, the change-plan dialog, and the cancel action. The cancel action opens a confirmation dialog.
   On a metered plan that dialog says that the system charges the usage of the period at the close of
   the period.
@@ -1849,8 +1850,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2778 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 566 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 560 pass and 6 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1521 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 307 tests |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1523 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 308 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 992 tests pass |
 
 ## CI/CD
