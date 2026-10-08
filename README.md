@@ -1633,6 +1633,11 @@ own configuration, so one flag turns the two-factor requirement on for both. The
 encrypted secret, thus it has no equivalent of `MFA_ENCRYPTION_KEY` and the flag is its whole
 condition.
 
+The mock has no payment provider, so it serves its own hosted checkout page at
+`/api/__mock-checkout/<sessionRef>`. A plan checkout, a one-time purchase and a payment-method
+update go there. "Pay" settles the payment and returns to the client, thus these flows complete
+by hand on `npm start` in `client/` with the mock.
+
 ### Server (`cd server`)
 
 ```bash
@@ -1852,7 +1857,7 @@ activates the git hooks through the `prepare` script.
 | Server E2E tests | Jest | A separate configuration in `test/` | 566 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 560 pass and 6 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1525 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 310 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 992 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 997 tests pass |
 
 ## CI/CD
 

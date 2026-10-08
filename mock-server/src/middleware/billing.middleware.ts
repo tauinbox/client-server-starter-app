@@ -38,6 +38,7 @@ import {
   sumPlanMeterUnits
 } from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
+import { mockCheckoutUrl } from '../routes/mock-checkout';
 import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
 import { addInterval } from '../utils/period';
 import type {
@@ -518,9 +519,16 @@ billingRouter.post(
     sub.updatedAt = nowIso;
 
     const sessionRef = randomUUID();
+    state.billingCheckoutSessions.set(sessionRef, {
+      sessionRef,
+      customerId: customer.id,
+      provider: sub.provider,
+      kind: 'method',
+      createdAt: nowIso
+    });
     res.json({
       provider: sub.provider,
-      url: `https://mock-checkout.local/${sub.provider}/method/${sessionRef}`,
+      url: mockCheckoutUrl(sessionRef),
       sessionRef
     });
   }
@@ -692,7 +700,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   });
   res.json({
     provider,
-    url: `https://mock-checkout.local/${provider}/purchase/${sessionRef}`,
+    url: mockCheckoutUrl(sessionRef),
     sessionRef
   });
 });
@@ -783,9 +791,17 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   if (rejectMissingPaddlePrice(res, provider, plan)) return;
 
   const sessionRef = randomUUID();
+  getState().billingCheckoutSessions.set(sessionRef, {
+    sessionRef,
+    customerId: customer.id,
+    provider,
+    kind: 'plan',
+    planKey: plan.key,
+    createdAt: new Date().toISOString()
+  });
   res.json({
     provider,
-    url: `https://mock-checkout.local/${provider}/${sessionRef}`,
+    url: mockCheckoutUrl(sessionRef),
     sessionRef
   });
 });

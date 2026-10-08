@@ -134,6 +134,7 @@ export function resetState(): void {
     billingPaymentMethods: new Map(),
     billingCustomerGrants: new Map(),
     billingPurchaseSessions: new Map(),
+    billingCheckoutSessions: new Map(),
     billingCreditBalances: new Map()
   };
 }
