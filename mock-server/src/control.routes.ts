@@ -588,7 +588,7 @@ router.post('/notify', (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /__control/billing/activate-subscription — put a user on a plan for E2E
+// POST /__control/billing/activate-subscription - put a user on a plan for E2E
 // with no checkout, through the same settlement as the Pay button of the mock
 // checkout page.
 router.post('/billing/activate-subscription', (req, res) => {
@@ -677,7 +677,7 @@ router.post('/billing/seed-usage', (req, res) => {
   res.json(toUsageResponse(record));
 });
 
-// POST /__control/billing/complete-purchase — settle a pending purchase for
+// POST /__control/billing/complete-purchase - settle a pending purchase for
 // E2E, by explicit `sessionRef` or the latest one for `userId`, through the
 // same settlement as the Pay button of the mock checkout page.
 router.post('/billing/complete-purchase', (req, res) => {
