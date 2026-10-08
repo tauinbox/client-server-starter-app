@@ -9,6 +9,7 @@ import {
   InvoiceCursorQueryDto,
   SubscriptionCursorQueryDto
 } from '../../modules/billing/dtos/billing-cursor-query.dto';
+import { SearchUsersCursorQueryDto } from '../../modules/users/dtos/search-users-cursor-query.dto';
 
 // The pipe options mirror main.ts. Every case goes through IntersectionType, so
 // it also proves that the composition carries the generated metadata.
@@ -91,6 +92,37 @@ describe('list query DTOs', () => {
       'isOrphaned must be a boolean value'
     ]);
   });
+
+  it.each([
+    SearchUsersCursorQueryDto,
+    FeatureFlagCursorQueryDto,
+    RoleCursorQueryDto,
+    ResourceCursorQueryDto,
+    InvoiceCursorQueryDto,
+    SubscriptionCursorQueryDto
+  ])(
+    '%p reports the paging messages in the order the mock reproduces',
+    async (metatype) => {
+      const errors = await messages(metatype, {
+        foo: '1',
+        limit: '0',
+        sortBy: 'zzz',
+        sortOrder: 'up'
+      });
+
+      expect(errors).toHaveLength(4);
+      expect(errors.slice(0, 2)).toEqual([
+        'property foo should not exist',
+        'limit must not be less than 1'
+      ]);
+      expect(errors[2]).toMatch(
+        /^sortBy must be one of the following values: /
+      );
+      expect(errors[3]).toBe(
+        'sortOrder must be one of the following values: asc, desc'
+      );
+    }
+  );
 
   it('accepts a known environment and rejects any other value', async () => {
     await expect(
