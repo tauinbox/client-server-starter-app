@@ -5,7 +5,16 @@
       <p>{{ t('billing.pricing.subtitle') }}</p>
     </div>
 
-    <nxs-region-control />
+    <div class="pricing-actions">
+      <nxs-region-control />
+
+      @if (isAuthenticated()) {
+        <a matButton="outlined" [routerLink]="settingsRoute">
+          <mat-icon aria-hidden="true">receipt_long</mat-icon>
+          {{ t('billing.pricing.manageBilling') }}
+        </a>
+      }
+    </div>
   </header>
 
   @if (store.pageLoading()) {

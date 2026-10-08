@@ -225,7 +225,9 @@ src/app/
 │       │                     # The parent route provides BillingStore.
 │       ├── components/
 │       │   ├── pricing-page/      # PricingPageComponent shows the plan cards, with Pro as the
-│       │   │                      # featured card. The header holds the region control. The
+│       │   │                      # featured card. The header holds the region control and,
+│       │   │                      # for an authenticated user, the "Manage billing" link to
+│       │   │                      # /billing/settings. The
 │       │   │                      # Choose button
 │       │   │                      # starts the checkout. An anonymous visitor goes to /login.
 │       │   │                      # An authenticated user with a non-empty catalog also sees the

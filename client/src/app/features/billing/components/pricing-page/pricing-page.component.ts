@@ -5,7 +5,8 @@ import {
   computed,
   inject
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -52,6 +53,8 @@ type PricedProduct = {
 @Component({
   selector: 'nxs-pricing-page',
   imports: [
+    RouterLink,
+    MatButton,
     MatProgressSpinner,
     MatIcon,
     TranslocoDirective,
@@ -72,6 +75,7 @@ export class PricingPageComponent implements OnInit {
   readonly #checkoutRedirect = inject(CheckoutRedirectService);
 
   protected readonly isAuthenticated = this.#authStore.isAuthenticated;
+  protected readonly settingsRoute = `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSettings}`;
 
   readonly #lang = toSignal(this.#transloco.langChanges$, {
     initialValue: this.#transloco.getActiveLang()

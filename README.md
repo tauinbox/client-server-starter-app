@@ -750,7 +750,8 @@ the same permission both apply.
   payment completes, the page polls as above. When the buyer closes the overlay, the page goes to
   `/billing/cancel`. Without `PADDLE_CLIENT_TOKEN` the page says that the payment form is not
   available. The Paddle payment-method change opens in the same way on `/billing/settings`.
-- **Billing settings** (`/billing/settings`). The page shows the current plan with a semantic status
+- **Billing settings** (`/billing/settings`). An authenticated user opens it from the "Manage
+  billing" link in the header of the pricing page. The page shows the current plan with a semantic status
   chip, the change-plan dialog, and the cancel action. The cancel action opens a confirmation dialog.
   On a metered plan that dialog says that the system charges the usage of the period at the close of
   the period.
