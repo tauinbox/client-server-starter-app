@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import type {
   HttpErrorResponse,
   HttpHandlerFn,
+  HttpHeaders,
   HttpInterceptorFn,
   HttpRequest
 } from '@angular/common/http';
@@ -25,6 +26,17 @@ function parseRetryAfterSeconds(value: string | null): number | null {
     return diff > 0 ? diff : null;
   }
   return null;
+}
+
+// A named throttler sends `Retry-After-<name>` instead of `Retry-After`.
+function retryAfterHeader(headers: HttpHeaders | undefined): string | null {
+  if (!headers) return null;
+  const plain = headers.get('Retry-After');
+  if (plain !== null) return plain;
+  const named = headers
+    .keys()
+    .find((key) => key.toLowerCase().startsWith('retry-after-'));
+  return named ? headers.get(named) : null;
 }
 
 export const errorInterceptor: HttpInterceptorFn = (
@@ -89,7 +101,7 @@ export const errorInterceptor: HttpInterceptorFn = (
           // message; show a friendly localized one and surface the
           // Retry-After header when present.
           const retryAfter = parseRetryAfterSeconds(
-            error.headers?.get('Retry-After')
+            retryAfterHeader(error.headers)
           );
           if (retryAfter !== null) {
             notify.warn('errors.general.tooManyRequestsRetry', {
