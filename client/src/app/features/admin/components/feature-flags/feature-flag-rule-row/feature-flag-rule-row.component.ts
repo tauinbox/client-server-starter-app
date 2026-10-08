@@ -57,7 +57,6 @@ import {
   debouncedUserSearch,
   isSearchableTerm,
   searchUsersPage,
-  USER_SEARCH_LIMIT,
   userToChip
 } from '../../../utils/user-chip-search';
 
@@ -96,15 +95,6 @@ function parseAttributeScalar(raw: string): AttributeScalar {
   const num = Number(raw);
   if (Number.isFinite(num) && String(num) === raw) return num;
   return raw;
-}
-
-function userMatchesTerm(user: User, lowered: string): boolean {
-  return (
-    user.email.toLowerCase().includes(lowered) ||
-    user.firstName.toLowerCase().includes(lowered) ||
-    user.lastName.toLowerCase().includes(lowered) ||
-    user.id.toLowerCase().includes(lowered)
-  );
 }
 
 @Component({
@@ -315,52 +305,10 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       });
   }
 
-  // Last completed server response — used to skip the network when the new
-  // term is a (case-insensitive) extension of the previous one AND the
-  // previous response was the full result set (length < page size). In that
-  // case the previous results are a strict superset of the new ones, so
-  // local filtering is exact.
-  #lastSearch: {
-    term: string;
-    results: User[];
-    isComplete: boolean;
-  } | null = null;
-
   #searchUsers(term: string) {
     const trimmed = term.trim();
-    if (!isSearchableTerm(trimmed)) {
-      this.#lastSearch = null;
-      return of([] as User[]);
-    }
-
-    const lowered = trimmed.toLowerCase();
-    const prev = this.#lastSearch;
-    if (
-      prev &&
-      prev.isComplete &&
-      lowered.startsWith(prev.term.toLowerCase())
-    ) {
-      const filtered = prev.results.filter((u) => userMatchesTerm(u, lowered));
-      // Refresh the cache anchor so successive narrowings keep working
-      // without ever hitting the network.
-      this.#lastSearch = {
-        term: trimmed,
-        results: filtered,
-        isComplete: true
-      };
-      return of(filtered);
-    }
-
-    return searchUsersPage(this.#userService, trimmed).pipe(
-      map((users) => {
-        this.#lastSearch = {
-          term: trimmed,
-          results: users,
-          isComplete: users.length < USER_SEARCH_LIMIT
-        };
-        return users;
-      })
-    );
+    if (!isSearchableTerm(trimmed)) return of([] as User[]);
+    return searchUsersPage(this.#userService, trimmed);
   }
 
   onTypeChange(type: FeatureFlagRuleType): void {

@@ -957,43 +957,9 @@ describe('FeatureFlagRuleRowComponent', () => {
     }
   });
 
-  it('skips the network when narrowing within a complete previous result set', async () => {
+  it('asks the server again when the admin narrows the term', async () => {
     vi.useFakeTimers();
     try {
-      const alice: User = {
-        id: '11111111-1111-1111-1111-111111111111',
-        email: 'alice@example.com',
-        firstName: 'Alice',
-        lastName: 'Wonder',
-        isActive: true,
-        roles: [],
-        isEmailVerified: true,
-        hasPassword: true,
-        mfaEnabled: false,
-        locale: 'en',
-        createdAt: '',
-        updatedAt: '',
-        deletedAt: null
-      };
-      const bob: User = {
-        id: '22222222-2222-2222-2222-222222222222',
-        email: 'bob@example.com',
-        firstName: 'Bob',
-        lastName: 'Marley',
-        isActive: true,
-        roles: [],
-        isEmailVerified: true,
-        hasPassword: true,
-        mfaEnabled: false,
-        locale: 'en',
-        createdAt: '',
-        updatedAt: '',
-        deletedAt: null
-      };
-      userServiceStub.searchCursor.mockReturnValueOnce(
-        of({ data: [alice, bob], meta: { nextCursor: null } })
-      );
-
       const fixture = TestBed.createComponent(HostComponent);
       fixture.componentInstance.rule.set({
         effect: 'include',
@@ -1006,17 +972,12 @@ describe('FeatureFlagRuleRowComponent', () => {
 
       cmp.onUserSearchTerm('ali');
       vi.advanceTimersByTime(400);
-      expect(userServiceStub.searchCursor).toHaveBeenCalledTimes(1);
-
-      cmp.onUserSearchTerm('alic');
-      vi.advanceTimersByTime(400);
       cmp.onUserSearchTerm('alice');
       vi.advanceTimersByTime(400);
 
-      // Narrowing within the cached complete result set must NOT hit
-      // the network — prevents the throttler-triggering request burst
-      // that occurred before the prefix-cache existed.
-      expect(userServiceStub.searchCursor).toHaveBeenCalledTimes(1);
+      expect(
+        userServiceStub.searchCursor.mock.calls.map(([query]) => query)
+      ).toEqual([{ q: 'ali' }, { q: 'alice' }]);
     } finally {
       vi.useRealTimers();
     }
