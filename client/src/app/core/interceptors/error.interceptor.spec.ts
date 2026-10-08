@@ -169,6 +169,25 @@ describe('errorInterceptor', () => {
       );
     });
 
+    it('reads the Retry-After header of a named throttler', () => {
+      http.get('/api/test').subscribe({ error: vi.fn() });
+
+      httpMock.expectOne('/api/test').flush(
+        { message: 'ThrottlerException: Too Many Requests' },
+        {
+          status: 429,
+          statusText: 'Too Many Requests',
+          headers: { 'Retry-After-login-long-window': '42' }
+        }
+      );
+
+      expect(notifyMock.warn).toHaveBeenCalledTimes(1);
+      expect(notifyMock.warn).toHaveBeenCalledWith(
+        'errors.general.tooManyRequestsRetry',
+        { seconds: 42 }
+      );
+    });
+
     it('honors the silent context for 429', () => {
       const context = new HttpContext().set(
         DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
