@@ -96,12 +96,13 @@ describe('Feature flag key is immutable after create (e2e)', () => {
   });
 
   it('accepts a PATCH without a key (200)', async () => {
-    flagService.findOne.mockResolvedValue({
+    const current = {
       id: FLAG_ID,
       key: 'stable-flag',
       enabled: false,
       rules: []
-    });
+    };
+    flagService.findOne.mockResolvedValue(current);
     flagService.update.mockResolvedValue({
       id: FLAG_ID,
       key: 'stable-flag',
@@ -116,7 +117,7 @@ describe('Feature flag key is immutable after create (e2e)', () => {
       .expect(200);
 
     expect(flagService.update).toHaveBeenCalledWith(
-      FLAG_ID,
+      current,
       { enabled: true },
       1,
       expect.objectContaining({ actorId: 'admin-1' })

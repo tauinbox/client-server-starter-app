@@ -305,33 +305,35 @@ describe('FeatureFlagService', () => {
 
   describe('update — optimistic lock', () => {
     it('returns 409 when version does not match (affected = 0)', async () => {
-      flagRepo.findOne.mockResolvedValue(sampleFlag);
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(0))
       });
       await expect(
         service.update(
-          'flag-1',
+          sampleFlag,
           { enabled: true, rules: [percentRule(25)] },
           /* expected */ 999,
           actor
         )
       ).rejects.toMatchObject({ status: 409 });
+      expect(flagRepo.findOne).not.toHaveBeenCalled();
       expect(em.delete).not.toHaveBeenCalled();
       expect(em.save).not.toHaveBeenCalled();
       expect(auditService.log).not.toHaveBeenCalled();
     });
 
     it('updates and increments version when match (affected = 1)', async () => {
-      flagRepo.findOne
-        .mockResolvedValueOnce(sampleFlag) // findOne preload
-        .mockResolvedValueOnce({ ...sampleFlag, enabled: true, version: 2 }); // final findOne
+      flagRepo.findOne.mockResolvedValueOnce({
+        ...sampleFlag,
+        enabled: true,
+        version: 2
+      });
       const qb = createQueryBuilder(1);
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(qb)
       });
       const result = await service.update(
-        'flag-1',
+        sampleFlag,
         { enabled: true },
         1,
         actor
@@ -341,6 +343,7 @@ describe('FeatureFlagService', () => {
         { id: 'flag-1', expected: 1 }
       );
       expect(result.version).toBe(2);
+      expect(flagRepo.findOne).toHaveBeenCalledTimes(1);
       expect(em.delete).not.toHaveBeenCalled();
       expect(auditService.log).toHaveBeenCalledWith(
         {
@@ -359,7 +362,7 @@ describe('FeatureFlagService', () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(qb)
       });
-      await service.update('flag-1', { rules: [] }, 1, actor);
+      await service.update(sampleFlag, { rules: [] }, 1, actor);
       expect(qb.execute).toHaveBeenCalledTimes(1);
       expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
         flagId: 'flag-1'
@@ -373,7 +376,7 @@ describe('FeatureFlagService', () => {
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(1))
       });
       await service.update(
-        'flag-1',
+        sampleFlag,
         { enabled: true, rules: [percentRule(25)] },
         1,
         actor
@@ -394,37 +397,38 @@ describe('FeatureFlagService', () => {
       auditService.log.mockRejectedValueOnce(new Error('audit down'));
 
       await expect(
-        service.update('flag-1', { enabled: true }, 1, actor)
+        service.update(sampleFlag, { enabled: true }, 1, actor)
       ).rejects.toThrow('audit down');
     });
 
     it('rejects an invalid rule payload before the transaction opens', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
       await expect(
-        service.update('flag-1', { rules: [percentRule(150)] }, 1, actor)
+        service.update(sampleFlag, { rules: [percentRule(150)] }, 1, actor)
       ).rejects.toBeInstanceOf(HttpException);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 
   describe('preview', () => {
-    const previewFlag = {
-      ...sampleFlag,
-      enabled: true,
-      environments: ['production']
-    };
-    const previewRule = {
+    const previewRule: FeatureFlagRule = {
       id: 'r1',
       flagId: 'flag-1',
+      flag: sampleFlag,
       type: 'role',
       effect: 'include',
-      payload: { type: 'role', roleNames: ['beta'] }
+      payload: { type: 'role', roleNames: ['beta'] },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    const previewFlag: FeatureFlag = {
+      ...sampleFlag,
+      enabled: true,
+      environments: ['production'],
+      rules: [previewRule]
     };
 
-    it('evaluates against synthetic role context and returns included-by-rule', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      const result = await service.preview('flag-1', { roles: ['beta'] });
+    it('evaluates against synthetic role context and returns included-by-rule', () => {
+      const result = service.preview(previewFlag, { roles: ['beta'] });
       expect(result.result).toBe(true);
       expect(result.reason).toBe('included-by-rule');
       expect(result.matchedRule).toEqual({
@@ -434,10 +438,8 @@ describe('FeatureFlagService', () => {
       });
     });
 
-    it('returns env-mismatch when synthetic env does not match the flag', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      const result = await service.preview('flag-1', {
+    it('returns env-mismatch when synthetic env does not match the flag', () => {
+      const result = service.preview(previewFlag, {
         roles: ['beta'],
         env: 'staging'
       });
@@ -448,24 +450,15 @@ describe('FeatureFlagService', () => {
       });
     });
 
-    it('falls back to ConfigService ENVIRONMENT when ctx.env is omitted', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      await service.preview('flag-1', { roles: ['beta'] });
+    it('falls back to ConfigService ENVIRONMENT when ctx.env is omitted', () => {
+      service.preview(previewFlag, { roles: ['beta'] });
       expect(configService.get).toHaveBeenCalledWith('ENVIRONMENT');
     });
 
-    it('throws 404 when the flag does not exist', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(null);
-      await expect(service.preview('missing', {})).rejects.toMatchObject({
-        status: 404
-      });
-    });
-
-    it('does not call save/update/remove (non-mutating)', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      await service.preview('flag-1', { roles: ['beta'] });
+    it('reads nothing and writes nothing', () => {
+      service.preview(previewFlag, { roles: ['beta'] });
+      expect(flagRepo.findOne).not.toHaveBeenCalled();
+      expect(ruleRepo.find).not.toHaveBeenCalled();
       expect(flagRepo.save).not.toHaveBeenCalled();
       expect(flagRepo.update).not.toHaveBeenCalled();
       expect(flagRepo.remove).not.toHaveBeenCalled();
@@ -473,10 +466,8 @@ describe('FeatureFlagService', () => {
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('evaluates a supplied rule set instead of the persisted one', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      const result = await service.preview('flag-1', {
+    it('evaluates a supplied rule set instead of the persisted one', () => {
+      const result = service.preview(previewFlag, {
         roles: ['beta'],
         rules: [
           {
@@ -490,19 +481,20 @@ describe('FeatureFlagService', () => {
       expect(result.matchedRule).toBeNull();
     });
 
-    it('matches a supplied rule the persisted set does not contain', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([]);
-      const result = await service.preview('flag-1', {
-        roles: ['gamma'],
-        rules: [
-          {
-            type: 'role',
-            effect: 'include',
-            payload: { type: 'role', roleNames: ['gamma'] }
-          }
-        ]
-      });
+    it('matches a supplied rule the persisted set does not contain', () => {
+      const result = service.preview(
+        { ...previewFlag, rules: [] },
+        {
+          roles: ['gamma'],
+          rules: [
+            {
+              type: 'role',
+              effect: 'include',
+              payload: { type: 'role', roleNames: ['gamma'] }
+            }
+          ]
+        }
+      );
       expect(result.result).toBe(true);
       expect(result.reason).toBe('included-by-rule');
       expect(result.matchedRule).toEqual({
@@ -512,11 +504,10 @@ describe('FeatureFlagService', () => {
       });
     });
 
-    it('rejects a supplied rule payload the save path also rejects', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      await expect(
-        service.preview('flag-1', {
+    it('rejects a supplied rule payload the save path also rejects', () => {
+      let error: unknown;
+      try {
+        service.preview(previewFlag, {
           rules: [
             {
               type: 'user',
@@ -525,8 +516,11 @@ describe('FeatureFlagService', () => {
               payload: { type: 'user', userIds: 'not-an-array' }
             }
           ]
-        })
-      ).rejects.toMatchObject({
+        });
+      } catch (e: unknown) {
+        error = e;
+      }
+      expect(error).toMatchObject({
         status: 400,
         response: {
           message: 'user rule requires userIds: an array of up to 100 UUIDs'
@@ -534,10 +528,8 @@ describe('FeatureFlagService', () => {
       });
     });
 
-    it('evaluates a supplied enabled flag state instead of the stored one', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      const result = await service.preview('flag-1', {
+    it('evaluates a supplied enabled flag state instead of the stored one', () => {
+      const result = service.preview(previewFlag, {
         roles: ['beta'],
         enabled: false
       });
@@ -548,10 +540,8 @@ describe('FeatureFlagService', () => {
       });
     });
 
-    it('evaluates a supplied environment list instead of the stored one', async () => {
-      flagRepo.findOne.mockResolvedValueOnce(previewFlag);
-      ruleRepo.find.mockResolvedValueOnce([previewRule]);
-      const result = await service.preview('flag-1', {
+    it('evaluates a supplied environment list instead of the stored one', () => {
+      const result = service.preview(previewFlag, {
         roles: ['beta'],
         environments: ['staging']
       });

@@ -105,7 +105,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     const flag = await seed('replace');
 
     const updated = await flagService.update(
-      flag.id,
+      flag,
       { enabled: true, rules: [percentRule(20), percentRule(30)] },
       flag.version,
       flagAuditActor()
@@ -119,7 +119,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     const flag = await seed('keep');
 
     await flagService.update(
-      flag.id,
+      flag,
       { enabled: true },
       flag.version,
       flagAuditActor()
@@ -133,7 +133,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
     await expect(
       flagService.update(
-        flag.id,
+        flag,
         { enabled: true, rules: [percentRule(20), percentRule(150)] },
         flag.version,
         flagAuditActor()
@@ -150,7 +150,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   it('writes no rule on a stale version', async () => {
     const flag = await seed('stale');
     await flagService.update(
-      flag.id,
+      flag,
       { enabled: true },
       flag.version,
       flagAuditActor()
@@ -158,7 +158,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
     await expect(
       flagService.update(
-        flag.id,
+        flag,
         { rules: [percentRule(20)] },
         flag.version,
         flagAuditActor()
@@ -174,7 +174,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
     await expect(
       flagService.update(
-        flag.id,
+        flag,
         {
           enabled: true,
           rules: [percentRule(20), percentRule(FAILING_PERCENT)]
