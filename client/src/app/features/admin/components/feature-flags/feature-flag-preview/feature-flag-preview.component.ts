@@ -25,13 +25,11 @@ import {
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
 import { NotifyService } from '@core/services/notify.service';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
-import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import {
   debouncedUserSearch,
   isSearchableTerm,
-  roleToChip,
   searchUsersPage,
   userToChip
 } from '../../../utils/user-chip-search';
@@ -61,7 +59,6 @@ import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.
 })
 export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   readonly #adminService = inject(FeatureFlagsAdminService);
-  readonly #roleCatalog = inject(RoleCatalogService);
   readonly #userService = inject(UserService);
   readonly #notify = inject(NotifyService);
   readonly #transloco = inject(TranslocoService);
@@ -75,12 +72,14 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
    */
   readonly draft = input<PreviewFlagDraft | null>(null);
 
+  // The role catalog. When it is empty, roles are entered as free text.
+  readonly roleOptions = input<ChipOption[]>([]);
+
   protected readonly selectedUser = signal<ChipOption[]>([]);
   protected readonly userOptions = signal<ChipOption[]>([]);
   protected readonly env = signal('');
   protected readonly attributesJson = signal('{}');
   protected readonly selectedRoles = signal<ChipOption[]>([]);
-  protected readonly roleOptions = signal<ChipOption[]>([]);
 
   protected readonly useRawJson = signal(false);
   protected readonly rawJson = signal('{}');
@@ -104,18 +103,6 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.#roleCatalog
-      .getAll()
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        next: (roles) => {
-          this.roleOptions.set(roles.map(roleToChip));
-        },
-        error: () => {
-          // Roles are optional for preview — silently degrade to free-text input.
-        }
-      });
-
     this.#userSearch$
       .pipe(
         debouncedUserSearch((term) => this.#searchUsers(term)),

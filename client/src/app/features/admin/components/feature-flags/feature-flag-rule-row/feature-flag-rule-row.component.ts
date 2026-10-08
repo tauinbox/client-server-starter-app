@@ -51,13 +51,11 @@ import {
   NxsChipsAutocompleteComponent,
   type ChipOption
 } from '@shared/forms/nxs-chips-autocomplete/nxs-chips-autocomplete.component';
-import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { UserService } from '../../../../users/services/user.service';
 import type { User } from '../../../../users/models/user.types';
 import {
   debouncedUserSearch,
   isSearchableTerm,
-  roleToChip,
   searchUsersPage,
   USER_SEARCH_LIMIT,
   userToChip
@@ -141,10 +139,11 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   // The custom attribute keys the server has registered. Empty while the
   // catalog request is in flight, or after it failed.
   readonly customKeyOptions = input<readonly string[]>([]);
+  // The role catalog. Empty while the request is in flight, or after it failed.
+  readonly roleOptions = input<ChipOption[]>([]);
   readonly remove = output<void>();
 
   protected readonly layout = inject(LayoutService);
-  readonly #roleCatalog = inject(RoleCatalogService);
   readonly #userService = inject(UserService);
   readonly #destroyRef = inject(DestroyRef);
 
@@ -153,14 +152,15 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected readonly attributeFields = FEATURE_FLAG_ATTRIBUTE_FIELDS;
   protected readonly bucketByOptions = FEATURE_FLAG_BUCKET_BY;
 
-  // Chip-label caches — keyed by the underlying API value (user UUID or role
-  // name) so subsequent edits keep the human-readable display even if the
-  // autocomplete list has churned to a different page of results.
+  // Chip-label cache — keyed by user UUID so subsequent edits keep the
+  // human-readable display even if the autocomplete list has churned to a
+  // different page of results.
   readonly #userLabelCache = signal(new Map<string, ChipOption>());
-  readonly #roleLabelCache = signal(new Map<string, ChipOption>());
+  readonly #roleLabels = computed(
+    () => new Map(this.roleOptions().map((chip) => [chip.value, chip]))
+  );
 
   protected readonly userOptions = signal<ChipOption[]>([]);
-  protected readonly roleOptions = signal<ChipOption[]>([]);
 
   protected readonly userChips = computed<ChipOption[]>(() => {
     const payload = this.rule().payload;
@@ -174,9 +174,9 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected readonly roleChips = computed<ChipOption[]>(() => {
     const payload = this.rule().payload;
     if (payload.type !== 'role') return [];
-    const cache = this.#roleLabelCache();
+    const labels = this.#roleLabels();
     return payload.roleNames.map(
-      (name) => cache.get(name) ?? { value: name, label: name }
+      (name) => labels.get(name) ?? { value: name, label: name }
     );
   });
 
@@ -272,24 +272,6 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
         }
         this.#userLabelCache.set(next);
         this.userOptions.set(chips);
-      });
-
-    this.#roleCatalog
-      .getAll()
-      .pipe(
-        catchError(() => of([])),
-        takeUntilDestroyed(this.#destroyRef)
-      )
-      .subscribe((roles) => {
-        const cache = new Map(this.#roleLabelCache());
-        const opts: ChipOption[] = [];
-        for (const r of roles) {
-          const chip = roleToChip(r);
-          cache.set(chip.value, chip);
-          opts.push(chip);
-        }
-        this.#roleLabelCache.set(cache);
-        this.roleOptions.set(opts);
       });
   }
 

@@ -47,10 +47,12 @@ import {
   FEATURE_FLAG_KEY_PATTERN
 } from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
+import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { deepEqual } from '@shared/utils/deep-equal.utils';
 import { featureFlagRuleError } from '../../../utils/feature-flag-rule-validation';
+import { roleToChip } from '../../../utils/user-chip-search';
 import {
   confirmEnableForEveryone,
   hasIncludeRule
@@ -105,6 +107,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   readonly #transloco = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #flagsAdmin = inject(FeatureFlagsAdminService);
+  readonly #roleCatalog = inject(RoleCatalogService);
   protected readonly data = inject<FeatureFlagFormDialogData>(MAT_DIALOG_DATA);
 
   #cleanupSave: (() => void) | null = null;
@@ -159,6 +162,10 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     ...(this.#customKeys() ?? [])
   ]);
 
+  // Loaded once for every rule row and the preview. Empty while the request
+  // is in flight, or after it failed.
+  protected readonly roleOptions = signal<ChipOption[]>([]);
+
   // A rules rejection fails the whole save, so the incomplete drafts the
   // editor can produce are blocked before the request.
   readonly ruleErrors = computed<(string | null)[]>(() =>
@@ -201,6 +208,14 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
         if (response === null) return;
         this.#customKeys.set(new Set(response.customKeys));
       });
+
+    this.#roleCatalog
+      .getAll()
+      .pipe(
+        catchError(() => of([])),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe((roles) => this.roleOptions.set(roles.map(roleToChip)));
 
     this.#cleanupSave = this.#shortcuts.registerSave(
       'shortcuts.labelSave',

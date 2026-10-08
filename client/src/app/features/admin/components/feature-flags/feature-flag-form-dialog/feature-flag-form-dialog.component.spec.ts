@@ -3,12 +3,14 @@ import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
-import { NEVER, of, throwError, type Observable } from 'rxjs';
+import { By } from '@angular/platform-browser';
+import { config, NEVER, of, throwError, type Observable } from 'rxjs';
 import type {
   FeatureFlagAttributeKeysResponse,
   FeatureFlagResponse,
   FeatureFlagRulePayload,
-  FeatureFlagRuleResponse
+  FeatureFlagRuleResponse,
+  RoleAdminResponse
 } from '@app/shared/types';
 import {
   APP_ENVIRONMENTS,
@@ -25,6 +27,7 @@ import type {
 } from '../../../services/feature-flags-admin.service';
 import { FeatureFlagsAdminService } from '../../../services/feature-flags-admin.service';
 import { FeatureFlagsAdminStore } from '../../../store/feature-flags-admin.store';
+import { FeatureFlagRuleRowComponent } from '../feature-flag-rule-row/feature-flag-rule-row.component';
 import { FeatureFlagFormDialogComponent } from './feature-flag-form-dialog.component';
 
 describe('FeatureFlagFormDialogComponent', () => {
@@ -43,6 +46,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   };
 
   let closeSpy: ReturnType<typeof vi.fn>;
+  let getAllRolesSpy: ReturnType<typeof vi.fn>;
   let confirmSpy: ReturnType<typeof vi.fn>;
   let createSpy: ReturnType<
     typeof vi.fn<(data: CreateFeatureFlag) => Observable<FeatureFlagResponse>>
@@ -65,9 +69,11 @@ describe('FeatureFlagFormDialogComponent', () => {
     data: Record<string, unknown> = {},
     attributeKeys$: Observable<FeatureFlagAttributeKeysResponse> = of({
       customKeys: ['billingConfigured', 'oauthGoogleConfigured']
-    })
+    }),
+    roles$: Observable<RoleAdminResponse[]> = of([])
   ): Promise<ComponentFixture<FeatureFlagFormDialogComponent>> => {
     closeSpy = vi.fn();
+    getAllRolesSpy = vi.fn(() => roles$);
     confirmSpy = vi.fn(() => of(true));
     // jsdom has no layout, so it does not implement scrollIntoView.
     Element.prototype.scrollIntoView = vi.fn();
@@ -95,7 +101,7 @@ describe('FeatureFlagFormDialogComponent', () => {
         },
         {
           provide: RoleCatalogService,
-          useValue: { getAll: vi.fn(() => of([])) }
+          useValue: { getAll: getAllRolesSpy }
         },
         {
           provide: FeatureFlagsAdminService,
@@ -220,6 +226,66 @@ describe('FeatureFlagFormDialogComponent', () => {
 
     cmp.removeRule(0);
     expect(cmp.rules().length).toBe(1);
+  });
+
+  it('loads the role catalog once and passes it to every rule row', async () => {
+    const roles: RoleAdminResponse[] = [
+      {
+        id: 'r1',
+        name: 'beta-tester',
+        description: 'beta program members',
+        isSystem: false,
+        isSuper: false,
+        createdAt: '',
+        updatedAt: ''
+      }
+    ];
+    const fixture = await setup({}, undefined, of(roles));
+    const cmp = fixture.componentInstance;
+    cmp.addRule();
+    cmp.addRule();
+    cmp.addRule();
+    fixture.detectChanges();
+
+    const rows = fixture.debugElement
+      .queryAll(By.directive(FeatureFlagRuleRowComponent))
+      .map((el) => el.componentInstance as FeatureFlagRuleRowComponent);
+    expect(rows.length).toBe(3);
+    expect(getAllRolesSpy).toHaveBeenCalledTimes(1);
+    for (const row of rows) {
+      expect(row.roleOptions()).toEqual([
+        {
+          value: 'beta-tester',
+          label: 'beta-tester',
+          sub: 'beta program members'
+        }
+      ]);
+    }
+  });
+
+  it('gives the rule rows no roles, and reports no error, when the role catalog is refused', async () => {
+    const unhandled = vi.fn();
+    config.onUnhandledError = unhandled;
+    vi.useFakeTimers();
+    try {
+      const fixture = await setup(
+        {},
+        undefined,
+        throwError(() => new Error('503'))
+      );
+      fixture.componentInstance.addRule();
+      fixture.detectChanges();
+      vi.runOnlyPendingTimers();
+
+      const row = fixture.debugElement.query(
+        By.directive(FeatureFlagRuleRowComponent)
+      ).componentInstance as FeatureFlagRuleRowComponent;
+      expect(row.roleOptions()).toEqual([]);
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      config.onUnhandledError = null;
+    }
   });
 
   it('submit serialises environments as a string array (not CSV)', async () => {

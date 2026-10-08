@@ -66,6 +66,7 @@
                 [rule]="rule"
                 [error]="ruleErrors()[i]"
                 [customKeyOptions]="customKeyOptions()"
+                [roleOptions]="roleOptions()"
                 (ruleChange)="updateRule(i, $event)"
                 (remove)="removeRule(i)"
               />
@@ -89,6 +90,7 @@
             <nxs-feature-flag-preview
               [flagId]="editFlag.id"
               [draft]="previewDraft()"
+              [roleOptions]="roleOptions()"
             />
           </ng-template>
         </mat-expansion-panel>
