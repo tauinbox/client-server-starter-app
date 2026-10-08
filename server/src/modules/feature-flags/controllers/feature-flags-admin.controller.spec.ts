@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ForbiddenException, HttpException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException
+} from '@nestjs/common';
 import { FeatureFlagsAdminController } from './feature-flags-admin.controller';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
@@ -128,11 +132,22 @@ describe('FeatureFlagsAdminController', () => {
     ).rejects.toBeInstanceOf(HttpException);
   });
 
-  it('update rejects non-integer If-Match', async () => {
-    await expect(
-      controller.update('flag-1', { enabled: true }, 'abc', req, fullAbility)
-    ).rejects.toBeInstanceOf(HttpException);
-  });
+  it.each(['abc', '1abc', '1.5'])(
+    'update rejects If-Match %j with 400 before the lookup',
+    async (ifMatch) => {
+      await expect(
+        controller.update(
+          'flag-1',
+          { enabled: true },
+          ifMatch,
+          req,
+          fullAbility
+        )
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(flagService.findOne).not.toHaveBeenCalled();
+      expect(flagService.update).not.toHaveBeenCalled();
+    }
+  );
 
   it('update strips quoted ETag and passes parsed version and audit actor', async () => {
     await controller.update(

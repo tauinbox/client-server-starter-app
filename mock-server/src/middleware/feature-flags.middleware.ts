@@ -34,6 +34,7 @@ import {
 import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { changedFields } from '@app/shared/utils/changed-fields';
+import { parseIfMatchVersion } from '@app/shared/utils/if-match';
 import {
   assertInstancePermission,
   authenticateRequest,
@@ -339,7 +340,8 @@ function parseIfMatch(
 ):
   | { ok: true; version: number }
   | { ok: false; status: number; message: string; errorKey?: string } {
-  if (header === undefined || header === '') {
+  const version = parseIfMatchVersion(header);
+  if (version === 'missing') {
     return {
       ok: false,
       status: 428,
@@ -347,16 +349,14 @@ function parseIfMatch(
       errorKey: ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED
     };
   }
-  const stripped = header.replace(/^"|"$/g, '').trim();
-  const parsed = Number.parseInt(stripped, 10);
-  if (!Number.isInteger(parsed) || parsed < 1) {
+  if (version === 'invalid') {
     return {
       ok: false,
       status: 400,
       message: 'If-Match must be a positive integer'
     };
   }
-  return { ok: true, version: parsed };
+  return { ok: true, version };
 }
 
 // Mirrors the real server's coalescing: a burst of flag changes collapses
