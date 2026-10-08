@@ -184,7 +184,7 @@ export class FeatureFlagsAdminController {
       id
     );
     const flag = await this.flagService.update(
-      id,
+      current,
       dto,
       expectedVersion,
       this.auditActor(req)
@@ -237,14 +237,9 @@ export class FeatureFlagsAdminController {
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    this.assertCanFlag(
-      ability,
-      'read',
-      await this.flagService.findOne(id),
-      req,
-      id
-    );
-    return this.flagService.preview(id, dto);
+    const flag = await this.flagService.findOne(id);
+    this.assertCanFlag(ability, 'read', flag, req, id);
+    return this.flagService.preview(flag, dto);
   }
 
   /**

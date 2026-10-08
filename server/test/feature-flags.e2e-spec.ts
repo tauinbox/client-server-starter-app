@@ -60,8 +60,8 @@ async function setRules(
   rules: FeatureFlagRuleDto[],
   actor: FlagAuditActor
 ): Promise<FeatureFlag> {
-  const { version } = await service.findOne(id);
-  return service.update(id, { rules }, version, actor);
+  const current = await service.findOne(id);
+  return service.update(current, { rules }, current.version, actor);
 }
 
 // ── In-memory repository stand-ins ─────────────────────────────────────────
@@ -469,7 +469,7 @@ describe('Feature flags end-to-end', () => {
 
     // Concurrent edit from another caller — bumps version to 2.
     const next = await flagService.update(
-      flag.id,
+      flag,
       { enabled: true },
       1,
       flagAuditActor('actor-2')
@@ -478,12 +478,7 @@ describe('Feature flags end-to-end', () => {
 
     // Stale PATCH at v1 → 409.
     await expect(
-      flagService.update(
-        flag.id,
-        { enabled: false },
-        1,
-        flagAuditActor('actor-3')
-      )
+      flagService.update(flag, { enabled: false }, 1, flagAuditActor('actor-3'))
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -540,7 +535,7 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
 
-    const result = await flagService.preview(flag.id, {
+    const result = flagService.preview(await flagService.findOne(flag.id), {
       roles: ['beta-tester']
     });
     expect(result).toEqual({
@@ -573,7 +568,7 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
 
-    const result = await flagService.preview(flag.id, {
+    const result = flagService.preview(await flagService.findOne(flag.id), {
       roles: ['beta', 'banned']
     });
     expect(result.result).toBe(false);
@@ -603,7 +598,7 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
 
-    const result = await flagService.preview(flag.id, {
+    const result = flagService.preview(await flagService.findOne(flag.id), {
       roles: ['plain']
     });
     expect(result).toEqual({
@@ -702,7 +697,7 @@ describe('Feature flags end-to-end', () => {
     );
     await resolver.invalidateAll();
 
-    const preview = await flagService.preview(flag.id, {
+    const preview = flagService.preview(await flagService.findOne(flag.id), {
       attributes: { createdAt: createdAt.toISOString() }
     });
     expect(preview.result).toBe(true);
@@ -719,7 +714,7 @@ describe('Feature flags end-to-end', () => {
       { key: 'off-preview', enabled: false },
       flagAuditActor('actor-1')
     );
-    const result = await flagService.preview(flag.id, {
+    const result = flagService.preview(await flagService.findOne(flag.id), {
       roles: ['anyone']
     });
     expect(result).toEqual({

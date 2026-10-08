@@ -37,6 +37,7 @@ describe('FeatureFlagsAdminController', () => {
     create: jest.Mock;
     update: jest.Mock;
     delete: jest.Mock;
+    preview: jest.Mock;
     getAttributeCustomKeys: jest.Mock;
     newFlagFields: FeatureFlagService['newFlagFields'];
   };
@@ -59,6 +60,11 @@ describe('FeatureFlagsAdminController', () => {
     enabled: false,
     version: 1
   };
+  const previewResult = {
+    result: true,
+    reason: 'included-by-rule',
+    matchedRule: { index: 0, type: 'role', effect: 'include' }
+  };
 
   beforeEach(async () => {
     flagService = {
@@ -69,6 +75,7 @@ describe('FeatureFlagsAdminController', () => {
         .fn()
         .mockResolvedValue({ ...sampleFlag, enabled: true, version: 2 }),
       delete: jest.fn().mockResolvedValue(undefined),
+      preview: jest.fn().mockReturnValue(previewResult),
       getAttributeCustomKeys: jest
         .fn()
         .mockReturnValue({ customKeys: ['billingConfigured'] })
@@ -157,13 +164,24 @@ describe('FeatureFlagsAdminController', () => {
       req,
       fullAbility
     );
+    expect(flagService.findOne).toHaveBeenCalledTimes(1);
     expect(flagService.update).toHaveBeenCalledWith(
-      'flag-1',
+      sampleFlag,
       { enabled: true },
       5,
       actor
     );
     expect(auditService.log).not.toHaveBeenCalled();
+  });
+
+  it('preview evaluates the loaded flag', async () => {
+    await expect(
+      controller.preview('flag-1', { roles: ['beta'] }, req, fullAbility)
+    ).resolves.toBe(previewResult);
+    expect(flagService.findOne).toHaveBeenCalledTimes(1);
+    expect(flagService.preview).toHaveBeenCalledWith(sampleFlag, {
+      roles: ['beta']
+    });
   });
 
   it('delete removes the loaded flag and emits a change event', async () => {
@@ -196,6 +214,7 @@ describe('FeatureFlagsAdminController', () => {
       expect(flagService.create).not.toHaveBeenCalled();
       expect(flagService.update).not.toHaveBeenCalled();
       expect(flagService.delete).not.toHaveBeenCalled();
+      expect(flagService.preview).not.toHaveBeenCalled();
     });
 
     it('allows a flag inside the condition', async () => {
