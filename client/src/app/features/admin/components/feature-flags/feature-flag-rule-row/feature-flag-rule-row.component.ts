@@ -152,7 +152,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected readonly attributeFields = FEATURE_FLAG_ATTRIBUTE_FIELDS;
   protected readonly bucketByOptions = FEATURE_FLAG_BUCKET_BY;
 
-  // Chip-label cache — keyed by user UUID so subsequent edits keep the
+  // Chip-label cache, keyed by user UUID, so subsequent edits keep the
   // human-readable display even if the autocomplete list has churned to a
   // different page of results.
   readonly #userLabelCache = signal(new Map<string, ChipOption>());
