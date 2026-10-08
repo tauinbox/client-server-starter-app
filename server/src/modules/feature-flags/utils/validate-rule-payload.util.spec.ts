@@ -299,6 +299,22 @@ describe('validateRulePayload attribute value', () => {
     ).toThrow('customKey "nope" is not registered in the attribute registry');
   });
 
+  it('drops a customKey sent with a field that is not custom', () => {
+    expect(
+      validateRulePayload(
+        'attribute',
+        {
+          type: 'attribute',
+          field: 'email',
+          op: 'eq',
+          value: 'a@b.c',
+          customKey: 'oauth.google.configured'
+        },
+        knownCustomKeys
+      )
+    ).toEqual({ type: 'attribute', field: 'email', op: 'eq', value: 'a@b.c' });
+  });
+
   it('rejects an out-of-range percent with the range message', () => {
     expect(() =>
       validateRulePayload(
