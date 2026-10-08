@@ -61,6 +61,15 @@ describe('PlanCardComponent', () => {
     expect(el.querySelector('button')).toBeNull();
   });
 
+  it('labels the action "Change plan" for a plan change', () => {
+    fixture.componentRef.setInput('changePlan', true);
+    fixture.detectChanges();
+    const button = (fixture.nativeElement as HTMLElement).querySelector(
+      'button'
+    );
+    expect(button?.textContent?.trim()).toBe('Change plan');
+  });
+
   it('emits choose with the plan key on click', () => {
     const choose = vi.fn();
     fixture.componentInstance.choose.subscribe(choose);
