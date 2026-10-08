@@ -4,12 +4,12 @@ import {
   FEATURE_FLAG_ATTRIBUTE_OPS,
   FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
+  FEATURE_FLAG_USER_IDS_MAX_ITEMS,
   type FeatureFlagAttributeField,
   type FeatureFlagAttributeOp,
   type FeatureFlagBucketBy,
   type FeatureFlagRuleType
 } from '../constants/feature-flag.constants';
-import { MAX_PAGE_SIZE } from '../constants/pagination.constants';
 import { ROLE_NAME_MAX_LENGTH } from '../constants/permission.constants';
 import { UUID_PATTERN } from '../constants/uuid.constants';
 import type { FeatureFlagRulePayload } from '../types/feature-flag.types';
@@ -59,9 +59,9 @@ export function parseFeatureFlagRulePayload(
   switch (type) {
     case 'user': {
       const userIds = p['userIds'];
-      if (!isBoundedArray(userIds, MAX_PAGE_SIZE, isUserId)) {
+      if (!isBoundedArray(userIds, FEATURE_FLAG_USER_IDS_MAX_ITEMS, isUserId)) {
         return fail(
-          `user rule requires userIds: an array of up to ${MAX_PAGE_SIZE} UUIDs`
+          `user rule requires userIds: an array of up to ${FEATURE_FLAG_USER_IDS_MAX_ITEMS} UUIDs`
         );
       }
       return { ok: true, payload: { type: 'user', userIds } };

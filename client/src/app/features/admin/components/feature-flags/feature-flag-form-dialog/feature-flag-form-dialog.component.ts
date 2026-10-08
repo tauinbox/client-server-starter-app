@@ -42,6 +42,7 @@ import type {
 import type { FeatureFlagResponse } from '@app/shared/types';
 import {
   APP_ENVIRONMENTS,
+  FEATURE_FLAG_DESCRIPTION_MAX_LENGTH,
   FEATURE_FLAG_KEY_MAX_LENGTH,
   FEATURE_FLAG_KEY_MIN_LENGTH,
   FEATURE_FLAG_KEY_PATTERN
@@ -194,7 +195,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     maxLength(path.key, FEATURE_FLAG_KEY_MAX_LENGTH);
     pattern(path.key, FEATURE_FLAG_KEY_PATTERN);
     readonly(path.key, () => this.isEdit);
-    maxLength(path.description, 500);
+    maxLength(path.description, FEATURE_FLAG_DESCRIPTION_MAX_LENGTH);
   });
 
   ngOnInit(): void {
