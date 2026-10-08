@@ -168,6 +168,31 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     expect(await percentsOf(flag.id)).toEqual([10]);
   });
 
+  it('refuses an If-Match version that a concurrent write reached after the read', async () => {
+    const flag = await seed('raced');
+    await flagService.update(
+      flag,
+      { enabled: true },
+      flag.version,
+      flagAuditActor()
+    );
+
+    await expect(
+      flagService.update(
+        flag,
+        { rules: [percentRule(20)] },
+        flag.version + 1,
+        flagAuditActor()
+      )
+    ).rejects.toMatchObject({ status: 409 });
+
+    expect(await flagService.findOne(flag.id)).toMatchObject({
+      enabled: true,
+      version: flag.version + 1
+    });
+    expect(await percentsOf(flag.id)).toEqual([10]);
+  });
+
   it('rolls the flag write back when a rule insert fails', async () => {
     const flag = await seed('rollback');
     await failRuleInserts();

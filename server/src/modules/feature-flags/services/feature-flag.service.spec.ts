@@ -304,7 +304,23 @@ describe('FeatureFlagService', () => {
   });
 
   describe('update — optimistic lock', () => {
-    it('returns 409 when version does not match (affected = 0)', async () => {
+    it('returns 409 before the write when the given flag is not at the expected version', async () => {
+      await expect(
+        service.update(sampleFlag, { enabled: true }, 2, actor)
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT }
+      });
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('reports a bad rule payload before a version mismatch, as the mock does', async () => {
+      await expect(
+        service.update(sampleFlag, { rules: [percentRule(150)] }, 2, actor)
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('returns 409 when the version-checked write matches no row (affected = 0)', async () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(0))
       });
@@ -312,10 +328,13 @@ describe('FeatureFlagService', () => {
         service.update(
           sampleFlag,
           { enabled: true, rules: [percentRule(25)] },
-          /* expected */ 999,
+          1,
           actor
         )
-      ).rejects.toMatchObject({ status: 409 });
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT }
+      });
       expect(flagRepo.findOne).not.toHaveBeenCalled();
       expect(em.delete).not.toHaveBeenCalled();
       expect(em.save).not.toHaveBeenCalled();

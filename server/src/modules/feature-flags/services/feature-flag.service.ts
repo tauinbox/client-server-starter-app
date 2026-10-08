@@ -64,6 +64,17 @@ function keyExistsConflict(): HttpException {
   );
 }
 
+function versionConflict(): HttpException {
+  return new HttpException(
+    {
+      message:
+        'Feature flag was modified by another request — reload and retry',
+      errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+    },
+    HttpStatus.CONFLICT
+  );
+}
+
 /** The actor of a flag write, as its audit row records it. */
 export interface FlagAuditActor {
   actorId: string | null;
@@ -203,12 +214,11 @@ export class FeatureFlagService {
     expectedVersion: number,
     actor: FlagAuditActor
   ): Promise<FeatureFlag> {
-    // The update is conditional on the version, so when it succeeds `current`
-    // is exactly the state that it replaced. The rules are reported as a
-    // count: rule rows and rule DTOs do not compare field by field.
     const { id } = current;
     const { rules: ruleDtos, ...fields } = dto;
     const rules = this.#validateRules(ruleDtos);
+    // A successful write then replaced exactly `current`, the audit diff base.
+    if (current.version !== expectedVersion) throw versionConflict();
     await this.dataSource.transaction(async (em) => {
       const result = await em
         .createQueryBuilder()
@@ -231,17 +241,9 @@ export class FeatureFlagService {
         })
         .execute();
 
-      if (result.affected === 0) {
-        throw new HttpException(
-          {
-            message:
-              'Feature flag was modified by another request — reload and retry',
-            errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
-          },
-          HttpStatus.CONFLICT
-        );
-      }
+      if (result.affected === 0) throw versionConflict();
       if (rules) await this.#writeRules(em, id, rules);
+      // Rule rows and rule DTOs do not compare field by field: count them.
       await this.#audit(em, actor, AuditAction.FEATURE_FLAG_UPDATE, id, {
         changedFields: changedFields(current, fields),
         ...(rules ? { ruleCount: rules.length } : {})
