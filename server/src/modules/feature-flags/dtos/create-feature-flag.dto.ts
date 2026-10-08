@@ -15,9 +15,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   APP_ENVIRONMENTS,
+  FEATURE_FLAG_DESCRIPTION_MAX_LENGTH,
   FEATURE_FLAG_KEY_MAX_LENGTH,
   FEATURE_FLAG_KEY_MIN_LENGTH,
   FEATURE_FLAG_KEY_PATTERN,
+  FEATURE_FLAG_RULES_MAX_ITEMS,
   normalizeEnvironmentList
 } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
@@ -41,7 +43,7 @@ export class CreateFeatureFlagDto {
   @ApiPropertyOptional({ example: 'New dashboard rollout' })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(FEATURE_FLAG_DESCRIPTION_MAX_LENGTH)
   description?: string;
 
   @ApiPropertyOptional({ default: false })
@@ -81,7 +83,7 @@ export class CreateFeatureFlagDto {
   })
   @ValidateIf(propertyIsDefined)
   @IsArray()
-  @ArrayMaxSize(64)
+  @ArrayMaxSize(FEATURE_FLAG_RULES_MAX_ITEMS)
   @ValidateNested({ each: true })
   @Type(() => FeatureFlagRuleDto)
   rules?: FeatureFlagRuleDto[];

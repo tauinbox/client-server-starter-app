@@ -22,6 +22,7 @@ import {
   ANON_ID_PATTERN,
   APP_ENVIRONMENTS,
   FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
+  FEATURE_FLAG_RULES_MAX_ITEMS,
   ROLE_NAME_MAX_LENGTH,
   normalizeEnvironmentList
 } from '@app/shared/constants';
@@ -99,7 +100,7 @@ export class PreviewFlagContextDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(64)
+  @ArrayMaxSize(FEATURE_FLAG_RULES_MAX_ITEMS)
   @ValidateNested({ each: true })
   @Type(() => FeatureFlagRuleDto)
   rules?: FeatureFlagRuleDto[];

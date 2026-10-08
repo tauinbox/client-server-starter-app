@@ -19,11 +19,13 @@ import {
   BILLING_CONFIGURED_ATTRIBUTE,
   BILLING_PROVIDER_FLAGS,
   ErrorKeys,
+  FEATURE_FLAG_DESCRIPTION_MAX_LENGTH,
   FEATURE_FLAG_KEY_MAX_LENGTH,
   FEATURE_FLAG_LIST_QUERY,
   FEATURE_FLAG_KEY_MIN_LENGTH,
   FEATURE_FLAG_KEY_PATTERN,
   FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
+  FEATURE_FLAG_RULES_MAX_ITEMS,
   FEATURE_FLAG_RULE_EFFECTS,
   FEATURE_FLAG_RULE_TYPES,
   OAUTH_PROVIDER_FLAGS,
@@ -181,7 +183,6 @@ function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
-const MAX_RULES = 64;
 const RULE_KEYS = ['effect', 'type', 'payload'] as const;
 const NESTED_RULES_MESSAGE =
   'each value in nested property rules must be either object or array';
@@ -210,7 +211,7 @@ function ruleEntryErrors(path: string, entries: unknown[]): string[] {
   });
 }
 
-// Mirrors `@IsArray() @ArrayMaxSize(64) @ValidateNested({ each: true })
+// Mirrors `@IsArray() @ArrayMaxSize @ValidateNested({ each: true })
 // @Type(() => FeatureFlagRuleDto)`. A plain object is validated as one rule.
 function rulesErrors(value: unknown, optional: OptionalMode): string[] {
   if (value === undefined || (optional === 'nullable' && value === null)) {
@@ -224,8 +225,10 @@ function rulesErrors(value: unknown, optional: OptionalMode): string[] {
       : [];
   if (children.length > 0) return children;
   const errors: string[] = [];
-  if (!Array.isArray(value) || value.length > MAX_RULES) {
-    errors.push(`rules must contain no more than ${MAX_RULES} elements`);
+  if (!Array.isArray(value) || value.length > FEATURE_FLAG_RULES_MAX_ITEMS) {
+    errors.push(
+      `rules must contain no more than ${FEATURE_FLAG_RULES_MAX_ITEMS} elements`
+    );
   }
   if (!Array.isArray(value)) errors.push('rules must be an array');
   if (!isObject) errors.push(NESTED_RULES_MESSAGE);
@@ -237,7 +240,7 @@ function rulesErrors(value: unknown, optional: OptionalMode): string[] {
 function flagFieldErrors(body: UpdateFlagBody): string[] {
   return [
     ...stringErrors('description', body.description, {
-      max: 500,
+      max: FEATURE_FLAG_DESCRIPTION_MAX_LENGTH,
       optional: 'nullable'
     }),
     ...booleanErrors('enabled', body.enabled, 'definedOnly'),
