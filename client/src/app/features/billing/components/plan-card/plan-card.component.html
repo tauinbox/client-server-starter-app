@@ -56,7 +56,11 @@
           [disabled]="disabled()"
           (click)="onChoose()"
         >
-          {{ t('billing.pricing.choose') }}
+          {{
+            changePlan()
+              ? t('billing.settings.changePlan')
+              : t('billing.pricing.choose')
+          }}
         </button>
       }
     </div>

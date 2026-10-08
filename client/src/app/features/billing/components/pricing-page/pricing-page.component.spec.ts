@@ -136,7 +136,7 @@ describe('PricingPageComponent', () => {
   function renderedCards(): {
     name: string;
     current: boolean;
-    chooseButton: boolean;
+    action: string | null;
   }[] {
     const cards: HTMLElement[] = Array.from(
       fixture.nativeElement.querySelectorAll('nxs-plan-card')
@@ -144,7 +144,8 @@ describe('PricingPageComponent', () => {
     return cards.map((card) => ({
       name: card.querySelector('.plan-name')?.textContent?.trim() ?? '',
       current: card.querySelector('.current-badge') !== null,
-      chooseButton: card.querySelector('.plan-action button') !== null
+      action:
+        card.querySelector('.plan-action button')?.textContent?.trim() ?? null
     }));
   }
 
@@ -177,9 +178,9 @@ describe('PricingPageComponent', () => {
     showSubscription('incomplete', false);
 
     expect(renderedCards()).toEqual([
-      { name: 'Free', current: true, chooseButton: false },
-      { name: 'Pro', current: false, chooseButton: true },
-      { name: 'Business', current: false, chooseButton: true }
+      { name: 'Free', current: true, action: null },
+      { name: 'Pro', current: false, action: 'Choose' },
+      { name: 'Business', current: false, action: 'Choose' }
     ]);
   });
 
@@ -188,9 +189,9 @@ describe('PricingPageComponent', () => {
     showSubscription('past_due', true);
 
     expect(renderedCards()).toEqual([
-      { name: 'Free', current: false, chooseButton: true },
-      { name: 'Pro', current: true, chooseButton: false },
-      { name: 'Business', current: false, chooseButton: true }
+      { name: 'Free', current: false, action: 'Change plan' },
+      { name: 'Pro', current: true, action: null },
+      { name: 'Business', current: false, action: 'Change plan' }
     ]);
   });
 
@@ -315,6 +316,19 @@ describe('PricingPageComponent', () => {
     await setup(true);
     fixture.componentInstance.onChoose('pro');
     expect(storeMock.checkout).toHaveBeenCalledWith('pro');
+  });
+
+  it('sends a subscriber to billing settings on choose instead of a checkout', async () => {
+    await setup(true);
+    const navigateByUrl = vi
+      .spyOn(router, 'navigateByUrl')
+      .mockResolvedValue(true);
+    showSubscription('active', true);
+
+    fixture.componentInstance.onChoose('business');
+
+    expect(navigateByUrl).toHaveBeenCalledWith('/billing/settings');
+    expect(storeMock.checkout).not.toHaveBeenCalled();
   });
 
   it('follows the checkout session through the guarded redirect', async () => {

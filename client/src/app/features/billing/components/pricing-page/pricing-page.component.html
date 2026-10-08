@@ -36,6 +36,7 @@
           [price]="item.price"
           [featured]="item.featured"
           [current]="item.current"
+          [changePlan]="store.hasActiveSubscription()"
           [disabled]="actionsDisabled()"
           (choose)="onChoose($event)"
         />

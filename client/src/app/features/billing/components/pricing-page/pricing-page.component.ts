@@ -187,6 +187,13 @@ export class PricingPageComponent implements OnInit {
       return;
     }
 
+    // The server refuses a second checkout while a subscription is entitled;
+    // the plan change lives on the settings page.
+    if (this.store.hasActiveSubscription()) {
+      void this.#router.navigateByUrl(this.settingsRoute);
+      return;
+    }
+
     void this.store.checkout(planKey).then((session) => {
       if (session) {
         this.#checkoutRedirect.redirect(session.url);

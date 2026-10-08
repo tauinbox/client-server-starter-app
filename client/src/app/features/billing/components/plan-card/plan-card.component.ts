@@ -36,6 +36,8 @@ export class PlanCardComponent {
   readonly price = input.required<string>();
   readonly featured = input(false);
   readonly current = input(false);
+  /** Labels the action "Change plan" instead of "Choose". */
+  readonly changePlan = input(false);
   readonly disabled = input(false);
 
   readonly choose = output<string>();

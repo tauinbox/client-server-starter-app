@@ -230,6 +230,8 @@ src/app/
 │       │   │                      # /billing/settings. The
 │       │   │                      # Choose button
 │       │   │                      # starts the checkout. An anonymous visitor goes to /login.
+│       │   │                      # A subscriber sees "Change plan", which opens
+│       │   │                      # /billing/settings and starts no checkout.
 │       │   │                      # An authenticated user with a non-empty catalog also sees the
 │       │   │                      # one-time purchases section, which holds the product cards and
 │       │   │                      # the donation cards. The Buy and Pay buttons put the session

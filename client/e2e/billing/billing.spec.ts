@@ -351,6 +351,78 @@ test.describe('Billing', () => {
     await expect(page.locator('.plan-summary')).toContainText('Cancels on');
   });
 
+  test('a subscriber is sent from the pricing page to the plan change in settings', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+    let checkouts = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        request.url().endsWith('/billing/checkout')
+      ) {
+        checkouts++;
+      }
+    });
+
+    await page.goto('/billing');
+    for (const plan of ['Free', 'Business']) {
+      await expect(
+        page
+          .locator('nxs-plan-card', { hasText: plan })
+          .getByRole('button', { name: 'Change plan' })
+      ).toBeVisible();
+    }
+    await expect(page.getByRole('button', { name: 'Choose' })).toHaveCount(0);
+
+    await page
+      .locator('nxs-plan-card', { hasText: 'Business' })
+      .getByRole('button', { name: 'Change plan' })
+      .click();
+
+    await expect(page).toHaveURL(/\/billing\/settings$/);
+    await expect(page.locator('.plan-summary')).toContainText('Pro');
+    expect(checkouts).toBe(0);
+  });
+
+  test('an unpaid incomplete checkout keeps "Choose" on the pricing page', async ({
+    page,
+    _mockServer
+  }) => {
+    // The ru profile locale routes the user to YooKassa, whose checkout leaves
+    // an `incomplete` subscription until the payment settles.
+    await loginViaUi(page, _mockServer.url, {
+      id: USER_ID,
+      roles: ['user'],
+      locale: 'ru'
+    });
+    await stubHostedCheckout(page);
+
+    await page.goto('/billing');
+    await page
+      .locator('nxs-plan-card', { hasText: 'Pro' })
+      .getByRole('button', { name: 'Choose' })
+      .click();
+    await expect(page).toHaveURL(/mock-checkout\.local/);
+
+    await page.goto('/billing');
+    const pro = page.locator('nxs-plan-card', { hasText: 'Pro' });
+    await expect(pro.getByRole('button', { name: 'Choose' })).toBeVisible();
+    await expect(
+      page
+        .locator('nxs-plan-card', { hasText: 'Free' })
+        .locator('.current-badge')
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Change plan' })).toHaveCount(
+      0
+    );
+  });
+
   test('a Paddle plan change via the proration dialog adds no local receipt', async ({
     page,
     _mockServer
