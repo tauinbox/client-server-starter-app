@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
 
@@ -49,6 +49,33 @@ describe('Application bootstrap', () => {
         expect(app).toBeDefined();
       } finally {
         await app?.close();
+      }
+    }
+  );
+
+  // Under a global prefix Nest rewrites a legacy middleware path such as "*"
+  // and logs a warning for each one at init.
+  runWithDb(
+    'registers middleware routes without a legacy path warning',
+    async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+      let app: INestApplication | undefined;
+      try {
+        const moduleFixture: TestingModule = await Test.createTestingModule({
+          imports: [CoreModule.forRoot()]
+        }).compile();
+
+        app = moduleFixture.createNestApplication();
+        app.setGlobalPrefix('api');
+        await app.init();
+
+        const legacyPathWarnings = warnSpy.mock.calls.filter(([message]) =>
+          String(message).includes('Unsupported route path')
+        );
+        expect(legacyPathWarnings).toEqual([]);
+      } finally {
+        await app?.close();
+        warnSpy.mockRestore();
       }
     }
   );

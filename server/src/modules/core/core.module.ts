@@ -36,9 +36,9 @@ export class CoreModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(RequestIdMiddleware)
-      .forRoutes('*')
+      .forRoutes('{*path}')
       .apply(RequestLoggingMiddleware)
-      .forRoutes('*');
+      .forRoutes('{*path}');
   }
 
   static forRoot(): DynamicModule {
