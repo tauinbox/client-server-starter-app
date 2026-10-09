@@ -1,9 +1,11 @@
 import {
   expect,
+  expectNoSnackbar,
   loginViaUi,
   markOAuthRoundTripStarted,
   test
 } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 /**
  * Regression: these pages show a refused request themselves, and the global
@@ -27,7 +29,7 @@ test.describe('A refused request shows one error message', () => {
     await expect(page.getByRole('main').getByRole('alert')).toHaveText(
       'OAuth authentication failed. Please try again.'
     );
-    await expect(page.locator('mat-snack-bar-container')).toHaveCount(0);
+    await expectNoSnackbar(page);
   });
 
   test('a wrong current password shows only the profile error', async ({
@@ -45,6 +47,29 @@ test.describe('A refused request shows one error message', () => {
     await expect(page.locator('.error-message')).toHaveText(
       /current password is incorrect/i
     );
-    await expect(page.locator('mat-snack-bar-container')).toHaveCount(0);
+    await expectNoSnackbar(page);
+  });
+
+  test('a refused user save shows only the edit form error', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto(`/users/${mockId('user-3')}/edit`);
+
+    // The address belongs to another seeded user, so the mock answers 409.
+    await page.getByLabel('Email').fill('jane@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByLabel('Your current password').fill('Password1');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Change email' })
+      .click();
+
+    await expect(page.locator('.error-message')).toHaveText(
+      'User with this email already exists'
+    );
+    await expectNoSnackbar(page);
   });
 });

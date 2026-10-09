@@ -267,6 +267,7 @@ export {
   markOAuthRoundTripStarted,
   expectAuthRedirect,
   expectForbiddenRedirect,
+  expectNoSnackbar,
   listResponse,
   openedDialog,
   routeApiToMockServer
