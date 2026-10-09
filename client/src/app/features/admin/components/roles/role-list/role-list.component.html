@@ -3,10 +3,10 @@
     <mat-card-title>{{ t('admin.roles.title') }}</mat-card-title>
     <div class="spacer"></div>
     @if (canCreate()) {
-      <button matButton="filled" (click)="openCreateDialog()">
-        <mat-icon>add</mat-icon>
-        {{ t('common.add') }}
-      </button>
+      <nxs-create-button
+        [label]="t('admin.roles.create')"
+        (pressed)="openCreateDialog()"
+      />
     }
   </mat-card-header>
 

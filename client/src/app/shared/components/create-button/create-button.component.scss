@@ -1,0 +1,8 @@
+@use '../../../../styles/abstracts/variables' as vars;
+
+.create-fab {
+  position: fixed;
+  right: vars.$spacing-md;
+  bottom: vars.$spacing-md;
+  z-index: 5;
+}

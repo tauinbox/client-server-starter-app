@@ -14,7 +14,8 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatIconButton } from '@angular/material/button';
+import { CreateButtonComponent } from '@shared/components/create-button/create-button.component';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -65,8 +66,8 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatCardHeader,
     MatCardTitle,
     MatCardContent,
-    MatButton,
     MatIconButton,
+    CreateButtonComponent,
     MatIcon,
     MatProgressSpinner,
     MatTooltip,

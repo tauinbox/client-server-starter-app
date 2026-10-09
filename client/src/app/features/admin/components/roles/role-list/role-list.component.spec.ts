@@ -171,6 +171,35 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     expect(rolesStoreMock.createRole).not.toHaveBeenCalled();
   });
 
+  it('offers the create action as "New role" and opens the form dialog', async () => {
+    authStoreMock.hasPermissions.mockReturnValue(true);
+    await setupComponent();
+    const fixture = TestBed.createComponent(RoleListComponent);
+    fixture.detectChanges();
+
+    const button = (fixture.nativeElement as HTMLElement).querySelector(
+      'nxs-create-button button'
+    ) as HTMLButtonElement;
+    expect(button.textContent?.trim()).toBe('add New role');
+    button.click();
+
+    expect(dialogMock.open).toHaveBeenCalledWith(
+      RoleFormDialogComponent,
+      expect.anything()
+    );
+  });
+
+  it('hides the create action without the create permission', async () => {
+    authStoreMock.hasPermissions.mockReturnValue(false);
+    await setupComponent();
+    const fixture = TestBed.createComponent(RoleListComponent);
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('nxs-create-button')
+    ).toBeNull();
+  });
+
   it('reports nothing when the form dialog is cancelled', async () => {
     const component = await setupComponent();
     component.openEditDialog(mockRole);

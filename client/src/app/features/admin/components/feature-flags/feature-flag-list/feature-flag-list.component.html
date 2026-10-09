@@ -2,11 +2,11 @@
   <mat-card-header>
     <mat-card-title>{{ t('admin.featureFlags.title') }}</mat-card-title>
     <div class="spacer"></div>
-    @if (canCreate() && !layout.isHandset()) {
-      <button matButton="filled" (click)="openCreateDialog()">
-        <mat-icon>add</mat-icon>
-        {{ t('admin.featureFlags.addFlag') }}
-      </button>
+    @if (canCreate()) {
+      <nxs-create-button
+        [label]="t('admin.featureFlags.create')"
+        (pressed)="openCreateDialog()"
+      />
     }
   </mat-card-header>
 
@@ -198,19 +198,6 @@
       </div>
     }
   </mat-card-content>
-
-  @if (canCreate() && layout.isHandset()) {
-    <button
-      matFab
-      extended
-      class="flag-fab"
-      (click)="openCreateDialog()"
-      [attr.aria-label]="t('admin.featureFlags.addFlag')"
-    >
-      <mat-icon>add</mat-icon>
-      {{ t('admin.featureFlags.addFlag') }}
-    </button>
-  }
 
   <ng-template #rowActions [nxsTemplateRowOf]="flags()" let-flag>
     <div class="row-actions">

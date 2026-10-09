@@ -16,6 +16,13 @@
   margin-bottom: vars.$spacing-sm;
 }
 
+// The handset create FAB of `nxs-create-button` is fixed at the bottom right.
+// Its card keeps room below the last row (56px FAB + 16px offset + 8px gap),
+// so the last row can scroll clear of the FAB.
+.mat-mdc-card:has(.create-fab) {
+  padding-bottom: func.rem(80);
+}
+
 // On narrow viewports the default 16px side padding on card-content leaves too
 // little space for table columns. Halve it at the xs breakpoint so tables fit
 // without horizontal overflow. Uses parent selector to win over Material's
