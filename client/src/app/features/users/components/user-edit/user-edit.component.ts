@@ -30,6 +30,7 @@ import {
 } from '@angular/forms/signals';
 import {
   MatFormField,
+  MatHint,
   MatLabel,
   MatPrefix
 } from '@angular/material/form-field';
@@ -94,6 +95,7 @@ const INITIAL_USER_FORM: UserFormData = {
     MatCardContent,
     MatProgressSpinner,
     MatFormField,
+    MatHint,
     MatCheckbox,
     MatChipSet,
     MatChip,
@@ -229,15 +231,23 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
   /**
    * A grant on `assign` can be limited to some roles. A role outside it stays
-   * visible but cannot be added or removed.
+   * visible but cannot be added or removed. The server refuses to add or remove
+   * a super role for every caller.
    */
   canAssignRole(role: RoleAdminResponse): boolean {
-    return this.#authStore.hasPermissions({
-      action: 'assign',
-      subject: 'Role',
-      instance: role
-    });
+    return (
+      !role.isSuper &&
+      this.#authStore.hasPermissions({
+        action: 'assign',
+        subject: 'Role',
+        instance: role
+      })
+    );
   }
+
+  protected readonly hasSuperRole = computed(() =>
+    this.availableRoles().some((role) => role.isSuper)
+  );
 
   readonly #isSelf = computed(() => this.id() === this.#authStore.user()?.id);
 

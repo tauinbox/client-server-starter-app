@@ -60,6 +60,7 @@
     "passwordMinLength": "Password must be at least 8 characters",
     "passwordMaxLength": "Password must be no more than 128 characters",
     "roles": "Roles",
+    "superRolesHint": "Super roles are assigned only by the system",
     "active": "Active",
     "emailNotVerified": "Email not verified",
     "accountLocked": "Account locked",
