@@ -48,7 +48,7 @@ test.describe('Live RBAC update via SSE — role-permission fan-out', () => {
     // with only `read Role` (no User/Role page guard to trip).
     await page.goto('/profile');
 
-    const adminLink = page.getByRole('link', { name: 'Admin Panel' });
+    const adminLink = page.getByRole('link', { name: 'Admin panel' });
     await expect(adminLink).toBeVisible();
 
     // Server-side: revoke the role's permission and fan out the SSE event to

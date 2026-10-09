@@ -22,14 +22,14 @@ test.describe('User List page', () => {
     await expectForbiddenRedirect(page, _mockServer.url, '/users');
   });
 
-  test('should display "User Management" heading', async ({
+  test('should display "User management" heading', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
-    await expect(page.getByText('User Management')).toBeVisible();
+    await expect(page.getByText('User management')).toBeVisible();
   });
 
   test('should display users table with correct columns', async ({
@@ -95,7 +95,7 @@ test.describe('User List page', () => {
     });
     await page.goto('/users');
 
-    await expect(page.getByText('No Users Found')).toBeVisible();
+    await expect(page.getByText('No users found')).toBeVisible();
   });
 
   test('should not display a paginator', async ({ _mockServer, page }) => {
@@ -272,7 +272,7 @@ test.describe('User List page', () => {
       .click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText('Confirm Delete')).toBeVisible();
+    await expect(page.getByText('Confirm delete')).toBeVisible();
     await expect(
       page.getByText(/Are you sure you want to delete user John Smith/)
     ).toBeVisible();

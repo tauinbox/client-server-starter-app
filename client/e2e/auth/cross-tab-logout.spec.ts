@@ -49,8 +49,8 @@ test.describe('Cross-tab logout', () => {
     const otherTab = await page.context().newPage();
     await routeApiToMockServer(otherTab, _mockServer.url);
     await otherTab.goto('/profile');
-    await otherTab.getByLabel('First Name').fill('Renamed');
-    await otherTab.getByLabel('First Name').blur();
+    await otherTab.getByLabel('First name').fill('Renamed');
+    await otherTab.getByLabel('First name').blur();
     await otherTab.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(
       otherTab.getByRole('button', { name: /Renamed Doe/i })

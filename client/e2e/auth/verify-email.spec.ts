@@ -11,8 +11,8 @@ test.describe('Email verification', () => {
     await page.goto('/register');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('verify-test@example.com');
-    await page.getByLabel('First Name').fill('Verify');
-    await page.getByLabel('Last Name').fill('Test');
+    await page.getByLabel('First name').fill('Verify');
+    await page.getByLabel('Last name').fill('Test');
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -31,7 +31,7 @@ test.describe('Email verification', () => {
     await page.goto(`/verify-email?token=${token}`);
 
     // Should show success message
-    await expect(page.getByText('Email Verified Successfully')).toBeVisible();
+    await expect(page.getByText('Email verified successfully')).toBeVisible();
     await expect(
       page.getByRole('main').getByRole('button', { name: 'Login', exact: true })
     ).toBeVisible();
@@ -127,7 +127,7 @@ test.describe('Email verification', () => {
   }) => {
     await page.goto('/verify-email?token=invalid-token-123');
 
-    await expect(page.getByText('Verification Failed')).toBeVisible();
+    await expect(page.getByText('Verification failed')).toBeVisible();
     await expect(page.getByText(/invalid or expired/i)).toBeVisible();
   });
 
@@ -138,8 +138,8 @@ test.describe('Email verification', () => {
     await page.goto('/register');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('expired-verify@example.com');
-    await page.getByLabel('First Name').fill('Expired');
-    await page.getByLabel('Last Name').fill('Verify');
+    await page.getByLabel('First name').fill('Expired');
+    await page.getByLabel('Last name').fill('Verify');
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -156,7 +156,7 @@ test.describe('Email verification', () => {
 
     await page.goto(`/verify-email?token=${token}`);
 
-    await expect(page.getByText('Verification Failed')).toBeVisible();
+    await expect(page.getByText('Verification failed')).toBeVisible();
     await expect(page.getByText(/token has expired/i)).toBeVisible();
   });
 
@@ -202,7 +202,7 @@ test.describe('Email verification', () => {
 
     // Verify email
     await page.goto(`/verify-email?token=${token}`);
-    await expect(page.getByText('Email Verified Successfully')).toBeVisible();
+    await expect(page.getByText('Email verified successfully')).toBeVisible();
 
     // Navigate to login and log in
     await page

@@ -76,8 +76,8 @@ test.describe('Keyboard navigation', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
-    // Focus the Admin Panel link in the sidenav and activate it
-    const adminLink = page.getByRole('link', { name: 'Admin Panel' });
+    // Focus the Admin panel link in the sidenav and activate it
+    const adminLink = page.getByRole('link', { name: 'Admin panel' });
     await adminLink.focus();
     await expect(adminLink).toBeFocused();
     await page.keyboard.press('Enter');
@@ -103,8 +103,8 @@ test.describe('Keyboard navigation', () => {
     // Wait for form to load
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
 
-    // Focus First Name, change it, then tab through remaining fields
-    const firstNameInput = page.getByLabel('First Name');
+    // Focus First name, change it, then tab through remaining fields
+    const firstNameInput = page.getByLabel('First name');
     await firstNameInput.focus();
     await expect(firstNameInput).toBeFocused();
     await firstNameInput.fill('Updated');

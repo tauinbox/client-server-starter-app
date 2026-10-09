@@ -1005,6 +1005,11 @@ WCAG 2.4.1 *Bypass Blocks*. Each navigation link in the sidenav has an `aria-lab
 `mat-icon` has `aria-hidden="true"`. Each `aria-label` of a toolbar control binds to a Transloco
 string.
 
+**Sentence case.** Each English label, title and button capitalises only its first word ("Edit role",
+"Page not found"). `check:i18n-case` (`scripts/check-i18n-case.mjs`, part of `npm run lint`) checks
+each `en.json` value that has no sentence punctuation. A proper noun or the name of a UI control
+goes into its `ALLOWED_CAPITALISED` set.
+
 ## Testing
 
 ### Unit Tests (Vitest)

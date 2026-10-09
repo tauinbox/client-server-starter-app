@@ -119,7 +119,7 @@ test.describe('User Detail page', () => {
     await expect(roleChip.locator('mat-icon')).toHaveText('person');
   });
 
-  test('should display User ID, Created On, Last Updated', async ({
+  test('should display User ID, Created on, Last updated', async ({
     _mockServer,
     page
   }) => {
@@ -127,8 +127,8 @@ test.describe('User Detail page', () => {
     await page.goto(`/users/${mockId('user-1')}`);
 
     await expect(page.getByText('User ID')).toBeVisible();
-    await expect(page.getByText('Created On')).toBeVisible();
-    await expect(page.getByText('Last Updated')).toBeVisible();
+    await expect(page.getByText('Created on')).toBeVisible();
+    await expect(page.getByText('Last updated')).toBeVisible();
   });
 
   test('should show "Edit" button', async ({ _mockServer, page }) => {
@@ -178,7 +178,7 @@ test.describe('User Detail page', () => {
     await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
-  test('should show "User Not Found" when API returns 404', async ({
+  test('should show "User not found" when API returns 404', async ({
     _mockServer,
     page
   }) => {
@@ -186,7 +186,7 @@ test.describe('User Detail page', () => {
     await page.goto(`/users/${mockId('user-999')}`);
 
     await expect(
-      page.getByRole('heading', { name: 'User Not Found' })
+      page.getByRole('heading', { name: 'User not found' })
     ).toBeVisible();
   });
 });

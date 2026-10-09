@@ -82,10 +82,10 @@ describe('ResourceFormDialogComponent', () => {
     };
   });
 
-  it('renders "Edit Resource" title', () => {
+  it('renders "Edit resource" title', () => {
     createComponent();
     const title = fixture.nativeElement.querySelector('[mat-dialog-title]');
-    expect(title?.textContent?.trim()).toBe('Edit Resource');
+    expect(title?.textContent?.trim()).toBe('Edit resource');
   });
 
   it('pre-fills model with resource displayName and description', () => {

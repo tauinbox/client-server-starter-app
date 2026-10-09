@@ -67,7 +67,7 @@ test.describe('OAuth-only account changes its email', () => {
     // The current-password field is what used to appear here, and it is the
     // field this account can never fill.
     await expect(
-      page.getByLabel('Current Password', { exact: true })
+      page.getByLabel('Current password', { exact: true })
     ).toHaveCount(0);
     await expect(page.getByText(/confirm it is you/i).first()).toBeVisible();
   });

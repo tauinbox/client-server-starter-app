@@ -30,7 +30,7 @@
     "logout": "Logout"
   },
   "sidenav": {
-    "adminPanel": "Admin Panel",
+    "adminPanel": "Admin panel",
     "billing": "Billing",
     "profile": "Profile",
     "collapse": "Collapse",
@@ -48,12 +48,12 @@
   },
   "pageNotFound": {
     "code": "404",
-    "title": "Page Not Found",
+    "title": "Page not found",
     "message": "The page you are looking for does not exist or has been moved.",
-    "goHome": "Go Home"
+    "goHome": "Go home"
   },
   "shortcuts": {
-    "dialogTitle": "Keyboard Shortcuts",
+    "dialogTitle": "Keyboard shortcuts",
     "noShortcuts": "No shortcuts available.",
     "groupGlobal": "Global",
     "groupForms": "Forms",

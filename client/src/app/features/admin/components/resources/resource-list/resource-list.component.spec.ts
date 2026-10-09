@@ -137,24 +137,24 @@ describe('ResourceListComponent', () => {
   });
 
   describe('permission-based rendering', () => {
-    it('hides Edit Resource button when canUpdate is false', async () => {
+    it('hides Edit resource button when canUpdate is false', async () => {
       authStoreMock.hasPermissions.mockReturnValue(false);
       await setupComponent();
       fixture.detectChanges();
 
       const editBtns = fixture.nativeElement.querySelectorAll(
-        'button[aria-label^="Edit Resource"]'
+        'button[aria-label^="Edit resource"]'
       );
       expect(editBtns.length).toBe(0);
     });
 
-    it('shows Edit Resource button when canUpdate is true', async () => {
+    it('shows Edit resource button when canUpdate is true', async () => {
       authStoreMock.hasPermissions.mockReturnValue(true);
       await setupComponent();
       fixture.detectChanges();
 
       const editBtns = fixture.nativeElement.querySelectorAll(
-        'button[aria-label^="Edit Resource"]'
+        'button[aria-label^="Edit resource"]'
       );
       expect(editBtns.length).toBeGreaterThan(0);
     });

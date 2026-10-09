@@ -42,7 +42,7 @@ test.describe('Admin Resources page', () => {
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
     await expect(
-      page.getByRole('columnheader', { name: 'Display Name', exact: true })
+      page.getByRole('columnheader', { name: 'Display name', exact: true })
     ).toBeVisible();
     await expect(
       page.getByRole('columnheader', { name: 'Name', exact: true })
@@ -52,7 +52,7 @@ test.describe('Admin Resources page', () => {
     ).toBeVisible();
   });
 
-  test('should open Edit Resource dialog when edit button is clicked', async ({
+  test('should open Edit resource dialog when edit button is clicked', async ({
     _mockServer,
     page
   }) => {
@@ -63,18 +63,18 @@ test.describe('Admin Resources page', () => {
 
     // Click the first visible edit button
     await page
-      .getByRole('button', { name: /^Edit Resource / })
+      .getByRole('button', { name: /^Edit resource / })
       .first()
       .click();
 
     // Dialog must open — this would fail with NG0201 if viewContainerRef is missing
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Edit Resource' })
+      page.getByRole('heading', { name: 'Edit resource' })
     ).toBeVisible();
   });
 
-  test('should close Edit Resource dialog on Cancel', async ({
+  test('should close Edit resource dialog on Cancel', async ({
     _mockServer,
     page
   }) => {
@@ -83,7 +83,7 @@ test.describe('Admin Resources page', () => {
 
     await expect(page.locator('table tbody tr').first()).toBeVisible();
     await page
-      .getByRole('button', { name: /^Edit Resource / })
+      .getByRole('button', { name: /^Edit resource / })
       .first()
       .click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -103,7 +103,7 @@ test.describe('Admin Resources page', () => {
     await page.goto('/admin/resources');
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Edit Resource Users' }).click();
+    await page.getByRole('button', { name: 'Edit resource Users' }).click();
     await openedDialog(page);
 
     await expect(page.getByRole('dialog')).toContainText(
@@ -129,7 +129,7 @@ test.describe('Admin Resources page', () => {
     await page.goto('/admin/resources');
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Edit Resource Profile' }).click();
+    await page.getByRole('button', { name: 'Edit resource Profile' }).click();
     await openedDialog(page);
 
     await page.getByRole('switch', { name: 'Custom' }).click();
@@ -149,12 +149,12 @@ test.describe('Admin Resources page', () => {
 
     await expect(page.locator('table tbody tr').first()).toBeVisible();
     await page
-      .getByRole('button', { name: /^Edit Resource / })
+      .getByRole('button', { name: /^Edit resource / })
       .first()
       .click();
     await openedDialog(page);
 
-    const displayNameInput = page.getByLabel('Display Name');
+    const displayNameInput = page.getByLabel('Display name');
     await displayNameInput.clear();
     await displayNameInput.fill('Updated Resource Name');
 

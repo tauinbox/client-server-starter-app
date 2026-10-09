@@ -70,7 +70,7 @@ test.describe('OAuth sign-in — completed session', () => {
     // it is absent for as long as the rules are missing. Asserted without a
     // reload on purpose: a reload re-runs the bootstrap initializer, which
     // loads the permissions the callback skipped and masks the defect.
-    const adminLink = page.locator('a.nav-link[aria-label="Admin Panel"]');
+    const adminLink = page.locator('a.nav-link[aria-label="Admin panel"]');
     await expect(adminLink).toBeVisible();
 
     // In-app navigation, so the guard evaluates against the same live ability.

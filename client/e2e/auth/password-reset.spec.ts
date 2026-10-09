@@ -5,7 +5,7 @@ test.describe('Password reset', () => {
   test('should display forgot password form', async ({ _mockServer, page }) => {
     await page.goto('/forgot-password');
 
-    await expect(page.getByText('Forgot Password')).toBeVisible();
+    await expect(page.getByText('Forgot password')).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(
       page.getByRole('button', { name: /send link/i })
@@ -76,11 +76,11 @@ test.describe('Password reset', () => {
     await page.goto(`/reset-password?token=${token}`);
 
     // Should show the password form
-    await expect(page.getByLabel('New Password')).toBeVisible();
+    await expect(page.getByLabel('New password')).toBeVisible();
 
     // Enter new password and confirm
-    await page.getByLabel('New Password').fill('Quartz-Meadow-77');
-    await page.getByLabel('Confirm Password').fill('Quartz-Meadow-77');
+    await page.getByLabel('New password').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm password').fill('Quartz-Meadow-77');
     await page.getByRole('button', { name: /reset password/i }).click();
 
     // Should redirect to login
@@ -105,9 +105,9 @@ test.describe('Password reset', () => {
 
     // The component sends the token to the server on submit, but first checks
     // if token is present. Let's fill in the password and submit.
-    await expect(page.getByLabel('New Password')).toBeVisible();
-    await page.getByLabel('New Password').fill('Quartz-Meadow-77');
-    await page.getByLabel('Confirm Password').fill('Quartz-Meadow-77');
+    await expect(page.getByLabel('New password')).toBeVisible();
+    await page.getByLabel('New password').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm password').fill('Quartz-Meadow-77');
     await page.getByRole('button', { name: /reset password/i }).click();
 
     // Should show error
@@ -135,8 +135,8 @@ test.describe('Password reset', () => {
     await _mockServer.expireToken(token);
 
     await page.goto(`/reset-password?token=${token}`);
-    await page.getByLabel('New Password').fill('Quartz-Meadow-77');
-    await page.getByLabel('Confirm Password').fill('Quartz-Meadow-77');
+    await page.getByLabel('New password').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm password').fill('Quartz-Meadow-77');
     await page.getByRole('button', { name: /reset password/i }).click();
 
     await expect(page.getByText(/token has expired/i)).toBeVisible();
@@ -149,9 +149,9 @@ test.describe('Password reset', () => {
   }) => {
     await page.goto('/reset-password?token=some-token');
 
-    await page.getByLabel('New Password').fill('short');
+    await page.getByLabel('New password').fill('short');
     // Blur to trigger validation
-    await page.getByText('Reset Password').first().click();
+    await page.getByText('Reset password').first().click();
 
     await expect(
       page.getByText('Password must be at least 8 characters')
@@ -164,10 +164,10 @@ test.describe('Password reset', () => {
   }) => {
     await page.goto('/reset-password?token=some-token');
 
-    await page.getByLabel('New Password').fill('Quartz-Meadow-77');
-    await page.getByLabel('Confirm Password').fill('DifferentPassword1');
+    await page.getByLabel('New password').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm password').fill('DifferentPassword1');
     // Blur to trigger validation
-    await page.getByText('Reset Password').first().click();
+    await page.getByText('Reset password').first().click();
 
     await expect(page.getByText(/passwords do not match/i)).toBeVisible();
   });

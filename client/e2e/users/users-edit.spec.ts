@@ -20,8 +20,8 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
-    await expect(page.getByLabel('First Name')).toHaveValue('Admin');
-    await expect(page.getByLabel('Last Name')).toHaveValue('User');
+    await expect(page.getByLabel('First name')).toHaveValue('Admin');
+    await expect(page.getByLabel('Last name')).toHaveValue('User');
   });
 
   test('should show status checkbox when logged in as admin', async ({
@@ -66,7 +66,7 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${selfId}/edit`);
 
     // The form must render, or a not-found page would pass the check below.
-    await expect(page.getByLabel('First Name')).toHaveValue('John');
+    await expect(page.getByLabel('First name')).toHaveValue('John');
     await expect(
       page.getByRole('button', { name: 'Delete', exact: true })
     ).toBeHidden();
@@ -82,10 +82,10 @@ test.describe('User Edit page', () => {
     await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.goto(`/users/${selfId}/edit`);
 
-    await expect(page.getByLabel('First Name')).toHaveValue('John');
+    await expect(page.getByLabel('First name')).toHaveValue('John');
     await expect(page.getByLabel('Active')).toBeHidden();
     await expect(page.getByRole('textbox', { name: 'Email' })).toBeHidden();
-    await expect(page.getByLabel('New Password')).toBeHidden();
+    await expect(page.getByLabel('New password')).toBeHidden();
     await expect(page.getByTestId('credentials-on-profile')).toContainText('@');
     await expect(
       page.getByRole('link', {
@@ -93,8 +93,8 @@ test.describe('User Edit page', () => {
       })
     ).toHaveAttribute('href', '/profile');
 
-    await page.getByLabel('First Name').fill('Renamed');
-    await page.getByLabel('First Name').blur();
+    await page.getByLabel('First name').fill('Renamed');
+    await page.getByLabel('First name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
@@ -141,16 +141,16 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await page.getByLabel('Email').clear();
-    await page.getByLabel('First Name').click();
+    await page.getByLabel('First name').click();
 
     await expect(page.getByText('Email is required')).toBeVisible();
 
-    await page.getByLabel('First Name').clear();
-    await page.getByLabel('Last Name').click();
+    await page.getByLabel('First name').clear();
+    await page.getByLabel('Last name').click();
 
     await expect(page.getByText('First name is required')).toBeVisible();
 
-    await page.getByLabel('Last Name').clear();
+    await page.getByLabel('Last name').clear();
     await page.getByLabel('Email').click();
 
     await expect(page.getByText('Last name is required')).toBeVisible();
@@ -160,8 +160,8 @@ test.describe('User Edit page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
-    await page.getByLabel('First Name').fill('Updated');
-    await page.getByLabel('First Name').blur();
+    await page.getByLabel('First name').fill('Updated');
+    await page.getByLabel('First name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
@@ -189,8 +189,8 @@ test.describe('User Edit page', () => {
     });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
-    await page.getByLabel('First Name').fill('Updated');
-    await page.getByLabel('First Name').blur();
+    await page.getByLabel('First name').fill('Updated');
+    await page.getByLabel('First name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
@@ -271,7 +271,7 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(page.getByLabel('Your current password')).toHaveCount(0);
-    await page.getByLabel('New Password (Optional)').fill('Copper-Meadow-83');
+    await page.getByLabel('New password (optional)').fill('Copper-Meadow-83');
     await expect(page.getByLabel('Your current password')).toBeVisible();
 
     await page.getByLabel('Your current password').fill('Wrong-Password-00');
@@ -356,7 +356,7 @@ test.describe('User Edit page', () => {
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText('Confirm Delete')).toBeVisible();
+    await expect(page.getByText('Confirm delete')).toBeVisible();
   });
 
   test('should delete and redirect to /users on confirm', async ({
