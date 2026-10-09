@@ -1,8 +1,7 @@
 import type { Server } from 'http';
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
-  ErrorKeys,
-  REFRESH_REUSE_GRACE_MS
+  ErrorKeys
 } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
@@ -253,7 +252,7 @@ describe('refresh-token failure parity', () => {
         lastActive.set(sid, at - ms);
     }
 
-    it('ends only the replayed session inside the grace window', async () => {
+    it('ends only the replayed session', async () => {
       const phone = await signIn();
       const desktop = await signIn();
 
@@ -270,7 +269,7 @@ describe('refresh-token failure parity', () => {
       const rows = auditRows('TOKEN_REFRESH_FAILURE');
       expect(rows).toHaveLength(1);
       expect(rows[0].details).toEqual({
-        reason: 'predecessor_replay_in_grace'
+        reason: 'lost_response_replay'
       });
       expect(rows[0].actorId).toBe(phone.userId);
 
@@ -279,16 +278,21 @@ describe('refresh-token failure parity', () => {
       expect((await refresh(desktop)).status).toBe(200);
     });
 
-    it('purges every session once the grace window has passed', async () => {
+    // A tab closed during the refresh replays the old cookie on the next visit,
+    // which can be a day later.
+    it('ends only the replayed session a day after the rotation', async () => {
       const phone = await signIn();
       const desktop = await signIn();
 
       expect((await refresh(phone)).status).toBe(200);
-      shiftLastActive(REFRESH_REUSE_GRACE_MS + 1000);
+      shiftLastActive(24 * 60 * 60 * 1000);
 
       expect((await refresh(phone)).status).toBe(401);
-      expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
-      expect((await refresh(desktop)).status).toBe(401);
+      expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
+      expect(auditRows('TOKEN_REFRESH_FAILURE')[0].details).toEqual({
+        reason: 'lost_response_replay'
+      });
+      expect((await refresh(desktop)).status).toBe(200);
     });
 
     it('purges every session when an older ancestor is replayed', async () => {
@@ -302,9 +306,15 @@ describe('refresh-token failure parity', () => {
         refreshCookie: refreshCookieOf(rotated)
       };
       expect((await refresh(next)).status).toBe(200);
+      const sessionId = getState().refreshSessions.get(
+        phone.refreshCookie.replace('refresh_token=', '')
+      );
 
       expect((await refresh(phone)).status).toBe(401);
-      expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
+      const reuse = auditRows('TOKEN_REUSE_DETECTED');
+      expect(reuse).toHaveLength(1);
+      expect(sessionId).toBeDefined();
+      expect(reuse[0].details).toEqual({ sessionId });
       expect((await refresh(desktop)).status).toBe(401);
     });
   });

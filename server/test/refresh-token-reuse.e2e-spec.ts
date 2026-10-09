@@ -29,10 +29,7 @@ import { BreachedPasswordService } from '../src/modules/auth/breached-password/b
 import { createMockCache } from '../src/common/testing/cache.mock';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import {
-  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
-  REFRESH_REUSE_GRACE_MS
-} from '@app/shared/constants';
+import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
 
 interface InMemoryStore {
   tokens: Map<string, RefreshToken>;
@@ -280,22 +277,18 @@ describe('Refresh token reuse detection (e2e)', () => {
 
     auth = moduleRef.get(AuthService);
 
-    // The real query compares timestamps in SQL, which this fake cannot run.
-    // The same rule over the store; the SQL itself is covered against real
-    // Postgres in refresh-token-lost-response.e2e-spec.ts.
+    // The real query orders rows in SQL, which this fake cannot run. The same
+    // rule over the store; the SQL itself is covered against real Postgres in
+    // refresh-token-lost-response.e2e-spec.ts.
     jest
       .spyOn(moduleRef.get(RefreshTokenService), 'isLostResponseReplay')
-      .mockImplementation((token, graceMs) => {
+      .mockImplementation((token) => {
         const later = Array.from(store.tokens.values()).filter(
           (t) =>
             t.sessionId === token.sessionId &&
             t.createdAt.getTime() > token.createdAt.getTime()
         );
-        return Promise.resolve(
-          later.length === 1 &&
-            !later[0].revoked &&
-            Date.now() - later[0].createdAt.getTime() < graceMs
-        );
+        return Promise.resolve(later.length === 1 && !later[0].revoked);
       });
   });
 
@@ -393,7 +386,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     expect(auditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.TOKEN_REFRESH_FAILURE,
-        details: { reason: 'predecessor_replay_in_grace' }
+        details: { reason: 'lost_response_replay' }
       })
     );
     expect(auditLog).not.toHaveBeenCalledWith(
@@ -406,29 +399,6 @@ describe('Refresh token reuse detection (e2e)', () => {
       null
     );
     expect(refreshedB.tokens.access_token).toBeDefined();
-  });
-
-  it('keeps the full purge for a replay once the grace window has passed', async () => {
-    const loginResult = await auth.login(userRecord, {
-      userAgent: null,
-      ipAddress: null
-    });
-    await nextMillisecond();
-    await auth.refreshTokens(loginResult.tokens.refresh_token, null);
-
-    for (const row of store.tokens.values()) {
-      row.createdAt = new Date(
-        row.createdAt.getTime() - REFRESH_REUSE_GRACE_MS - 1000
-      );
-    }
-
-    await expect(
-      auth.refreshTokens(loginResult.tokens.refresh_token, null)
-    ).rejects.toThrow(HttpException);
-
-    expect(store.tokens.size).toBe(0);
-    expect(store.userRevokedAt.get('user-1')).toBeInstanceOf(Date);
-    expect(recordAuthEvent).toHaveBeenCalledWith('token_reuse_detected');
   });
 
   it('returns plain 401 (no panic-revoke) for revoked-AND-expired tokens', async () => {

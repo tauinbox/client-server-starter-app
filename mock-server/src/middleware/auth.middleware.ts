@@ -12,7 +12,6 @@ import {
   MAX_NAME_LENGTH,
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
-  REFRESH_REUSE_GRACE_MS,
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
   VERIFICATION_TOKEN_EXPIRY_MS
@@ -575,11 +574,11 @@ router.post('/refresh-token', (req, res) => {
   if (reusedUserId) {
     // A lost rotation response replays the old cookie. End only this
     // session and issue nothing, so a thief gains no token either.
-    if (isLostResponseReplay(cookieToken, REFRESH_REUSE_GRACE_MS)) {
+    if (isLostResponseReplay(cookieToken)) {
       endSessionOfToken(cookieToken);
       logAudit('TOKEN_REFRESH_FAILURE', {
         actorId: reusedUserId,
-        details: { reason: 'predecessor_replay_in_grace' },
+        details: { reason: 'lost_response_replay' },
         ip: req.ip
       });
       res.status(401).json({
@@ -590,10 +589,12 @@ router.post('/refresh-token', (req, res) => {
       return;
     }
 
+    // The mock keeps no row ids, so `tokenId` of the server has no equivalent.
     logAudit('TOKEN_REUSE_DETECTED', {
       actorId: reusedUserId,
       targetId: reusedUserId,
       targetType: 'User',
+      details: { sessionId: state.refreshSessions.get(cookieToken) },
       ip: req.ip
     });
     revokeUserSessions(reusedUserId);

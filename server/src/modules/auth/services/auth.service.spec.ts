@@ -23,7 +23,6 @@ import {
   ErrorKeys,
   MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
-  REFRESH_REUSE_GRACE_MS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
@@ -1659,7 +1658,7 @@ describe('AuthService', () => {
             actorId: 'user-1',
             targetId: 'user-1',
             targetType: 'User',
-            details: { tokenId: 'token-1' }
+            details: { tokenId: 'token-1', sessionId: 'session-1' }
           })
         );
         expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
@@ -1685,7 +1684,7 @@ describe('AuthService', () => {
 
         expect(
           mockRefreshTokenService.isLostResponseReplay
-        ).toHaveBeenCalledWith(revokedToken, REFRESH_REUSE_GRACE_MS);
+        ).toHaveBeenCalledWith(revokedToken);
         expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
           'session-1'
         );
@@ -1694,7 +1693,7 @@ describe('AuthService', () => {
         expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
           action: AuditAction.TOKEN_REFRESH_FAILURE,
           actorId: 'user-1',
-          details: { reason: 'predecessor_replay_in_grace' }
+          details: { reason: 'lost_response_replay' }
         });
         expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
           expect.objectContaining({ action: AuditAction.TOKEN_REUSE_DETECTED })

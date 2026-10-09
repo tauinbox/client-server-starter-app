@@ -1854,7 +1854,7 @@ activates the git hooks through the `prepare` script.
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2850 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 594 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 588 pass and 6 skip |
+| Server E2E tests | Jest | A separate configuration in `test/` | 593 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 588 pass and 6 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1545 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 316 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1020 tests pass |
@@ -2013,10 +2013,10 @@ a second request to the registry for a verdict that gates nothing.
   token before its natural expiry, the server purges the full session of the user. It writes a
   `TOKEN_REUSE_DETECTED` audit row and increases the
   `auth_events_total{event="token_reuse_detected"}` metric. One exception applies: when a rotation
-  response does not reach the browser, the next page load presents the old token. If its successor
-  is unused and less than 60 seconds old (`REFRESH_REUSE_GRACE_MS`), the server ends that one
-  session only and writes a `TOKEN_REFRESH_FAILURE` row with `reason: 'predecessor_replay_in_grace'`.
-  The other devices of the user stay signed in.
+  response does not reach the browser (a closed tab, a sleeping laptop, a network drop), the next
+  page load presents the old token, possibly hours later. If its successor is unused, the server
+  ends that one session only and writes a `TOKEN_REFRESH_FAILURE` row with
+  `reason: 'lost_response_replay'`. The other devices of the user stay signed in.
 - A JWT access token lives 1 h and stays in an Angular signal. The app never writes it to
   `localStorage`.
 

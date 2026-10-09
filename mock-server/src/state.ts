@@ -199,26 +199,11 @@ export function isSessionLive(sessionId: string): boolean {
 
 /**
  * Whether a rotated token is the immediate predecessor of a live successor that
- * was issued less than `graceMs` ago. Mirrors
- * `RefreshTokenService.isLostResponseReplay`.
+ * was never used, at any age. Mirrors `RefreshTokenService.isLostResponseReplay`.
  */
-export function isLostResponseReplay(
-  refreshToken: string,
-  graceMs: number
-): boolean {
+export function isLostResponseReplay(refreshToken: string): boolean {
   const successor = state.rotatedTo.get(refreshToken);
-  if (successor === undefined || !state.refreshTokens.has(successor)) {
-    return false;
-  }
-
-  const sessionId = state.refreshSessions.get(successor);
-  // A live successor is the newest row of its session, so the last-active
-  // stamp is its issue time.
-  const issuedAt =
-    sessionId === undefined
-      ? undefined
-      : state.sessionLastActive.get(sessionId);
-  return issuedAt !== undefined && Date.now() - issuedAt < graceMs;
+  return successor !== undefined && state.refreshTokens.has(successor);
 }
 
 /**

@@ -9,9 +9,8 @@ import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { REFRESH_REUSE_GRACE_MS } from '@app/shared/constants';
 
-// The grace check compares `created_at` values in SQL, so only a real Postgres
+// The replay check orders rows by `created_at` in SQL, so only a real Postgres
 // proves it. Runs only when DB_HOST is set: CI provides Postgres, a bare local
 // run skips.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -104,7 +103,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     return auditSpy.mock.calls.map((call) => call[0].action);
   }
 
-  it('ends only the replayed session inside the window and leaves the other device signed in', async () => {
+  it('ends only the replayed session and leaves the other device signed in', async () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
 
@@ -122,7 +121,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     expect(auditSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.TOKEN_REFRESH_FAILURE,
-        details: { reason: 'predecessor_replay_in_grace' }
+        details: { reason: 'lost_response_replay' }
       })
     );
     expect(auditActions()).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
@@ -131,23 +130,25 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     expect(tokens.refresh_token).toBeTruthy();
   }, 30000);
 
-  it('purges every session when the replay arrives after the window', async () => {
+  // A tab closed during the refresh replays the old cookie on the next visit,
+  // which can be a day later.
+  it('ends only the replayed session when the replay arrives a day later', async () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
 
     await authService.refreshTokens(deviceA.raw, null);
     // Both rows of the chain move back together, so their order is kept.
     await dataSource.query(
-      `UPDATE refresh_tokens SET created_at = created_at - ($1 * INTERVAL '1 millisecond') WHERE session_id = $2`,
-      [REFRESH_REUSE_GRACE_MS + 1000, deviceA.sessionId]
+      `UPDATE refresh_tokens SET created_at = created_at - INTERVAL '1 day' WHERE session_id = $1`,
+      [deviceA.sessionId]
     );
 
     await errorKeyOf(authService.refreshTokens(deviceA.raw, null));
 
     expect(await rowsOf(deviceA.sessionId)).toBe(0);
-    expect(await rowsOf(deviceB.sessionId)).toBe(0);
-    expect(await tokenRevokedAt()).toBeInstanceOf(Date);
-    expect(auditActions()).toContain(AuditAction.TOKEN_REUSE_DETECTED);
+    expect(await rowsOf(deviceB.sessionId)).toBe(1);
+    expect(await tokenRevokedAt()).toBeNull();
+    expect(auditActions()).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
   }, 30000);
 
   it('purges every session when an older ancestor is replayed', async () => {
