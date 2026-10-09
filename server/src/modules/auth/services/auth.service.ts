@@ -49,7 +49,6 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   REAUTH_PROOF_MAX_AGE_SECONDS,
-  REFRESH_REUSE_GRACE_MS,
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
   SYSTEM_ROLES,
@@ -594,14 +593,9 @@ export class AuthService {
     if (tokenDoc && tokenDoc.revoked && !tokenDoc.isExpired()) {
       // A lost rotation response replays the old cookie. End only this
       // session and issue nothing, so a thief gains no token either.
-      if (
-        await this.refreshTokenService.isLostResponseReplay(
-          tokenDoc,
-          REFRESH_REUSE_GRACE_MS
-        )
-      ) {
+      if (await this.refreshTokenService.isLostResponseReplay(tokenDoc)) {
         await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
-        throw this.refreshRefusal('predecessor_replay_in_grace', {
+        throw this.refreshRefusal('lost_response_replay', {
           actorId: tokenDoc.userId
         });
       }
@@ -612,7 +606,7 @@ export class AuthService {
         actorId: tokenDoc.userId,
         targetId: tokenDoc.userId,
         targetType: 'User',
-        details: { tokenId: tokenDoc.id }
+        details: { tokenId: tokenDoc.id, sessionId: tokenDoc.sessionId }
       });
       this.metricsService.recordAuthEvent('token_reuse_detected');
       throw new HttpException(

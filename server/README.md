@@ -1560,16 +1560,18 @@ before a 30-day cap would read it.
 `TOKEN_REUSE_DETECTED` audit row and increases
 `auth_events_total{event="token_reuse_detected"}`.
 
-A **lost rotation response** is the one exception. A double reload or a closed tab can stop the
-rotation response before the browser stores the new cookie, and the next load presents the old one.
-`RefreshTokenService.isLostResponseReplay` reads the replay as a lost response when the presented row
-has exactly one newer row in its session, that row is not revoked, and it is less than
-`REFRESH_REUSE_GRACE_MS` (60 s) old. The time comparisons run in SQL, because `created_at` holds
-microseconds and a JS `Date` holds milliseconds. The server then deletes that one session, answers
-401 `errors.auth.invalidRefreshToken`, issues no token, writes `TOKEN_REFRESH_FAILURE` with
-`reason: 'predecessor_replay_in_grace'` and does not stamp `tokenRevokedAt`. A thief who replays a
-stolen token inside the window gets no token either; that event is recorded as a refresh failure,
-not as reuse.
+A **lost rotation response** is the one exception. A double reload, a closed tab, a sleeping laptop
+or a network drop can stop the rotation response before the browser stores the new cookie, and the
+next load presents the old one, possibly a day later. `RefreshTokenService.isLostResponseReplay`
+reads the replay as a lost response when the presented row has exactly one newer row in its session
+and that row is not revoked, that is, the successor was never used. The age of the successor does
+not matter: until it is used, the browser cannot hold it. The ordering runs in SQL, because
+`created_at` holds microseconds and a JS `Date` holds milliseconds. The server then deletes that one
+session, answers 401 `errors.auth.invalidRefreshToken`, issues no token, writes
+`TOKEN_REFRESH_FAILURE` with `reason: 'lost_response_replay'` and does not stamp `tokenRevokedAt`.
+A thief who replays a stolen token before the owner uses its successor gets no token either and
+ends the session of the owner; that event is recorded as a refresh failure, not as reuse. The
+`TOKEN_REUSE_DETECTED` row carries `tokenId` and `sessionId` in `details`.
 
 A token that is revoked and expired falls through to the standard 401. That is the natural cleanup
 window.
