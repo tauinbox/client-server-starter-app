@@ -9,7 +9,7 @@
   "featureFlags": {
     "title": "Фича-флаги",
     "empty": "Пока нет ни одного флага — нажмите «+ Новый флаг», чтобы создать.",
-    "addFlag": "Новый флаг",
+    "create": "Новый флаг",
     "editFlag": "Редактировать флаг",
     "deleteFlag": "Удалить флаг",
     "toggleFlag": "Переключить флаг",
@@ -40,8 +40,8 @@
     "errorDeleteFailed": "Не удалось удалить фича-флаг."
   },
   "featureFlagForm": {
-    "createTitle": "Создать фича-флаг",
-    "editTitle": "Редактировать фича-флаг",
+    "createTitle": "Создание фича-флага",
+    "editTitle": "Редактирование фича-флага",
     "createButton": "Создать",
     "keyLabel": "Ключ",
     "keyHint": "Строчные буквы, цифры и дефисы. Пример: new-dashboard",
@@ -133,6 +133,7 @@
   },
   "roles": {
     "title": "Управление ролями",
+    "create": "Новая роль",
     "tableHeaderName": "Название",
     "tableHeaderDescription": "Описание",
     "tableHeaderType": "Тип",

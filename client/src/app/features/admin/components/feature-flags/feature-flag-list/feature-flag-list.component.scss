@@ -1,4 +1,3 @@
-@use '../../../../../../styles/abstracts/functions' as func;
 @use '../../../../../../styles/abstracts/variables' as vars;
 @use '../../../../../../styles/abstracts/mixins' as mix;
 
@@ -68,10 +67,6 @@
   display: flex;
   flex-direction: column;
   gap: vars.$spacing-sm;
-
-  // Bottom padding equal to FAB + breathing room so the last card can scroll
-  // fully above the fixed FAB on handset.
-  padding-bottom: func.rem(80);
 }
 
 .flag-card {
@@ -118,10 +113,3 @@
 }
 
 // ── Handset FAB ────────────────────────────────────────────────────────────
-
-.flag-fab {
-  position: fixed;
-  right: vars.$spacing-md;
-  bottom: vars.$spacing-md;
-  z-index: 5;
-}

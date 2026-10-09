@@ -9,7 +9,7 @@
   "featureFlags": {
     "title": "Feature flags",
     "empty": "No feature flags yet — click \"+ New flag\" to create one.",
-    "addFlag": "New flag",
+    "create": "New flag",
     "editFlag": "Edit flag",
     "deleteFlag": "Delete flag",
     "toggleFlag": "Toggle flag",
@@ -133,6 +133,7 @@
   },
   "roles": {
     "title": "Roles management",
+    "create": "New role",
     "tableHeaderName": "Name",
     "tableHeaderDescription": "Description",
     "tableHeaderType": "Type",
@@ -156,7 +157,7 @@
   },
   "roleForm": {
     "editTitle": "Edit Role",
-    "createTitle": "Create Role",
+    "createTitle": "Create role",
     "systemWarning": "System roles cannot be modified.",
     "nameLabel": "Name",
     "namePlaceholder": "Role name",

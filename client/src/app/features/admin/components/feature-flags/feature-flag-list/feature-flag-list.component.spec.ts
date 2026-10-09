@@ -282,7 +282,7 @@ describe('FeatureFlagListComponent', () => {
     );
     expect(cards.length).toBe(1);
     const fab = (fixture.nativeElement as HTMLElement).querySelector(
-      'button.flag-fab'
+      'nxs-create-button button.create-fab'
     );
     expect(fab).not.toBeNull();
   });

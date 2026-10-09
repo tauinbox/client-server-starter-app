@@ -1,0 +1,17 @@
+@if (layout.isHandset()) {
+  <button
+    matFab
+    extended
+    type="button"
+    class="create-fab"
+    (click)="pressed.emit()"
+  >
+    <mat-icon>add</mat-icon>
+    {{ label() }}
+  </button>
+} @else {
+  <button matButton="filled" type="button" (click)="pressed.emit()">
+    <mat-icon>add</mat-icon>
+    {{ label() }}
+  </button>
+}
