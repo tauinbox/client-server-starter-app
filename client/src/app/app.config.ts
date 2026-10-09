@@ -5,7 +5,11 @@ import {
   provideAppInitializer,
   provideZoneChangeDetection
 } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import {
+  provideRouter,
+  withComponentInputBinding,
+  withNavigationErrorHandler
+} from '@angular/router';
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideTransloco } from '@jsverse/transloco';
@@ -17,6 +21,7 @@ import { MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
+import { reloadOnStaleChunk } from '@core/navigation/stale-chunk-reload';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
 import { restoreSession } from '@features/auth/utils/restore-session';
 import { OAuthIntentService } from '@features/auth/services/oauth-intent.service';
@@ -27,7 +32,11 @@ import { DisplayPreferencesService } from '@core/services/display-preferences.se
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
-    provideRouter(routes, withComponentInputBinding()),
+    provideRouter(
+      routes,
+      withComponentInputBinding(),
+      withNavigationErrorHandler(reloadOnStaleChunk)
+    ),
     // Error interceptor must be registered before JWT interceptor:
     // JWT handles 401s (refresh + retry), error interceptor handles everything else
     provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
