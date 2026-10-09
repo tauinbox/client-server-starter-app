@@ -96,6 +96,12 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       help: 'Breached-password blocklist lookups by verdict, including the fail-open branch',
       labelNames: ['outcome']
     }),
+    // The `action` label is the closed AuditAction enum.
+    makeCounterProvider({
+      name: 'audit_write_failures_total',
+      help: 'Audit rows that a fire-and-forget write lost',
+      labelNames: ['action']
+    }),
     {
       provide: SSE_CONNECTIONS_REF,
       useFactory: (): SseConnectionsRef => ({ getCount: () => 0 })

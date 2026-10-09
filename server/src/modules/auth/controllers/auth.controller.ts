@@ -211,7 +211,7 @@ export class AuthController {
     this.cookies.clearRefresh(res);
     this.cookies.clearIntents(res);
     this.setClearSiteData(res);
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.USER_LOGOUT,
       actorId: req.user.userId,
       actorEmail: req.user.email,
@@ -291,7 +291,7 @@ export class AuthController {
       await this.authService.revokeAllUserSessions(req.user.userId);
       this.cookies.clearRefresh(res);
       this.cookies.clearIntents(res);
-      await this.auditService.log({
+      this.auditService.logFireAndForget({
         action: AuditAction.PASSWORD_CHANGE,
         actorId: req.user.userId,
         actorEmail: req.user.email,

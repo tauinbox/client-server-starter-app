@@ -106,7 +106,6 @@ describe('AuthService', () => {
     findRoleByName: jest.Mock;
   };
   let mockAuditService: {
-    log: jest.Mock;
     logFireAndForget: jest.Mock;
   };
   let mockMetricsService: {
@@ -287,7 +286,6 @@ describe('AuthService', () => {
     };
 
     mockAuditService = {
-      log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn()
     };
 
@@ -1009,7 +1007,9 @@ describe('AuthService', () => {
         actorEmail: 'new@example.com',
         context: { ip: '10.0.0.1', requestId: 'req-1' }
       });
-      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.USER_REGISTER })
+      );
     });
 
     it('audits the conflict raised by the unique violation on the insert', async () => {
@@ -1026,7 +1026,9 @@ describe('AuthService', () => {
           actorEmail: 'new@example.com'
         })
       );
-      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.USER_REGISTER })
+      );
     });
 
     it('does not audit a conflict when the failure is unrelated', async () => {
@@ -1050,7 +1052,7 @@ describe('AuthService', () => {
 
       await service.register(registerDto);
 
-      expect(mockAuditService.log).toHaveBeenCalledWith(
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.USER_REGISTER })
       );
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
@@ -1358,7 +1360,9 @@ describe('AuthService', () => {
         response: { errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN }
       });
       expect(mockManager.delete).not.toHaveBeenCalled();
-      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.PASSWORD_RESET_COMPLETE })
+      );
       expect(
         mockMailService.sendPasswordChangedNotification
       ).not.toHaveBeenCalled();
@@ -2889,7 +2893,7 @@ describe('AuthService', () => {
       expect(mockManager.delete).toHaveBeenCalledWith(expect.anything(), {
         userId: 'user-1'
       });
-      expect(mockAuditService.log).toHaveBeenCalledWith(
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
           details: { oldEmail: 'test@example.com', newEmail: 'new@example.com' }

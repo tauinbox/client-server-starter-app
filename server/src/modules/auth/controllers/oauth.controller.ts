@@ -347,7 +347,7 @@ export class OAuthController {
     // window. The ledger already refuses a second use of the value.
     this.cookies.clearReauthProof(res);
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.OAUTH_UNLINK,
       actorId: userId,
       actorEmail: req.user.email,

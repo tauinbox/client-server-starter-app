@@ -303,12 +303,17 @@ The metrics are `http_requests_total`, `http_request_duration_seconds`, `auth_ev
 `rbac_permission_denied_total{action,subject,level}`, `mail_queue_jobs{state}`,
 `mail_jobs_processed_total{outcome}`, `db_pool_connections{state}`,
 `cache_requests_total{cache,outcome}`, `billing_usage_records_unrated_total{meter}`,
-`password_breach_lookups_total{outcome}` and
+`password_breach_lookups_total{outcome}`, `audit_write_failures_total{action}` and
 `dependency_up{dependency}`. The module also supplies `HttpMetricsInterceptor`.
 
 `password_breach_lookups_total{outcome="unavailable"}` needs an alert. The breached-password check
 fails open, so a blocklist that stops answering is silent in every other signal: registrations keep
 succeeding and no error rate moves. That counter is the only place the gap shows.
+
+`audit_write_failures_total{action}` counts the audit rows that a fire-and-forget write lost (a
+self-service action, a refusal, a billing administrator route). The action took effect without
+its row. Each `AuditAction` value starts at 0, and the Grafana rule "Audit rows lost" alerts on any
+increase in 15 minutes.
 
 `schedule/` uses `@nestjs/schedule` for the cron jobs.
 

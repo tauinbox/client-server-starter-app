@@ -131,7 +131,7 @@ export class SessionsController {
     }
 
     this.cookies.clearReauthProof(res);
-    await this.logRevoke(req, 'one', 1);
+    this.logRevoke(req, 'one', 1);
     return { message: 'Session has ended' };
   }
 
@@ -158,7 +158,7 @@ export class SessionsController {
     );
 
     this.cookies.clearReauthProof(res);
-    await this.logRevoke(req, 'others', count);
+    this.logRevoke(req, 'others', count);
     return { message: 'Other sessions have ended', count };
   }
 
@@ -182,12 +182,12 @@ export class SessionsController {
   }
 
   /** The device label is client data, so it never enters the audit row. */
-  private async logRevoke(
+  private logRevoke(
     req: JwtAuthRequest,
     scope: 'one' | 'others',
     count: number
-  ): Promise<void> {
-    await this.auditService.log({
+  ): void {
+    this.auditService.logFireAndForget({
       action: AuditAction.SESSION_REVOKE,
       actorId: req.user.userId,
       actorEmail: req.user.email,

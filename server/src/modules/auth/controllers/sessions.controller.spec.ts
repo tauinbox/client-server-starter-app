@@ -44,7 +44,7 @@ describe('SessionsController', () => {
     deleteUserSession: jest.Mock;
     deleteOtherSessions: jest.Mock;
   };
-  let auditService: { log: jest.Mock };
+  let auditService: { logFireAndForget: jest.Mock };
 
   beforeEach(async () => {
     authService = { assertStepUp: jest.fn().mockResolvedValue(undefined) };
@@ -53,7 +53,7 @@ describe('SessionsController', () => {
       deleteUserSession: jest.fn().mockResolvedValue(true),
       deleteOtherSessions: jest.fn().mockResolvedValue(2)
     };
-    auditService = { log: jest.fn().mockResolvedValue(undefined) };
+    auditService = { logFireAndForget: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SessionsController],
@@ -158,7 +158,7 @@ describe('SessionsController', () => {
         secure: true,
         path: '/'
       });
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.SESSION_REVOKE,
           actorId: 'user-1',
@@ -179,7 +179,7 @@ describe('SessionsController', () => {
 
       expect(refreshTokenService.deleteUserSession).not.toHaveBeenCalled();
       expect(res.clearCookie).not.toHaveBeenCalled();
-      expect(auditService.log).not.toHaveBeenCalled();
+      expect(auditService.logFireAndForget).not.toHaveBeenCalled();
     });
 
     it('refuses the session of the caller before it spends any factor', async () => {
@@ -216,7 +216,7 @@ describe('SessionsController', () => {
       });
 
       expect(res.clearCookie).not.toHaveBeenCalled();
-      expect(auditService.log).not.toHaveBeenCalled();
+      expect(auditService.logFireAndForget).not.toHaveBeenCalled();
     });
   });
 
@@ -244,7 +244,7 @@ describe('SessionsController', () => {
       );
       expect(result.count).toBe(2);
       expect(res.clearCookie).toHaveBeenCalled();
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.SESSION_REVOKE,
           details: { scope: 'others', count: 2 }

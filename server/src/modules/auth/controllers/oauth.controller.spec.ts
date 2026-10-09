@@ -115,7 +115,6 @@ describe('OAuthController', () => {
     unlinkProvider: jest.Mock;
   };
   let auditServiceMock: {
-    log: jest.Mock;
     logFireAndForget: jest.Mock;
   };
   let metricsServiceMock: { recordAuthEvent: jest.Mock };
@@ -158,7 +157,6 @@ describe('OAuthController', () => {
     };
 
     auditServiceMock = {
-      log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn()
     };
 
@@ -323,7 +321,7 @@ describe('OAuthController', () => {
         'user-1',
         'google'
       );
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.OAUTH_UNLINK,
           details: { provider: 'google' }
@@ -351,7 +349,7 @@ describe('OAuthController', () => {
           mockResponse()
         )
       ).rejects.toThrow('No linked google account found');
-      expect(auditServiceMock.log).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
     });
 
     it('demands a step-up bound to the unlink operation', async () => {
@@ -432,7 +430,7 @@ describe('OAuthController', () => {
       ).rejects.toBeInstanceOf(HttpException);
 
       expect(oauthAccountServiceMock.unlinkProvider).not.toHaveBeenCalled();
-      expect(auditServiceMock.log).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
       expect(
         mailServiceMock.sendOAuthUnlinkedNotification
       ).not.toHaveBeenCalled();
@@ -739,7 +737,6 @@ describe('OAuthController', () => {
         );
 
         expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
-        expect(auditServiceMock.log).not.toHaveBeenCalled();
         expect(metricsServiceMock.recordAuthEvent).not.toHaveBeenCalled();
       });
 
@@ -1066,7 +1063,7 @@ describe('OAuthController', () => {
         mockResponse()
       );
 
-      expect(auditServiceMock.log).toHaveBeenCalledWith({
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
         action: AuditAction.USER_LOGIN_SUCCESS,
         actorId: '1',
         actorEmail: 'test@example.com',

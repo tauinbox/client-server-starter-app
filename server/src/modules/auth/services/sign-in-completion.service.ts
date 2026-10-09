@@ -37,7 +37,7 @@ export class SignInCompletionService {
     await this.authService.endPresentedSession(this.cookies.readRefresh(req));
     const result = await this.authService.login(user, sessionClientOf(req));
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.USER_LOGIN_SUCCESS,
       actorId: user.id,
       actorEmail: user.email,

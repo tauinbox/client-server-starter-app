@@ -163,7 +163,7 @@ export class MfaService {
     }
 
     if (!(await this.consumeTotp(user, code))) {
-      await this.recordChallengeFailure(user, 'enrolment', context);
+      this.recordChallengeFailure(user, 'enrolment', context);
       throw this.invalidCodeException();
     }
 
@@ -174,7 +174,7 @@ export class MfaService {
       totpRecoveryCodes: recoveryCodes.map((code) => hashToken(normalize(code)))
     });
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.MFA_ENABLE,
       actorId: user.id,
       actorEmail: user.email,
@@ -210,7 +210,7 @@ export class MfaService {
       totpRecoveryCodes: recoveryCodes.map((code) => hashToken(normalize(code)))
     });
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.MFA_RECOVERY_CODES_REGENERATED,
       actorId: user.id,
       actorEmail: user.email,
@@ -252,7 +252,7 @@ export class MfaService {
       totpLastUsedStep: null
     });
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.MFA_DISABLE,
       actorId: user.id,
       actorEmail: user.email,
@@ -356,7 +356,7 @@ export class MfaService {
     }
 
     if (!(await this.consumeTotp(user, code))) {
-      await this.recordChallengeFailure(user, 'challenge', context, count);
+      this.recordChallengeFailure(user, 'challenge', context, count);
 
       if (count >= MAX_FAILED_ATTEMPTS) {
         throw this.challengeLockedException(remainingMs);
@@ -401,7 +401,7 @@ export class MfaService {
     );
 
     if (remaining === null) {
-      await this.recordChallengeFailure(user, 'recovery_code', context);
+      this.recordChallengeFailure(user, 'recovery_code', context);
       throw new HttpException(
         {
           message: 'Recovery code is invalid or was already used',
@@ -411,7 +411,7 @@ export class MfaService {
       );
     }
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.MFA_RECOVERY_CODE_USED,
       actorId: user.id,
       actorEmail: user.email,
@@ -455,7 +455,7 @@ export class MfaService {
     }
 
     if (!(await this.consumeTotp(user, code))) {
-      await this.recordChallengeFailure(user, 'step_up', context, count);
+      this.recordChallengeFailure(user, 'step_up', context, count);
 
       if (count >= MAX_FAILED_ATTEMPTS) {
         throw this.stepUpLockedException(remainingMs);
@@ -635,13 +635,13 @@ export class MfaService {
     }
   }
 
-  private async recordChallengeFailure(
+  private recordChallengeFailure(
     user: User,
     stage: 'enrolment' | 'challenge' | 'recovery_code' | 'step_up',
     context?: AuditContext,
     attempt?: number
-  ): Promise<void> {
-    await this.auditService.log({
+  ): void {
+    this.auditService.logFireAndForget({
       action: AuditAction.MFA_CHALLENGE_FAILURE,
       actorId: user.id,
       actorEmail: user.email,

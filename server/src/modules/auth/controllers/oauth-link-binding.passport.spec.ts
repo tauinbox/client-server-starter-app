@@ -161,7 +161,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
         },
         {
           provide: AuditService,
-          useValue: { log: jest.fn(), logFireAndForget: jest.fn() }
+          useValue: { logFireAndForget: jest.fn() }
         },
         { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
         {

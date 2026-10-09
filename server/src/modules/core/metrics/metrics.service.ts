@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import type { Counter, Histogram } from 'prom-client';
 import type { BillingProviderId } from '@app/shared/types';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
 export type AuthEvent =
   | 'login_success'
@@ -48,8 +49,16 @@ export class MetricsService {
     @InjectMetric('billing_off_session_charges_unmatched_total')
     private readonly unmatchedChargeCounter: Counter<string>,
     @InjectMetric('password_breach_lookups_total')
-    private readonly breachLookupCounter: Counter<string>
-  ) {}
+    private readonly breachLookupCounter: Counter<string>,
+    @InjectMetric('audit_write_failures_total')
+    private readonly auditWriteFailureCounter: Counter<string>
+  ) {
+    // A series that first appears at 1 has no earlier sample, so increase()
+    // reads 0 and the alert misses the first lost row of each action.
+    for (const action of Object.values(AuditAction)) {
+      this.auditWriteFailureCounter.inc({ action }, 0);
+    }
+  }
 
   recordHttpRequest(
     method: string,
@@ -92,5 +101,9 @@ export class MetricsService {
 
   recordBreachLookup(outcome: BreachLookupOutcome): void {
     this.breachLookupCounter.inc({ outcome });
+  }
+
+  recordAuditWriteFailure(action: AuditAction): void {
+    this.auditWriteFailureCounter.inc({ action });
   }
 }

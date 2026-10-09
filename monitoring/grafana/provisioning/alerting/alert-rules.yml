@@ -104,3 +104,48 @@ groups:
                     type: lt
                     params:
                       - 1
+
+      # A self-service action, a refusal and a billing-admin route write their
+      # audit row after the answer, so a failed write is lost without an error
+      # to the caller. This counter is the only record that a row is missing.
+      - uid: nexus-audit-write-failures
+        title: Audit rows lost
+        condition: B
+        for: 0m
+        annotations:
+          summary: 'Audit rows for {{ $labels.action }} were lost'
+          description: 'The server could not write one or more audit rows for {{ $labels.action }} in the last 15 minutes. The actions took effect without their audit record. Check the server log for "Failed to write audit log". A common cause is an AuditAction value without its ALTER TYPE migration.'
+        labels:
+          severity: warning
+        # The series exist from startup at 0, so no data means no server, which
+        # nexus-server-down reports.
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (action) (increase(audit_write_failures_total[15m]))
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0

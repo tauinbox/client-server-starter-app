@@ -61,7 +61,7 @@ describe('MfaController', () => {
     verifyChallenge: jest.Mock;
     consumeRecoveryCode: jest.Mock;
   };
-  let auditService: { log: jest.Mock };
+  let auditService: { logFireAndForget: jest.Mock };
   let metricsService: { recordAuthEvent: jest.Mock };
   let res: MockedResponse & Response;
 
@@ -94,7 +94,7 @@ describe('MfaController', () => {
       verifyChallenge: jest.fn().mockResolvedValue(mockUser),
       consumeRecoveryCode: jest.fn().mockResolvedValue(mockUser)
     };
-    auditService = { log: jest.fn().mockResolvedValue(undefined) };
+    auditService = { logFireAndForget: jest.fn() };
     metricsService = { recordAuthEvent: jest.fn() };
     res = mockResponse();
 
@@ -356,7 +356,7 @@ describe('MfaController', () => {
         res
       );
 
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_LOGIN_SUCCESS,
           details: { factor: 'mfa' }

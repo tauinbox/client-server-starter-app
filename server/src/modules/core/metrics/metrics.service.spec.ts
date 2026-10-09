@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getToken } from '@willsoto/nestjs-prometheus';
 import type { Counter, Histogram } from 'prom-client';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from './metrics.service';
 
 const mockCounter: jest.Mocked<Pick<Counter<string>, 'inc'>> = {
@@ -53,6 +54,10 @@ describe('MetricsService', () => {
         },
         {
           provide: getToken('password_breach_lookups_total'),
+          useValue: mockCounter
+        },
+        {
+          provide: getToken('audit_write_failures_total'),
           useValue: mockCounter
         }
       ]
@@ -167,6 +172,22 @@ describe('MetricsService', () => {
       service.recordBreachLookup('unavailable');
 
       expect(mockCounter.inc).toHaveBeenCalledWith({ outcome: 'unavailable' });
+    });
+  });
+
+  describe('recordAuditWriteFailure', () => {
+    it('starts every action at zero, so the first loss is an increase', () => {
+      for (const action of Object.values(AuditAction)) {
+        expect(mockCounter.inc).toHaveBeenCalledWith({ action }, 0);
+      }
+    });
+
+    it('increments the counter labelled by audit action', () => {
+      service.recordAuditWriteFailure(AuditAction.MFA_DISABLE);
+
+      expect(mockCounter.inc).toHaveBeenCalledWith({
+        action: AuditAction.MFA_DISABLE
+      });
     });
   });
 });
