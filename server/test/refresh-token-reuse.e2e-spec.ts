@@ -281,14 +281,21 @@ describe('Refresh token reuse detection (e2e)', () => {
     // rule over the store; the SQL itself is covered against real Postgres in
     // refresh-token-lost-response.e2e-spec.ts.
     jest
-      .spyOn(moduleRef.get(RefreshTokenService), 'isLostResponseReplay')
+      .spyOn(moduleRef.get(RefreshTokenService), 'findLostResponseSuccessor')
       .mockImplementation((token) => {
         const later = Array.from(store.tokens.values()).filter(
           (t) =>
             t.sessionId === token.sessionId &&
             t.createdAt.getTime() > token.createdAt.getTime()
         );
-        return Promise.resolve(later.length === 1 && !later[0].revoked);
+        return Promise.resolve(
+          later.length === 1 && !later[0].revoked
+            ? {
+                ageMs: Date.now() - later[0].createdAt.getTime(),
+                ipAddress: later[0].ipAddress
+              }
+            : null
+        );
       });
   });
 
@@ -386,7 +393,8 @@ describe('Refresh token reuse detection (e2e)', () => {
     expect(auditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.TOKEN_REFRESH_FAILURE,
-        details: { reason: 'lost_response_replay' }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        details: expect.objectContaining({ reason: 'lost_response_replay' })
       })
     );
     expect(auditLog).not.toHaveBeenCalledWith(

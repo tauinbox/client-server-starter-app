@@ -86,7 +86,7 @@ describe('AuthService', () => {
   let mockRefreshTokenService: {
     createRefreshToken: jest.Mock;
     findByToken: jest.Mock;
-    isLostResponseReplay: jest.Mock;
+    findLostResponseSuccessor: jest.Mock;
     deleteByUserId: jest.Mock;
     deleteBySessionId: jest.Mock;
     revokeToken: jest.Mock;
@@ -252,7 +252,7 @@ describe('AuthService', () => {
     mockRefreshTokenService = {
       createRefreshToken: jest.fn().mockResolvedValue(undefined),
       findByToken: jest.fn(),
-      isLostResponseReplay: jest.fn().mockResolvedValue(false),
+      findLostResponseSuccessor: jest.fn().mockResolvedValue(null),
       deleteByUserId: jest.fn().mockResolvedValue(undefined),
       deleteBySessionId: jest.fn().mockResolvedValue(1),
       revokeToken: jest.fn().mockResolvedValue(undefined),
@@ -1673,17 +1673,20 @@ describe('AuthService', () => {
           isExpired: () => false
         };
         mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
-        mockRefreshTokenService.isLostResponseReplay.mockResolvedValue(true);
+        mockRefreshTokenService.findLostResponseSuccessor.mockResolvedValue({
+          ageMs: 3_600_000,
+          ipAddress: '203.0.113.7'
+        });
 
         await expect(
-          service.refreshTokens('replayed-token', null)
+          service.refreshTokens('replayed-token', '203.0.113.7')
         ).rejects.toMatchObject({
           status: HttpStatus.UNAUTHORIZED,
           response: { errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN }
         });
 
         expect(
-          mockRefreshTokenService.isLostResponseReplay
+          mockRefreshTokenService.findLostResponseSuccessor
         ).toHaveBeenCalledWith(revokedToken);
         expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
           'session-1'
@@ -1693,7 +1696,12 @@ describe('AuthService', () => {
         expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
           action: AuditAction.TOKEN_REFRESH_FAILURE,
           actorId: 'user-1',
-          details: { reason: 'lost_response_replay' }
+          details: {
+            reason: 'lost_response_replay',
+            sessionId: 'session-1',
+            replayAgeMs: 3_600_000,
+            sameIp: true
+          }
         });
         expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
           expect.objectContaining({ action: AuditAction.TOKEN_REUSE_DETECTED })
@@ -1705,6 +1713,40 @@ describe('AuthService', () => {
           'token_reuse_detected'
         );
       });
+
+      it.each([
+        {
+          presentedIp: '198.51.100.9',
+          successorIp: '203.0.113.7',
+          sameIp: false
+        },
+        { presentedIp: null, successorIp: '203.0.113.7', sameIp: null },
+        { presentedIp: '198.51.100.9', successorIp: null, sameIp: null }
+      ])(
+        'records sameIp=$sameIp for a lost-response replay from $presentedIp',
+        async ({ presentedIp, successorIp, sameIp }) => {
+          mockRefreshTokenService.findByToken.mockResolvedValue({
+            ...mockTokenDoc,
+            revoked: true,
+            isExpired: () => false
+          });
+          mockRefreshTokenService.findLostResponseSuccessor.mockResolvedValue({
+            ageMs: 5,
+            ipAddress: successorIp
+          });
+
+          await expect(
+            service.refreshTokens('replayed-token', presentedIp)
+          ).rejects.toThrow(HttpException);
+
+          expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+            expect.objectContaining({
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              details: expect.objectContaining({ sameIp })
+            })
+          );
+        }
+      );
 
       it('should fall through to plain failure for revoked AND expired tokens', async () => {
         // Expired-and-revoked is the natural cleanup path; do not panic-revoke

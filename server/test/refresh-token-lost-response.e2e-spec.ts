@@ -107,10 +107,10 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
 
-    await authService.refreshTokens(deviceA.raw, null);
+    await authService.refreshTokens(deviceA.raw, '203.0.113.7');
 
     expect(
-      await errorKeyOf(authService.refreshTokens(deviceA.raw, null))
+      await errorKeyOf(authService.refreshTokens(deviceA.raw, '203.0.113.7'))
     ).toEqual(
       expect.objectContaining({ errorKey: 'errors.auth.invalidRefreshToken' })
     );
@@ -121,7 +121,13 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     expect(auditSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.TOKEN_REFRESH_FAILURE,
-        details: { reason: 'lost_response_replay' }
+        details: {
+          reason: 'lost_response_replay',
+          sessionId: deviceA.sessionId,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          replayAgeMs: expect.any(Number),
+          sameIp: true
+        }
       })
     );
     expect(auditActions()).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
@@ -136,19 +142,33 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
 
-    await authService.refreshTokens(deviceA.raw, null);
+    await authService.refreshTokens(deviceA.raw, '203.0.113.7');
     // Both rows of the chain move back together, so their order is kept.
     await dataSource.query(
       `UPDATE refresh_tokens SET created_at = created_at - INTERVAL '1 day' WHERE session_id = $1`,
       [deviceA.sessionId]
     );
 
-    await errorKeyOf(authService.refreshTokens(deviceA.raw, null));
+    await errorKeyOf(authService.refreshTokens(deviceA.raw, '198.51.100.9'));
 
     expect(await rowsOf(deviceA.sessionId)).toBe(0);
     expect(await rowsOf(deviceB.sessionId)).toBe(1);
     expect(await tokenRevokedAt()).toBeNull();
     expect(auditActions()).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
+
+    // The age and the address tell a lost response from a stolen token.
+    const failure = auditSpy.mock.calls.find(
+      (call) => call[0].action === AuditAction.TOKEN_REFRESH_FAILURE
+    );
+    const details = failure?.[0].details;
+    expect(details).toMatchObject({
+      reason: 'lost_response_replay',
+      sessionId: deviceA.sessionId,
+      sameIp: false
+    });
+    const dayMs = 24 * 60 * 60 * 1000;
+    expect(details?.['replayAgeMs']).toBeGreaterThanOrEqual(dayMs);
+    expect(details?.['replayAgeMs']).toBeLessThan(dayMs + 60_000);
   }, 30000);
 
   it('purges every session when an older ancestor is replayed', async () => {

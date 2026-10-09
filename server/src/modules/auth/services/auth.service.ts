@@ -593,11 +593,26 @@ export class AuthService {
     if (tokenDoc && tokenDoc.revoked && !tokenDoc.isExpired()) {
       // A lost rotation response replays the old cookie. End only this
       // session and issue nothing, so a thief gains no token either.
-      if (await this.refreshTokenService.isLostResponseReplay(tokenDoc)) {
+      const successor =
+        await this.refreshTokenService.findLostResponseSuccessor(tokenDoc);
+      if (successor) {
         await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
-        throw this.refreshRefusal('lost_response_replay', {
-          actorId: tokenDoc.userId
-        });
+        // A thief replays from another address, the owner's device from the
+        // one that sent the lost rotation; null when either is unknown.
+        const sameIp =
+          ipAddress === null || successor.ipAddress === null
+            ? null
+            : ipAddress === successor.ipAddress;
+        throw this.refreshRefusal(
+          'lost_response_replay',
+          { actorId: tokenDoc.userId },
+          INVALID_REFRESH_TOKEN_BODY,
+          {
+            sessionId: tokenDoc.sessionId,
+            replayAgeMs: successor.ageMs,
+            sameIp
+          }
+        );
       }
 
       await this.revokeAllUserSessions(tokenDoc.userId);
@@ -1269,12 +1284,13 @@ export class AuthService {
   private refreshRefusal(
     reason: string,
     actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>,
-    body: { message: string; errorKey: string } = INVALID_REFRESH_TOKEN_BODY
+    body: { message: string; errorKey: string } = INVALID_REFRESH_TOKEN_BODY,
+    extraDetails: Record<string, unknown> = {}
   ): HttpException {
     this.auditService.logFireAndForget({
       action: AuditAction.TOKEN_REFRESH_FAILURE,
       ...actor,
-      details: { reason }
+      details: { reason, ...extraDetails }
     });
     this.metricsService.recordAuthEvent('token_refresh_failure');
     return new HttpException(body, HttpStatus.UNAUTHORIZED);
