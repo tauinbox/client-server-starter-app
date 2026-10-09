@@ -148,7 +148,7 @@ describe('AuthController', () => {
     appliesTo: jest.Mock;
   };
   let auditServiceMock: {
-    log: jest.Mock;
+    logFireAndForget: jest.Mock;
   };
   let mailServiceMock: { sendPasswordChangedNotification: jest.Mock };
   let configValues: Record<string, string | undefined>;
@@ -221,7 +221,7 @@ describe('AuthController', () => {
     };
 
     auditServiceMock = {
-      log: jest.fn().mockResolvedValue(undefined)
+      logFireAndForget: jest.fn()
     };
 
     mailServiceMock = {
@@ -343,7 +343,7 @@ describe('AuthController', () => {
       // No session is owed yet: no cookie, no success entry, no metric.
       expect(res.cookie).not.toHaveBeenCalled();
       expect(authServiceMock.login).not.toHaveBeenCalled();
-      expect(auditServiceMock.log).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
       // The browser keeps its cookie until the second factor is met.
       expect(authServiceMock.endPresentedSession).not.toHaveBeenCalled();
     });
@@ -455,7 +455,7 @@ describe('AuthController', () => {
 
       await controller.login(req, res);
 
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_LOGIN_SUCCESS,
           actorId: 'user-42',
@@ -657,7 +657,7 @@ describe('AuthController', () => {
 
       await controller.logout(req, res);
 
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_LOGOUT,
           actorId: 'user-99',
@@ -677,7 +677,7 @@ describe('AuthController', () => {
 
       await controller.logout(req, res);
 
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_LOGOUT,
           details: { scope: 'none' }
@@ -717,7 +717,7 @@ describe('AuthController', () => {
       expect(authServiceMock.assertStepUpForUser).not.toHaveBeenCalled();
       expect(authServiceMock.revokeAllUserSessions).not.toHaveBeenCalled();
       expect(res.clearCookie).not.toHaveBeenCalled();
-      expect(auditServiceMock.log).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'user-1', email: 'admin@example.com' });
     });
 
@@ -751,7 +751,7 @@ describe('AuthController', () => {
         secure: true,
         path: '/'
       });
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.PASSWORD_CHANGE,
           actorId: 'user-1',

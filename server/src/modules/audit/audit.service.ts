@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { MetricsService } from '../core/metrics/metrics.service';
 import { AuditLog } from './entities/audit-log.entity';
 
 /**
@@ -41,7 +42,8 @@ export class AuditService {
 
   constructor(
     @InjectRepository(AuditLog)
-    private readonly auditLogRepository: Repository<AuditLog>
+    private readonly auditLogRepository: Repository<AuditLog>,
+    private readonly metricsService: MetricsService
   ) {}
 
   /** With a manager, the row is written in the transaction of that manager. */
@@ -61,8 +63,10 @@ export class AuditService {
     await repository.save(entry);
   }
 
+  /** The row is lost on a fault, and the loss is counted. */
   logFireAndForget(params: AuditLogParams): void {
     this.log(params).catch((err) => {
+      this.metricsService.recordAuditWriteFailure(params.action);
       this.logger.error('Failed to write audit log', err);
     });
   }

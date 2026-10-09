@@ -990,6 +990,72 @@
       "description": "Aggregate hit ratio across all caches since the server started (counters reset on restart) — a stable headline figure that doesn't drop to red just because the last few minutes were idle. The 'Cache Hit Ratio by Cache' panel shows the recent (5-min) trend. Reads 0 only when no cache lookups have been recorded.",
       "title": "Overall Cache Hit Ratio",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 96 },
+      "id": 10,
+      "title": "Audit",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 97 },
+      "id": 100,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (action) (increase(audit_write_failures_total[15m])) > 0",
+          "legendFormat": "{{action}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Audit rows that a fire-and-forget write lost in a 15-min window, by audit action. A self-service action, a refusal and a billing-admin route write their row after the answer, so the action took effect without its record. A series shows only while it is above 0.",
+      "title": "Audit Rows Lost by Action",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 97 },
+      "id": 101,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(audit_write_failures_total[1h]))",
+          "legendFormat": "lost (1h)",
+          "refId": "A"
+        }
+      ],
+      "description": "Audit rows lost in the last hour, all actions. Any value above 0 means some actions have no audit record.",
+      "title": "Audit Rows Lost (1h)",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
@@ -1000,5 +1066,5 @@
   "timezone": "browser",
   "title": "App Metrics",
   "uid": "nexus",
-  "version": 5
+  "version": 6
 }

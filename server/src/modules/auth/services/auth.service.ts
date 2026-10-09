@@ -350,7 +350,7 @@ export class AuthService {
       throw error;
     }
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.USER_REGISTER,
       actorId: user.id,
       actorEmail: user.email,
@@ -560,7 +560,7 @@ export class AuthService {
       await manager.delete(RefreshToken, { userId: user.id });
     });
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.PASSWORD_RESET_COMPLETE,
       actorId: user.id,
       actorEmail: user.email,
@@ -960,7 +960,7 @@ export class AuthService {
 
     const result = outcome;
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
       actorId: result.userId,
       actorEmail: result.newEmail,

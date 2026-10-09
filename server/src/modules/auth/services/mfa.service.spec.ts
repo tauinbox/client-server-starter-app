@@ -84,7 +84,7 @@ describe('MfaService', () => {
     findOne: jest.Mock;
   };
   let jwtService: { sign: jest.Mock; verify: jest.Mock };
-  let auditService: { log: jest.Mock };
+  let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mailService: {
     sendMfaEnabledNotification: jest.Mock;
     sendMfaDisabledNotification: jest.Mock;
@@ -107,7 +107,10 @@ describe('MfaService', () => {
       sign: jest.fn().mockReturnValue('signed'),
       verify: jest.fn()
     };
-    auditService = { log: jest.fn().mockResolvedValue(undefined) };
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
+    };
     mailService = {
       sendMfaEnabledNotification: jest.fn().mockResolvedValue(undefined),
       sendMfaDisabledNotification: jest.fn().mockResolvedValue(undefined),
@@ -255,7 +258,7 @@ describe('MfaService', () => {
       expect(result.recoveryCodes).toHaveLength(10);
       const stored = lastUpdate();
       expect(stored.totpEnabledAt).toBeInstanceOf(Date);
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.MFA_ENABLE })
       );
       expect(mailService.sendMfaEnabledNotification).toHaveBeenCalled();
@@ -308,7 +311,7 @@ describe('MfaService', () => {
         response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
       });
       expect(repository.update).not.toHaveBeenCalled();
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.MFA_CHALLENGE_FAILURE,
           details: { stage: 'enrolment' }
@@ -342,7 +345,7 @@ describe('MfaService', () => {
         totpRecoveryCodes: null,
         totpLastUsedStep: null
       });
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.MFA_DISABLE })
       );
       expect(mailService.sendMfaDisabledNotification).toHaveBeenCalled();
@@ -448,7 +451,7 @@ describe('MfaService', () => {
       expect(stored.totpRecoveryCodes).toContain(
         hashToken(recoveryCodes[0].replaceAll('-', ''))
       );
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.MFA_RECOVERY_CODES_REGENERATED
         })
@@ -533,7 +536,7 @@ describe('MfaService', () => {
         status: 401,
         response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
       });
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.MFA_CHALLENGE_FAILURE,
           details: { stage: 'challenge', attempt: 1 }
@@ -744,7 +747,7 @@ describe('MfaService', () => {
       expect(repository.update).toHaveBeenCalledWith('user-1', {
         totpRecoveryCodes: ['other-hash']
       });
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.MFA_RECOVERY_CODE_USED,
           details: { remaining: 1 }
@@ -1006,7 +1009,7 @@ describe('MfaService', () => {
 
         await guessWrong(user, 1);
 
-        expect(auditService.log).toHaveBeenCalledWith(
+        expect(auditService.logFireAndForget).toHaveBeenCalledWith(
           expect.objectContaining({
             action: AuditAction.MFA_CHALLENGE_FAILURE,
             details: { stage: 'step_up', attempt: 1 }

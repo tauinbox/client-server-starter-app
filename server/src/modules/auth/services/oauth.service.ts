@@ -342,7 +342,7 @@ export class OAuthService {
     }
     await this.safeCreateOAuthAccount(userId, provider, providerId);
 
-    await this.auditService.log({
+    this.auditService.logFireAndForget({
       action: AuditAction.OAUTH_LINK,
       actorId: userId,
       actorEmail: user.email,

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AUDIT_FIELD_MAX_LENGTH, AuditService } from './audit.service';
+import { MetricsService } from '../core/metrics/metrics.service';
 import { AuditLog } from './entities/audit-log.entity';
 
 describe('AuditService', () => {
@@ -10,8 +11,10 @@ describe('AuditService', () => {
     create: jest.Mock;
     save: jest.Mock;
   };
+  let mockMetrics: jest.Mocked<Pick<MetricsService, 'recordAuditWriteFailure'>>;
 
   beforeEach(async () => {
+    mockMetrics = { recordAuditWriteFailure: jest.fn() };
     mockRepository = {
       create: jest
         .fn()
@@ -25,7 +28,8 @@ describe('AuditService', () => {
         {
           provide: getRepositoryToken(AuditLog),
           useValue: mockRepository
-        }
+        },
+        { provide: MetricsService, useValue: mockMetrics }
       ]
     }).compile();
 
@@ -163,6 +167,24 @@ describe('AuditService', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(mockRepository.save).toHaveBeenCalled();
+    });
+
+    it('counts a lost row under its action', async () => {
+      mockRepository.save.mockRejectedValue(new Error('DB connection lost'));
+
+      service.logFireAndForget({ action: AuditAction.MFA_DISABLE });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockMetrics.recordAuditWriteFailure).toHaveBeenCalledWith(
+        AuditAction.MFA_DISABLE
+      );
+    });
+
+    it('does not count a row that was written', async () => {
+      service.logFireAndForget({ action: AuditAction.MFA_DISABLE });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockMetrics.recordAuditWriteFailure).not.toHaveBeenCalled();
     });
   });
 });

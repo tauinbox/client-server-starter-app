@@ -43,7 +43,6 @@ describe('OAuthService', () => {
     findRoleByName: jest.Mock;
   };
   let mockAuditService: {
-    log: jest.Mock;
     logFireAndForget: jest.Mock;
   };
   let mockMfaService: {
@@ -122,7 +121,6 @@ describe('OAuthService', () => {
     };
 
     mockAuditService = {
-      log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn()
     };
 
@@ -751,6 +749,13 @@ describe('OAuthService', () => {
         'user-1',
         'google',
         'google-123'
+      );
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.OAUTH_LINK,
+          targetId: 'user-1',
+          details: { provider: 'google' }
+        })
       );
     });
 
