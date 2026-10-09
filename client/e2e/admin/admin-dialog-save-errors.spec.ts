@@ -1,16 +1,10 @@
 import {
   expect,
+  expectNoSnackbar,
   loginViaUi,
   openedDialog,
   test
 } from '../fixtures/base.fixture';
-import type { Page } from '@playwright/test';
-
-// A one-shot count: the global error snackbar opens before the alert renders,
-// and a retrying toHaveCount(0) would pass once the snackbar dismissed itself.
-async function expectNoSnackbar(page: Page): Promise<void> {
-  expect(await page.locator('mat-snack-bar-container').count()).toBe(0);
-}
 
 // A rejected save must leave the edit on screen, because a rule set or a long
 // description can take minutes to build.

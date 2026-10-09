@@ -1,6 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
-import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
+import {
+  DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
+  silentContext
+} from '@core/context-tokens/error-notifications';
 import type { Observable } from 'rxjs';
 import type { UserEffectivePermissionsResponse } from '@app/shared/types';
 import type {
@@ -36,7 +39,10 @@ export class UserService {
   }
 
   update(id: string, user: UpdateUser): Observable<User> {
-    return this.#http.patch<User>(`${USERS_API_V1}/${id}`, user);
+    // The edit form and the unlock action show the refusal themselves.
+    return this.#http.patch<User>(`${USERS_API_V1}/${id}`, user, {
+      context: silentContext()
+    });
   }
 
   delete(id: string): Observable<void> {

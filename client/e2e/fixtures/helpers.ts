@@ -51,6 +51,15 @@ export async function openedDialog(page: Page): Promise<Locator> {
 }
 
 /**
+ * A one-shot count. Call it after the in-page error is visible: the global
+ * error snackbar opens before that error renders, and a retrying
+ * `toHaveCount(0)` would pass once the snackbar dismissed itself.
+ */
+export async function expectNoSnackbar(page: Page): Promise<void> {
+  expect(await page.locator('mat-snack-bar-container').count()).toBe(0);
+}
+
+/**
  * Waits for the list response whose request carries every one of `params`. A
  * list filter applies by itself (the search after a pause in typing), so a test
  * waits for this where it once clicked a Search button. Start the wait before
