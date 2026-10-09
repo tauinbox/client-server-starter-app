@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
@@ -13,6 +13,7 @@ import {
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
+import type { AuditLogParams } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-target.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -60,6 +61,13 @@ const USER_LIST_COLUMNS: ListColumns<typeof USER_LIST_QUERY> = {
   id: 'user.id'
 };
 
+/**
+ * The audit rows of an administrator write, built from the record the write
+ * produced. They are written in the transaction of the write, so the change
+ * never commits without them.
+ */
+export type UserAuditRows = (user: User) => AuditLogParams[];
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -74,7 +82,10 @@ export class UsersService {
     private breachedPasswordService: BreachedPasswordService
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(
+    createUserDto: CreateUserDto,
+    audit?: UserAuditRows
+  ): Promise<User> {
     const { email, password } = createUserDto;
 
     // Ahead of the address conflict, matching AuthService.register: both routes
@@ -108,9 +119,23 @@ export class UsersService {
     });
 
     try {
-      return await this.userRepository.save(user);
+      return await withTransaction(this.dataSource, async (manager) => {
+        const saved = await manager.save(user);
+        await this.writeAudit(manager, audit, saved);
+        return saved;
+      });
     } catch (error: unknown) {
       throw this.emailConflictOrOriginal(error);
+    }
+  }
+
+  private async writeAudit(
+    manager: EntityManager,
+    audit: UserAuditRows | undefined,
+    user: User
+  ): Promise<void> {
+    for (const params of audit?.(user) ?? []) {
+      await this.auditService.log(params, manager);
     }
   }
 
@@ -244,7 +269,8 @@ export class UsersService {
     id: string,
     updateUserDto: UpdateUserDto,
     ability: AbilityOrSystem,
-    actorId?: string
+    actorId?: string,
+    audit?: UserAuditRows
   ): Promise<User> {
     const user = await this.findOne(id);
 
@@ -330,7 +356,11 @@ export class UsersService {
     this.userRepository.merge(user, changes);
     let saved: User;
     try {
-      saved = await this.userRepository.save(user);
+      saved = await withTransaction(this.dataSource, async (manager) => {
+        const written = await manager.save(user);
+        await this.writeAudit(manager, audit, written);
+        return written;
+      });
     } catch (error: unknown) {
       throw this.emailConflictOrOriginal(error);
     }
@@ -476,7 +506,8 @@ export class UsersService {
   async remove(
     id: string,
     ability: AbilityOrSystem,
-    actorId?: string
+    actorId?: string,
+    audit?: UserAuditRows
   ): Promise<void> {
     const user = await this.findOne(id);
 
@@ -497,13 +528,15 @@ export class UsersService {
         passwordResetExpiresAt: null
       });
       await manager.softRemove(user);
+      await this.writeAudit(manager, audit, user);
     });
   }
 
   async restore(
     id: string,
     ability: AbilityOrSystem,
-    actorId?: string
+    actorId?: string,
+    audit?: UserAuditRows
   ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
@@ -528,7 +561,10 @@ export class UsersService {
     // state gated by the `update` action, so reactivating here would let a
     // principal holding just `delete` re-enable a deactivated account by
     // deleting and restoring it.
-    await this.userRepository.restore(id);
+    await withTransaction(this.dataSource, async (manager) => {
+      await manager.restore(User, id);
+      await this.writeAudit(manager, audit, user);
+    });
     return this.findOne(id);
   }
 }

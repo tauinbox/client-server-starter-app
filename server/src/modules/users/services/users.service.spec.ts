@@ -8,6 +8,7 @@ import {
 } from '../../../common/utils/password-hash';
 import { DataSource } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS, ErrorKeys } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { UsersService } from './users.service';
 import { User } from '../entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
@@ -35,7 +36,7 @@ describe('UsersService', () => {
   let mockDataSource: { transaction: jest.Mock };
   let mockMailService: { sendEmailVerification: jest.Mock };
   let mockBreachedPasswordService: { assertNotBreached: jest.Mock };
-  let mockAuditService: { logFireAndForget: jest.Mock };
+  let mockAuditService: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mockQueryBuilder: {
     leftJoinAndSelect: jest.Mock;
     innerJoin: jest.Mock;
@@ -92,11 +93,30 @@ describe('UsersService', () => {
       update: jest.fn().mockResolvedValue(undefined)
     };
 
-    mockDataSource = { transaction: jest.fn() };
+    // The manager writes through the repository mock, so a write in the
+    // transaction is asserted the same way as a write outside it.
+    mockDataSource = {
+      transaction: jest.fn(
+        (
+          run: (manager: {
+            save: jest.Mock;
+            restore: (entity: unknown, id: string) => Promise<unknown>;
+          }) => Promise<unknown>
+        ) =>
+          run({
+            save: mockRepository.save,
+            restore: (_entity, id) =>
+              mockRepository.restore(id) as Promise<unknown>
+          })
+      )
+    };
     mockMailService = {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined)
     };
-    mockAuditService = { logFireAndForget: jest.fn() };
+    mockAuditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
+    };
     mockMetricsService = { recordPermissionDenied: jest.fn() };
     mockBreachedPasswordService = {
       assertNotBreached: jest.fn().mockResolvedValue(undefined)
@@ -244,6 +264,36 @@ describe('UsersService', () => {
       await expect(service.create(createUserDto)).rejects.toThrow(
         'connection lost'
       );
+    });
+
+    it('writes the audit rows of the saved record in the transaction of the save', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockUser);
+      mockRepository.save.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
+
+      await service.create(createUserDto, (user) => [
+        { action: AuditAction.USER_CREATE, targetId: user.id }
+      ]);
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        { action: AuditAction.USER_CREATE, targetId: 'user-1' },
+        expect.objectContaining({ save: mockRepository.save })
+      );
+    });
+
+    it('fails the create when its audit row cannot be written', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockUser);
+      mockRepository.save.mockResolvedValue(mockUser);
+      mockAuditService.log.mockRejectedValue(new Error('audit down'));
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
+
+      await expect(
+        service.create(createUserDto, () => [
+          { action: AuditAction.USER_CREATE }
+        ])
+      ).rejects.toThrow('audit down');
     });
   });
 
@@ -984,13 +1034,6 @@ describe('UsersService', () => {
     };
 
     it('should lift the soft-delete without reactivating a deactivated user', async () => {
-      const mockManager = {
-        restore: jest.fn().mockResolvedValue(undefined),
-        update: jest.fn().mockResolvedValue(undefined)
-      };
-      mockDataSource.transaction.mockImplementation(
-        (cb: (manager: typeof mockManager) => Promise<void>) => cb(mockManager)
-      );
       const restoredUser = { ...deletedUser, deletedAt: null } as User;
       mockRepository.findOne
         .mockResolvedValueOnce(deletedUser) // withDeleted lookup
@@ -1007,7 +1050,6 @@ describe('UsersService', () => {
       // `isActive` is gated by the `update` action, which this endpoint does
       // not require, so restoring must never write it.
       expect(mockRepository.update).not.toHaveBeenCalled();
-      expect(mockManager.update).not.toHaveBeenCalled();
       expect(result.isActive).toBe(false);
     });
 
