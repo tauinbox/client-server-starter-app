@@ -411,7 +411,9 @@ older than `AUDIT_LOG_RETENTION_DAYS` days.
 logging.
 
 `interceptors/` holds `AuditLogInterceptor`. It is a global `APP_INTERCEPTOR`. It reads the
-`@LogAudit` metadata and calls `logFireAndForget` after a success.
+`@LogAudit` metadata and calls `logFireAndForget` after a success. Only the four billing
+administrator routes use it. An administrator change to a user, a role, a resource or a feature flag
+writes its row with `AuditService.log(params, manager)` in the transaction of the change instead.
 
 `entities/` holds the `AuditLog` entity, with `action`, `actorId`, `actorEmail`, `targetId`, `ip`,
 `requestId` and `createdAt`.
@@ -487,9 +489,9 @@ delete check `create`, `update` and `delete` on `FeatureFlag`. All five actions 
 The create checks the record with the defaults that the service writes. The update
 also checks the record as it is after the write, so a grant scoped by a writable field (`enabled`,
 `public`) cannot move a flag out of its own scope. The 3 mutating
-endpoints each write an audit entry. The create uses `@LogAudit`. The delete calls
-`AuditService.log` itself, to record `details: { key }` of the flag that it removed. The update
-calls it too, because `changedFields` compares the request with the flag read before the write. The 3 read
+endpoints each write an audit entry in the transaction of the change. The delete records
+`details: { key }` of the flag that it removed. The update records `changedFields`, which compares
+the request with the flag read before the write. The 3 read
 endpoints and `POST :id/preview` write nothing, thus they make no audit entry.
 
 `controllers/feature-flags.controller.ts` holds `GET /feature-flags` with `@OptionalAuth()`. An

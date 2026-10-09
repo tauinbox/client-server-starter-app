@@ -4,6 +4,7 @@ import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { RolesController } from './roles.controller';
 import { RoleService } from '../services/role.service';
 import { AuditService } from '../../audit/audit.service';
+import type { AuditLogParams } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
@@ -12,7 +13,6 @@ import { UserRoleChangedEvent } from '../events/user-role-changed.event';
 import type { AppAbility } from '../casl/app-ability';
 import {
   LOG_AUDIT_KEY,
-  LogAuditDetailsContext,
   LogAuditOptions
 } from '../../audit/decorators/log-audit.decorator';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -25,14 +25,6 @@ function getAuditOptions(
     LOG_AUDIT_KEY,
     RolesController.prototype[methodName]
   ) as LogAuditOptions | undefined;
-}
-
-function detailsCtx(
-  body: unknown,
-  params: Record<string, string> = {}
-): LogAuditDetailsContext {
-  // @ts-expect-error partial Request — details() callbacks only read body/params
-  return { request: {}, response: {}, params, body };
 }
 
 const allowAllGuard = { canActivate: () => true };
@@ -221,7 +213,10 @@ describe('RolesController', () => {
 
       const result = await controller.create(dto, mockReq, mockAbility);
 
-      expect(roleServiceMock.create).toHaveBeenCalledWith(dto);
+      expect(roleServiceMock.create).toHaveBeenCalledWith(
+        dto,
+        expect.any(Function)
+      );
       expect(result).toBe(role);
     });
 
@@ -294,7 +289,11 @@ describe('RolesController', () => {
       );
 
       expect(roleServiceMock.findOne).toHaveBeenCalledWith('role-1');
-      expect(roleServiceMock.update).toHaveBeenCalledWith('role-1', dto);
+      expect(roleServiceMock.update).toHaveBeenCalledWith(
+        'role-1',
+        dto,
+        expect.objectContaining({ action: AuditAction.ROLE_UPDATE })
+      );
       expect(result).toBe(updated);
     });
 
@@ -326,44 +325,10 @@ describe('RolesController', () => {
       expect(roleServiceMock.delete).toHaveBeenCalledWith(
         'role-1',
         mockAbility,
-        mockReq.user?.userId
-      );
-      expect(result).toBeUndefined();
-    });
-
-    it('should record the deleted role name in the ROLE_DELETE audit details', async () => {
-      roleServiceMock.findOne.mockResolvedValue({
-        id: 'role-1',
-        name: 'editor'
-      });
-
-      await controller.remove('role-1', mockReq, mockAbility);
-
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: AuditAction.ROLE_DELETE,
-          actorId: 'actor-1',
-          actorEmail: 'a@example.com',
-          targetId: 'role-1',
-          targetType: 'Role',
-          details: { name: 'editor' }
-        })
-      );
-    });
-
-    it('should not write a ROLE_DELETE audit entry when the ability denies', async () => {
-      roleServiceMock.findOne.mockResolvedValue({
-        id: 'role-1',
-        name: 'editor'
-      });
-
-      await expect(
-        controller.remove('role-1', mockReq, denyAbility)
-      ).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(auditServiceMock.log).not.toHaveBeenCalledWith(
+        mockReq.user?.userId,
         expect.objectContaining({ action: AuditAction.ROLE_DELETE })
       );
+      expect(result).toBeUndefined();
     });
 
     it('should throw ForbiddenException and skip delete when ability denies the loaded role', async () => {
@@ -393,7 +358,8 @@ describe('RolesController', () => {
         'role-1',
         items,
         mockAbility,
-        'actor-1'
+        'actor-1',
+        expect.objectContaining({ action: AuditAction.PERMISSION_ASSIGN })
       );
     });
   });
@@ -412,7 +378,8 @@ describe('RolesController', () => {
         ['perm-1', 'perm-2'],
         undefined,
         mockAbility,
-        'actor-1'
+        'actor-1',
+        expect.objectContaining({ action: AuditAction.PERMISSION_ASSIGN })
       );
     });
   });
@@ -430,7 +397,8 @@ describe('RolesController', () => {
         'role-1',
         'perm-5',
         mockAbility,
-        'actor-1'
+        'actor-1',
+        expect.objectContaining({ action: AuditAction.PERMISSION_UNASSIGN })
       );
     });
   });
@@ -445,7 +413,8 @@ describe('RolesController', () => {
         'user-99',
         'role-1',
         mockAbility,
-        'actor-1'
+        'actor-1',
+        expect.objectContaining({ action: AuditAction.ROLE_ASSIGN })
       );
     });
 
@@ -486,7 +455,8 @@ describe('RolesController', () => {
         'user-99',
         'role-1',
         mockAbility,
-        'actor-1'
+        'actor-1',
+        expect.objectContaining({ action: AuditAction.ROLE_UNASSIGN })
       );
     });
 
@@ -520,19 +490,45 @@ describe('RolesController', () => {
     });
   });
 
-  describe('@LogAudit metadata', () => {
-    it('create: ROLE_CREATE with id from response and name in details', () => {
-      const opts = getAuditOptions('create');
-      expect(opts?.action).toBe(AuditAction.ROLE_CREATE);
-      expect(opts?.targetType).toBe('Role');
-      expect(opts?.targetIdFromResponse?.({ id: 'role-new' })).toBe('role-new');
-      expect(opts?.details?.(detailsCtx({ name: 'editor' }))).toEqual({
-        name: 'editor'
-      });
-    });
+  // Each row goes to the service, which writes it in the transaction of the
+  // change, so a role change never commits without its row.
+  describe('audit rows', () => {
+    const actorFields = {
+      actorId: 'actor-1',
+      actorEmail: 'a@example.com',
+      context: { ip: '127.0.0.1', requestId: undefined }
+    };
 
-    it('update: no @LogAudit metadata - the handler logs ROLE_UPDATE itself', () => {
-      expect(getAuditOptions('update')).toBeUndefined();
+    it.each([
+      'create',
+      'update',
+      'remove',
+      'setPermissions',
+      'assignPermissions',
+      'removePermission',
+      'assignRole',
+      'removeRole'
+    ] as const)(
+      '%s: no @LogAudit metadata, the row is not fire-and-forget',
+      (method) => {
+        expect(getAuditOptions(method)).toBeUndefined();
+      }
+    );
+
+    it('create: ROLE_CREATE on the created role with the name', async () => {
+      await controller.create({ name: 'editor' }, mockReq, mockAbility);
+
+      const [, row] = roleServiceMock.create.mock.calls[0] as [
+        unknown,
+        (role: { id: string }) => AuditLogParams
+      ];
+      expect(row({ id: 'role-new' })).toEqual({
+        ...actorFields,
+        action: AuditAction.ROLE_CREATE,
+        targetType: 'Role',
+        targetId: 'role-new',
+        details: { name: 'editor' }
+      });
     });
 
     it('update: ROLE_UPDATE lists only the fields that differ from the stored role', async () => {
@@ -549,69 +545,146 @@ describe('RolesController', () => {
         mockAbility
       );
 
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(roleServiceMock.update).toHaveBeenCalledWith(
+        'role-1',
+        { name: 'editor', description: 'new' },
+        {
+          ...actorFields,
           action: AuditAction.ROLE_UPDATE,
-          targetId: 'role-1',
           targetType: 'Role',
+          targetId: 'role-1',
           details: { changedFields: ['description'] }
-        })
+        }
+      );
+      expect(auditServiceMock.log).not.toHaveBeenCalled();
+    });
+
+    it('remove: ROLE_DELETE records the name of the deleted role', async () => {
+      await controller.remove('role-1', mockReq, mockAbility);
+
+      expect(roleServiceMock.delete).toHaveBeenCalledWith(
+        'role-1',
+        mockAbility,
+        'actor-1',
+        {
+          ...actorFields,
+          action: AuditAction.ROLE_DELETE,
+          targetType: 'Role',
+          targetId: 'role-1',
+          details: { name: 'editor' }
+        }
       );
     });
 
-    it('remove: no @LogAudit metadata - the handler logs ROLE_DELETE itself', () => {
-      expect(getAuditOptions('remove')).toBeUndefined();
+    it('setPermissions: PERMISSION_ASSIGN with permissionIds from items', async () => {
+      await controller.setPermissions(
+        'role-1',
+        { items: [{ permissionId: 'p1' }, { permissionId: 'p2' }] },
+        mockAbility,
+        mockReq
+      );
+
+      expect(roleServiceMock.setPermissionsForRole).toHaveBeenCalledWith(
+        'role-1',
+        expect.any(Array),
+        mockAbility,
+        'actor-1',
+        {
+          ...actorFields,
+          action: AuditAction.PERMISSION_ASSIGN,
+          targetType: 'Role',
+          targetId: 'role-1',
+          details: { permissionIds: ['p1', 'p2'] }
+        }
+      );
     });
 
-    it('setPermissions: PERMISSION_ASSIGN with permissionIds from items', () => {
-      const opts = getAuditOptions('setPermissions');
-      expect(opts?.action).toBe(AuditAction.PERMISSION_ASSIGN);
-      expect(opts?.targetType).toBe('Role');
-      expect(
-        opts?.details?.(
-          detailsCtx({
-            items: [{ permissionId: 'p1' }, { permissionId: 'p2' }]
-          })
-        )
-      ).toEqual({ permissionIds: ['p1', 'p2'] });
+    it('assignPermissions: PERMISSION_ASSIGN with permissionIds from body', async () => {
+      await controller.assignPermissions(
+        'role-1',
+        { permissionIds: ['p1', 'p2'] },
+        mockAbility,
+        mockReq
+      );
+
+      expect(roleServiceMock.assignPermissionsToRole).toHaveBeenCalledWith(
+        'role-1',
+        ['p1', 'p2'],
+        undefined,
+        mockAbility,
+        'actor-1',
+        {
+          ...actorFields,
+          action: AuditAction.PERMISSION_ASSIGN,
+          targetType: 'Role',
+          targetId: 'role-1',
+          details: { permissionIds: ['p1', 'p2'] }
+        }
+      );
     });
 
-    it('assignPermissions: PERMISSION_ASSIGN with permissionIds from body', () => {
-      const opts = getAuditOptions('assignPermissions');
-      expect(opts?.action).toBe(AuditAction.PERMISSION_ASSIGN);
-      expect(opts?.targetType).toBe('Role');
-      expect(
-        opts?.details?.(detailsCtx({ permissionIds: ['p1', 'p2'] }))
-      ).toEqual({ permissionIds: ['p1', 'p2'] });
+    it('removePermission: PERMISSION_UNASSIGN with the permission id', async () => {
+      await controller.removePermission(
+        'role-1',
+        'perm-5',
+        mockAbility,
+        mockReq
+      );
+
+      expect(roleServiceMock.removePermissionFromRole).toHaveBeenCalledWith(
+        'role-1',
+        'perm-5',
+        mockAbility,
+        'actor-1',
+        {
+          ...actorFields,
+          action: AuditAction.PERMISSION_UNASSIGN,
+          targetType: 'Role',
+          targetId: 'role-1',
+          details: { permissionId: 'perm-5' }
+        }
+      );
     });
 
-    it('removePermission: PERMISSION_UNASSIGN with permissionId from params', () => {
-      const opts = getAuditOptions('removePermission');
-      expect(opts?.action).toBe(AuditAction.PERMISSION_UNASSIGN);
-      expect(opts?.targetType).toBe('Role');
-      expect(
-        opts?.details?.(detailsCtx({}, { permissionId: 'perm-5' }))
-      ).toEqual({ permissionId: 'perm-5' });
+    it('assignRole: ROLE_ASSIGN on the user with the role id', async () => {
+      await controller.assignRole(
+        'user-99',
+        { roleId: 'role-1' },
+        mockAbility,
+        mockReq
+      );
+
+      expect(roleServiceMock.assignRoleToUser).toHaveBeenCalledWith(
+        'user-99',
+        'role-1',
+        mockAbility,
+        'actor-1',
+        {
+          ...actorFields,
+          action: AuditAction.ROLE_ASSIGN,
+          targetType: 'User',
+          targetId: 'user-99',
+          details: { roleId: 'role-1' }
+        }
+      );
     });
 
-    it('assignRole: ROLE_ASSIGN on User with userId param and roleId in details', () => {
-      const opts = getAuditOptions('assignRole');
-      expect(opts?.action).toBe(AuditAction.ROLE_ASSIGN);
-      expect(opts?.targetType).toBe('User');
-      expect(opts?.targetIdParam).toBe('userId');
-      expect(opts?.details?.(detailsCtx({ roleId: 'role-1' }))).toEqual({
-        roleId: 'role-1'
-      });
-    });
+    it('removeRole: ROLE_UNASSIGN on the user with the role id', async () => {
+      await controller.removeRole('user-99', 'role-1', mockAbility, mockReq);
 
-    it('removeRole: ROLE_UNASSIGN on User with userId param and roleId from params', () => {
-      const opts = getAuditOptions('removeRole');
-      expect(opts?.action).toBe(AuditAction.ROLE_UNASSIGN);
-      expect(opts?.targetType).toBe('User');
-      expect(opts?.targetIdParam).toBe('userId');
-      expect(opts?.details?.(detailsCtx({}, { roleId: 'role-1' }))).toEqual({
-        roleId: 'role-1'
-      });
+      expect(roleServiceMock.removeRoleFromUser).toHaveBeenCalledWith(
+        'user-99',
+        'role-1',
+        mockAbility,
+        'actor-1',
+        {
+          ...actorFields,
+          action: AuditAction.ROLE_UNASSIGN,
+          targetType: 'User',
+          targetId: 'user-99',
+          details: { roleId: 'role-1' }
+        }
+      );
     });
   });
 });

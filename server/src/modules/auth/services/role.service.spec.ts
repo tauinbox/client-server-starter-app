@@ -11,6 +11,7 @@ import { PermissionService } from './permission.service';
 import type { AppAbility } from '../casl/app-ability';
 import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RoleRenamedEvent } from '../events/role-renamed.event';
@@ -149,7 +150,9 @@ describe('RoleService', () => {
           save: (_target: unknown, entity: unknown): unknown =>
             roleRepo.save(entity) as unknown,
           remove: (_target: unknown, entity: unknown): unknown =>
-            roleRepo.remove(entity) as unknown
+            roleRepo.remove(entity) as unknown,
+          createQueryBuilder: (): unknown =>
+            roleRepo.manager.createQueryBuilder() as unknown
         })
     );
 
@@ -165,31 +168,21 @@ describe('RoleService', () => {
         .mockImplementation((data: Record<string, unknown>) => data),
       save: jest.fn(),
       delete: jest.fn(),
-      manager: {
-        transaction: jest
-          .fn()
-          .mockImplementation(
-            async (
-              cb: (em: {
-                delete: jest.Mock;
-                create: jest.Mock;
-                save: jest.Mock;
-              }) => Promise<void>
-            ) => {
-              const em = {
-                delete: jest.fn().mockResolvedValue(undefined),
-                create: jest
-                  .fn()
-                  .mockImplementation(
-                    (_, data: Record<string, unknown>) => data
-                  ),
-                save: jest.fn().mockResolvedValue(undefined)
-              };
-              await cb(em);
-            }
-          )
-      }
+      manager: { transaction: jest.fn() }
     };
+    const rolePermissionRepo = mockRolePermissionRepo;
+    // As for roles: the writes inside the transaction land on the repository
+    // mocks.
+    rolePermissionRepo.manager.transaction.mockImplementation(
+      (cb: (em: unknown) => Promise<unknown>) =>
+        cb({
+          delete: (_target: unknown, criteria: unknown): unknown =>
+            rolePermissionRepo.delete(criteria) as unknown,
+          create: (_target: unknown, data: unknown) => data,
+          save: (_target: unknown, entity: unknown): unknown =>
+            rolePermissionRepo.save(entity) as unknown
+        })
+    );
 
     mockPermissionService = {
       invalidateUserCache: jest.fn()
@@ -364,9 +357,118 @@ describe('RoleService', () => {
 
       await service.update('role-2', { name: 'editor', description: 'New' });
 
-      expect(mockRoleRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(mockRoleRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'New' })
+      );
       expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('audit row in the write transaction', () => {
+    const audit = { action: AuditAction.ROLE_UPDATE, targetId: 'role-2' };
+
+    it('create builds the row from the saved role', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(null);
+
+      await service.create({ name: 'editor' }, (role) => ({
+        action: AuditAction.ROLE_CREATE,
+        targetId: role.id
+      }));
+
+      expect(mockRoleRepo.manager.transaction).toHaveBeenCalled();
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        { action: AuditAction.ROLE_CREATE, targetId: 'new-role' },
+        expect.anything()
+      );
+    });
+
+    it('an update without a rename writes the row', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+
+      await service.update('role-2', { description: 'New' }, audit);
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        audit,
+        expect.anything()
+      );
+    });
+
+    it('a rename writes the row in the transaction of the event listeners', async () => {
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockRoleRepo.findOne.mockResolvedValueOnce(null);
+
+      await service.update('role-2', { name: 'renamed' }, audit);
+
+      expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalled();
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        audit,
+        expect.anything()
+      );
+    });
+
+    it('a failed row fails the delete and invalidates no holder', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockAuditService.log.mockRejectedValue(new Error('audit down'));
+
+      await expect(
+        service.delete('role-2', undefined, undefined, audit)
+      ).rejects.toThrow('audit down');
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+
+    it('a role assignment writes the row and fails without it', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+
+      await service.assignRoleToUser('user-1', 'role-2', undefined, 'a', audit);
+      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        audit,
+        expect.anything()
+      );
+
+      mockAuditService.log.mockRejectedValue(new Error('audit down'));
+      mockPermissionService.invalidateUserCache.mockClear();
+      await expect(
+        service.removeRoleFromUser('user-1', 'role-2', undefined, 'a', audit)
+      ).rejects.toThrow('audit down');
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+
+    it('a permission write writes the row in the transaction of the grants', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+
+      await service.setPermissionsForRole('role-2', [], undefined, 'a', audit);
+      await service.assignPermissionsToRole(
+        'role-2',
+        [],
+        undefined,
+        undefined,
+        'a',
+        audit
+      );
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-1',
+        undefined,
+        'a',
+        audit
+      );
+
+      expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalledTimes(
+        3
+      );
+      expect(mockAuditService.log).toHaveBeenCalledTimes(3);
+    });
+
+    it('writes no row without audit params', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+
+      await service.removePermissionFromRole('role-2', 'perm-1');
+
+      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
   });
 

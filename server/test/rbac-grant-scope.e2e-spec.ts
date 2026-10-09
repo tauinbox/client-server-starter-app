@@ -104,7 +104,11 @@ function abilityWith(conditions: PermissionCondition | null): AppAbility {
 describe('Grant scope over the HTTP path', () => {
   let app: INestApplication;
   let holder: AbilityHolder;
-  let rolePermissionRepo: { save: jest.Mock; create: jest.Mock };
+  let rolePermissionRepo: {
+    save: jest.Mock;
+    create: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
   let auditService: { logFireAndForget: jest.Mock; log: jest.Mock };
 
   beforeAll(async () => {
@@ -131,7 +135,17 @@ describe('Grant scope over the HTTP path', () => {
 
     rolePermissionRepo = {
       save: jest.fn().mockResolvedValue([]),
-      create: jest.fn((v: unknown) => v)
+      create: jest.fn((v: unknown) => v),
+      // The grant is saved through the transaction of its audit row; the
+      // save lands on the repository mock.
+      manager: {
+        transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
+          work({
+            save: (_target: unknown, entity: unknown): unknown =>
+              rolePermissionRepo.save(entity) as unknown
+          })
+        )
+      }
     };
     auditService = {
       logFireAndForget: jest.fn(),
