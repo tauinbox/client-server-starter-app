@@ -15,6 +15,7 @@ export function requireUuid(...params: string[]): RequestHandler {
   return (req, res, next) => {
     for (const param of params) {
       if (!isUuid(String(req.params[param] ?? ''))) {
+        // eslint-disable-next-line no-restricted-syntax -- ParseUUIDPipe sends this 400 with no key
         res.status(400).json({
           message: 'Validation failed (uuid is expected)',
           statusCode: 400,

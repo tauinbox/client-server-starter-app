@@ -119,6 +119,7 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
 // by POST /__control/oauth-data instead, which is how E2E drives the exchange.
 for (const provider of OAUTH_PROVIDERS) {
   router.get(`/${provider}`, (_req, res) => {
+    // eslint-disable-next-line no-restricted-syntax -- a stub of the mock only; the server redirects here
     res.status(501).json({
       message: `OAuth ${provider} redirect requires a real backend. Use the mock-server for API-level testing only.`,
       statusCode: 501
@@ -126,6 +127,7 @@ for (const provider of OAUTH_PROVIDERS) {
   });
 
   router.get(`/${provider}/callback`, (_req, res) => {
+    // eslint-disable-next-line no-restricted-syntax -- a stub of the mock only; the server redirects here
     res.status(501).json({
       message: `OAuth ${provider} callback requires a real backend.`,
       statusCode: 501

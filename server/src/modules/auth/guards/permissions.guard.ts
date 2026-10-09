@@ -12,6 +12,7 @@ import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
 @Injectable()
@@ -36,6 +37,7 @@ export class PermissionsGuard implements CanActivate {
     const { user } = req;
 
     if (!user) {
+      // eslint-disable-next-line no-restricted-syntax -- a bare 401: the client handles it by status, never by text
       throw new UnauthorizedException();
     }
 
@@ -72,7 +74,10 @@ export class PermissionsGuard implements CanActivate {
         },
         context: { ip: req.ip }
       });
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenException({
+        message: 'Insufficient permissions',
+        errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+      });
     }
 
     return true;

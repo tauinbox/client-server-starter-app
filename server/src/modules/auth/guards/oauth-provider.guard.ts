@@ -41,6 +41,7 @@ export function createOAuthProviderGuard(
           error instanceof Error &&
           error.message.startsWith(MISSING_STRATEGY_MESSAGE)
         ) {
+          // eslint-disable-next-line no-restricted-syntax -- a browser navigation, never read by the client error funnel
           throw new NotFoundException(
             `${providerName} OAuth is not configured`
           );

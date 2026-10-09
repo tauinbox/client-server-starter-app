@@ -18,6 +18,7 @@ import type {
   SubscriptionStatus
 } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import { ErrorKeys } from '@app/shared/constants';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import { PADDLE_CLIENT, paddleEnvironment } from './paddle.client';
@@ -173,7 +174,10 @@ export class PaddleProvider implements PaymentProvider {
 
   private requireClient(): Paddle {
     if (!this.paddle) {
-      throw new ServiceUnavailableException('Paddle is not configured');
+      throw new ServiceUnavailableException({
+        message: 'Paddle is not configured',
+        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+      });
     }
     return this.paddle;
   }
@@ -184,12 +188,7 @@ export class PaddleProvider implements PaymentProvider {
     urls: CheckoutUrls
   ): Promise<CheckoutSession> {
     const paddle = this.requireClient();
-    const priceId = plan.prices.paddle?.providerPriceId;
-    if (!priceId) {
-      throw new ServiceUnavailableException(
-        `Plan "${plan.key}" has no Paddle price configured`
-      );
-    }
+    const priceId = this.requirePriceId(plan);
 
     const transaction = await paddle.transactions.create({
       items: [{ priceId, quantity: 1 }],
@@ -200,13 +199,7 @@ export class PaddleProvider implements PaymentProvider {
       checkout: { url: urls.successUrl }
     });
 
-    const url = transaction.checkout?.url;
-    if (!url) {
-      throw new ServiceUnavailableException(
-        'Paddle did not return a checkout URL'
-      );
-    }
-    return { url, sessionRef: transaction.id };
+    return this.checkoutSession(transaction);
   }
 
   /**
@@ -259,6 +252,7 @@ export class PaddleProvider implements PaymentProvider {
   chargeOffSession(): Promise<ChargeResult> {
     // Paddle owns renewals; off-session charging is the self-managed (YooKassa)
     // path. Paddle usage is charged via chargeUsage (createOneTimeCharge).
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'PaddleProvider.chargeOffSession is not applicable (provider-managed lifecycle)'
     );
@@ -266,6 +260,7 @@ export class PaddleProvider implements PaymentProvider {
 
   findOffSessionCharge(): Promise<ChargeResult | null> {
     // No off-session charges exist to reconcile (see chargeOffSession).
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'PaddleProvider.findOffSessionCharge is not applicable (provider-managed lifecycle)'
     );
@@ -273,6 +268,7 @@ export class PaddleProvider implements PaymentProvider {
 
   getOffSessionCharge(): Promise<ChargeResult | null> {
     // No off-session charges exist to read back (see chargeOffSession).
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'PaddleProvider.getOffSessionCharge is not applicable (provider-managed lifecycle)'
     );
@@ -313,12 +309,27 @@ export class PaddleProvider implements PaymentProvider {
   }
 
   /** The new plan's Paddle catalog price id — required for update/preview. */
+  private checkoutSession(transaction: {
+    id: string;
+    checkout: { url: string | null } | null;
+  }): CheckoutSession {
+    const url = transaction.checkout?.url;
+    if (!url) {
+      throw new ServiceUnavailableException({
+        message: 'Paddle did not return a checkout URL',
+        errorKey: ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED
+      });
+    }
+    return { url, sessionRef: transaction.id };
+  }
+
   private requirePriceId(plan: Plan): string {
     const priceId = plan.prices.paddle?.providerPriceId;
     if (!priceId) {
-      throw new ServiceUnavailableException(
-        `Plan "${plan.key}" has no Paddle price configured`
-      );
+      throw new ServiceUnavailableException({
+        message: `Plan "${plan.key}" has no Paddle price configured`,
+        errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
+      });
     }
     return priceId;
   }
@@ -378,21 +389,16 @@ export class PaddleProvider implements PaymentProvider {
   ): Promise<CheckoutSession> {
     const paddle = this.requireClient();
     if (!providerSubscriptionId) {
-      throw new ServiceUnavailableException(
-        'The subscription is not linked to Paddle yet'
-      );
+      throw new ServiceUnavailableException({
+        message: 'The subscription is not linked to Paddle yet',
+        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED
+      });
     }
     const transaction =
       await paddle.subscriptions.getPaymentMethodChangeTransaction(
         providerSubscriptionId
       );
-    const url = transaction.checkout?.url;
-    if (!url) {
-      throw new ServiceUnavailableException(
-        'Paddle did not return a checkout URL'
-      );
-    }
-    return { url, sessionRef: transaction.id };
+    return this.checkoutSession(transaction);
   }
 
   async cancel(
@@ -446,9 +452,10 @@ export class PaddleProvider implements PaymentProvider {
     // so a partial refund applies the amount to that item.
     const lineItem = transaction.details?.lineItems?.[0];
     if (!lineItem) {
-      throw new ServiceUnavailableException(
-        `Transaction ${providerInvoiceRef} has no line item to refund`
-      );
+      throw new ServiceUnavailableException({
+        message: `Transaction ${providerInvoiceRef} has no line item to refund`,
+        errorKey: ErrorKeys.BILLING.PROVIDER_REFUND_FAILED
+      });
     }
     await paddle.adjustments.create({
       transactionId: providerInvoiceRef,

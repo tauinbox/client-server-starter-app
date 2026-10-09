@@ -72,6 +72,7 @@ export function createDiskStorageOptions(options: {
     ) {
       if (!allowedExtensions.test(file.originalname)) {
         return callback(
+          // eslint-disable-next-line no-restricted-syntax -- no route uses this upload config, so no user reaches this text
           new BadRequestException('File type not allowed'),
           false
         );
@@ -80,6 +81,7 @@ export function createDiskStorageOptions(options: {
       const expectedMimeTypes = UPLOAD_ALLOWED_MIME_TYPES[ext];
       if (!expectedMimeTypes || !expectedMimeTypes.includes(file.mimetype)) {
         return callback(
+          // eslint-disable-next-line no-restricted-syntax -- no route uses this upload config, so no user reaches this text
           new BadRequestException('File MIME type does not match extension'),
           false
         );

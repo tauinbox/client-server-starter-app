@@ -7,6 +7,40 @@ import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 // @ts-expect-error TS7016: .mjs has no type declarations under classic node resolution
 import baseRules from '../eslint.base.config.mjs';
 
+type RestrictedSyntax = { selector: string; message: string };
+
+// Flat config replaces rule options, so the base selectors are re-added.
+const [, ...baseRestrictedSyntax] = (
+  baseRules as {
+    'no-restricted-syntax': ['error', ...RestrictedSyntax[]];
+  }
+)['no-restricted-syntax'];
+const restrictedSyntax: RestrictedSyntax[] = [
+  ...baseRestrictedSyntax,
+  {
+    selector: "CallExpression[callee.name='forwardRef']",
+    message:
+      'Do not use forwardRef() across a module boundary. Emit an EventEmitter2 event and handle it in a listener of the target module.'
+  }
+];
+
+// The client shows a server message as it is when no errorKey comes with it,
+// so a body without a key reaches a Russian user in English. A selector cannot
+// see the type of an identifier: a message held in a variable is not caught.
+const KEYLESS_EXCEPTION_MESSAGE =
+  'Throw an HTTP exception with a { message, errorKey } body. Add the key to ErrorKeys and to both client i18n files. If no user can see the text, disable this line and give the reason.';
+const keylessExceptionSyntax: RestrictedSyntax[] = [
+  {
+    selector:
+      'NewExpression[callee.name=/Exception$/][arguments.0.type=/^(Literal|TemplateLiteral)$/]',
+    message: KEYLESS_EXCEPTION_MESSAGE
+  },
+  {
+    selector: 'NewExpression[callee.name=/Exception$/][arguments.length=0]',
+    message: KEYLESS_EXCEPTION_MESSAGE
+  }
+];
+
 export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -60,26 +94,28 @@ export default defineConfig(
       '@typescript-eslint/no-misused-promises': 'error'
     }
   },
+  // `basePath` keeps `src/**` relative to this workspace. The pre-commit hook
+  // runs ESLint from the repository root, where `src/**` matches nothing; the
+  // rule then reports each disable directive as unused and --fix deletes it.
   {
+    basePath: __dirname,
     files: ['src/**/*.ts'],
+    ignores: ['**/*.spec.ts'],
     rules: {
-      // Flat config replaces rule options, so the base selectors are re-added.
       'no-restricted-syntax': [
         'error',
-        ...(
-          baseRules as {
-            'no-restricted-syntax': ['error', ...{ selector: string }[]];
-          }
-        )['no-restricted-syntax'].slice(1),
-        {
-          selector: "CallExpression[callee.name='forwardRef']",
-          message:
-            'Do not use forwardRef() across a module boundary. Emit an EventEmitter2 event and handle it in a listener of the target module.'
-        }
+        ...restrictedSyntax,
+        ...keylessExceptionSyntax
       ]
     }
   },
   {
+    basePath: __dirname,
+    files: ['src/**/*.spec.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax] }
+  },
+  {
+    basePath: __dirname,
     files: ['src/**/*.ts'],
     // CLI entry points that run outside Nest, so no logger exists there.
     ignores: [

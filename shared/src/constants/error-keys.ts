@@ -52,7 +52,8 @@ export const ErrorKeys = {
     MFA_STEP_UP_LOCKED: 'errors.auth.mfaStepUpLocked',
     STEP_UP_LOCKED: 'errors.auth.stepUpLocked',
     SESSION_NOT_FOUND: 'errors.auth.sessionNotFound',
-    SESSION_IS_CURRENT: 'errors.auth.sessionIsCurrent'
+    SESSION_IS_CURRENT: 'errors.auth.sessionIsCurrent',
+    REFRESH_TOKEN_REQUIRED: 'errors.auth.refreshTokenRequired'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',
@@ -75,7 +76,9 @@ export const ErrorKeys = {
     CONDITION_NOT_SUPPORTED: 'errors.roles.conditionNotSupported',
     ACTION_NOT_GRANTABLE: 'errors.roles.actionNotGrantable',
     CONDITION_BROADER_THAN_CALLER: 'errors.roles.conditionBroaderThanCaller',
-    CONDITION_UNRESOLVABLE: 'errors.roles.conditionUnresolvable'
+    CONDITION_UNRESOLVABLE: 'errors.roles.conditionUnresolvable',
+    SUPER_ROLE_ASSIGN_FORBIDDEN: 'errors.roles.superRoleAssignForbidden',
+    SUPER_ROLE_REMOVE_FORBIDDEN: 'errors.roles.superRoleRemoveForbidden'
   },
   RESOURCES: {
     NOT_FOUND: 'errors.resources.notFound',
@@ -87,7 +90,9 @@ export const ErrorKeys = {
     NOT_FOUND: 'errors.featureFlags.notFound',
     KEY_EXISTS: 'errors.featureFlags.keyExists',
     VERSION_CONFLICT: 'errors.featureFlags.versionConflict',
-    IF_MATCH_REQUIRED: 'errors.featureFlags.ifMatchRequired'
+    IF_MATCH_REQUIRED: 'errors.featureFlags.ifMatchRequired',
+    IF_MATCH_INVALID: 'errors.featureFlags.ifMatchInvalid',
+    INVALID_RULE: 'errors.featureFlags.invalidRule'
   },
   BILLING: {
     REGION_UNAVAILABLE: 'errors.billing.regionUnavailable',
@@ -113,7 +118,21 @@ export const ErrorKeys = {
     RENEWAL_IN_PROGRESS: 'errors.billing.renewalInProgress',
     PLAN_CHANGE_CONFLICT: 'errors.billing.planChangeConflict',
     PLAN_CHANGE_PAYMENT_CONFLICT: 'errors.billing.planChangePaymentConflict',
-    ENTITLEMENT_REQUIRED: 'errors.billing.entitlementRequired'
+    ENTITLEMENT_REQUIRED: 'errors.billing.entitlementRequired',
+    WEBHOOK_EVENT_NOT_FOUND: 'errors.billing.webhookEventNotFound',
+    WEBHOOK_EVENT_NOT_REPLAYABLE: 'errors.billing.webhookEventNotReplayable',
+    SUBSCRIPTION_NOT_FOUND: 'errors.billing.subscriptionNotFound',
+    INVOICE_NOT_FOUND: 'errors.billing.invoiceNotFound',
+    INVOICE_NOT_REFUNDABLE: 'errors.billing.invoiceNotRefundable',
+    REFUND_AMOUNT_OUT_OF_RANGE: 'errors.billing.refundAmountOutOfRange',
+    CREDITS_BLOCKED: 'errors.billing.creditsBlocked',
+    CUSTOMER_NO_ACTIVE_SUBSCRIPTION:
+      'errors.billing.customerNoActiveSubscription',
+    METER_NOT_DECLARED: 'errors.billing.meterNotDeclared',
+    PROVIDER_CHECKOUT_FAILED: 'errors.billing.providerCheckoutFailed',
+    PROVIDER_REFUND_FAILED: 'errors.billing.providerRefundFailed',
+    PROVIDER_STATE_UNCERTAIN: 'errors.billing.providerStateUncertain',
+    PAYMENT_METHOD_MISSING: 'errors.billing.paymentMethodMissing'
   },
   DB: {
     UNIQUE_VIOLATION: 'errors.db.uniqueViolation',
@@ -123,6 +142,8 @@ export const ErrorKeys = {
   },
   GENERAL: {
     RESOURCE_NOT_FOUND: 'errors.general.resourceNotFound',
-    INTERNAL_SERVER_ERROR: 'errors.general.internalServerError'
+    INTERNAL_SERVER_ERROR: 'errors.general.internalServerError',
+    INSUFFICIENT_PERMISSIONS: 'errors.general.insufficientPermissions',
+    INVALID_CURSOR: 'errors.general.invalidCursor'
   }
 } as const;

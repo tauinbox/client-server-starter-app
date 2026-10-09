@@ -5,7 +5,11 @@ import {
   ROLE_LIST_QUERY,
   ROLE_NAME_MAX_LENGTH
 } from '@app/shared/constants';
-import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
+import {
+  listPage,
+  listQueryErrors,
+  rejectInvalidCursor
+} from '../helpers/list-query.helpers';
 
 import type { PermissionCondition } from '@app/shared/types';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
@@ -207,6 +211,7 @@ router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
     res.status(400).json(validationError(errors));
     return;
   }
+  if (rejectInvalidCursor(res, query)) return;
   res.json(
     listPage(Array.from(getState().roles.values()), ROLE_LIST_QUERY, query)
   );
@@ -916,7 +921,8 @@ router.post(
     if (role.isSuper) {
       res.status(403).json({
         message: 'Cannot assign super roles',
-        statusCode: 403
+        statusCode: 403,
+        errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
       });
       return;
     }
@@ -1006,7 +1012,8 @@ router.delete(
     if (role.isSuper) {
       res.status(403).json({
         message: 'Cannot remove super roles',
-        statusCode: 403
+        statusCode: 403,
+        errorKey: ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
       });
       return;
     }

@@ -2,6 +2,8 @@ import { ForbiddenException } from '@nestjs/common';
 import { subject } from '@casl/ability';
 import { assertCan } from './assert-can.util';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants';
+import { thrownBy } from '../testing/thrown-by';
 
 describe('assertCan', () => {
   let auditService: { logFireAndForget: jest.Mock };
@@ -33,6 +35,25 @@ describe('assertCan', () => {
         targetType: 'User'
       })
     ).toThrow(ForbiddenException);
+  });
+
+  it('carries an errorKey, so the client can translate the refusal', () => {
+    const ability = { can: jest.fn().mockReturnValue(false) };
+
+    expect(
+      thrownBy(() =>
+        // @ts-expect-error partial mock
+        assertCan(ability, 'delete', { id: '2' }, auditService, {
+          targetId: '2',
+          targetType: 'User'
+        })
+      )
+    ).toMatchObject({
+      response: {
+        message: 'Insufficient permissions',
+        errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+      }
+    });
   });
 
   it('should fire audit log with instance check details on denial', () => {

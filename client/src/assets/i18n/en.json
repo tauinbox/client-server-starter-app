@@ -138,7 +138,8 @@
       "mfaStepUpLocked": "Too many incorrect verification codes. Try again later.",
       "stepUpLocked": "Too many incorrect passwords. Try again later.",
       "sessionNotFound": "That session has already ended.",
-      "sessionIsCurrent": "Use Sign out to end the session of this device."
+      "sessionIsCurrent": "Use Sign out to end the session of this device.",
+      "refreshTokenRequired": "Your session has ended. Please sign in again."
     },
     "users": {
       "notFound": "User not found",
@@ -161,7 +162,9 @@
       "conditionNotSupported": "This permission cannot carry a condition: no check of this action reads the record, so the condition would restrict nothing",
       "actionNotGrantable": "This action is not offered for the resource, so it cannot be granted",
       "conditionBroaderThanCaller": "You cannot grant a permission with a condition broader than the one you hold yourself",
-      "conditionUnresolvable": "This condition cannot be applied as written, so it would not restrict the permission"
+      "conditionUnresolvable": "This condition cannot be applied as written, so it would not restrict the permission",
+      "superRoleAssignForbidden": "A super role cannot be assigned",
+      "superRoleRemoveForbidden": "A super role cannot be removed"
     },
     "resources": {
       "notFound": "Resource not found",
@@ -173,7 +176,9 @@
       "notFound": "Feature flag not found",
       "keyExists": "Feature flag with this key already exists",
       "versionConflict": "Feature flag was modified by another request. Reload and retry.",
-      "ifMatchRequired": "The If-Match header is required for optimistic locking"
+      "ifMatchRequired": "The If-Match header is required for optimistic locking",
+      "ifMatchInvalid": "The If-Match header must be a positive integer",
+      "invalidRule": "One of the rules is not valid. Check the rules and try again."
     },
     "billing": {
       "regionUnavailable": "Payments are not available in this billing region.",
@@ -198,7 +203,20 @@
       "renewalInProgress": "The billing period has ended and its renewal is in progress. Try again shortly.",
       "planChangeConflict": "The subscription changed while the plan change was in progress. Please try again.",
       "planChangePaymentConflict": "The subscription changed while the payment was in progress, so the plan was not switched. Any amount charged is on your invoices.",
-      "entitlementRequired": "Your plan does not include this feature."
+      "entitlementRequired": "Your plan does not include this feature.",
+      "webhookEventNotFound": "This webhook event was not found.",
+      "webhookEventNotReplayable": "Only a dead-lettered webhook event can be replayed.",
+      "subscriptionNotFound": "This subscription was not found.",
+      "invoiceNotFound": "This invoice was not found.",
+      "invoiceNotRefundable": "Only a paid invoice can be refunded.",
+      "refundAmountOutOfRange": "The refund amount must be between 1 and the remaining refundable total.",
+      "creditsBlocked": "The credit balance is negative. Top up credits before you record more usage.",
+      "customerNoActiveSubscription": "The customer has no active subscription to record usage against.",
+      "meterNotDeclared": "No plan declares this meter.",
+      "providerCheckoutFailed": "The payment provider did not start the payment. Please try again later.",
+      "providerRefundFailed": "The payment provider cannot refund this payment.",
+      "providerStateUncertain": "The payment provider did not confirm the state of the payment. Please try again later.",
+      "paymentMethodMissing": "No saved payment method was found. Add a payment method and try again."
     },
     "db": {
       "uniqueViolation": "A record with this value already exists",
@@ -212,7 +230,9 @@
       "internalServerError": "Internal server error",
       "tooManyRequests": "Too many requests. Please slow down and try again.",
       "tooManyRequestsRetry": "Too many requests. Please try again in {{ seconds }} s.",
-      "validationFailed": "Some of the submitted values are invalid. Please check the form and try again."
+      "validationFailed": "Some of the submitted values are invalid. Please check the form and try again.",
+      "insufficientPermissions": "You do not have permission to do this.",
+      "invalidCursor": "The list position is not valid. Reload the list and try again."
     }
   }
 }

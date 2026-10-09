@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -201,9 +202,10 @@ describe('super role assignment', () => {
     });
 
     expect(res.status).toBe(403);
-    expect(((await res.json()) as { message: string }).message).toBe(
-      'Cannot assign super roles'
-    );
+    expect(await res.json()).toMatchObject({
+      message: 'Cannot assign super roles',
+      errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
+    });
     expect(getState().users.get(userId)?.roles).not.toContain('admin');
   });
 
@@ -218,9 +220,10 @@ describe('super role assignment', () => {
     );
 
     expect(res.status).toBe(403);
-    expect(((await res.json()) as { message: string }).message).toBe(
-      'Cannot remove super roles'
-    );
+    expect(await res.json()).toMatchObject({
+      message: 'Cannot remove super roles',
+      errorKey: ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
+    });
     expect(getState().users.get(adminId)?.roles).toContain('admin');
   });
 });

@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import type { AppAbility, Subjects } from '../../modules/auth/casl/app-ability';
 import { AuditService } from '../../modules/audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants';
 import type { MetricsService } from '../../modules/core/metrics/metrics.service';
 
 interface AssertCanContext {
@@ -48,5 +49,8 @@ export function assertCan(
 
   metricsService?.recordPermissionDenied('instance', action, subjectName);
 
-  throw new ForbiddenException('Insufficient permissions');
+  throw new ForbiddenException({
+    message: 'Insufficient permissions',
+    errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+  });
 }

@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
+  ErrorKeys,
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION
@@ -178,7 +179,10 @@ export class AuthController {
   ) {
     const cookieToken = this.cookies.readRefresh(req);
     if (!cookieToken) {
-      throw new UnauthorizedException('Refresh token is required');
+      throw new UnauthorizedException({
+        message: 'Refresh token is required',
+        errorKey: ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED
+      });
     }
 
     const result = await this.authService.refreshTokens(

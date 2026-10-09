@@ -242,6 +242,7 @@ export function assertCanGrantPermissions(
       // Every route reaching this check runs behind @Authorize, which cannot
       // produce a request without a user id. Fail loudly rather than skip the
       // comparison, which would reopen the escalation this check exists for.
+      // eslint-disable-next-line no-restricted-syntax -- a programmer error (500) that no user request can reach
       throw new InternalServerErrorException(
         'Cannot verify grant scope without the acting user id'
       );

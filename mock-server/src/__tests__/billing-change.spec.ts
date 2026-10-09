@@ -405,7 +405,8 @@ describe('POST /billing/subscription/change/preview', () => {
 describe('a plan with no Paddle price id (server parity)', () => {
   const NO_PRICE_BODY = {
     statusCode: 503,
-    message: 'Plan "business" has no Paddle price configured'
+    message: 'Plan "business" has no Paddle price configured',
+    errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
   };
 
   function removePaddlePriceId(planKey: string): void {

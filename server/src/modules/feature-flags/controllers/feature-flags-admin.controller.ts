@@ -283,7 +283,10 @@ export class FeatureFlagsAdminController {
       );
     }
     if (version === 'invalid') {
-      throw new BadRequestException('If-Match must be a positive integer');
+      throw new BadRequestException({
+        message: 'If-Match must be a positive integer',
+        errorKey: ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID
+      });
     }
     return version;
   }
