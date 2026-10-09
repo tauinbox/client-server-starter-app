@@ -129,15 +129,19 @@ export class UsersController {
       { actorId: req.user.userId, targetType: 'User' },
       this.metricsService
     );
-    const createdUser = await this.usersService.create(createUserDto);
-    await this.auditService.log({
-      action: AuditAction.USER_CREATE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: createdUser.id,
-      targetType: 'User',
-      context: extractAuditContext(req)
-    });
+    const createdUser = await this.usersService.create(
+      createUserDto,
+      (user) => [
+        {
+          action: AuditAction.USER_CREATE,
+          actorId: req.user.userId,
+          actorEmail: req.user.email,
+          targetId: user.id,
+          targetType: 'User',
+          context: extractAuditContext(req)
+        }
+      ]
+    );
     this.eventEmitter.emit(
       UserCreatedEvent.name,
       new UserCreatedEvent(createdUser.id)
@@ -334,38 +338,60 @@ export class UsersController {
       changed.push('unlockAccount');
     }
 
-    const updatedUser = await this.usersService.update(
-      id,
-      changes,
-      ability,
-      req.user.userId
-    );
-    const emailChanged =
-      previousEmail !== undefined && updatedUser.email !== previousEmail;
-    await this.auditService.log({
-      action: AuditAction.USER_UPDATE,
+    const rowFields = {
       actorId: req.user.userId,
       actorEmail: req.user.email,
       targetId: id,
       targetType: 'User',
-      details: { changedFields: changed },
       context: extractAuditContext(req)
-    });
+    };
+    const updatedUser = await this.usersService.update(
+      id,
+      changes,
+      ability,
+      req.user.userId,
+      (user) => [
+        {
+          ...rowFields,
+          action: AuditAction.USER_UPDATE,
+          details: { changedFields: changed }
+        },
+        ...(password
+          ? [
+              {
+                ...rowFields,
+                action: AuditAction.PASSWORD_CHANGE,
+                details: { source: 'admin' }
+              }
+            ]
+          : []),
+        // The USER_UPDATE row carries field names only, on purpose, so the
+        // address the account moved to would otherwise be unrecoverable. This
+        // is the administrator counterpart of the self-service confirm row,
+        // and `source` is what separates the two.
+        ...(previousEmail !== undefined && user.email !== previousEmail
+          ? [
+              {
+                ...rowFields,
+                action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
+                details: {
+                  oldEmail: previousEmail,
+                  newEmail: user.email,
+                  source: 'admin'
+                }
+              }
+            ]
+          : [])
+      ]
+    );
+    const emailChanged =
+      previousEmail !== undefined && updatedUser.email !== previousEmail;
 
     if (password) {
       this.eventEmitter.emit(
         UserPasswordChangedByAdminEvent.name,
         new UserPasswordChangedByAdminEvent(id)
       );
-      await this.auditService.log({
-        action: AuditAction.PASSWORD_CHANGE,
-        actorId: req.user.userId,
-        actorEmail: req.user.email,
-        targetId: id,
-        targetType: 'User',
-        details: { source: 'admin' },
-        context: extractAuditContext(req)
-      });
 
       this.mailService
         .sendPasswordChangedNotification(
@@ -379,25 +405,7 @@ export class UsersController {
         );
     }
 
-    // The USER_UPDATE row above carries field names only, on purpose, so the
-    // address the account moved to would otherwise be unrecoverable. This is
-    // the administrator counterpart of the self-service confirm row, and
-    // `source` is what separates the two.
     if (previousEmail !== undefined && emailChanged) {
-      await this.auditService.log({
-        action: AuditAction.USER_EMAIL_CHANGE_COMPLETE,
-        actorId: req.user.userId,
-        actorEmail: req.user.email,
-        targetId: id,
-        targetType: 'User',
-        details: {
-          oldEmail: previousEmail,
-          newEmail: updatedUser.email,
-          source: 'admin'
-        },
-        context: extractAuditContext(req)
-      });
-
       // Masked: the case this route exists for is an old mailbox that an
       // attacker holds, and it must not learn the recovered address.
       this.mailService
@@ -545,10 +553,9 @@ export class UsersController {
       req.user.userId
     );
 
-    await this.eventEmitter.emitAsync(
-      UserSessionRevocationRequiredEvent.name,
-      new UserSessionRevocationRequiredEvent(id)
-    );
+    // The row goes first: the revocation runs in the auth module and cannot
+    // share its transaction. A revocation never happens without its row; a
+    // row whose revocation failed is answered 500 and the admin retries.
     await this.auditService.log({
       action: AuditAction.SESSION_REVOKE,
       actorId: req.user.userId,
@@ -558,6 +565,10 @@ export class UsersController {
       details: { scope: 'all', source: 'admin' },
       context: extractAuditContext(req)
     });
+    await this.eventEmitter.emitAsync(
+      UserSessionRevocationRequiredEvent.name,
+      new UserSessionRevocationRequiredEvent(id)
+    );
     return { message: 'Every session of the user has ended' };
   }
 
@@ -608,18 +619,18 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const user = await this.usersService.findOne(id);
-    await this.usersService.remove(id, ability, req.user.userId);
+    await this.usersService.remove(id, ability, req.user.userId, (user) => [
+      {
+        action: AuditAction.USER_DELETE,
+        actorId: req.user.userId,
+        actorEmail: req.user.email,
+        targetId: id,
+        targetType: 'User',
+        details: { targetEmail: user.email },
+        context: extractAuditContext(req)
+      }
+    ]);
     this.eventEmitter.emit(UserDeletedEvent.name, new UserDeletedEvent(id));
-    await this.auditService.log({
-      action: AuditAction.USER_DELETE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: id,
-      targetType: 'User',
-      details: { targetEmail: user.email },
-      context: extractAuditContext(req)
-    });
     await this.eventEmitter.emitAsync(
       UserSessionRevocationRequiredEvent.name,
       new UserSessionRevocationRequiredEvent(id)
@@ -647,17 +658,19 @@ export class UsersController {
     const restoredUser = await this.usersService.restore(
       id,
       ability,
-      req.user.userId
+      req.user.userId,
+      (user) => [
+        {
+          action: AuditAction.USER_RESTORE,
+          actorId: req.user.userId,
+          actorEmail: req.user.email,
+          targetId: id,
+          targetType: 'User',
+          details: { targetEmail: user.email },
+          context: extractAuditContext(req)
+        }
+      ]
     );
-    await this.auditService.log({
-      action: AuditAction.USER_RESTORE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: id,
-      targetType: 'User',
-      details: { targetEmail: restoredUser.email },
-      context: extractAuditContext(req)
-    });
     this.eventEmitter.emit(UserRestoredEvent.name, new UserRestoredEvent(id));
     return restoredUser;
   }

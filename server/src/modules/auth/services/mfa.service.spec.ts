@@ -380,15 +380,29 @@ describe('MfaService', () => {
         totpRecoveryCodes: null,
         totpLastUsedStep: null
       });
+      // The second argument is the manager of the transaction of the update.
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.MFA_RESET_BY_ADMIN,
           actorId: 'admin-1',
           actorEmail: 'admin@example.com',
           targetId: 'user-1'
-        })
+        }),
+        expect.anything()
       );
       expect(mailService.sendMfaResetByAdminNotification).toHaveBeenCalled();
+    });
+
+    it('fails, and does not mail, when the audit row cannot be written', async () => {
+      repository.update.mockResolvedValueOnce({ affected: 1 });
+      auditService.log.mockRejectedValueOnce(new Error('audit down'));
+
+      await expect(service.resetByAdmin(enrolled(), actor)).rejects.toThrow(
+        'audit down'
+      );
+      expect(
+        mailService.sendMfaResetByAdminNotification
+      ).not.toHaveBeenCalled();
     });
 
     it('refuses when the factor is not on', async () => {

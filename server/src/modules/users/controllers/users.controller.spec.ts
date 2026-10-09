@@ -3,6 +3,8 @@ import { ForbiddenException, Logger } from '@nestjs/common';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
+import type { UserAuditRows } from '../services/users.service';
+import type { User } from '../entities/user.entity';
 import { MailService } from '../../mail/mail.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../../audit/audit.service';
@@ -109,10 +111,48 @@ describe('UsersController', () => {
 
     mfaServiceMock = { resetByAdmin: jest.fn().mockResolvedValue(undefined) };
 
+    // The service writes the rows that the controller builds, in the
+    // transaction of the write and before it resolves. This does the same with
+    // the record of the mock, so a row assertion reads `auditServiceMock.log`.
+    async function writeRows(
+      record: unknown,
+      audit: UserAuditRows | undefined
+    ): Promise<void> {
+      for (const row of audit?.(record as User) ?? []) {
+        await auditServiceMock.log(row);
+      }
+    }
+    const usersService = {
+      ...usersServiceMock,
+      create: async (dto: CreateUserDto, audit?: UserAuditRows) => {
+        const created: unknown = await usersServiceMock.create(dto, audit);
+        await writeRows(created, audit);
+        return created;
+      },
+      update: async (
+        ...args: [string, unknown, AppAbility, string, UserAuditRows?]
+      ) => {
+        const updated: unknown = await usersServiceMock.update(...args);
+        await writeRows(updated, args[4]);
+        return updated;
+      },
+      remove: async (...args: [string, AppAbility, string, UserAuditRows?]) => {
+        await usersServiceMock.remove(...args);
+        await writeRows(await usersServiceMock.findOne(args[0]), args[3]);
+      },
+      restore: async (
+        ...args: [string, AppAbility, string, UserAuditRows?]
+      ) => {
+        const restored: unknown = await usersServiceMock.restore(...args);
+        await writeRows(restored, args[3]);
+        return restored;
+      }
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
-        { provide: UsersService, useValue: usersServiceMock },
+        { provide: UsersService, useValue: usersService },
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MetricsService, useValue: metricsServiceMock },
@@ -157,7 +197,10 @@ describe('UsersController', () => {
 
       const result = await controller.create(dto, req, mockAbility);
 
-      expect(usersServiceMock.create).toHaveBeenCalledWith(dto);
+      expect(usersServiceMock.create).toHaveBeenCalledWith(
+        dto,
+        expect.any(Function)
+      );
       expect(result).toBe(createdUser);
     });
 
@@ -498,7 +541,8 @@ describe('UsersController', () => {
           'user-5',
           { password: 'NewPassword1' },
           mockAbility,
-          'user-1'
+          'user-1',
+          expect.any(Function)
         );
         expect(auditServiceMock.log).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -521,7 +565,8 @@ describe('UsersController', () => {
         'user-5',
         dto,
         mockAbility,
-        'user-1'
+        'user-1',
+        expect.any(Function)
       );
       expect(result).toBe(updatedUser);
     });
@@ -608,6 +653,29 @@ describe('UsersController', () => {
 
       expect(result).toBeDefined();
       expect(loggerError).toHaveBeenCalled();
+    });
+
+    it('should neither notify nor end sessions when the audit rows of a password change fail', async () => {
+      auditServiceMock.log.mockRejectedValue(new Error('audit down'));
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'target@example.com'
+      });
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.update(
+          'user-5',
+          { password: 'NewPassword1' },
+          req,
+          mockAbility
+        )
+      ).rejects.toThrow('audit down');
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
+      expect(
+        mailServiceMock.sendPasswordChangedNotification
+      ).not.toHaveBeenCalled();
     });
 
     it('should NOT log PASSWORD_CHANGE when dto does not contain password', async () => {
@@ -1146,7 +1214,8 @@ describe('UsersController', () => {
           'user-5',
           { isActive: false },
           mockAbility,
-          'user-1'
+          'user-1',
+          expect.any(Function)
         );
       });
     });
@@ -1155,7 +1224,7 @@ describe('UsersController', () => {
   // ── remove ────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should call usersService.findOne and usersService.remove with the id, ability and actor', async () => {
+    it('should call usersService.remove with the id, ability, actor and audit rows', async () => {
       const user = { id: 'user-7', email: 'del@example.com' };
       usersServiceMock.findOne.mockResolvedValue(user);
       usersServiceMock.remove.mockResolvedValue(undefined);
@@ -1163,12 +1232,28 @@ describe('UsersController', () => {
 
       await controller.remove('user-7', req, mockAbility);
 
-      expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-7');
       expect(usersServiceMock.remove).toHaveBeenCalledWith(
         'user-7',
         mockAbility,
-        'user-1'
+        'user-1',
+        expect.any(Function)
       );
+    });
+
+    it('ends no session when the delete and its audit row fail', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-7',
+        email: 'del@example.com'
+      });
+      usersServiceMock.remove.mockResolvedValue(undefined);
+      auditServiceMock.log.mockRejectedValue(new Error('audit down'));
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.remove('user-7', req, mockAbility)
+      ).rejects.toThrow('audit down');
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
     });
 
     it('should emit UserDeletedEvent with the correct user id', async () => {
@@ -1269,7 +1354,8 @@ describe('UsersController', () => {
       expect(usersServiceMock.restore).toHaveBeenCalledWith(
         'user-8',
         mockAbility,
-        'user-1'
+        'user-1',
+        expect.any(Function)
       );
       expect(result).toBe(restoredUser);
     });
@@ -1429,6 +1515,17 @@ describe('UsersController', () => {
           details: { scope: 'all', source: 'admin' }
         })
       );
+    });
+
+    it('writes the row before it ends the sessions, and ends none when the row fails', async () => {
+      usersServiceMock.findOne.mockResolvedValueOnce(target);
+      auditServiceMock.log.mockRejectedValueOnce(new Error('audit down'));
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await expect(
+        controller.revokeSessions('user-9', req, mockAbility)
+      ).rejects.toThrow('audit down');
+      expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
     });
 
     it('refuses a self-target before it reads the record', async () => {

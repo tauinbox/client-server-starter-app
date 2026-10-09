@@ -98,6 +98,16 @@ function makeUserRepoMock(store: UserStore) {
   };
 }
 
+// The update saves and audits in one transaction; its manager writes to the
+// same in-memory store as the repository.
+function transactionOver(repo: ReturnType<typeof makeUserRepoMock>) {
+  return {
+    transaction: (
+      run: (manager: { save: typeof repo.save }) => Promise<unknown>
+    ) => run({ save: repo.save })
+  };
+}
+
 describe('UsersService.update — email change side effects', () => {
   let usersService: UsersService;
   let store: UserStore;
@@ -120,7 +130,7 @@ describe('UsersService.update — email change side effects', () => {
         },
         UsersService,
         { provide: getRepositoryToken(User), useValue: repo },
-        { provide: DataSource, useValue: {} },
+        { provide: DataSource, useValue: transactionOver(repo) },
         { provide: AuditService, useValue: { logFireAndForget: jest.fn() } },
         {
           provide: MetricsService,
@@ -301,7 +311,9 @@ describe('Admin email change - session revocation through the real event bus', (
       if (row) Object.assign(row, patch);
       return Promise.resolve({});
     });
+    const userRepo = makeUserRepoMock(store);
     const dataSource = {
+      ...transactionOver(userRepo),
       getRepository: jest.fn().mockReturnValue({ update: userUpdate })
     };
 
@@ -330,10 +342,7 @@ describe('Admin email change - session revocation through the real event bus', (
         },
         UsersService,
         SessionRevocationListener,
-        {
-          provide: getRepositoryToken(User),
-          useValue: makeUserRepoMock(store)
-        },
+        { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: RefreshTokenService, useValue: refreshTokenService },
         { provide: AuditService, useValue: auditService },
@@ -400,7 +409,9 @@ describe('Admin email change - session revocation through the real event bus', (
           newEmail: 'after@example.com',
           source: 'admin'
         }
-      })
+      }),
+      // The manager of the transaction of the write.
+      expect.anything()
     );
 
     // The request record stays value-free; the credential change is the new row.
@@ -408,7 +419,8 @@ describe('Admin email change - session revocation through the real event bus', (
       expect.objectContaining({
         action: AuditAction.USER_UPDATE,
         details: { changedFields: ['email'] }
-      })
+      }),
+      expect.anything()
     );
   });
 
@@ -439,7 +451,8 @@ describe('Admin email change - session revocation through the real event bus', (
     expect(auditService.log).not.toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.USER_EMAIL_CHANGE_COMPLETE
-      })
+      }),
+      expect.anything()
     );
   });
 

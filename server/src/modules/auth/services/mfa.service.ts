@@ -284,26 +284,33 @@ export class MfaService {
 
     // Conditional on the factor still being on, so of two concurrent resets
     // only one audits and mails; the other is told there is nothing to reset.
-    const { affected } = await this.dataSource.getRepository(User).update(
-      { id: target.id, totpEnabledAt: Not(IsNull()) },
-      {
-        totpSecret: null,
-        totpEnabledAt: null,
-        totpRecoveryCodes: null,
-        totpLastUsedStep: null
+    // The row shares the transaction: a reset never commits without it.
+    await withTransaction(this.dataSource, async (manager) => {
+      const { affected } = await manager.update(
+        User,
+        { id: target.id, totpEnabledAt: Not(IsNull()) },
+        {
+          totpSecret: null,
+          totpEnabledAt: null,
+          totpRecoveryCodes: null,
+          totpLastUsedStep: null
+        }
+      );
+      if (!affected) {
+        throw this.notEnabledException();
       }
-    );
-    if (!affected) {
-      throw this.notEnabledException();
-    }
 
-    await this.auditService.log({
-      action: AuditAction.MFA_RESET_BY_ADMIN,
-      actorId: actor.id,
-      actorEmail: actor.email,
-      targetId: target.id,
-      targetType: 'User',
-      context
+      await this.auditService.log(
+        {
+          action: AuditAction.MFA_RESET_BY_ADMIN,
+          actorId: actor.id,
+          actorEmail: actor.email,
+          targetId: target.id,
+          targetType: 'User',
+          context
+        },
+        manager
+      );
     });
 
     this.mailService

@@ -116,7 +116,8 @@ describe('Admin user update DTO validation (e2e)', () => {
       TARGET_ID,
       payload,
       undefined,
-      'admin-1'
+      'admin-1',
+      expect.any(Function)
     );
   });
 
