@@ -20,6 +20,8 @@ import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
 import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
 import { ResourceRegistryService } from './resource-registry.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { AuditService } from '../../audit/audit.service';
+import type { AuditLogParams } from '../../audit/audit.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 
 // Key is versioned: the cached value's shape changes between releases (a flat
@@ -59,7 +61,8 @@ export class ResourceService {
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
     private readonly registry: ResourceRegistryService,
-    private readonly metrics: MetricsService
+    private readonly metrics: MetricsService,
+    private readonly auditService: AuditService
   ) {}
 
   /**
@@ -101,7 +104,8 @@ export class ResourceService {
       displayName?: string;
       description?: string | null;
       allowedActionNames?: string[] | null;
-    }
+    },
+    audit?: AuditLogParams
   ): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
@@ -126,9 +130,21 @@ export class ResourceService {
       );
     }
     Object.assign(resource, data);
-    const saved = await this.resourceRepository.save(resource);
+    const saved = await this.saveAudited(resource, audit);
     await this.invalidateSubjectMapCache();
     return saved;
+  }
+
+  /** Saves the resource and the audit row of the change in one transaction. */
+  private saveAudited(
+    resource: Resource,
+    audit?: AuditLogParams
+  ): Promise<Resource> {
+    return this.resourceRepository.manager.transaction(async (em) => {
+      const saved = await em.save(resource);
+      if (audit) await this.auditService.log(audit, em);
+      return saved;
+    });
   }
 
   async getSubjectMaps(): Promise<SubjectMaps> {
@@ -165,7 +181,7 @@ export class ResourceService {
     return maps;
   }
 
-  async restore(id: string): Promise<Resource> {
+  async restore(id: string, audit?: AuditLogParams): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
       throw new HttpException(
@@ -186,7 +202,7 @@ export class ResourceService {
       );
     }
     resource.isOrphaned = false;
-    const saved = await this.resourceRepository.save(resource);
+    const saved = await this.saveAudited(resource, audit);
     await this.invalidateSubjectMapCache();
     saved.isRegistered = true;
     return saved;

@@ -8,6 +8,7 @@
 // MongoAbility built via AbilityBuilder + condition resolvers analogous to
 // the production CASL factory.
 
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   CanActivate,
   ExecutionContext,
@@ -311,7 +312,8 @@ describe('Instance-level @Authorize re-check', () => {
         .expect(200);
       expect(mocks.roleService.update).toHaveBeenCalledWith(
         ROLE_A,
-        expect.objectContaining({ description: 'x' })
+        expect.objectContaining({ description: 'x' }),
+        expect.objectContaining({ action: AuditAction.ROLE_UPDATE })
       );
     });
   });

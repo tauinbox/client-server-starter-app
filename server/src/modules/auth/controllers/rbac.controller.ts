@@ -147,9 +147,7 @@ export class RbacController {
       { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
       this.metricsService
     );
-    const result = await this.resourceService.restore(id);
-    await this.cacheManager.del(METADATA_CACHE_KEY);
-    await this.auditService.log({
+    const result = await this.resourceService.restore(id, {
       action: AuditAction.RESOURCE_RESTORE,
       actorId: req.user.userId,
       actorEmail: req.user.email,
@@ -157,6 +155,7 @@ export class RbacController {
       targetType: 'Resource',
       context: extractAuditContext(req)
     });
+    await this.cacheManager.del(METADATA_CACHE_KEY);
     return result;
   }
 
@@ -193,9 +192,7 @@ export class RbacController {
       this.metricsService
     );
     const changed = changedFields(resource, dto);
-    const result = await this.resourceService.update(id, dto);
-    await this.cacheManager.del(METADATA_CACHE_KEY);
-    await this.auditService.log({
+    const result = await this.resourceService.update(id, dto, {
       action: AuditAction.RESOURCE_UPDATE,
       actorId: req.user.userId,
       actorEmail: req.user.email,
@@ -204,6 +201,7 @@ export class RbacController {
       details: { changedFields: changed },
       context: extractAuditContext(req)
     });
+    await this.cacheManager.del(METADATA_CACHE_KEY);
     return result;
   }
 }

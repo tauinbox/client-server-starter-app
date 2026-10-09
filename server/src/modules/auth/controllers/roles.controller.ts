@@ -42,8 +42,8 @@ import { RegisterResource } from '../decorators/register-resource.decorator';
 import type { AppAbility } from '../casl/app-ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { changedFields } from '@app/shared/utils/changed-fields';
-import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { AuditService } from '../../audit/audit.service';
+import type { AuditLogParams } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -73,6 +73,18 @@ export class RolesController {
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService
   ) {}
+
+  private auditRow(
+    req: JwtAuthRequest,
+    row: Pick<AuditLogParams, 'action' | 'targetType' | 'targetId' | 'details'>
+  ): AuditLogParams {
+    return {
+      ...row,
+      actorId: req.user?.userId ?? null,
+      actorEmail: req.user?.email ?? null,
+      context: extractAuditContext(req)
+    };
+  }
 
   @Get('cursor')
   @Authorize(['read', 'Role'])
@@ -158,12 +170,6 @@ export class RolesController {
 
   @Post()
   @Authorize(['create', 'Role'])
-  @LogAudit({
-    action: AuditAction.ROLE_CREATE,
-    targetType: 'Role',
-    targetIdFromResponse: (response) => (response as { id?: string })?.id,
-    details: ({ body }) => ({ name: (body as CreateRoleDto).name })
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new role' })
   @ApiBody({ type: CreateRoleDto })
@@ -184,7 +190,14 @@ export class RolesController {
       { actorId: req.user?.userId, targetType: 'Role' },
       this.metricsService
     );
-    return this.roleService.create(createRoleDto);
+    return this.roleService.create(createRoleDto, (role) =>
+      this.auditRow(req, {
+        action: AuditAction.ROLE_CREATE,
+        targetType: 'Role',
+        targetId: role.id,
+        details: { name: createRoleDto.name }
+      })
+    );
   }
 
   @Patch(':id')
@@ -211,17 +224,16 @@ export class RolesController {
       this.metricsService
     );
     const changed = changedFields(role, updateRoleDto);
-    const updated = await this.roleService.update(id, updateRoleDto);
-    await this.auditService.log({
-      action: AuditAction.ROLE_UPDATE,
-      actorId: req.user?.userId ?? null,
-      actorEmail: req.user?.email ?? null,
-      targetId: id,
-      targetType: 'Role',
-      details: { changedFields: changed },
-      context: extractAuditContext(req)
-    });
-    return updated;
+    return this.roleService.update(
+      id,
+      updateRoleDto,
+      this.auditRow(req, {
+        action: AuditAction.ROLE_UPDATE,
+        targetType: 'Role',
+        targetId: id,
+        details: { changedFields: changed }
+      })
+    );
   }
 
   @Delete(':id')
@@ -245,31 +257,23 @@ export class RolesController {
       { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
       this.metricsService
     );
-    await this.roleService.delete(id, ability, req.user?.userId);
     // The row is gone after the delete, so the name is recorded here: a bare
     // targetId resolves to nothing once the role no longer exists.
-    await this.auditService.log({
-      action: AuditAction.ROLE_DELETE,
-      actorId: req.user?.userId ?? null,
-      actorEmail: req.user?.email ?? null,
-      targetId: id,
-      targetType: 'Role',
-      details: { name: role.name },
-      context: extractAuditContext(req)
-    });
+    await this.roleService.delete(
+      id,
+      ability,
+      req.user?.userId,
+      this.auditRow(req, {
+        action: AuditAction.ROLE_DELETE,
+        targetType: 'Role',
+        targetId: id,
+        details: { name: role.name }
+      })
+    );
   }
 
   @Put(':id/permissions')
   @Authorize(['update', 'Role'])
-  @LogAudit({
-    action: AuditAction.PERMISSION_ASSIGN,
-    targetType: 'Role',
-    details: ({ body }) => ({
-      permissionIds: (body as SetPermissionsDto).items.map(
-        (i) => i.permissionId
-      )
-    })
-  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Set the full permission set for a role (replaces existing)'
@@ -288,19 +292,18 @@ export class RolesController {
       id,
       dto.items,
       ability,
-      req.user?.userId
+      req.user?.userId,
+      this.auditRow(req, {
+        action: AuditAction.PERMISSION_ASSIGN,
+        targetType: 'Role',
+        targetId: id,
+        details: { permissionIds: dto.items.map((i) => i.permissionId) }
+      })
     );
   }
 
   @Post(':id/permissions')
   @Authorize(['update', 'Role'])
-  @LogAudit({
-    action: AuditAction.PERMISSION_ASSIGN,
-    targetType: 'Role',
-    details: ({ body }) => ({
-      permissionIds: (body as AssignPermissionsDto).permissionIds
-    })
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Assign permissions to a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -317,17 +320,18 @@ export class RolesController {
       dto.permissionIds,
       dto.conditions,
       ability,
-      req.user?.userId
+      req.user?.userId,
+      this.auditRow(req, {
+        action: AuditAction.PERMISSION_ASSIGN,
+        targetType: 'Role',
+        targetId: id,
+        details: { permissionIds: dto.permissionIds }
+      })
     );
   }
 
   @Delete(':id/permissions/:permissionId')
   @Authorize(['update', 'Role'])
-  @LogAudit({
-    action: AuditAction.PERMISSION_UNASSIGN,
-    targetType: 'Role',
-    details: ({ params }) => ({ permissionId: params['permissionId'] })
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove a permission from a role' })
   @ApiParam({ name: 'id', description: 'The role ID' })
@@ -343,18 +347,18 @@ export class RolesController {
       id,
       permissionId,
       ability,
-      req.user?.userId
+      req.user?.userId,
+      this.auditRow(req, {
+        action: AuditAction.PERMISSION_UNASSIGN,
+        targetType: 'Role',
+        targetId: id,
+        details: { permissionId }
+      })
     );
   }
 
   @Post('assign/:userId')
   @Authorize(['assign', 'Role'])
-  @LogAudit({
-    action: AuditAction.ROLE_ASSIGN,
-    targetType: 'User',
-    targetIdParam: 'userId',
-    details: ({ body }) => ({ roleId: (body as AssignRoleDto).roleId })
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Assign a role to a user' })
   @ApiParam({ name: 'userId', description: 'The user ID' })
@@ -370,7 +374,13 @@ export class RolesController {
       userId,
       dto.roleId,
       ability,
-      req.user?.userId
+      req.user?.userId,
+      this.auditRow(req, {
+        action: AuditAction.ROLE_ASSIGN,
+        targetType: 'User',
+        targetId: userId,
+        details: { roleId: dto.roleId }
+      })
     );
     await this.eventEmitter.emitAsync(
       UserRoleChangedEvent.name,
@@ -381,12 +391,6 @@ export class RolesController {
 
   @Delete('assign/:userId/:roleId')
   @Authorize(['assign', 'Role'])
-  @LogAudit({
-    action: AuditAction.ROLE_UNASSIGN,
-    targetType: 'User',
-    targetIdParam: 'userId',
-    details: ({ params }) => ({ roleId: params['roleId'] })
-  })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove a role from a user' })
   @ApiParam({ name: 'userId', description: 'The user ID' })
@@ -402,7 +406,13 @@ export class RolesController {
       userId,
       roleId,
       ability,
-      req.user?.userId
+      req.user?.userId,
+      this.auditRow(req, {
+        action: AuditAction.ROLE_UNASSIGN,
+        targetType: 'User',
+        targetId: userId,
+        details: { roleId }
+      })
     );
     await this.eventEmitter.emitAsync(
       UserRoleChangedEvent.name,

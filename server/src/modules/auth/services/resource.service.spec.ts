@@ -6,6 +6,8 @@ import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
 import { Resource } from '../entities/resource.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
 describe('ResourceService', () => {
   let service: ResourceService;
@@ -14,7 +16,10 @@ describe('ResourceService', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+    manager: { transaction: jest.Mock };
   };
+  let mockEm: { save: jest.Mock };
+  let mockAudit: { log: jest.Mock };
   let mockCacheManager: {
     get: jest.Mock;
     set: jest.Mock;
@@ -85,8 +90,19 @@ describe('ResourceService', () => {
         .fn()
         .mockImplementation((data: Record<string, unknown>) =>
           Promise.resolve(data)
+        ),
+      manager: {
+        transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
+          work(mockEm)
         )
+      }
     };
+    // The transactional save goes through the repository mock, so the
+    // assertions on `save` below cover both paths.
+    mockEm = {
+      save: jest.fn((data: unknown): unknown => mockResourceRepo.save(data))
+    };
+    mockAudit = { log: jest.fn().mockResolvedValue(undefined) };
 
     mockCacheManager = {
       get: jest.fn().mockResolvedValue(undefined),
@@ -110,7 +126,8 @@ describe('ResourceService', () => {
         },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: ResourceRegistryService, useValue: mockRegistry },
-        { provide: MetricsService, useValue: mockMetrics }
+        { provide: MetricsService, useValue: mockMetrics },
+        { provide: AuditService, useValue: mockAudit }
       ]
     }).compile();
 
@@ -209,6 +226,42 @@ describe('ResourceService', () => {
           description: null
         })
       );
+    });
+
+    it('writes the audit row in the transaction of the save', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      const audit = {
+        action: AuditAction.RESOURCE_UPDATE,
+        targetId: 'res-1',
+        targetType: 'Resource'
+      };
+
+      await service.update('res-1', { displayName: 'Audited' }, audit);
+
+      expect(mockEm.save).toHaveBeenCalled();
+      expect(mockAudit.log).toHaveBeenCalledWith(audit, mockEm);
+    });
+
+    it('fails and leaves the cache when the audit row fails', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      mockAudit.log.mockRejectedValue(new Error('audit down'));
+
+      await expect(
+        service.update(
+          'res-1',
+          { displayName: 'Audited' },
+          { action: AuditAction.RESOURCE_UPDATE }
+        )
+      ).rejects.toThrow('audit down');
+      expect(mockCacheManager.del).not.toHaveBeenCalled();
+    });
+
+    it('writes no audit row without audit params', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+
+      await service.update('res-1', { displayName: 'Plain' });
+
+      expect(mockAudit.log).not.toHaveBeenCalled();
     });
   });
 
@@ -597,6 +650,22 @@ describe('ResourceService', () => {
       const result = await service.restore('res-3');
 
       expect(result.isRegistered).toBe(true);
+    });
+
+    it('writes the audit row in the transaction of the save', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
+      const audit = {
+        action: AuditAction.RESOURCE_RESTORE,
+        targetId: 'res-3',
+        targetType: 'Resource'
+      };
+
+      await service.restore('res-3', audit);
+
+      expect(mockEm.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isOrphaned: false })
+      );
+      expect(mockAudit.log).toHaveBeenCalledWith(audit, mockEm);
     });
 
     it('should invalidate subject map cache after restore', async () => {

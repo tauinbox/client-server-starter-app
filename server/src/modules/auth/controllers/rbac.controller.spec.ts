@@ -184,7 +184,11 @@ describe('RbacController', () => {
       );
 
       expect(resourceServiceMock.findOne).toHaveBeenCalledWith('res-1');
-      expect(resourceServiceMock.update).toHaveBeenCalledWith('res-1', dto);
+      expect(resourceServiceMock.update).toHaveBeenCalledWith(
+        'res-1',
+        dto,
+        expect.objectContaining({ action: AuditAction.RESOURCE_UPDATE })
+      );
       expect(result).toBe(updated);
     });
 
@@ -225,7 +229,7 @@ describe('RbacController', () => {
       expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
     });
 
-    it('should log RESOURCE_UPDATE audit event', async () => {
+    it('passes the RESOURCE_UPDATE audit row to the update', async () => {
       const dto = { displayName: 'Users', description: 'desc' };
       const req = mockJwtRequest(
         'user-42',
@@ -235,7 +239,10 @@ describe('RbacController', () => {
 
       await controller.updateResource('res-1', dto, req, mockAbility);
 
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect(auditServiceMock.log).not.toHaveBeenCalled();
+      expect(resourceServiceMock.update).toHaveBeenCalledWith(
+        'res-1',
+        dto,
         expect.objectContaining({
           action: AuditAction.RESOURCE_UPDATE,
           actorId: 'user-42',
@@ -276,7 +283,7 @@ describe('RbacController', () => {
       expect(resourceServiceMock.restore).not.toHaveBeenCalled();
     });
 
-    it('should restore resource when ability allows and log RESOURCE_RESTORE', async () => {
+    it('should restore resource with the RESOURCE_RESTORE audit row when ability allows', async () => {
       resourceServiceMock.findOne.mockResolvedValue({ id: 'res-1' });
       resourceServiceMock.restore.mockResolvedValue({
         id: 'res-1',
@@ -286,8 +293,9 @@ describe('RbacController', () => {
 
       await controller.restoreResource('res-1', req, mockAbility);
 
-      expect(resourceServiceMock.restore).toHaveBeenCalledWith('res-1');
-      expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect(auditServiceMock.log).not.toHaveBeenCalled();
+      expect(resourceServiceMock.restore).toHaveBeenCalledWith(
+        'res-1',
         expect.objectContaining({
           action: AuditAction.RESOURCE_RESTORE,
           actorId: 'user-99',
