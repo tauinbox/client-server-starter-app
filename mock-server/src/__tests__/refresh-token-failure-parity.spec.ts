@@ -269,7 +269,10 @@ describe('refresh-token failure parity', () => {
       const rows = auditRows('TOKEN_REFRESH_FAILURE');
       expect(rows).toHaveLength(1);
       expect(rows[0].details).toEqual({
-        reason: 'lost_response_replay'
+        reason: 'lost_response_replay',
+        sessionId: expect.any(String),
+        replayAgeMs: expect.any(Number),
+        sameIp: true
       });
       expect(rows[0].actorId).toBe(phone.userId);
 
@@ -289,9 +292,14 @@ describe('refresh-token failure parity', () => {
 
       expect((await refresh(phone)).status).toBe(401);
       expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
-      expect(auditRows('TOKEN_REFRESH_FAILURE')[0].details).toEqual({
-        reason: 'lost_response_replay'
+      const details = auditRows('TOKEN_REFRESH_FAILURE')[0].details;
+      expect(details).toMatchObject({
+        reason: 'lost_response_replay',
+        sameIp: true
       });
+      const dayMs = 24 * 60 * 60 * 1000;
+      expect(details?.['replayAgeMs']).toBeGreaterThanOrEqual(dayMs);
+      expect(details?.['replayAgeMs']).toBeLessThan(dayMs + 60_000);
       expect((await refresh(desktop)).status).toBe(200);
     });
 

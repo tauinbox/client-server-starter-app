@@ -36,7 +36,7 @@ import {
   findUserById,
   getPackedRulesForUser,
   getState,
-  isLostResponseReplay,
+  findLostResponseSuccessor,
   isMfaMandatoryFor,
   logAudit,
   registerSession,
@@ -574,11 +574,22 @@ router.post('/refresh-token', (req, res) => {
   if (reusedUserId) {
     // A lost rotation response replays the old cookie. End only this
     // session and issue nothing, so a thief gains no token either.
-    if (isLostResponseReplay(cookieToken)) {
+    const successor = findLostResponseSuccessor(cookieToken);
+    if (successor) {
+      const sessionId = state.refreshSessions.get(cookieToken);
+      const ip = normalizeIpAddress(req.ip);
       endSessionOfToken(cookieToken);
       logAudit('TOKEN_REFRESH_FAILURE', {
         actorId: reusedUserId,
-        details: { reason: 'lost_response_replay' },
+        details: {
+          reason: 'lost_response_replay',
+          sessionId,
+          replayAgeMs: successor.ageMs,
+          sameIp:
+            ip === null || successor.ipAddress === null
+              ? null
+              : ip === successor.ipAddress
+        },
         ip: req.ip
       });
       res.status(401).json({

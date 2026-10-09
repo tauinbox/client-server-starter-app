@@ -12,6 +12,14 @@ export type SessionDevice = Pick<
   'userAgent' | 'ipAddress' | 'countryCode' | 'city'
 >;
 
+/** The unused successor that a lost rotation response left behind. */
+export interface LostResponseSuccessor {
+  /** Time since the rotation that issued the successor. */
+  ageMs: number;
+  /** The address that sent the rotation whose response was lost. */
+  ipAddress: string | null;
+}
+
 @Injectable()
 export class RefreshTokenService {
   constructor(
@@ -159,31 +167,47 @@ export class RefreshTokenService {
   }
 
   /**
-   * Whether a revoked row is the immediate predecessor of a live successor that
-   * was never used. That is the shape a rotation leaves when its response never
-   * reached the browser (a tab closed, a laptop asleep, a network drop), which
-   * then presents the old cookie again, possibly hours later. The age of the
-   * successor does not matter: until it is used, the browser cannot hold it.
+   * The live successor when a revoked row is the immediate predecessor of a
+   * successor that was never used, otherwise null. That is the shape a rotation
+   * leaves when its response never reached the browser (a tab closed, a laptop
+   * asleep, a network drop), which then presents the old cookie again, possibly
+   * hours later. The age of the successor does not matter: until it is used,
+   * the browser cannot hold it.
    *
-   * The ordering runs in SQL: `created_at` holds microseconds and reads back as
-   * a millisecond Date, so a value sent back from JS could misorder two rows
-   * created in the same millisecond.
+   * The ordering and the age run in SQL: `created_at` holds microseconds and
+   * reads back as a millisecond Date, so a value sent back from JS could
+   * misorder two rows created in the same millisecond.
    */
-  async isLostResponseReplay(token: RefreshToken): Promise<boolean> {
+  async findLostResponseSuccessor(
+    token: RefreshToken
+  ): Promise<LostResponseSuccessor | null> {
     const result = await this.repository
       .createQueryBuilder('rt')
       .select(
         'COUNT(*) = 1 AND COALESCE(BOOL_AND(NOT rt.revoked), false)',
         'replay'
       )
+      .addSelect(
+        'EXTRACT(EPOCH FROM (NOW() - MAX(rt.created_at))) * 1000',
+        'age_ms'
+      )
+      .addSelect('MAX(rt.ip_address)', 'ip_address')
       .where('rt.session_id = :sessionId', { sessionId: token.sessionId })
       .andWhere(
         'rt.created_at > (SELECT prev.created_at FROM refresh_tokens prev WHERE prev.id = :id)',
         { id: token.id }
       )
-      .getRawOne<{ replay: boolean }>();
+      .getRawOne<{
+        replay: boolean;
+        age_ms: string | number | null;
+        ip_address: string | null;
+      }>();
 
-    return result?.replay === true;
+    if (result?.replay !== true) return null;
+    return {
+      ageMs: Math.round(Number(result.age_ms)),
+      ipAddress: result.ip_address
+    };
   }
 
   async findByToken(token: string): Promise<RefreshToken | null> {

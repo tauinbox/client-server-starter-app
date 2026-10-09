@@ -198,12 +198,24 @@ export function isSessionLive(sessionId: string): boolean {
 }
 
 /**
- * Whether a rotated token is the immediate predecessor of a live successor that
- * was never used, at any age. Mirrors `RefreshTokenService.isLostResponseReplay`.
+ * The live successor of a rotated token that was never used, at any age, or
+ * null. Mirrors `RefreshTokenService.findLostResponseSuccessor`.
  */
-export function isLostResponseReplay(refreshToken: string): boolean {
+export function findLostResponseSuccessor(
+  refreshToken: string
+): { ageMs: number; ipAddress: string | null } | null {
   const successor = state.rotatedTo.get(refreshToken);
-  return successor !== undefined && state.refreshTokens.has(successor);
+  if (successor === undefined || !state.refreshTokens.has(successor)) {
+    return null;
+  }
+  const sessionId = state.refreshSessions.get(successor);
+  if (sessionId === undefined) return null;
+  // A live successor is the newest row of its session, so the last-active
+  // stamp is its issue time and the session address is its address.
+  return {
+    ageMs: Date.now() - (state.sessionLastActive.get(sessionId) ?? Date.now()),
+    ipAddress: state.sessionIps.get(sessionId) ?? null
+  };
 }
 
 /**
