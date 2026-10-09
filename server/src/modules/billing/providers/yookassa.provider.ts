@@ -210,7 +210,7 @@ export class YooKassaProvider implements PaymentProvider {
   chargeUsage(): Promise<void> {
     // Self-managed lifecycle: usage periods are closed and charged by the
     // renewal scheduler through chargeOffSession (with the 54-FZ receipt).
-     
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'YooKassaProvider.chargeUsage is not applicable (usage is charged by the renewal scheduler)'
     );
@@ -220,14 +220,14 @@ export class YooKassaProvider implements PaymentProvider {
     // Self-managed lifecycle: there is no provider-side subscription to update.
     // The core computes the proration (ProrationCalculator) and settles it via
     // refund + chargeOffSession with the two 54-FZ documents.
-     
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'YooKassaProvider.changePlan is not applicable (proration is computed by the core)'
     );
   }
 
   previewChangePlan(): Promise<never> {
-     
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'YooKassaProvider.previewChangePlan is not applicable (proration is computed by the core)'
     );

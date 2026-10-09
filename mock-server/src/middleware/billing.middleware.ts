@@ -111,7 +111,7 @@ function cancelBodyErrors(body: unknown): string[] {
 // 200 success shape. Synthetic lifecycle injection is driven through /__control.
 function handleWebhook(req: Request, res: Response): void {
   if (!req.body || Object.keys(req.body).length === 0) {
-     
+    // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
     res.status(400).json({ message: 'Missing webhook body', statusCode: 400 });
     return;
   }

@@ -94,7 +94,11 @@ export default defineConfig(
       '@typescript-eslint/no-misused-promises': 'error'
     }
   },
+  // `basePath` keeps `src/**` relative to this workspace. The pre-commit hook
+  // runs ESLint from the repository root, where `src/**` matches nothing; the
+  // rule then reports each disable directive as unused and --fix deletes it.
   {
+    basePath: __dirname,
     files: ['src/**/*.ts'],
     ignores: ['**/*.spec.ts'],
     rules: {
@@ -106,10 +110,12 @@ export default defineConfig(
     }
   },
   {
+    basePath: __dirname,
     files: ['src/**/*.spec.ts'],
     rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax] }
   },
   {
+    basePath: __dirname,
     files: ['src/**/*.ts'],
     // CLI entry points that run outside Nest, so no logger exists there.
     ignores: [

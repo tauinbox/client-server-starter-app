@@ -252,7 +252,7 @@ export class PaddleProvider implements PaymentProvider {
   chargeOffSession(): Promise<ChargeResult> {
     // Paddle owns renewals; off-session charging is the self-managed (YooKassa)
     // path. Paddle usage is charged via chargeUsage (createOneTimeCharge).
-     
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'PaddleProvider.chargeOffSession is not applicable (provider-managed lifecycle)'
     );
@@ -260,7 +260,7 @@ export class PaddleProvider implements PaymentProvider {
 
   findOffSessionCharge(): Promise<ChargeResult | null> {
     // No off-session charges exist to reconcile (see chargeOffSession).
-     
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'PaddleProvider.findOffSessionCharge is not applicable (provider-managed lifecycle)'
     );
@@ -268,7 +268,7 @@ export class PaddleProvider implements PaymentProvider {
 
   getOffSessionCharge(): Promise<ChargeResult | null> {
     // No off-session charges exist to read back (see chargeOffSession).
-     
+    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'PaddleProvider.getOffSessionCharge is not applicable (provider-managed lifecycle)'
     );

@@ -38,7 +38,11 @@ export default defineConfig(
   {
     rules: baseRules
   },
+  // `basePath` keeps `src/**` relative to this workspace. The pre-commit hook
+  // runs ESLint from the repository root, where `src/**` matches nothing; the
+  // rule then reports each disable directive as unused and --fix deletes it.
   {
+    basePath: __dirname,
     files: ['src/**/*.ts'],
     // The control routes drive the tests; they mirror no server route.
     ignores: ['src/__tests__/**', 'src/control.routes.ts'],

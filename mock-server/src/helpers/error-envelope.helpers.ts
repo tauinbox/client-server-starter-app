@@ -45,7 +45,7 @@ export const errorEnvelope: RequestHandler = (req, res, next) => {
 
 /** Mirrors the 404 that Nest answers for a route it does not know. */
 export const routeNotFound: RequestHandler = (req, res) => {
-   
+  // eslint-disable-next-line no-restricted-syntax -- Nest sends this 404 with no key
   res.status(404).json({ message: `Cannot ${req.method} ${req.originalUrl}` });
 };
 
@@ -56,7 +56,7 @@ export const routeNotFound: RequestHandler = (req, res) => {
  */
 export const unhandledError: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof SyntaxError || err instanceof URIError) {
-     
+    // eslint-disable-next-line no-restricted-syntax -- Nest sends this 400 with no key
     res.status(400).json({ message: err.message });
     return;
   }

@@ -59,20 +59,20 @@ export class WebhookIngestionService {
     headers: IncomingHttpHeaders
   ): Promise<void> {
     if (!rawBody || rawBody.length === 0) {
-       
+      // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
       throw new BadRequestException('Missing webhook body');
     }
 
     const provider = this.providers.find((p) => p.id === providerId);
     if (!provider) {
-       
+      // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
       throw new BadRequestException('Unknown billing provider');
     }
 
     const event = await provider.verifyAndParseWebhook(rawBody, headers);
     if (event === null) {
       // Signature invalid, or a payload the provider cannot confirm.
-       
+      // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
       throw new BadRequestException('Webhook verification failed');
     }
     if (event === WEBHOOK_IGNORED) {

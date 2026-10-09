@@ -793,7 +793,7 @@ export class RoleService {
   async findRoleByName(name: string): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { name } });
     if (!role) {
-       
+      // eslint-disable-next-line no-restricted-syntax -- a deployment error (500): the migrations were not run
       throw new InternalServerErrorException(
         `System role "${name}" not found. Run migrations.`
       );

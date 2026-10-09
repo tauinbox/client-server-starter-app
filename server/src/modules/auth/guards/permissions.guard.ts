@@ -37,7 +37,7 @@ export class PermissionsGuard implements CanActivate {
     const { user } = req;
 
     if (!user) {
-       
+      // eslint-disable-next-line no-restricted-syntax -- a bare 401: the client handles it by status, never by text
       throw new UnauthorizedException();
     }
 
