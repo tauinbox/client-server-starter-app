@@ -1081,6 +1081,12 @@ The fixtures in `e2e/fixtures/` are modular:
   `base.fixture` applies the `/api` redirect and the SSE stub to the fixture page. A Playwright route
   applies to one page, thus a test that opens a second tab must apply `routeApiToMockServer()` to
   that tab.
+- `pending-requests.ts` records each request that `routeApiToMockServer()` routes. When a test
+  fails, `base.fixture` attaches `pending-api-requests.json`: each routed request that got no
+  response, with `reachedMockServer` and `documentStartedAfterRouting`. A request with
+  `documentStartedAfterRouting: true` is a request of an older document that a navigation
+  cancelled. Playwright sends no `requestfailed` event for it, thus it shows status `-1` in the
+  trace and is not a stall.
 
 **Wait for a dialog with `openedDialog(page)` before each keyboard operation.** Do not use
 `expect(getByRole('dialog')).toBeVisible()`. A dialog becomes visible approximately 150 ms before it

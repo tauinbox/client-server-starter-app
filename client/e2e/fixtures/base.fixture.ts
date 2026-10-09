@@ -8,6 +8,11 @@ import {
 import type { ControlApi } from '../../../mock-server/src/control.types';
 import type { Server } from 'http';
 import { routeApiToMockServer } from './helpers';
+import {
+  pendingRequestReport,
+  recordMockServerArrival,
+  resetRequestTracking
+} from './pending-requests';
 
 // ControlApi is the single source of truth for all __control endpoints.
 // TypeScript enforces that every ControlApi method is implemented in the
@@ -35,18 +40,23 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       const server = await listenOnUnblockedPort(app);
       const port = portOf(server);
       console.log(`[Worker] Mock server started on port ${port}`);
+      // Express rewrites `req.url` while it routes, so read it first.
+      server.prependListener('request', (req) =>
+        recordMockServerArrival(req.url ?? '')
+      );
       await use({ port, server });
       server.close();
     },
     { scope: 'worker' }
   ],
 
-  _mockServer: async ({ _workerMockServer, page }, use) => {
+  _mockServer: async ({ _workerMockServer, page }, use, testInfo) => {
     const { port } = _workerMockServer;
     const baseUrl = `http://localhost:${port}`;
 
     // Reset state before each test
     resetState();
+    resetRequestTracking();
 
     // Redirect all /api requests to worker's mock-server and stub the SSE stream
     await routeApiToMockServer(page, baseUrl);
@@ -225,6 +235,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     };
 
     await use(api);
+
+    if (testInfo.status !== testInfo.expectedStatus) {
+      await testInfo.attach('pending-api-requests.json', {
+        body: JSON.stringify(await pendingRequestReport(), null, 2),
+        contentType: 'application/json'
+      });
+    }
   }
 });
 
