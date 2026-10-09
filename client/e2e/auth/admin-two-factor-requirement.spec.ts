@@ -29,7 +29,7 @@ test.describe('two-factor requirement for an administrator', () => {
     ).toBeVisible();
 
     // The entry point is hidden, not merely denied.
-    await expect(page.getByRole('link', { name: 'Admin Panel' })).toHaveCount(
+    await expect(page.getByRole('link', { name: 'Admin panel' })).toHaveCount(
       0
     );
 
@@ -53,7 +53,7 @@ test.describe('two-factor requirement for an administrator', () => {
         .getByRole('alert')
         .filter({ hasText: 'Two-factor authentication is required' })
     ).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Admin Panel' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Admin panel' })).toBeVisible();
 
     await page.goto('/admin/users');
     await expect(page).toHaveURL(/\/admin\/users/);

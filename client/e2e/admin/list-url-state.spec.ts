@@ -119,7 +119,7 @@ test.describe('List state in the URL', () => {
         new URL(r.url()).pathname.endsWith(FLAGS_API) &&
         !new URL(r.url()).searchParams.has('enabled')
     );
-    await page.getByRole('tab', { name: 'Feature Flags' }).click();
+    await page.getByRole('tab', { name: 'Feature flags' }).click();
     await unfiltered;
     await expect(page).toHaveURL(/\/admin\/feature-flags$/);
   });

@@ -15,12 +15,12 @@ test.describe('Profile password change', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
-    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
+    await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
 
     // currentPassword field is now visible (rendered when new password entered).
     // Submit with it left empty — form-level validation must keep submit disabled.
-    await expect(page.getByLabel('Current Password')).toBeVisible();
+    await expect(page.getByLabel('Current password')).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Save', exact: true })
     ).toBeDisabled();
@@ -32,10 +32,10 @@ test.describe('Profile password change', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
-    await page.getByLabel('Current Password').fill('WrongPass1');
-    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
-    await page.getByLabel('First Name').click(); // blur
+    await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
+    await page.getByLabel('Current password').fill('WrongPass1');
+    await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
+    await page.getByLabel('First name').click(); // blur
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
@@ -58,12 +58,12 @@ test.describe('Profile password change', () => {
     const otherTab = await page.context().newPage();
     await routeApiToMockServer(otherTab, _mockServer.url);
     await otherTab.goto('/profile');
-    await expect(otherTab.getByLabel('First Name')).toBeVisible();
+    await expect(otherTab.getByLabel('First name')).toBeVisible();
 
-    // Current Password field only appears once the user starts typing a new password.
-    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
-    await page.getByLabel('Current Password').fill('Password1');
-    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
+    // Current password field only appears once the user starts typing a new password.
+    await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
+    await page.getByLabel('Current password').fill('Password1');
+    await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page).toHaveURL(/\/login\?password_changed=1$/);
@@ -87,12 +87,12 @@ test.describe('Profile password change', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await expect(page.getByLabel('Current Password')).not.toBeVisible();
+    await expect(page.getByLabel('Current password')).not.toBeVisible();
 
-    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
-    await expect(page.getByLabel('Current Password')).toBeVisible();
+    await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
+    await expect(page.getByLabel('Current password')).toBeVisible();
 
-    await page.getByLabel('New Password (Optional)').clear();
-    await expect(page.getByLabel('Current Password')).not.toBeVisible();
+    await page.getByLabel('New password (optional)').clear();
+    await expect(page.getByLabel('Current password')).not.toBeVisible();
   });
 });

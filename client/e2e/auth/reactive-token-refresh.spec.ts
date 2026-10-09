@@ -48,7 +48,7 @@ test.describe('Reactive access-token refresh', () => {
     // so we match it by text. Confirms the user list loaded successfully for
     // an authenticated admin.
     await expect(
-      page.getByText('User Management', { exact: true })
+      page.getByText('User management', { exact: true })
     ).toBeVisible();
     await expect(
       page.getByRole('cell', { name: /@example\.com$/ }).first()

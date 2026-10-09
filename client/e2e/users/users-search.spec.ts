@@ -17,7 +17,7 @@ async function searchFor(page: Page, q: string): Promise<void> {
   await response;
 }
 
-test.describe('Inline user search (User Management page)', () => {
+test.describe('Inline user search (User management page)', () => {
   test('should display the search box and the filters, with no Search button', async ({
     _mockServer,
     page
@@ -76,7 +76,7 @@ test.describe('Inline user search (User Management page)', () => {
 
     await searchFor(page, 'nonexistent@nowhere.com');
 
-    await expect(page.getByText('No Users Found')).toBeVisible();
+    await expect(page.getByText('No users found')).toBeVisible();
   });
 
   test('should return to the full list when the search box is emptied', async ({
@@ -87,7 +87,7 @@ test.describe('Inline user search (User Management page)', () => {
     await page.goto('/users');
 
     await searchFor(page, 'nonexistent@nowhere.com');
-    await expect(page.getByText('No Users Found')).toBeVisible();
+    await expect(page.getByText('No users found')).toBeVisible();
 
     const fullList = listResponse(page, '/api/v1/users/cursor', {});
     await page.getByLabel('Search').fill('');
@@ -188,7 +188,7 @@ test.describe('Inline user search (User Management page)', () => {
     });
     await chooseOption(page, 'Sign-in', 'Provider only');
     await providerOnly;
-    await expect(page.getByText('No Users Found')).toBeVisible();
+    await expect(page.getByText('No users found')).toBeVisible();
   });
 
   test('should filter users by selected role', async ({

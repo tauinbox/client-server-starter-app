@@ -59,12 +59,12 @@ test.describe('OAuth-only account sets its first password', () => {
     await page.goto('/profile');
 
     await page
-      .getByLabel('New Password (Optional)', { exact: true })
+      .getByLabel('New password (optional)', { exact: true })
       .fill(newPassword);
 
     // The field this account can never fill.
     await expect(
-      page.getByLabel('Current Password', { exact: true })
+      page.getByLabel('Current password', { exact: true })
     ).toHaveCount(0);
     await expect(page.getByText(/confirm it is you/i).first()).toBeVisible();
   });
@@ -111,10 +111,10 @@ test.describe('OAuth-only account sets its first password', () => {
     ).toBeVisible();
 
     await page
-      .getByLabel('New Password (Optional)', { exact: true })
+      .getByLabel('New password (optional)', { exact: true })
       .fill(newPassword);
     await page
-      .getByLabel('Confirm New Password', { exact: true })
+      .getByLabel('Confirm new password', { exact: true })
       .fill(newPassword);
 
     const saved = page.waitForResponse(
@@ -165,10 +165,10 @@ test.describe('OAuth-only account sets its first password', () => {
     ).toBeVisible();
 
     await page
-      .getByLabel('New Password (Optional)', { exact: true })
+      .getByLabel('New password (optional)', { exact: true })
       .fill(newPassword);
     await page
-      .getByLabel('Confirm New Password', { exact: true })
+      .getByLabel('Confirm new password', { exact: true })
       .fill(newPassword);
 
     const refused = page.waitForResponse(

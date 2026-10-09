@@ -70,7 +70,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/roles');
 
-    await page.getByRole('button', { name: 'Edit Role editor' }).click();
+    await page.getByRole('button', { name: 'Edit role editor' }).click();
     const dialog = await openedDialog(page);
 
     const name = dialog.getByLabel('Name');
@@ -96,9 +96,9 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
 
-    await page.getByRole('button', { name: 'Edit Resource Users' }).click();
+    await page.getByRole('button', { name: 'Edit resource Users' }).click();
     const dialog = await openedDialog(page);
-    await dialog.getByLabel('Display Name').fill('People');
+    await dialog.getByLabel('Display name').fill('People');
 
     await page.route('**/api/v1/rbac/resources/*', async (route) => {
       if (route.request().method() !== 'PATCH') {
@@ -120,6 +120,6 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
 
     await expect(dialog.getByRole('alert')).toBeVisible();
     await expectNoSnackbar(page);
-    await expect(dialog.getByLabel('Display Name')).toHaveValue('People');
+    await expect(dialog.getByLabel('Display name')).toHaveValue('People');
   });
 });

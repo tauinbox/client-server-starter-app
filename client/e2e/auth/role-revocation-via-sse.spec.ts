@@ -29,7 +29,7 @@ test.describe('Live RBAC update via SSE', () => {
     // Land on a screen where the sidenav admin link is rendered.
     await page.goto('/users');
 
-    const adminLink = page.getByRole('link', { name: 'Admin Panel' });
+    const adminLink = page.getByRole('link', { name: 'Admin panel' });
     await expect(adminLink).toBeVisible();
 
     // Server-side: drop the user's roles and push the SSE event without

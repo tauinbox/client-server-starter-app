@@ -38,10 +38,10 @@ test.describe('A refused request shows one error message', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('New Password (Optional)').fill('Quartz-Meadow-77');
-    await page.getByLabel('Current Password').fill('WrongPass1');
-    await page.getByLabel('Confirm New Password').fill('Quartz-Meadow-77');
-    await page.getByLabel('First Name').click();
+    await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
+    await page.getByLabel('Current password').fill('WrongPass1');
+    await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
+    await page.getByLabel('First name').click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.locator('.error-message')).toHaveText(
