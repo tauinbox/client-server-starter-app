@@ -22,6 +22,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { eventually } from './eventually';
 
 // The whole pipeline is real: the global JWT guard, whose session check is what
 // ends the access token of a device, the step-up, and the scoped delete.
@@ -161,10 +162,12 @@ runWithInfra('Active sessions (e2e)', () => {
     expect(await profileStatus(b.token)).toBe(401);
     expect(await profileStatus(a.token)).toBe(200);
 
-    const audit = await dataSource.getRepository(AuditLog).findOne({
-      where: { action: AuditAction.SESSION_REVOKE, actorEmail: ownerEmail },
-      order: { createdAt: 'DESC' }
-    });
+    const audit = await eventually(() =>
+      dataSource.getRepository(AuditLog).findOne({
+        where: { action: AuditAction.SESSION_REVOKE, actorEmail: ownerEmail },
+        order: { createdAt: 'DESC' }
+      })
+    );
     expect(audit?.details).toEqual({ scope: 'one', count: 1 });
   }, 30000);
 
