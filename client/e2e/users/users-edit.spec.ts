@@ -290,36 +290,60 @@ test.describe('User Edit page', () => {
     await expect(page.getByText('User updated successfully')).toBeVisible();
   });
 
-  // The server refusal carries an errorKey, so the Russian interface shows the
-  // reason, not the generic fallback of the form.
-  test('shows the reason of a refused role change on the Russian interface', async ({
+  // The server refuses to add or remove a super role for every caller.
+  test('disables a super role in the role select and says why', async ({
     _mockServer,
     page
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto(`/users/${mockId('user-3')}/edit`);
+
+    await expect(
+      page.getByText('Super roles are assigned only by the system')
+    ).toBeVisible();
+    await page.getByRole('combobox', { name: 'Roles', exact: true }).click();
+    const listbox = page.getByRole('listbox', { name: 'Roles', exact: true });
+    await expect(
+      listbox.getByRole('option', { name: 'admin', exact: true })
+    ).toBeDisabled();
+    await expect(
+      listbox.getByRole('option', { name: 'user', exact: true })
+    ).toBeEnabled();
+  });
+
+  // The server refusal carries an errorKey, so the Russian interface shows the
+  // reason, not the generic fallback of the form. SSE is stubbed, so the page
+  // keeps the ability that the role change took away.
+  test('shows the reason of a revoked permission on the Russian interface', async ({
+    _mockServer,
+    page
+  }) => {
+    const selfId = mockId('user-100');
+    await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.evaluate(() =>
       window.localStorage.setItem('preferred-language', 'ru')
     );
     await page.goto(`/users/${mockId('user-3')}/edit`);
+    await expect(page.getByLabel('Имя')).toHaveValue(/.+/);
 
-    await page.getByRole('combobox', { name: 'Роли', exact: true }).click();
-    await page
-      .getByRole('listbox', { name: 'Роли', exact: true })
-      .getByRole('option', { name: 'admin', exact: true })
-      .click();
-    await page.keyboard.press('Escape');
+    await _mockServer.changeUserRoles(selfId, ['user']);
+    await page.getByLabel('Имя').fill('Переименован');
+    await page.getByLabel('Имя').blur();
     const refused = page.waitForResponse(
       (response) =>
-        response.url().includes('/roles/assign/') &&
-        response.request().method() === 'POST'
+        response.url().includes(`/users/${mockId('user-3')}`) &&
+        response.request().method() === 'PATCH'
     );
     await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
     expect((await refused).status()).toBe(403);
 
     await expect(page.locator('.error-message')).toHaveText(
-      'Суперроль нельзя назначить'
+      'У вас нет прав на это действие.'
     );
     await expectNoSnackbar(page);
+    await expect(page).toHaveURL(
+      new RegExp(`/users/${mockId('user-3')}/edit$`)
+    );
   });
 
   test('should show confirmation dialog on "Delete" click', async ({

@@ -429,6 +429,44 @@ describe('UserEditComponent', () => {
         instance: role
       });
     });
+
+    it('refuses a super role even when the ability allows it', () => {
+      expect(
+        component.canAssignRole({
+          ...mockUserRole,
+          id: 'role-x',
+          isSuper: true
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('super role in the role select', () => {
+    const superRole: RoleAdminResponse = {
+      ...mockUserRole,
+      id: 'role-super',
+      name: 'admin',
+      isSuper: true
+    };
+
+    function hint(): string | undefined {
+      fixture.detectChanges();
+      return (fixture.nativeElement as HTMLElement)
+        .querySelector('mat-hint')
+        ?.textContent?.trim();
+    }
+
+    it('explains why a super role is disabled', () => {
+      roleCatalogMock.getAll.mockReturnValue(of([mockUserRole, superRole]));
+
+      expect(hint()).toBe('Super roles are assigned only by the system');
+    });
+
+    it('shows no hint when the catalog has no super role', () => {
+      roleCatalogMock.getAll.mockReturnValue(of([mockUserRole]));
+
+      expect(hint()).toBeUndefined();
+    });
   });
 
   describe('canManageUser (instance-level)', () => {
