@@ -26,6 +26,7 @@ export class InternalNetworkGuard implements CanActivate {
     this.logger.warn(
       `Rejected request from non-internal IP ${req.ip ?? '<unknown>'} on ${req.method} ${redactSensitiveQuery(req.originalUrl)}`
     );
+     
     throw new ForbiddenException();
   }
 }

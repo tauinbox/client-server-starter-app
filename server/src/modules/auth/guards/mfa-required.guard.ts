@@ -40,6 +40,7 @@ export class MfaRequiredGuard implements CanActivate {
     const { user } = req;
 
     if (!user) {
+       
       throw new UnauthorizedException();
     }
 

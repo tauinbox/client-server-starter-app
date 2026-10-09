@@ -10,6 +10,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import {
+  ErrorKeys,
   INVOICE_LIST_QUERY,
   SUBSCRIPTION_LIST_QUERY
 } from '@app/shared/constants';
@@ -44,6 +45,12 @@ import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 
 const ZERO = Money.fromMinor(0);
+
+const invoiceNotFound = () =>
+  new NotFoundException({
+    message: 'Invoice not found',
+    errorKey: ErrorKeys.BILLING.INVOICE_NOT_FOUND
+  });
 
 /**
  * Admin-facing billing operations. Unlike `BillingUserService`,
@@ -110,12 +117,16 @@ export class BillingAdminService {
       select: { id: true, status: true }
     });
     if (!event) {
-      throw new NotFoundException('Webhook event not found');
+      throw new NotFoundException({
+        message: 'Webhook event not found',
+        errorKey: ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND
+      });
     }
     if (event.status !== 'dead_letter') {
-      throw new ConflictException(
-        'Only dead-lettered webhook events can be replayed'
-      );
+      throw new ConflictException({
+        message: 'Only dead-lettered webhook events can be replayed',
+        errorKey: ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE
+      });
     }
     await this.webhookEvents.update(
       { id },
@@ -136,7 +147,10 @@ export class BillingAdminService {
   ): Promise<Subscription> {
     const subscription = await this.subscriptions.findOne({ where: { id } });
     if (!subscription) {
-      throw new NotFoundException('Subscription not found');
+      throw new NotFoundException({
+        message: 'Subscription not found',
+        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_FOUND
+      });
     }
     return cancelOpenSubscription(
       {
@@ -174,10 +188,13 @@ export class BillingAdminService {
       await withTransaction(this.dataSource, async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
         if (!invoice) {
-          throw new NotFoundException('Invoice not found');
+          throw invoiceNotFound();
         }
         if (invoice.status !== 'paid') {
-          throw new ConflictException('Only paid invoices can be refunded');
+          throw new ConflictException({
+            message: 'Only paid invoices can be refunded',
+            errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE
+          });
         }
 
         // Rejecting rather than capping is this route's policy: an admin who
@@ -186,9 +203,11 @@ export class BillingAdminService {
         const requested =
           amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
         if (requested.compare(ZERO) <= 0 || requested.compare(remaining) > 0) {
-          throw new BadRequestException(
-            'Refund amount must be between 1 and the remaining refundable total'
-          );
+          throw new BadRequestException({
+            message:
+              'Refund amount must be between 1 and the remaining refundable total',
+            errorKey: ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE
+          });
         }
 
         const { reserved: refundAmount, cumulative: cumulativeRefunded } =
@@ -224,7 +243,7 @@ export class BillingAdminService {
       async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
         if (!invoice) {
-          throw new NotFoundException('Invoice not found');
+          throw invoiceNotFound();
         }
 
         // The one-way `paid -> refunded` flip keeps grant revoke / credit

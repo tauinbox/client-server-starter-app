@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
-import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
+import {
+  listPage,
+  listQueryErrors,
+  rejectInvalidCursor
+} from '../helpers/list-query.helpers';
 
 import { getState, logAudit, toResourceResponse } from '../state';
 import {
@@ -42,6 +46,7 @@ router.get(
       res.status(400).json(validationError(errors));
       return;
     }
+    if (rejectInvalidCursor(res, query)) return;
     const page = listPage(
       Array.from(getState().resources.values()),
       RESOURCE_LIST_QUERY,

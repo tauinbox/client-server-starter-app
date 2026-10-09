@@ -720,17 +720,21 @@ describe('BillingAdminService', () => {
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({ status: 'pending' })
       );
-      await expect(ctx.service.refundInvoice('inv-1')).rejects.toThrow(
-        ConflictException
-      );
+      const refusal = ctx.service.refundInvoice('inv-1');
+      await expect(refusal).rejects.toThrow(ConflictException);
+      await expect(refusal).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE }
+      });
     });
 
     it('rejects a partial amount above the invoice total', async () => {
       const ctx = await build();
       ctx.invoices.findOne.mockResolvedValue(makeInvoice());
-      await expect(ctx.service.refundInvoice('inv-1', 99001)).rejects.toThrow(
-        BadRequestException
-      );
+      const refusal = ctx.service.refundInvoice('inv-1', 99001);
+      await expect(refusal).rejects.toThrow(BadRequestException);
+      await expect(refusal).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE }
+      });
     });
 
     it('rejects a refund that would push cumulative refunds past the total', async () => {

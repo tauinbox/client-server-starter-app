@@ -45,6 +45,7 @@ export const errorEnvelope: RequestHandler = (req, res, next) => {
 
 /** Mirrors the 404 that Nest answers for a route it does not know. */
 export const routeNotFound: RequestHandler = (req, res) => {
+   
   res.status(404).json({ message: `Cannot ${req.method} ${req.originalUrl}` });
 };
 
@@ -55,6 +56,7 @@ export const routeNotFound: RequestHandler = (req, res) => {
  */
 export const unhandledError: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof SyntaxError || err instanceof URIError) {
+     
     res.status(400).json({ message: err.message });
     return;
   }

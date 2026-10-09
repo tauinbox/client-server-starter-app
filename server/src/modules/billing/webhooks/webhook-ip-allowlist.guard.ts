@@ -52,6 +52,7 @@ export class WebhookIpAllowlistGuard implements CanActivate {
     this.logger.warn(
       `Rejected webhook from non-allowlisted IP ${req.ip ?? '<unknown>'} on ${req.method} ${redactSensitiveQuery(req.originalUrl)}`
     );
+     
     throw new ForbiddenException();
   }
 

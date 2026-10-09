@@ -8,7 +8,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
-import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  ErrorKeys
+} from '@app/shared/constants';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Plan } from '../entities/plan.entity';
@@ -75,16 +78,19 @@ export class UsageService {
     // A negative balance means a refund clawed back already-spent credits:
     // no new usage may accrue until the debt is topped up.
     if (await this.credits.isBlocked(input.customerId)) {
-      throw new ConflictException(
-        'Credit balance is negative. Top up credits before recording more usage.'
-      );
+      throw new ConflictException({
+        message:
+          'Credit balance is negative. Top up credits before recording more usage.',
+        errorKey: ErrorKeys.BILLING.CREDITS_BLOCKED
+      });
     }
 
     const subscription = await this.findActiveSubscription(input.customerId);
     if (!subscription) {
-      throw new NotFoundException(
-        'No active subscription for customer to record usage against'
-      );
+      throw new NotFoundException({
+        message: 'No active subscription for customer to record usage against',
+        errorKey: ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION
+      });
     }
 
     // One query answers both questions: is this meter in the catalog at all, and
@@ -93,9 +99,10 @@ export class UsageService {
       where: [{ key: subscription.planKey }, { meterKey: input.meterKey }]
     });
     if (!candidates.some((p) => p.meterKey === input.meterKey)) {
-      throw new BadRequestException(
-        `Meter "${input.meterKey}" is not declared by any plan`
-      );
+      throw new BadRequestException({
+        message: `Meter "${input.meterKey}" is not declared by any plan`,
+        errorKey: ErrorKeys.BILLING.METER_NOT_DECLARED
+      });
     }
 
     const record = this.usageRecords.create({

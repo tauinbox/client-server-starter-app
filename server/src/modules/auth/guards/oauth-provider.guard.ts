@@ -41,6 +41,7 @@ export function createOAuthProviderGuard(
           error instanceof Error &&
           error.message.startsWith(MISSING_STRATEGY_MESSAGE)
         ) {
+           
           throw new NotFoundException(
             `${providerName} OAuth is not configured`
           );

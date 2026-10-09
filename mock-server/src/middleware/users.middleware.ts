@@ -19,7 +19,8 @@ import {
 import {
   listPage,
   listQueryErrors,
-  parseListQuery
+  parseListQuery,
+  rejectInvalidCursor
 } from '../helpers/list-query.helpers';
 import {
   findUserByEmail,
@@ -83,6 +84,7 @@ function listUsers(req: Request, res: Response): void {
     res.status(400).json(validationError(queryErrors));
     return;
   }
+  if (rejectInvalidCursor(res, query)) return;
   const { role, includeDeleted } = parseListQuery(query, USER_LIST_QUERY);
   const users = Array.from(getState().users.values()).filter(
     (u) => (includeDeleted || !u.deletedAt) && (!role || u.roles.includes(role))

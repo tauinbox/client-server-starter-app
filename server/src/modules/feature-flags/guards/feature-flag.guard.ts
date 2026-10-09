@@ -26,12 +26,14 @@ export class FeatureFlagGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
     const userId = req.user?.userId;
     if (!userId) {
+       
       throw new NotFoundException();
     }
 
     const user = await this.resolver.buildResolverUser(userId);
     const enabled = await this.resolver.isEnabledForUser(user, req, key);
     if (!enabled) {
+       
       throw new NotFoundException();
     }
     return true;

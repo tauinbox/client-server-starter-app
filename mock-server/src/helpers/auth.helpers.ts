@@ -93,7 +93,11 @@ export function requirePermission(
         details: { required: [`${action}:${subject}`] },
         ip: req.ip
       });
-      return { error: 403, message: 'Insufficient permissions' };
+      return {
+        error: 403,
+        message: 'Insufficient permissions',
+        errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+      };
     }
 
     return result;
@@ -174,9 +178,11 @@ export function assertInstancePermission(
       subject: subjectName
     }
   });
-  res
-    .status(403)
-    .json({ message: 'Insufficient permissions', statusCode: 403 });
+  res.status(403).json({
+    message: 'Insufficient permissions',
+    statusCode: 403,
+    errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+  });
   return false;
 }
 

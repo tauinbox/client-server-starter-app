@@ -1,8 +1,11 @@
+import type { Response } from 'express';
 import {
+  ErrorKeys,
   UUID_PATTERN,
   MAX_LIST_FILTER_LENGTH,
   MAX_PAGE_SIZE
 } from '@app/shared/constants';
+import { parseCursor } from '@app/shared/utils/cursor';
 import type {
   ListFilterDefinition,
   ListFilterKind,
@@ -229,6 +232,24 @@ export function filterByListQuery<T extends object, S extends ListQuerySpec>(
       );
     });
   });
+}
+
+/**
+ * Mirrors `decodeCursor`, which the service runs after the query DTO passed:
+ * a cursor that does not decode is a 400. Call it after `listQueryErrors`.
+ */
+export function rejectInvalidCursor(
+  res: Response,
+  query: Record<string, unknown>
+): boolean {
+  const { cursor } = parseCursorQuery(query);
+  if (!cursor || parseCursor(cursor)) return false;
+  res.status(400).json({
+    message: 'Invalid cursor',
+    statusCode: 400,
+    errorKey: ErrorKeys.GENERAL.INVALID_CURSOR
+  });
+  return true;
 }
 
 /**

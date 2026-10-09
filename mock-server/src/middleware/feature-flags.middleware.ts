@@ -34,7 +34,11 @@ import {
   type FeatureFlagRuleEffect,
   type FeatureFlagRuleType
 } from '@app/shared/constants';
-import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
+import {
+  listPage,
+  listQueryErrors,
+  rejectInvalidCursor
+} from '../helpers/list-query.helpers';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import { findPreviewAttributesError } from '@app/shared/utils/feature-flag-preview-attributes';
@@ -321,7 +325,9 @@ type ValidatedRule = {
 // a value that rulesErrors accepted.
 function parseRules(
   value: unknown
-): { ok: true; rules: ValidatedRule[] } | { ok: false; message: string } {
+):
+  | { ok: true; rules: ValidatedRule[] }
+  | { ok: false; message: string; errorKey: string } {
   const out: ValidatedRule[] = [];
   for (const entry of value as IncomingRule[]) {
     const type = entry.type as FeatureFlagRuleType;
@@ -330,7 +336,13 @@ function parseRules(
       entry.payload,
       KNOWN_CUSTOM_KEYS
     );
-    if (!parsed.ok) return parsed;
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        message: parsed.message,
+        errorKey: ErrorKeys.FEATURE_FLAGS.INVALID_RULE
+      };
+    }
     out.push({
       type,
       effect: entry.effect as FeatureFlagRuleEffect,
@@ -358,7 +370,8 @@ function parseIfMatch(
     return {
       ok: false,
       status: 400,
-      message: 'If-Match must be a positive integer'
+      message: 'If-Match must be a positive integer',
+      errorKey: ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID
     };
   }
   return { ok: true, version };
@@ -545,6 +558,7 @@ adminRouter.get(
       res.status(400).json(validationError(errors));
       return;
     }
+    if (rejectInvalidCursor(res, query)) return;
     const page = listPage(
       filterByAbility(
         Array.from(getState().featureFlags.values()),
@@ -659,7 +673,7 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
     return;
   }
   if (rules && !rules.ok) {
-    sendError(res, 400, rules.message);
+    sendError(res, 400, rules.message, rules.errorKey);
     return;
   }
   const now = nowIso();
@@ -745,7 +759,7 @@ adminRouter.patch(
       return;
     }
     if (rules && !rules.ok) {
-      sendError(res, 400, rules.message);
+      sendError(res, 400, rules.message, rules.errorKey);
       return;
     }
     if (flag.version !== ifMatch.version) {
@@ -916,7 +930,7 @@ adminRouter.post(
     }
     const draftRules = rulesOf(body);
     if (draftRules && !draftRules.ok) {
-      sendError(res, 400, draftRules.message);
+      sendError(res, 400, draftRules.message, draftRules.errorKey);
       return;
     }
     const draftEnvironments =

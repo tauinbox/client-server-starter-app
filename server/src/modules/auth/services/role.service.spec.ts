@@ -660,9 +660,14 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
-      await expect(
-        service.assignRoleToUser('user-1', 'role-1', ability)
-      ).rejects.toThrow(ForbiddenException);
+      const refusal = service.assignRoleToUser('user-1', 'role-1', ability);
+      await expect(refusal).rejects.toThrow(ForbiddenException);
+      await expect(refusal).rejects.toMatchObject({
+        response: {
+          message: 'Cannot assign super roles',
+          errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
+        }
+      });
     });
 
     it('should throw ForbiddenException when ability denies update on target user', async () => {
@@ -767,9 +772,14 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
-      await expect(
-        service.removeRoleFromUser('user-1', 'role-1', ability)
-      ).rejects.toThrow(ForbiddenException);
+      const refusal = service.removeRoleFromUser('user-1', 'role-1', ability);
+      await expect(refusal).rejects.toThrow(ForbiddenException);
+      await expect(refusal).rejects.toMatchObject({
+        response: {
+          message: 'Cannot remove super roles',
+          errorKey: ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
+        }
+      });
     });
 
     it('should throw ForbiddenException when ability denies update on target user', async () => {

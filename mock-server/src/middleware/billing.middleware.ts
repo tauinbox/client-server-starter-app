@@ -39,7 +39,11 @@ import {
 } from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
 import { mockCheckoutUrl } from '../routes/mock-checkout';
-import { listPage, listQueryErrors } from '../helpers/list-query.helpers';
+import {
+  listPage,
+  listQueryErrors,
+  rejectInvalidCursor
+} from '../helpers/list-query.helpers';
 import { addInterval } from '../utils/period';
 import type {
   AuthenticatedRequest,
@@ -107,6 +111,7 @@ function cancelBodyErrors(body: unknown): string[] {
 // 200 success shape. Synthetic lifecycle injection is driven through /__control.
 function handleWebhook(req: Request, res: Response): void {
   if (!req.body || Object.keys(req.body).length === 0) {
+     
     res.status(400).json({ message: 'Missing webhook body', statusCode: 400 });
     return;
   }
@@ -195,7 +200,8 @@ function rejectMissingPaddlePrice(
   res.status(503).json({
     statusCode: 503,
     message: `Plan "${plan.key}" has no Paddle price configured`,
-    error: 'Service Unavailable'
+    error: 'Service Unavailable',
+    errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
   });
   return true;
 }
@@ -389,6 +395,7 @@ billingRouter.get('/invoices', authGuard, (req: Request, res: Response) => {
   const query = req.query as Record<string, unknown>;
   const errors = listQueryErrors(query, INVOICE_LIST_QUERY);
   if (rejectInvalidBody(res, errors)) return;
+  if (rejectInvalidCursor(res, query)) return;
 
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
@@ -1255,6 +1262,7 @@ billingAdminRouter.get(
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, SUBSCRIPTION_LIST_QUERY);
     if (rejectInvalidBody(res, errors)) return;
+    if (rejectInvalidCursor(res, query)) return;
 
     const page = listPage(
       [...getState().billingSubscriptions.values()],
@@ -1275,6 +1283,7 @@ billingAdminRouter.get(
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, INVOICE_LIST_QUERY);
     if (rejectInvalidBody(res, errors)) return;
+    if (rejectInvalidCursor(res, query)) return;
 
     const page = listPage(
       [...getState().billingInvoices.values()],
@@ -1297,9 +1306,11 @@ billingAdminRouter.post(
       (req.params['id'] as string) ?? ''
     );
     if (!sub) {
-      res
-        .status(404)
-        .json({ message: 'Subscription not found', statusCode: 404 });
+      res.status(404).json({
+        message: 'Subscription not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_FOUND
+      });
       return;
     }
     // Addressed by id, so a canceled row can be handed in — the self-service
@@ -1392,13 +1403,18 @@ billingAdminRouter.post(
       (req.params['id'] as string) ?? ''
     );
     if (!invoice) {
-      res.status(404).json({ message: 'Invoice not found', statusCode: 404 });
+      res.status(404).json({
+        message: 'Invoice not found',
+        statusCode: 404,
+        errorKey: ErrorKeys.BILLING.INVOICE_NOT_FOUND
+      });
       return;
     }
     if (invoice.status !== 'paid') {
       res.status(409).json({
         message: 'Only paid invoices can be refunded',
-        statusCode: 409
+        statusCode: 409,
+        errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE
       });
       return;
     }
@@ -1410,7 +1426,8 @@ billingAdminRouter.post(
       res.status(400).json({
         message:
           'Refund amount must be between 1 and the remaining refundable total',
-        statusCode: 400
+        statusCode: 400,
+        errorKey: ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE
       });
       return;
     }
@@ -1437,9 +1454,11 @@ billingAdminRouter.post(
   permissionGuard('update', 'Billing'),
   requireUuid('id'),
   (_req: Request, res: Response) => {
-    res
-      .status(404)
-      .json({ message: 'Webhook event not found', statusCode: 404 });
+    res.status(404).json({
+      message: 'Webhook event not found',
+      statusCode: 404,
+      errorKey: ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND
+    });
   }
 );
 
@@ -1520,7 +1539,8 @@ billingAdminRouter.post(
       res.status(409).json({
         message:
           'Credit balance is negative. Top up credits before recording more usage.',
-        statusCode: 409
+        statusCode: 409,
+        errorKey: ErrorKeys.BILLING.CREDITS_BLOCKED
       });
       return;
     }
@@ -1537,7 +1557,8 @@ billingAdminRouter.post(
     if (!subscription) {
       res.status(404).json({
         message: 'No active subscription for customer to record usage against',
-        statusCode: 404
+        statusCode: 404,
+        errorKey: ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION
       });
       return;
     }
@@ -1548,7 +1569,8 @@ billingAdminRouter.post(
     if (![...state.plans.values()].some((p) => p.meterKey === meterKey)) {
       res.status(400).json({
         message: `Meter "${meterKey}" is not declared by any plan`,
-        statusCode: 400
+        statusCode: 400,
+        errorKey: ErrorKeys.BILLING.METER_NOT_DECLARED
       });
       return;
     }

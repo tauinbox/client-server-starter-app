@@ -1,4 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
+import { thrownBy } from '../testing/thrown-by';
 import { encodeCursor, decodeCursor } from './cursor.util';
 
 describe('cursor.util', () => {
@@ -33,6 +35,15 @@ describe('cursor.util', () => {
   describe('decodeCursor — invalid input', () => {
     it('should throw BadRequestException for invalid base64', () => {
       expect(() => decodeCursor('not-valid!!!')).toThrow(BadRequestException);
+    });
+
+    it('carries an errorKey, so the client can translate the refusal', () => {
+      expect(thrownBy(() => decodeCursor('not-valid!!!'))).toMatchObject({
+        response: {
+          message: 'Invalid cursor',
+          errorKey: ErrorKeys.GENERAL.INVALID_CURSOR
+        }
+      });
     });
 
     it('should throw BadRequestException for valid base64 but invalid JSON', () => {

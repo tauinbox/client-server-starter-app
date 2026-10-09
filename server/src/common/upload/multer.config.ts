@@ -72,6 +72,7 @@ export function createDiskStorageOptions(options: {
     ) {
       if (!allowedExtensions.test(file.originalname)) {
         return callback(
+           
           new BadRequestException('File type not allowed'),
           false
         );
@@ -80,6 +81,7 @@ export function createDiskStorageOptions(options: {
       const expectedMimeTypes = UPLOAD_ALLOWED_MIME_TYPES[ext];
       if (!expectedMimeTypes || !expectedMimeTypes.includes(file.mimetype)) {
         return callback(
+           
           new BadRequestException('File MIME type does not match extension'),
           false
         );

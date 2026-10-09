@@ -59,17 +59,20 @@ export class WebhookIngestionService {
     headers: IncomingHttpHeaders
   ): Promise<void> {
     if (!rawBody || rawBody.length === 0) {
+       
       throw new BadRequestException('Missing webhook body');
     }
 
     const provider = this.providers.find((p) => p.id === providerId);
     if (!provider) {
+       
       throw new BadRequestException('Unknown billing provider');
     }
 
     const event = await provider.verifyAndParseWebhook(rawBody, headers);
     if (event === null) {
       // Signature invalid, or a payload the provider cannot confirm.
+       
       throw new BadRequestException('Webhook verification failed');
     }
     if (event === WEBHOOK_IGNORED) {

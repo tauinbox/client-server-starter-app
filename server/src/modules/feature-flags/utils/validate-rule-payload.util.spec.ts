@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  ErrorKeys,
   FEATURE_FLAG_ATTRIBUTE_FIELD_OPS,
   FEATURE_FLAG_ATTRIBUTE_FIELDS,
   FEATURE_FLAG_ATTRIBUTE_OPS,
@@ -12,6 +13,7 @@ import {
   ATTRIBUTE_VALUE_MAX_ITEMS,
   ATTRIBUTE_VALUE_MAX_LENGTH
 } from '@app/shared/utils/feature-flag-attribute-value';
+import { thrownBy } from '../../../common/testing/thrown-by';
 import { validateRulePayload } from './validate-rule-payload.util';
 
 describe('validateRulePayload user and role lists', () => {
@@ -297,6 +299,20 @@ describe('validateRulePayload attribute value', () => {
         knownCustomKeys
       )
     ).toThrow('customKey "nope" is not registered in the attribute registry');
+  });
+
+  it('carries an errorKey beside the specific message', () => {
+    expect(
+      thrownBy(() =>
+        validateRulePayload(
+          'percentage',
+          { type: 'percentage', percent: 500 },
+          knownCustomKeys
+        )
+      )
+    ).toMatchObject({
+      response: { errorKey: ErrorKeys.FEATURE_FLAGS.INVALID_RULE }
+    });
   });
 
   it('drops a customKey sent with a field that is not custom', () => {

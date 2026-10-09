@@ -1,6 +1,7 @@
 import {
   expect,
   expectAuthRedirect,
+  expectNoSnackbar,
   loginViaUi,
   test
 } from '../fixtures/base.fixture';
@@ -287,6 +288,38 @@ test.describe('User Edit page', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
+  });
+
+  // The server refusal carries an errorKey, so the Russian interface shows the
+  // reason, not the generic fallback of the form.
+  test('shows the reason of a refused role change on the Russian interface', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.evaluate(() =>
+      window.localStorage.setItem('preferred-language', 'ru')
+    );
+    await page.goto(`/users/${mockId('user-3')}/edit`);
+
+    await page.getByRole('combobox', { name: 'Роли', exact: true }).click();
+    await page
+      .getByRole('listbox', { name: 'Роли', exact: true })
+      .getByRole('option', { name: 'admin', exact: true })
+      .click();
+    await page.keyboard.press('Escape');
+    const refused = page.waitForResponse(
+      (response) =>
+        response.url().includes('/roles/assign/') &&
+        response.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    expect((await refused).status()).toBe(403);
+
+    await expect(page.locator('.error-message')).toHaveText(
+      'Суперроль нельзя назначить'
+    );
+    await expectNoSnackbar(page);
   });
 
   test('should show confirmation dialog on "Delete" click', async ({

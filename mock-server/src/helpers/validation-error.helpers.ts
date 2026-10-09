@@ -15,6 +15,7 @@ export function requireUuid(...params: string[]): RequestHandler {
   return (req, res, next) => {
     for (const param of params) {
       if (!isUuid(String(req.params[param] ?? ''))) {
+         
         res.status(400).json({
           message: 'Validation failed (uuid is expected)',
           statusCode: 400,
