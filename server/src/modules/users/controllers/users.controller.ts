@@ -1,6 +1,5 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
@@ -14,8 +13,7 @@ import {
   Post,
   Query,
   Request,
-  SerializeOptions,
-  UseInterceptors
+  SerializeOptions
 } from '@nestjs/common';
 import { packRules } from '@casl/ability/extra';
 import { subject } from '@casl/ability';
@@ -80,7 +78,6 @@ import { maskEmail } from '../../../common/utils/escape-html';
   actions: ['create', 'read', 'update', 'delete', 'search'],
   conditionalActions: ['create', 'read', 'update', 'delete', 'search']
 })
-@UseInterceptors(ClassSerializerInterceptor)
 @SerializeOptions({ groups: ['privileged'] })
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);

@@ -1,14 +1,12 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
-  Query,
-  UseInterceptors
+  Query
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -54,7 +52,6 @@ import { UsageResponseDto } from '../dtos/usage-response.dto';
   actions: ['search', 'create', 'update', 'refund'],
   conditionalActions: []
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class BillingAdminController {
   constructor(
     private readonly billingAdmin: BillingAdminService,

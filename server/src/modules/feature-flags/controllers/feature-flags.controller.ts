@@ -1,11 +1,4 @@
-import {
-  ClassSerializerInterceptor,
-  Controller,
-  Get,
-  Req,
-  Res,
-  UseInterceptors
-} from '@nestjs/common';
+import { Controller, Get, Req, Res } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -29,7 +22,6 @@ type RequestWithUser = Request & {
   path: 'feature-flags',
   version: '1'
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class FeatureFlagsController {
   constructor(
     private readonly resolver: FeatureFlagResolverService,

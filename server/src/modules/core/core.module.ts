@@ -26,6 +26,7 @@ import { RequestLoggingMiddleware } from './middleware/request-logging.middlewar
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MetricsModule } from './metrics/metrics.module';
 import { HttpMetricsInterceptor } from './interceptors/http-metrics.interceptor';
+import { RESPONSE_SERIALIZER } from './interceptors/response-serializer.provider';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 import { BillingModule } from '../billing/billing.module';
@@ -117,7 +118,8 @@ export class CoreModule implements NestModule {
         {
           provide: APP_INTERCEPTOR,
           useClass: HttpMetricsInterceptor
-        }
+        },
+        RESPONSE_SERIALIZER
       ]
     };
   }

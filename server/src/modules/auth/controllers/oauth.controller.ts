@@ -1,6 +1,5 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
@@ -13,8 +12,7 @@ import {
   Request,
   Res,
   UseFilters,
-  UseGuards,
-  UseInterceptors
+  UseGuards
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -95,7 +93,6 @@ function invalidOAuthData(): HttpException {
   path: 'auth/oauth',
   version: '1'
 })
-@UseInterceptors(ClassSerializerInterceptor)
 @UseFilters(OAuthAuthenticationExceptionFilter)
 export class OAuthController {
   private readonly logger = new Logger(OAuthController.name);

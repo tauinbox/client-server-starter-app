@@ -1,6 +1,5 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
@@ -11,8 +10,7 @@ import {
   Put,
   Query,
   Req,
-  SerializeOptions,
-  UseInterceptors
+  SerializeOptions
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -64,7 +62,6 @@ import type { JwtAuthRequest } from '../types/auth.request';
   actions: ['create', 'read', 'update', 'delete', 'assign'],
   conditionalActions: ['create', 'update', 'delete', 'assign']
 })
-@UseInterceptors(ClassSerializerInterceptor)
 @SerializeOptions({ groups: ['privileged'] })
 export class RolesController {
   constructor(

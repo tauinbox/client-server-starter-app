@@ -25,6 +25,7 @@ import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard'
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { UsageService } from '../src/modules/billing/services/usage.service';
 import { BillingAdminController } from '../src/modules/billing/controllers/billing-admin.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuditLogInterceptor } from '../src/modules/audit/interceptors/audit-log.interceptor';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -110,6 +111,7 @@ describe('Billing admin (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [BillingAdminController],
       providers: [
+        RESPONSE_SERIALIZER,
         { provide: BillingAdminService, useValue: billingAdmin },
         { provide: UsageService, useValue: usage },
         { provide: AuditService, useValue: audit },

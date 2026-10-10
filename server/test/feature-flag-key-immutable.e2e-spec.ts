@@ -12,6 +12,7 @@ import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 import type { Server } from 'http';
 import { FeatureFlagsAdminController } from '../src/modules/feature-flags/controllers/feature-flags-admin.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
@@ -41,6 +42,7 @@ describe('Feature flag key is immutable after create (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [FeatureFlagsAdminController],
       providers: [
+        RESPONSE_SERIALIZER,
         { provide: FeatureFlagService, useValue: flagService },
         { provide: PermissionService, useValue: {} },
         { provide: CaslAbilityFactory, useValue: {} },

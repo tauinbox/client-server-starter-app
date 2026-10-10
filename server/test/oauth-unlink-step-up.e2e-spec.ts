@@ -14,6 +14,7 @@ import { Server } from 'http';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { OAuthController } from '../src/modules/auth/controllers/oauth.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { OAuthService } from '../src/modules/auth/services/oauth.service';
 import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.service';
 import { AuthService } from '../src/modules/auth/services/auth.service';
@@ -45,6 +46,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [OAuthController],
       providers: [
+        RESPONSE_SERIALIZER,
         AuthCookies,
         {
           provide: AuthService,

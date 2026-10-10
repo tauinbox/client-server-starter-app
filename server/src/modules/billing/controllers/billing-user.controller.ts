@@ -1,14 +1,12 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Get,
   HttpCode,
   Post,
   Put,
   Query,
-  Req,
-  UseInterceptors
+  Req
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -46,7 +44,6 @@ import { PurchaseSessionResponseDto } from '../dtos/purchase-session-response.dt
   path: 'billing',
   version: '1'
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class BillingUserController {
   constructor(
     private readonly billingUser: BillingUserService,

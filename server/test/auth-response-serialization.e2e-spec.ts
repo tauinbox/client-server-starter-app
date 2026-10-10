@@ -13,6 +13,7 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import type { Server } from 'http';
 import { AuthController } from '../src/modules/auth/controllers/auth.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { OAuthController } from '../src/modules/auth/controllers/oauth.controller';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
@@ -174,6 +175,7 @@ describe('Auth response serialization (e2e)', () => {
       imports: [JwtModule.register({ secret: 'test-secret' })],
       controllers: [AuthController, OAuthController],
       providers: [
+        RESPONSE_SERIALIZER,
         AuthCookies,
         SignInCompletionService,
         { provide: CACHE_MANAGER, useValue: createMockCache() },

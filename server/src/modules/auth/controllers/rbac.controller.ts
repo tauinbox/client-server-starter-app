@@ -1,6 +1,5 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Get,
   HttpCode,
@@ -12,8 +11,7 @@ import {
   Patch,
   Post,
   Query,
-  Request,
-  UseInterceptors
+  Request
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -62,7 +60,6 @@ const METADATA_CACHE_TTL = 60_000; // 1 minute
   actions: ['read', 'update'],
   conditionalActions: ['update']
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class RbacController {
   constructor(
     private readonly resourceService: ResourceService,

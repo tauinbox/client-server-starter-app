@@ -43,6 +43,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { FeatureFlagsController } from '../src/modules/feature-flags/controllers/feature-flags.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { ANON_ID_COOKIE } from '../src/modules/feature-flags/utils/anon-id-cookie';
 import cookieParser from 'cookie-parser';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
@@ -864,6 +865,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [FeatureFlagsController, TestFeatureController],
       providers: [
+        RESPONSE_SERIALIZER,
         FeatureFlagService,
         FeatureFlagResolverService,
         AttributeRegistryService,

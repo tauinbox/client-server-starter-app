@@ -1,13 +1,11 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   HttpCode,
   HttpStatus,
   Post,
   Request,
-  Res,
-  UseInterceptors
+  Res
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -47,7 +45,6 @@ import { SignInCompletionService } from '../services/sign-in-completion.service'
   path: 'auth/mfa',
   version: '1'
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class MfaController {
   constructor(
     private readonly authService: AuthService,

@@ -1,6 +1,5 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
@@ -10,8 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Request,
-  Res,
-  UseInterceptors
+  Res
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -51,7 +49,6 @@ import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator'
   path: 'auth/sessions',
   version: '1'
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class SessionsController {
   constructor(
     private readonly authService: AuthService,

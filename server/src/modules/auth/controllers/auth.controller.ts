@@ -1,6 +1,5 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Get,
   HttpCode,
@@ -11,7 +10,6 @@ import {
   Request,
   Res,
   UseGuards,
-  UseInterceptors,
   UnauthorizedException
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -84,7 +82,6 @@ import { SignInCompletionService } from '../services/sign-in-completion.service'
   actions: ['update'],
   conditionalActions: []
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
