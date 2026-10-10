@@ -43,6 +43,7 @@ import {
   ListSkeletonComponent,
   type ListSkeletonCell
 } from '@shared/components/list-skeleton/list-skeleton.component';
+import { ListEmptyComponent } from '@shared/components/list-empty/list-empty.component';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingInvoicesStore } from '../../store/billing-invoices.store';
@@ -83,7 +84,8 @@ import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.sto
     MatCell,
     TranslocoDirective,
     InfiniteScrollDirective,
-    ListSkeletonComponent
+    ListSkeletonComponent,
+    ListEmptyComponent
   ],
   templateUrl: './billing-admin-list.component.html',
   styleUrl: './billing-admin-list.component.scss',

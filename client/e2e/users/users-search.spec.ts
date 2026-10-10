@@ -76,7 +76,9 @@ test.describe('Inline user search (User management page)', () => {
 
     await searchFor(page, 'nonexistent@nowhere.com');
 
-    await expect(page.getByText('No users found')).toBeVisible();
+    await expect(
+      page.getByText('Nothing matches these filters.')
+    ).toBeVisible();
   });
 
   test('should return to the full list when the search box is emptied', async ({
@@ -87,7 +89,9 @@ test.describe('Inline user search (User management page)', () => {
     await page.goto('/users');
 
     await searchFor(page, 'nonexistent@nowhere.com');
-    await expect(page.getByText('No users found')).toBeVisible();
+    await expect(
+      page.getByText('Nothing matches these filters.')
+    ).toBeVisible();
 
     const fullList = listResponse(page, '/api/v1/users/cursor', {});
     await page.getByLabel('Search').fill('');
@@ -188,7 +192,9 @@ test.describe('Inline user search (User management page)', () => {
     });
     await chooseOption(page, 'Sign-in', 'Provider only');
     await providerOnly;
-    await expect(page.getByText('No users found')).toBeVisible();
+    await expect(
+      page.getByText('Nothing matches these filters.')
+    ).toBeVisible();
   });
 
   test('should filter users by selected role', async ({

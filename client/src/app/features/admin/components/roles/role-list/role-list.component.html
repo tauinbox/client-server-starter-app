@@ -20,7 +20,11 @@
     @if (loading() && roles().length === 0) {
       <nxs-list-skeleton [cells]="skeletonCells" />
     } @else if (roles().length === 0) {
-      <p class="empty-state">{{ t('common.noFilterResults') }}</p>
+      <nxs-list-empty
+        icon="shield"
+        [message]="t('admin.roles.empty')"
+        [filtered]="hasActiveFilters()"
+      />
     } @else {
       <div class="table-wrapper">
         <table

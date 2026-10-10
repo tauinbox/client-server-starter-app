@@ -278,6 +278,12 @@ describe('BillingSettingsComponent', () => {
     expect(fixture.nativeElement.querySelector('.empty-state')).not.toBeNull();
   });
 
+  it('renders the shared list empty state with no invoice', async () => {
+    await setup(false);
+    const empty = fixture.nativeElement.querySelector('nxs-list-empty');
+    expect(empty?.textContent).toContain('No invoices yet.');
+  });
+
   it('confirms then cancels the subscription', async () => {
     await setup(true);
     fixture.componentInstance.onCancel();

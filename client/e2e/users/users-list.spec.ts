@@ -95,7 +95,7 @@ test.describe('User List page', () => {
     });
     await page.goto('/users');
 
-    await expect(page.getByText('No users found')).toBeVisible();
+    await expect(page.getByText('No users yet.')).toBeVisible();
   });
 
   test('should not display a paginator', async ({ _mockServer, page }) => {

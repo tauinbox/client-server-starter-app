@@ -1,0 +1,6 @@
+<ng-container *transloco="let t">
+  <mat-icon class="empty-icon" aria-hidden="true">{{ icon() }}</mat-icon>
+  <p class="empty-message">
+    {{ filtered() ? t('common.noFilterResults') : message() }}
+  </p>
+</ng-container>

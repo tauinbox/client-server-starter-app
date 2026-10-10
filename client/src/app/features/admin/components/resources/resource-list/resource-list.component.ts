@@ -49,6 +49,7 @@ import {
   ListSkeletonComponent,
   type ListSkeletonCell
 } from '@shared/components/list-skeleton/list-skeleton.component';
+import { ListEmptyComponent } from '@shared/components/list-empty/list-empty.component';
 import type { ResourceFormDialogData } from '../resource-form-dialog/resource-form-dialog.component';
 import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-form-dialog.component';
 
@@ -64,6 +65,7 @@ import { ResourceFormDialogComponent } from '../resource-form-dialog/resource-fo
     MatProgressSpinner,
     InfiniteScrollDirective,
     ListSkeletonComponent,
+    ListEmptyComponent,
     MatTooltip,
     MatChip,
     MatTable,
@@ -106,6 +108,7 @@ export class ResourceListComponent {
   }
 
   readonly filters = this.#resourcesStore.filters;
+  readonly hasActiveFilters = this.#resourcesStore.hasActiveFilters;
 
   readonly filterControls: readonly ListFilterControl<ResourceListQuery>[] = [
     {
