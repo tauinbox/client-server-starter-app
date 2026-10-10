@@ -44,6 +44,7 @@ import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-eve
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
@@ -363,6 +364,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [BillingWebhooksController, BillingUserController],
       providers: [
+        RESPONSE_SERIALIZER,
         WebhookIngestionService,
         BillingEventReducer,
         {
@@ -853,6 +855,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
       imports: [EventEmitterModule.forRoot()],
       controllers: [BillingWebhooksController],
       providers: [
+        RESPONSE_SERIALIZER,
         WebhookIngestionService,
         BillingEventReducer,
         {

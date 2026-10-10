@@ -23,6 +23,7 @@ import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard'
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { ErrorKeys, MAX_PAGE_SIZE } from '@app/shared/constants';
 import { CursorPaginatedResponseDto } from '../src/common/dtos/cursor-paginated-response.dto';
 
@@ -109,6 +110,7 @@ describe('Billing user self-service (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [BillingUserController],
       providers: [
+        RESPONSE_SERIALIZER,
         { provide: BillingUserService, useValue: billingUser },
         { provide: EntitlementService, useValue: entitlements },
         EntitlementGuard,

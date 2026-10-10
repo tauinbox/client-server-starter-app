@@ -35,6 +35,7 @@ import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { RolesController } from '../src/modules/auth/controllers/roles.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -155,6 +156,7 @@ describe('Grant scope over the HTTP path', () => {
     @Module({
       controllers: [RolesController],
       providers: [
+        RESPONSE_SERIALIZER,
         RoleService,
         { provide: AbilityHolder, useValue: holder },
         { provide: APP_GUARD, useClass: TestJwtAuthGuard },

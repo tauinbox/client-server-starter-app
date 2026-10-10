@@ -13,6 +13,7 @@ import request from 'supertest';
 import { Strategy as OAuth2Strategy } from 'passport-oauth2';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { OAuthController } from './oauth.controller';
+import { RESPONSE_SERIALIZER } from '../../core/interceptors/response-serializer.provider';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
@@ -155,6 +156,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
       imports: [PassportModule],
       controllers: [OAuthController],
       providers: [
+        RESPONSE_SERIALIZER,
         AuthCookies,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {

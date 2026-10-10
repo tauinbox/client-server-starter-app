@@ -1,9 +1,4 @@
-import {
-  ClassSerializerInterceptor,
-  Controller,
-  Get,
-  UseInterceptors
-} from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { PaddleClientConfigResponse } from '@app/shared/types';
 import { Public } from '../../auth/decorators/public.decorator';
@@ -16,7 +11,6 @@ import { PlanService } from '../services/plan.service';
   path: 'billing',
   version: '1'
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class BillingPlansController {
   constructor(
     private readonly planService: PlanService,

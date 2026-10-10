@@ -15,6 +15,7 @@ import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 import type { Server } from 'http';
 import { AuthController } from '../src/modules/auth/controllers/auth.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersService } from '../src/modules/users/services/users.service';
@@ -45,6 +46,7 @@ describe('Profile mass-assignment protection (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        RESPONSE_SERIALIZER,
         AuthCookies,
         SignInCompletionService,
         { provide: AuthService, useValue: {} },

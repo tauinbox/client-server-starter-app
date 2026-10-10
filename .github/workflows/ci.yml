@@ -49,6 +49,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run check:routes
       - run: npm run check:enums
+      - run: npm run check:controllers
       - run: npm run check:permissions
       - run: npm run check:i18n
       # Repo-wide, not server-scoped: it walks all four source roots, and

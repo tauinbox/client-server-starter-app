@@ -34,6 +34,7 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 
 // ── In-memory stores + EntityManager / DataSource / repo stand-ins ──────────
 
@@ -340,6 +341,7 @@ describe('Billing payment-method update flow (e2e)', () => {
       imports: [EventEmitterModule.forRoot()],
       controllers: [BillingWebhooksController],
       providers: [
+        RESPONSE_SERIALIZER,
         WebhookIngestionService,
         BillingEventReducer,
         {

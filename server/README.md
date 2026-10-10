@@ -53,6 +53,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
 | Revert migration | `npm run migrations:revert` (build first) |
 | Run seeders | `npm run seed:run` (build first) |
+| Validate the controller layout | `npm run check:controllers` fails when a module keeps a controller outside its `controllers/` folder, when a sub-feature folder holds more than one controller, when a controller registers `ClassSerializerInterceptor` (`CoreModule` registers it for every route), or when a test app mounts a production controller without `CoreModule` and without `RESPONSE_SERIALIZER`. CI applies it in the `Server - Checks` job |
 | Validate i18n keys | `npm run check:i18n` verifies that each `ErrorKeys` value exists in each client i18n JSON file. CI applies it in the `Server - Checks` job. Thus a new error key with no translation fails the build |
 | Generate CASL subjects | `npm run generate:subjects` scans the `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`. Run it when you add a new resource |
 | Report grants against the grant-scope rule | `npm run check:grant-scope` is read-only. Refer to the description below the table |
@@ -189,6 +190,11 @@ src/
     └── users/              # User CRUD
 ```
 
+The controllers of a module are in `<module>/controllers/`. A sub-feature folder with its own
+service or module (`auth/captcha/`, `billing/webhooks/`, `core/health/`, `core/metrics/`) and the
+one-controller `notifications/` module keep their single controller beside the service.
+`npm run check:controllers` enforces this layout.
+
 The subsections below give the detail of each directory.
 
 #### common
@@ -250,6 +256,12 @@ unreachable Redis from holding a request, and the server then serves the data wi
 `database/` holds the TypeORM and PostgreSQL configuration.
 
 `filters/` holds `GlobalExceptionFilter`. It gives a standard error response and maps a DB error.
+
+`interceptors/response-serializer.provider.ts` holds `RESPONSE_SERIALIZER`, a global
+`ClassSerializerInterceptor`. It removes the `@Exclude()` fields and applies the
+`@SerializeOptions` groups of the controller on each route, and on each SSE event. A controller does
+not register its own serializer. A test that mounts a controller without `CoreModule` adds
+`RESPONSE_SERIALIZER` to its providers.
 
 `logger-options.ts` holds `buildLoggerOptions(ENVIRONMENT)`, the `nestjs-pino` configuration. The
 Nest `Logger` gives each argument after the message to pino as a printf value, and pino drops a
@@ -1151,7 +1163,7 @@ form, and its `roles` field is a `RoleResponse[]` array. `AdminUserResponseDto` 
 Request -> Global Middleware (Compression, CookieParser, CORS)
         -> Module Middleware
         -> Guards (JwtAuthGuard, RolesGuard)
-        -> Interceptors (ClassSerializer with @SerializeOptions, custom)
+        -> Interceptors (global ClassSerializer with @SerializeOptions, custom)
         -> Pipes (ValidationPipe, custom)
         -> Controller Handler
         -> Interceptors (response phase)

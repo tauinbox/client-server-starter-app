@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
@@ -14,8 +13,7 @@ import {
   Patch,
   Post,
   Query,
-  Req,
-  UseInterceptors
+  Req
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -69,7 +67,6 @@ import type { FeatureFlagAttributeKeysResponse } from '@app/shared/types';
   actions: ['create', 'read', 'update', 'delete', 'search'],
   conditionalActions: ['create', 'read', 'update', 'delete', 'search']
 })
-@UseInterceptors(ClassSerializerInterceptor)
 export class FeatureFlagsAdminController {
   constructor(
     private readonly flagService: FeatureFlagService,

@@ -12,6 +12,7 @@ import type { Server } from 'http';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { PlanService } from '../src/modules/billing/services/plan.service';
 import { BillingPlansController } from '../src/modules/billing/controllers/billing-plans.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { PaddleProvider } from '../src/modules/billing/providers/paddle.provider';
 import { PADDLE_CLIENT } from '../src/modules/billing/providers/paddle.client';
 import { ConfigService } from '@nestjs/config';
@@ -76,6 +77,7 @@ describe('Billing plan catalog (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [BillingPlansController],
       providers: [
+        RESPONSE_SERIALIZER,
         PlanService,
         { provide: getRepositoryToken(Plan), useValue: planRepo },
         PaddleProvider,

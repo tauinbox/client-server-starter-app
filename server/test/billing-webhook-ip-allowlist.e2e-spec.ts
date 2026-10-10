@@ -20,6 +20,7 @@ import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-eve
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { WebhookIpAllowlistGuard } from '../src/modules/billing/webhooks/webhook-ip-allowlist.guard';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 
 function makeEvent(id: string): NormalizedEvent {
   return {
@@ -110,6 +111,7 @@ async function makeApp(options: {
   const moduleRef = await Test.createTestingModule({
     controllers: [BillingWebhooksController],
     providers: [
+      RESPONSE_SERIALIZER,
       WebhookIngestionService,
       WebhookIpAllowlistGuard,
       {

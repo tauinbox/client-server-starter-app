@@ -27,6 +27,7 @@
     "migrations:revert": "npx typeorm-ts-node-esm migration:revert -d dist/server/src/postgres-data-source.js",
     "check:routes": "ts-node scripts/check-routes.ts",
     "check:enums": "ts-node scripts/check-enums.ts",
+    "check:controllers": "ts-node scripts/check-controllers.ts",
     "check:permissions": "ts-node scripts/check-permissions.ts",
     "check:i18n": "ts-node -r tsconfig-paths/register scripts/check-i18n-keys.ts",
     "check:imports": "node ../scripts/check-imports.mjs",

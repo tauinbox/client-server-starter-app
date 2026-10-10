@@ -22,6 +22,7 @@ import type {
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { BillingWebhooksController } from '../src/modules/billing/webhooks/billing-webhooks.controller';
+import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 
 function readGlobalLimit(): number {
   const globalThrottler = buildThrottlerOptions(undefined).throttlers.find(
@@ -131,6 +132,7 @@ describe('Billing webhook throttle exemption (e2e)', () => {
       imports: [ThrottlerModule.forRoot(buildThrottlerOptions(undefined))],
       controllers: [BillingWebhooksController],
       providers: [
+        RESPONSE_SERIALIZER,
         WebhookIngestionService,
         // WebhookIpAllowlistGuard dep; unset allowlist keeps the receivers open
         { provide: ConfigService, useValue: { get: () => undefined } },
