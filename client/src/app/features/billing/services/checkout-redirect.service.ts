@@ -27,7 +27,7 @@ export class CheckoutRedirectService {
     const win = this.#window;
     if (!win) return;
     if (!isSafeCheckoutUrl(url, win.location.origin)) {
-      this.#notify.error('billing.errors.unsafeRedirect');
+      this.#notify.error('billing.checkout.errorUnsafeRedirect');
       return;
     }
     win.location.href = url;

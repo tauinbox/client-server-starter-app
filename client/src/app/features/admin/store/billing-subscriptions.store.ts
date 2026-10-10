@@ -26,7 +26,7 @@ export const BillingSubscriptionsStore = signalStore(
   withList({
     spec: SUBSCRIPTION_LIST_QUERY,
     urlKey: 'subs',
-    fallbackKey: 'admin.billing.errors.loadFailed',
+    fallbackKey: 'admin.billing.errorLoadFailed',
     fetcher: () => {
       const billing = inject(BillingAdminService);
       return (request) => billing.listSubscriptions(request);
@@ -50,12 +50,12 @@ export const BillingSubscriptionsStore = signalStore(
             billing.cancelSubscription(id, mode)
           );
           patchState(store, updateEntity({ id, changes: updated }));
-          notify.success('admin.billing.cancelSuccess');
+          notify.success('admin.billing.successCancelled');
           return true;
         } catch (error) {
           notify.error(
             error as HttpErrorResponse,
-            'admin.billing.errors.cancelFailed'
+            'admin.billing.errorCancelFailed'
           );
           return false;
         } finally {

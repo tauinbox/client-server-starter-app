@@ -1010,6 +1010,15 @@ string.
 each `en.json` value that has no sentence punctuation. A proper noun or the name of a UI control
 goes into its `ALLOWED_CAPITALISED` set.
 
+**Key names and key checks.** A failure message key is `error<X>` (`errorLoadFailed`), a success
+message key is `success<Result>` (`successCancelled`). The key goes in the section of the screen that
+shows it; a message that a store shows goes in a `store` section (`billing.store.errorLoadFailed`).
+A feature file has no `errors` group, because the root `errors.*` group holds the server error keys.
+`check:i18n-keys` (`scripts/check-i18n-keys.mjs`, part of `npm run lint`) checks these names. It also
+checks that each single-quoted key in a non-spec `.ts` or `.html` file is in `en.json` and `ru.json`
+of its scope, and that the two files of a scope hold the same keys. A dynamic key is a literal prefix
+that ends with `.` or `_`.
+
 ## Testing
 
 ### Unit Tests (Vitest)

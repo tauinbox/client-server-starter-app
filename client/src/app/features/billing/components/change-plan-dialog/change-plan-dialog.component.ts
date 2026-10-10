@@ -216,7 +216,7 @@ export class ChangePlanDialogComponent {
             parseHttpErrorMessage(
               error,
               this.#transloco,
-              'billing.changePlan.previewFailed'
+              'billing.changePlan.errorPreviewFailed'
             )
           );
           this.previewLoading.set(false);

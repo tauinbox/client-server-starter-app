@@ -67,7 +67,7 @@ describe('Admin billing requests through the error interceptor', () => {
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
-      'admin.billing.errors.loadFailed'
+      'admin.billing.errorLoadFailed'
     );
   });
 
@@ -79,7 +79,7 @@ describe('Admin billing requests through the error interceptor', () => {
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
-      'admin.billing.errors.loadFailed'
+      'admin.billing.errorLoadFailed'
     );
   });
 
@@ -93,7 +93,7 @@ describe('Admin billing requests through the error interceptor', () => {
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
-      'admin.billing.errors.cancelFailed'
+      'admin.billing.errorCancelFailed'
     );
   });
 
@@ -105,7 +105,7 @@ describe('Admin billing requests through the error interceptor', () => {
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
-      'admin.billing.errors.refundFailed'
+      'admin.billing.errorRefundFailed'
     );
   });
 });

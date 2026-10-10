@@ -172,6 +172,20 @@ test.describe('Password reset', () => {
     await expect(page.getByText(/passwords do not match/i)).toBeVisible();
   });
 
+  test('should show a translated error when the confirmation is empty', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/reset-password?token=some-token');
+
+    await page.getByLabel('New password').fill('Quartz-Meadow-77');
+    await page.getByLabel('Confirm password').focus();
+    await page.getByText('Reset password').first().click();
+
+    await expect(page.getByText('Confirm your new password')).toBeVisible();
+    await expect(page.getByText(/auth\.resetPassword\./)).toHaveCount(0);
+  });
+
   test('should reject login with old password after reset', async ({
     _mockServer,
     page

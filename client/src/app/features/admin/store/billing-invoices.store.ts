@@ -20,7 +20,7 @@ export const BillingInvoicesStore = signalStore(
   withList({
     spec: INVOICE_LIST_QUERY,
     urlKey: 'invoices',
-    fallbackKey: 'admin.billing.errors.loadFailed',
+    fallbackKey: 'admin.billing.errorLoadFailed',
     fetcher: () => {
       const billing = inject(BillingAdminService);
       return (request) => billing.listInvoices(request);
@@ -41,12 +41,12 @@ export const BillingInvoicesStore = signalStore(
             billing.refundInvoice(id, amountMinor)
           );
           patchState(store, updateEntity({ id, changes: updated }));
-          notify.success('admin.billing.refundSuccess');
+          notify.success('admin.billing.successRefunded');
           return true;
         } catch (error) {
           notify.error(
             error as HttpErrorResponse,
-            'admin.billing.errors.refundFailed'
+            'admin.billing.errorRefundFailed'
           );
           return false;
         } finally {

@@ -58,7 +58,9 @@ const initialState: BillingState = {
 export const BillingStore = signalStore(
   withEntities<InvoiceResponse>(),
   withState(initialState),
-  withCursorList<InvoiceResponse>({ fallbackKey: 'billing.errors.loadFailed' }),
+  withCursorList<InvoiceResponse>({
+    fallbackKey: 'billing.store.errorLoadFailed'
+  }),
   withComputed((store) => ({
     /** The plan the caller is currently subscribed to, if any. */
     currentPlan: computed(() => {
@@ -87,7 +89,10 @@ export const BillingStore = signalStore(
         const plans = await firstValueFrom(billing.getPlans());
         patchState(store, { plans });
       } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorLoadFailed'
+        );
       }
     }
 
@@ -96,7 +101,10 @@ export const BillingStore = signalStore(
         const region = await firstValueFrom(billing.getRegion());
         patchState(store, { region });
       } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorLoadFailed'
+        );
       }
     }
 
@@ -105,7 +113,10 @@ export const BillingStore = signalStore(
         const products = await firstValueFrom(billing.getProducts());
         patchState(store, { products });
       } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorLoadFailed'
+        );
       }
     }
 
@@ -162,7 +173,7 @@ export const BillingStore = signalStore(
       if (failed) {
         notify.error(
           failed.reason as HttpErrorResponse,
-          'billing.errors.loadFailed'
+          'billing.store.errorLoadFailed'
         );
       }
     }
@@ -174,7 +185,10 @@ export const BillingStore = signalStore(
         patchState(store, { subscription });
         return subscription;
       } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.loadFailed');
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorLoadFailed'
+        );
         return store.subscription();
       }
     }
@@ -192,7 +206,7 @@ export const BillingStore = signalStore(
       } catch (error) {
         notify.error(
           error as HttpErrorResponse,
-          'billing.errors.checkoutFailed'
+          'billing.store.errorCheckoutFailed'
         );
         return null;
       } finally {
@@ -213,7 +227,7 @@ export const BillingStore = signalStore(
       } catch (error) {
         notify.error(
           error as HttpErrorResponse,
-          'billing.errors.purchaseFailed'
+          'billing.store.errorPurchaseFailed'
         );
         return null;
       } finally {
@@ -246,9 +260,12 @@ export const BillingStore = signalStore(
       try {
         const subscription = await firstValueFrom(billing.changePlan(planKey));
         patchState(store, { subscription });
-        notify.success('billing.changePlan.success');
+        notify.success('billing.changePlan.successChanged');
       } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.changeFailed');
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorChangeFailed'
+        );
         return false;
       } finally {
         patchState(store, { working: false });
@@ -277,7 +294,7 @@ export const BillingStore = signalStore(
       } catch (error) {
         notify.error(
           error as HttpErrorResponse,
-          'billing.errors.paymentMethodFailed'
+          'billing.store.errorPaymentMethodFailed'
         );
         return null;
       } finally {
@@ -290,10 +307,13 @@ export const BillingStore = signalStore(
       try {
         const subscription = await firstValueFrom(billing.cancel(mode));
         patchState(store, { subscription });
-        notify.success('billing.settings.cancelSuccess');
+        notify.success('billing.settings.successCancelled');
         return true;
       } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.cancelFailed');
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorCancelFailed'
+        );
         return false;
       } finally {
         patchState(store, { working: false });
@@ -307,7 +327,10 @@ export const BillingStore = signalStore(
         patchState(store, { region: updated });
         return true;
       } catch (error) {
-        notify.error(error as HttpErrorResponse, 'billing.errors.regionFailed');
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorRegionFailed'
+        );
         return false;
       } finally {
         patchState(store, { working: false });

@@ -412,7 +412,7 @@ describe('BillingSettingsComponent', () => {
       await fixture.whenStable();
 
       expect(notifyMock.error).toHaveBeenCalledWith(
-        'billing.errors.paymentFormUnavailable'
+        'billing.settings.errorPaymentFormUnavailable'
       );
     });
 
