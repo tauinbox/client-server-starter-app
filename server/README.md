@@ -538,8 +538,9 @@ not need to know which flag changed. A role rename or delete that changes role r
 after the commit.
 
 `listeners/feature-flag-changed.listener.ts` reacts to `FeatureFlagChangedEvent`. It invalidates the
-cache, increases the version, and calls `pushToAll` over SSE. It also does a per-user invalidation on
-`UserRoleChangedEvent` and on `UserDeletedEvent`.
+cache and calls `pushToAll` over SSE, through a coalescing window of 500 ms. On `UserRoleChangedEvent`
+it pushes `feature_flags_updated` to that user only. It invalidates nothing per user, because the
+server keeps no per-user cache.
 
 `utils/validate-rule-payload.util.ts` wraps the shared `parseFeatureFlagRulePayload`
 (`shared/src/utils/feature-flag-rule-payload.ts`) and throws its message as a 400. That function
@@ -2510,9 +2511,10 @@ change.
 
 The system invalidates the cache at each change. It coalesces the broadcast in a window of 500 ms.
 Thus a burst of changes causes one synchronized refetch on the client, and not one refetch for each
-change. One save in a dialog is such a burst, because it emits an update and a rules-replaced event.
+change. Several saves in quick succession are such a burst; one save emits one event.
 
-`UserRoleChangedEvent` and `UserDeletedEvent` invalidate the cache of the affected user only.
+The server keeps no per-user cache, so a user event invalidates nothing. `UserRoleChangedEvent` only
+sends `feature_flags_updated` to the affected user.
 
 Role rules store role names. `RoleService` emits `RoleRenamedEvent` and `RoleDeletedEvent` inside the
 transaction that renames or deletes the role. `RoleRulesListener` rewrites the rules in that

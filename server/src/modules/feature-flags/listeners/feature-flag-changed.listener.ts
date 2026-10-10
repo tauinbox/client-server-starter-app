@@ -20,8 +20,8 @@ export class FeatureFlagChangedListener implements OnModuleDestroy {
   async handleFeatureFlagChanged(): Promise<void> {
     await this.resolver.invalidateAll();
     // Every broadcast makes all connected clients refetch their flag set at
-    // once, so a burst of changes (e.g. one dialog save emitting update +
-    // rules-replaced) must collapse into a single delayed push, not N.
+    // once, so a burst of changes (e.g. several saves in quick succession)
+    // must collapse into a single delayed push, not N.
     if (this.#broadcastTimer) return;
     this.#broadcastTimer = setTimeout(() => {
       this.#broadcastTimer = null;
