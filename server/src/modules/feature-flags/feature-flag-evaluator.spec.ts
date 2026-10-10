@@ -377,6 +377,139 @@ describe('evaluateFeatureFlag — rule types', () => {
     ];
     expect(evaluateFeatureFlag(baseFlag(), rules, baseCtx())).toBe(false);
   });
+
+  describe('email and emailDomain compare case-insensitively', () => {
+    const attributes = { email: 'bob@acme.org', emailDomain: 'acme.org' };
+    const cases: [
+      string,
+      Extract<EvaluatorRule['payload'], { type: 'attribute' }>
+    ][] = [
+      [
+        'email eq',
+        { type: 'attribute', field: 'email', op: 'eq', value: 'Bob@ACME.org' }
+      ],
+      [
+        'email in',
+        {
+          type: 'attribute',
+          field: 'email',
+          op: 'in',
+          value: ['other@x.io', 'BOB@acme.ORG']
+        }
+      ],
+      [
+        'email endsWith',
+        {
+          type: 'attribute',
+          field: 'email',
+          op: 'endsWith',
+          value: '@Acme.Org'
+        }
+      ],
+      [
+        'emailDomain eq',
+        { type: 'attribute', field: 'emailDomain', op: 'eq', value: 'ACME.ORG' }
+      ],
+      [
+        'emailDomain in',
+        {
+          type: 'attribute',
+          field: 'emailDomain',
+          op: 'in',
+          value: ['EXAMPLE.COM', 'Acme.Org']
+        }
+      ],
+      [
+        'emailDomain endsWith',
+        {
+          type: 'attribute',
+          field: 'emailDomain',
+          op: 'endsWith',
+          value: 'ACME.ORG'
+        }
+      ]
+    ];
+
+    it.each(cases)('%s: an include rule includes', (_, payload) => {
+      expect(
+        evaluateFeatureFlag(
+          baseFlag(),
+          [rule('include', payload)],
+          baseCtx({ attributes })
+        )
+      ).toBe(true);
+    });
+
+    it.each(cases)('%s: an exclude rule excludes', (_, payload) => {
+      expect(
+        evaluateFeatureFlag(
+          baseFlag(),
+          [rule('exclude', payload)],
+          baseCtx({ attributes })
+        )
+      ).toBe(false);
+    });
+
+    it('a mixed-case actual value matches a lower-case rule', () => {
+      const rules = [
+        rule('include', {
+          type: 'attribute',
+          field: 'email',
+          op: 'eq',
+          value: 'bob@acme.org'
+        }),
+        rule('include', {
+          type: 'attribute',
+          field: 'emailDomain',
+          op: 'in',
+          value: ['acme.org']
+        })
+      ];
+      for (const ctx of [
+        baseCtx({ attributes: { email: 'BOB@Acme.org' } }),
+        baseCtx({ attributes: { emailDomain: 'ACME.ORG' } })
+      ]) {
+        expect(evaluateFeatureFlag(baseFlag(), rules, ctx)).toBe(true);
+      }
+    });
+
+    it('a custom attribute stays case-sensitive', () => {
+      const rules = [
+        rule('include', {
+          type: 'attribute',
+          field: 'custom',
+          op: 'eq',
+          value: 'Gold',
+          customKey: 'tier'
+        })
+      ];
+      expect(
+        evaluateFeatureFlag(
+          baseFlag(),
+          rules,
+          baseCtx({ attributes: { tier: 'gold' } })
+        )
+      ).toBe(false);
+    });
+
+    it('a non-string email value does not match', () => {
+      const rules = [
+        rule('include', {
+          type: 'attribute',
+          field: 'email',
+          op: 'in',
+          value: [42]
+        })
+      ];
+      expect(
+        evaluateFeatureFlag(
+          baseFlag(),
+          rules,
+          baseCtx({ attributes: { email: '42' } })
+        )
+      ).toBe(false);
+    });
+  });
 });
 
 describe('evaluateFeatureFlag — composition', () => {
