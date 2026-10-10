@@ -932,6 +932,8 @@ The state and the HTTP calls are in `features/admin/{store,services}`:
 - **`FeatureFlagsAdminStore`** is a route-level `signalStore` with
   `withEntities<FeatureFlagResponse>`. It has the same structure as `RolesStore`. `load()` uses
   `rxMethod`. Each CRUD method returns an `Observable`, thus a caller can show its own notification.
+  On a version conflict, `updateFlag()` loads the row again and then rethrows the error, so the next
+  edit from the list switch or the edit dialog sends the current version.
 - **`FeatureFlagsAdminService`** is the HTTP wrapper for `/api/v1/admin/feature-flags/*`. `update()`
   sets `If-Match: <expectedVersion>` for optimistic locking. If the version is stale, the server
   answers HTTP 409 with `errors.featureFlags.versionConflict`.
