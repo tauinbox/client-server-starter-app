@@ -102,7 +102,7 @@ src/app/
 │   │   ├── store/          # FeatureFlagsStore is an NgRx Signal Store with { providedIn: 'root' }.
 │   │   │                   # State: { flags: Record<string, boolean>; loaded: boolean }.
 │   │   │                   # Methods: load(), reload(), clear(), and isEnabled(key), which returns
-│   │   │                   # a memoized computed signal for each key.
+│   │   │                   # a new computed signal on each call.
 │   │   ├── guards/         # featureFlagGuard(key, redirectTo = '/forbidden') first calls
 │   │   │                   # ensureAuthenticated(), thus an expired token gets a refresh before
 │   │   │                   # the flag check. On a miss it returns the redirectTo UrlTree.
@@ -811,7 +811,7 @@ The client core is in `src/app/features/feature-flags/`.
 
 | Piece | Use it for |
 |-------|------------|
-| `FeatureFlagsStore` (`providedIn: 'root'`) | To read the evaluated flag map from any place. `flags()` gives a `Record<string, boolean>`. `loaded()` gives a `boolean`. `isEnabled(key)` gives a `Signal<boolean>`. Each key has one memoized computed signal, which all consumers of that key share |
+| `FeatureFlagsStore` (`providedIn: 'root'`) | To read the evaluated flag map from any place. `flags()` gives a `Record<string, boolean>`. `loaded()` gives a `boolean`. `isEnabled(key)` gives a `Signal<boolean>`. Each call makes a new computed signal over `flags()`; the store keeps no cache of them, because a computed signal is cheap |
 | `featureFlagGuard(key, redirectTo?)` | To gate a route: `canActivate: [featureFlagGuard('new-dashboard')]`. The guard runs `ensureAuthenticated()` first, and then `isEnabled(key)`. On a miss it goes to `redirectTo`. The default is `/forbidden` |
 | `HasFeatureDirective`, that is `*nxsHasFeature` | To gate a template. The optional `nxsHasFeatureElse` input takes a fallback `<ng-template>`. The directive reacts to a store update through `effect()` |
 | `FeatureEnabledPipe`, that is `\| featureEnabled` | To gate an attribute binding. The pipe sets `pure: false`, because the value comes from the store signal and not from the pipe argument. The cost is one property read for each check cycle |
@@ -896,8 +896,9 @@ The dialog opens at `DialogSize.Wide` on a desktop. On a handset it uses the
 `.app-dialog-fullscreen-mobile` panel class from `_dialogs.scss`. That class gives an edge-to-edge
 layout of `100vw` by `100dvh`, with a sticky title and sticky actions.
 
-The rule order at save time is the array order. The component makes `priority: i` from the rendered
-index before it sends the data, because the server contract still requires `priority`.
+The dialog sends the rules in the rendered order, and the server keeps that order. The order does not
+change the result, because the evaluator reads every exclude rule before the include rules. It only
+selects the rule that the preview shows as the match.
 
 The `public` field has helper text. The text says that the field controls **anonymous** visibility
 only. A save of an enabled flag with no include rules asks for the same "enable for everyone"
