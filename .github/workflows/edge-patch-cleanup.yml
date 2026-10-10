@@ -14,8 +14,8 @@ jobs:
     name: Check & Clean CVE Patches
     runs-on: ubuntu-latest
     # No `packages:` grant and no registry login: both images below are built
-    # with `load: true` for a local Trivy scan and never pushed, and the base
-    # images come from Docker Hub, which needs no credentials here.
+    # with `load: true` for a local Trivy scan and never pushed. The base
+    # images come from Docker Hub through the mirror.gcr.io pull mirror.
     permissions:
       contents: write
       pull-requests: write
@@ -47,6 +47,10 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
         if: steps.check.outputs.found == 'true'
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
 
       - name: Lowercase owner
         if: steps.check.outputs.found == 'true'

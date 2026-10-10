@@ -1186,6 +1186,21 @@ docker-compose build
 docker-compose up -d
 ```
 
+### Host Docker daemon
+
+Configure a Docker Hub pull mirror on the deployment host. The redis, db, prometheus and grafana
+images come from Docker Hub, and an anonymous Docker Hub pull can fail with `429 Too Many Requests`.
+Add this key to `/etc/docker/daemon.json` and keep the other keys:
+
+```json
+"registry-mirrors": ["https://mirror.gcr.io"]
+```
+
+Validate the file with `sudo dockerd --validate --config-file /etc/docker/daemon.json`. Then apply
+it with `sudo kill -HUP $(pidof dockerd)`. This option reloads without a daemon restart, thus the
+containers continue to run. `docker info` shows the mirror under `Registry Mirrors`. If the mirror
+does not hold an image, the daemon pulls it from Docker Hub.
+
 Services:
 
 - **redis** is redis:7.4-alpine. It supplies the distributed rate limiting and the shared permission

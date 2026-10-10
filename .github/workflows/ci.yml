@@ -68,9 +68,11 @@ jobs:
       run:
         working-directory: server
 
+    # Docker Hub images come through mirror.gcr.io: anonymous Docker Hub pulls
+    # from shared runner IPs hit the 429 rate limit.
     services:
       postgres:
-        image: postgres:18-alpine
+        image: mirror.gcr.io/library/postgres:18-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -84,7 +86,7 @@ jobs:
           --health-retries 5
 
       mailpit:
-        image: axllent/mailpit:v1.30.0
+        image: mirror.gcr.io/axllent/mailpit:v1.30.0
         ports:
           - 1025:1025
           - 8025:8025
