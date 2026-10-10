@@ -62,34 +62,11 @@ jobs:
     name: Server – Tests & Build
     needs: [server-checks]
     runs-on: ubuntu-latest
-    # Worst observed: ~2.7 min, plus the postgres and mailpit service containers.
+    # Worst observed: ~2.7 min, plus the postgres and mailpit containers.
     timeout-minutes: 20
     defaults:
       run:
         working-directory: server
-
-    # Docker Hub images come through mirror.gcr.io: anonymous Docker Hub pulls
-    # from shared runner IPs hit the 429 rate limit.
-    services:
-      postgres:
-        image: mirror.gcr.io/library/postgres:18-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: testdb
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      mailpit:
-        image: mirror.gcr.io/axllent/mailpit:v1.30.0
-        ports:
-          - 1025:1025
-          - 8025:8025
 
     env:
       DB_HOST: localhost
@@ -112,6 +89,44 @@ jobs:
       SMTP_PORT: 1025
 
     steps:
+      # Anonymous Docker Hub pulls from shared runner IPs hit the 429 rate
+      # limit. A daemon mirror falls back to Docker Hub on a cache miss. A
+      # `services:` container starts before the first step and cannot use it,
+      # so postgres and mailpit start here.
+      - name: Configure Docker Hub pull mirror
+        working-directory: .
+        run: |
+          [ -f /etc/docker/daemon.json ] || echo '{}' | sudo tee /etc/docker/daemon.json >/dev/null
+          sudo jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' /etc/docker/daemon.json > "$RUNNER_TEMP/daemon.json"
+          sudo cp "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
+          sudo kill -HUP "$(pidof dockerd)"
+          for _ in $(seq 1 20); do
+            if docker info --format '{{json .RegistryConfig.Mirrors}}' | grep -q mirror.gcr.io; then exit 0; fi
+            sleep 0.5
+          done
+          echo "::error::dockerd did not load the mirror.gcr.io registry mirror"
+          exit 1
+
+      - name: Start postgres and mailpit
+        working-directory: .
+        run: |
+          docker run -d --name postgres -p 5432:5432 \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=testdb \
+            --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 30 \
+            postgres:18-alpine
+          docker run -d --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.30.0
+          for _ in $(seq 1 60); do
+            status="$(docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' postgres)"
+            case "$status" in
+              "running healthy") exit 0 ;;
+              exited*|dead*) break ;;
+            esac
+            sleep 1
+          done
+          echo "::error::postgres is not healthy: $status"
+          docker logs postgres
+          exit 1
+
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
