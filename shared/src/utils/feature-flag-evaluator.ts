@@ -8,6 +8,7 @@ import type {
   FeatureFlagPreviewResult,
   FeatureFlagRulePayload
 } from '../types/feature-flag.types';
+import { normalizeEmail } from './email';
 import { toTimestamp } from './feature-flag-timestamp';
 
 export type FeatureFlagEvaluationContext = {
@@ -119,7 +120,21 @@ function matchesAttribute(
     payload.field === 'custom' ? payload.customKey : payload.field;
   if (fieldKey === undefined || fieldKey === '') return false;
   const actual = ctx.attributes[fieldKey];
+  if (payload.field === 'email' || payload.field === 'emailDomain') {
+    return matchesAttributeOp(
+      foldEmailCase(actual),
+      payload.op,
+      Array.isArray(payload.value)
+        ? payload.value.map(foldEmailCase)
+        : foldEmailCase(payload.value)
+    );
+  }
   return matchesAttributeOp(actual, payload.op, payload.value);
+}
+
+// Stored addresses are canonical, but a rule value is stored as typed.
+function foldEmailCase(value: unknown): unknown {
+  return normalizeEmail(value) ?? value;
 }
 
 function matchesAttributeOp(
