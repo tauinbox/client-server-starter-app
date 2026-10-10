@@ -151,7 +151,10 @@
         <h2 class="card-heading">{{ t('billing.settings.invoices') }}</h2>
 
         @if (invoices().length === 0) {
-          <p class="invoices-empty">{{ t('billing.settings.noInvoices') }}</p>
+          <nxs-list-empty
+            icon="receipt_long"
+            [message]="t('billing.settings.noInvoices')"
+          />
         } @else if (isHandset()) {
           <ul class="invoice-cards">
             @for (invoice of invoices(); track invoice.id) {
