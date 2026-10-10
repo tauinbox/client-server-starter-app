@@ -5,6 +5,7 @@ import {
   openedDialog,
   test
 } from '../fixtures/base.fixture';
+import { mockId } from '../fixtures/ids';
 
 // A rejected save must leave the edit on screen, because a rule set or a long
 // description can take minutes to build.
@@ -61,6 +62,70 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     await expect(description).toHaveValue('Rolled out to the beta group');
     await expect(ruleRows).toHaveCount(3);
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  test('after a version conflict the reopened flag dialog saves with the current version', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.goto('/admin/feature-flags');
+    const row = page.getByRole('row', { name: /new-dashboard/ });
+    await expect(row).toBeVisible();
+
+    // A second admin changes the flag after the list was loaded.
+    const login = await fetch(`${_mockServer.url}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'Password1'
+      })
+    });
+    const { tokens } = (await login.json()) as {
+      tokens: { access_token: string };
+    };
+    const otherPatch = await fetch(
+      `${_mockServer.url}/api/v1/admin/feature-flags/${mockId('flag-new-dashboard')}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          'Content-Type': 'application/json',
+          'If-Match': '1'
+        },
+        body: JSON.stringify({ description: 'Changed by another admin' })
+      }
+    );
+    expect(otherPatch.status).toBe(200);
+
+    const editButton = row.getByRole('button', {
+      name: /Edit flag new-dashboard/
+    });
+    await editButton.click();
+    const dialog = await openedDialog(page);
+    await dialog.getByLabel('Description').fill('Stale edit');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog.getByRole('alert')).toHaveText(
+      'Feature flag was modified by another request. Reload and retry.'
+    );
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await editButton.click();
+    const reopened = await openedDialog(page);
+    const description = reopened.getByLabel('Description');
+    await expect(description).toHaveValue('Changed by another admin');
+    await description.fill('Edit on the current version');
+    const save = page.waitForResponse(
+      (r) =>
+        r.request().method() === 'PATCH' &&
+        r.url().includes('/api/v1/admin/feature-flags/')
+    );
+    await reopened.getByRole('button', { name: 'Save' }).click();
+    expect((await save).status()).toBe(200);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(row).toContainText('Edit on the current version');
   });
 
   test('a duplicate role name keeps the role dialog open with the edit and the reason', async ({

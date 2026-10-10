@@ -122,7 +122,7 @@ describe('FeatureFlagsAdminStore', () => {
     expect(service.update).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
   });
 
-  it('updateFlag() propagates a 409 version-conflict error to the caller', async () => {
+  describe('updateFlag() on a version conflict', () => {
     const conflict = new HttpErrorResponse({
       status: 409,
       error: {
@@ -130,25 +130,54 @@ describe('FeatureFlagsAdminStore', () => {
         errorKey: 'errors.featureFlags.versionConflict'
       }
     });
-    service.update.mockReturnValue(throwError(() => conflict));
-    const store = TestBed.inject(FeatureFlagsAdminStore);
-    store.load();
-    await vi.waitFor(() => expect(store.entities().length).toBe(1));
-    await expect(
-      firstValueFrom(store.updateFlag('flag-1', { enabled: true }, 1))
-    ).rejects.toBe(conflict);
-  });
 
-  it('reloadFlag() replaces the entity with the stored row', async () => {
-    service.getOne.mockReturnValue(
-      of(sampleFlag({ enabled: true, version: 2 }))
-    );
-    const store = TestBed.inject(FeatureFlagsAdminStore);
-    store.load();
-    await vi.waitFor(() => expect(store.entities().length).toBe(1));
-    await firstValueFrom(store.reloadFlag('flag-1'));
-    expect(service.getOne).toHaveBeenCalledWith('flag-1');
-    expect(store.entities()[0]).toMatchObject({ enabled: true, version: 2 });
+    async function loadedStore() {
+      const store = TestBed.inject(FeatureFlagsAdminStore);
+      store.load();
+      await vi.waitFor(() => expect(store.entities().length).toBe(1));
+      return store;
+    }
+
+    it('replaces the entity with the stored row and rethrows the conflict', async () => {
+      service.update.mockReturnValue(throwError(() => conflict));
+      service.getOne.mockReturnValue(
+        of(sampleFlag({ description: 'by another admin', version: 2 }))
+      );
+      const store = await loadedStore();
+
+      await expect(
+        firstValueFrom(store.updateFlag('flag-1', { enabled: true }, 1))
+      ).rejects.toBe(conflict);
+      expect(service.getOne).toHaveBeenCalledWith('flag-1');
+      expect(store.entities()[0]).toMatchObject({
+        description: 'by another admin',
+        version: 2
+      });
+    });
+
+    it('rethrows the conflict when the reload fails', async () => {
+      service.update.mockReturnValue(throwError(() => conflict));
+      service.getOne.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 }))
+      );
+      const store = await loadedStore();
+
+      await expect(
+        firstValueFrom(store.updateFlag('flag-1', { enabled: true }, 1))
+      ).rejects.toBe(conflict);
+      expect(store.entities()[0].version).toBe(1);
+    });
+
+    it('does not reload the row after another error', async () => {
+      const error = new HttpErrorResponse({ status: 500 });
+      service.update.mockReturnValue(throwError(() => error));
+      const store = await loadedStore();
+
+      await expect(
+        firstValueFrom(store.updateFlag('flag-1', { enabled: true }, 1))
+      ).rejects.toBe(error);
+      expect(service.getOne).not.toHaveBeenCalled();
+    });
   });
 
   it('deleteFlag() removes the entity from the store', async () => {
