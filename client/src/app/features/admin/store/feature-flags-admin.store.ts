@@ -1,10 +1,18 @@
 import { inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { tap } from 'rxjs';
+import {
+  catchError,
+  concatWith,
+  EMPTY,
+  ignoreElements,
+  tap,
+  throwError
+} from 'rxjs';
 import { patchState, signalStore, withMethods } from '@ngrx/signals';
 import { removeEntity, setEntity } from '@ngrx/signals/entities';
 import type { FeatureFlagResponse } from '@app/shared/types';
-import { FEATURE_FLAG_LIST_QUERY } from '@app/shared/constants';
+import { ErrorKeys, FEATURE_FLAG_LIST_QUERY } from '@app/shared/constants';
 import { withList } from '@shared/store/with-list';
 import type {
   CreateFeatureFlag,
@@ -34,6 +42,9 @@ export const FeatureFlagsAdminStore = signalStore(
         );
       },
 
+      // After a version conflict the row is reloaded before the error goes
+      // to the caller, so the next edit sends the current version. A failed
+      // reload is ignored: the caller already reports the conflict.
       updateFlag(
         id: string,
         data: UpdateFeatureFlag,
@@ -42,14 +53,22 @@ export const FeatureFlagsAdminStore = signalStore(
         return service.update(id, data, expectedVersion).pipe(
           tap((flag) => {
             patchState(store, setEntity(flag));
-          })
-        );
-      },
-
-      reloadFlag(id: string): Observable<FeatureFlagResponse> {
-        return service.getOne(id).pipe(
-          tap((flag) => {
-            patchState(store, setEntity(flag));
+          }),
+          catchError((err: unknown) => {
+            if (
+              !(err instanceof HttpErrorResponse) ||
+              err.error?.errorKey !== ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+            ) {
+              return throwError(() => err);
+            }
+            return service.getOne(id).pipe(
+              tap((flag) => {
+                patchState(store, setEntity(flag));
+              }),
+              ignoreElements(),
+              catchError(() => EMPTY),
+              concatWith(throwError(() => err))
+            );
           })
         );
       },

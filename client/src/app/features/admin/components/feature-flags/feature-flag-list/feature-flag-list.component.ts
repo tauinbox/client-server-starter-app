@@ -52,7 +52,6 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import {
   APP_ENVIRONMENTS,
-  ErrorKeys,
   type FeatureFlagListQuery
 } from '@app/shared/constants';
 import {
@@ -261,22 +260,6 @@ export class FeatureFlagListComponent {
         error: (err: HttpErrorResponse) => {
           revert();
           this.#notify.error(err, 'admin.featureFlags.errorToggleFailed');
-          if (
-            err.error?.errorKey === ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
-          ) {
-            this.#reloadFlag(flag.id);
-          }
-        }
-      });
-  }
-
-  #reloadFlag(id: string): void {
-    this.#store
-      .reloadFlag(id)
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe({
-        error: (err) => {
-          this.#notify.error(err, 'admin.featureFlags.errorLoadFailed');
         }
       });
   }

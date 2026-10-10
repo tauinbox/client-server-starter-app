@@ -932,6 +932,8 @@ The state and the HTTP calls are in `features/admin/{store,services}`:
 - **`FeatureFlagsAdminStore`** is a route-level `signalStore` with
   `withEntities<FeatureFlagResponse>`. It has the same structure as `RolesStore`. `load()` uses
   `rxMethod`. Each CRUD method returns an `Observable`, thus a caller can show its own notification.
+  On a version conflict, `updateFlag()` loads the row again and then rethrows the error, so the next
+  edit from the list switch or the edit dialog sends the current version.
 - **`FeatureFlagsAdminService`** is the HTTP wrapper for `/api/v1/admin/feature-flags/*`. `update()`
   sets `If-Match: <expectedVersion>` for optimistic locking. If the version is stale, the server
   answers HTTP 409 with `errors.featureFlags.versionConflict`.
@@ -1170,8 +1172,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 317 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1549 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 318 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1550 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
