@@ -53,6 +53,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
 | Revert migration | `npm run migrations:revert` (build first) |
 | Run seeders | `npm run seed:run` (build first) |
+| Validate the controller layout | `npm run check:controllers` fails when a module keeps a controller outside its `controllers/` folder, when a sub-feature folder holds more than one controller, or when a controller in `controllers/` has no class-level `@UseInterceptors(ClassSerializerInterceptor)`. CI applies it in the `Server - Checks` job |
 | Validate i18n keys | `npm run check:i18n` verifies that each `ErrorKeys` value exists in each client i18n JSON file. CI applies it in the `Server - Checks` job. Thus a new error key with no translation fails the build |
 | Generate CASL subjects | `npm run generate:subjects` scans the `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`. Run it when you add a new resource |
 | Report grants against the grant-scope rule | `npm run check:grant-scope` is read-only. Refer to the description below the table |
@@ -188,6 +189,11 @@ src/
     │                       #   and billing
     └── users/              # User CRUD
 ```
+
+The controllers of a module are in `<module>/controllers/`. A sub-feature folder with its own
+service or module (`auth/captcha/`, `billing/webhooks/`, `core/health/`, `core/metrics/`) and the
+one-controller `notifications/` module keep their single controller beside the service.
+`npm run check:controllers` enforces this layout.
 
 The subsections below give the detail of each directory.
 
