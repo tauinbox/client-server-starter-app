@@ -16,8 +16,8 @@ test.describe('Admin panel — auto-redirect on permission loss (BKL-013)', () =
     _mockServer,
     page
   }) => {
-    // The base fixture stubs /notifications/stream with an empty body so
-    // loginViaUi's networkidle wait can settle. For this test we need the
+    // The base fixture stubs /notifications/stream with an empty body.
+    // For this test we need the
     // real SSE pipe — drop the stub so requests fall through to the general
     // /api/* handler that rewrites the URL to mock-server's worker port.
     await page.unroute(/\/api\/.*\/notifications\/stream/);

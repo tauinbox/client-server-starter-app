@@ -20,8 +20,8 @@ of `BACKEND_URL` is `http://localhost:3000`.
 | Dev server | `npm start` |
 | Build | `npm run build` |
 | Typecheck | `npm run typecheck` runs `tsc --noEmit` on the `app` project and the `spec` project. Do not point it at the base `tsconfig.json`. That file is a shared base and not a compilable program. The `app` project needs `types: []`, the specs need `lib: esnext.disposable`, and e2e needs `types: ["node"]` |
-| Typecheck e2e | `npm run typecheck:e2e` uses `tsconfig.e2e.json`, which covers `e2e/**` and `playwright.config.ts`. This gate is separate because the fixtures import mock-server sources. Thus the gate needs `mock-server/` installed. `ng build` covers the `app` project only, and Playwright transpiles the tests without a typecheck. Thus no other gate examines `e2e/` |
-| Lint (TS + SCSS + checks) | `npm run lint` |
+| Typecheck e2e | `npm run typecheck:e2e` uses `tsconfig.e2e.json`, which covers `e2e/**` and `playwright.config.ts`. This gate is separate because the fixtures import mock-server sources. Thus the gate needs `mock-server/` installed. `ng build` covers the `app` project only, and Playwright transpiles the tests without a typecheck. Thus no other gate typechecks `e2e/` |
+| Lint (TS + SCSS + checks) | `npm run lint` (`ng lint` examines `src/` and `e2e/`) |
 | Lint fix (TS + SCSS) | `npm run lint:fix` |
 | Lint SCSS only | `npm run lint:styles` |
 | Format check | `npm run format:check` examines `src/`, `e2e/`, `scripts/` and the root-level configuration files |
@@ -1091,7 +1091,11 @@ The fixtures in `e2e/fixtures/` are modular:
   `createMockUser` and `createOAuthAccount`.
 - `helpers.ts` holds `loginViaUi()`, `loginViaUiKeepSse()`, `expectAuthRedirect()`,
   `expectForbiddenRedirect()`, `openedDialog()` and `routeApiToMockServer()`.
-  `loginViaUiKeepSse()` does not wait for `networkidle`, thus a test can keep a true SSE stream open.
+  `loginViaUi()` ends on `/profile` and waits until the profile heading is visible.
+  `loginViaUiKeepSse()` stays on the landing page and waits for the `/auth/permissions` response.
+  Use it when a test keeps a true SSE stream open. No test waits for `networkidle`: an open request
+  can keep that wait from settling, and ESLint refuses it in `e2e/`. Wait for page content with a web
+  assertion.
   `base.fixture` applies the `/api` redirect and the SSE stub to the fixture page. A Playwright route
   applies to one page, thus a test that opens a second tab must apply `routeApiToMockServer()` to
   that tab.

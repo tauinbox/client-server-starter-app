@@ -131,6 +131,20 @@ export default tseslint.config(
             "CallExpression[callee.property.name=/^(success|info|warn|error)$/][arguments.0.property.name='errorKey']",
           message:
             'Do not pass a server errorKey as a NotifyService message key. Pass the HttpErrorResponse itself and a client-owned fallback key.'
+        },
+        {
+          // Playwright discourages networkidle: an open request can hang the
+          // wait for the whole test timeout.
+          selector:
+            "CallExpression[callee.property.name='waitForLoadState'] > Literal[value='networkidle']",
+          message:
+            "Do not wait for 'networkidle'. Wait for the page content with a web assertion, for example expect(locator).toBeVisible()."
+        },
+        {
+          selector:
+            "Property[key.name='waitUntil'] > Literal[value='networkidle']",
+          message:
+            "Do not wait for 'networkidle'. Wait for the page content with a web assertion, for example expect(locator).toBeVisible()."
         }
       ]
     }
