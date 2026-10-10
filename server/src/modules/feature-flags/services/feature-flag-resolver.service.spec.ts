@@ -100,7 +100,6 @@ describe('FeatureFlagResolverService', () => {
       rules.map((r, i) => ({
         id: r.id ?? `rule-${i}`,
         flagId: r.flagId ?? 'flag-0',
-        type: r.type ?? 'percentage',
         effect: r.effect ?? 'include',
         payload: r.payload ?? { type: 'percentage', percent: 100 },
         createdAt: new Date(),
@@ -146,7 +145,6 @@ describe('FeatureFlagResolverService', () => {
       [
         {
           flagId: 'f1',
-          type: 'attribute',
           effect: 'exclude',
           payload: {
             type: 'attribute',
@@ -177,7 +175,6 @@ describe('FeatureFlagResolverService', () => {
       {
         id: 'r1',
         flagId: 'f2',
-        type: 'role',
         effect: 'include',
         payload: { type: 'role', roleNames: ['beta'] },
         createdAt: new Date(),
@@ -226,7 +223,6 @@ describe('FeatureFlagResolverService', () => {
       [
         {
           flagId: 'f1',
-          type: 'attribute',
           payload: {
             type: 'attribute',
             field: 'emailDomain',
@@ -298,7 +294,6 @@ describe('FeatureFlagResolverService', () => {
         [
           {
             flagId: 'f1',
-            type: 'attribute',
             payload: {
               type: 'attribute',
               field: 'custom',

@@ -5,8 +5,7 @@ import {
   BILLING_FLAG_KEY,
   BILLING_PROVIDER_FLAGS,
   OAUTH_PROVIDER_FLAGS,
-  type FeatureFlagRuleEffect,
-  type FeatureFlagRuleType
+  type FeatureFlagRuleEffect
 } from '@app/shared/constants';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { FeatureFlag } from '../modules/feature-flags/entities/feature-flag.entity';
@@ -18,7 +17,6 @@ type FlagSeed = {
   enabled: boolean;
   public: boolean;
   rule?: {
-    type: FeatureFlagRuleType;
     effect: FeatureFlagRuleEffect;
     payload: FeatureFlagRulePayload;
   };
@@ -37,7 +35,6 @@ const FLAGS: FlagSeed[] = [
     enabled: true,
     public: false,
     rule: {
-      type: 'percentage',
       effect: 'include',
       payload: { type: 'percentage', percent: 10 }
     }
@@ -50,7 +47,6 @@ const FLAGS: FlagSeed[] = [
     enabled: true,
     public: true,
     rule: {
-      type: 'attribute' as const,
       effect: 'include' as const,
       payload: {
         type: 'attribute' as const,
@@ -70,7 +66,6 @@ const FLAGS: FlagSeed[] = [
     enabled: true,
     public: true,
     rule: {
-      type: 'attribute',
       effect: 'include',
       payload: {
         type: 'attribute',
@@ -90,7 +85,6 @@ const FLAGS: FlagSeed[] = [
       enabled: false,
       public: false,
       rule: {
-        type: 'attribute' as const,
         effect: 'include' as const,
         payload: {
           type: 'attribute' as const,

@@ -60,7 +60,7 @@ describe('email and emailDomain rules compare case-insensitively (parity)', () =
     const createRes = await call(admin, 'POST', '/admin/feature-flags', {
       key,
       enabled: true,
-      rules: [{ type: 'attribute', effect, payload }]
+      rules: [{ effect, payload }]
     });
     expect(createRes.status).toBe(201);
     const res = await call(admin, 'GET', '/feature-flags');

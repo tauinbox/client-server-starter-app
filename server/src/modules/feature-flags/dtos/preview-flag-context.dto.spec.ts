@@ -37,7 +37,6 @@ describe('PreviewFlagContextDto draft fields', () => {
   }
 
   const validRule = {
-    type: 'role',
     effect: 'include',
     payload: { type: 'role', roleNames: ['beta'] }
   };
@@ -84,6 +83,37 @@ describe('PreviewFlagContextDto draft fields', () => {
     const preview = await messagesFor({ rules: [bad] });
     const save = await messagesFor({ rules: [bad] }, UpdateFeatureFlagDto);
     expect(preview).toBe(save);
+  });
+
+  it('rejects a rule-level type, because payload.type is the one source', async () => {
+    const bad = { ...validRule, type: 'role' };
+    await expect(messagesFor({ rules: [bad] })).resolves.toBe(
+      'rules.0.property type should not exist'
+    );
+    await expect(
+      messagesFor({ rules: [bad] }, UpdateFeatureFlagDto)
+    ).resolves.toBe('rules.0.property type should not exist');
+  });
+
+  // The mock pins the same list: feature-flag-validation-parity.spec.ts.
+  it('reports a rule-level type among other unknown rule properties', async () => {
+    const response = await transform(
+      {
+        rules: [{ zeta: 1, effect: 'x', alpha: 2, type: 'role', payload: {} }]
+      },
+      UpdateFeatureFlagDto
+    ).then(
+      () => null,
+      (e: unknown) => (e as BadRequestException).getResponse()
+    );
+    expect(response).toMatchObject({
+      message: [
+        'rules.0.property zeta should not exist',
+        'rules.0.property alpha should not exist',
+        'rules.0.property type should not exist',
+        'rules.0.effect must be one of the following values: include, exclude'
+      ]
+    });
   });
 
   it('rejects more than 64 rules', async () => {

@@ -141,7 +141,6 @@ describe('FeatureFlagPreviewComponent', () => {
     const draft = {
       rules: [
         {
-          type: 'role' as const,
           effect: 'include' as const,
           payload: { type: 'role' as const, roleNames: ['gamma'] }
         }

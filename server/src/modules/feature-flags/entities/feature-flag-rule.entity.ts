@@ -6,10 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
-import type {
-  FeatureFlagRuleEffect,
-  FeatureFlagRuleType
-} from '@app/shared/constants';
+import type { FeatureFlagRuleEffect } from '@app/shared/constants';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { FeatureFlag } from './feature-flag.entity';
 
@@ -27,9 +24,6 @@ export class FeatureFlagRule {
     foreignKeyConstraintName: 'FK_feature_flag_rules_flag_id'
   })
   flag: FeatureFlag;
-
-  @Column({ type: 'varchar', length: 32 })
-  type: FeatureFlagRuleType;
 
   @Column({ type: 'varchar', length: 16 })
   effect: FeatureFlagRuleEffect;

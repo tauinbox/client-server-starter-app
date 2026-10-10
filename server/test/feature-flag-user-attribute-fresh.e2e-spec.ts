@@ -68,7 +68,6 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
         enabled: true,
         rules: [
           {
-            type: 'attribute',
             effect: 'include',
             payload: {
               type: 'attribute',

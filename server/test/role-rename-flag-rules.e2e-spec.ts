@@ -120,17 +120,14 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
         enabled: true,
         rules: [
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: [roleName, otherName] }
           },
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: [renamed, roleName] }
           },
           {
-            type: 'user',
             effect: 'include',
             payload: { type: 'user', userIds: [] }
           }
@@ -171,7 +168,6 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
         enabled: true,
         rules: [
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: [otherName] }
           }
@@ -197,7 +193,6 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
         enabled: true,
         rules: [
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: [name] }
           }

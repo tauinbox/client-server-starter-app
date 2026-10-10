@@ -206,7 +206,9 @@ describe('FeatureFlagFormDialogComponent', () => {
       fixture.componentInstance.environments().map((c) => c.value)
     ).toEqual(['production', 'staging']);
     expect(fixture.componentInstance.rules().length).toBe(1);
-    expect(fixture.componentInstance.rules()[0].type).toBe('percentage');
+    expect(fixture.componentInstance.rules()[0].payload.type).toBe(
+      'percentage'
+    );
   });
 
   it('environmentOptions offers exactly the environments the API accepts', async () => {
@@ -325,6 +327,17 @@ describe('FeatureFlagFormDialogComponent', () => {
       public: false
     });
     expect(closeSpy).toHaveBeenCalledExactlyOnceWith(savedFlag);
+  });
+
+  it('submit() sends each rule as effect and payload only', async () => {
+    const fixture = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.model.set({ key: 'new-dashboard', description: '' });
+    cmp.addRule();
+    cmp.submit();
+    expect(sentFlag()?.rules).toEqual([
+      { effect: 'include', payload: { type: 'percentage', percent: 0 } }
+    ]);
   });
 
   it('keeps the dialog open with the input and shows the error when the save fails', async () => {
@@ -492,7 +505,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         value: '@acme.com',
         op: 'endsWith',
@@ -510,7 +522,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         value: '@other.com',
         op: 'endsWith',
@@ -522,7 +533,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(sentFlag()?.rules).toEqual([
       {
         effect: 'include',
-        type: 'attribute',
         payload: {
           value: '@other.com',
           op: 'endsWith',
@@ -555,7 +565,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'createdAt',
@@ -577,7 +586,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -604,7 +612,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'createdAt',
@@ -625,7 +632,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -649,7 +655,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -672,7 +677,6 @@ describe('FeatureFlagFormDialogComponent', () => {
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -701,7 +705,6 @@ describe('FeatureFlagFormDialogComponent', () => {
       rules: [
         {
           effect: 'include',
-          type: 'attribute',
           payload: attributeRulePayload
         }
       ],
@@ -718,7 +721,6 @@ describe('FeatureFlagFormDialogComponent', () => {
       rules: [
         {
           effect: 'include',
-          type: 'percentage',
           payload: { type: 'percentage', percent: 0 }
         }
       ],

@@ -374,7 +374,6 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          type: 'percentage',
           effect: 'include',
           payload: { type: 'percentage', percent: 10 }
         }
@@ -402,7 +401,6 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          type: 'percentage',
           effect: 'include',
           payload: { type: 'percentage', percent: 100 }
         }
@@ -428,12 +426,10 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          type: 'role',
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
         },
         {
-          type: 'role',
           effect: 'exclude',
           payload: { type: 'role', roleNames: ['banned'] }
         }
@@ -523,12 +519,10 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          type: 'percentage',
           effect: 'include',
           payload: { type: 'percentage', percent: 0 }
         },
         {
-          type: 'role',
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta-tester'] }
         }
@@ -556,12 +550,10 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          type: 'role',
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
         },
         {
-          type: 'role',
           effect: 'exclude',
           payload: { type: 'role', roleNames: ['banned'] }
         }
@@ -591,7 +583,6 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          type: 'role',
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
         }
@@ -620,7 +611,6 @@ describe('Feature flags end-to-end', () => {
         flag.id,
         [
           {
-            type: 'attribute',
             effect: 'include',
             payload: {
               type: 'attribute',
@@ -663,7 +653,7 @@ describe('Feature flags end-to-end', () => {
       setRules(
         flagService,
         flag.id,
-        [{ type: payload.type, effect: 'include', payload }],
+        [{ effect: 'include', payload }],
         flagAuditActor('actor-1')
       )
     ).rejects.toMatchObject({ status: 400, message });
@@ -684,7 +674,6 @@ describe('Feature flags end-to-end', () => {
       flag.id,
       [
         {
-          type: 'attribute',
           effect: 'include',
           payload: {
             type: 'attribute',
@@ -953,7 +942,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
     await setRules(
       flagService,
       flag.id,
-      [{ type: 'percentage', effect: 'include', payload }],
+      [{ effect: 'include', payload }],
       flagAuditActor('actor-1')
     );
     await resolver.invalidateAll();
@@ -985,7 +974,6 @@ describe('GET /feature-flags anonymous rollout id', () => {
       hidden.id,
       [
         {
-          type: 'percentage',
           effect: 'include',
           payload: { type: 'percentage', percent: 50 }
         }

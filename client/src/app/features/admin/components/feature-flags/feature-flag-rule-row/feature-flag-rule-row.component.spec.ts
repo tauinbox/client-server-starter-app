@@ -31,7 +31,6 @@ import { FeatureFlagRuleRowComponent } from './feature-flag-rule-row.component';
 class HostComponent {
   readonly rule = signal<FeatureFlagRuleDraft>({
     effect: 'include',
-    type: 'percentage',
     payload: { type: 'percentage', percent: 25 }
   });
   readonly error = signal<string | null>(null);
@@ -144,7 +143,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'percentage',
       payload: { type: 'percentage', percent: 25, bucketBy: 'device' }
     });
     fixture.detectChanges();
@@ -189,7 +187,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -276,7 +273,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'user',
       payload: { type: 'user', userIds: ['uuid-1', 'uuid-2'] }
     });
     fixture.detectChanges();
@@ -298,7 +294,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'role',
       payload: { type: 'role', roleNames: ['admin'] }
     });
     fixture.detectChanges();
@@ -309,7 +304,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'user',
       payload: { type: 'user', userIds: [] }
     });
     fixture.detectChanges();
@@ -330,7 +324,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'user',
       payload: { type: 'user', userIds: ['uuid-known', 'uuid-missing'] }
     });
     fixture.detectChanges();
@@ -348,7 +341,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'user',
       payload: { type: 'user', userIds: ['uuid-1'] }
     });
     expect(() => fixture.detectChanges()).not.toThrow();
@@ -362,7 +354,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'user',
       payload: { type: 'user', userIds: [] }
     });
     fixture.detectChanges();
@@ -382,7 +373,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'role',
       payload: { type: 'role', roleNames: [] }
     });
     fixture.detectChanges();
@@ -402,7 +392,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'createdAt',
@@ -425,7 +414,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'createdAt',
@@ -444,7 +432,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'createdAt',
@@ -470,7 +457,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'createdAt',
@@ -494,7 +480,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'email',
@@ -513,7 +498,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: { type: 'attribute', field: 'email', op: 'in', value: [] }
     });
     fixture.detectChanges();
@@ -535,7 +519,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'email',
@@ -559,7 +542,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: { type: 'attribute', field: 'email', op: 'eq', value: 'a@x.com' }
     });
     fixture.detectChanges();
@@ -578,7 +560,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -604,7 +585,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -634,7 +614,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.componentInstance.customKeyOptions.set(options);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -699,7 +678,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -725,7 +703,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: { type: 'attribute', field: 'email', op: 'eq', value: 'x' }
     });
     fixture.detectChanges();
@@ -745,7 +722,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'custom',
@@ -770,7 +746,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: { type: 'attribute', field: 'createdAt', op: 'after', value: '' }
     });
     fixture.detectChanges();
@@ -786,7 +761,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: { type: 'attribute', field: 'email', op: 'in', value: ['a'] }
     });
     fixture.detectChanges();
@@ -805,7 +779,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'attribute',
       payload: {
         type: 'attribute',
         field: 'createdAt',
@@ -829,7 +802,6 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'role',
       payload: { type: 'role', roleNames: ['beta-tester', 'gone'] }
     });
     fixture.detectChanges();
@@ -884,7 +856,6 @@ describe('FeatureFlagRuleRowComponent', () => {
       const fixture = TestBed.createComponent(HostComponent);
       fixture.componentInstance.rule.set({
         effect: 'include',
-        type: 'user',
         payload: { type: 'user', userIds: [] }
       });
       fixture.detectChanges();
@@ -909,7 +880,6 @@ describe('FeatureFlagRuleRowComponent', () => {
       const fixture = TestBed.createComponent(HostComponent);
       fixture.componentInstance.rule.set({
         effect: 'include',
-        type: 'user',
         payload: { type: 'user', userIds: [] }
       });
       fixture.detectChanges();
@@ -941,7 +911,6 @@ describe('FeatureFlagRuleRowComponent', () => {
       const fixture = TestBed.createComponent(HostComponent);
       fixture.componentInstance.rule.set({
         effect: 'include',
-        type: 'user',
         payload: { type: 'user', userIds: [] }
       });
       fixture.detectChanges();
@@ -963,7 +932,6 @@ describe('FeatureFlagRuleRowComponent', () => {
       const fixture = TestBed.createComponent(HostComponent);
       fixture.componentInstance.rule.set({
         effect: 'include',
-        type: 'user',
         payload: { type: 'user', userIds: [] }
       });
       fixture.detectChanges();
@@ -990,7 +958,6 @@ describe('FeatureFlagRuleRowComponent', () => {
       const fixture = TestBed.createComponent(HostComponent);
       fixture.componentInstance.rule.set({
         effect: 'include',
-        type: 'attribute',
         payload
       });
       fixture.detectChanges();
@@ -1136,7 +1103,6 @@ describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.rule.set({
       effect: 'include',
-      type: 'user',
       payload: { type: 'user', userIds }
     });
 

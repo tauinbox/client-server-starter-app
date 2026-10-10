@@ -152,21 +152,21 @@ describe('validation-error envelope parity with server', () => {
       }
     );
 
-    it('feature-flags: a rules array whose entry has an unknown type', async () => {
+    it('feature-flags: a rules array whose entry has a rule-level type', async () => {
       const token = await login('admin@example.com');
       const { status, body } = await send(
         'POST',
         '/api/v1/admin/feature-flags',
         {
           key: 'envelope-rule-type',
-          rules: [{ effect: 'include', type: 'nope', payload: {} }]
+          rules: [{ effect: 'include', type: 'role', payload: {} }]
         },
         token
       );
 
       expect(status).toBe(400);
-      expect(body.errors).toEqual([body.message]);
-      expect(body.errors?.join(' ')).toContain('rules.0.type');
+      expect(body.errors).toEqual(['rules.0.property type should not exist']);
+      expect(body.message).toBe('rules.0.property type should not exist');
     });
   });
 
@@ -214,9 +214,7 @@ describe('validation-error envelope parity with server', () => {
         '/api/v1/admin/feature-flags',
         {
           key: 'envelope-rule-payload',
-          rules: [
-            { effect: 'include', type: 'user', payload: { type: 'user' } }
-          ]
+          rules: [{ effect: 'include', payload: { type: 'user' } }]
         },
         token
       );

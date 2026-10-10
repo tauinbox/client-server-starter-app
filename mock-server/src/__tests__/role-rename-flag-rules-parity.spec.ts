@@ -87,7 +87,6 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
       key,
       enabled: true,
       rules: roleNames.map((names) => ({
-        type: 'role',
         effect: 'include',
         payload: { type: 'role', roleNames: names }
       }))
