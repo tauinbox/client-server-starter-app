@@ -1,0 +1,11 @@
+@use 'abstracts/mixins' as mix;
+
+:host {
+  color: var(--mat-sys-on-surface-variant);
+
+  @include mix.empty-state;
+}
+
+.empty-message {
+  margin: 0;
+}

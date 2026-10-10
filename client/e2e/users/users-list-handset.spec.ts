@@ -46,7 +46,7 @@ test.describe('User List page — handset layout', () => {
     });
     await page.goto('/users');
 
-    await expect(page.getByText('No users found')).toBeVisible();
+    await expect(page.getByText('No users yet.')).toBeVisible();
     await expect(page.locator('mat-card.user-card')).toHaveCount(0);
   });
 

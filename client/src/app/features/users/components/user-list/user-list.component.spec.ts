@@ -59,6 +59,7 @@ describe('UserListComponent', () => {
       displayedUsers: signal<User[]>([]),
       hasMore: signal(false),
       filters: signal<UserSearch>({}),
+      hasActiveFilters: signal(false),
       loadMore: vi.fn(),
       deleteUser: vi.fn().mockReturnValue(of(void 0)),
       restoreUser: vi.fn().mockReturnValue(of(mockUser))
@@ -119,6 +120,19 @@ describe('UserListComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('tells an empty list from a filter that matches no user', () => {
+    const message = () =>
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('nxs-list-empty .empty-message')
+        ?.textContent?.trim();
+
+    expect(message()).toBe('No users yet.');
+
+    usersStoreMock.hasActiveFilters.set(true);
+    fixture.detectChanges();
+    expect(message()).toBe('Nothing matches these filters.');
   });
 
   it('loads the first page once on init, with the state of the URL', () => {

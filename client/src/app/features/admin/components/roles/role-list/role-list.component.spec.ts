@@ -46,6 +46,7 @@ function createRolesStoreMock() {
     isLoadingMore: signal(false),
     hasMore: signal(false),
     filters: signal<RoleListQuery>({}),
+    hasActiveFilters: signal(false),
     loadMore: vi.fn(),
     createRole: vi.fn(),
     updateRole: vi.fn(),

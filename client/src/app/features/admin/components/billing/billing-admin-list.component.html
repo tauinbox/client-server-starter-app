@@ -11,7 +11,10 @@
       @if (subscriptionsLoading() && subscriptions().length === 0) {
         <nxs-list-skeleton [cells]="subscriptionSkeletonCells" />
       } @else if (subscriptions().length === 0) {
-        <p class="empty-state">{{ t('admin.billing.subscriptionsEmpty') }}</p>
+        <nxs-list-empty
+          icon="workspace_premium"
+          [message]="t('admin.billing.subscriptionsEmpty')"
+        />
       } @else if (layout.isHandset()) {
         <div class="record-card-list">
           @for (sub of subscriptions(); track sub.id) {
@@ -197,7 +200,10 @@
       @if (invoicesLoading() && invoices().length === 0) {
         <nxs-list-skeleton [cells]="invoiceSkeletonCells" />
       } @else if (invoices().length === 0) {
-        <p class="empty-state">{{ t('admin.billing.invoicesEmpty') }}</p>
+        <nxs-list-empty
+          icon="receipt_long"
+          [message]="t('admin.billing.invoicesEmpty')"
+        />
       } @else if (layout.isHandset()) {
         <div class="record-card-list">
           @for (inv of invoices(); track inv.id) {

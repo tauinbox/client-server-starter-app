@@ -15,7 +15,6 @@ import {
   MatCardHeader,
   MatCardTitle
 } from '@angular/material/card';
-import { MatIcon } from '@angular/material/icon';
 import { MatDivider } from '@angular/material/divider';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type { Sort } from '@angular/material/sort';
@@ -42,6 +41,7 @@ import {
   ListSkeletonComponent,
   type ListSkeletonCell
 } from '@shared/components/list-skeleton/list-skeleton.component';
+import { ListEmptyComponent } from '@shared/components/list-empty/list-empty.component';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
 import type { RoleAdminResponse } from '@app/shared/types';
 
@@ -52,7 +52,6 @@ import type { RoleAdminResponse } from '@app/shared/types';
     MatCardHeader,
     MatCardContent,
     MatCardTitle,
-    MatIcon,
     MatDivider,
     MatProgressSpinner,
     UserTableComponent,
@@ -60,7 +59,8 @@ import type { RoleAdminResponse } from '@app/shared/types';
     TranslocoDirective,
     NxsListFiltersComponent,
     InfiniteScrollDirective,
-    ListSkeletonComponent
+    ListSkeletonComponent,
+    ListEmptyComponent
   ],
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss',
@@ -81,6 +81,7 @@ export class UserListComponent implements OnInit {
 
   readonly roles = signal<RoleAdminResponse[]>([]);
   readonly filters = this.#usersStore.filters;
+  readonly hasActiveFilters = this.#usersStore.hasActiveFilters;
 
   /** The table marks a sort only when it is not the default one. */
   readonly sort = computed(() => {

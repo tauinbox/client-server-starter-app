@@ -17,11 +17,11 @@
       @if (loading() && displayedUsers().length === 0) {
         <nxs-list-skeleton [cells]="skeletonCells" [topBorder]="false" />
       } @else if (displayedUsers().length === 0) {
-        <div class="empty-state">
-          <mat-icon class="empty-icon">people_outline</mat-icon>
-          <h3>{{ t('users.list.noUsers') }}</h3>
-          <p>{{ t('users.list.noUsersMessage') }}</p>
-        </div>
+        <nxs-list-empty
+          icon="people_outline"
+          [message]="t('users.list.empty')"
+          [filtered]="hasActiveFilters()"
+        />
       } @else if (layout.isHandset() || layout.isTablet()) {
         <nxs-user-card-list
           [users]="displayedUsers()"

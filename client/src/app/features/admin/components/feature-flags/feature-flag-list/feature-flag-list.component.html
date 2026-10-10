@@ -20,13 +20,11 @@
     @if (loading() && flags().length === 0) {
       <nxs-list-skeleton [cells]="skeletonCells" />
     } @else if (flags().length === 0) {
-      <p class="empty-state">
-        {{
-          hasActiveFilters()
-            ? t('common.noFilterResults')
-            : t('admin.featureFlags.empty')
-        }}
-      </p>
+      <nxs-list-empty
+        icon="flag"
+        [message]="t('admin.featureFlags.empty')"
+        [filtered]="hasActiveFilters()"
+      />
     } @else if (layout.isHandset()) {
       <div class="flag-card-list">
         @for (flag of flags(); track flag.id) {

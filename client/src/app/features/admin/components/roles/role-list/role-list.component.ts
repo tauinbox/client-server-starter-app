@@ -40,6 +40,7 @@ import {
   ListSkeletonComponent,
   type ListSkeletonCell
 } from '@shared/components/list-skeleton/list-skeleton.component';
+import { ListEmptyComponent } from '@shared/components/list-empty/list-empty.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types';
 import type { RoleListQuery } from '@app/shared/constants';
@@ -86,6 +87,7 @@ import { RolePermissionsDialogComponent } from '../role-permissions-dialog/role-
     MatSortHeader,
     InfiniteScrollDirective,
     ListSkeletonComponent,
+    ListEmptyComponent,
     NxsListFiltersComponent,
     TranslocoDirective
   ],
@@ -116,6 +118,7 @@ export class RoleListComponent {
   }
   readonly roles = this.#rolesStore.entities;
   readonly filters = this.#rolesStore.filters;
+  readonly hasActiveFilters = this.#rolesStore.hasActiveFilters;
 
   readonly filterControls: readonly ListFilterControl<RoleListQuery>[] = [
     {

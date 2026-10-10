@@ -47,6 +47,7 @@ import {
   ListSkeletonComponent,
   type ListSkeletonCell
 } from '@shared/components/list-skeleton/list-skeleton.component';
+import { ListEmptyComponent } from '@shared/components/list-empty/list-empty.component';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { FeatureFlagResponse } from '@app/shared/types';
 import {
@@ -102,6 +103,7 @@ import { FeatureFlagFormDialogComponent } from '../feature-flag-form-dialog/feat
     InfiniteScrollDirective,
     TemplateRowOfDirective,
     ListSkeletonComponent,
+    ListEmptyComponent,
     NxsListFiltersComponent,
     TranslocoDirective
   ],

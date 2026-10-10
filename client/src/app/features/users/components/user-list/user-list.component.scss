@@ -17,10 +17,6 @@
     margin-block: vars.$spacing-md;
   }
 
-  .empty-state {
-    @include mix.empty-state;
-  }
-
   .scroll-sentinel {
     height: func.rem(1);
   }

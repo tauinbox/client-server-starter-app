@@ -13,7 +13,11 @@
     @if (loading() && resources().length === 0) {
       <nxs-list-skeleton [cells]="skeletonCells" />
     } @else if (resources().length === 0) {
-      <p class="empty-state">{{ t('common.noFilterResults') }}</p>
+      <nxs-list-empty
+        icon="category"
+        [message]="t('admin.resources.empty')"
+        [filtered]="hasActiveFilters()"
+      />
     } @else {
       <div class="table-wrapper">
         <table

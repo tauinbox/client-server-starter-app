@@ -133,6 +133,7 @@
   },
   "roles": {
     "title": "Управление ролями",
+    "empty": "Пока нет ролей.",
     "create": "Новая роль",
     "tableHeaderName": "Название",
     "tableHeaderDescription": "Описание",
@@ -227,6 +228,7 @@
   },
   "resources": {
     "title": "Ресурсы",
+    "empty": "Пока нет ресурсов.",
     "tableHeaderDisplayName": "Отображаемое имя",
     "tableHeaderName": "Название",
     "tableHeaderSubject": "Субъект",

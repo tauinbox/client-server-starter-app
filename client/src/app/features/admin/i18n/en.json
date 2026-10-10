@@ -133,6 +133,7 @@
   },
   "roles": {
     "title": "Roles management",
+    "empty": "No roles yet.",
     "create": "New role",
     "tableHeaderName": "Name",
     "tableHeaderDescription": "Description",
@@ -227,6 +228,7 @@
   },
   "resources": {
     "title": "Resources",
+    "empty": "No resources yet.",
     "tableHeaderDisplayName": "Display name",
     "tableHeaderName": "Name",
     "tableHeaderSubject": "Subject",
