@@ -242,23 +242,19 @@ runWithInfra('List search and filters (e2e)', () => {
   });
 
   describe('resources', () => {
-    const names = { active: `${stamp}-active`, orphaned: `${stamp}-orphaned` };
+    const orphaned = `${stamp}-orphaned`;
 
+    // The resource sync of any app that boots in a parallel spec marks every
+    // resource that no controller registers as orphaned, so a row inserted
+    // here as not orphaned does not stay so. `roles` (RolesController) is
+    // registered by every app that runs the sync, so it is never orphaned.
     beforeAll(async () => {
-      await dataSource.getRepository(Resource).save([
-        {
-          name: names.active,
-          subject: `Lq${stamp}Active`,
-          displayName: 'List query active',
-          isOrphaned: false
-        },
-        {
-          name: names.orphaned,
-          subject: `Lq${stamp}Orphaned`,
-          displayName: 'List query orphaned',
-          isOrphaned: true
-        }
-      ]);
+      await dataSource.getRepository(Resource).save({
+        name: orphaned,
+        subject: `Lq${stamp}Orphaned`,
+        displayName: 'List query orphaned',
+        isOrphaned: true
+      });
     });
 
     async function resourceNames(query: string): Promise<string[]> {
@@ -272,10 +268,13 @@ runWithInfra('List search and filters (e2e)', () => {
     it('searches the subject and filters on isOrphaned and isSystem', async () => {
       await expect(
         resourceNames(`q=lq${stamp}orphaned&isOrphaned=true&isSystem=false`)
-      ).resolves.toEqual([names.orphaned]);
+      ).resolves.toEqual([orphaned]);
       await expect(
         resourceNames(`q=${stamp}&isOrphaned=false`)
-      ).resolves.toEqual([names.active]);
+      ).resolves.toEqual([]);
+      await expect(
+        resourceNames('q=roles&isOrphaned=false')
+      ).resolves.toContain('roles');
       await expect(resourceNames(`q=${stamp}&isSystem=true`)).resolves.toEqual(
         []
       );
