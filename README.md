@@ -1188,6 +1188,9 @@ docker-compose up -d
 
 Services:
 
+The Docker Hub images (redis, db, prometheus, grafana) are pulled through the `mirror.gcr.io` pull
+mirror, thus a Docker Hub rate limit or outage does not fail `docker compose pull`.
+
 - **redis** is redis:7.4-alpine. It supplies the distributed rate limiting and the shared permission
   cache.
 - **db** is postgres:18-alpine with a persistent named volume.
