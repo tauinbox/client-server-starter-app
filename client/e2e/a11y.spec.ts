@@ -39,7 +39,7 @@ test.describe('Accessibility (axe-core)', () => {
     page
   }) => {
     await page.goto('/login');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByLabel('Email')).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -50,7 +50,7 @@ test.describe('Accessibility (axe-core)', () => {
     page
   }) => {
     await page.goto('/register');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByLabel('Email')).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -61,7 +61,7 @@ test.describe('Accessibility (axe-core)', () => {
     page
   }) => {
     await page.goto('/forgot-password');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByLabel('Email')).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -122,7 +122,7 @@ test.describe('Accessibility (axe-core)', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -134,7 +134,9 @@ test.describe('Accessibility (axe-core)', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}`);
-    await page.waitForLoadState('networkidle');
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Admin User' })
+    ).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -146,7 +148,7 @@ test.describe('Accessibility (axe-core)', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -158,7 +160,7 @@ test.describe('Accessibility (axe-core)', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/roles');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -170,7 +172,7 @@ test.describe('Accessibility (axe-core)', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
     expect(seriousOrCritical(violations)).toEqual([]);

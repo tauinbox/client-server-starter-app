@@ -121,10 +121,9 @@ export async function routeApiToMockServer(
     return route.continue({ url });
   });
 
-  // A persistent SSE connection blocks waitForLoadState('networkidle') in
-  // loginViaUi() because Playwright counts a streaming request as active until
-  // the connection closes. Registered after the general route so it takes priority
-  // (Playwright: last = first matched).
+  // Most tests do not need live notifications, so the SSE stream gets an empty
+  // body instead of a connection that stays open. Registered after the general
+  // route so it takes priority (Playwright: last = first matched).
   await page.route(/\/api\/.*\/notifications\/stream/, (route) =>
     route.fulfill({
       status: 200,
@@ -180,13 +179,17 @@ export async function loginViaUi(
   // Post-login destination depends on permissions (admin → /admin/users via
   // root redirect → defaultRoute(); user → /profile fallback).
   await page.waitForURL((url) => !url.pathname.endsWith('/login'));
-  await page.waitForLoadState('networkidle');
   // Tests written before the dynamic landing page rely on /profile being the
   // post-login URL; normalize so existing assertions keep working.
   if (!page.url().endsWith('/profile')) {
     await page.goto('/profile');
-    await page.waitForLoadState('networkidle');
   }
+  await expect(
+    page.getByRole('heading', {
+      level: 2,
+      name: `${user.firstName} ${user.lastName}`
+    })
+  ).toBeVisible();
 }
 
 export async function expectAuthRedirect(
@@ -210,10 +213,9 @@ export async function expectForbiddenRedirect(
 /**
  * Login variant for tests that opt into the REAL `/api/.../notifications/stream`
  * SSE connection (after `page.unroute(...)` removes the empty-body stub from
- * base.fixture). Skips `waitForLoadState('networkidle')` because a live SSE
- * connection stays open and never lets the page reach idle. Instead waits for
- * the `/auth/permissions` response so the CASL ability is hydrated before the
- * test continues — same end-state as `loginViaUi`.
+ * base.fixture). Has no `goto('/profile')`, so the test stays on the landing
+ * page. Waits for the `/auth/permissions` response so the CASL ability is
+ * hydrated before the test continues.
  */
 export async function loginViaUiKeepSse(
   page: Page,

@@ -16,7 +16,7 @@ test.describe('Keyboard navigation', () => {
     page
   }) => {
     await page.goto('/login');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByLabel('Email')).toBeVisible();
 
     // Move focus into the document, then advance with Tab — the skip-link
     // must be the first focusable element (WCAG 2.4.1 Bypass Blocks).
