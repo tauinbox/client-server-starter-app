@@ -168,7 +168,7 @@ export class BillingSettingsComponent implements OnInit {
     if (result === 'completed') {
       this.#notify.success('billing.settings.paymentMethodUpdated');
     } else if (result === 'unavailable') {
-      this.#notify.error('billing.errors.paymentFormUnavailable');
+      this.#notify.error('billing.settings.errorPaymentFormUnavailable');
     }
   }
 

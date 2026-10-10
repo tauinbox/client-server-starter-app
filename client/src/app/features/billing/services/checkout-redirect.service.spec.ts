@@ -68,7 +68,7 @@ describe('CheckoutRedirectService', () => {
     service.redirect('javascript:alert(document.cookie)');
     expect(fakeWindow.location.href).toBe('initial');
     expect(notifyMock.error).toHaveBeenCalledWith(
-      'billing.errors.unsafeRedirect'
+      'billing.checkout.errorUnsafeRedirect'
     );
   });
 
@@ -76,7 +76,7 @@ describe('CheckoutRedirectService', () => {
     service.redirect('http://evil.example/pay');
     expect(fakeWindow.location.href).toBe('initial');
     expect(notifyMock.error).toHaveBeenCalledWith(
-      'billing.errors.unsafeRedirect'
+      'billing.checkout.errorUnsafeRedirect'
     );
   });
 });

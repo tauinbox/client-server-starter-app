@@ -104,7 +104,7 @@
     "cancelMessage": "Your plan stays active until the end of the current billing period, then reverts to Free.",
     "cancelMessageUsage": "Your plan stays active until the end of the current billing period, then reverts to Free. Metered usage recorded so far is charged when the period closes.",
     "cancelConfirm": "Cancel subscription",
-    "cancelSuccess": "Subscription canceled — active until the period ends.",
+    "successCancelled": "Subscription canceled — active until the period ends.",
     "noSubscription": "No subscription yet — explore plans.",
     "explorePlans": "Explore plans",
     "paymentMethod": "Payment method",
@@ -124,7 +124,8 @@
     "invoiceAmount": "Amount",
     "receipt": "Receipt",
     "deviceAllowance": "Devices at once: {{ count }}",
-    "deviceAllowanceHint": "Signing in beyond this drops your oldest session."
+    "deviceAllowanceHint": "Signing in beyond this drops your oldest session.",
+    "errorPaymentFormUnavailable": "Could not open the payment form. Please try again later."
   },
   "usage": {
     "title": "Usage this period",
@@ -154,7 +155,8 @@
     "payingTitle": "Opening the payment form…",
     "payingMessage": "Complete the payment in the window that opens.",
     "unavailableTitle": "Payment form unavailable",
-    "unavailableMessage": "We could not open the payment form. No charge was made. Please try again later."
+    "unavailableMessage": "We could not open the payment form. No charge was made. Please try again later.",
+    "errorUnsafeRedirect": "Received an invalid checkout link. Please try again or contact support."
   },
   "changePlan": {
     "title": "Change plan",
@@ -173,19 +175,17 @@
     "trialNote": "You're on a trial — switching plans moves no money.",
     "providerSettles": "The exact split is settled by the payment provider; this is the net amount.",
     "selectHint": "Select a plan to see what you'd pay today.",
-    "previewFailed": "Could not calculate the proration. Pick the plan again to retry.",
+    "errorPreviewFailed": "Could not calculate the proration. Pick the plan again to retry.",
     "confirm": "Confirm",
-    "success": "Plan changed — the proration receipts are in your invoices."
+    "successChanged": "Plan changed — the proration receipts are in your invoices."
   },
-  "errors": {
-    "loadFailed": "Could not load billing information.",
-    "checkoutFailed": "Could not start checkout. Please try again.",
-    "cancelFailed": "Could not cancel the subscription. Please try again.",
-    "regionFailed": "Could not change the billing region.",
-    "changeFailed": "Could not change the plan. Please try again.",
-    "paymentMethodFailed": "Could not start the payment-method update. Please try again.",
-    "purchaseFailed": "Could not start the purchase. Please try again.",
-    "unsafeRedirect": "Received an invalid checkout link. Please try again or contact support.",
-    "paymentFormUnavailable": "Could not open the payment form. Please try again later."
+  "store": {
+    "errorLoadFailed": "Could not load billing information.",
+    "errorCheckoutFailed": "Could not start checkout. Please try again.",
+    "errorCancelFailed": "Could not cancel the subscription. Please try again.",
+    "errorRegionFailed": "Could not change the billing region.",
+    "errorChangeFailed": "Could not change the plan. Please try again.",
+    "errorPaymentMethodFailed": "Could not start the payment-method update. Please try again.",
+    "errorPurchaseFailed": "Could not start the purchase. Please try again."
   }
 }

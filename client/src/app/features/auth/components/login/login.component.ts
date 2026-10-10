@@ -318,7 +318,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
 
     this.resendError.set(
-      this.#resolveErrorMessage(err, 'auth.login.resendVerificationFailed')
+      this.#resolveErrorMessage(err, 'auth.login.errorResendVerificationFailed')
     );
   }
 

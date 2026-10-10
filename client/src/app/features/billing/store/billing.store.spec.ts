@@ -253,7 +253,7 @@ describe('BillingStore', () => {
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.anything(),
-      'billing.errors.loadFailed'
+      'billing.store.errorLoadFailed'
     );
   });
 
@@ -301,7 +301,7 @@ describe('BillingStore', () => {
     expect(session).toBeNull();
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.anything(),
-      'billing.errors.purchaseFailed'
+      'billing.store.errorPurchaseFailed'
     );
   });
 
@@ -581,77 +581,77 @@ describe('Billing requests through the error interceptor', () => {
         (store) => store.loadPlans(),
         'GET',
         '/plans',
-        'billing.errors.loadFailed'
+        'billing.store.errorLoadFailed'
       ],
       [
         'loadRegion',
         (store) => store.loadRegion(),
         'GET',
         '/region',
-        'billing.errors.loadFailed'
+        'billing.store.errorLoadFailed'
       ],
       [
         'loadProducts',
         (store) => store.loadProducts(),
         'GET',
         '/products',
-        'billing.errors.loadFailed'
+        'billing.store.errorLoadFailed'
       ],
       [
         'refreshSubscription',
         (store) => store.refreshSubscription(),
         'GET',
         '/subscription',
-        'billing.errors.loadFailed'
+        'billing.store.errorLoadFailed'
       ],
       [
         'refreshInvoices',
         (store) => store.refreshInvoices(),
         'GET',
         '/invoices',
-        'billing.errors.loadFailed'
+        'billing.store.errorLoadFailed'
       ],
       [
         'checkout',
         (store) => store.checkout('pro'),
         'POST',
         '/checkout',
-        'billing.errors.checkoutFailed'
+        'billing.store.errorCheckoutFailed'
       ],
       [
         'purchase',
         (store) => store.purchase({ productKey: 'report-pack' }),
         'POST',
         '/purchase',
-        'billing.errors.purchaseFailed'
+        'billing.store.errorPurchaseFailed'
       ],
       [
         'changePlan',
         (store) => store.changePlan('business'),
         'POST',
         '/subscription/change',
-        'billing.errors.changeFailed'
+        'billing.store.errorChangeFailed'
       ],
       [
         'startPaymentMethodUpdate',
         (store) => store.startPaymentMethodUpdate(),
         'POST',
         '/payment-method',
-        'billing.errors.paymentMethodFailed'
+        'billing.store.errorPaymentMethodFailed'
       ],
       [
         'cancel',
         (store) => store.cancel(),
         'POST',
         '/subscription/cancel',
-        'billing.errors.cancelFailed'
+        'billing.store.errorCancelFailed'
       ],
       [
         'setRegion',
         (store) => store.setRegion('ru'),
         'PUT',
         '/region',
-        'billing.errors.regionFailed'
+        'billing.store.errorRegionFailed'
       ]
     ]
   )(
