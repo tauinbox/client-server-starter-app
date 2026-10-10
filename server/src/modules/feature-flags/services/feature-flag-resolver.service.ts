@@ -42,7 +42,6 @@ interface CachedFlag {
   environments: string[];
   public: boolean;
   rules: {
-    type: FeatureFlagRule['type'];
     effect: FeatureFlagRule['effect'];
     payload: FeatureFlagRule['payload'];
   }[];
@@ -227,7 +226,6 @@ export class FeatureFlagResolverService {
       environments: f.environments,
       public: f.public,
       rules: (rulesByFlag.get(f.id) ?? []).map((r) => ({
-        type: r.type,
         effect: r.effect,
         payload: r.payload
       }))

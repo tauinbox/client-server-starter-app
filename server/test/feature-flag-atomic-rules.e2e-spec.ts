@@ -19,7 +19,6 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 const FAILING_PERCENT = 37;
 
 const percentRule = (percent: number): FeatureFlagRuleDto => ({
-  type: 'percentage',
   effect: 'include',
   payload: { type: 'percentage', percent }
 });

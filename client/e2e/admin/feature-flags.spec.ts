@@ -126,7 +126,6 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
           public: true,
           rules: [
             {
-              type: 'percentage',
               effect: 'include',
               payload: { type: 'percentage', percent: 100 }
             }

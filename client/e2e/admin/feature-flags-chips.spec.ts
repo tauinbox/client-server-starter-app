@@ -96,12 +96,16 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
 
     const createBody = response.request().postDataJSON() as {
       rules: {
-        type: string;
+        effect: string;
         payload: { type: string; roleNames?: string[] };
       }[];
     };
     expect(createBody.rules).toHaveLength(1);
-    expect(createBody.rules[0].type).toBe('role');
+    expect(Object.keys(createBody.rules[0]).sort()).toEqual([
+      'effect',
+      'payload'
+    ]);
+    expect(createBody.rules[0].payload.type).toBe('role');
     expect(createBody.rules[0].payload.roleNames).toEqual(['user']);
     expect(created.rules[0].payload.roleNames).toEqual(['user']);
   });

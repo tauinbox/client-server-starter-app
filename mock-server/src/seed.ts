@@ -557,7 +557,6 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
     {
       id: mockId('rule-beta-export-percent'),
       flagId: mockId('flag-beta-export'),
-      type: 'percentage',
       effect: 'include',
       payload: { type: 'percentage', percent: 10 },
       createdAt: now,
@@ -566,7 +565,6 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
     ...OAUTH_PROVIDER_FLAGS.map(({ flagKey, attributeKey }) => ({
       id: mockId(`rule-${flagKey}-configured`),
       flagId: mockId(`flag-${flagKey}`),
-      type: 'attribute' as const,
       effect: 'include' as const,
       payload: {
         type: 'attribute' as const,
@@ -581,7 +579,6 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
     {
       id: mockId(`rule-${BILLING_FLAG_KEY}-configured`),
       flagId: mockId(`flag-${BILLING_FLAG_KEY}`),
-      type: 'attribute' as const,
       effect: 'include' as const,
       payload: {
         type: 'attribute' as const,
@@ -597,7 +594,6 @@ function generateFeatureFlagRules(): MockFeatureFlagRule[] {
       ({ enabledFlagKey, configuredAttribute }) => ({
         id: mockId(`rule-${enabledFlagKey}-configured`),
         flagId: mockId(`flag-${enabledFlagKey}`),
-        type: 'attribute' as const,
         effect: 'include' as const,
         payload: {
           type: 'attribute' as const,

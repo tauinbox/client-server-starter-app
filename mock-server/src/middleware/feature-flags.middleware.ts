@@ -27,12 +27,10 @@ import {
   FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
   FEATURE_FLAG_RULES_MAX_ITEMS,
   FEATURE_FLAG_RULE_EFFECTS,
-  FEATURE_FLAG_RULE_TYPES,
   OAUTH_PROVIDER_FLAGS,
   ROLE_NAME_MAX_LENGTH,
   normalizeEnvironmentList,
-  type FeatureFlagRuleEffect,
-  type FeatureFlagRuleType
+  type FeatureFlagRuleEffect
 } from '@app/shared/constants';
 import {
   listPage,
@@ -187,7 +185,7 @@ function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
-const RULE_KEYS = ['effect', 'type', 'payload'] as const;
+const RULE_KEYS = ['effect', 'payload'] as const;
 const NESTED_RULES_MESSAGE =
   'each value in nested property rules must be either object or array';
 
@@ -200,7 +198,6 @@ function ruleObjectErrors(path: string, rule: object): string[] {
   return [
     ...unknownPropertyErrors(r, RULE_KEYS),
     ...oneOfErrors('effect', r['effect'], FEATURE_FLAG_RULE_EFFECTS),
-    ...oneOfErrors('type', r['type'], FEATURE_FLAG_RULE_TYPES),
     ...objectErrors('payload', r['payload'])
   ].map((message) => `${path}.${message}`);
 }
@@ -309,13 +306,11 @@ function validateUpdate(
 }
 
 interface IncomingRule {
-  type?: unknown;
   effect?: unknown;
   payload?: unknown;
 }
 
 type ValidatedRule = {
-  type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
 };
@@ -330,9 +325,7 @@ function parseRules(
   | { ok: false; message: string; errorKey: string } {
   const out: ValidatedRule[] = [];
   for (const entry of value as IncomingRule[]) {
-    const type = entry.type as FeatureFlagRuleType;
     const parsed = parseFeatureFlagRulePayload(
-      type,
       entry.payload,
       KNOWN_CUSTOM_KEYS
     );
@@ -344,7 +337,6 @@ function parseRules(
       };
     }
     out.push({
-      type,
       effect: entry.effect as FeatureFlagRuleEffect,
       payload: parsed.payload
     });
@@ -633,7 +625,6 @@ function writeRules(
     const rule: MockFeatureFlagRule = {
       id: randomUUID(),
       flagId,
-      type: r.type,
       effect: r.effect,
       payload: r.payload,
       createdAt: new Date(start + i).toISOString(),

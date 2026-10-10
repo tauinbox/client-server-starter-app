@@ -171,7 +171,6 @@ describe('FeatureFlagService', () => {
   }
 
   const percentRule = (percent: number) => ({
-    type: 'percentage' as const,
     effect: 'include' as const,
     payload: { type: 'percentage' as const, percent }
   });
@@ -433,7 +432,6 @@ describe('FeatureFlagService', () => {
       id: 'r1',
       flagId: 'flag-1',
       flag: sampleFlag,
-      type: 'role',
       effect: 'include',
       payload: { type: 'role', roleNames: ['beta'] },
       createdAt: new Date(),
@@ -490,7 +488,6 @@ describe('FeatureFlagService', () => {
         roles: ['beta'],
         rules: [
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: ['gamma'] }
           }
@@ -507,7 +504,6 @@ describe('FeatureFlagService', () => {
           roles: ['gamma'],
           rules: [
             {
-              type: 'role',
               effect: 'include',
               payload: { type: 'role', roleNames: ['gamma'] }
             }
@@ -529,7 +525,6 @@ describe('FeatureFlagService', () => {
         service.preview(previewFlag, {
           rules: [
             {
-              type: 'user',
               effect: 'include',
               // @ts-expect-error probing the runtime validator with a bad payload
               payload: { type: 'user', userIds: 'not-an-array' }

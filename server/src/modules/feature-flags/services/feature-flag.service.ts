@@ -304,7 +304,7 @@ export class FeatureFlagService {
     const evalRules: EvaluatorRule[] = dto.rules
       ? dto.rules.map((r) => ({
           effect: r.effect,
-          payload: validateRulePayload(r.type, r.payload, customKeys)
+          payload: validateRulePayload(r.payload, customKeys)
         }))
       : flag.rules.map((r) => ({
           effect: r.effect,
@@ -332,9 +332,8 @@ export class FeatureFlagService {
     if (!rules) return undefined;
     const customKeys = this.attributeRegistry.getKnownCustomKeys();
     return rules.map((r) => ({
-      type: r.type,
       effect: r.effect,
-      payload: validateRulePayload(r.type, r.payload, customKeys)
+      payload: validateRulePayload(r.payload, customKeys)
     }));
   }
 
@@ -351,7 +350,6 @@ export class FeatureFlagService {
         FeatureFlagRule,
         em.create(FeatureFlagRule, {
           flagId,
-          type: r.type,
           effect: r.effect,
           payload: r.payload
         })
@@ -389,7 +387,7 @@ export class FeatureFlagService {
             ) deduped
           ))`
       })
-      .where(`type = 'role' AND payload->'roleNames' ? :oldName`)
+      .where(`payload->>'type' = 'role' AND payload->'roleNames' ? :oldName`)
       .setParameters({ oldName, newName })
       .returning('flag_id')
       .execute();

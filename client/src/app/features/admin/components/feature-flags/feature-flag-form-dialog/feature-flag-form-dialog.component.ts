@@ -149,7 +149,6 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     (this.data.flag?.rules ?? []).map((r) => ({
       id: r.id,
       effect: r.effect,
-      type: r.payload.type,
       payload: r.payload
     }))
   );
@@ -180,11 +179,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   // The preview panel evaluates this instead of the persisted flag, so it
   // answers for the rules and toggles currently on screen.
   readonly previewDraft = computed<PreviewFlagDraft>(() => ({
-    rules: this.rules().map((r) => ({
-      effect: r.effect,
-      type: r.type,
-      payload: r.payload
-    })),
+    rules: this.rules().map((r) => ({ effect: r.effect, payload: r.payload })),
     enabled: this.enabled(),
     environments: this.environments().map((c) => c.value)
   }));
@@ -245,7 +240,6 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     const next = [...this.rules()];
     next.push({
       effect: 'include',
-      type: 'percentage',
       payload: { type: 'percentage', percent: 0 }
     });
     this.rules.set(next);
@@ -295,7 +289,6 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
         ? {
             rules: this.rules().map((r) => ({
               effect: r.effect,
-              type: r.type,
               payload: r.payload
             }))
           }

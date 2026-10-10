@@ -131,7 +131,6 @@ export interface MockFeatureFlag {
 export interface MockFeatureFlagRule {
   id: string;
   flagId: string;
-  type: import('@app/shared/constants').FeatureFlagRuleType;
   effect: import('@app/shared/constants').FeatureFlagRuleEffect;
   payload: import('@app/shared/types').FeatureFlagRulePayload;
   createdAt: string;

@@ -3,8 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type {
   FeatureFlagListQuery,
-  FeatureFlagRuleEffect,
-  FeatureFlagRuleType
+  FeatureFlagRuleEffect
 } from '@app/shared/constants';
 import type {
   FeatureFlagAttributeKeysResponse,
@@ -24,7 +23,6 @@ import {
 const ADMIN_API_V1 = '/api/v1/admin/feature-flags';
 
 export type FeatureFlagRuleInput = {
-  type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
 };

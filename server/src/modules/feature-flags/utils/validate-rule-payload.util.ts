@@ -1,19 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
-import type { FeatureFlagRuleType } from '@app/shared/constants';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 
 export function validateRulePayload(
-  type: FeatureFlagRuleType,
   payload: unknown,
   knownCustomAttributeKeys: ReadonlySet<string>
 ): FeatureFlagRulePayload {
-  const result = parseFeatureFlagRulePayload(
-    type,
-    payload,
-    knownCustomAttributeKeys
-  );
+  const result = parseFeatureFlagRulePayload(payload, knownCustomAttributeKeys);
   if (!result.ok) {
     throw new BadRequestException({
       message: result.message,

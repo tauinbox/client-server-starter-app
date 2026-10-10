@@ -16,6 +16,18 @@ import {
 import { thrownBy } from '../../../common/testing/thrown-by';
 import { validateRulePayload } from './validate-rule-payload.util';
 
+describe('validateRulePayload rule type', () => {
+  it.each([
+    ['a missing type', { percent: 25 }],
+    ['an unknown type', { type: 'segment', percent: 25 }],
+    ['a non-string type', { type: 1, percent: 25 }]
+  ])('rejects %s', (_label, payload) => {
+    expect(() => validateRulePayload(payload, new Set<string>())).toThrow(
+      'Rule payload.type must be one of user, role, percentage, attribute'
+    );
+  });
+});
+
 describe('validateRulePayload user and role lists', () => {
   const noCustomKeys = new Set<string>();
   const userIdsMessage =
@@ -28,7 +40,7 @@ describe('validateRulePayload user and role lists', () => {
   it('accepts 100 UUIDs', () => {
     const userIds = Array.from({ length: 100 }, (_, i) => uuid(i));
     expect(
-      validateRulePayload('user', { type: 'user', userIds }, noCustomKeys)
+      validateRulePayload({ type: 'user', userIds }, noCustomKeys)
     ).toEqual({ type: 'user', userIds });
   });
 
@@ -42,7 +54,7 @@ describe('validateRulePayload user and role lists', () => {
     ['101 items', Array.from({ length: 101 }, (_, i) => uuid(i))]
   ])('rejects userIds with %s', (_label, userIds) => {
     expect(() =>
-      validateRulePayload('user', { type: 'user', userIds }, noCustomKeys)
+      validateRulePayload({ type: 'user', userIds }, noCustomKeys)
     ).toThrow(userIdsMessage);
   });
 
@@ -51,7 +63,7 @@ describe('validateRulePayload user and role lists', () => {
       String(i).padEnd(100, 'x')
     );
     expect(
-      validateRulePayload('role', { type: 'role', roleNames }, noCustomKeys)
+      validateRulePayload({ type: 'role', roleNames }, noCustomKeys)
     ).toEqual({ type: 'role', roleNames });
   });
 
@@ -61,7 +73,7 @@ describe('validateRulePayload user and role lists', () => {
     ['33 items', Array.from({ length: 33 }, (_, i) => `role-${i}`)]
   ])('rejects roleNames with %s', (_label, roleNames) => {
     expect(() =>
-      validateRulePayload('role', { type: 'role', roleNames }, noCustomKeys)
+      validateRulePayload({ type: 'role', roleNames }, noCustomKeys)
     ).toThrow(roleNamesMessage);
   });
 });
@@ -134,7 +146,6 @@ describe('validateRulePayload attribute value', () => {
   function validate(op: string, value: unknown): unknown {
     const field = op === 'before' || op === 'after' ? 'createdAt' : 'email';
     return validateRulePayload(
-      'attribute',
       { type: 'attribute', field, op, value },
       knownCustomKeys
     );
@@ -232,7 +243,6 @@ describe('validateRulePayload attribute value', () => {
     ])('rejects field=%s with op=%s', (field, op, value) => {
       expect(() =>
         validateRulePayload(
-          'attribute',
           { type: 'attribute', field, op, value },
           knownCustomKeys
         )
@@ -250,7 +260,6 @@ describe('validateRulePayload attribute value', () => {
               : 'x';
         expect(
           validateRulePayload(
-            'attribute',
             {
               type: 'attribute',
               field: 'custom',
@@ -267,18 +276,13 @@ describe('validateRulePayload attribute value', () => {
 
   it('still validates the other rule types unchanged', () => {
     expect(
-      validateRulePayload(
-        'percentage',
-        { type: 'percentage', percent: 25 },
-        knownCustomKeys
-      )
+      validateRulePayload({ type: 'percentage', percent: 25 }, knownCustomKeys)
     ).toEqual({ type: 'percentage', percent: 25 });
   });
 
   it.each(['user', 'device'])('keeps percentage bucketBy=%s', (bucketBy) => {
     expect(
       validateRulePayload(
-        'percentage',
         { type: 'percentage', percent: 25, bucketBy },
         knownCustomKeys
       )
@@ -288,7 +292,6 @@ describe('validateRulePayload attribute value', () => {
   it('rejects an unregistered customKey with the registry message', () => {
     expect(() =>
       validateRulePayload(
-        'attribute',
         {
           type: 'attribute',
           field: 'custom',
@@ -305,7 +308,6 @@ describe('validateRulePayload attribute value', () => {
     expect(
       thrownBy(() =>
         validateRulePayload(
-          'percentage',
           { type: 'percentage', percent: 500 },
           knownCustomKeys
         )
@@ -318,7 +320,6 @@ describe('validateRulePayload attribute value', () => {
   it('drops a customKey sent with a field that is not custom', () => {
     expect(
       validateRulePayload(
-        'attribute',
         {
           type: 'attribute',
           field: 'email',
@@ -333,21 +334,13 @@ describe('validateRulePayload attribute value', () => {
 
   it('rejects an out-of-range percent with the range message', () => {
     expect(() =>
-      validateRulePayload(
-        'percentage',
-        { type: 'percentage', percent: 500 },
-        knownCustomKeys
-      )
+      validateRulePayload({ type: 'percentage', percent: 500 }, knownCustomKeys)
     ).toThrow('percentage rule requires percent: an integer in [0, 100]');
   });
 
   it('rejects a fractional percent, which the integer bucket rounds up', () => {
     expect(() =>
-      validateRulePayload(
-        'percentage',
-        { type: 'percentage', percent: 0.5 },
-        knownCustomKeys
-      )
+      validateRulePayload({ type: 'percentage', percent: 0.5 }, knownCustomKeys)
     ).toThrow('percentage rule requires percent: an integer in [0, 100]');
   });
 
@@ -356,7 +349,6 @@ describe('validateRulePayload attribute value', () => {
     (bucketBy) => {
       expect(() =>
         validateRulePayload(
-          'percentage',
           { type: 'percentage', percent: 25, bucketBy },
           knownCustomKeys
         )

@@ -198,7 +198,6 @@ describe('feature-flag validation parity with server', () => {
 
     it('returns the server text for an unregistered customKey', async () => {
       const { res, flagId } = await ruleResponse('payload-custom-key', {
-        type: 'attribute',
         effect: 'include',
         payload: {
           type: 'attribute',
@@ -220,7 +219,6 @@ describe('feature-flag validation parity with server', () => {
 
     it('returns the server text for an out-of-range percent', async () => {
       const { res } = await ruleResponse('payload-percent', {
-        type: 'percentage',
         effect: 'include',
         payload: { type: 'percentage', percent: 500 }
       });
@@ -250,7 +248,7 @@ describe('feature-flag validation parity with server', () => {
     ])('returns the server text for %s', async (_label, payload, message) => {
       const { res, flagId } = await ruleResponse(
         `payload-${payload.type}-bad`,
-        { type: payload.type, effect: 'include', payload }
+        { effect: 'include', payload }
       );
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
@@ -262,7 +260,6 @@ describe('feature-flag validation parity with server', () => {
 
     it('returns the server text for a field and operator that never match', async () => {
       const { res, flagId } = await ruleResponse('payload-created-eq', {
-        type: 'attribute',
         effect: 'include',
         payload: {
           type: 'attribute',
@@ -283,7 +280,6 @@ describe('feature-flag validation parity with server', () => {
 
     it('stores percentage bucketBy=device', async () => {
       const { res } = await ruleResponse('payload-bucket-device', {
-        type: 'percentage',
         effect: 'include',
         payload: { type: 'percentage', percent: 10, bucketBy: 'device' }
       });
@@ -338,7 +334,6 @@ describe('feature-flag validation parity with server', () => {
       const flag = (await created.json()) as { id: string };
       const res = await saveRules(flag.id, [
         {
-          type: 'attribute',
           effect: 'include',
           payload: {
             type: 'attribute',
@@ -362,7 +357,6 @@ describe('feature-flag validation parity with server', () => {
       getState().featureFlagRules.push({
         id: 'legacy-created-eq',
         flagId: flag.id,
-        type: 'attribute',
         effect: 'include',
         payload: {
           type: 'attribute',
@@ -406,7 +400,6 @@ describe('feature-flag validation parity with server', () => {
       flagId = ((await created.json()) as { id: string }).id;
       const stored = await saveRules(flagId, [
         {
-          type: 'role',
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
         }
@@ -428,7 +421,6 @@ describe('feature-flag validation parity with server', () => {
         roles: ['beta'],
         rules: [
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: ['gamma'] }
           }
@@ -446,7 +438,6 @@ describe('feature-flag validation parity with server', () => {
         roles: ['gamma'],
         rules: [
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: ['gamma'] }
           }
@@ -463,7 +454,6 @@ describe('feature-flag validation parity with server', () => {
     it('rejects a supplied payload the save path also rejects', async () => {
       const rules = [
         {
-          type: 'user',
           effect: 'include',
           payload: { type: 'user', userIds: 'not-an-array' }
         }
@@ -530,7 +520,6 @@ describe('feature-flag validation parity with server', () => {
         environments: ['staging'],
         rules: [
           {
-            type: 'role',
             effect: 'include',
             payload: { type: 'role', roleNames: ['gamma'] }
           }
@@ -723,7 +712,6 @@ describe('feature-flag validation parity with server', () => {
     it('evaluates all 32 attribute keys', async () => {
       const stored = await saveRules(flagId, [
         {
-          type: 'attribute',
           effect: 'include',
           payload: {
             type: 'attribute',
@@ -754,8 +742,6 @@ describe('feature-flag validation parity with server', () => {
   describe('DTO error lists', () => {
     const ABSENT_ID = '22222222-2222-4222-8222-222222222222';
     const EFFECT = 'must be one of the following values: include, exclude';
-    const TYPE =
-      'must be one of the following values: user, role, percentage, attribute';
     const ENVIRONMENT_ONE_OF =
       'each value in environments must be one of the following values: local, development, staging, production';
     const NESTED =
@@ -767,7 +753,6 @@ describe('feature-flag validation parity with server', () => {
     ];
     const validRule = {
       effect: 'include',
-      type: 'role',
       payload: { type: 'role', roleNames: ['beta'] }
     };
 
@@ -799,7 +784,7 @@ describe('feature-flag validation parity with server', () => {
           enabled: 'yes',
           environments: ['moon'],
           public: 'no',
-          rules: [{ effect: 'include', type: 'nope', payload: 'x' }]
+          rules: [{ effect: 'include', payload: 'x' }]
         },
         [
           'description must be shorter than or equal to 500 characters',
@@ -807,7 +792,6 @@ describe('feature-flag validation parity with server', () => {
           'enabled must be a boolean value',
           ENVIRONMENT_ONE_OF,
           'public must be a boolean value',
-          `rules.0.type ${TYPE}`,
           'rules.0.payload must be an object'
         ]
       ],
@@ -835,15 +819,14 @@ describe('feature-flag validation parity with server', () => {
         'every bad rule entry',
         {
           rules: [
-            { effect: 'maybe', type: 'role', payload: {} },
-            { effect: 'include', type: 'nope', payload: null },
-            { effect: 'include', type: 'role', payload: [] },
-            { type: 'role' }
+            { effect: 'maybe', payload: {} },
+            { effect: 'include', payload: null },
+            { effect: 'include', payload: [] },
+            {}
           ]
         },
         [
           `rules.0.effect ${EFFECT}`,
-          `rules.1.type ${TYPE}`,
           'rules.1.payload must be an object',
           'rules.2.payload must be an object',
           `rules.3.effect ${EFFECT}`,
@@ -858,18 +841,13 @@ describe('feature-flag validation parity with server', () => {
           `rules.${NESTED}`,
           `rules.${NESTED}`,
           `rules.4.effect ${EFFECT}`,
-          `rules.4.type ${TYPE}`,
           'rules.4.payload must be an object'
         ]
       ],
       [
         'only the bad entry of a rule set over the cap',
         { rules: [...Array.from({ length: 64 }, () => validRule), {}] },
-        [
-          `rules.64.effect ${EFFECT}`,
-          `rules.64.type ${TYPE}`,
-          'rules.64.payload must be an object'
-        ]
+        [`rules.64.effect ${EFFECT}`, 'rules.64.payload must be an object']
       ],
       [
         'a rule set over the cap',
@@ -887,11 +865,7 @@ describe('feature-flag validation parity with server', () => {
       [
         'an empty object sent as the rule set',
         { rules: {} },
-        [
-          `rules.effect ${EFFECT}`,
-          `rules.type ${TYPE}`,
-          'rules.payload must be an object'
-        ]
+        [`rules.effect ${EFFECT}`, 'rules.payload must be an object']
       ],
       [
         'nested rule arrays',
@@ -899,7 +873,6 @@ describe('feature-flag validation parity with server', () => {
         [
           `rules.1.${NESTED}`,
           `rules.2.0.effect ${EFFECT}`,
-          `rules.2.0.type ${TYPE}`,
           'rules.2.0.payload must be an object'
         ]
       ],
@@ -911,8 +884,14 @@ describe('feature-flag validation parity with server', () => {
         [
           'rules.0.property zeta should not exist',
           'rules.0.property alpha should not exist',
+          'rules.0.property type should not exist',
           `rules.0.effect ${EFFECT}`
         ]
+      ],
+      [
+        'a rule-level type, which payload.type replaced',
+        { rules: [{ ...validRule, type: 'role' }] },
+        ['rules.0.property type should not exist']
       ],
       [
         'environments after normalization',
@@ -1034,14 +1013,14 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a non-object rule payload on an absent flag with 400, not 404', async () => {
       const res = await saveRules(ABSENT_ID, [
-        { type: 'user', effect: 'include', payload: 'nope' }
+        { effect: 'include', payload: 'nope' }
       ]);
       expect(res.status).toBe(400);
     });
 
     it('answers 404 for a payload the rule validator rejects on an absent flag', async () => {
       const res = await saveRules(ABSENT_ID, [
-        { type: 'user', effect: 'include', payload: { type: 'user' } }
+        { effect: 'include', payload: { type: 'user' } }
       ]);
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
@@ -1053,7 +1032,7 @@ describe('feature-flag validation parity with server', () => {
       const flag = (await created.json()) as { id: string };
       const res = await patchFlag(
         flag.id,
-        { rules: [{ type: 'user', effect: 'include', payload: {} }] },
+        { rules: [{ effect: 'include', payload: {} }] },
         '7'
       );
       expect(res.status).toBe(400);
@@ -1069,7 +1048,7 @@ describe('feature-flag validation parity with server', () => {
       await createFlag({ key: 'order-taken-payload' });
       const res = await createFlag({
         key: 'order-taken-payload',
-        rules: [{ type: 'user', effect: 'include', payload: { type: 'user' } }]
+        rules: [{ effect: 'include', payload: { type: 'user' } }]
       });
       expect(res.status).toBe(409);
     });
@@ -1077,7 +1056,6 @@ describe('feature-flag validation parity with server', () => {
 
   describe('flag and rules save together', () => {
     const roleRule = (name: string) => ({
-      type: 'role',
       effect: 'include',
       payload: { type: 'role', roleNames: [name] }
     });
@@ -1099,10 +1077,40 @@ describe('feature-flag validation parity with server', () => {
       ]);
     });
 
+    // The server pins the same keys: feature-flag-rule-response.e2e-spec.ts.
+    it('answers the rule without a rule-level type on create and read', async () => {
+      const ruleKeys = [
+        'createdAt',
+        'effect',
+        'flagId',
+        'id',
+        'payload',
+        'updatedAt'
+      ];
+      const res = await createFlag({
+        key: 'rule-shape',
+        rules: [roleRule('a')]
+      });
+      expect(res.status).toBe(201);
+      const created = (await res.json()) as {
+        id: string;
+        rules: Record<string, unknown>[];
+      };
+      expect(Object.keys(created.rules[0]).sort()).toEqual(ruleKeys);
+
+      const token = await loginAsAdmin();
+      const read = await fetch(
+        `${baseUrl}/api/v1/admin/feature-flags/${created.id}`,
+        { headers: { authorization: `Bearer ${token}` } }
+      );
+      const body = (await read.json()) as { rules: Record<string, unknown>[] };
+      expect(Object.keys(body.rules[0]).sort()).toEqual(ruleKeys);
+    });
+
     it('creates no flag when a rule payload is rejected', async () => {
       const res = await createFlag({
         key: 'atomic-create-rejected',
-        rules: [roleRule('a'), { type: 'user', effect: 'include', payload: {} }]
+        rules: [roleRule('a'), { effect: 'include', payload: {} }]
       });
       expect(res.status).toBe(400);
       const keys = [...getState().featureFlags.values()].map((f) => f.key);
@@ -1119,10 +1127,7 @@ describe('feature-flag validation parity with server', () => {
         flag.id,
         {
           enabled: true,
-          rules: [
-            roleRule('b'),
-            { type: 'user', effect: 'include', payload: {} }
-          ]
+          rules: [roleRule('b'), { effect: 'include', payload: {} }]
         },
         '1'
       );

@@ -4,6 +4,7 @@ import {
   FEATURE_FLAG_ATTRIBUTE_OPS,
   FEATURE_FLAG_BUCKET_BY,
   FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS,
+  FEATURE_FLAG_RULE_TYPES,
   FEATURE_FLAG_USER_IDS_MAX_ITEMS,
   type FeatureFlagAttributeField,
   type FeatureFlagAttributeOp,
@@ -41,7 +42,6 @@ const isRoleName = (v: unknown): v is string =>
   typeof v === 'string' && v.length > 0 && v.length <= ROLE_NAME_MAX_LENGTH;
 
 export function parseFeatureFlagRulePayload(
-  type: FeatureFlagRuleType,
   payload: unknown,
   knownCustomKeys: ReadonlySet<string>
 ): FeatureFlagRulePayloadResult {
@@ -49,14 +49,15 @@ export function parseFeatureFlagRulePayload(
     return fail('Rule payload must be an object');
   }
   const p = payload as Record<string, unknown>;
+  const type = p['type'];
 
-  if (p['type'] !== type) {
+  if (!FEATURE_FLAG_RULE_TYPES.includes(type as FeatureFlagRuleType)) {
     return fail(
-      `Rule payload.type "${String(p['type'])}" does not match rule.type "${type}"`
+      `Rule payload.type must be one of ${FEATURE_FLAG_RULE_TYPES.join(', ')}`
     );
   }
 
-  switch (type) {
+  switch (type as FeatureFlagRuleType) {
     case 'user': {
       const userIds = p['userIds'];
       if (!isBoundedArray(userIds, FEATURE_FLAG_USER_IDS_MAX_ITEMS, isUserId)) {

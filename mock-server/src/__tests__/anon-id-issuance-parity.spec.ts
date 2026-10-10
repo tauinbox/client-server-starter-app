@@ -53,7 +53,6 @@ function addPercentageFlag(
   state.featureFlagRules.push({
     id: 'rule-public-rollout',
     flagId: 'flag-public-rollout',
-    type: 'percentage',
     effect: 'include',
     payload,
     createdAt: now,

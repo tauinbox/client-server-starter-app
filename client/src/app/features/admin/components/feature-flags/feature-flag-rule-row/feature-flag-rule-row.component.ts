@@ -62,7 +62,6 @@ import {
 
 export type FeatureFlagRuleDraft = {
   id?: string;
-  type: FeatureFlagRuleType;
   effect: FeatureFlagRuleEffect;
   payload: FeatureFlagRulePayload;
 };
@@ -313,7 +312,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   onTypeChange(type: FeatureFlagRuleType): void {
     const next: FeatureFlagRulePayload = this.#defaultPayloadFor(type);
-    this.rule.set({ ...this.rule(), type, payload: next });
+    this.rule.set({ ...this.rule(), payload: next });
   }
 
   onEffectChange(effect: FeatureFlagRuleEffect): void {
