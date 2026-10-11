@@ -1,5 +1,4 @@
 import { Logger } from '@nestjs/common';
-import type { RedisClientConnectionType } from '@keyv/redis';
 import type { Cache } from 'cache-manager';
 import { redisClientOf, ThrottledFailureLog } from './redis-client';
 
@@ -13,20 +12,31 @@ export interface AttemptWindow {
 
 const NO_WINDOW: AttemptWindow = { count: 0, remainingMs: 0 };
 
+// Returns { count, pttl }. The expiry is set only on a key that has none, so
+// the window is never extended.
+const RECORD_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+if redis.call('PTTL', KEYS[1]) < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+return { count, redis.call('PTTL', KEYS[1]) }
+`;
+
 /**
  * A fixed-window failure counter for a subject that has no counter column of
  * its own. It bars the subject rather than the caller, so a distributed
  * attacker gains nothing by changing address, which is what a per-IP throttle
  * alone cannot do.
  *
- * With Redis available the count is a raw `INCR`: atomic, so a burst fired at
- * several instances at once cannot read the same previous value and write back
- * the same next one. The expiry is written first, by a `SET NX PX` that also
- * creates the key, because an `INCR` that lands before its `PEXPIRE` fails
- * would leave a counter with no expiry - that is a subject barred for ever.
- * The raw client is used rather than cache-manager because Keyv stores every
- * value inside a JSON envelope, which `INCR` cannot operate on, and because
- * Keyv exposes no conditional write.
+ * With Redis available the count is an `INCR` inside one Lua script that also
+ * sets the expiry when the key has none. Redis runs a script atomically, so a
+ * burst fired at several instances at once cannot lose an increment, and the
+ * key cannot expire between the increment and the expiry. Separate commands
+ * leave that gap: a key that expires after a `SET NX` and before the `INCR` is
+ * created again by the `INCR` with no expiry - that is a subject barred for
+ * ever. The script also repairs a key that already has no expiry. The raw
+ * client is used rather than cache-manager because Keyv stores every value
+ * inside a JSON envelope, which `INCR` cannot operate on.
  *
  * Without Redis (in-memory fallback, no `REDIS_URL`) the window is held in this
  * process. The map is read and written synchronously, so a burst cannot
@@ -69,12 +79,11 @@ export class FailedAttemptCounter {
 
     if (redis) {
       try {
-        await redis.set(key, '0', {
-          condition: 'NX',
-          expiration: { type: 'PX', value: windowMs }
-        });
-        const count = await redis.incr(key);
-        return { count, remainingMs: await this.#remainingMs(redis, key) };
+        const [count, ttl] = (await redis.eval(RECORD_SCRIPT, {
+          keys: [key],
+          arguments: [String(windowMs)]
+        })) as [number, number];
+        return { count, remainingMs: ttl > 0 ? ttl : 0 };
       } catch (error: unknown) {
         this.#failureLog.log(error);
         return NO_WINDOW;
@@ -112,18 +121,6 @@ export class FailedAttemptCounter {
 
   #key(id: string): string {
     return `${this.#keyPrefix}${id}`;
-  }
-
-  /**
-   * `PTTL` answers -1 for a key with no expiry and -2 for a key that is gone.
-   * Neither is a window, so both read as closed.
-   */
-  async #remainingMs(
-    redis: RedisClientConnectionType,
-    key: string
-  ): Promise<number> {
-    const ttl = await redis.pTTL(key);
-    return ttl > 0 ? Number(ttl) : 0;
   }
 
   #pruneLocal(now: number): void {

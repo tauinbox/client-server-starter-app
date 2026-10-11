@@ -1269,9 +1269,10 @@ account. The enrolment stage is not counted either, because that caller is an au
 setting up their own device.
 
 The state is `FailedAttemptCounter` (`common/utils/failed-attempt-counter.ts`), not a column. With
-Redis it is a raw `INCR` behind a `SET NX PX` that creates the key and carries the expiry, in that
-order: an `INCR` that landed before a separate `PEXPIRE` failed would leave a counter with no expiry,
-that is an account barred for ever. Without Redis one process map holds the window. It **fails open**
+Redis it is one Lua script: `INCR`, then `PEXPIRE` when the key has no expiry. Redis runs a script
+atomically, so the key cannot expire between the two steps. Separate commands can leave a counter
+with no expiry, that is an account barred for ever. The script also repairs a key that already has
+no expiry. Without Redis one process map holds the window. It **fails open**
 on a cache outage, which returns the route to the throttle-only behaviour and never to a worse one.
 Each of the three counters takes the slot of an attempt before the secret is checked, and checks the
 secret only when that slot is inside the budget. A read of the count before the check let every
