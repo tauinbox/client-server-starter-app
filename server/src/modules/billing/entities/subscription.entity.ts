@@ -100,6 +100,15 @@ export class Subscription {
   version: number;
 
   /**
+   * Counts the committed self-service plan changes. The money legs of a switch
+   * key on it, so a later switch never reuses the keys of an earlier one, and a
+   * retry of a switch that did not commit keeps its keys and reconciles.
+   */
+  @Column({ name: 'plan_change_seq', type: 'integer', default: 0 })
+  @Exclude()
+  planChangeSeq: number;
+
+  /**
    * When the self-service plan change now in flight claimed the row, or null.
    * The renewal scan leaves a row with a live lease alone, so the change and
    * the renewal never charge the same period in parallel; a lease older than

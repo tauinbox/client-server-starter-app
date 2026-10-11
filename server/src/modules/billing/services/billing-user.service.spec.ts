@@ -174,12 +174,33 @@ function makeInsertStore(invoices: RepoMock) {
         )
     ),
     // The proration refund reserves its leg on the source invoice under a row
-    // lock, so that read goes through the transactional manager.
-    findOne: jest.fn((entity: unknown, options: unknown): Promise<unknown> =>
-      entity === Invoice
-        ? (invoices.findOne(options) as Promise<unknown>)
-        : Promise.resolve(null)
+    // lock, so that read goes through the transactional manager. A read by
+    // event id looks for a leg row this store recorded.
+    findOne: jest.fn(
+      (
+        entity: unknown,
+        options: { where?: InvoiceCriteria }
+      ): Promise<unknown> => {
+        if (entity !== Invoice) return Promise.resolve(null);
+        const eventId = options.where?.providerEventId;
+        if (eventId !== undefined) {
+          return Promise.resolve(
+            inserted.find((row) => row.providerEventId === eventId) ?? null
+          );
+        }
+        return invoices.findOne(options) as Promise<unknown>;
+      }
     ),
+    delete: jest.fn((_target: unknown, criteria: InvoiceCriteria) => {
+      const kept = inserted.filter(
+        (row) =>
+          row.providerEventId !== criteria.providerEventId ||
+          !statusMatches(row, criteria.status)
+      );
+      const affected = inserted.length - kept.length;
+      inserted.splice(0, inserted.length, ...kept);
+      return Promise.resolve({ affected });
+    }),
     createQueryBuilder: () => {
       const captured: { values?: InsertedInvoice } = {};
       const builder = {
@@ -1281,6 +1302,7 @@ describe('BillingUserService', () => {
         trialEnd: null,
         providerSubscriptionId: null,
         version: 1,
+        planChangeSeq: 0,
         ...overrides
       } as Subscription;
     }
@@ -1429,12 +1451,12 @@ describe('BillingUserService', () => {
         expect.arrayContaining([
           expect.objectContaining({ amountMinor: 116000 })
         ]),
-        `change-charge:sub-1:business:${periodEnd.getTime()}`
+        'change-charge:sub-1:0:business'
       );
       expect(yoo.refund).toHaveBeenCalledWith(
         'pay_period',
         39600,
-        `change-refund:sub-1:business:${periodEnd.getTime()}`
+        'change-refund:sub-1:0'
       );
       expect(ctx.insertedInvoices).toHaveLength(2);
       expect(ctx.insertedInvoices[0]).toMatchObject({
@@ -1641,7 +1663,12 @@ describe('BillingUserService', () => {
       expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
         Subscription,
         expect.objectContaining({ id: 'sub-1' }),
-        { planKey: 'usage', billingMode: 'usage', meteredFrom: frozenNow }
+        {
+          planKey: 'usage',
+          billingMode: 'usage',
+          planChangeSeq: expect.any(Function) as unknown,
+          meteredFrom: frozenNow
+        }
       );
       expect(result.meteredFrom).toEqual(frozenNow);
       expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
@@ -1747,7 +1774,12 @@ describe('BillingUserService', () => {
       expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
         Subscription,
         expect.objectContaining({ id: 'sub-1' }),
-        { planKey: 'business', billingMode: 'fixed', meteredFrom: frozenNow }
+        {
+          planKey: 'business',
+          billingMode: 'fixed',
+          planChangeSeq: expect.any(Function) as unknown,
+          meteredFrom: frozenNow
+        }
       );
     });
 
@@ -1769,7 +1801,11 @@ describe('BillingUserService', () => {
       expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
         Subscription,
         expect.objectContaining({ id: 'sub-1' }),
-        { planKey: 'business', billingMode: 'fixed' }
+        {
+          planKey: 'business',
+          billingMode: 'fixed',
+          planChangeSeq: expect.any(Function) as unknown
+        }
       );
       expect(ctx.emit).not.toHaveBeenCalledWith(
         UsagePeriodClosedEvent.name,
@@ -1978,7 +2014,7 @@ describe('BillingUserService', () => {
       await ctx.service.changePlan('user-1', 'business');
 
       expect(recordedWhenCharged).toMatchObject({
-        providerEventId: `change-charge:sub-1:business:${periodEnd.getTime()}`,
+        providerEventId: 'change-charge:sub-1:0:business',
         amountMinor: Money.fromMinor(116000),
         status: 'pending',
         paidAt: null
@@ -2016,10 +2052,134 @@ describe('BillingUserService', () => {
       // payment with no invoice, no ledger row and no log line.
       expect(ctx.insertedInvoices).toHaveLength(1);
       expect(ctx.insertedInvoices[0]).toMatchObject({
-        providerEventId: `change-charge:sub-1:business:${periodEnd.getTime()}`,
+        providerEventId: 'change-charge:sub-1:0:business',
         providerInvoiceRef: 'pay_change',
         amountMinor: Money.fromMinor(116000)
       });
+    });
+
+    it('a retry after the closing transaction died charges nothing again and refunds the same leg', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      const source = {
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      };
+      ctx.invoices.findOne.mockResolvedValue(source);
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      const applyUpdate =
+        ctx.dataSource.manager.update.getMockImplementation() as (
+          target: unknown,
+          criteria: unknown,
+          patch: unknown
+        ) => Promise<{ affected: number }>;
+      ctx.dataSource.manager.update.mockImplementationOnce(() =>
+        Promise.reject(new Error('connection terminated'))
+      );
+
+      await expect(
+        ctx.service.changePlan('user-1', 'business')
+      ).rejects.toThrow('connection terminated');
+      ctx.dataSource.manager.update.mockImplementation(applyUpdate);
+      // The confirming webhook settles the charge before the retry.
+      Object.assign(ctx.insertedInvoices[0], { status: 'paid' });
+      ctx.emit.mockClear();
+
+      const result = await ctx.service.changePlan('user-1', 'business');
+
+      expect(yoo.chargeOffSession).toHaveBeenCalledTimes(1);
+      expect(yoo.refund).toHaveBeenCalledTimes(2);
+      expect(yoo.refund).toHaveBeenNthCalledWith(
+        2,
+        'pay_period',
+        39600,
+        'change-refund:sub-1:0'
+      );
+      expect(source.refundedMinor).toEqual(Money.fromMinor(39600));
+      expect(ctx.insertedInvoices).toHaveLength(2);
+      expect(ctx.insertedInvoices[1]).toMatchObject({
+        providerEventId: 'change-refund:sub-1:0',
+        amountMinor: Money.fromMinor(39600),
+        status: 'refunded'
+      });
+      // The webhook announced the payment when it settled the row.
+      expect(ctx.emit).not.toHaveBeenCalledWith(
+        InvoicePaidEvent.name,
+        expect.anything()
+      );
+      expect(result.planKey).toBe('business');
+    });
+
+    it('gives the reservation back and drops the pending leg when the refund fails', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      const source = {
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      };
+      ctx.invoices.findOne.mockResolvedValue(source);
+      const yoo = provider('yookassa', false);
+      yoo.refund.mockRejectedValue(new Error('refund refused'));
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      expect(source.refundedMinor).toEqual(Money.fromMinor(0));
+      expect(ctx.insertedInvoices).toHaveLength(1);
+      expect(ctx.insertedInvoices[0]).toMatchObject({
+        providerEventId: 'change-charge:sub-1:0:business',
+        status: 'paid'
+      });
+    });
+
+    it('keys the legs on the count of committed switches', async () => {
+      const ctx = await build();
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSub({ planChangeSeq: 2 })
+      );
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await ctx.service.changePlan('user-1', 'business');
+
+      expect(yoo.chargeOffSession).toHaveBeenCalledWith(
+        customer,
+        116000,
+        'RUB',
+        expect.any(Array),
+        'change-charge:sub-1:2:business'
+      );
+      expect(yoo.refund).toHaveBeenCalledWith(
+        'pay_period',
+        39600,
+        'change-refund:sub-1:2'
+      );
     });
 
     it('marks the planted row failed when the provider declines the card', async () => {
@@ -2066,7 +2226,7 @@ describe('BillingUserService', () => {
       expect(ctx.insertedInvoices[0]).toMatchObject({ status: 'pending' });
     });
 
-    it('applies the switch as a two-column guarded write, never as a whole-entity save', async () => {
+    it('applies the switch as a guarded write of the plan columns and the switch counter, never as a whole-entity save', async () => {
       const ctx = await build();
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
@@ -2089,7 +2249,11 @@ describe('BillingUserService', () => {
           cancelAtPeriodEnd: false,
           currentPeriodEnd: periodEnd
         },
-        { planKey: 'business', billingMode: 'fixed' }
+        {
+          planKey: 'business',
+          billingMode: 'fixed',
+          planChangeSeq: expect.any(Function) as unknown
+        }
       );
     });
 

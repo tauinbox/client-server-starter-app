@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConflictException } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -361,7 +361,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     expect(invoices).toHaveLength(1);
     expect(invoices[0]).toMatchObject({
       status: 'paid',
-      providerEventId: `change-charge:${subscription.id}:race-business:${periodEnd.getTime()}`
+      providerEventId: `change-charge:${subscription.id}:0:race-business`
     });
     // The insert omits refunded_minor and relies on the column default.
     expect(invoices[0].refundedMinor.toNumber()).toBe(0);
@@ -385,7 +385,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       status: 'pending',
       providerInvoiceRef: '',
       paidAt: null,
-      providerEventId: `change-charge:${subscription.id}:race-business:${periodEnd.getTime()}`
+      providerEventId: `change-charge:${subscription.id}:0:race-business`
     });
     expect(recordedDuringCall[0].amountMinor.toNumber()).toBeGreaterThan(0);
 
@@ -569,6 +569,100 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     expect(await reload(subscription.id)).toMatchObject({
       cancelAtPeriodEnd: true,
       planKey: 'race-pro'
+    });
+  }, 30000);
+
+  it('gives each switch of a period its own charge and refund keys', async () => {
+    const { subscription, user, provider } = await setup('yookassa', null);
+    await seedSourceInvoice(subscription, 99000);
+    // The provider key store: a reused key returns the first payment.
+    const payments = new Map<string, string>();
+    provider.chargeOffSession.mockImplementation((...args: unknown[]) => {
+      const key = args[4] as string;
+      const ref = payments.get(key) ?? `pay_${payments.size + 1}`;
+      payments.set(key, ref);
+      return Promise.resolve({ providerInvoiceRef: ref, status: 'captured' });
+    });
+
+    for (const planKey of ['race-business', 'race-pro', 'race-business']) {
+      await service.changePlan(user, planKey);
+    }
+
+    expect(payments.size).toBe(3);
+    const refundKeys = provider.refund.mock.calls.map(
+      (call: unknown[]) => call[2]
+    );
+    expect(new Set(refundKeys).size).toBe(3);
+    const rows = await ds
+      .getRepository(Invoice)
+      .find({ where: { subscriptionId: subscription.id } });
+    expect(rows).toHaveLength(7);
+    const charges = rows.filter((row) =>
+      row.providerEventId?.startsWith('change-charge:')
+    );
+    expect(charges.map((row) => row.providerInvoiceRef).sort()).toEqual([
+      'pay_1',
+      'pay_2',
+      'pay_3'
+    ]);
+    expect(await reload(subscription.id)).toMatchObject({
+      planKey: 'race-business',
+      planChangeSeq: 3
+    });
+  }, 30000);
+
+  it('a retry after the closing transaction died neither charges nor reserves again', async () => {
+    const { subscription, user, provider } = await setup('yookassa', null);
+    const source = await seedSourceInvoice(subscription, 99000);
+    let crashesLeft = 1;
+    let crashNextTransaction = false;
+    provider.refund.mockImplementation(() => {
+      crashNextTransaction = crashesLeft-- > 0;
+      return Promise.resolve(undefined);
+    });
+    const transaction = ds.transaction.bind(ds);
+    jest.spyOn(ds, 'transaction').mockImplementation(((
+      operation: (manager: EntityManager) => Promise<unknown>
+    ) => {
+      if (!crashNextTransaction) return transaction(operation);
+      crashNextTransaction = false;
+      return transaction(async (manager) => {
+        await operation(manager);
+        throw new Error('connection terminated');
+      });
+    }) as typeof ds.transaction);
+
+    await expect(service.changePlan(user, 'race-business')).rejects.toThrow(
+      'connection terminated'
+    );
+    // The confirming webhook settles the charge before the retry.
+    await ds
+      .getRepository(Invoice)
+      .update(
+        { providerEventId: `change-charge:${subscription.id}:0:race-business` },
+        { status: 'paid', paidAt: new Date() }
+      );
+    await service.changePlan(user, 'race-business');
+
+    expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
+    expect(provider.refund.mock.calls).toEqual([
+      [source.providerInvoiceRef, 66000, `change-refund:${subscription.id}:0`],
+      [source.providerInvoiceRef, 66000, `change-refund:${subscription.id}:0`]
+    ]);
+    const invoices = ds.getRepository(Invoice);
+    const sourceAfter = await invoices.findOneOrFail({
+      where: { id: source.id }
+    });
+    expect(sourceAfter.status).toBe('paid');
+    expect(sourceAfter.refundedMinor.toNumber()).toBe(66000);
+    const leg = await invoices.findOneOrFail({
+      where: { providerEventId: `change-refund:${subscription.id}:0` }
+    });
+    expect(leg.status).toBe('refunded');
+    expect(leg.amountMinor.toNumber()).toBe(66000);
+    expect(await reload(subscription.id)).toMatchObject({
+      planKey: 'race-business',
+      planChangeSeq: 1
     });
   }, 30000);
 });
