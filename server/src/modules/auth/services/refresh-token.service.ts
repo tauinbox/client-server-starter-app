@@ -218,6 +218,9 @@ export class RefreshTokenService {
     await this.repository.delete({ userId });
   }
 
+  /**
+   * Ends the oldest sessions whole, for the reason given at `deleteBySessionId`.
+   */
   async pruneOldestTokens(userId: string, maxSessions: number): Promise<void> {
     const count = await this.repository.count({
       where: { userId, revoked: false }
@@ -232,7 +235,7 @@ export class RefreshTokenService {
       .delete()
       .from(RefreshToken)
       .where(
-        'id IN (SELECT id FROM refresh_tokens WHERE user_id = :userId AND revoked = false ORDER BY created_at ASC LIMIT :excess)',
+        'user_id = :userId AND session_id IN (SELECT session_id FROM refresh_tokens WHERE user_id = :userId AND revoked = false ORDER BY created_at ASC LIMIT :excess)',
         { userId, excess }
       )
       .execute();

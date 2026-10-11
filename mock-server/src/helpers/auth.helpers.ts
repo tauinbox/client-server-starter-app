@@ -5,6 +5,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import {
   buildAbilityForUser,
+  endSessionOfToken,
   findUserById,
   getState,
   isSessionLive,
@@ -236,21 +237,21 @@ export function assertCanWriteUser(
 
 /**
  * Concurrent-session cap, applied wherever a session is created. The oldest
- * refresh tokens go first, matching the real server's SessionLimitService.
+ * sessions end whole, with their rotated ancestors, as
+ * `RefreshTokenService.pruneOldestTokens` does.
  */
 export function pruneOldestUserTokens(
-  refreshTokens: Map<string, string>,
   userId: string,
   maxSessions: number
 ): void {
   const userTokens: string[] = [];
-  for (const [token, uid] of refreshTokens.entries()) {
+  for (const [token, uid] of getState().refreshTokens.entries()) {
     if (uid === userId) userTokens.push(token);
   }
   if (userTokens.length > maxSessions) {
     const excess = userTokens.length - maxSessions;
     for (let i = 0; i < excess; i++) {
-      refreshTokens.delete(userTokens[i]);
+      endSessionOfToken(userTokens[i]);
     }
   }
 }
