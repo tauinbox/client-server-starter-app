@@ -7,22 +7,27 @@
 export const CHANGE_CHARGE_KEY_PREFIX = 'change-charge:';
 export const CHANGE_REFUND_KEY_PREFIX = 'change-refund:';
 
-/** The charge leg of a self-managed plan switch. */
+/**
+ * The charge leg of a self-managed plan switch. `seq` is the count of switches
+ * committed before this one, so a switch back to a plan used earlier in the
+ * period gets a new key. The amount depends on the target plan, so a retry to
+ * another plan gets a new key too.
+ */
 export function changeChargeKey(
   subscriptionId: string,
-  planKey: string,
-  periodEndMs: number
+  seq: number,
+  planKey: string
 ): string {
-  return `${CHANGE_CHARGE_KEY_PREFIX}${subscriptionId}:${planKey}:${periodEndMs}`;
+  return `${CHANGE_CHARGE_KEY_PREFIX}${subscriptionId}:${seq}:${planKey}`;
 }
 
-/** The refund leg of a self-managed plan switch. */
-export function changeRefundKey(
-  subscriptionId: string,
-  planKey: string,
-  periodEndMs: number
-): string {
-  return `${CHANGE_REFUND_KEY_PREFIX}${subscriptionId}:${planKey}:${periodEndMs}`;
+/**
+ * The refund leg of a self-managed plan switch. The amount depends only on the
+ * outgoing plan, so a retry to another target reuses the leg of the attempt
+ * that did not commit.
+ */
+export function changeRefundKey(subscriptionId: string, seq: number): string {
+  return `${CHANGE_REFUND_KEY_PREFIX}${subscriptionId}:${seq}`;
 }
 
 /**

@@ -682,42 +682,47 @@ export class BillingUserService {
     now: Date
   ): Promise<Subscription> {
     const { customer, subscription, fromPlan, toPlan, provider } = ctx;
-    const periodEndMs = subscription.currentPeriodEnd.getTime();
-    const chargeKey = changeChargeKey(subscription.id, toPlan.key, periodEndMs);
-    const refundKey = changeRefundKey(subscription.id, toPlan.key, periodEndMs);
+    const seq = subscription.planChangeSeq;
+    const chargeKey = changeChargeKey(subscription.id, seq, toPlan.key);
+    const refundKey = changeRefundKey(subscription.id, seq);
 
     // External legs run outside the DB transaction — a provider HTTP call must
     // never be held inside an open transaction. Both keys are stable across
     // retries so a replay reconciles instead of charging/refunding twice.
-    const chargeAmount = quote?.chargeMinor ?? 0;
     let chargeInvoiceId: string | null = null;
     let chargeRef: string | null = null;
     let chargeCaptured = true;
     if (quote && quote.chargeMinor > 0) {
-      chargeInvoiceId = await this.plantChangeCharge({
+      const planted = await this.plantChangeCharge({
         subscription,
         providerEventId: chargeKey,
-        amountMinor: chargeAmount,
+        amountMinor: quote.chargeMinor,
         currency: quote.currency,
         billingMode: toPlan.billingMode
       });
-      let charge: ChargeResult;
-      try {
-        charge = await provider.chargeOffSession(
-          customer,
-          quote.chargeMinor,
-          quote.currency,
-          quote.chargeItems,
-          chargeKey
-        );
-      } catch (error) {
-        await this.failPlantedCharge(chargeKey, error);
-        throw error;
+      chargeInvoiceId = planted.id;
+      if (planted.paidRef !== null) {
+        // A retry after the webhook settled the charge of the earlier attempt.
+        chargeRef = planted.paidRef;
+      } else {
+        let charge: ChargeResult;
+        try {
+          charge = await provider.chargeOffSession(
+            customer,
+            quote.chargeMinor,
+            quote.currency,
+            quote.chargeItems,
+            chargeKey
+          );
+        } catch (error) {
+          await this.failPlantedCharge(chargeKey, error);
+          throw error;
+        }
+        chargeRef = charge.providerInvoiceRef;
+        // Uncaptured (payment-after-receipt) stays pending for the webhook.
+        chargeCaptured = charge.status === 'captured';
+        await this.recordChargeRef(chargeKey, chargeRef);
       }
-      chargeRef = charge.providerInvoiceRef;
-      // Uncaptured (payment-after-receipt) stays pending for the webhook.
-      chargeCaptured = charge.status === 'captured';
-      await this.recordChargeRef(chargeKey, chargeRef);
     }
 
     // The fixed plan must not absorb units metered before the switch: they are
@@ -739,6 +744,7 @@ export class BillingUserService {
         ? await this.reserveProrationRefund(
             subscription,
             quote.refundMinor,
+            refundKey,
             chargeInvoiceId
           )
         : null;
@@ -753,7 +759,11 @@ export class BillingUserService {
         );
         refundIssued = true;
       } catch (error) {
-        await this.releaseProrationRefund(refund.source.id, refund.minor);
+        await this.releaseProrationRefund(
+          refund.source.id,
+          refund.minor,
+          refundKey
+        );
         // A refund failure after a successful charge never reverts the switch —
         // reverting would double-tangle the money; the admin console can re-issue.
         this.logger.error(
@@ -774,15 +784,11 @@ export class BillingUserService {
             ? await this.settleChangeCharge(manager, chargeKey, chargeRef)
             : false;
         if (refundIssued && refund) {
-          await this.insertChangeInvoice(manager, {
-            subscription,
-            providerEventId: refundKey,
-            providerInvoiceRef: refund.source.providerInvoiceRef,
-            amountMinor: refund.minor,
-            currency: refund.source.currency,
-            status: 'refunded',
-            billingMode: 'fixed'
-          });
+          await manager.update(
+            Invoice,
+            { providerEventId: refundKey, status: 'pending' },
+            { status: 'refunded', paidAt: new Date() }
+          );
           // Gated on this leg's own cumulative, as the admin refund is, so a
           // concurrent leg still in flight cannot flip it for money that may
           // never move. A subscription invoice has no grant or credit to revoke.
@@ -883,6 +889,7 @@ export class BillingUserService {
       {
         planKey: toPlan.key,
         billingMode: toPlan.billingMode,
+        planChangeSeq: () => 'plan_change_seq + 1',
         ...(modeChanges ? { meteredFrom: now } : {})
       }
     );
@@ -1135,18 +1142,44 @@ export class BillingUserService {
    * so a switch can never refund the payment it just took. The id is matched
    * rather than the charge key because `provider_event_id` is nullable and a
    * `!=` on it would drop every row that has none.
+   *
+   * The leg row is written as `pending` in the same transaction as the
+   * reservation. A retry of a switch that did not commit finds it under
+   * `refundKey` and refunds the same amount from the same source instead of
+   * reserving again; a leg that is already `refunded` is not refunded again.
    */
   private async reserveProrationRefund(
     subscription: Subscription,
     refundMinor: number,
+    refundKey: string,
     excludeInvoiceId: string | null = null
   ): Promise<{ source: Invoice; minor: number; cumulative: Money } | null> {
     return withTransaction(this.dataSource, async (manager) => {
+      const leg = await manager.findOne(Invoice, {
+        where: { providerEventId: refundKey }
+      });
+      if (leg && leg.status !== 'pending') return null;
+
       const source = await lockInvoice(
         manager,
-        this.prorationRefundSource(subscription, excludeInvoiceId)
+        leg
+          ? {
+              where: {
+                subscriptionId: subscription.id,
+                providerInvoiceRef: leg.providerInvoiceRef,
+                status: 'paid'
+              }
+            }
+          : this.prorationRefundSource(subscription, excludeInvoiceId)
       );
       if (!source) return null;
+      if (leg) {
+        return {
+          source,
+          minor: leg.amountMinor.toNumber(),
+          cumulative: source.refundedMinor
+        };
+      }
 
       // Capping silently is this leg's policy: a switch is not refused because
       // its source invoice has less left on it than the quote assumed.
@@ -1158,24 +1191,37 @@ export class BillingUserService {
       const minor = reserved.toNumber();
       if (minor <= 0) return null;
 
+      await this.insertChangeInvoice(manager, {
+        subscription,
+        providerEventId: refundKey,
+        providerInvoiceRef: source.providerInvoiceRef,
+        amountMinor: minor,
+        currency: source.currency,
+        billingMode: 'fixed'
+      });
       return { source, minor, cumulative };
     });
   }
 
   /**
-   * Gives a proration reservation back when its provider call failed. A release
-   * that itself fails is only logged: the switch has already gone through, and
-   * an invoice showing more refunded than was paid out is the safe direction to
-   * fail in.
+   * Gives a proration reservation back, and removes its `pending` leg row, when
+   * its provider call failed. A release that itself fails is only logged: the
+   * switch has already gone through, and an invoice showing more refunded than
+   * was paid out is the safe direction to fail in.
    */
   private async releaseProrationRefund(
     sourceId: string,
-    minor: number
+    minor: number,
+    refundKey: string
   ): Promise<void> {
     try {
-      await withTransaction(this.dataSource, (manager) =>
-        releaseRefund(manager, sourceId, Money.fromMinor(minor))
-      );
+      await withTransaction(this.dataSource, async (manager) => {
+        await releaseRefund(manager, sourceId, Money.fromMinor(minor));
+        await manager.delete(Invoice, {
+          providerEventId: refundKey,
+          status: 'pending'
+        });
+      });
     } catch (error) {
       this.logger.error(
         `Failed to release proration refund reservation of ${minor} minor on invoice ${sourceId}: ${(error as Error).message}`
@@ -1242,7 +1288,9 @@ export class BillingUserService {
    * Same construction as the usage close (`UsageInvoicingService`): the row
    * carries no provider ref yet - `recordChargeRef` writes the real one the
    * moment the provider answers - and a replayed change loses the `orIgnore`
-   * insert and reuses the row already under the key.
+   * insert and reuses the row already under the key. `paidRef` is the provider
+   * reference of a reused row that is already `paid`: the caller must not ask
+   * the provider for that money again.
    */
   private async plantChangeCharge(args: {
     subscription: Subscription;
@@ -1250,19 +1298,21 @@ export class BillingUserService {
     amountMinor: number;
     currency: string;
     billingMode: Plan['billingMode'];
-  }): Promise<string | null> {
+  }): Promise<{ id: string | null; paidRef: string | null }> {
     const planted = await this.insertChangeInvoice(this.dataSource.manager, {
       ...args,
-      providerInvoiceRef: '',
-      status: 'pending'
+      providerInvoiceRef: ''
     });
     if (planted) {
-      return planted;
+      return { id: planted, paidRef: null };
     }
     const existing = await this.invoices.findOne({
       where: { providerEventId: args.providerEventId }
     });
-    return existing?.id ?? null;
+    return {
+      id: existing?.id ?? null,
+      paidRef: existing?.status === 'paid' ? existing.providerInvoiceRef : null
+    };
   }
 
   /**
@@ -1331,10 +1381,11 @@ export class BillingUserService {
   }
 
   /**
-   * Records one leg of a self-managed switch as its own invoice row within the
-   * caller's transaction (the two fiscal documents of the switch stay visible in
-   * the history). The unique `providerEventId` makes a double-submitted change
-   * insert each leg at most once.
+   * Records one leg of a self-managed switch as its own `pending` invoice row
+   * within the caller's transaction (the two fiscal documents of the switch stay
+   * visible in the history); the caller settles it once the money moved. The
+   * unique `providerEventId` makes a double-submitted change insert each leg at
+   * most once.
    */
   private async insertChangeInvoice(
     manager: EntityManager,
@@ -1344,7 +1395,6 @@ export class BillingUserService {
       providerInvoiceRef: string;
       amountMinor: number;
       currency: string;
-      status: 'paid' | 'refunded' | 'pending';
       billingMode: Plan['billingMode'];
     }
   ): Promise<string | null> {
@@ -1358,11 +1408,11 @@ export class BillingUserService {
       providerInvoiceRef: args.providerInvoiceRef,
       amountMinor: Money.fromMinor(args.amountMinor),
       currency: args.currency,
-      status: args.status,
+      status: 'pending',
       billingMode: args.billingMode,
       periodStart: now,
       periodEnd: subscription.currentPeriodEnd,
-      paidAt: args.status === 'pending' ? null : now,
+      paidAt: null,
       receiptRef: null
     });
   }

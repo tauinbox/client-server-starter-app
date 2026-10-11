@@ -13,6 +13,7 @@ type _ExcludedFields =
   | 'billingAnchorAt'
   | 'meteredFrom'
   | 'version'
+  | 'planChangeSeq'
   | 'planChangeStartedAt';
 
 type _EntityFieldCoverage = _AssertNever<
