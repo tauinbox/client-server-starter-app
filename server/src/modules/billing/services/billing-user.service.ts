@@ -1054,6 +1054,12 @@ export class BillingUserService {
       };
     }
 
+    const seq = subscription.planChangeSeq;
+    await this.assertNoUnfinishedSwitch(
+      subscription,
+      seq,
+      changeChargeKey(subscription.id, seq, toPlan.key)
+    );
     const quote = this.proration.quote({
       fromPlan,
       toPlan,

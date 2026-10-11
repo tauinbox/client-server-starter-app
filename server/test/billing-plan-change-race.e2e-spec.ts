@@ -684,11 +684,15 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const source = await seedSourceInvoice(subscription, 99000);
     await crashFirstSwitch(subscription, user, provider);
 
+    const unfinished = {
+      response: { errorKey: ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED }
+    };
+    await expect(service.previewChange(user, 'race-max')).rejects.toMatchObject(
+      unfinished
+    );
     const refused = service.changePlan(user, 'race-max');
     await expect(refused).rejects.toBeInstanceOf(ConflictException);
-    await expect(refused).rejects.toMatchObject({
-      response: { errorKey: ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED }
-    });
+    await expect(refused).rejects.toMatchObject(unfinished);
     expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
     expect(provider.refund).toHaveBeenCalledTimes(1);
 
