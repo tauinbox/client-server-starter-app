@@ -92,7 +92,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APPLICATION_PORT` | `3000` | HTTP listen port |
-| `ENVIRONMENT` | `local` | Environment name. The value `local` enables the automatic schema sync and a permissive CORS policy. Each other value makes the session cookies `Secure`, thus the deployment must use HTTPS |
+| `ENVIRONMENT` | `production` | Environment name. The value `local` enables the automatic schema sync and a permissive CORS policy. Each other value makes the session cookies `Secure`, thus the deployment must use HTTPS. The server uses `production` when the variable is not set; `.env.example` sets `local` |
 | `SWAGGER_ENABLED` | - | Set it to `true` to enable the Swagger UI in staging or in production. It is always on in `local` and `development` |
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
