@@ -1118,7 +1118,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
 | `PADDLE_ENVIRONMENT` | `sandbox` | Paddle environment: `sandbox` or `production`. The server API client and Paddle.js in the browser use the same value |
 | `PADDLE_CLIENT_TOKEN` | - | Public client-side token of Paddle.js (`test_...` for sandbox, `live_...` for production). Without it the browser cannot open a Paddle checkout |
-| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. The two values are necessary before YooKassa counts as configured |
+| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. YooKassa counts as configured only when the two values and `REDIS_URL` are set, because the renewal queue needs Redis. With the keys and no `REDIS_URL`, the server logs a warning and refuses new YooKassa checkouts |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency of a new customer: `USD` or `RUB` |
@@ -1507,7 +1507,7 @@ the script is the authoritative reference for the key list.
 | `MFA_REQUIRED_FOR_ADMINS` | deploy, rebuild | `server/.env` | Not a credential, but carried the same way because this is the only channel that survives a from-scratch rebuild of the host. Set it to `true` to make two-factor authentication mandatory for every account with a super role. It has no effect while `MFA_ENCRYPTION_KEY` is empty |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register`, `/forgot-password` and `/resend-verification`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
-| `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. Keep them empty until a person connects a provider |
+| `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. YooKassa also needs `REDIS_URL`. Keep them empty until a person connects a provider |
 | `PADDLE_CLIENT_TOKEN` | deploy, rebuild | `server/.env` | The public client-side token of Paddle.js. It is not a credential, but the workflow injects it in the same way, as it does for `TURNSTILE_SITE_KEY`. Without it no Paddle payment can complete |
 | `CI_JWT_SECRET` | ci.yml | - (CI tests only) | Production does not use it. The `Server E2E` job runs on HS256, thus the value must hold a minimum of 32 characters |
 
@@ -1868,7 +1868,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2884 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2892 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 608 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 597 pass and 11 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1551 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 318 tests |
