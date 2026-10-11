@@ -93,15 +93,11 @@ describe('FailedAttemptCounter', () => {
       return cache;
     }
 
-    // The expiry is written by the command that creates the key. An `INCR`
-    // that lands before a separate `PEXPIRE` fails would leave a counter with
-    // no expiry, which bars the subject for ever.
-    it('opens the window with a conditional write that carries the expiry', async () => {
-      const client = {
-        set: jest.fn().mockResolvedValue('OK'),
-        incr: jest.fn().mockResolvedValue(1),
-        pTTL: jest.fn().mockResolvedValue(59_000)
-      };
+    // Separate commands let the key expire between the increment and the
+    // expiry, which leaves a counter with no expiry and bars the subject for
+    // ever. One script cannot be split.
+    it('counts and sets the expiry in one script that gets the window', async () => {
+      const client = { eval: jest.fn().mockResolvedValue([1, 59_000]) };
       const counter = new FailedAttemptCounter(
         cacheWithRedis(client),
         'p:',
@@ -112,37 +108,16 @@ describe('FailedAttemptCounter', () => {
         count: 1,
         remainingMs: 59_000
       });
-      expect(client.set).toHaveBeenCalledWith('p:id-1', '0', {
-        condition: 'NX',
-        expiration: { type: 'PX', value: 60_000 }
-      });
-      expect(client.incr).toHaveBeenCalledWith('p:id-1');
-    });
-
-    // -1 is a key with no expiry and -2 a key that is gone. Neither is a window.
-    it('reports no time left when the key carries no expiry', async () => {
-      const client = {
-        set: jest.fn().mockResolvedValue(null),
-        incr: jest.fn().mockResolvedValue(4),
-        pTTL: jest.fn().mockResolvedValue(-1)
-      };
-      const counter = new FailedAttemptCounter(
-        cacheWithRedis(client),
-        'p:',
-        logger
+      expect(client.eval).toHaveBeenCalledTimes(1);
+      expect(client.eval).toHaveBeenCalledWith(
+        expect.stringContaining("redis.call('INCR', KEYS[1])"),
+        { keys: ['p:id-1'], arguments: ['60000'] }
       );
-
-      await expect(counter.record('id-1', 60_000)).resolves.toEqual({
-        count: 4,
-        remainingMs: 0
-      });
     });
 
     it('fails open and warns when Redis throws', async () => {
       const client = {
-        set: jest.fn().mockRejectedValue(new Error('redis down')),
-        incr: jest.fn(),
-        pTTL: jest.fn()
+        eval: jest.fn().mockRejectedValue(new Error('redis down'))
       };
       const counter = new FailedAttemptCounter(
         cacheWithRedis(client),
