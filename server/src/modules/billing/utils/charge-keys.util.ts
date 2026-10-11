@@ -18,7 +18,15 @@ export function changeChargeKey(
   seq: number,
   planKey: string
 ): string {
-  return `${CHANGE_CHARGE_KEY_PREFIX}${subscriptionId}:${seq}:${planKey}`;
+  return `${changeChargeKeyPrefix(subscriptionId, seq)}${planKey}`;
+}
+
+/** The part of `changeChargeKey` that every target plan of one switch shares. */
+export function changeChargeKeyPrefix(
+  subscriptionId: string,
+  seq: number
+): string {
+  return `${CHANGE_CHARGE_KEY_PREFIX}${subscriptionId}:${seq}:`;
 }
 
 /**

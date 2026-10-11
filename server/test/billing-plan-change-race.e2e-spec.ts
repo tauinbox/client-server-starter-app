@@ -8,7 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConflictException } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, Like } from 'typeorm';
+import { ErrorKeys } from '@app/shared/constants';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -611,9 +612,15 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     });
   }, 30000);
 
-  it('a retry after the closing transaction died neither charges nor reserves again', async () => {
-    const { subscription, user, provider } = await setup('yookassa', null);
-    const source = await seedSourceInvoice(subscription, 99000);
+  /**
+   * Makes the closing transaction of the first switch fail after the refund
+   * was issued, then settles its charge as the confirming webhook does.
+   */
+  async function crashFirstSwitch(
+    subscription: Subscription,
+    user: string,
+    provider: ReturnType<typeof providerStub>
+  ): Promise<void> {
     let crashesLeft = 1;
     let crashNextTransaction = false;
     provider.refund.mockImplementation(() => {
@@ -635,13 +642,18 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     await expect(service.changePlan(user, 'race-business')).rejects.toThrow(
       'connection terminated'
     );
-    // The confirming webhook settles the charge before the retry.
     await ds
       .getRepository(Invoice)
       .update(
         { providerEventId: `change-charge:${subscription.id}:0:race-business` },
         { status: 'paid', paidAt: new Date() }
       );
+  }
+
+  it('a retry after the closing transaction died neither charges nor reserves again', async () => {
+    const { subscription, user, provider } = await setup('yookassa', null);
+    const source = await seedSourceInvoice(subscription, 99000);
+    await crashFirstSwitch(subscription, user, provider);
     await service.changePlan(user, 'race-business');
 
     expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
@@ -662,6 +674,62 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     expect(leg.amountMinor.toNumber()).toBe(66000);
     expect(await reload(subscription.id)).toMatchObject({
       planKey: 'race-business',
+      planChangeSeq: 1
+    });
+  }, 30000);
+
+  it('refuses another target while a charged switch is unfinished, then finishes that switch', async () => {
+    const { subscription, user, provider } = await setup('yookassa', null);
+    await seedPlan('race-max', 500000);
+    const source = await seedSourceInvoice(subscription, 99000);
+    await crashFirstSwitch(subscription, user, provider);
+
+    const unfinished = {
+      response: { errorKey: ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED }
+    };
+    await expect(service.previewChange(user, 'race-max')).rejects.toMatchObject(
+      unfinished
+    );
+    const refused = service.changePlan(user, 'race-max');
+    await expect(refused).rejects.toBeInstanceOf(ConflictException);
+    await expect(refused).rejects.toMatchObject(unfinished);
+    expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
+    expect(provider.refund).toHaveBeenCalledTimes(1);
+
+    await service.changePlan(user, 'race-business');
+
+    expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
+    expect(
+      provider.refund.mock.calls.map((call: unknown[]) => call[0])
+    ).toEqual([source.providerInvoiceRef, source.providerInvoiceRef]);
+    const charges = await ds.getRepository(Invoice).find({
+      where: {
+        subscriptionId: subscription.id,
+        providerEventId: Like('change-charge:%')
+      }
+    });
+    expect(charges).toHaveLength(1);
+    expect(await reload(subscription.id)).toMatchObject({
+      planKey: 'race-business',
+      planChangeSeq: 1
+    });
+  }, 30000);
+
+  it('lets a declined switch be followed by a switch to another target', async () => {
+    const { subscription, user, provider } = await setup('yookassa', null);
+    await seedPlan('race-max', 500000);
+    provider.chargeOffSession.mockRejectedValueOnce(
+      new ChargeDeclinedError('declined')
+    );
+    await expect(
+      service.changePlan(user, 'race-business')
+    ).rejects.toBeInstanceOf(ChargeDeclinedError);
+
+    await service.changePlan(user, 'race-max');
+
+    expect(provider.chargeOffSession).toHaveBeenCalledTimes(2);
+    expect(await reload(subscription.id)).toMatchObject({
+      planKey: 'race-max',
       planChangeSeq: 1
     });
   }, 30000);
