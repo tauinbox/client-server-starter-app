@@ -20,6 +20,7 @@ import {
   ApiBody,
   ApiCreatedResponse,
   ApiHeader,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -198,7 +199,7 @@ export class FeatureFlagsAdminController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a feature flag' })
   @ApiParam({ name: 'id' })
-  @ApiOkResponse({ description: 'Deleted' })
+  @ApiNoContentResponse({ description: 'Deleted' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,

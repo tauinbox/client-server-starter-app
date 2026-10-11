@@ -23,7 +23,7 @@ describe('FeatureFlagResolverService', () => {
     set: jest.Mock;
     del: jest.Mock;
   };
-  let configService: { get: jest.Mock };
+  let configService: { getOrThrow: jest.Mock };
   let permissionService: { getRoleNamesForUser: jest.Mock };
   let usersService: { findOne: jest.Mock };
   let metrics: { recordCacheAccess: jest.Mock };
@@ -45,7 +45,7 @@ describe('FeatureFlagResolverService', () => {
     };
     flagRepo = { find: jest.fn() };
     ruleRepo = { find: jest.fn() };
-    configService = { get: jest.fn().mockReturnValue('production') };
+    configService = { getOrThrow: jest.fn().mockReturnValue('production') };
     permissionService = {
       getRoleNamesForUser: jest.fn().mockResolvedValue(['admin'])
     };

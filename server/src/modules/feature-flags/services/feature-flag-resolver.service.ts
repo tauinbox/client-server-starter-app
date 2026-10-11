@@ -36,7 +36,6 @@ export interface RolloutEvaluation {
 }
 
 interface CachedFlag {
-  id: string;
   key: string;
   enabled: boolean;
   environments: string[];
@@ -220,7 +219,6 @@ export class FeatureFlagResolverService {
       rulesByFlag.set(r.flagId, arr);
     }
     const projected: CachedFlag[] = flags.map((f) => ({
-      id: f.id,
       key: f.key,
       enabled: f.enabled,
       environments: f.environments,
@@ -262,7 +260,7 @@ export class FeatureFlagResolverService {
   }
 
   private env(): string {
-    return this.configService.get<string>('ENVIRONMENT') ?? 'production';
+    return this.configService.getOrThrow<string>('ENVIRONMENT');
   }
 
   private evaluate(

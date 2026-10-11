@@ -52,6 +52,7 @@ import type { FeatureFlagRulePayload } from '@app/shared/types';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
 import type { FlagAuditActor } from '../src/modules/feature-flags/services/feature-flag.service';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { createMockConfigService } from '../src/common/testing/config-service.mock';
 import { flagAuditActor } from './flag-audit-actor';
 
 // Saves a full rule set through the update path at the current version.
@@ -311,7 +312,7 @@ describe('Feature flags end-to-end', () => {
         { provide: NotificationsService, useValue: notifications },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockReturnValue('production') }
+          useValue: createMockConfigService({ ENVIRONMENT: 'production' })
         },
         {
           provide: PermissionService,
@@ -871,7 +872,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
         { provide: CACHE_MANAGER, useValue: makeCacheMock().manager },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockReturnValue('production') }
+          useValue: createMockConfigService({ ENVIRONMENT: 'production' })
         },
         {
           provide: PermissionService,

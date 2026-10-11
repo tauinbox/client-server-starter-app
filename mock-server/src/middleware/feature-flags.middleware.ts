@@ -933,10 +933,7 @@ adminRouter.post(
     const userId = typeof body['userId'] === 'string' ? body['userId'] : null;
     const roles = isStringArray(body['roles']) ? body['roles'] : [];
     const attributes = (body['attributes'] ?? {}) as Record<string, unknown>;
-    const env =
-      typeof body['env'] === 'string'
-        ? body['env']
-        : (process.env['ENVIRONMENT'] ?? 'production');
+    const env = typeof body['env'] === 'string' ? body['env'] : evaluationEnv();
     const anonId = typeof body['anonId'] === 'string' ? body['anonId'] : null;
     const rules: EvaluatorRule[] = draftRules?.ok
       ? draftRules.rules.map((r) => ({
