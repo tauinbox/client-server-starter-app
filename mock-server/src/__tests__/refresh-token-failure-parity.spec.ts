@@ -1,7 +1,8 @@
 import type { Server } from 'http';
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
-  ErrorKeys
+  ErrorKeys,
+  MAX_CONCURRENT_SESSIONS
 } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
@@ -301,6 +302,28 @@ describe('refresh-token failure parity', () => {
       expect(details?.['replayAgeMs']).toBeGreaterThanOrEqual(dayMs);
       expect(details?.['replayAgeMs']).toBeLessThan(dayMs + 60_000);
       expect((await refresh(desktop)).status).toBe(200);
+    });
+
+    it('ends only the evicted session when its replay comes after the session limit', async () => {
+      const phone = await signIn();
+      expect((await refresh(phone)).status).toBe(200);
+
+      const others: Session[] = [];
+      for (let i = 0; i < MAX_CONCURRENT_SESSIONS; i++) {
+        others.push(await signIn());
+      }
+
+      const replay = await refresh(phone);
+      expect(replay.status).toBe(401);
+      expect(await readErrorBody(replay)).toEqual({
+        message: 'Invalid refresh token',
+        statusCode: 401,
+        errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      });
+      expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
+      for (const other of others) {
+        expect((await refresh(other)).status).toBe(200);
+      }
     });
 
     it('purges every session when an older ancestor is replayed', async () => {

@@ -365,6 +365,10 @@ describe('RefreshTokenService', () => {
         expect.stringContaining('LIMIT :excess'),
         { userId: 'user-1', excess: 1 }
       );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        expect.stringContaining('session_id IN'),
+        expect.anything()
+      );
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 

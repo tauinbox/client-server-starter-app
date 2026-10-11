@@ -38,7 +38,6 @@ export function completeSignIn(
   // Concurrent-session allowance is plan-driven; a plan carrying no `sessions`
   // limit (Free, usage) keeps the constant, exactly as the server resolves it.
   pruneOldestUserTokens(
-    state.refreshTokens,
     user.id,
     resolveEntitlementLimit(user.id, 'sessions') ?? MAX_CONCURRENT_SESSIONS
   );

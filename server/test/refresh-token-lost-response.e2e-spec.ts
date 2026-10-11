@@ -171,6 +171,27 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     expect(details?.['replayAgeMs']).toBeLessThan(dayMs + 60_000);
   }, 30000);
 
+  it('ends only the evicted session when its lost response is replayed after a prune', async () => {
+    const deviceA = await seedSession();
+    await authService.refreshTokens(deviceA.raw, null);
+    const deviceB = await seedSession();
+    const deviceC = await seedSession();
+
+    await refreshTokenService.pruneOldestTokens(userId, 2);
+
+    expect(await rowsOf(deviceA.sessionId)).toBe(0);
+    expect(
+      await errorKeyOf(authService.refreshTokens(deviceA.raw, null))
+    ).toEqual(
+      expect.objectContaining({ errorKey: 'errors.auth.invalidRefreshToken' })
+    );
+
+    expect(await rowsOf(deviceB.sessionId)).toBe(1);
+    expect(await rowsOf(deviceC.sessionId)).toBe(1);
+    expect(await tokenRevokedAt()).toBeNull();
+    expect(auditActions()).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
+  }, 30000);
+
   it('purges every session when an older ancestor is replayed', async () => {
     const deviceA = await seedSession();
     const deviceB = await seedSession();
