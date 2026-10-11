@@ -15,6 +15,11 @@ import {
 // the healthcheck interval cuts that down; a recovery surfaces within one TTL.
 const VERIFY_CACHE_TTL_MS = 5 * 60 * 1000;
 
+// The transport timeouts alone do not bound a verify (connect + greeting +
+// an idle AUTH add up past the 10s container probe timeout), and the deploy
+// health gate waits on the first /ready of a fresh container.
+const VERIFY_TIMEOUT_MS = 3000;
+
 @Injectable()
 export class SmtpHealthIndicator {
   private readonly logger = new Logger(SmtpHealthIndicator.name);
@@ -56,12 +61,21 @@ export class SmtpHealthIndicator {
 
   private async runVerify(): Promise<boolean> {
     let ok = false;
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`timed out after ${VERIFY_TIMEOUT_MS} ms`)),
+        VERIFY_TIMEOUT_MS
+      );
+    });
     try {
-      await this.mailService.verifySmtp();
+      await Promise.race([this.mailService.verifySmtp(), timeout]);
       ok = true;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       this.logger.warn(`SMTP verify failed: ${reason}`);
+    } finally {
+      clearTimeout(timer);
     }
     this.cached = { ok, at: Date.now() };
     return ok;

@@ -180,6 +180,19 @@ describe('MailService', () => {
       });
     });
 
+    it('bounds connect, greeting and socket idle time instead of the 2 min default', async () => {
+      await buildWith({ SMTP_HOST: 'smtp.example.com' });
+
+      const [options] = createTransportSpy.mock.calls[0] as [
+        nodemailer.TransportOptions
+      ];
+      expect(options).toMatchObject({
+        connectionTimeout: 3000,
+        greetingTimeout: 3000,
+        socketTimeout: 10000
+      });
+    });
+
     it('uses jsonTransport (console branch) when SMTP_HOST is unset', async () => {
       await buildWith({});
 

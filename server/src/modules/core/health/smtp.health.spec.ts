@@ -106,6 +106,38 @@ describe('SmtpHealthIndicator', () => {
       });
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('EAUTH'));
     });
+
+    it('should fail the verify after 3s when SMTP never answers', async () => {
+      jest.useFakeTimers();
+      mockMailService.verifySmtp.mockReturnValue(new Promise<void>(() => {}));
+
+      const probe = indicator.isHealthy('smtp');
+      await jest.advanceTimersByTimeAsync(3000);
+
+      await expect(probe).resolves.toEqual({
+        smtp: { status: 'up', warning: 'SMTP verify failed' }
+      });
+      expect(dependencyHealth.statuses.get('smtp')).toBe(false);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('timed out after 3000 ms')
+      );
+
+      await indicator.isHealthy('smtp');
+      expect(mockMailService.verifySmtp).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still wait for a verify that answers inside 3s', async () => {
+      jest.useFakeTimers();
+      mockMailService.verifySmtp.mockReturnValue(
+        new Promise<void>((resolve) => setTimeout(resolve, 2999))
+      );
+
+      const probe = indicator.isHealthy('smtp');
+      await jest.advanceTimersByTimeAsync(2999);
+
+      await expect(probe).resolves.toEqual({ smtp: { status: 'up' } });
+      expect(jest.getTimerCount()).toBe(0);
+    });
   });
 
   describe('verify caching', () => {
