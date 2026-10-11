@@ -1049,9 +1049,13 @@ inside a transaction, and it is idempotent. It stamps the row with `event.provid
 lifecycle owner that follows from it: Paddle is `provider`, and YooKassa is `self`. Then it emits the
 matching domain event.
 
-On the self-managed first-payment path it also persists the saved card as the default
-`PaymentMethod` of the customer. It points the incomplete subscription, found by customer id, at that
-method. Then it flips the subscription to `active` or `trialing`.
+On the self-managed first-payment path it flips the incomplete subscription, found by customer id, to
+`active` or `trialing`, but only while that row is still `incomplete` on the plan of the payment
+(`planKey` from the payment metadata). Then it persists the saved card as the default `PaymentMethod`
+of the customer and points the subscription at it. A paid first payment that activates nothing (a
+second tab, a plan that a later checkout replaced, a cancelled row) emits
+`FirstPaymentUnclaimedEvent`, and `FirstPaymentUnclaimedListener` refunds the whole invoice through
+`BillingAdminService.refundInvoice`.
 
 A `payment_method.updated` event comes from a method-update re-bind. It changes the default card. The
 old method is demoted and kept for the history. The autopay pointer of the customer and the open

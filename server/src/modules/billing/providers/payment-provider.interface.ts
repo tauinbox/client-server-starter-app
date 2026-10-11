@@ -100,6 +100,12 @@ export interface NormalizedInvoicePayload {
    */
   savedPaymentMethod?: NormalizedSavedPaymentMethod | null;
   /**
+   * The plan a self-managed first payment was opened for, from a field that
+   * only our server writes. The payment activates the `incomplete` row only
+   * while that row still carries this plan.
+   */
+  planKey?: string | null;
+  /**
    * The `usage:{subscriptionId}:{periodEnd}` key a postpaid usage charge was
    * posted under (echoed back through the provider's price custom data). When
    * present, the reducer reconciles the payment onto the matching pending

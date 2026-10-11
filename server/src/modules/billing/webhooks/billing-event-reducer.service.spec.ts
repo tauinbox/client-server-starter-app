@@ -11,6 +11,7 @@ import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
+  FirstPaymentUnclaimedEvent,
   InvoicePaidEvent,
   PaymentFailedEvent,
   SubscriptionActivatedEvent,
@@ -846,7 +847,8 @@ describe('BillingEventReducer', () => {
         providerMethodRef: 'pm_tok',
         brand: 'Visa',
         last4: '4242'
-      }
+      },
+      planKey: 'pro'
     };
 
     it('persists the saved card, activates the incomplete subscription, and emits both events', async () => {
@@ -887,8 +889,13 @@ describe('BillingEventReducer', () => {
       );
       expect(manager.update).toHaveBeenCalledWith(
         Subscription,
-        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
-        { status: 'active', paymentMethodId: 'sub-new' }
+        { id: 'sub-1', status: 'incomplete', planKey: 'pro' },
+        { status: 'active' }
+      );
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1' },
+        { paymentMethodId: 'sub-new' }
       );
       expect(emit).toHaveBeenCalledWith(
         InvoicePaidEvent.name,
@@ -897,6 +904,80 @@ describe('BillingEventReducer', () => {
       expect(emit).toHaveBeenCalledWith(
         SubscriptionActivatedEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
+      );
+      expect(emit).not.toHaveBeenCalledWith(
+        FirstPaymentUnclaimedEvent.name,
+        expect.anything()
+      );
+    });
+
+    it.each([
+      ['the row is already active (a second tab paid)', 'active'],
+      ['the row carries another plan (a later checkout)', 'incomplete'],
+      ['the row was cancelled', 'canceled']
+    ])(
+      'activates nothing, stores no card and asks for a refund when %s',
+      async (_case, status) => {
+        const { reducer, manager, emit } = await build({
+          subscription:
+            status === 'canceled'
+              ? null
+              : ({
+                  id: 'sub-1',
+                  customerId: 'cust-1',
+                  provider: 'yookassa',
+                  billingMode: 'fixed',
+                  status,
+                  trialEnd: null
+                } as Subscription),
+          invoiceInsertRows: [{ id: 'inv-2' }],
+          // The guarded flip misses: the row is not the `incomplete` one of
+          // this plan any more.
+          updateAffected: 0
+        });
+
+        await reducer.reduce(
+          event('invoice.paid', selfManagedPayload, 'yookassa')
+        );
+
+        expect(manager.save).not.toHaveBeenCalled();
+        expect(manager.update).not.toHaveBeenCalledWith(
+          PaymentMethod,
+          expect.anything(),
+          expect.anything()
+        );
+        expect(emit).toHaveBeenCalledWith(
+          InvoicePaidEvent.name,
+          expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-2' })
+        );
+        expect(emit).not.toHaveBeenCalledWith(
+          SubscriptionActivatedEvent.name,
+          expect.anything()
+        );
+        expect(emit).toHaveBeenCalledWith(
+          FirstPaymentUnclaimedEvent.name,
+          new FirstPaymentUnclaimedEvent('user-1', 'inv-2')
+        );
+      }
+    );
+
+    it('asks for no refund when a trial binding activates nothing (no money moved)', async () => {
+      const { reducer, emit } = await build({
+        subscription: null,
+        invoiceInsertRows: [{ id: 'inv-2' }]
+      });
+
+      await reducer.reduce(
+        event(
+          'invoice.paid',
+          { ...selfManagedPayload, amountMinor: 0 },
+          'yookassa'
+        )
+      );
+
+      expect(emit).not.toHaveBeenCalledWith(
+        FirstPaymentUnclaimedEvent.name,
+        expect.anything()
       );
     });
 

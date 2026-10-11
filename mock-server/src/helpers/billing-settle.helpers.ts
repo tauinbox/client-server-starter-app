@@ -144,6 +144,54 @@ export function activateSubscription(
 }
 
 /**
+ * Settles a paid self-managed (YooKassa) plan checkout the way the server
+ * reducer does: the payment activates the `incomplete` row only while that row
+ * still carries the plan of the payment. Any other payment (a second tab, a
+ * plan that a later checkout replaced, a cancelled row) activates nothing and
+ * is refunded in full.
+ */
+export function settleSelfManagedCheckout(
+  user: MockUser,
+  plan: MockPlan,
+  customerId: string
+): void {
+  const state = getState();
+  const open = [...state.billingSubscriptions.values()].find(
+    (s) => s.customerId === customerId && s.status !== 'canceled'
+  );
+  if (open?.status === 'incomplete' && open.planKey === plan.key) {
+    activateSubscription(user, plan, 'active', 'yookassa');
+    return;
+  }
+
+  const nowIso = new Date().toISOString();
+  // A trial binding moves no money, so there is nothing to give back.
+  const amountMinor =
+    plan.trialDays > 0 ? 0 : (plan.prices.yookassa?.amountMinor ?? 0);
+  const invoice: MockInvoice = {
+    id: randomUUID(),
+    customerId,
+    subscriptionId: open?.id ?? null,
+    provider: 'yookassa',
+    providerInvoiceRef: `in_${randomUUID()}`,
+    amountMinor,
+    refundedMinor: amountMinor,
+    currency: plan.prices.yookassa?.currency ?? 'RUB',
+    status: amountMinor > 0 ? 'refunded' : 'paid',
+    billingMode: open?.billingMode ?? 'fixed',
+    kind: 'subscription',
+    productId: null,
+    periodStart: nowIso,
+    periodEnd: nowIso,
+    paidAt: nowIso,
+    receiptRef: null,
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+  state.billingInvoices.set(invoice.id, invoice);
+}
+
+/**
  * Settles a pending one-time purchase exactly the way the server's webhook
  * reducer would: a paid `one_time` invoice keyed by the provider payment
  * reference, plus a CustomerGrant when the product is an entitlement-granting

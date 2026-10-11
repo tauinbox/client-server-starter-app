@@ -114,6 +114,68 @@ describe('mock checkout page', () => {
     ]);
   });
 
+  describe('a YooKassa first payment that activates nothing is refunded', () => {
+    async function ruSession(token: string, planKey: string) {
+      const session = await openSession(token, '/checkout', { planKey });
+      expect(session.provider).toBe('yookassa');
+      return session;
+    }
+
+    function invoiceStatuses(): string[] {
+      return [...getState().billingInvoices.values()].map((i) => i.status);
+    }
+
+    it('when a second tab pays the same plan', async () => {
+      const { token } = await login();
+      await call(token, 'PUT', '/region', { region: 'ru' });
+      const tabA = await ruSession(token, 'pro');
+      const tabB = await ruSession(token, 'pro');
+
+      expect((await pay(tabA.url)).status).toBe(200);
+      expect((await pay(tabB.url)).status).toBe(200);
+
+      expect([...getState().billingSubscriptions.values()]).toEqual([
+        expect.objectContaining({ planKey: 'pro', status: 'active' })
+      ]);
+      expect(invoiceStatuses()).toEqual(['paid', 'refunded']);
+    });
+
+    it('when a later checkout moved the row to another plan', async () => {
+      const { token } = await login();
+      await call(token, 'PUT', '/region', { region: 'ru' });
+      const tabA = await ruSession(token, 'pro');
+      await ruSession(token, 'business');
+
+      expect((await pay(tabA.url)).status).toBe(200);
+
+      expect([...getState().billingSubscriptions.values()]).toEqual([
+        expect.objectContaining({ planKey: 'business', status: 'incomplete' })
+      ]);
+      expect([...getState().billingInvoices.values()]).toEqual([
+        expect.objectContaining({
+          status: 'refunded',
+          refundedMinor: expect.any(Number) as number
+        })
+      ]);
+    });
+
+    it('when the row was cancelled first', async () => {
+      const { token } = await login();
+      await call(token, 'PUT', '/region', { region: 'ru' });
+      const session = await ruSession(token, 'pro');
+      for (const sub of getState().billingSubscriptions.values()) {
+        sub.status = 'canceled';
+      }
+
+      expect((await pay(session.url)).status).toBe(200);
+
+      expect([...getState().billingSubscriptions.values()]).toEqual([
+        expect.objectContaining({ status: 'canceled' })
+      ]);
+      expect(invoiceStatuses()).toEqual(['refunded']);
+    });
+  });
+
   it('pays a one-time purchase into a paid invoice and returns to success', async () => {
     const { token } = await login();
     const session = await openSession(token, '/purchase', {

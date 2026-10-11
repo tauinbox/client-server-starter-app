@@ -3,7 +3,8 @@ import type { Response } from 'express';
 import { getState } from '../state';
 import {
   activateSubscription,
-  settlePurchase
+  settlePurchase,
+  settleSelfManagedCheckout
 } from '../helpers/billing-settle.helpers';
 import type { MockCheckoutSession, MockPurchaseSession } from '../types';
 
@@ -165,7 +166,11 @@ router.post('/:sessionRef/pay', (req, res) => {
     sessionNotFound(res);
     return;
   }
-  activateSubscription(user, plan, 'active', session.provider);
+  if (session.provider === 'yookassa') {
+    settleSelfManagedCheckout(user, plan, session.customerId);
+  } else {
+    activateSubscription(user, plan, 'active', session.provider);
+  }
   sendReturn(res, SUCCESS_URL);
 });
 

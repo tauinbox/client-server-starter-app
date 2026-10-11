@@ -24,6 +24,7 @@ import { insertInvoiceOnce } from '../utils/invoice-insert.util';
 import { meteredWindowStart } from '../utils/period.util';
 import { CreditService } from '../services/credit.service';
 import {
+  FirstPaymentUnclaimedEvent,
   InvoicePaidEvent,
   PaymentFailedEvent,
   SubscriptionActivatedEvent,
@@ -522,7 +523,12 @@ export class BillingEventReducer {
           // No pending row matched but the invoice exists — an already-settled
           // replay; never insert a duplicate alongside it.
           return reconciled.affected
-            ? { invoiceId: invoice.id, userId, activatedSubscriptionId: null }
+            ? {
+                invoiceId: invoice.id,
+                userId,
+                activatedSubscriptionId: null,
+                unclaimed: false
+              }
             : null;
         }
         // The keyed invoice vanished — fall through to the plain insert so the
@@ -586,15 +592,23 @@ export class BillingEventReducer {
           product,
           now
         );
-        return { invoiceId, userId, activatedSubscriptionId: null };
+        return {
+          invoiceId,
+          userId,
+          activatedSubscriptionId: null,
+          unclaimed: false
+        };
       }
 
       const activatedSubscriptionId =
         selfManaged && subscription
           ? await this.activateSelfManaged(manager, subscription, payload, now)
           : null;
+      // A trial binding moves no money, so there is nothing to give back.
+      const unclaimed =
+        selfManaged && !activatedSubscriptionId && payload.amountMinor > 0;
 
-      return { invoiceId, userId, activatedSubscriptionId };
+      return { invoiceId, userId, activatedSubscriptionId, unclaimed };
     });
 
     if (!result?.userId) {
@@ -611,6 +625,12 @@ export class BillingEventReducer {
           result.userId,
           result.activatedSubscriptionId
         )
+      );
+    }
+    if (result.unclaimed) {
+      this.events.emit(
+        FirstPaymentUnclaimedEvent.name,
+        new FirstPaymentUnclaimedEvent(result.userId, result.invoiceId)
       );
     }
   }
@@ -662,14 +682,17 @@ export class BillingEventReducer {
   }
 
   /**
-   * Self-managed first-payment activation: persist the saved card
-   * as the customer's default `PaymentMethod`, point the subscription at it, and
-   * flip it out of `incomplete` (to `trialing` while a trial is still running,
-   * else `active`). Idempotency is guaranteed by the caller's invoice insert.
+   * Self-managed first-payment activation: flip the subscription out of
+   * `incomplete` (to `trialing` while a trial is still running, else `active`),
+   * then persist the saved card as the customer's default `PaymentMethod` and
+   * point the subscription at it. Idempotency is guaranteed by the caller's
+   * invoice insert.
    *
-   * Returns `null` when a cancellation landed while the card was being stored:
-   * the open-status predicate makes that cancel win, and no activation event
-   * may be emitted for a row this call did not activate.
+   * Returns `null`, and stores no card, when the row is no longer the
+   * `incomplete` one this payment was opened for: another first payment
+   * activated it, a later checkout moved it to another plan, or a cancel
+   * landed. Postgres re-checks the predicate after the row lock, so of two
+   * concurrent first payments only one activates.
    */
   private async activateSelfManaged(
     manager: EntityManager,
@@ -677,7 +700,22 @@ export class BillingEventReducer {
     payload: NormalizedInvoicePayload,
     now: Date
   ): Promise<string | null> {
-    let methodId: string | null = null;
+    const trialing =
+      subscription.trialEnd != null &&
+      subscription.trialEnd.getTime() > now.getTime();
+    const applied = await manager.update(
+      Subscription,
+      {
+        id: subscription.id,
+        status: 'incomplete',
+        ...(payload.planKey ? { planKey: payload.planKey } : {})
+      },
+      { status: trialing ? 'trialing' : 'active' }
+    );
+    if (!applied.affected) {
+      return null;
+    }
+
     if (payload.savedPaymentMethod) {
       // Demote the current default before inserting the new one (mirrors
       // reducePaymentMethodUpdated) so defaults never accumulate.
@@ -696,29 +734,18 @@ export class BillingEventReducer {
           isDefault: true
         })
       );
-      methodId = method.id;
       await manager.update(
         Customer,
         { id: subscription.customerId },
         { defaultPaymentMethodId: method.id }
       );
+      await manager.update(
+        Subscription,
+        { id: subscription.id },
+        { paymentMethodId: method.id }
+      );
     }
-
-    const trialing =
-      subscription.trialEnd != null &&
-      subscription.trialEnd.getTime() > now.getTime();
-    const fields: QueryDeepPartialEntity<Subscription> = {
-      status: trialing ? 'trialing' : 'active'
-    };
-    if (methodId) {
-      fields.paymentMethodId = methodId;
-    }
-    const applied = await manager.update(
-      Subscription,
-      { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
-      fields
-    );
-    return applied.affected ? subscription.id : null;
+    return subscription.id;
   }
 
   /**

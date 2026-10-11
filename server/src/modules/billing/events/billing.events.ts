@@ -69,6 +69,18 @@ export class InvoicePaidEvent {
   ) {}
 }
 
+/**
+ * A self-managed first payment was paid but activated nothing: the row was
+ * already active, carried another plan, or was cancelled. The money must go
+ * back in full.
+ */
+export class FirstPaymentUnclaimedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly invoiceId: string
+  ) {}
+}
+
 export class PaymentFailedEvent {
   constructor(
     public readonly userId: string,
