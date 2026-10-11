@@ -12,7 +12,6 @@ export class FeatureFlagService {
 
   getEvaluatedFlags(): Observable<EvaluatedFeatureFlagsResponse> {
     return this.#http.get<EvaluatedFeatureFlagsResponse>(FEATURE_FLAGS_URL, {
-      withCredentials: true,
       context: new HttpContext().set(
         DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
         true

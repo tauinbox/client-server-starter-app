@@ -159,7 +159,7 @@ export class TokenService {
       this.#http.post<AuthResponse>(
         AuthApiEnum.RefreshToken,
         {},
-        { context: silentContext(), withCredentials: true }
+        { context: silentContext() }
       )
     );
 

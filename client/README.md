@@ -96,8 +96,8 @@ src/app/
 │   │                       # mustEnrolMfa() is mfaMandatory AND a profile with no factor.
 │   │                       # Also RbacMetadataStore.
 │   ├── feature-flags/      # Client core of the feature-flags subsystem
-│   │   ├── services/       # FeatureFlagService calls HttpClient.get('/api/v1/feature-flags',
-│   │   │                   # { withCredentials: true }). It uses the silent-error context, thus a
+│   │   ├── services/       # FeatureFlagService calls HttpClient.get('/api/v1/feature-flags').
+│   │   │                   # It uses the silent-error context, thus a
 │   │   │                   # bootstrap failure does not show a toast.
 │   │   ├── store/          # FeatureFlagsStore is an NgRx Signal Store with { providedIn: 'root' }.
 │   │   │                   # State: { flags: Record<string, boolean>; loaded: boolean }.
