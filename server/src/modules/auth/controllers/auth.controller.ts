@@ -13,12 +13,7 @@ import {
   UnauthorizedException
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import {
-  ErrorKeys,
-  LOCKOUT_DURATION_MS,
-  MAX_FAILED_ATTEMPTS,
-  STEP_UP_OPERATION
-} from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -68,6 +63,7 @@ import { CaptchaRequiredGuard } from '../captcha/captcha-required.guard';
 import { AuthCookies } from '../utils/auth-cookies';
 import { normalizeIpAddress } from '../utils/session-client';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 
 @ApiTags('Auth API')
 @Controller({
@@ -125,10 +121,7 @@ export class AuthController {
   @Public()
   @Throttle({
     default: { ttl: 60000, limit: 3 },
-    'login-long-window': {
-      ttl: LOCKOUT_DURATION_MS,
-      limit: MAX_FAILED_ATTEMPTS - 1
-    }
+    'login-long-window': CHALLENGE_THROTTLE['login-long-window']
   })
   @UseGuards(LocalAuthGuard)
   @Post('login')
@@ -243,12 +236,7 @@ export class AuthController {
   // The step-up in this handler verifies a secret, so a refused attempt must
   // cost the caller the same budget a refused sign-in costs. A name or locale
   // edit presents no secret and is left out of that count.
-  @Throttle({
-    'login-long-window': {
-      ttl: LOCKOUT_DURATION_MS,
-      limit: MAX_FAILED_ATTEMPTS - 1
-    }
-  })
+  @Throttle({ 'login-long-window': CHALLENGE_THROTTLE['login-long-window'] })
   @CountFailuresOnlyWhenBody('password')
   @Patch('profile')
   @ApiBearerAuth()
