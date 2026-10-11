@@ -112,6 +112,12 @@ function oneTimeFromMetadata(
   return { productId: typeof productId === 'string' ? productId : null };
 }
 
+function planKeyFrom(metadata: unknown): string | null {
+  const data = (metadata ?? {}) as Record<string, unknown>;
+  const planKey = data['planKey'];
+  return typeof planKey === 'string' ? planKey : null;
+}
+
 /**
  * Reads the off-session charge marker — returns the core invoice key the
  * confirming webhook must reconcile onto, or `null` if the payment is not a
@@ -671,7 +677,9 @@ export class YooKassaProvider implements PaymentProvider {
         periodEnd: null,
         paidAt: payment.captured_at ?? payment.created_at ?? null,
         savedPaymentMethod: oneTime ? null : savedPaymentMethod,
-        ...(oneTime ? { kind: 'one_time', productId: oneTime.productId } : {})
+        ...(oneTime
+          ? { kind: 'one_time', productId: oneTime.productId }
+          : { planKey: planKeyFrom(payment.metadata) })
       };
       return { ...base, type: 'invoice.paid', payload };
     }

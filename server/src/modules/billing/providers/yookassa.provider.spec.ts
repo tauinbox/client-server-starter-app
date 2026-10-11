@@ -1012,6 +1012,7 @@ describe('YooKassaProvider', () => {
       const payload = reducible(result).payload as NormalizedInvoicePayload;
       expect(payload).toMatchObject({
         ref: { customerId: 'cust-1', userId: 'user-1' },
+        planKey: 'pro',
         providerInvoiceRef: 'pay-w',
         providerSubscriptionId: null,
         amountMinor: 99000,
