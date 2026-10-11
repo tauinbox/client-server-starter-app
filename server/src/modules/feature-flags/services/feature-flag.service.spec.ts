@@ -42,7 +42,7 @@ describe('FeatureFlagService', () => {
   let ruleRepo: { find: jest.Mock; manager: { transaction: jest.Mock } };
   let dataSource: { transaction: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
-  let configService: { get: jest.Mock };
+  let configService: { getOrThrow: jest.Mock };
   let auditService: { log: jest.Mock };
 
   const actor = {
@@ -88,7 +88,7 @@ describe('FeatureFlagService', () => {
     dataSource = { transaction: jest.fn() };
     attributeRegistry = new AttributeRegistryService();
     configService = {
-      get: jest.fn((key: string) =>
+      getOrThrow: jest.fn((key: string) =>
         key === 'ENVIRONMENT' ? 'production' : undefined
       )
     };
@@ -469,7 +469,7 @@ describe('FeatureFlagService', () => {
 
     it('falls back to ConfigService ENVIRONMENT when ctx.env is omitted', () => {
       service.preview(previewFlag, { roles: ['beta'] });
-      expect(configService.get).toHaveBeenCalledWith('ENVIRONMENT');
+      expect(configService.getOrThrow).toHaveBeenCalledWith('ENVIRONMENT');
     });
 
     it('reads nothing and writes nothing', () => {

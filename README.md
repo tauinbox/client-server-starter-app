@@ -1073,7 +1073,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APPLICATION_PORT` | `3000` | HTTP listen port |
-| `ENVIRONMENT` | `local` | Environment name. Each value other than `local` makes the session cookies `Secure` and thus needs HTTPS |
+| `ENVIRONMENT` | `production` | Environment name. Each value other than `local` makes the session cookies `Secure` and thus needs HTTPS. The server uses `production` when the variable is not set; `.env.example` sets `local` |
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `my-db` | Database name |

@@ -310,8 +310,7 @@ export class FeatureFlagService {
           effect: r.effect,
           payload: r.payload
         }));
-    const env =
-      dto.env ?? this.configService.get<string>('ENVIRONMENT') ?? 'production';
+    const env = dto.env ?? this.configService.getOrThrow<string>('ENVIRONMENT');
     const ctx: FeatureFlagEvaluationContext = {
       userId: dto.userId ?? null,
       anonId: dto.anonId ?? null,
