@@ -263,28 +263,7 @@ export class OAuthService {
     providerId: string,
     reauthTokenIssuedAt: number
   ): Promise<void> {
-    // A missing account throws 404 inside `findOne`; the callback turns either
-    // refusal into the same redirect.
-    const user = await this.usersService.findOne(userId);
-    if (!user.isActive) {
-      throw new HttpException(
-        {
-          message: 'User account not found or deactivated',
-          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
-        },
-        HttpStatus.UNAUTHORIZED
-      );
-    }
-
-    if (issuedBeforeRevocation(reauthTokenIssuedAt, user.tokenRevokedAt)) {
-      throw new HttpException(
-        {
-          message: 'Token has been revoked',
-          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
-        },
-        HttpStatus.UNAUTHORIZED
-      );
-    }
+    await this.intentHolder(userId, reauthTokenIssuedAt);
 
     const account = await this.oauthAccountService.findByProviderAndProviderId(
       provider,
@@ -317,29 +296,7 @@ export class OAuthService {
     linkTokenIssuedAt: number,
     auditContext?: AuditContext
   ): Promise<void> {
-    // A missing account throws 404 inside `findOne`; the callback turns either
-    // refusal into the same redirect.
-    const user = await this.usersService.findOne(userId);
-    if (!user.isActive) {
-      throw new HttpException(
-        {
-          message: 'User account not found or deactivated',
-          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
-        },
-        HttpStatus.UNAUTHORIZED
-      );
-    }
-    // The link intent travels in a browser cookie that can outlive the session
-    // that minted it - another tab, another device, a replayed request.
-    if (issuedBeforeRevocation(linkTokenIssuedAt, user.tokenRevokedAt)) {
-      throw new HttpException(
-        {
-          message: 'Token has been revoked',
-          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
-        },
-        HttpStatus.UNAUTHORIZED
-      );
-    }
+    const user = await this.intentHolder(userId, linkTokenIssuedAt);
     await this.safeCreateOAuthAccount(userId, provider, providerId);
 
     this.auditService.logFireAndForget({
@@ -362,5 +319,38 @@ export class OAuthService {
       .catch((err) =>
         this.logger.error('Failed to send provider-linked notification', err)
       );
+  }
+
+  /**
+   * Loads the account that an intent cookie names. The cookie can outlive the
+   * session that minted it - another tab, another device, a replayed request -
+   * so the account must still be active and the intent must postdate the last
+   * revocation. A missing account throws 404 inside `findOne`; the callback
+   * turns each refusal into the same redirect.
+   */
+  private async intentHolder(
+    userId: string,
+    intentIssuedAt: number
+  ): Promise<User> {
+    const user = await this.usersService.findOne(userId);
+    if (!user.isActive) {
+      throw new HttpException(
+        {
+          message: 'User account not found or deactivated',
+          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+    if (issuedBeforeRevocation(intentIssuedAt, user.tokenRevokedAt)) {
+      throw new HttpException(
+        {
+          message: 'Token has been revoked',
+          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
+        },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+    return user;
   }
 }
