@@ -70,13 +70,18 @@ export class MailService {
       // only break plaintext delivery. Certificate validation stays on
       // (nodemailer default rejectUnauthorized:true) to guard against MITM.
       const requireTLS = !secure && !!(user && pass);
+      // The nodemailer default connectionTimeout is 2 min: with blocked egress
+      // a send or a health verify holds its socket that long.
       this.transporter = nodemailer.createTransport({
         host: smtpHost,
         port,
         secure,
         requireTLS,
         tls: { minVersion: 'TLSv1.2' },
-        auth: { user, pass }
+        auth: { user, pass },
+        connectionTimeout: 3000,
+        greetingTimeout: 3000,
+        socketTimeout: 10000
       });
     } else {
       this.transporter = nodemailer.createTransport({

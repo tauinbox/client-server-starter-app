@@ -294,7 +294,8 @@ degrades to a generic warning, and an SMTP failure does the same. The server log
 and never returns it from the public endpoint.
 
 The server keeps the SMTP verify result for 5 minutes behind an in-flight guard. Thus a probe does
-not authenticate against the provider again at each request.
+not authenticate against the provider again at each request. A verify that does not finish in 3 s
+counts as a failure, so an SMTP host that cannot be reached does not hold the probe.
 
 Each result also goes to the `dependency_up` gauge. That gauge is what makes a degraded dependency
 alertable while readiness reports it as up.
