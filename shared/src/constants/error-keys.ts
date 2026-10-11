@@ -118,6 +118,7 @@ export const ErrorKeys = {
     RENEWAL_IN_PROGRESS: 'errors.billing.renewalInProgress',
     PLAN_CHANGE_CONFLICT: 'errors.billing.planChangeConflict',
     PLAN_CHANGE_PAYMENT_CONFLICT: 'errors.billing.planChangePaymentConflict',
+    PLAN_CHANGE_UNFINISHED: 'errors.billing.planChangeUnfinished',
     ENTITLEMENT_REQUIRED: 'errors.billing.entitlementRequired',
     WEBHOOK_EVENT_NOT_FOUND: 'errors.billing.webhookEventNotFound',
     WEBHOOK_EVENT_NOT_REPLAYABLE: 'errors.billing.webhookEventNotReplayable',

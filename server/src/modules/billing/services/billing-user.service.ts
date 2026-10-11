@@ -10,12 +10,14 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
+  And,
   DataSource,
   EntityManager,
   FindOneOptions,
   In,
   IsNull,
   LessThanOrEqual,
+  Like,
   Not,
   Or,
   Repository
@@ -74,7 +76,11 @@ import {
   meteredWindowStart,
   renewalAnchor
 } from '../utils/period.util';
-import { changeChargeKey, changeRefundKey } from '../utils/charge-keys.util';
+import {
+  changeChargeKey,
+  changeChargeKeyPrefix,
+  changeRefundKey
+} from '../utils/charge-keys.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import { insertInvoiceOnce } from '../utils/invoice-insert.util';
 import {
@@ -685,6 +691,7 @@ export class BillingUserService {
     const seq = subscription.planChangeSeq;
     const chargeKey = changeChargeKey(subscription.id, seq, toPlan.key);
     const refundKey = changeRefundKey(subscription.id, seq);
+    await this.assertNoUnfinishedSwitch(subscription, seq, chargeKey);
 
     // External legs run outside the DB transaction — a provider HTTP call must
     // never be held inside an open transaction. Both keys are stable across
@@ -837,6 +844,35 @@ export class BillingUserService {
       });
     }
     return saved;
+  }
+
+  /**
+   * Refuses a switch while a switch of the same `seq` to another plan has a
+   * charge that may hold money. A retry to another target would charge again,
+   * and its refund would take the newest paid invoice, which is that charge, so
+   * the money of the first target would stay with the merchant. A `failed` row
+   * is a decline and holds no money.
+   */
+  private async assertNoUnfinishedSwitch(
+    subscription: Subscription,
+    seq: number,
+    chargeKey: string
+  ): Promise<void> {
+    // A uuid and an integer: the prefix holds no LIKE wildcard to escape.
+    const prefix = changeChargeKeyPrefix(subscription.id, seq);
+    const unfinished = await this.invoices.findOne({
+      where: {
+        subscriptionId: subscription.id,
+        providerEventId: And(Like(`${prefix}%`), Not(chargeKey)),
+        status: In(['pending', 'paid'])
+      }
+    });
+    if (!unfinished?.providerEventId) return;
+    const planKey = unfinished.providerEventId.slice(prefix.length);
+    throw new ConflictException({
+      message: `A switch to plan "${planKey}" was charged but did not finish. Switch to that plan again to finish it.`,
+      errorKey: ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED
+    });
   }
 
   /**

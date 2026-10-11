@@ -203,6 +203,7 @@
       "renewalInProgress": "The billing period has ended and its renewal is in progress. Try again shortly.",
       "planChangeConflict": "The subscription changed while the plan change was in progress. Please try again.",
       "planChangePaymentConflict": "The subscription changed while the payment was in progress, so the plan was not switched. Any amount charged is on your invoices.",
+      "planChangeUnfinished": "An earlier switch to another plan was charged but did not finish. Switch to that plan again to finish it.",
       "entitlementRequired": "Your plan does not include this feature.",
       "webhookEventNotFound": "This webhook event was not found.",
       "webhookEventNotReplayable": "Only a dead-lettered webhook event can be replayed.",
