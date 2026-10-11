@@ -708,11 +708,12 @@ describe('AuthService', () => {
       req.flush(null, { status: 400, statusText: 'Bad Request' });
     });
 
-    it('keeps the credentials on the OAuth data exchange', () => {
+    // The request is same-origin, so fetch sends the cookies without the flag.
+    it('does not widen the credentials mode of the OAuth data exchange', () => {
       service.exchangeOAuthData().subscribe({ error: () => undefined });
 
       const req = httpMock.expectOne(AuthApiEnum.OAuthExchange);
-      expect(req.request.withCredentials).toBe(true);
+      expect(req.request.withCredentials).toBe(false);
       req.flush(null, { status: 400, statusText: 'Bad Request' });
     });
 

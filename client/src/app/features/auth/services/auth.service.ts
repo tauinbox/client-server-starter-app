@@ -415,7 +415,7 @@ export class AuthService {
       .post<LoginResponse>(
         AuthApiEnum.OAuthExchange,
         {},
-        { context: silentContext(), withCredentials: true }
+        { context: silentContext() }
       )
       .pipe(
         switchMap((response) => {
