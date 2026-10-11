@@ -8,8 +8,9 @@ export const YOOKASSA_CLIENT = Symbol('YOOKASSA_CLIENT');
  * Builds the YooKassa SDK client from env, or `null` when YooKassa is not
  * configured (shop id / secret key absent) — the provider then reports billing
  * unavailable instead of constructing a client that would fail on first call.
- * Both credentials are required to count as configured (mirrors
- * `BillingConfigService.isConfigured`).
+ * Both credentials are required. Unlike `BillingConfigService.isConfigured`,
+ * `REDIS_URL` is not: an existing subscription must still cancel and refund
+ * when new YooKassa checkouts are disabled for lack of Redis.
  */
 export function createYooKassaClient(
   config: ConfigService

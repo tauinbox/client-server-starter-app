@@ -38,11 +38,21 @@ describe('BillingConfiguredAttributesRegistrar', () => {
   it('billingConfigured is true when any provider is configured', () => {
     const out = setup({
       YOOKASSA_SHOP_ID: 'id',
-      YOOKASSA_SECRET_KEY: 'sec'
+      YOOKASSA_SECRET_KEY: 'sec',
+      REDIS_URL: 'redis://localhost:6379'
     }).resolveAll(null, fakeReq);
     expect(out['paddleConfigured']).toBe(false);
     expect(out['yookassaConfigured']).toBe(true);
     expect(out['billingConfigured']).toBe(true);
+  });
+
+  it('turns yookassaConfigured off when REDIS_URL is not set', () => {
+    const out = setup({
+      YOOKASSA_SHOP_ID: 'id',
+      YOOKASSA_SECRET_KEY: 'sec'
+    }).resolveAll(null, fakeReq);
+    expect(out['yookassaConfigured']).toBe(false);
+    expect(out['billingConfigured']).toBe(false);
   });
 
   it('billingConfigured is false when no provider is configured', () => {

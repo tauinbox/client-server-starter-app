@@ -146,7 +146,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
 | `PADDLE_ENVIRONMENT` | `sandbox` | Paddle environment: `sandbox` or `production`. The server API client and Paddle.js in the browser use the same value |
 | `PADDLE_CLIENT_TOKEN` | - | Public client-side token of Paddle.js (`test_...` for sandbox, `live_...` for production). `GET /api/v1/billing/paddle-config` gives it to the browser. Without it no Paddle payment can complete |
-| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. The two values are necessary before YooKassa counts as configured |
+| `YOOKASSA_SHOP_ID` | - | YooKassa shop ID. Use it with `YOOKASSA_SECRET_KEY`. YooKassa counts as configured only when the two values and `REDIS_URL` are set, because the renewal queue needs Redis. With the keys and no `REDIS_URL`, the server logs a warning and refuses new YooKassa checkouts |
 | `YOOKASSA_SECRET_KEY` | - | YooKassa secret key |
 | `YOOKASSA_VAT_CODE` | `1` | VAT code on each 54-FZ receipt line. The range is 1 to 6, and the value depends on the tax regime. The value `1` means "no VAT" |
 | `BILLING_DEFAULT_CURRENCY` | `USD` | Default billing currency of a new customer: `USD` or `RUB`. The billing UI stays hidden until a person configures a minimum of one provider |
@@ -1101,7 +1101,10 @@ The seam ignores a failed or canceled one-time payment, because nothing is pendi
 is no dunning signal.
 
 **Configuration.** `BillingConfigService` supplies the `paddle` and `yookassa` configured booleans,
-which come from the environment.
+which come from the environment. YooKassa also needs `REDIS_URL`, because the server renews its
+subscriptions on the renewal queue. With the YooKassa keys and no `REDIS_URL`, the service logs one
+warning at bootstrap and YooKassa stays unconfigured. An existing YooKassa subscription still
+cancels and refunds.
 
 **Registrars.** `BillingConfiguredAttributesRegistrar` registers the `paddleConfigured`,
 `yookassaConfigured` and combined `billingConfigured` feature-flag attributes. The public `billing`
