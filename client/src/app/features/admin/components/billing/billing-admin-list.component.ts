@@ -32,7 +32,11 @@ import {
   MatTable
 } from '@angular/material/table';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
-import type { InvoiceResponse, SubscriptionResponse } from '@app/shared/types';
+import type {
+  CancelMode,
+  InvoiceResponse,
+  SubscriptionResponse
+} from '@app/shared/types';
 import { isOpenStatus } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -45,7 +49,6 @@ import {
 } from '@shared/components/list-skeleton/list-skeleton.component';
 import { ListEmptyComponent } from '@shared/components/list-empty/list-empty.component';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
-import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingInvoicesStore } from '../../store/billing-invoices.store';
 import { BillingSubscriptionsStore } from '../../store/billing-subscriptions.store';
 

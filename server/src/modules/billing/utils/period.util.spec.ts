@@ -1,9 +1,4 @@
-import {
-  addInterval,
-  meteredWindowStart,
-  nextPeriodEnd,
-  usageIngestStart
-} from './period.util';
+import { addInterval, nextPeriodEnd } from './period.util';
 
 /** UTC [year, month-1, day] for a Date - addInterval operates on the UTC wall-clock. */
 function ymd(date: Date): [number, number, number] {
@@ -246,70 +241,5 @@ describe('nextPeriodEnd', () => {
     } finally {
       process.env['TZ'] = originalTz;
     }
-  });
-});
-
-describe('meteredWindowStart', () => {
-  const periodStart = utc(2026, 8, 1);
-
-  it('is the period start when no switch moved the window', () => {
-    expect(
-      meteredWindowStart({ currentPeriodStart: periodStart, meteredFrom: null })
-    ).toBe(periodStart);
-  });
-
-  it('is the switch moment when a switch moved the window inside the period', () => {
-    const switchedAt = utc(2026, 8, 11);
-    expect(
-      meteredWindowStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: switchedAt
-      })
-    ).toBe(switchedAt);
-  });
-
-  it('ignores a switch moment left over from an earlier period', () => {
-    expect(
-      meteredWindowStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: utc(2026, 7, 20)
-      })
-    ).toBe(periodStart);
-  });
-});
-
-describe('usageIngestStart', () => {
-  const periodStart = utc(2026, 8, 1);
-
-  it('is the metered window start when no close sealed the window', () => {
-    expect(
-      usageIngestStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: null,
-        usageSealedUntil: null
-      })
-    ).toBe(periodStart);
-  });
-
-  it('is the seal when a close sealed the window past its start', () => {
-    const sealed = utc(2026, 9, 1);
-    expect(
-      usageIngestStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: null,
-        usageSealedUntil: sealed
-      })
-    ).toBe(sealed);
-  });
-
-  it('ignores a seal that an earlier period left behind', () => {
-    const switchedAt = utc(2026, 8, 11);
-    expect(
-      usageIngestStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: switchedAt,
-        usageSealedUntil: periodStart
-      })
-    ).toBe(switchedAt);
   });
 });

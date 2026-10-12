@@ -10,6 +10,7 @@ import {
 import type {
   BillingRegion,
   BillingRegionResponse,
+  CancelMode,
   CheckoutSessionResponse,
   CreditBalanceResponse,
   EntitlementsResponse,
@@ -25,8 +26,6 @@ import type {
 } from '@app/shared/types';
 
 export const BILLING_API_V1 = '/api/v1/billing';
-
-export type CancelMode = 'period_end' | 'immediate';
 
 /**
  * One-time purchase request. `amountMinor` is required for

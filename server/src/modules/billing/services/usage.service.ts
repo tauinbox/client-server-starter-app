@@ -8,6 +8,7 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
+import { usageIngestStart } from '@app/shared/utils/billing-rules';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
@@ -19,7 +20,6 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
-import { usageIngestStart } from '../utils/period.util';
 import { CreditService } from './credit.service';
 
 export interface RecordUsageInput {

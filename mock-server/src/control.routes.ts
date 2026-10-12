@@ -33,10 +33,10 @@ import {
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
+import { meteredWindowStart } from '@app/shared/utils/billing-rules';
 import { generateMfaPendingToken } from './jwt.utils';
 import {
   billClosingUsagePeriod,
-  meteredWindowStart,
   sumPlanMeterUnits
 } from './helpers/billing.helpers';
 import type { NotificationEvent } from '@app/shared/types';

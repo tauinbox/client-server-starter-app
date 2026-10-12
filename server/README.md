@@ -943,7 +943,8 @@ before the pricing step, and the caller deducts the applied units.
 
 `ProrationCalculator` computes the split of a self-managed plan change. It uses a whole-day
 remainder. It refunds the old plan and charges the new plan, as in section 17.4 of the billing
-design.
+design. The amounts come from `prorationAmounts` in `shared/src/utils/billing-rules.ts`, which the
+mock server also calls.
 
 **Renewals.** `RenewalService` is the renewal loop of the self-managed (YooKassa) provider. Section 8
 of the billing design describes it.
@@ -1004,7 +1005,7 @@ the renewal key. Instead, a self-managed plan change after the anchor gets `409`
 renews the period.
 
 Every usage rating reads the metered window `[max(current_period_start, metered_from), end)`
-(`meteredWindowStart` in `utils/period.util.ts`). A switch of billing mode sets `metered_from` to the
+(`meteredWindowStart` in `shared/src/utils/billing-rules.ts`). A switch of billing mode sets `metered_from` to the
 moment of the switch, and a new period resets it to NULL. Thus a usage plan never rates the units
 that a fixed plan already covered, and a switch away from usage bills its units at the switch. On
 Paddle that switch emits `UsagePeriodClosedEvent` with the outgoing `planKey`. When Paddle applies a

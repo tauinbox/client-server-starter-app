@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { meteredWindowStart } from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import type { MockInvoice, MockPlan, MockSubscription } from '../types';
 
@@ -25,32 +26,6 @@ export function sumPlanMeterUnits(
         r.occurredAt < endIso
     )
     .reduce((sum, r) => sum + r.quantity, 0);
-}
-
-/**
- * The start of the metered window of the current period, as the server's
- * `meteredWindowStart`: the later of the period start and `meteredFrom`.
- */
-export function meteredWindowStart(subscription: MockSubscription): string {
-  const { currentPeriodStart, meteredFrom } = subscription;
-  return meteredFrom &&
-    new Date(meteredFrom).getTime() > new Date(currentPeriodStart).getTime()
-    ? meteredFrom
-    : currentPeriodStart;
-}
-
-/**
- * The earliest `occurredAt` usage ingest accepts, as the server's
- * `usageIngestStart`: the metered window start, or the seal a renewal left
- * when that is later.
- */
-export function usageIngestStart(subscription: MockSubscription): string {
-  const windowStart = meteredWindowStart(subscription);
-  const { usageSealedUntil } = subscription;
-  return usageSealedUntil &&
-    new Date(usageSealedUntil).getTime() > new Date(windowStart).getTime()
-    ? usageSealedUntil
-    : windowStart;
 }
 
 /**

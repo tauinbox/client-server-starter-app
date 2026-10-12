@@ -14,6 +14,7 @@ import {
   INVOICE_LIST_QUERY,
   SUBSCRIPTION_LIST_QUERY
 } from '@app/shared/constants';
+import type { CancelMode } from '@app/shared/types';
 import type { CursorPaginatedResponseDto } from '../../../common/dtos';
 import { applyList } from '../../../common/utils/apply-list-query.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -24,7 +25,6 @@ import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { EntitlementService } from '../../entitlements/entitlement.service';
-import type { CancelMode } from '../providers/payment-provider.interface';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
   INVOICE_LIST_COLUMNS,

@@ -75,6 +75,7 @@ export type {
   InvoiceStatus,
   InvoiceKind,
   BillingRegion,
+  CancelMode,
   EntitlementLimitKey,
   EntitlementLimits,
   PlanPrice,

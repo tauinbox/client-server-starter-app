@@ -1,6 +1,7 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type {
   BillingProviderId,
+  CancelMode,
   InvoiceKind,
   SubscriptionStatus
 } from '@app/shared/types';
@@ -166,8 +167,6 @@ export interface NormalizedPaymentFailedPayload {
    */
   offSessionChargeKey?: string | null;
 }
-
-export type CancelMode = 'period_end' | 'immediate';
 
 export interface CheckoutUrls {
   successUrl: string;

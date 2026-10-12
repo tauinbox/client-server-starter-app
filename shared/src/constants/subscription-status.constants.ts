@@ -1,4 +1,4 @@
-import type { SubscriptionStatus } from '../types/billing.types';
+import type { CancelMode, SubscriptionStatus } from '../types/billing.types';
 
 /**
  * The three subscription-status sets the whole system reasons in, shared so the
@@ -42,6 +42,9 @@ export const CHANGEABLE_SUBSCRIPTION_STATUSES: readonly SubscriptionStatus[] = [
   'trialing',
   'active'
 ];
+
+/** Every `CancelMode`, for the validation of a cancel request. */
+export const CANCEL_MODES: readonly CancelMode[] = ['period_end', 'immediate'];
 
 export function isOpenStatus(status: SubscriptionStatus): boolean {
   return OPEN_SUBSCRIPTION_STATUSES.includes(status);

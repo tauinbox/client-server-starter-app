@@ -14,6 +14,7 @@ import {
   type TransactionNotification
 } from '@paddle/paddle-node-sdk';
 import type {
+  CancelMode,
   PaddleClientConfigResponse,
   SubscriptionStatus
 } from '@app/shared/types';
@@ -27,7 +28,6 @@ import {
   WEBHOOK_IGNORED
 } from './payment-provider.interface';
 import type {
-  CancelMode,
   ChangePreview,
   ChargeResult,
   CheckoutSession,

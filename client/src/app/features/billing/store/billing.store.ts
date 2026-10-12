@@ -12,6 +12,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import type {
   BillingRegion,
   BillingRegionResponse,
+  CancelMode,
   CheckoutSessionResponse,
   CreditBalanceResponse,
   InvoiceResponse,
@@ -27,7 +28,6 @@ import { NotifyService } from '@core/services/notify.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import {
   BillingService,
-  type CancelMode,
   type PurchaseRequest
 } from '../services/billing.service';
 
