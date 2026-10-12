@@ -22,6 +22,7 @@ import { PaymentMethod } from '../src/modules/billing/entities/payment-method.en
 import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { ErrorKeys, MAX_PAGE_SIZE } from '@app/shared/constants';
@@ -96,12 +97,11 @@ describe('Billing user self-service (e2e)', () => {
     checkout: jest.fn(),
     listProducts: jest.fn(),
     purchase: jest.fn(),
-    changePlan: jest.fn(),
-    previewChange: jest.fn(),
     cancelSubscription: jest.fn(),
     getRegion: jest.fn(),
     setRegion: jest.fn()
   };
+  const planChange = { changePlan: jest.fn(), previewChange: jest.fn() };
   const entitlements = { has: jest.fn(), capabilitiesFor: jest.fn() };
 
   beforeEach(async () => {
@@ -112,6 +112,7 @@ describe('Billing user self-service (e2e)', () => {
       providers: [
         RESPONSE_SERIALIZER,
         { provide: BillingUserService, useValue: billingUser },
+        { provide: PlanChangeService, useValue: planChange },
         { provide: EntitlementService, useValue: entitlements },
         EntitlementGuard,
         Reflector
@@ -343,7 +344,7 @@ describe('Billing user self-service (e2e)', () => {
   });
 
   it('changes the plan for the caller and serializes the subscription', async () => {
-    billingUser.changePlan.mockResolvedValue(
+    planChange.changePlan.mockResolvedValue(
       Object.assign(makeSubscription(), { planKey: 'business' })
     );
 
@@ -353,13 +354,13 @@ describe('Billing user self-service (e2e)', () => {
       .send({ planKey: 'business' })
       .expect(200);
 
-    expect(billingUser.changePlan).toHaveBeenCalledWith('user-7', 'business');
+    expect(planChange.changePlan).toHaveBeenCalledWith('user-7', 'business');
     expect((res.body as { planKey: string }).planKey).toBe('business');
     expect(res.body).not.toHaveProperty('providerSubscriptionId');
   });
 
   it('previews a plan change without applying it', async () => {
-    billingUser.previewChange.mockResolvedValue({
+    planChange.previewChange.mockResolvedValue({
       provider: 'yookassa',
       fromPlanKey: 'pro',
       toPlanKey: 'business',
@@ -374,10 +375,7 @@ describe('Billing user self-service (e2e)', () => {
       .send({ planKey: 'business' })
       .expect(200);
 
-    expect(billingUser.previewChange).toHaveBeenCalledWith(
-      'user-1',
-      'business'
-    );
+    expect(planChange.previewChange).toHaveBeenCalledWith('user-1', 'business');
     expect(res.body).toEqual({
       provider: 'yookassa',
       fromPlanKey: 'pro',
@@ -395,7 +393,7 @@ describe('Billing user self-service (e2e)', () => {
       .send({})
       .expect(400);
 
-    expect(billingUser.changePlan).not.toHaveBeenCalled();
+    expect(planChange.changePlan).not.toHaveBeenCalled();
   });
 
   it('cancels the current subscription at period end', async () => {

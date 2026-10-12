@@ -1619,7 +1619,7 @@ The base URL of the API is `/api/v1`.
 
 > `typecheck` exists in the three workspaces, and it is not redundant with `build`. `build` typechecks
 > only the files that it compiles. The `tsconfig.build.json` file of `server/` excludes `test/`,
-> `*.spec.ts` and `common/testing/`. The `ng build` command of the client covers the `app` project
+> `*.spec.ts` and each `testing/` directory. The `ng build` command of the client covers the `app` project
 > only, and Playwright transpiles the tests without a typecheck. Thus no other gate examines `e2e/`.
 >
 > Each script runs the true project configurations, and never the base `tsconfig.json`. The base

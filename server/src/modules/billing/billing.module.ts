@@ -46,6 +46,7 @@ import { ProrationCalculator } from './rating/proration-calculator';
 import { PlanService } from './services/plan.service';
 import { CreditService } from './services/credit.service';
 import { BillingUserService } from './services/billing-user.service';
+import { PlanChangeService } from './services/plan-change.service';
 import { BillingAdminService } from './services/billing-admin.service';
 import { UsageService } from './services/usage.service';
 import { UsageInvoicingService } from './services/usage-invoicing.service';
@@ -133,6 +134,7 @@ export class BillingModule {
         PlanService,
         CreditService,
         BillingUserService,
+        PlanChangeService,
         BillingAdminService,
         UsageService,
         UsageInvoicingService,

@@ -17,7 +17,6 @@ import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
-import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
@@ -78,7 +77,6 @@ runWithInfra('One trial for each customer (e2e)', () => {
       providers: [
         BillingUserService,
         BillingEventReducer,
-        ProrationCalculator,
         { provide: getDataSourceToken(), useValue: ds },
         ...[
           Customer,

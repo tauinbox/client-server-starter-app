@@ -46,6 +46,7 @@ import { BillingWebhooksController } from '../src/modules/billing/webhooks/billi
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
@@ -376,6 +377,7 @@ describe('Billing Paddle webhook (e2e)', () => {
         // The entitlements read is served by EntitlementService directly, so
         // the self-service controller needs no billing service here.
         { provide: BillingUserService, useValue: {} },
+        { provide: PlanChangeService, useValue: {} },
         EntitlementGuard,
         Reflector,
         // WebhookIpAllowlistGuard dep; unset allowlist keeps the receivers open

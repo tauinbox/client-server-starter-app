@@ -30,8 +30,8 @@ import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy
 import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
-import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
+import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -86,7 +86,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
   let providerSubscriptionRef: string;
   let provider: FakeProvider;
   let emitted: Array<{ name: string; payload: unknown }>;
-  let users: BillingUserService;
+  let planChange: PlanChangeService;
   let renewals: RenewalService;
   let invoicing: UsageInvoicingService;
   let reducer: BillingEventReducer;
@@ -180,7 +180,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     });
     const module = await Test.createTestingModule({
       providers: [
-        BillingUserService,
+        PlanChangeService,
         RenewalService,
         UsageInvoicingService,
         BillingEventReducer,
@@ -222,7 +222,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         }
       ]
     }).compile();
-    users = module.get(BillingUserService);
+    planChange = module.get(PlanChangeService);
     renewals = module.get(RenewalService);
     invoicing = module.get(UsageInvoicingService);
     reducer = module.get(BillingEventReducer);
@@ -360,7 +360,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await build('yookassa');
     await seed('yookassa', FIXED_KEY);
 
-    await users.changePlan(userId as string, USAGE_KEY);
+    await planChange.changePlan(userId as string, USAGE_KEY);
     await renewals.runDueRenewals(afterPeriodEnd);
 
     const renewal = await ds.getRepository(Invoice).findOneOrFail({
@@ -377,7 +377,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await build('yookassa');
     await seed('yookassa', USAGE_KEY);
 
-    await users.changePlan(userId as string, FIXED_KEY);
+    await planChange.changePlan(userId as string, FIXED_KEY);
 
     const [closing] = await usageInvoices();
     expect(closing).toMatchObject({
@@ -417,7 +417,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
       );
 
     await expect(
-      users.changePlan(userId as string, FIXED_KEY)
+      planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toMatchObject({ status: 409 });
 
     expect(provider.chargeOffSession).not.toHaveBeenCalled();
@@ -433,7 +433,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await build('paddle');
     await seed('paddle', FIXED_KEY);
 
-    await users.changePlan(userId as string, USAGE_KEY);
+    await planChange.changePlan(userId as string, USAGE_KEY);
     await deliverUsageCloses();
     await rollOverAtProvider();
     await deliverUsageCloses();
@@ -451,7 +451,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await build('paddle');
     await seed('paddle', USAGE_KEY);
 
-    await users.changePlan(userId as string, FIXED_KEY);
+    await planChange.changePlan(userId as string, FIXED_KEY);
     await deliverUsageCloses();
     await rollOverAtProvider();
     await deliverUsageCloses();
@@ -482,7 +482,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     });
 
     await expect(
-      users.changePlan(userId as string, FIXED_KEY)
+      planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toMatchObject({ status: 409 });
     await planSnapshotAtProvider(FIXED_KEY);
 
@@ -517,7 +517,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     );
 
     await expect(
-      users.changePlan(userId as string, FIXED_KEY)
+      planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toMatchObject({ status: 409 });
     await deliverUsageCloses();
     await rollOverAtProvider();

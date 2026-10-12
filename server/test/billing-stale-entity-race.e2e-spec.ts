@@ -23,7 +23,6 @@ import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
-import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
@@ -259,7 +258,6 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     const module = await Test.createTestingModule({
       providers: [
         BillingUserService,
-        ProrationCalculator,
         { provide: getDataSourceToken(), useValue: ds },
         {
           provide: getRepositoryToken(Customer),
