@@ -272,6 +272,9 @@ runWithInfra('billing write paths (e2e)', () => {
         status: 'active',
         dunningAttempts: 0,
         nextRenewalAttemptAt: null,
+        // The period moves back in time here, which no real writer does, so
+        // the seal an earlier case left would close the new window.
+        usageSealedUntil: null,
         currentPeriodStart: new Date(Date.now() - 40 * DAY),
         currentPeriodEnd: new Date(Date.now() - DAY),
         ...overrides

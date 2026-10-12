@@ -756,12 +756,18 @@ A record is an observation, thus the current plan of the customer does not gate 
 service refuses, with a 400, only a record that no rating can charge correctly:
 
 - A meter that no plan in the catalog declares. Such a meter is a typo of the producer.
-- An `occurredAt` before the open metered window (`meteredWindowStart`). Rating never reads a closed
-  period again.
+- An `occurredAt` before the open metered window (`usageIngestStart`: `meteredWindowStart`, or
+  `usage_sealed_until` when later). Rating never reads a closed period again.
 - An `occurredAt` more than 5 minutes (`USAGE_FUTURE_TOLERANCE_MS`) after the server clock. Such a
   record is rated in a later period.
 
 A replay of a known key answers before these checks.
+
+The checks and the insert run in one transaction that reads the subscription `FOR SHARE`. A close
+that moves the window waits for that lock. The renewal and `billClosingUsagePeriod` rate before they
+move the window, so they first write `usage_sealed_until` (the end of the window) in a committed
+write. Thus a record is rated by the close, or it gets the 400. It is never stored in a window that
+was already rated.
 
 The service stores a meter that another plan prices. It counts that record on
 `billing_usage_records_unrated_total{meter}` and leaves it for the rating step to ignore.

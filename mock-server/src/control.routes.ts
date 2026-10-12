@@ -772,6 +772,11 @@ router.post('/billing/advance-renewal', (req, res) => {
   const nowIso = now.toISOString();
 
   if (outcome === 'failure') {
+    // The server seals usage ingest at the anchor before it rates the window,
+    // and the seal outlives the decline: a retry re-rates the same window.
+    if (subscription.billingMode === 'usage') {
+      subscription.usageSealedUntil = nowIso;
+    }
     const attempts = (subscription.dunningAttempts ?? 0) + 1;
     subscription.dunningAttempts = attempts;
     subscription.status =

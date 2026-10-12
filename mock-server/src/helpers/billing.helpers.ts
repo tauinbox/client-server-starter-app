@@ -40,6 +40,20 @@ export function meteredWindowStart(subscription: MockSubscription): string {
 }
 
 /**
+ * The earliest `occurredAt` usage ingest accepts, as the server's
+ * `usageIngestStart`: the metered window start, or the seal a renewal left
+ * when that is later.
+ */
+export function usageIngestStart(subscription: MockSubscription): string {
+  const windowStart = meteredWindowStart(subscription);
+  const { usageSealedUntil } = subscription;
+  return usageSealedUntil &&
+    new Date(usageSealedUntil).getTime() > new Date(windowStart).getTime()
+    ? usageSealedUntil
+    : windowStart;
+}
+
+/**
  * Rates and invoices the open metered window that a cancellation or a switch
  * to a fixed plan closes, mirroring the server: a `usage` plan is postpaid, so
  * the units consumed inside `[windowStart, now)` are owed whether or not the

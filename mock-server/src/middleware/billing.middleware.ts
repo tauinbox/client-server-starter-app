@@ -36,7 +36,8 @@ import { authGuard, permissionGuard } from '../helpers/auth.helpers';
 import {
   billClosingUsagePeriod,
   meteredWindowStart,
-  sumPlanMeterUnits
+  sumPlanMeterUnits,
+  usageIngestStart
 } from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
 import { mockCheckoutUrl } from '../routes/mock-checkout';
@@ -1585,7 +1586,7 @@ billingAdminRouter.post(
         ? new Date(occurredAtRaw).toISOString()
         : now;
     const occurredAtMs = new Date(occurredAt).getTime();
-    if (occurredAtMs < new Date(meteredWindowStart(subscription)).getTime()) {
+    if (occurredAtMs < new Date(usageIngestStart(subscription)).getTime()) {
       res.status(400).json({
         message: 'occurredAt is before the open metered window',
         statusCode: 400,

@@ -362,6 +362,47 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(accepted.status).toBe(201);
   });
 
+  it('refuses usage inside a window a declined renewal sealed, as the server does', async () => {
+    const token = await login('admin@example.com');
+    const { customerId, subscriptionId } = await activateSubscription(
+      'admin@example.com',
+      'usage'
+    );
+    const declined = await fetch(
+      `${baseUrl}/__control/billing/advance-renewal`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subscriptionId, outcome: 'failure' })
+      }
+    );
+    expect(declined.status).toBe(200);
+    const sealedAt =
+      getState().billingSubscriptions.get(subscriptionId)?.usageSealedUntil;
+    if (!sealedAt) throw new Error('renewal did not seal the window');
+
+    const refused = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      occurredAt: new Date(new Date(sealedAt).getTime() - 1).toISOString(),
+      idempotencyKey: 'evt-before-seal'
+    });
+    const accepted = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      occurredAt: sealedAt,
+      idempotencyKey: 'evt-at-seal'
+    });
+
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({
+      errorKey: 'errors.billing.usageBeforeOpenWindow'
+    });
+    expect(accepted.status).toBe(201);
+  });
+
   it('rejects an occurredAt past the clock skew tolerance (400)', async () => {
     const token = await login('admin@example.com');
     const { customerId } = await activateSubscription(
