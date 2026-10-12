@@ -810,7 +810,60 @@ describe('BillingUserService', () => {
         {
           successUrl: 'http://localhost:4200/billing/success',
           cancelUrl: 'http://localhost:4200/billing/cancel'
-        }
+        },
+        false
+      );
+    });
+
+    it('gives a trial when the plan has one and the customer never used one', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan({ trialDays: 14 }));
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null,
+        trialUsedAt: null
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.resolveProvider.mockResolvedValue(yoo);
+
+      await ctx.service.checkout('user-1', 'pro');
+
+      expect(ctx.subscriptions.save).toHaveBeenCalledWith(
+        expect.objectContaining({ trialEnd: expect.any(Date) as Date })
+      );
+      expect(yoo.startCheckout).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        true
+      );
+    });
+
+    it('gives no second trial to a customer who used one', async () => {
+      const ctx = await build();
+      ctx.plans.findOne.mockResolvedValue(makePlan({ trialDays: 14 }));
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null,
+        trialUsedAt: new Date('2026-09-01T00:00:00Z')
+      });
+      const yoo = provider('yookassa', false);
+      ctx.billing.resolveProvider.mockResolvedValue(yoo);
+
+      await ctx.service.checkout('user-1', 'pro');
+
+      expect(ctx.subscriptions.save).toHaveBeenCalledWith(
+        expect.objectContaining({ trialEnd: null })
+      );
+      expect(yoo.startCheckout).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        false
       );
     });
 

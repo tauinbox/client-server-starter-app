@@ -167,6 +167,8 @@ export interface MockCustomer {
   country: string;
   currency: string;
   defaultPaymentMethodId: string | null;
+  /** Server: `Customer.trialUsedAt`, `@Exclude()`-d from the wire format. */
+  trialUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -271,7 +273,15 @@ export type MockCheckoutSession = {
   customerId: string;
   provider: import('@app/shared/types').BillingProviderId;
   createdAt: string;
-} & ({ kind: 'plan'; planKey: string } | { kind: 'method' });
+} & (
+  | {
+      kind: 'plan';
+      planKey: string;
+      /** A trial checkout pays zero, as the YooKassa card binding does. */
+      trial: boolean;
+    }
+  | { kind: 'method' }
+);
 
 export interface MockInvoice {
   id: string;

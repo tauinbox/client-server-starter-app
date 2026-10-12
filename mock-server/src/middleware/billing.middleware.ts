@@ -359,6 +359,7 @@ function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
     country,
     currency,
     defaultPaymentMethodId: null,
+    trialUsedAt: null,
     createdAt: now,
     updatedAt: now
   };
@@ -761,6 +762,9 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     (s) => s.customerId === customer.id && s.status === 'incomplete'
   );
 
+  // One trial for each customer.
+  const trial = plan.trialDays > 0 && !customer.trialUsedAt;
+
   if (!managesLifecycle(provider)) {
     const now = new Date();
     const fields = {
@@ -773,10 +777,9 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
       currentPeriodEnd: addInterval(now, plan.interval).toISOString(),
       billingAnchorAt: now.toISOString(),
       cancelAtPeriodEnd: false,
-      trialEnd:
-        plan.trialDays > 0
-          ? new Date(now.getTime() + plan.trialDays * 86_400_000).toISOString()
-          : null,
+      trialEnd: trial
+        ? new Date(now.getTime() + plan.trialDays * 86_400_000).toISOString()
+        : null,
       paymentMethodId: null,
       providerSubscriptionId: null,
       updatedAt: now.toISOString()
@@ -806,6 +809,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     provider,
     kind: 'plan',
     planKey: plan.key,
+    trial,
     createdAt: new Date().toISOString()
   });
   res.json({

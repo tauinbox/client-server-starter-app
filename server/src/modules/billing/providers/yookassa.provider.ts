@@ -242,7 +242,8 @@ export class YooKassaProvider implements PaymentProvider {
   async startCheckout(
     customer: Customer,
     plan: Plan,
-    urls: CheckoutUrls
+    urls: CheckoutUrls,
+    isTrial: boolean
   ): Promise<CheckoutSession> {
     const yoo = this.requireClient();
     const price = plan.prices.yookassa;
@@ -258,7 +259,6 @@ export class YooKassaProvider implements PaymentProvider {
       userId: customer.userId,
       planKey: plan.key
     };
-    const isTrial = plan.trialDays > 0;
 
     // Trial = zero-amount card binding (save the method now, charge at trial end
     // via the scheduler); no money moves, so no fiscal receipt. A paid first

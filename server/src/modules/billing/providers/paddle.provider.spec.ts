@@ -523,10 +523,15 @@ describe('PaddleProvider', () => {
       const bounded = withProviderDeadline(provider, 20);
 
       await expect(
-        bounded.startCheckout(customer, plan, {
-          successUrl: 'https://app/return',
-          cancelUrl: 'https://app/cancel'
-        })
+        bounded.startCheckout(
+          customer,
+          plan,
+          {
+            successUrl: 'https://app/return',
+            cancelUrl: 'https://app/cancel'
+          },
+          false
+        )
       ).rejects.toBeInstanceOf(ProviderTimeoutError);
     });
 

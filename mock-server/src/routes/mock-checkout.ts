@@ -167,7 +167,7 @@ router.post('/:sessionRef/pay', (req, res) => {
     return;
   }
   if (session.provider === 'yookassa') {
-    settleSelfManagedCheckout(user, plan, session.customerId);
+    settleSelfManagedCheckout(user, plan, session.customerId, session.trial);
   } else {
     activateSubscription(user, plan, 'active', session.provider);
   }

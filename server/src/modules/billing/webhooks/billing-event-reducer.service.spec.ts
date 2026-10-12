@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
-import { In } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { Customer } from '../entities/customer.entity';
@@ -250,6 +250,46 @@ describe('BillingEventReducer', () => {
       expect(manager.create).not.toHaveBeenCalled();
       expect(manager.save).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
+    });
+
+    it('records the used trial when a provider snapshot creates a trialing subscription', async () => {
+      const { reducer, manager } = await build({ plan: planRow('pro') });
+
+      await reducer.reduce(
+        event('subscription.activated', subPayload({ status: 'trialing' }))
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Customer,
+        { id: 'cust-1', trialUsedAt: IsNull() },
+        { trialUsedAt: expect.any(Date) as Date }
+      );
+    });
+
+    it('records the used trial when a provider snapshot moves a subscription to trialing', async () => {
+      const { reducer, manager } = await build({
+        plan: planRow('pro'),
+        subscription: {
+          id: 'sub-1',
+          customerId: 'cust-1',
+          planKey: 'pro',
+          billingMode: 'fixed',
+          lifecycleOwner: 'provider',
+          status: 'incomplete',
+          currentPeriodStart: new Date('2026-06-01T00:00:00Z'),
+          currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
+        } as Subscription
+      });
+
+      await reducer.reduce(
+        event('subscription.activated', subPayload({ status: 'trialing' }))
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Customer,
+        { id: 'cust-1', trialUsedAt: IsNull() },
+        { trialUsedAt: expect.any(Date) as Date }
+      );
     });
 
     it('stamps the event provider and derives the lifecycle owner (YooKassa = self)', async () => {
@@ -908,6 +948,45 @@ describe('BillingEventReducer', () => {
       expect(emit).not.toHaveBeenCalledWith(
         FirstPaymentUnclaimedEvent.name,
         expect.anything()
+      );
+      expect(manager.update).not.toHaveBeenCalledWith(
+        Customer,
+        expect.anything(),
+        { trialUsedAt: expect.any(Date) as Date }
+      );
+    });
+
+    it('records the used trial when the first payment starts one', async () => {
+      const { reducer, manager } = await build({
+        subscription: {
+          id: 'sub-1',
+          customerId: 'cust-1',
+          provider: 'yookassa',
+          billingMode: 'fixed',
+          status: 'incomplete',
+          trialEnd: new Date(Date.now() + 14 * 86_400_000)
+        } as Subscription,
+        invoiceInsertRows: [{ id: 'inv-1' }],
+        updateAffected: 1
+      });
+
+      await reducer.reduce(
+        event(
+          'invoice.paid',
+          { ...selfManagedPayload, amountMinor: 0 },
+          'yookassa'
+        )
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1', status: 'incomplete', planKey: 'pro' },
+        { status: 'trialing' }
+      );
+      expect(manager.update).toHaveBeenCalledWith(
+        Customer,
+        { id: 'cust-1', trialUsedAt: IsNull() },
+        { trialUsedAt: expect.any(Date) as Date }
       );
     });
 

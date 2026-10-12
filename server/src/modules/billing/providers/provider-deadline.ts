@@ -76,10 +76,11 @@ export class DeadlineBoundProvider implements PaymentProvider {
   startCheckout(
     customer: Customer,
     plan: Plan,
-    urls: CheckoutUrls
+    urls: CheckoutUrls,
+    trial: boolean
   ): Promise<CheckoutSession> {
     return this.bound('startCheckout', () =>
-      this.inner.startCheckout(customer, plan, urls)
+      this.inner.startCheckout(customer, plan, urls, trial)
     );
   }
 

@@ -56,6 +56,15 @@ export class Customer {
   })
   defaultPaymentMethodId: string | null;
 
+  /**
+   * When a subscription of this customer first went to `trialing`. A customer
+   * gets one trial: checkout gives none once this is set. Not read from the
+   * subscriptions, because a trial conversion clears `trial_end`.
+   */
+  @Column({ name: 'trial_used_at', type: 'timestamptz', nullable: true })
+  @Exclude()
+  trialUsedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
