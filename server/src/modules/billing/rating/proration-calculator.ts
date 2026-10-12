@@ -17,41 +17,29 @@ export interface ProrationInput {
 }
 
 export interface ProrationQuote extends ProrationAmounts {
-  refundItems: ReceiptItem[];
   chargeItems: ReceiptItem[];
 }
 
 /**
  * Self-managed (YooKassa) plan-change proration. The amounts and the rounding
  * policy are `prorationAmounts`, which the mock server runs too; this adds the
- * receipt items, because each leg is fiscalized separately (refund receipt +
- * payment receipt). Metered overage is settled by the usage-invoicing path,
+ * receipt items of the charge leg. The provider builds the refund receipt from
+ * the paid payment. Metered overage is settled by the usage-invoicing path,
  * not here.
  */
 @Injectable()
 export class ProrationCalculator {
   quote(input: ProrationInput): ProrationQuote {
-    const { fromPlan, toPlan } = input;
     const amounts = prorationAmounts(input);
-    const { remainderDays, totalDays, refundMinor, chargeMinor } = amounts;
+    const { remainderDays, totalDays, chargeMinor } = amounts;
 
     return {
       ...amounts,
-      refundItems:
-        refundMinor > 0
-          ? [
-              {
-                description: `${fromPlan.name}: unused remainder (${remainderDays} of ${totalDays} days)`,
-                amountMinor: refundMinor,
-                quantity: 1
-              }
-            ]
-          : [],
       chargeItems:
         chargeMinor > 0
           ? [
               {
-                description: `${toPlan.name}: prorated (${remainderDays} of ${totalDays} days)`,
+                description: `${input.toPlan.name}: prorated (${remainderDays} of ${totalDays} days)`,
                 amountMinor: chargeMinor,
                 quantity: 1
               }
