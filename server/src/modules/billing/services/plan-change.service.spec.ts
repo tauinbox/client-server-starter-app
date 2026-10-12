@@ -1475,6 +1475,32 @@ describe('PlanChangeService', () => {
       });
     });
 
+    it('quotes nothing when the charge and the refund leg of an earlier attempt are settled', async () => {
+      const ctx = await build();
+      setupYoo(ctx);
+      ctx.subscriptions.findOne.mockResolvedValue({
+        ...(await ctx.subscriptions.findOne()),
+        planChangeSeq: 0
+      });
+      ctx.invoices.findOne.mockImplementation(
+        (opts: { where: { providerEventId?: unknown } }) =>
+          Promise.resolve(
+            opts.where.providerEventId === 'change-refund:sub-1:0'
+              ? { status: 'refunded', amountMinor: Money.fromMinor(39600) }
+              : periodInvoice(0)
+          )
+      );
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      const preview = await ctx.service.previewChange('user-1', 'business');
+
+      expect(preview).toMatchObject({
+        creditMinor: 0,
+        chargeMinor: 0,
+        dueNowMinor: 0
+      });
+    });
+
     it('shows no credit when no paid fixed invoice covers the period', async () => {
       const ctx = await build();
       setupYoo(ctx);
