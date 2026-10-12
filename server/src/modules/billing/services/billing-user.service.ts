@@ -474,6 +474,7 @@ export class BillingUserService {
     // resolveProvider asserts the geo's provider is enabled + configured (503),
     // the server-side enforcement behind the UI availability gating.
     const provider = await this.billing.resolveProvider(customer);
+    const trial = plan.trialDays > 0 && !customer.trialUsedAt;
 
     // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
     // stack a second open subscription (forbidden by UQ_subscriptions_customer_open).
@@ -498,10 +499,9 @@ export class BillingUserService {
         // cannot walk a month-end customer permanently backwards.
         billingAnchorAt: now,
         cancelAtPeriodEnd: false,
-        trialEnd:
-          plan.trialDays > 0
-            ? new Date(now.getTime() + plan.trialDays * 86_400_000)
-            : null,
+        trialEnd: trial
+          ? new Date(now.getTime() + plan.trialDays * 86_400_000)
+          : null,
         providerSubscriptionId: null,
         paymentMethodId: null
       };
@@ -527,10 +527,15 @@ export class BillingUserService {
       await this.reuseIncompleteRow(pending, { status: 'canceled' });
     }
 
-    const session = await provider.startCheckout(customer, plan, {
-      successUrl: this.checkoutUrl('success'),
-      cancelUrl: this.checkoutUrl('cancel')
-    });
+    const session = await provider.startCheckout(
+      customer,
+      plan,
+      {
+        successUrl: this.checkoutUrl('success'),
+        cancelUrl: this.checkoutUrl('cancel')
+      },
+      trial
+    );
     return {
       provider: provider.id,
       url: session.url,
@@ -1558,7 +1563,8 @@ export class BillingUserService {
           country,
           currency,
           providerCustomerId: null,
-          defaultPaymentMethodId: null
+          defaultPaymentMethodId: null,
+          trialUsedAt: null
         })
       );
     } catch (error: unknown) {

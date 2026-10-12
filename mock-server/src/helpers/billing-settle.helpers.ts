@@ -56,6 +56,7 @@ export function activateSubscription(
       country: isRu ? 'RU' : 'US',
       currency: isRu ? 'RUB' : 'USD',
       defaultPaymentMethodId: null,
+      trialUsedAt: null,
       createdAt: nowIso,
       updatedAt: nowIso
     } satisfies MockCustomer;
@@ -114,8 +115,12 @@ export function activateSubscription(
   }
   subscription.updatedAt = nowIso;
   state.billingSubscriptions.set(subscription.id, subscription);
+  if (status === 'trialing') {
+    customer.trialUsedAt ??= nowIso;
+  }
 
-  // A paid invoice for the plan price on the provider of the subscription.
+  // A paid invoice for the plan price on the provider of the subscription; a
+  // trial moves no money.
   const price =
     plan.prices[subscription.provider] ?? Object.values(plan.prices)[0];
   const invoice: MockInvoice = {
@@ -124,7 +129,7 @@ export function activateSubscription(
     subscriptionId: subscription.id,
     provider: subscription.provider,
     providerInvoiceRef: `in_${randomUUID()}`,
-    amountMinor: price?.amountMinor ?? 0,
+    amountMinor: status === 'trialing' ? 0 : (price?.amountMinor ?? 0),
     currency: price?.currency ?? 'USD',
     status: 'paid',
     billingMode: plan.billingMode,
@@ -153,21 +158,28 @@ export function activateSubscription(
 export function settleSelfManagedCheckout(
   user: MockUser,
   plan: MockPlan,
-  customerId: string
+  customerId: string,
+  trial: boolean
 ): void {
   const state = getState();
   const open = [...state.billingSubscriptions.values()].find(
     (s) => s.customerId === customerId && s.status !== 'canceled'
   );
   if (open?.status === 'incomplete' && open.planKey === plan.key) {
-    activateSubscription(user, plan, 'active', 'yookassa');
+    const trialing =
+      open.trialEnd !== null && Date.parse(open.trialEnd) > Date.now();
+    activateSubscription(
+      user,
+      plan,
+      trialing ? 'trialing' : 'active',
+      'yookassa'
+    );
     return;
   }
 
   const nowIso = new Date().toISOString();
   // A trial binding moves no money, so there is nothing to give back.
-  const amountMinor =
-    plan.trialDays > 0 ? 0 : (plan.prices.yookassa?.amountMinor ?? 0);
+  const amountMinor = trial ? 0 : (plan.prices.yookassa?.amountMinor ?? 0);
   const invoice: MockInvoice = {
     id: randomUUID(),
     customerId,

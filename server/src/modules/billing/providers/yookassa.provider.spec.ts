@@ -139,7 +139,12 @@ describe('YooKassaProvider', () => {
         confirmation: { confirmation_url: 'https://yoomoney/checkout/pay-1' }
       });
 
-      const session = await provider.startCheckout(customer, paidPlan, urls);
+      const session = await provider.startCheckout(
+        customer,
+        paidPlan,
+        urls,
+        false
+      );
 
       const [payload, idempotencyKey] = client!.createPayment.mock.calls[0] as [
         ICreatePayment,
@@ -188,7 +193,8 @@ describe('YooKassaProvider', () => {
       await provider.startCheckout(
         customer,
         { ...paidPlan, trialDays: 14 },
-        urls
+        urls,
+        true
       );
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
@@ -197,10 +203,35 @@ describe('YooKassaProvider', () => {
       expect(payload.receipt).toBeUndefined();
     });
 
+    it('charges the full price with a receipt when the trial is not given', async () => {
+      const { provider, client } = await build();
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-4',
+        status: 'pending',
+        confirmation: { confirmation_url: 'https://yoomoney/checkout/pay-4' }
+      });
+
+      await provider.startCheckout(
+        customer,
+        { ...paidPlan, trialDays: 14 },
+        urls,
+        false
+      );
+
+      const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+      expect(payload.amount).toEqual({ value: '990.00', currency: 'RUB' });
+      expect(payload.receipt).toBeDefined();
+    });
+
     it('throws when the plan has no YooKassa price', async () => {
       const { provider } = await build();
       await expect(
-        provider.startCheckout(customer, { ...paidPlan, prices: {} }, urls)
+        provider.startCheckout(
+          customer,
+          { ...paidPlan, prices: {} },
+          urls,
+          false
+        )
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
@@ -211,14 +242,14 @@ describe('YooKassaProvider', () => {
         confirmation: {}
       });
       await expect(
-        provider.startCheckout(customer, paidPlan, urls)
+        provider.startCheckout(customer, paidPlan, urls, false)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
       await expect(
-        provider.startCheckout(customer, paidPlan, urls)
+        provider.startCheckout(customer, paidPlan, urls, false)
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });

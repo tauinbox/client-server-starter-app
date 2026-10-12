@@ -895,7 +895,8 @@ images from `cdn.paddle.com` and `sandbox-cdn.paddle.com`, and the checkout fram
 `YooKassaProvider` is the true YooKassa client, and it is self-managed:
 
 - `startCheckout` calls `createPayment` with `save_payment_method` and a redirect. A trial uses a
-  zero-amount binding.
+  zero-amount binding. The caller decides the trial: a customer gets one trial, thus a checkout
+  after `billing_customers.trial_used_at` is set charges the full price with a receipt.
 - `chargeOffSession` charges with the saved `PaymentMethod` token, in the currency of the price that
   the caller passes (never `Customer.currency`). It attaches the 54-FZ receipt and
   an `Idempotence-Key`. It reports `captured` only for a `succeeded` payment. It reports a
@@ -1066,7 +1067,9 @@ matching domain event.
 On the self-managed first-payment path it flips the incomplete subscription, found by customer id, to
 `active` or `trialing`, but only while that row is still `incomplete` on the plan of the payment
 (`planKey` from the payment metadata). Then it persists the saved card as the default `PaymentMethod`
-of the customer and points the subscription at it. A paid first payment that activates nothing (a
+of the customer and points the subscription at it. A flip to `trialing`, and a provider snapshot
+with the status `trialing`, set `billing_customers.trial_used_at` once; checkout gives no trial after
+that. A paid first payment that activates nothing (a
 second tab, a plan that a later checkout replaced, a cancelled row) emits
 `FirstPaymentUnclaimedEvent`, and `FirstPaymentUnclaimedListener` refunds the whole invoice through
 `BillingAdminService.refundInvoice`.
@@ -1963,7 +1966,7 @@ a currency with zero decimals and a currency with three decimals correctly.
 | Table | Description |
 |-------|-------------|
 | `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits?, providerPriceId? }` for each provider. Paddle needs `providerPriceId`, and the seeder does not write it (refer to the Paddle price ids note under Billing) |
-| `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL) |
+| `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL), `trial_used_at` (nullable, the first move of a subscription to `trialing`; one trial for each customer) |
 | `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default`. A partial unique index on `customer_id WHERE is_default` permits a maximum of one default for each customer |
 | `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `metered_from`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL. `metered_from` is nullable. It is the start of the metered window after a switch of billing mode, and a new period resets it |
 | `billing_invoices` | UUID PK, `customer_id` (FK, RESTRICT), `subscription_id` (FK, SET NULL), `provider`. The FK to the customer uses RESTRICT, because a financial record must survive the deletion of a customer. Also `provider_event_id` (unique, for the webhook idempotency), `provider_invoice_ref`, `amount_minor`, `refunded_minor`, `currency`, `status` and `billing_mode`. Also `kind` (`subscription` or `one_time`) and `product_id` (FK to `billing_products`, SET NULL), which a one-time purchase uses. Also the period bounds, `paid_at` and `receipt_ref` (54-FZ). `refunded_minor` holds the cumulative refunded units. A refund is full when `refunded_minor` is equal to `amount_minor`, and partial when it is less. `@Exclude` keeps it off the wire |

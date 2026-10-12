@@ -176,6 +176,41 @@ describe('mock checkout page', () => {
     });
   });
 
+  it('gives one trial for each customer: a checkout after a cancel pays in full', async () => {
+    const { token } = await login();
+    for (const plan of getState().plans.values()) {
+      if (plan.key === 'pro') plan.trialDays = 14;
+    }
+    await call(token, 'PUT', '/region', { region: 'ru' });
+
+    const first = await openSession(token, '/checkout', { planKey: 'pro' });
+    expect((await pay(first.url)).status).toBe(200);
+    expect([...getState().billingSubscriptions.values()]).toEqual([
+      expect.objectContaining({ status: 'trialing' })
+    ]);
+    const [customer] = getState().billingCustomers.values();
+    expect(customer.trialUsedAt).toEqual(expect.any(String));
+
+    const cancel = await call(token, 'POST', '/subscription/cancel', {
+      mode: 'immediate'
+    });
+    expect(cancel.status).toBe(200);
+
+    const second = await openSession(token, '/checkout', { planKey: 'pro' });
+    const open = [...getState().billingSubscriptions.values()].find(
+      (s) => s.status === 'incomplete'
+    );
+    expect(open?.trialEnd).toBeNull();
+    expect((await pay(second.url)).status).toBe(200);
+
+    expect(
+      [...getState().billingInvoices.values()].map((i) => i.amountMinor)
+    ).toEqual([0, 99000]);
+    expect(
+      [...getState().billingSubscriptions.values()].map((s) => s.status)
+    ).toEqual(['canceled', 'active']);
+  });
+
   it('pays a one-time purchase into a paid invoice and returns to success', async () => {
     const { token } = await login();
     const session = await openSession(token, '/purchase', {

@@ -41,7 +41,9 @@ describe('withProviderDeadline', () => {
     inner.startCheckout.mockImplementation(hangs);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
-    await expect(provider.startCheckout(customer, plan, urls)).rejects.toThrow(
+    await expect(
+      provider.startCheckout(customer, plan, urls, true)
+    ).rejects.toThrow(
       new ProviderTimeoutError('yookassa', 'startCheckout', TIMEOUT_MS)
     );
   });
@@ -52,10 +54,15 @@ describe('withProviderDeadline', () => {
     inner.startCheckout.mockResolvedValue(session);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
-    await expect(provider.startCheckout(customer, plan, urls)).resolves.toBe(
-      session
+    await expect(
+      provider.startCheckout(customer, plan, urls, true)
+    ).resolves.toBe(session);
+    expect(inner.startCheckout).toHaveBeenCalledWith(
+      customer,
+      plan,
+      urls,
+      true
     );
-    expect(inner.startCheckout).toHaveBeenCalledWith(customer, plan, urls);
   });
 
   it('forwards every argument, including optional ones', async () => {

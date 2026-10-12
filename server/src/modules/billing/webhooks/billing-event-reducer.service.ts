@@ -4,6 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import {
   DataSource,
   In,
+  IsNull,
   type EntityManager,
   type QueryDeepPartialEntity
 } from 'typeorm';
@@ -254,6 +255,9 @@ export class BillingEventReducer {
             paymentMethodId: null
           })
         );
+        if (payload.status === 'trialing') {
+          await this.markTrialUsed(manager, created.customerId, now);
+        }
         return { subscriptionId: created.id, userId, closedPeriod: null };
       }
 
@@ -317,6 +321,9 @@ export class BillingEventReducer {
         snapshot.meteredFrom = null;
       }
       await manager.update(Subscription, { id: subscription.id }, snapshot);
+      if (payload.status === 'trialing') {
+        await this.markTrialUsed(manager, subscription.customerId, now);
+      }
       return { subscriptionId: subscription.id, userId, closedPeriod };
     });
 
@@ -715,6 +722,9 @@ export class BillingEventReducer {
     if (!applied.affected) {
       return null;
     }
+    if (trialing) {
+      await this.markTrialUsed(manager, subscription.customerId, now);
+    }
 
     if (payload.savedPaymentMethod) {
       // Demote the current default before inserting the new one (mirrors
@@ -746,6 +756,19 @@ export class BillingEventReducer {
       );
     }
     return subscription.id;
+  }
+
+  /** Keeps the first moment: a replayed or later trial does not move it. */
+  private async markTrialUsed(
+    manager: EntityManager,
+    customerId: string,
+    now: Date
+  ): Promise<void> {
+    await manager.update(
+      Customer,
+      { id: customerId, trialUsedAt: IsNull() },
+      { trialUsedAt: now }
+    );
   }
 
   /**

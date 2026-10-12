@@ -260,10 +260,15 @@ export interface ChangePreview {
 export interface PaymentProvider {
   readonly id: BillingProviderId;
   readonly managesLifecycle: boolean;
+  /**
+   * `trial` is false when the plan has no trial or the customer used one
+   * already. Paddle ignores it: the trial comes from the Paddle price.
+   */
   startCheckout(
     customer: Customer,
     plan: Plan,
-    urls: CheckoutUrls
+    urls: CheckoutUrls,
+    trial: boolean
   ): Promise<CheckoutSession>;
   chargeOffSession(
     customer: Customer,
