@@ -302,6 +302,108 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
   });
 
+  it('rejects an occurredAt before the open metered window (400)', async () => {
+    const token = await login('admin@example.com');
+    const { customerId, subscriptionId } = await activateSubscription(
+      'admin@example.com',
+      'usage'
+    );
+    const sub = getState().billingSubscriptions.get(subscriptionId);
+    if (!sub) throw new Error('subscription not seeded');
+    const before = new Date(
+      new Date(sub.currentPeriodStart).getTime() - 1
+    ).toISOString();
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      occurredAt: before,
+      idempotencyKey: 'evt-before-window'
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      message: 'occurredAt is before the open metered window',
+      statusCode: 400,
+      errorKey: 'errors.billing.usageBeforeOpenWindow'
+    });
+    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
+  });
+
+  it('measures the window from meteredFrom when it is later than the period start', async () => {
+    const token = await login('admin@example.com');
+    const { customerId, subscriptionId } = await activateSubscription(
+      'admin@example.com',
+      'usage'
+    );
+    const sub = getState().billingSubscriptions.get(subscriptionId);
+    if (!sub) throw new Error('subscription not seeded');
+    const now = Date.now();
+    sub.currentPeriodStart = new Date(now - 10 * 86_400_000).toISOString();
+    sub.meteredFrom = new Date(now - 86_400_000).toISOString();
+
+    const refused = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      occurredAt: new Date(now - 2 * 86_400_000).toISOString(),
+      idempotencyKey: 'evt-before-metered-from'
+    });
+    const accepted = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      occurredAt: sub.meteredFrom,
+      idempotencyKey: 'evt-at-metered-from'
+    });
+
+    expect(refused.status).toBe(400);
+    expect(accepted.status).toBe(201);
+  });
+
+  it('rejects an occurredAt past the clock skew tolerance (400)', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await activateSubscription(
+      'admin@example.com',
+      'usage'
+    );
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      occurredAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      idempotencyKey: 'evt-future'
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      message: 'occurredAt is in the future',
+      statusCode: 400,
+      errorKey: 'errors.billing.usageInFuture'
+    });
+    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
+  });
+
+  it('accepts an occurredAt inside the clock skew tolerance', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await activateSubscription(
+      'admin@example.com',
+      'usage'
+    );
+
+    const res = await postUsage(token, {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 7,
+      occurredAt: new Date(Date.now() + 60_000).toISOString(),
+      idempotencyKey: 'evt-near-future'
+    });
+
+    expect(res.status).toBe(201);
+  });
+
   it('stores a catalog meter the current plan does not price', async () => {
     const token = await login('admin@example.com');
     // On the fixed `pro` plan, which meters nothing — the observation is still

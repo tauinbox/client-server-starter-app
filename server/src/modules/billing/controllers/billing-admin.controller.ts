@@ -9,6 +9,7 @@ import {
   Query
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
@@ -166,6 +167,10 @@ export class BillingAdminController {
   @ApiBody({ type: RecordUsageRequestDto })
   @ApiCreatedResponse({ type: UsageResponseDto })
   @ApiNotFoundResponse({ description: 'No active subscription for customer' })
+  @ApiBadRequestResponse({
+    description:
+      'Meter not declared by any plan, or occurredAt outside the accepted range'
+  })
   recordUsage(@Body() body: RecordUsageRequestDto) {
     return this.usage.record(body);
   }

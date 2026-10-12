@@ -32,12 +32,16 @@ function repo(): RepoMock {
   };
 }
 
+const PERIOD_START = new Date('2026-01-01T00:00:00.000Z');
+
 function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
   return {
     id: 'sub-1',
     customerId: 'cust-1',
     status: 'active',
     planKey: 'usage',
+    currentPeriodStart: PERIOD_START,
+    meteredFrom: null,
     ...overrides
   } as Subscription;
 }
@@ -349,5 +353,100 @@ describe('UsageService', () => {
     credits.isBlocked.mockResolvedValue(true);
 
     await expect(service.record(INPUT)).resolves.toBe(existing);
+  });
+
+  describe('occurredAt range', () => {
+    const NOW = new Date('2026-01-20T12:00:00.000Z').getTime();
+
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(NOW);
+      subscriptions.findOne.mockResolvedValue(makeSubscription());
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('refuses a record before the open metered window', async () => {
+      await expect(
+        service.record({
+          ...INPUT,
+          occurredAt: new Date(PERIOD_START.getTime() - 1).toISOString()
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+      });
+      expect(usageRecords.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a record at the first instant of the window', async () => {
+      await service.record({
+        ...INPUT,
+        occurredAt: PERIOD_START.toISOString()
+      });
+
+      expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('measures the window from meteredFrom when a billing-mode switch moved it', async () => {
+      const meteredFrom = new Date('2026-01-10T00:00:00.000Z');
+      subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ meteredFrom })
+      );
+
+      await expect(
+        service.record({ ...INPUT, occurredAt: '2026-01-05T00:00:00.000Z' })
+      ).rejects.toMatchObject({
+        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+      });
+      await service.record({
+        ...INPUT,
+        occurredAt: meteredFrom.toISOString()
+      });
+      expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a record past the clock skew tolerance', async () => {
+      await expect(
+        service.record({
+          ...INPUT,
+          occurredAt: new Date(NOW + 5 * 60_000 + 1).toISOString()
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.billing.usageInFuture' }
+      });
+      expect(usageRecords.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts a record at the edge of the clock skew tolerance', async () => {
+      await service.record({
+        ...INPUT,
+        occurredAt: new Date(NOW + 5 * 60_000).toISOString()
+      });
+
+      expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('defaults an omitted occurredAt to the same clock it checks against', async () => {
+      await service.record(INPUT);
+
+      expect(usageRecords.create).toHaveBeenCalledWith(
+        expect.objectContaining({ occurredAt: new Date(NOW) })
+      );
+    });
+
+    it('still answers a replayed key whose occurredAt is out of range now', async () => {
+      const existing = {
+        id: 'usage-1',
+        idempotencyKey: 'evt-1'
+      } as UsageRecord;
+      usageRecords.findOne.mockResolvedValue(existing);
+
+      await expect(
+        service.record({ ...INPUT, occurredAt: '2025-01-01T00:00:00.000Z' })
+      ).resolves.toBe(existing);
+    });
   });
 });

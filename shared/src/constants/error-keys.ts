@@ -130,6 +130,8 @@ export const ErrorKeys = {
     CUSTOMER_NO_ACTIVE_SUBSCRIPTION:
       'errors.billing.customerNoActiveSubscription',
     METER_NOT_DECLARED: 'errors.billing.meterNotDeclared',
+    USAGE_BEFORE_OPEN_WINDOW: 'errors.billing.usageBeforeOpenWindow',
+    USAGE_IN_FUTURE: 'errors.billing.usageInFuture',
     PROVIDER_CHECKOUT_FAILED: 'errors.billing.providerCheckoutFailed',
     PROVIDER_REFUND_FAILED: 'errors.billing.providerRefundFailed',
     PROVIDER_STATE_UNCERTAIN: 'errors.billing.providerStateUncertain',

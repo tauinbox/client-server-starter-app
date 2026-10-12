@@ -467,15 +467,59 @@ runWithInfra('billing write paths (e2e)', () => {
       expect(rows).toHaveLength(0);
     }, 30000);
 
+    it('refuses a record that no rating can reach', async () => {
+      const usage = await build(UsageService);
+      const subscription = await ds
+        .getRepository(Subscription)
+        .findOneByOrFail({ id: subscriptionId });
+
+      await expect(
+        usage.record({
+          customerId,
+          meterKey: 'api_calls',
+          quantity: 5,
+          occurredAt: new Date(
+            subscription.currentPeriodStart.getTime() - 1
+          ).toISOString(),
+          idempotencyKey: 'wp-usage-before-window'
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+      });
+      await expect(
+        usage.record({
+          customerId,
+          meterKey: 'api_calls',
+          quantity: 5,
+          occurredAt: new Date(Date.now() + DAY).toISOString(),
+          idempotencyKey: 'wp-usage-future'
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.billing.usageInFuture' }
+      });
+
+      const rows = await ds.getRepository(UsageRecord).find({
+        where: [
+          { customerId, idempotencyKey: 'wp-usage-before-window' },
+          { customerId, idempotencyKey: 'wp-usage-future' }
+        ]
+      });
+      expect(rows).toHaveLength(0);
+    }, 30000);
+
     it('rates only the plan meter when a foreign-meter row shares the period', async () => {
       // An isolated window, so only these two rows are in scope whatever else
       // the suite has recorded. Both go in through the real ingest: the foreign
       // one is another plan's meter, which is stored and simply not priced here.
+      // The ingest refuses a record before the open period, so the window is
+      // inside it, clear of the other rows of this block (two days ago).
+      const occurredAt = new Date(Date.now() - 30 * DAY);
       const period = {
-        start: new Date('2020-01-01T00:00:00Z'),
-        end: new Date('2020-02-01T00:00:00Z')
+        start: new Date(occurredAt.getTime() - DAY),
+        end: new Date(occurredAt.getTime() + DAY)
       };
-      const occurredAt = new Date('2020-01-15T00:00:00Z');
       const usage = await build(UsageService);
       const own = await usage.record({
         customerId,
