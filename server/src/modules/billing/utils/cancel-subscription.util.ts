@@ -6,10 +6,10 @@ import {
   OPEN_SUBSCRIPTION_STATUSES,
   isOpenStatus
 } from '@app/shared/constants';
+import type { CancelMode } from '@app/shared/types';
 import type { BillingService } from '../billing.service';
 import type { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
-import type { CancelMode } from '../providers/payment-provider.interface';
 import type { RenewalService } from '../renewals/renewal.service';
 import { cancelFields } from './cancel-fields.util';
 

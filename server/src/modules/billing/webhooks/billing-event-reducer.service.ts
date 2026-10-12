@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import { meteredWindowStart } from '@app/shared/utils/billing-rules';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
@@ -22,7 +23,6 @@ import { Subscription } from '../entities/subscription.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { isPlantedBeforeCharge } from '../utils/charge-keys.util';
 import { insertInvoiceOnce } from '../utils/invoice-insert.util';
-import { meteredWindowStart } from '../utils/period.util';
 import { CreditService } from '../services/credit.service';
 import {
   FirstPaymentUnclaimedEvent,

@@ -10,9 +10,9 @@ import {
 import { updateEntity } from '@ngrx/signals/entities';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { SUBSCRIPTION_LIST_QUERY } from '@app/shared/constants';
+import type { CancelMode } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { withList } from '@shared/store/with-list';
-import type { CancelMode } from '@features/billing/services/billing.service';
 import { BillingAdminService } from '../services/billing-admin.service';
 
 /**

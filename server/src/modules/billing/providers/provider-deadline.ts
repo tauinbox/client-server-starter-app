@@ -1,8 +1,7 @@
-import type { BillingProviderId } from '@app/shared/types';
+import type { BillingProviderId, CancelMode } from '@app/shared/types';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import type {
-  CancelMode,
   ChangePreview,
   ChargeResult,
   CheckoutSession,

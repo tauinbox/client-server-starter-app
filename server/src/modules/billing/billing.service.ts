@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { BillingProviderId } from '@app/shared/types';
 import { BILLING_PROVIDER_FLAGS, ErrorKeys } from '@app/shared/constants';
+import { geoDefault } from '@app/shared/utils/billing-rules';
 import { FeatureFlagResolverService } from '../feature-flags/services/feature-flag-resolver.service';
 import type { Customer } from './entities/customer.entity';
 import {
@@ -18,11 +19,6 @@ const PROVIDER_ENABLED_FLAG: Record<BillingProviderId, string> =
   Object.fromEntries(
     BILLING_PROVIDER_FLAGS.map((p) => [p.provider, p.enabledFlagKey])
   ) as Record<BillingProviderId, string>;
-
-/** Geo default: country code 'RU' → YooKassa, everywhere else → Paddle. */
-function geoDefault(country: string): BillingProviderId {
-  return country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle';
-}
 
 @Injectable()
 export class BillingService {

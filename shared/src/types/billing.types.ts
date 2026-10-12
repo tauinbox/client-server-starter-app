@@ -25,6 +25,9 @@ export type ProductType = 'sku' | 'credits' | 'custom';
  */
 export type BillingRegion = 'auto' | 'ru' | 'world';
 
+/** When a cancellation takes effect. */
+export type CancelMode = 'period_end' | 'immediate';
+
 /**
  * The numeric entitlement axis, closed the same way `EntitlementCapability` is.
  * A free-form key space is what let a limit be seeded against a key no code

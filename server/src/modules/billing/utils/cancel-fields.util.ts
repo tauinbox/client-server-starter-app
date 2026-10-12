@@ -1,5 +1,5 @@
+import type { CancelMode } from '@app/shared/types';
 import type { Subscription } from '../entities/subscription.entity';
-import type { CancelMode } from '../providers/payment-provider.interface';
 
 /**
  * The columns a cancellation owns. Every cancel path asks the provider first,

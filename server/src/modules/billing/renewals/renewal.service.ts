@@ -15,6 +15,10 @@ import {
 } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
+import {
+  meteredWindowStart,
+  renewalAnchor
+} from '@app/shared/utils/billing-rules';
 import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { User } from '../../users/entities/user.entity';
@@ -39,11 +43,7 @@ import { UsageRating } from '../rating/usage-rating.strategy';
 import type { RatedAmount } from '../rating/rating-strategy.interface';
 import { CreditService } from '../services/credit.service';
 import { insertInvoiceOnce } from '../utils/invoice-insert.util';
-import {
-  meteredWindowStart,
-  nextPeriodEnd,
-  renewalAnchor
-} from '../utils/period.util';
+import { nextPeriodEnd } from '../utils/period.util';
 import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS,

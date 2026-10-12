@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type {
+  CancelMode,
   CursorPaginatedResponse,
   InvoiceResponse,
   SubscriptionResponse
@@ -11,7 +12,6 @@ import {
   cursorParams,
   type CursorPageRequest
 } from '@shared/utils/pagination.utils';
-import type { CancelMode } from '@features/billing/services/billing.service';
 
 const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
 

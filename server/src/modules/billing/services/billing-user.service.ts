@@ -25,6 +25,13 @@ import {
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import {
+  geoFromLocale,
+  meteredWindowStart,
+  overrideForRegion,
+  regionForOverride,
+  renewalAnchor
+} from '@app/shared/utils/billing-rules';
+import {
   BILLING_PROVIDER_FLAGS,
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
@@ -33,9 +40,9 @@ import {
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import type {
-  BillingProviderId,
   BillingRegion,
   BillingRegionResponse,
+  CancelMode,
   CheckoutSessionResponse,
   PlanPrice,
   ProductPrice,
@@ -61,7 +68,6 @@ import {
 } from '../events/billing.events';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import type {
-  CancelMode,
   ChargeResult,
   PaymentProvider
 } from '../providers/payment-provider.interface';
@@ -71,11 +77,7 @@ import {
 } from '../rating/proration-calculator';
 import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
-import {
-  addInterval,
-  meteredWindowStart,
-  renewalAnchor
-} from '../utils/period.util';
+import { addInterval } from '../utils/period.util';
 import {
   changeChargeKey,
   changeChargeKeyPrefix,
@@ -137,13 +139,6 @@ interface ChangeContext {
   provider: PaymentProvider;
 }
 
-/** Maps the user's registration locale to a billing country + currency. */
-function geoFromLocale(locale: string): { country: string; currency: string } {
-  return locale.toLowerCase().startsWith('ru')
-    ? { country: 'RU', currency: 'RUB' }
-    : { country: 'US', currency: 'USD' };
-}
-
 /**
  * One-time product types listed in the purchase catalog.
  * `custom` is listed too: its price entry carries the amount bounds and
@@ -171,19 +166,6 @@ function closesMeteredWindow(
   toPlan: Plan
 ): boolean {
   return subscription.billingMode === 'usage' && toPlan.billingMode !== 'usage';
-}
-
-/** Region selector ⇄ provider override. */
-function overrideForRegion(region: BillingRegion): BillingProviderId | null {
-  if (region === 'ru') return 'yookassa';
-  if (region === 'world') return 'paddle';
-  return null;
-}
-
-function regionForOverride(override: BillingProviderId | null): BillingRegion {
-  if (override === 'yookassa') return 'ru';
-  if (override === 'paddle') return 'world';
-  return 'auto';
 }
 
 /**

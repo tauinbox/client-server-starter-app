@@ -12,7 +12,18 @@ import type {
   UsageSummaryResponse
 } from '@app/shared/types';
 import {
+  geoDefault,
+  geoFromLocale,
+  meteredWindowStart,
+  overrideForRegion,
+  prorationAmounts,
+  regionForOverride,
+  renewalAnchor,
+  usageIngestStart
+} from '@app/shared/utils/billing-rules';
+import {
   BILLING_PROVIDER_FLAGS,
+  CANCEL_MODES,
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
@@ -35,9 +46,7 @@ import {
 import { authGuard, permissionGuard } from '../helpers/auth.helpers';
 import {
   billClosingUsagePeriod,
-  meteredWindowStart,
-  sumPlanMeterUnits,
-  usageIngestStart
+  sumPlanMeterUnits
 } from '../helpers/billing.helpers';
 import { pushToUser } from '../sse-hub';
 import { mockCheckoutUrl } from '../routes/mock-checkout';
@@ -74,7 +83,6 @@ import {
 const router = Router();
 
 const CANCEL_KEYS = ['mode'] as const;
-const CANCEL_MODES = ['period_end', 'immediate'] as const;
 
 /**
  * Replies with the class-validator envelope and returns true when anything
@@ -145,16 +153,6 @@ billingRouter.get('/paddle-config', (_req: Request, res: Response) => {
   res.json(getState().paddleClientConfig);
 });
 
-function geoFromLocale(locale: string): { country: string; currency: string } {
-  return locale.toLowerCase().startsWith('ru')
-    ? { country: 'RU', currency: 'RUB' }
-    : { country: 'US', currency: 'USD' };
-}
-
-function geoDefault(country: string): BillingProviderId {
-  return country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle';
-}
-
 // Mock treats both providers as configured, so lifecycle
 // ownership is purely the provider's: YooKassa self-managed, Paddle managed.
 function managesLifecycle(provider: BillingProviderId): boolean {
@@ -206,18 +204,6 @@ function rejectMissingPaddlePrice(
     errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
   });
   return true;
-}
-
-function overrideForRegion(region: BillingRegion): BillingProviderId | null {
-  if (region === 'ru') return 'yookassa';
-  if (region === 'world') return 'paddle';
-  return null;
-}
-
-function regionForOverride(override: BillingProviderId | null): BillingRegion {
-  if (override === 'yookassa') return 'ru';
-  if (override === 'paddle') return 'world';
-  return 'auto';
 }
 
 function effectiveProvider(
@@ -437,9 +423,7 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
     res.json(null);
     return;
   }
-  const plan = [...getState().plans.values()].find(
-    (p) => p.key === sub.planKey
-  );
+  const plan = findPlanByKey(sub.planKey);
   const price = plan?.prices[sub.provider];
   if (!plan || !price) {
     res.json(null);
@@ -723,10 +707,8 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     (req.body as Record<string, unknown>)['planKey'] as string
   ).trim();
 
-  const plan = [...getState().plans.values()].find(
-    (p) => p.key === planKey && p.active
-  );
-  if (!plan) {
+  const plan = findPlanByKey(planKey);
+  if (!plan?.active) {
     res.status(404).json({
       message: `Plan "${planKey}" was not found`,
       errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND,
@@ -820,50 +802,12 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Plan change with proration. Mirrors the server's guards and
-// ProrationCalculator math (whole-day granularity, refund-and-recharge). The
+// Plan change with proration. Mirrors the server's guards and uses its
+// proration amounts (`prorationAmounts`, refund-and-recharge). The
 // server's Paddle path delegates the money to Paddle and reconciles invoices
 // via webhooks; the mock has no provider, so both providers settle the same
 // synchronous way — the documented divergence is timing, not shape.
 // ---------------------------------------------------------------------------
-const DAY_MS = 86_400_000;
-
-interface MockProrationQuote {
-  remainderDays: number;
-  totalDays: number;
-  currency: string;
-  refundMinor: number;
-  chargeMinor: number;
-}
-
-function prorationQuote(
-  fromPlan: MockPlan,
-  toPlan: MockPlan,
-  provider: BillingProviderId,
-  sub: MockSubscription,
-  now: Date
-): MockProrationQuote {
-  const periodStart = new Date(sub.currentPeriodStart).getTime();
-  const periodEnd = new Date(sub.currentPeriodEnd).getTime();
-  const totalDays = Math.max(1, Math.round((periodEnd - periodStart) / DAY_MS));
-  const remainderDays = Math.min(
-    totalDays,
-    Math.max(0, Math.ceil((periodEnd - now.getTime()) / DAY_MS))
-  );
-  const fromMinor = fromPlan.prices[provider]?.amountMinor ?? 0;
-  const toMinor = toPlan.prices[provider]?.amountMinor ?? 0;
-  return {
-    remainderDays,
-    totalDays,
-    currency:
-      toPlan.prices[provider]?.currency ??
-      fromPlan.prices[provider]?.currency ??
-      'USD',
-    refundMinor: Math.floor((fromMinor * remainderDays) / totalDays),
-    chargeMinor: Math.floor((toMinor * remainderDays) / totalDays)
-  };
-}
-
 interface ChangeGuardResult {
   customer: MockCustomer;
   sub: MockSubscription;
@@ -907,13 +851,9 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     });
     return null;
   }
-  const renewalAnchor =
-    sub.status === 'trialing' && sub.trialEnd
-      ? sub.trialEnd
-      : sub.currentPeriodEnd;
   if (
     sub.lifecycleOwner === 'self' &&
-    new Date(renewalAnchor).getTime() <= Date.now()
+    new Date(renewalAnchor(sub)).getTime() <= Date.now()
   ) {
     res.status(409).json({
       message:
@@ -924,10 +864,8 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     return null;
   }
 
-  const toPlan = [...getState().plans.values()].find(
-    (p) => p.key === planKey && p.active
-  );
-  if (!toPlan) {
+  const toPlan = findPlanByKey(planKey);
+  if (!toPlan?.active) {
     res.status(404).json({
       message: `Plan "${planKey}" was not found`,
       errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND,
@@ -952,9 +890,7 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
     return null;
   }
 
-  const fromPlan = [...getState().plans.values()].find(
-    (p) => p.key === sub.planKey
-  );
+  const fromPlan = findPlanByKey(sub.planKey);
   if (!fromPlan) {
     res.status(503).json({
       message: 'The current plan is missing from the catalog',
@@ -1013,7 +949,14 @@ billingRouter.post(
     // Trial moves no fixed money, and a provider-managed row is prorated by the
     // provider; a self-managed paid period settles the charge + refund legs.
     if (sub.status !== 'trialing' && !managesLifecycle(sub.provider)) {
-      const quote = prorationQuote(fromPlan, toPlan, sub.provider, sub, now);
+      const quote = prorationAmounts({
+        fromPlan,
+        toPlan,
+        provider: sub.provider,
+        periodStart: sub.currentPeriodStart,
+        periodEnd: sub.currentPeriodEnd,
+        now
+      });
       const state = getState();
 
       // Resolved before the new charge is recorded so the charge can't become
@@ -1093,13 +1036,14 @@ billingRouter.post(
     if (!ctx) return;
     const { sub, fromPlan, toPlan } = ctx;
     const delegated = managesLifecycle(sub.provider);
-    const quote = prorationQuote(
+    const quote = prorationAmounts({
       fromPlan,
       toPlan,
-      sub.provider,
-      sub,
-      new Date()
-    );
+      provider: sub.provider,
+      periodStart: sub.currentPeriodStart,
+      periodEnd: sub.currentPeriodEnd,
+      now: new Date()
+    });
     const trial = sub.status === 'trialing';
     // The self-managed credit is capped as the executed refund caps it; the
     // delegated net stands in for the provider's own preview.

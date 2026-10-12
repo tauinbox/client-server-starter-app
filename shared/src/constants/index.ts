@@ -135,6 +135,7 @@ export {
   ENTITLED_SUBSCRIPTION_STATUSES,
   OPEN_SUBSCRIPTION_STATUSES,
   CHANGEABLE_SUBSCRIPTION_STATUSES,
+  CANCEL_MODES,
   isOpenStatus
 } from './subscription-status.constants';
 

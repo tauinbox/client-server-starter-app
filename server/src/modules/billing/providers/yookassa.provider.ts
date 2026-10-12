@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Money, minorUnitScale } from '@app/shared/utils/money';
 import { ErrorKeys } from '@app/shared/constants';
+import type { CancelMode } from '@app/shared/types';
 import type {
   ICreatePayment,
   ICreateRefund,
@@ -29,7 +30,6 @@ import {
   WEBHOOK_IGNORED
 } from './payment-provider.interface';
 import type {
-  CancelMode,
   ChargeResult,
   CheckoutSession,
   CheckoutUrls,

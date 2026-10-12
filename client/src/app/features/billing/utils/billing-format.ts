@@ -1,3 +1,4 @@
+import { geoDefault, geoFromLocale } from '@app/shared/utils/billing-rules';
 import { minorUnitScale } from '@app/shared/utils/money';
 import type {
   BillingProviderId,
@@ -29,14 +30,13 @@ export function formatMoney(
 /**
  * The provider whose price/currency should be shown. Authenticated callers have
  * a resolved provider from `GET /billing/region`; anonymous visitors fall back
- * to a language heuristic (ru → yookassa/RUB, otherwise paddle/USD).
+ * to the geo default of the server for that language.
  */
 export function resolveDisplayProvider(
   effectiveProvider: BillingProviderId | null,
   lang: string
 ): BillingProviderId {
-  if (effectiveProvider) return effectiveProvider;
-  return lang.toLowerCase().startsWith('ru') ? 'yookassa' : 'paddle';
+  return effectiveProvider ?? geoDefault(geoFromLocale(lang).country);
 }
 
 /**
