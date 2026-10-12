@@ -31,7 +31,7 @@ import { ProrationCalculator } from '../src/modules/billing/rating/proration-cal
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { PLAN_CHANGE_LEASE_MS } from '../src/modules/billing/renewals/renewal-queue.constants';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
-import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import {
   BILLING_DB_LOCK_TIMEOUT_MS,
@@ -83,7 +83,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   let subscriptionId: string;
   let periodEnd: Date;
   let provider: FakeProvider;
-  let users: BillingUserService;
+  let planChange: PlanChangeService;
   let renewals: RenewalService;
   /** Idempotency key and amount of every charge the provider was asked for. */
   let charges: Array<{ key: string; amount: number }>;
@@ -160,7 +160,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     });
     const module = await Test.createTestingModule({
       providers: [
-        BillingUserService,
+        PlanChangeService,
         RenewalService,
         CreditService,
         FixedRating,
@@ -188,7 +188,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();
-    users = module.get(BillingUserService);
+    planChange = module.get(PlanChangeService);
     renewals = module.get(RenewalService);
   }
 
@@ -335,7 +335,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     await seed();
     gateOn('change-charge:', scanPastAnchor);
 
-    await users.changePlan(userId as string, FIXED_KEY);
+    await planChange.changePlan(userId as string, FIXED_KEY);
     await renewals.runDueRenewals();
 
     await expectSwitchThenFixedRenewal();
@@ -346,7 +346,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     await seed();
     gateOn('cancel:', scanPastAnchor);
 
-    await users.changePlan(userId as string, FIXED_KEY);
+    await planChange.changePlan(userId as string, FIXED_KEY);
     await renewals.runDueRenewals();
 
     await expectSwitchThenFixedRenewal();
@@ -366,7 +366,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     });
 
     await expect(
-      users.changePlan(userId as string, FIXED_KEY)
+      planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toMatchObject({ status: 409 });
 
     expect(charges).toHaveLength(0);
@@ -395,7 +395,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     });
 
     await expect(
-      users.changePlan(userId as string, FIXED_KEY)
+      planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toMatchObject({ status: 409 });
 
     // The units are charged once, by the renewal; the proration charge stays
@@ -423,7 +423,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     );
 
     await expect(
-      users.changePlan(userId as string, FIXED_KEY)
+      planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toBeInstanceOf(ChargeDeclinedError);
     expect((await row()).planChangeStartedAt).toBeNull();
 
@@ -447,7 +447,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       }
     );
 
-    await users.changePlan(userId as string, FIXED_KEY);
+    await planChange.changePlan(userId as string, FIXED_KEY);
 
     expect(await row()).toMatchObject({
       planKey: FIXED_KEY,
@@ -460,11 +460,11 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     await seed();
     gateOn('change-charge:', async () => {
       await expect(
-        users.changePlan(userId as string, FIXED_KEY)
+        planChange.changePlan(userId as string, FIXED_KEY)
       ).rejects.toMatchObject({ status: 409 });
     });
 
-    await users.changePlan(userId as string, FIXED_KEY);
+    await planChange.changePlan(userId as string, FIXED_KEY);
 
     expect(chargedPrefixes()).toEqual(['change-charge', 'cancel']);
     expect(await row()).toMatchObject({

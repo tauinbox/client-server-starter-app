@@ -25,6 +25,7 @@ import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { ChargeDeclinedError } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import {
   BILLING_DB_LOCK_TIMEOUT_MS,
@@ -40,7 +41,8 @@ type ConcurrentWrite = (subscriptionId: string) => Promise<unknown>;
 runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   let ds: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
-  let service: BillingUserService;
+  let service: PlanChangeService;
+  let users: BillingUserService;
   let userId: string | undefined;
   let customerId: string | undefined;
   let planKeys: string[] = [];
@@ -203,11 +205,12 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     };
   }
 
-  async function buildService(
+  async function buildServices(
     provider: ReturnType<typeof providerStub>
-  ): Promise<BillingUserService> {
+  ): Promise<void> {
     const module = await Test.createTestingModule({
       providers: [
+        PlanChangeService,
         BillingUserService,
         ProrationCalculator,
         { provide: getDataSourceToken(), useValue: ds },
@@ -256,7 +259,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();
-    return module.get(BillingUserService);
+    service = module.get(PlanChangeService);
+    users = module.get(BillingUserService);
   }
 
   async function setup(
@@ -273,7 +277,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     await seedPlan('race-business', 290000);
     const subscription = await seedSubscription(providerId, planKey, status);
     const provider = providerStub(providerId, subscription.id, duringCall);
-    service = await buildService(provider);
+    await buildServices(provider);
     await warmPool();
     return { subscription, user: userId as string, provider };
   }
@@ -547,9 +551,9 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       return row;
     });
 
-    await expect(
-      service.checkout(user, 'race-business')
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(users.checkout(user, 'race-business')).rejects.toBeInstanceOf(
+      ConflictException
+    );
 
     expect(await reload(subscription.id)).toMatchObject({
       status: 'active',

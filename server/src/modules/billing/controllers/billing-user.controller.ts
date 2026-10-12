@@ -21,6 +21,7 @@ import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 import { RequireEntitlement } from '../../entitlements/require-entitlement.decorator';
 import { BillingUserService } from '../services/billing-user.service';
+import { PlanChangeService } from '../services/plan-change.service';
 import { EntitlementsResponseDto } from '../dtos/entitlements-response.dto';
 import { CheckoutRequestDto } from '../dtos/checkout-request.dto';
 import { CancelSubscriptionRequestDto } from '../dtos/cancel-subscription-request.dto';
@@ -47,6 +48,7 @@ import { PurchaseSessionResponseDto } from '../dtos/purchase-session-response.dt
 export class BillingUserController {
   constructor(
     private readonly billingUser: BillingUserService,
+    private readonly planChange: PlanChangeService,
     private readonly entitlements: EntitlementService
   ) {}
 
@@ -169,7 +171,7 @@ export class BillingUserController {
     @Req() req: JwtAuthRequest,
     @Body() body: ChangeSubscriptionRequestDto
   ) {
-    return this.billingUser.changePlan(req.user.userId, body.planKey);
+    return this.planChange.changePlan(req.user.userId, body.planKey);
   }
 
   @Post('subscription/change/preview')
@@ -182,7 +184,7 @@ export class BillingUserController {
     @Req() req: JwtAuthRequest,
     @Body() body: ChangeSubscriptionRequestDto
   ) {
-    return this.billingUser.previewChange(req.user.userId, body.planKey);
+    return this.planChange.previewChange(req.user.userId, body.planKey);
   }
 
   @Post('subscription/cancel')

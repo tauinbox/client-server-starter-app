@@ -39,7 +39,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Dev server | `npm run start:dev` (port 3000, watch mode) |
 | Production start | `npm run start:prod` |
 | Build | `npm run build` |
-| Typecheck | `npm run typecheck` runs `tsc --noEmit` over the full `tsconfig.json`. Thus it covers `test/`, `*.spec.ts`, `common/testing/` and `eslint.config.ts`. `tsconfig.build.json` excludes those files from `npm run build` |
+| Typecheck | `npm run typecheck` runs `tsc --noEmit` over the full `tsconfig.json`. Thus it covers `test/`, `*.spec.ts`, each `testing/` directory and `eslint.config.ts`. `tsconfig.build.json` excludes those files from `npm run build` |
 | Lint | `npm run lint` |
 | Lint fix | `npm run lint:fix` |
 | Format check | `npm run format:check` covers `src/`, `test/`, `scripts/` and the root configuration files. It also covers `shared/src/` and the root-level `*.mjs` configuration files |
@@ -665,7 +665,9 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
   service answers `{ provider, url|null, sessionRef }` to the client.
 - It starts a payment-method update. The dispatch uses the provider of the subscription, as the
   cancel does. It returns the hosted session, and the return URL is the billing settings page.
-- It does the plan change and the proration preview. The next paragraphs describe that flow.
+
+`PlanChangeService` does the plan change and the proration preview. The next paragraphs describe
+that flow.
 
 **The plan change.** An optimistic `version` compare-and-swap on the subscription serializes the
 change before any money moves. A concurrent change loses the CAS and gets a 409. Thus the system
@@ -2697,7 +2699,8 @@ repository.
   logger.
 
   The reusable fakes for a context, a configuration and an Express object are in
-  `src/common/testing/`. The production build excludes that directory.
+  `src/common/testing/`. The billing service specs share their repository and provider stubs
+  through `src/modules/billing/testing/`. The production build excludes each `testing/` directory.
 
 ```bash
 npm test                   # Run all

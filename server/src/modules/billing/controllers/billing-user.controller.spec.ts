@@ -3,6 +3,7 @@ import type { EntitlementsResponse } from '@app/shared/types';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { BillingUserController } from './billing-user.controller';
 import { BillingUserService } from '../services/billing-user.service';
+import { PlanChangeService } from '../services/plan-change.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 
 function mockJwtRequest(userId = 'user-1'): { user: JwtAuthRequest['user'] } {
@@ -27,6 +28,7 @@ describe('BillingUserController', () => {
       controllers: [BillingUserController],
       providers: [
         { provide: BillingUserService, useValue: {} },
+        { provide: PlanChangeService, useValue: {} },
         { provide: EntitlementService, useValue: { capabilitiesFor } }
       ]
     }).compile();
