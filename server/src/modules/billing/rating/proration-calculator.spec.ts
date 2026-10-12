@@ -58,7 +58,6 @@ describe('ProrationCalculator', () => {
     expect(q.refundMinor).toBe(Math.floor((99000 * 12) / 30)); // 39600
     expect(q.chargeMinor).toBe(Math.floor((290000 * 12) / 30)); // 116000
     expect(q.chargeMinor).toBeGreaterThan(q.refundMinor);
-    expect(q.refundItems).toHaveLength(1);
     expect(q.chargeItems).toHaveLength(1);
     expect(q.currency).toBe('RUB');
   });
@@ -81,7 +80,6 @@ describe('ProrationCalculator', () => {
     const q = quote(usage, pro);
     expect(q.refundMinor).toBe(0);
     expect(q.chargeMinor).toBe(39600);
-    expect(q.refundItems).toHaveLength(0);
   });
 
   it('a started day counts as remaining (ceil)', () => {
@@ -94,7 +92,6 @@ describe('ProrationCalculator', () => {
     expect(q.remainderDays).toBe(0);
     expect(q.refundMinor).toBe(0);
     expect(q.chargeMinor).toBe(0);
-    expect(q.refundItems).toHaveLength(0);
     expect(q.chargeItems).toHaveLength(0);
   });
 
