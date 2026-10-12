@@ -647,8 +647,9 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
   negative, which blocks usage until the customer adds credits. A refund that leaves a remaining
   balance keeps the grant and the credits.
 - `POST usage` is the internal metering ingest. It is idempotent on
-  `(customer_id, idempotency_key)`. The server validates the meter against the plan catalog. There is
-  no public meter endpoint.
+  `(customer_id, idempotency_key)`. The server validates the meter against the plan catalog, and
+  `occurredAt` against the open metered window and the server clock. There is no public meter
+  endpoint.
 
 **Services.** `PlanService` supplies `findActive()`.
 
@@ -752,8 +753,15 @@ a guard for a unique-violation race. A key that another customer reuses is a dis
 replay.
 
 A record is an observation, thus the current plan of the customer does not gate the write. The
-service refuses only a meter that no plan in the catalog declares, with a 400. Such a meter is a typo
-of the producer and can never become chargeable.
+service refuses, with a 400, only a record that no rating can charge correctly:
+
+- A meter that no plan in the catalog declares. Such a meter is a typo of the producer.
+- An `occurredAt` before the open metered window (`meteredWindowStart`). Rating never reads a closed
+  period again.
+- An `occurredAt` more than 5 minutes (`USAGE_FUTURE_TOLERANCE_MS`) after the server clock. Such a
+  record is rated in a later period.
+
+A replay of a known key answers before these checks.
 
 The service stores a meter that another plan prices. It counts that record on
 `billing_usage_records_unrated_total{meter}` and leaves it for the rating step to ignore.

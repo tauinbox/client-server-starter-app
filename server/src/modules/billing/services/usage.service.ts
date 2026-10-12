@@ -10,13 +10,15 @@ import { In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
-  ErrorKeys
+  ErrorKeys,
+  USAGE_FUTURE_TOLERANCE_MS
 } from '@app/shared/constants';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
+import { meteredWindowStart } from '../utils/period.util';
 import { CreditService } from './credit.service';
 
 export interface RecordUsageInput {
@@ -45,9 +47,11 @@ export interface RecordUsageInput {
  * stored whatever plan is in force, and `UsageRating` decides at period close
  * whether the plan prices that meter. Gating the write on the plan would make an
  * immutable fact conditional on state that changes under it — an upgrade an hour
- * into the period would have discarded the hour before it. The only rejection
- * here is a meter no plan in the catalog declares, which cannot become
- * chargeable later and is a producer typo.
+ * into the period would have discarded the hour before it. The rejections here
+ * are records that can never become chargeable: a meter no plan in the catalog
+ * declares (a producer typo), and an `occurredAt` before the open metered
+ * window, which no rating reads again. An `occurredAt` past the clock skew
+ * tolerance is refused too, because it would be rated in a later period.
  */
 @Injectable()
 export class UsageService {
@@ -105,12 +109,29 @@ export class UsageService {
       });
     }
 
+    const now = Date.now();
+    const occurredAt = input.occurredAt
+      ? new Date(input.occurredAt)
+      : new Date(now);
+    if (occurredAt.getTime() < meteredWindowStart(subscription).getTime()) {
+      throw new BadRequestException({
+        message: 'occurredAt is before the open metered window',
+        errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
+      });
+    }
+    if (occurredAt.getTime() > now + USAGE_FUTURE_TOLERANCE_MS) {
+      throw new BadRequestException({
+        message: 'occurredAt is in the future',
+        errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE
+      });
+    }
+
     const record = this.usageRecords.create({
       customerId: input.customerId,
       subscriptionId: subscription.id,
       meterKey: input.meterKey,
       quantity: Money.fromMinor(input.quantity),
-      occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(),
+      occurredAt,
       idempotencyKey: input.idempotencyKey
     });
 

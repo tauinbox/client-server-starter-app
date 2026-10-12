@@ -214,6 +214,8 @@
       "creditsBlocked": "The credit balance is negative. Top up credits before you record more usage.",
       "customerNoActiveSubscription": "The customer has no active subscription to record usage against.",
       "meterNotDeclared": "No plan declares this meter.",
+      "usageBeforeOpenWindow": "The usage time is before the open billing period. Usage from a closed period cannot be billed.",
+      "usageInFuture": "The usage time is in the future.",
       "providerCheckoutFailed": "The payment provider did not start the payment. Please try again later.",
       "providerRefundFailed": "The payment provider cannot refund this payment.",
       "providerStateUncertain": "The payment provider did not confirm the state of the payment. Please try again later.",

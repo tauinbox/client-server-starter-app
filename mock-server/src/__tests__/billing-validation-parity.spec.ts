@@ -1,7 +1,7 @@
 import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
 
 let server: Server;
@@ -365,12 +365,18 @@ describe('billing request-body validation parity with server', () => {
 
     it('records usage with a date-only ISO 8601 occurredAt', async () => {
       const token = await login('admin@example.com');
-      const { customerId } = await activateSubscription('usage');
+      const { id, customerId } = await activateSubscription('usage');
+      // A date-only value is midnight UTC; the period must be open at that
+      // instant, or the ingest refuses it as before the metered window.
+      const today = new Date().toISOString().slice(0, 10);
+      const sub = getState().billingSubscriptions.get(id);
+      if (!sub) throw new Error('subscription not seeded');
+      sub.currentPeriodStart = `${today}T00:00:00.000Z`;
 
       const { status } = await send(
         'POST',
         '/admin/billing/usage',
-        { ...validUsageBody(), customerId, occurredAt: '2023-01-01' },
+        { ...validUsageBody(), customerId, occurredAt: today },
         token
       );
 

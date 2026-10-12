@@ -39,7 +39,8 @@ export class RecordUsageRequestDto {
   quantity: number;
 
   @ApiPropertyOptional({
-    description: 'When the usage occurred (ISO 8601). Defaults to now.',
+    description:
+      'When the usage occurred (ISO 8601). Defaults to now. Must not be before the open metered window of the subscription, and must not be more than 5 minutes after the server clock.',
     example: '2023-01-01T00:00:00.000Z'
   })
   @IsOptional()

@@ -18,7 +18,8 @@ import {
   ErrorKeys,
   INVOICE_LIST_QUERY,
   OPEN_SUBSCRIPTION_STATUSES,
-  SUBSCRIPTION_LIST_QUERY
+  SUBSCRIPTION_LIST_QUERY,
+  USAGE_FUTURE_TOLERANCE_MS
 } from '@app/shared/constants';
 import {
   getState,
@@ -1575,17 +1576,39 @@ billingAdminRouter.post(
       return;
     }
 
-    const now = new Date().toISOString();
+    // The server refuses a record that no rating can reach: one before the
+    // open metered window, and one past the clock skew tolerance.
+    const nowMs = Date.now();
+    const now = new Date(nowMs).toISOString();
+    const occurredAt =
+      typeof occurredAtRaw === 'string'
+        ? new Date(occurredAtRaw).toISOString()
+        : now;
+    const occurredAtMs = new Date(occurredAt).getTime();
+    if (occurredAtMs < new Date(meteredWindowStart(subscription)).getTime()) {
+      res.status(400).json({
+        message: 'occurredAt is before the open metered window',
+        statusCode: 400,
+        errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
+      });
+      return;
+    }
+    if (occurredAtMs > nowMs + USAGE_FUTURE_TOLERANCE_MS) {
+      res.status(400).json({
+        message: 'occurredAt is in the future',
+        statusCode: 400,
+        errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE
+      });
+      return;
+    }
+
     const record: MockUsageRecord = {
       id: randomUUID(),
       customerId,
       subscriptionId: subscription.id,
       meterKey,
       quantity,
-      occurredAt:
-        typeof occurredAtRaw === 'string'
-          ? new Date(occurredAtRaw).toISOString()
-          : now,
+      occurredAt,
       idempotencyKey,
       recordedAt: now
     };
