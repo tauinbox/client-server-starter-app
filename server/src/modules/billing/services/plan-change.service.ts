@@ -539,11 +539,8 @@ export class PlanChangeService {
     }
 
     const seq = subscription.planChangeSeq;
-    await this.assertNoUnfinishedSwitch(
-      subscription,
-      seq,
-      changeChargeKey(subscription.id, seq, toPlan.key)
-    );
+    const chargeKey = changeChargeKey(subscription.id, seq, toPlan.key);
+    await this.assertNoUnfinishedSwitch(subscription, seq, chargeKey);
     const quote = this.proration.quote({
       fromPlan,
       toPlan,
@@ -552,29 +549,68 @@ export class PlanChangeService {
       periodEnd: subscription.currentPeriodEnd,
       now: new Date()
     });
+    // A retry of a switch that did not commit reuses the rows of the earlier
+    // attempt, so the preview reads them too.
+    const charge =
+      quote.chargeMinor > 0
+        ? await this.invoices.findOne({ where: { providerEventId: chargeKey } })
+        : null;
+    const chargeMinor = charge?.status === 'paid' ? 0 : quote.chargeMinor;
     const creditMinor =
       quote.refundMinor > 0
-        ? await this.refundableCredit(subscription, quote.refundMinor)
+        ? await this.refundableCredit(
+            subscription,
+            quote.refundMinor,
+            changeRefundKey(subscription.id, seq),
+            charge?.id ?? null
+          )
         : 0;
     return {
       ...base,
       currency: quote.currency,
       creditMinor,
-      chargeMinor: quote.chargeMinor,
-      dueNowMinor: quote.chargeMinor - creditMinor
+      chargeMinor,
+      dueNowMinor: chargeMinor - creditMinor
     };
   }
 
   /** The refund leg `reserveProrationRefund` would reserve now, without a lock. */
   private async refundableCredit(
     subscription: Subscription,
-    refundMinor: number
+    refundMinor: number,
+    refundKey: string,
+    excludeInvoiceId: string | null
   ): Promise<number> {
+    const leg = await this.invoices.findOne({
+      where: { providerEventId: refundKey }
+    });
+    if (leg && leg.status !== 'pending') return 0;
     const source = await this.invoices.findOne(
-      this.prorationRefundSource(subscription)
+      this.refundLegSource(subscription, leg, excludeInvoiceId)
     );
     if (!source) return 0;
+    if (leg) return leg.amountMinor.toNumber();
     return Math.min(refundMinor, remainingRefundable(source).toNumber());
+  }
+
+  /**
+   * The source of a refund leg: the invoice that an earlier attempt reserved
+   * against, else the proration refund source.
+   */
+  private refundLegSource(
+    subscription: Subscription,
+    leg: Invoice | null,
+    excludeInvoiceId: string | null
+  ): FindOneOptions<Invoice> {
+    return leg
+      ? {
+          where: {
+            subscriptionId: subscription.id,
+            providerInvoiceRef: leg.providerInvoiceRef,
+            status: 'paid'
+          }
+        }
+      : this.prorationRefundSource(subscription, excludeInvoiceId);
   }
 
   /**
@@ -689,15 +725,7 @@ export class PlanChangeService {
 
       const source = await lockInvoice(
         manager,
-        leg
-          ? {
-              where: {
-                subscriptionId: subscription.id,
-                providerInvoiceRef: leg.providerInvoiceRef,
-                status: 'paid'
-              }
-            }
-          : this.prorationRefundSource(subscription, excludeInvoiceId)
+        this.refundLegSource(subscription, leg, excludeInvoiceId)
       );
       if (!source) return null;
       if (leg) {

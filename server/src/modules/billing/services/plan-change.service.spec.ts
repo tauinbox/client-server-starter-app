@@ -1421,10 +1421,21 @@ describe('PlanChangeService', () => {
       };
     }
 
+    /** Answers only the refund source lookup; no switch rows exist. */
+    function sourceOnly(
+      ctx: Awaited<ReturnType<typeof build>>,
+      invoice: ReturnType<typeof periodInvoice>
+    ) {
+      ctx.invoices.findOne.mockImplementation(
+        (opts: { where: { billingMode?: string } }) =>
+          Promise.resolve(opts.where.billingMode === 'fixed' ? invoice : null)
+      );
+    }
+
     it('returns the computed split for a self-managed subscription', async () => {
       const ctx = await build();
       setupYoo(ctx);
-      ctx.invoices.findOne.mockResolvedValue(periodInvoice(0));
+      sourceOnly(ctx, periodInvoice(0));
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
 
       const preview = await ctx.service.previewChange('user-1', 'business');
@@ -1451,7 +1462,7 @@ describe('PlanChangeService', () => {
     it('caps the credit by what is still refundable on the source invoice', async () => {
       const ctx = await build();
       setupYoo(ctx);
-      ctx.invoices.findOne.mockResolvedValue(periodInvoice(80000));
+      sourceOnly(ctx, periodInvoice(80000));
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
 
       const preview = await ctx.service.previewChange('user-1', 'business');
@@ -1461,6 +1472,32 @@ describe('PlanChangeService', () => {
         creditMinor: 19000,
         chargeMinor: 116000,
         dueNowMinor: 97000
+      });
+    });
+
+    it('quotes nothing when the charge and the refund leg of an earlier attempt are settled', async () => {
+      const ctx = await build();
+      setupYoo(ctx);
+      ctx.subscriptions.findOne.mockResolvedValue({
+        ...(await ctx.subscriptions.findOne()),
+        planChangeSeq: 0
+      });
+      ctx.invoices.findOne.mockImplementation(
+        (opts: { where: { providerEventId?: unknown } }) =>
+          Promise.resolve(
+            opts.where.providerEventId === 'change-refund:sub-1:0'
+              ? { status: 'refunded', amountMinor: Money.fromMinor(39600) }
+              : periodInvoice(0)
+          )
+      );
+      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+
+      const preview = await ctx.service.previewChange('user-1', 'business');
+
+      expect(preview).toMatchObject({
+        creditMinor: 0,
+        chargeMinor: 0,
+        dueNowMinor: 0
       });
     });
 
