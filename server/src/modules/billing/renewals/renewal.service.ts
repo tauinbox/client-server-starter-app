@@ -6,6 +6,9 @@ import {
   DataSource,
   EntityManager,
   In,
+  IsNull,
+  LessThan,
+  Or,
   Repository,
   type QueryDeepPartialEntity,
   type UpdateResult
@@ -218,6 +221,7 @@ export class RenewalService {
       return;
     }
 
+    await this.sealUsageWindow(subscription.id, now);
     const parties: ChargeParties = { subscription, customer, plan, provider };
     if (!splitsAtDueAnchor) {
       // Stable per (subscription, window) so two racing closes charge once,
@@ -251,6 +255,26 @@ export class RenewalService {
         now
       );
     }
+  }
+
+  /**
+   * Stops usage ingest from accepting an `occurredAt` before `end`, and commits
+   * that before the caller rates the window that ends there. The write waits
+   * for each ingest that holds the subscription row FOR SHARE, so a record that
+   * passed its window check is committed before the rating reads. The seal only
+   * moves forward.
+   */
+  private async sealUsageWindow(
+    subscriptionId: string,
+    end: Date
+  ): Promise<void> {
+    await this.subscriptions.update(
+      {
+        id: subscriptionId,
+        usageSealedUntil: Or(IsNull(), LessThan(end))
+      },
+      { usageSealedUntil: end }
+    );
   }
 
   /**
@@ -428,6 +452,9 @@ export class RenewalService {
     // from trial_end, a renewal extends from the current period end — never from
     // wall-clock now, so periods stay contiguous even if a scan runs late.
     const anchor = renewalAnchor(subscription);
+    if (subscription.billingMode === 'usage') {
+      await this.sealUsageWindow(subscription.id, anchor);
+    }
     // Fixed prepays the upcoming period; usage postpays the metered window
     // ending at the anchor, with prepaid credits offsetting billable units - the
     // balance is read here and deducted only when the invoice insert wins.

@@ -63,6 +63,23 @@ export function meteredWindowStart(subscription: {
 }
 
 /**
+ * The earliest `occurredAt` that usage ingest accepts: the metered window
+ * start, or the end of a window that a close already started to rate when
+ * that is later. Rating uses `meteredWindowStart`, never this.
+ */
+export function usageIngestStart(subscription: {
+  currentPeriodStart: Date;
+  meteredFrom: Date | null;
+  usageSealedUntil: Date | null;
+}): Date {
+  const windowStart = meteredWindowStart(subscription);
+  const { usageSealedUntil } = subscription;
+  return usageSealedUntil && usageSealedUntil.getTime() > windowStart.getTime()
+    ? usageSealedUntil
+    : windowStart;
+}
+
+/**
  * The boundary a self-managed renewal charges at: `trial_end` for a trial,
  * else the end of the current period.
  */

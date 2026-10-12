@@ -1089,6 +1089,57 @@ describe('RenewalService', () => {
     const usageSub = () =>
       makeSub({ planKey: 'usage', billingMode: 'usage' as const });
 
+    it('seals usage ingest at the anchor before it rates the window', async () => {
+      const sub = usageSub();
+      const store = usageStore(sub);
+      let sealAtRating: Date | null | undefined;
+      const sum = jest.fn(() => {
+        sealAtRating = sub.usageSealedUntil;
+        return Promise.resolve(142);
+      });
+      const { service } = await build(
+        store,
+        jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_usage',
+          status: 'captured'
+        }),
+        sum
+      );
+
+      await service.runDueRenewals(NOW);
+
+      expect(sealAtRating).toEqual(new Date('2026-06-01T00:00:00Z'));
+    });
+
+    it('re-rates the whole window on a dunning retry the seal already covers', async () => {
+      const anchor = new Date('2026-06-01T00:00:00Z');
+      const sub = makeSub({
+        planKey: 'usage',
+        billingMode: 'usage' as const,
+        status: 'past_due',
+        dunningAttempts: 1,
+        nextRenewalAttemptAt: new Date(NOW.getTime() - 1000),
+        usageSealedUntil: anchor
+      });
+      const store = usageStore(sub);
+      const { service } = await build(
+        store,
+        jest.fn().mockResolvedValue({
+          providerInvoiceRef: 'pay_retry',
+          status: 'captured'
+        }),
+        jest.fn().mockResolvedValue(142)
+      );
+
+      await service.runDueRenewals(NOW);
+
+      expect(store.invoices[0]).toMatchObject({
+        amountMinor: Money.fromMinor(8400),
+        periodStart: new Date('2026-05-01T00:00:00Z'),
+        periodEnd: anchor
+      });
+    });
+
     it('charges the overage of the closed period and invoices that period', async () => {
       const sub = usageSub();
       const store = usageStore(sub);
@@ -1445,6 +1496,28 @@ describe('RenewalService', () => {
           InvoicePaidEvent.name,
           expect.objectContaining({ userId: 'user-1' })
         );
+      });
+
+      it('seals usage ingest at now before it rates the closing window', async () => {
+        const sub = usageSub();
+        const store = usageStore(sub);
+        let sealAtRating: Date | null | undefined;
+        const sum = jest.fn(() => {
+          sealAtRating = store.subscriptions[0].usageSealedUntil;
+          return Promise.resolve(142);
+        });
+        const { service } = await build(
+          store,
+          jest.fn().mockResolvedValue({
+            providerInvoiceRef: 'pay_now',
+            status: 'captured'
+          }),
+          sum
+        );
+
+        await service.billClosingUsagePeriod(sub, NOW);
+
+        expect(sealAtRating).toEqual(NOW);
       });
 
       it('charges a window a mode switch moved under a key of its own', async () => {

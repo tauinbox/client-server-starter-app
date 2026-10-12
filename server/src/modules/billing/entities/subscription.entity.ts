@@ -69,6 +69,17 @@ export class Subscription {
   @Exclude()
   meteredFrom: Date | null;
 
+  /**
+   * The end of the last metered window that a self-managed close started to
+   * rate. It is written before the rating, and usage ingest refuses an
+   * `occurredAt` before it, so a record cannot land in a window after that
+   * window was rated. Rating never reads it: a dunning retry re-rates the same
+   * window. Null until the first close.
+   */
+  @Column({ name: 'usage_sealed_until', type: 'timestamptz', nullable: true })
+  @Exclude()
+  usageSealedUntil: Date | null;
+
   @Column({ name: 'cancel_at_period_end', default: false })
   cancelAtPeriodEnd: boolean;
 

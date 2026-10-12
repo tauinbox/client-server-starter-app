@@ -4,7 +4,7 @@ import {
   ConflictException,
   NotFoundException
 } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { FindOneOptions } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -42,6 +42,7 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
     planKey: 'usage',
     currentPeriodStart: PERIOD_START,
     meteredFrom: null,
+    usageSealedUntil: null,
     ...overrides
   } as Subscription;
 }
@@ -79,12 +80,27 @@ describe('UsageService', () => {
     credits = { isBlocked: jest.fn().mockResolvedValue(false) };
     metrics = { recordUnratedUsage: jest.fn() };
 
+    // The transaction hands out the same repository doubles, so a test reads
+    // one set of calls whichever path made them.
+    const manager = {
+      getRepository: (entity: unknown) =>
+        entity === UsageRecord
+          ? usageRecords
+          : entity === Subscription
+            ? subscriptions
+            : plans
+    };
+    const dataSource = {
+      transaction: (cb: (m: typeof manager) => unknown) => cb(manager)
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         UsageService,
         { provide: getRepositoryToken(UsageRecord), useValue: usageRecords },
         { provide: getRepositoryToken(Subscription), useValue: subscriptions },
         { provide: getRepositoryToken(Plan), useValue: plans },
+        { provide: getDataSourceToken(), useValue: dataSource },
         { provide: CreditService, useValue: credits },
         { provide: MetricsService, useValue: metrics }
       ]
@@ -110,6 +126,16 @@ describe('UsageService', () => {
       })
     );
     expect(result.id).toBe('usage-1');
+  });
+
+  it('reads the subscription FOR SHARE, so a close that moves the window waits for the insert', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+
+    await service.record(INPUT);
+
+    expect(subscriptions.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ lock: { mode: 'pessimistic_read' } })
+    );
   });
 
   it('bills the newest active subscription when the customer has more than one', async () => {
@@ -404,6 +430,43 @@ describe('UsageService', () => {
         ...INPUT,
         occurredAt: meteredFrom.toISOString()
       });
+      expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a record before the seal of a window a close already rates', async () => {
+      const usageSealedUntil = new Date('2026-01-15T00:00:00.000Z');
+      subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ usageSealedUntil })
+      );
+
+      await expect(
+        service.record({
+          ...INPUT,
+          occurredAt: new Date(usageSealedUntil.getTime() - 1).toISOString()
+        })
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+      });
+      await service.record({
+        ...INPUT,
+        occurredAt: usageSealedUntil.toISOString()
+      });
+      expect(usageRecords.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a seal from an earlier period', async () => {
+      subscriptions.findOne.mockResolvedValue(
+        makeSubscription({
+          usageSealedUntil: new Date(PERIOD_START.getTime() - 1000)
+        })
+      );
+
+      await service.record({
+        ...INPUT,
+        occurredAt: PERIOD_START.toISOString()
+      });
+
       expect(usageRecords.save).toHaveBeenCalledTimes(1);
     });
 

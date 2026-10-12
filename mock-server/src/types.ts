@@ -202,6 +202,12 @@ export interface MockSubscription {
    * serialized on the wire. Absent when the window is the whole period.
    */
   meteredFrom?: string;
+  /**
+   * The end of the last metered window a renewal started to rate - mirrors
+   * the server's @Exclude'd `usage_sealed_until`. Usage ingest refuses an
+   * `occurredAt` before it; rating never reads it.
+   */
+  usageSealedUntil?: string;
   createdAt: string;
   updatedAt: string;
 }

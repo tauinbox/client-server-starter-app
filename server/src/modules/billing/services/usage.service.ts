@@ -5,8 +5,8 @@ import {
   Logger,
   NotFoundException
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
@@ -14,11 +14,12 @@ import {
   USAGE_FUTURE_TOLERANCE_MS
 } from '@app/shared/constants';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
+import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
-import { meteredWindowStart } from '../utils/period.util';
+import { usageIngestStart } from '../utils/period.util';
 import { CreditService } from './credit.service';
 
 export interface RecordUsageInput {
@@ -50,8 +51,10 @@ export interface RecordUsageInput {
  * into the period would have discarded the hour before it. The rejections here
  * are records that can never become chargeable: a meter no plan in the catalog
  * declares (a producer typo), and an `occurredAt` before the open metered
- * window, which no rating reads again. An `occurredAt` past the clock skew
- * tolerance is refused too, because it would be rated in a later period.
+ * window, which no rating reads again. A window that a close has started to
+ * rate is not open any more (`usageIngestStart`). An `occurredAt` past the
+ * clock skew tolerance is refused too, because it would be rated in a later
+ * period.
  */
 @Injectable()
 export class UsageService {
@@ -64,6 +67,7 @@ export class UsageService {
     private readonly subscriptions: Repository<Subscription>,
     @InjectRepository(Plan)
     private readonly plans: Repository<Plan>,
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly credits: CreditService,
     private readonly metrics: MetricsService
   ) {}
@@ -89,55 +93,18 @@ export class UsageService {
       });
     }
 
-    const subscription = await this.findActiveSubscription(input.customerId);
-    if (!subscription) {
-      throw new NotFoundException({
-        message: 'No active subscription for customer to record usage against',
-        errorKey: ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION
-      });
-    }
-
-    // One query answers both questions: is this meter in the catalog at all, and
-    // is it the meter the customer's current plan prices.
-    const candidates = await this.plans.find({
-      where: [{ key: subscription.planKey }, { meterKey: input.meterKey }]
-    });
-    if (!candidates.some((p) => p.meterKey === input.meterKey)) {
-      throw new BadRequestException({
-        message: `Meter "${input.meterKey}" is not declared by any plan`,
-        errorKey: ErrorKeys.BILLING.METER_NOT_DECLARED
-      });
-    }
-
-    const now = Date.now();
-    const occurredAt = input.occurredAt
-      ? new Date(input.occurredAt)
-      : new Date(now);
-    if (occurredAt.getTime() < meteredWindowStart(subscription).getTime()) {
-      throw new BadRequestException({
-        message: 'occurredAt is before the open metered window',
-        errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
-      });
-    }
-    if (occurredAt.getTime() > now + USAGE_FUTURE_TOLERANCE_MS) {
-      throw new BadRequestException({
-        message: 'occurredAt is in the future',
-        errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE
-      });
-    }
-
-    const record = this.usageRecords.create({
-      customerId: input.customerId,
-      subscriptionId: subscription.id,
-      meterKey: input.meterKey,
-      quantity: Money.fromMinor(input.quantity),
-      occurredAt,
-      idempotencyKey: input.idempotencyKey
-    });
-
     let saved: UsageRecord;
+    let pricedByCurrentPlan: boolean;
+    let planKey: string;
     try {
-      saved = await this.usageRecords.save(record);
+      // The subscription is read FOR SHARE and the row is inserted in the same
+      // transaction. A close moves the window (or seals it) in a write that
+      // waits for this lock, so a record is either committed before the close
+      // rates the window, or it sees the moved window and is refused.
+      ({ saved, pricedByCurrentPlan, planKey } = await withTransaction(
+        this.dataSource,
+        (manager) => this.insertChecked(manager, input)
+      ));
     } catch (error: unknown) {
       // Lost an insert race on the same idempotency key — the unique constraint
       // rejected the second writer. Return the record the winner persisted so the
@@ -159,20 +126,87 @@ export class UsageService {
       throw error;
     }
 
-    const ownPlan = candidates.find((p) => p.key === subscription.planKey);
-    saved.pricedByCurrentPlan = ownPlan?.meterKey === input.meterKey;
+    saved.pricedByCurrentPlan = pricedByCurrentPlan;
 
     // Stored but not chargeable under the plan in force. Visible rather than
     // fatal: a producer meters what it observes and cannot know the customer's
     // plan, so this is an operations signal, not the producer's error.
     if (!saved.pricedByCurrentPlan) {
       this.logger.warn(
-        `Usage under meter "${input.meterKey}" is not priced by plan "${subscription.planKey}" (customer ${input.customerId})`
+        `Usage under meter "${input.meterKey}" is not priced by plan "${planKey}" (customer ${input.customerId})`
       );
       this.metrics.recordUnratedUsage(input.meterKey);
     }
 
     return saved;
+  }
+
+  private async insertChecked(
+    manager: EntityManager,
+    input: RecordUsageInput
+  ): Promise<{
+    saved: UsageRecord;
+    pricedByCurrentPlan: boolean;
+    planKey: string;
+  }> {
+    const subscription = await this.findActiveSubscription(
+      manager.getRepository(Subscription),
+      input.customerId,
+      true
+    );
+    if (!subscription) {
+      throw new NotFoundException({
+        message: 'No active subscription for customer to record usage against',
+        errorKey: ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION
+      });
+    }
+
+    // One query answers both questions: is this meter in the catalog at all, and
+    // is it the meter the customer's current plan prices.
+    const candidates = await manager.getRepository(Plan).find({
+      where: [{ key: subscription.planKey }, { meterKey: input.meterKey }]
+    });
+    if (!candidates.some((p) => p.meterKey === input.meterKey)) {
+      throw new BadRequestException({
+        message: `Meter "${input.meterKey}" is not declared by any plan`,
+        errorKey: ErrorKeys.BILLING.METER_NOT_DECLARED
+      });
+    }
+
+    const now = Date.now();
+    const occurredAt = input.occurredAt
+      ? new Date(input.occurredAt)
+      : new Date(now);
+    if (occurredAt.getTime() < usageIngestStart(subscription).getTime()) {
+      throw new BadRequestException({
+        message: 'occurredAt is before the open metered window',
+        errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
+      });
+    }
+    if (occurredAt.getTime() > now + USAGE_FUTURE_TOLERANCE_MS) {
+      throw new BadRequestException({
+        message: 'occurredAt is in the future',
+        errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE
+      });
+    }
+
+    const usageRecords = manager.getRepository(UsageRecord);
+    const saved = await usageRecords.save(
+      usageRecords.create({
+        customerId: input.customerId,
+        subscriptionId: subscription.id,
+        meterKey: input.meterKey,
+        quantity: Money.fromMinor(input.quantity),
+        occurredAt,
+        idempotencyKey: input.idempotencyKey
+      })
+    );
+    const ownPlan = candidates.find((p) => p.key === subscription.planKey);
+    return {
+      saved,
+      pricedByCurrentPlan: ownPlan?.meterKey === input.meterKey,
+      planKey: subscription.planKey
+    };
   }
 
   /**
@@ -182,13 +216,16 @@ export class UsageService {
    * self-service subscribing.
    */
   private findActiveSubscription(
-    customerId: string
+    subscriptions: Repository<Subscription>,
+    customerId: string,
+    lock = false
   ): Promise<Subscription | null> {
     // A usage record only counts toward a subscription that is currently
     // billable; `canceled`/`incomplete` ones cannot accrue metered usage.
-    return this.subscriptions.findOne({
+    return subscriptions.findOne({
       where: { customerId, status: In([...ENTITLED_SUBSCRIPTION_STATUSES]) },
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
+      ...(lock ? { lock: { mode: 'pessimistic_read' as const } } : {})
     });
   }
 
@@ -198,7 +235,10 @@ export class UsageService {
    * when the row was first written.
    */
   private async stampPricing(record: UsageRecord): Promise<UsageRecord> {
-    const subscription = await this.findActiveSubscription(record.customerId);
+    const subscription = await this.findActiveSubscription(
+      this.subscriptions,
+      record.customerId
+    );
     const plan = subscription
       ? await this.plans.findOne({ where: { key: subscription.planKey } })
       : null;
