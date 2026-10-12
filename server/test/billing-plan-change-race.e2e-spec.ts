@@ -699,6 +699,13 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     await expect(refused).rejects.toMatchObject(unfinished);
     expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
     expect(provider.refund).toHaveBeenCalledTimes(1);
+    await expect(
+      service.previewChange(user, 'race-business')
+    ).resolves.toMatchObject({
+      chargeMinor: 0,
+      creditMinor: 66000,
+      dueNowMinor: -66000
+    });
 
     await service.changePlan(user, 'race-business');
 

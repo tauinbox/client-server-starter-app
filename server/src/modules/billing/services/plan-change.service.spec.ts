@@ -1421,10 +1421,21 @@ describe('PlanChangeService', () => {
       };
     }
 
+    /** Answers only the refund source lookup; no switch rows exist. */
+    function sourceOnly(
+      ctx: Awaited<ReturnType<typeof build>>,
+      invoice: ReturnType<typeof periodInvoice>
+    ) {
+      ctx.invoices.findOne.mockImplementation(
+        (opts: { where: { billingMode?: string } }) =>
+          Promise.resolve(opts.where.billingMode === 'fixed' ? invoice : null)
+      );
+    }
+
     it('returns the computed split for a self-managed subscription', async () => {
       const ctx = await build();
       setupYoo(ctx);
-      ctx.invoices.findOne.mockResolvedValue(periodInvoice(0));
+      sourceOnly(ctx, periodInvoice(0));
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
 
       const preview = await ctx.service.previewChange('user-1', 'business');
@@ -1451,7 +1462,7 @@ describe('PlanChangeService', () => {
     it('caps the credit by what is still refundable on the source invoice', async () => {
       const ctx = await build();
       setupYoo(ctx);
-      ctx.invoices.findOne.mockResolvedValue(periodInvoice(80000));
+      sourceOnly(ctx, periodInvoice(80000));
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
 
       const preview = await ctx.service.previewChange('user-1', 'business');
