@@ -131,7 +131,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
-| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting and a shared permission cache for a deployment with more than one instance |
+| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting, a shared permission cache and SSE pushes across instances for a deployment with more than one instance |
 | `E2E_REDIS_DB` | `15` | For a test only. `npm run test:e2e` uses this logical Redis database, and it clears the database before each run. The value must not be `0`. Refer to [E2E Tests](#e2e-tests-jest) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry before the nightly deletion |
 | `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key, which is public. The two Turnstile keys are necessary before the CAPTCHA operates. Refer to [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
@@ -464,7 +464,14 @@ allow rule and keeps it for a deny rule.
 #### notifications
 
 `notifications.service.ts` manages a `Map<userId, Map<connectionId, Subject>>` structure. It supplies
-`push(userId)` and `pushToAll()`.
+`push(userId)`, `pushToAll()` and `pushToAuthorized()`.
+
+`notifications-bus.ts` and `redis-notifications-bus.ts` carry each push to the other server
+instances. With `REDIS_URL`, a push goes to the connections of this instance and to a Redis
+pub/sub channel, and each other instance delivers it to its own connections. A Redis registry
+holds the users that have a stream on each instance, so `pushToAuthorized` checks the abilities of
+all of them on the sending instance and sends only user IDs. Without `REDIS_URL`, and under Jest,
+the bus does nothing.
 
 `notifications.listener.ts` holds the `@OnEvent()` handlers. They react to `UserDeleted`,
 `UserPasswordChanged`, `UserCreated`, `UserUpdated`, `UserRestored`, `UserRoleChanged` and

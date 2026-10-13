@@ -38,7 +38,7 @@ export class RedisHealthIndicator implements OnModuleDestroy {
       return degraded
         ? indicator.up({
             warning:
-              'REDIS_URL not set — rate limiting and cache invalidation are per-instance only'
+              'REDIS_URL not set — rate limiting, cache invalidation and SSE pushes are per-instance only'
           })
         : indicator.up();
     }

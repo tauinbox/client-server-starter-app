@@ -1105,7 +1105,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
-| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting and a shared permission cache for a deployment with more than one instance |
+| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting, a shared permission cache and SSE pushes across instances for a deployment with more than one instance |
 | `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | The Express `trust proxy` setting. It is necessary behind nginx, Caddy, a K8s ingress or Cloudflare, thus `req.ip` gives the true client IP. The throttlers and the audit-log IP record use that value. It accepts `loopback`, `linklocal`, `uniquelocal`, an IP-CIDR list, a hop count, or `true`. The application has no built-in default. `docker-compose.yml` gives `loopback,uniquelocal` for a production deployment. Refer to "Deployment behind a reverse proxy" in `server/README.md` |
 | `SWAGGER_ENABLED` | - | Set it to `true` to enable the Swagger UI in staging or in production. It is always on in `local` and `development` |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry |

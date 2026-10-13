@@ -27,6 +27,8 @@ import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
 import type { AppAbility } from '../auth/casl/app-ability';
 import { RefreshTokenService } from '../auth/services/refresh-token.service';
 import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
+import { NotificationsBus } from './notifications-bus';
+import type { BusPush } from './notifications-bus';
 
 @Injectable()
 export class NotificationsService {
@@ -38,9 +40,14 @@ export class NotificationsService {
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly refreshTokenService: RefreshTokenService,
     @Inject(SSE_HEARTBEAT_INTERVAL_MS)
-    private readonly heartbeatIntervalMs: number
+    private readonly heartbeatIntervalMs: number,
+    private readonly bus: NotificationsBus
   ) {
     this.sseRef.getCount = () => this.#countConnections();
+    this.bus.attach({
+      deliver: (push) => this.#deliver(push),
+      localUserIds: () => Array.from(this.#connections.keys())
+    });
   }
 
   /**
@@ -106,6 +113,7 @@ export class NotificationsService {
   createStream(userId: string, connectionId: string): Subject<MessageEvent> {
     if (!this.#connections.has(userId)) {
       this.#connections.set(userId, new Map());
+      this.bus.userConnected(userId);
     }
     const subject = new Subject<MessageEvent>();
     this.#connections.get(userId)!.set(connectionId, subject);
@@ -122,6 +130,7 @@ export class NotificationsService {
     }
     if (userConnections.size === 0) {
       this.#connections.delete(userId);
+      this.bus.userDisconnected(userId);
     }
   }
 
@@ -134,40 +143,54 @@ export class NotificationsService {
   }
 
   push(userId: string, event: NotificationEvent): void {
-    const userConnections = this.#connections.get(userId);
-    if (!userConnections) return;
-    const message: MessageEvent = { data: event };
-    for (const subject of userConnections.values()) {
-      subject.next(message);
-    }
+    this.#send({ userIds: [userId], event });
   }
 
   pushToAll(event: NotificationEvent): void {
-    const message: MessageEvent = { data: event };
-    for (const userConnections of this.#connections.values()) {
-      for (const subject of userConnections.values()) {
-        subject.next(message);
-      }
-    }
+    this.#send({ event });
   }
 
   /**
    * Deliver only to connected users whose current abilities satisfy `allows`.
    * Abilities are resolved per push (not cached on the connection) so a
    * permission change takes effect on the next event rather than on reconnect.
+   * The check runs here for the users of every instance, so only user IDs
+   * cross to the other instances.
    */
   async pushToAuthorized(
     event: NotificationEvent,
     allows: (ability: AppAbility) => boolean
   ): Promise<void> {
-    const userIds = Array.from(this.#connections.keys());
-    await Promise.all(
-      userIds.map(async (userId) => {
-        if (await this.#can(userId, allows)) {
-          this.push(userId, event);
-        }
-      })
+    const userIds = new Set([
+      ...this.#connections.keys(),
+      ...((await this.bus.connectedUserIds()) ?? [])
+    ]);
+    const allowed = await Promise.all(
+      Array.from(userIds, async (userId) =>
+        (await this.#can(userId, allows)) ? userId : null
+      )
     );
+    const recipients = allowed.filter((userId) => userId !== null);
+    if (recipients.length > 0) {
+      this.#send({ userIds: recipients, event });
+    }
+  }
+
+  #send(push: BusPush): void {
+    this.#deliver(push);
+    this.bus.publish(push);
+  }
+
+  #deliver({ userIds, event }: BusPush): void {
+    const message: MessageEvent = { data: event };
+    const targets = userIds
+      ? userIds.map((userId) => this.#connections.get(userId))
+      : this.#connections.values();
+    for (const userConnections of targets) {
+      for (const subject of userConnections?.values() ?? []) {
+        subject.next(message);
+      }
+    }
   }
 
   async #can(
