@@ -243,10 +243,15 @@ runWithInfra(
       const registered = await usersService.findByEmail(emails.registered);
       const provider = await usersService.findByEmail(emails.provider);
       await settle(stream, 2);
-      expect(stream()).toEqual([
-        crud('created', registered!.id),
-        crud('created', provider!.id)
-      ]);
+      // Each push resolves the abilities of its viewers on its own, so the
+      // two frames can arrive in either order.
+      expect(stream()).toHaveLength(2);
+      expect(stream()).toEqual(
+        expect.arrayContaining([
+          crud('created', registered!.id),
+          crud('created', provider!.id)
+        ])
+      );
     }, 30000);
 
     it('sends updated for a role assign and a role remove', async () => {
