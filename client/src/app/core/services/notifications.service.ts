@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import type { HttpDownloadProgressEvent } from '@angular/common/http';
-import { filter, retry, Subject, tap, timer } from 'rxjs';
+import { filter, Subject } from 'rxjs';
 import type { Observable, OperatorFunction, Subscription } from 'rxjs';
 import type { NotificationEvent } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -9,10 +9,8 @@ import { TokenService } from '@features/auth/services/token.service';
 import { silentContext } from '@core/context-tokens/error-notifications';
 
 const NOTIFICATIONS_STREAM_URL = '/api/v1/notifications/stream';
-const MAX_RETRIES = 10;
-const INITIAL_RETRY_DELAY_MS = 3000;
-const MAX_RETRY_DELAY_MS = 60_000;
-const RECONNECT_DELAY_MS = 5000;
+const INITIAL_RECONNECT_DELAY_MS = 3000;
+const MAX_RECONNECT_DELAY_MS = 60_000;
 const RECYCLE_MIN_DELAY_MS = 4 * 60 * 60 * 1000;
 const RECYCLE_JITTER_MS = 4 * 60 * 60 * 1000;
 
@@ -23,9 +21,18 @@ export class NotificationsService {
   readonly #tokenService = inject(TokenService);
 
   readonly #events$ = new Subject<NotificationEvent>();
+  readonly #reconnected$ = new Subject<void>();
   #subscription: Subscription | null = null;
   #recycleTimer: ReturnType<typeof setTimeout> | null = null;
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  #reconnectAttempt = 0;
+  #wasLive = false;
+
+  /**
+   * A stream is live again after a gap. The server keeps no event history, so
+   * an event sent during the gap is lost.
+   */
+  readonly reconnected$ = this.#reconnected$.asObservable();
 
   readonly sessionInvalidated$ = this.#events$.pipe(
     this.#ofType('session_invalidated')
@@ -58,8 +65,23 @@ export class NotificationsService {
   connect(): void {
     if (this.#subscription) return;
 
+    this.#clearReconnectTimer();
+    this.#reconnectAttempt = 0;
+    this.#wasLive = false;
+    this.#open();
+  }
+
+  disconnect(): void {
+    this.#clearRecycleTimer();
+    this.#clearReconnectTimer();
+    this.#subscription?.unsubscribe();
+    this.#subscription = null;
+  }
+
+  #open(): void {
     let lastLength = 0;
     let pendingFrame = '';
+    let live = false;
 
     this.#subscription = this.#http
       .get(NOTIFICATIONS_STREAM_URL, {
@@ -68,25 +90,6 @@ export class NotificationsService {
         context: silentContext(),
         reportProgress: true
       })
-      .pipe(
-        tap({
-          error: () => {
-            lastLength = 0;
-            pendingFrame = '';
-          }
-        }),
-        retry({
-          count: MAX_RETRIES,
-          delay: (_error, retryCount) =>
-            timer(
-              Math.min(
-                INITIAL_RETRY_DELAY_MS * 2 ** (retryCount - 1),
-                MAX_RETRY_DELAY_MS
-              )
-            ),
-          resetOnSuccess: true
-        })
-      )
       .subscribe({
         next: (event) => {
           if (
@@ -94,6 +97,11 @@ export class NotificationsService {
             !this.#authStore.isAuthenticated()
           ) {
             return;
+          }
+
+          if (!live) {
+            live = true;
+            this.#onStreamLive();
           }
 
           const progressEvent = event as HttpDownloadProgressEvent;
@@ -119,11 +127,12 @@ export class NotificationsService {
     this.#scheduleRecycle();
   }
 
-  disconnect(): void {
-    this.#clearRecycleTimer();
-    this.#clearReconnectTimer();
-    this.#subscription?.unsubscribe();
-    this.#subscription = null;
+  #onStreamLive(): void {
+    this.#reconnectAttempt = 0;
+    if (this.#wasLive) {
+      this.#reconnected$.next();
+    }
+    this.#wasLive = true;
   }
 
   #handleStreamEnd(): void {
@@ -132,14 +141,23 @@ export class NotificationsService {
     this.#scheduleReconnect();
   }
 
+  // A deploy ends every stream at the same moment. The jitter keeps the
+  // clients from reconnecting, and retrying, at the same moments.
   #scheduleReconnect(): void {
     if (!this.#authStore.isAuthenticated()) return;
 
     this.#clearReconnectTimer();
+    const delay =
+      Math.min(
+        INITIAL_RECONNECT_DELAY_MS * 2 ** this.#reconnectAttempt,
+        MAX_RECONNECT_DELAY_MS
+      ) *
+      (0.5 + Math.random() / 2);
+    this.#reconnectAttempt++;
     this.#reconnectTimer = setTimeout(() => {
       this.#reconnectTimer = null;
-      this.connect();
-    }, RECONNECT_DELAY_MS);
+      this.#open();
+    }, delay);
   }
 
   // Angular's HTTP backends retain the whole response body for the life of a
@@ -153,8 +171,8 @@ export class NotificationsService {
         this.#recycleTimer = null;
         if (!this.#subscription || !this.#authStore.isAuthenticated()) return;
 
-        this.disconnect();
-        this.connect();
+        this.#subscription.unsubscribe();
+        this.#open();
       },
       RECYCLE_MIN_DELAY_MS + Math.random() * RECYCLE_JITTER_MS
     );

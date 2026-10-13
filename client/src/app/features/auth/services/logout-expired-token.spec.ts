@@ -86,7 +86,8 @@ describe('logout with an expired access token', () => {
             disconnect: vi.fn(),
             permissionsUpdated$: EMPTY,
             featureFlagsUpdated$: EMPTY,
-            entitlementsUpdated$: EMPTY
+            entitlementsUpdated$: EMPTY,
+            reconnected$: EMPTY
           }
         }
       ]

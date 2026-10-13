@@ -715,19 +715,27 @@ The service supplies three streams:
 - `userCrudEvents$` refreshes the user list. The server sends these events only to a client whose
   ability permits `users:search` on the changed user.
 
-`connect()` runs after a login and after a session restore. `disconnect()` runs on each session
+`connect()` runs after a login and after a session restore, before the flags and the permissions
+load, thus a change pushed during those loads is not lost. `disconnect()` runs on each session
 teardown. This includes an explicit logout and a forced logout.
 
-The retry uses exponential backoff. It starts at 3 s and has a limit of 60 s. It makes a maximum of
-10 retries and uses `resetOnSuccess`. If the retries end, or if the server closes the stream, the
-service connects again while the user stays authenticated. The server sends a heartbeat every 30 s
-as an empty `data:` frame. The heartbeat prevents an idle timeout in a proxy. It also checks the
-session: when the session has ended, the server sends `session_invalidated` and ends the stream. If
-that frame is lost, the reconnect gets 401, its refresh gets 401, and the tab signs out.
+When the stream ends or fails, the service connects again while the user stays authenticated. One
+loop does this. The delay starts at 3 s, doubles on each failure and has a limit of 60 s. A random
+factor from 0.5 to 1 multiplies it, thus the clients that a deploy disconnects do not reconnect at
+the same time. The first frame of a stream resets the delay. The server sends an empty `data:`
+frame when the stream opens, and then a heartbeat every 30 s. The heartbeat prevents an idle
+timeout in a proxy. It also checks the session: when the session has ended, the server sends
+`session_invalidated` and ends the stream. If that frame is lost, the reconnect gets 401, its
+refresh gets 401, and the tab signs out.
+
+The server keeps no event history, thus an event sent while the tab was not connected is lost.
+`reconnected$` emits when a reopened stream sends its first frame (not for the first stream after
+`connect()`). On it, `AuthService` waits a random 0 to 5 s and then reloads the feature flags, the
+permissions and, when they are loaded, the entitlements.
 
 The service recycles the connection each 4 h to 8 h. The interval has jitter for each client, thus
-the clients do not reconnect at the same time. The recycle is a `disconnect()` and then a
-`connect()`, which discards the buffers. This is necessary because an Angular HTTP backend keeps the
+the clients do not reconnect at the same time. The recycle closes the stream and opens a new one,
+which discards the buffers. This is necessary because an Angular HTTP backend keeps the
 full response body for the full life of a request. The body includes each raw chunk and the
 cumulative `partialText`. Thus a stream with no end increases the memory without a limit. The service
 does not recycle while it is disconnected or while the user is not authenticated.

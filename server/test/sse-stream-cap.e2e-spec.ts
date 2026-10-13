@@ -15,7 +15,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 interface StreamResponse {
   status: number;
-  body: string;
+  body: () => string;
   close: () => void;
 }
 
@@ -69,8 +69,8 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
     await app?.close();
   });
 
-  // Resolves at the status line. The body of a refused stream is read in
-  // full; an accepted stream stays open until close().
+  // Resolves at the status line for an accepted stream, which stays open
+  // until close(), and at the end of the body for a refused one.
   function requestStream(): Promise<StreamResponse> {
     return new Promise((resolve, reject) => {
       const req = get(
@@ -81,18 +81,22 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
         },
         (res) => {
           const status = res.statusCode ?? 0;
-          const close = () => req.destroy();
-          res.on('error', () => undefined);
-          if (status === 200) {
-            resolve({ status, body: '', close });
-            return;
-          }
           let body = '';
+          const response = {
+            status,
+            body: () => body,
+            close: () => req.destroy()
+          };
+          res.on('error', () => undefined);
           res.setEncoding('utf8');
           res.on('data', (chunk: string) => {
             body += chunk;
           });
-          res.on('end', () => resolve({ status, body, close }));
+          if (status === 200) {
+            resolve(response);
+            return;
+          }
+          res.on('end', () => resolve(response));
         }
       );
       req.on('error', reject);
@@ -111,7 +115,7 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
 
     const refused = await requestStream();
     expect(refused.status).toBe(429);
-    expect(JSON.parse(refused.body)).toMatchObject({
+    expect(JSON.parse(refused.body())).toMatchObject({
       statusCode: 429,
       message: 'Too many open notification streams'
     });
@@ -123,5 +127,23 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
       return null;
     });
     expect(reopened?.status).toBe(200);
+    for (const stream of [...open.slice(1), reopened]) stream?.close();
+  }, 30000);
+
+  // The heartbeat of this app is the default 30 s, so a frame that arrives
+  // sooner is the frame sent when the stream opens.
+  it('sends a frame when the stream opens', async () => {
+    const stream = await eventually(async () => {
+      const candidate = await requestStream();
+      return candidate.status === 200 ? candidate : null;
+    });
+    expect(stream?.status).toBe(200);
+
+    const opened = await eventually(() =>
+      Promise.resolve(stream?.body().includes('data: \n\n') || null)
+    );
+
+    expect(opened).toBe(true);
+    stream?.close();
   }, 30000);
 });

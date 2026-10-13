@@ -14,6 +14,7 @@ import {
 import type { AuthenticatedRequest } from '../types';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_FRAME = 'data: \n\n';
 
 /** A test can shorten the heartbeat, which also checks the session. */
 function heartbeatIntervalMs(): number {
@@ -40,6 +41,7 @@ router.get('/stream', authGuard, (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  res.write(HEARTBEAT_FRAME);
 
   const connectionId = randomUUID();
   registerSseConnection(userId, connectionId, res);
@@ -56,7 +58,7 @@ router.get('/stream', authGuard, (req, res) => {
       return;
     }
     try {
-      res.write(': ping\n\n');
+      res.write(HEARTBEAT_FRAME);
     } catch {
       clearInterval(keepalive);
     }

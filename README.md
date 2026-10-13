@@ -185,7 +185,9 @@ management and theming.
 
   The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches
   the Bearer token. `NotificationsService` connects at login and disconnects at logout, and it
-  reconnects with exponential backoff. It also recycles the connection each 4 h to 8 h, with jitter.
+  reconnects with exponential backoff and jitter. After a reconnect it reloads the feature flags, the
+  permissions and the entitlements, because the server keeps no event history. It also recycles the
+  connection each 4 h to 8 h, with jitter.
   Angular keeps the transport buffers for the life of a request, thus the recycle stops unbounded
   growth on a tab that stays open.
 - **Role-Based Access Control (RBAC).** The resources and the actions are dynamic, and
@@ -1870,11 +1872,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2933 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 622 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 609 pass and 11 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1552 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2934 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 623 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 612 pass and 11 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1564 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 318 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1041 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1042 tests pass |
 
 ## CI/CD
 

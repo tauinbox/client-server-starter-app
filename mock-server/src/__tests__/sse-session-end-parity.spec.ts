@@ -5,6 +5,7 @@ import { findUserByEmail, resetState, revokeUserSessions } from '../state';
 
 const HEARTBEAT_MS = 100;
 const USER_EMAIL = 'user@example.com';
+const HEARTBEAT_FRAME = 'data: \n\n';
 
 let server: Server;
 let baseUrl: string;
@@ -145,6 +146,19 @@ describe('an SSE stream ends with its session', () => {
     await wait(HEARTBEAT_MS * 4);
 
     expect(stream.ended()).toBe(false);
-    expect(stream.body()).toContain(': ping');
+    expect(stream.body()).toContain(HEARTBEAT_FRAME);
+  });
+
+  it('sends the heartbeat frame of the server at once, before the first interval', async () => {
+    const a = await signIn();
+    process.env['MOCK_SSE_HEARTBEAT_MS'] = '60000';
+    try {
+      const stream = await openStream(a.accessToken);
+      for (let i = 0; i < 100 && !stream.body(); i++) await wait(10);
+
+      expect(stream.body()).toBe(HEARTBEAT_FRAME);
+    } finally {
+      process.env['MOCK_SSE_HEARTBEAT_MS'] = String(HEARTBEAT_MS);
+    }
   });
 });
