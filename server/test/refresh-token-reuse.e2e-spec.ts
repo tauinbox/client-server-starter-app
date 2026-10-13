@@ -4,6 +4,7 @@
 // stand-in so the full login → rotate → reuse flow runs end-to-end (token
 // hashing, transactional revoke + rotate, full session purge on reuse).
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
@@ -203,6 +204,7 @@ describe('Refresh token reuse detection (e2e)', () => {
 
     const moduleRef = await Test.createTestingModule({
       providers: [
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         {
           provide: BreachedPasswordService,
           useValue: { assertNotBreached: jest.fn() }

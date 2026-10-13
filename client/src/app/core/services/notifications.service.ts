@@ -46,6 +46,8 @@ export class NotificationsService {
     this.#ofType('user_crud_events')
   );
 
+  readonly userListStale$ = this.#events$.pipe(this.#ofType('user_list_stale'));
+
   readonly featureFlagsUpdated$ = this.#events$.pipe(
     this.#ofType('feature_flags_updated')
   );

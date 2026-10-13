@@ -3,6 +3,7 @@
 // cache -> limit -> oldest-first pruning runs as one chain. A unit test at
 // either end cannot see whether the plan limit actually reaches the prune.
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -174,6 +175,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
 
     const moduleRef = await Test.createTestingModule({
       providers: [
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         {
           provide: BreachedPasswordService,
           useValue: { assertNotBreached: jest.fn() }

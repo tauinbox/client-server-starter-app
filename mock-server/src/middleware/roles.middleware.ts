@@ -42,6 +42,10 @@ import {
   sameConditions
 } from '../helpers/grant-scope.helpers';
 import { pushToUser } from '../sse-hub';
+import {
+  pushUserCrudEvent,
+  pushUserListStale
+} from '../helpers/user-list-events.helpers';
 import { rewriteRoleNameInRules } from './feature-flags.middleware';
 import {
   requireUuid,
@@ -453,6 +457,7 @@ router.patch(
         }
         notifyRoleHolders(role.name);
         rewriteRoleNameInRules(oldName, role.name);
+        pushUserListStale();
       }
     }
 
@@ -535,6 +540,7 @@ router.delete(
     for (const userId of holderIds) {
       pushToUser(userId, { type: 'permissions_updated', userId });
     }
+    pushUserListStale();
 
     const actor = (req as AuthenticatedRequest).user;
     logAudit('ROLE_DELETE', {
@@ -972,6 +978,7 @@ router.post(
     });
 
     notifyUserRolesChanged(userId);
+    pushUserCrudEvent('updated', userId);
     // The server route is a @Post with no @HttpCode, so Nest answers 201.
     res.status(201).send();
   }
@@ -1045,6 +1052,7 @@ router.delete(
     });
 
     notifyUserRolesChanged(userId);
+    pushUserCrudEvent('updated', userId);
     res.send();
   }
 );

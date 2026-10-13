@@ -167,11 +167,13 @@ describe('NotificationsService', () => {
     const permissions: NotificationEvent[] = [];
     const userCrud: NotificationEvent[] = [];
     const featureFlags: NotificationEvent[] = [];
+    const listStale: NotificationEvent[] = [];
 
     service.sessionInvalidated$.subscribe((e) => session.push(e));
     service.permissionsUpdated$.subscribe((e) => permissions.push(e));
     service.userCrudEvents$.subscribe((e) => userCrud.push(e));
     service.featureFlagsUpdated$.subscribe((e) => featureFlags.push(e));
+    service.userListStale$.subscribe((e) => listStale.push(e));
 
     service.connect();
     const req = httpController.expectOne('/api/v1/notifications/stream');
@@ -180,7 +182,8 @@ describe('NotificationsService', () => {
       'data: {"type":"session_invalidated","userId":"u-1"}\n\n' +
       'data: {"type":"permissions_updated","userId":"u-2"}\n\n' +
       'data: {"type":"user_crud_events","action":"created","userId":"u-3"}\n\n' +
-      'data: {"type":"feature_flags_updated"}\n\n';
+      'data: {"type":"feature_flags_updated"}\n\n' +
+      'data: {"type":"user_list_stale"}\n\n';
     req.event(makeProgressEvent(chunk, chunk.length));
 
     expect(session).toEqual([{ type: 'session_invalidated', userId: 'u-1' }]);
@@ -191,6 +194,7 @@ describe('NotificationsService', () => {
       { type: 'user_crud_events', action: 'created', userId: 'u-3' }
     ]);
     expect(featureFlags).toEqual([{ type: 'feature_flags_updated' }]);
+    expect(listStale).toEqual([{ type: 'user_list_stale' }]);
   });
 
   it('emits an event exactly once when its SSE frame is split across two progress chunks', () => {

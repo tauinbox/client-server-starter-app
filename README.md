@@ -179,9 +179,12 @@ management and theming.
     user change, and when the permission set of a role that they hold changes. It goes to each
     connected holder of that role.
   - `user_crud_events` refreshes the administrator user list after a create, update, delete or
-    restore. The server sends it only to a connected client whose current abilities permit
-    `users:search` on the changed user. Thus an ordinary user never sees these events, and a
-    grant with a condition sees only the users that its list shows.
+    restore. This includes a self-registration, a provider sign-up, a role assign or remove, an
+    own name change and a confirmed email change. The server sends it only to a connected client
+    whose current abilities permit `users:search` on the changed user. Thus an ordinary user
+    never sees these events, and a grant with a condition sees only the users that its list shows.
+  - `user_list_stale` refreshes the same list after a role rename or delete, which changes the
+    role chip of every holder. It names no user and goes to each client that may search users.
 
   The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches
   the Bearer token. `NotificationsService` connects at login and disconnects at logout, and it
@@ -1599,7 +1602,7 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove a permission from a role |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign a role to a user. Answers 404 when the user is unknown or soft-deleted |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted |
-| GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated` and `user_crud_events`. The last one goes only to a client whose `users:search` covers the changed user. One user can hold at most 10 open streams; the next one gets 429 |
+| GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events` and `user_list_stale`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
 | GET | `/rbac/metadata` | `permissions:read` | Get the RBAC metadata: the resources. Redis caches it for 60 s |
 | GET | `/rbac/resources` | `permissions:read` | List each resource |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 400 for an action that the code does not check |
@@ -1872,11 +1875,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2934 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 623 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 612 pass and 11 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1564 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2939 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 628 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 617 pass and 11 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1565 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 318 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1042 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1047 tests pass |
 
 ## CI/CD
 

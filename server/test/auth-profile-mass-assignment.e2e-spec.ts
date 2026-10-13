@@ -3,6 +3,7 @@
 // narrow UpdateProfileDto; fails if either is widened. Auth (401) is covered
 // by check-auth-coverage.
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import {
   ValidationPipe,
@@ -46,6 +47,7 @@ describe('Profile mass-assignment protection (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         RESPONSE_SERIALIZER,
         AuthCookies,
         SignInCompletionService,

@@ -3,7 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { HttpException, Logger, UnauthorizedException } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Request as ExpressRequest, Response } from 'express';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuthController } from './auth.controller';
+import { UserUpdatedEvent } from '../../users/events/user-updated.event';
 import { MfaService } from '../services/mfa.service';
 import { AuthService } from '../services/auth.service';
 import { UsersService } from '../../users/services/users.service';
@@ -141,6 +143,7 @@ describe('AuthController', () => {
     findOne: jest.Mock;
     update: jest.Mock;
   };
+  let eventEmitterMock: { emit: jest.Mock };
   let caslAbilityFactoryMock: {
     resolveForUser: jest.Mock;
   };
@@ -208,6 +211,8 @@ describe('AuthController', () => {
         .mockResolvedValue({ id: 'user-1', email: 'admin@example.com' })
     };
 
+    eventEmitterMock = { emit: jest.fn() };
+
     caslAbilityFactoryMock = {
       resolveForUser: jest.fn().mockResolvedValue({
         ability: { rules: [] },
@@ -245,6 +250,7 @@ describe('AuthController', () => {
         { provide: MfaPolicyService, useValue: mfaPolicyMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MailService, useValue: mailServiceMock },
+        { provide: EventEmitter2, useValue: eventEmitterMock },
         {
           provide: MetricsService,
           useValue: { recordAuthEvent: jest.fn() }
@@ -719,6 +725,47 @@ describe('AuthController', () => {
       expect(res.clearCookie).not.toHaveBeenCalled();
       expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'user-1', email: 'admin@example.com' });
+    });
+
+    it('announces a name change with the record before the write', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const previous = { id: 'user-1', firstName: 'Old', lastName: 'Name' };
+      userServiceMock.findOne.mockResolvedValueOnce(previous);
+      userServiceMock.update.mockResolvedValueOnce({
+        ...previous,
+        firstName: 'New'
+      });
+
+      await controller.updateProfile(req, { firstName: 'New' }, mockResponse());
+
+      expect(eventEmitterMock.emit).toHaveBeenCalledWith(
+        UserUpdatedEvent.name,
+        expect.objectContaining({ userId: 'user-1', previous })
+      );
+    });
+
+    it('announces nothing when the name does not change', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const previous = { id: 'user-1', firstName: 'Same', lastName: 'Name' };
+      userServiceMock.findOne.mockResolvedValueOnce(previous);
+      userServiceMock.update.mockResolvedValueOnce(previous);
+
+      await controller.updateProfile(
+        req,
+        { firstName: 'Same', locale: 'ru' },
+        mockResponse()
+      );
+
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+    });
+
+    it('reads no previous record for a change without a name', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+
+      await controller.updateProfile(req, { locale: 'ru' }, mockResponse());
+
+      expect(userServiceMock.findOne).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
     });
 
     it('should call logout, clear cookie, and log PASSWORD_CHANGE when password is updated', async () => {

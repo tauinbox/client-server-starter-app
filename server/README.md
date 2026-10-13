@@ -2514,7 +2514,7 @@ The base URL is `/api/v1`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events` and `feature_flags_updated`. `user_crud_events` goes only to a client whose `users:search` covers the changed user. One user can hold at most 10 open streams; the next one gets 429 |
+| GET | `/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events`, `user_list_stale` and `feature_flags_updated`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` (a role rename or delete) goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
 
 ### Feature Flags (`/api/v1`)
 

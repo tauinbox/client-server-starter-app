@@ -32,6 +32,9 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { MfaService } from './mfa.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserCreatedEvent } from '../../users/events/user-created.event';
+import { UserUpdatedEvent } from '../../users/events/user-updated.event';
 import { SessionIssuerService } from './session-issuer.service';
 import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
@@ -120,6 +123,7 @@ describe('AuthService', () => {
     sign: jest.Mock;
     verify: jest.Mock;
   };
+  let mockEventEmitter: { emit: jest.Mock };
   let mockMfaService: {
     isValidStepUpCode: jest.Mock;
   };
@@ -311,6 +315,8 @@ describe('AuthService', () => {
       isValidStepUpCode: jest.fn().mockResolvedValue(false)
     };
 
+    mockEventEmitter = { emit: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -332,6 +338,7 @@ describe('AuthService', () => {
           useValue: mockBreachedPasswordService
         },
         { provide: MfaService, useValue: mockMfaService },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: CACHE_MANAGER, useValue: createMockCache() }
       ]
     }).compile();
@@ -921,6 +928,10 @@ describe('AuthService', () => {
         expect.any(String),
         'en'
       );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        UserCreatedEvent.name,
+        new UserCreatedEvent('new-user-1')
+      );
       expect(result.message).toContain('Registration successful');
     });
 
@@ -931,6 +942,7 @@ describe('AuthService', () => {
         HttpException
       );
       expect(mockManager.save).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('refuses a breached password before it opens the transaction', async () => {
@@ -2943,6 +2955,10 @@ describe('AuthService', () => {
       expect(
         mockMailService.sendEmailChangeCompletedNotification
       ).toHaveBeenCalledWith('test@example.com', 'new@example.com', 'en');
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        UserUpdatedEvent.name,
+        expect.objectContaining({ userId: 'user-1', previous: pendingUser })
+      );
       expect(result.message).toMatch(/sign in again/);
     });
 
@@ -2953,6 +2969,7 @@ describe('AuthService', () => {
         HttpException
       );
       expect(mockManager.update).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('refuses a deactivated account with the not-found envelope', async () => {
