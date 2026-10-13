@@ -178,12 +178,15 @@ management and theming.
   - `permissions_updated` starts a silent permissions read. The server sends it when the roles of a
     user change, and when the permission set of a role that they hold changes. It goes to each
     connected holder of that role.
-  - `user_crud_events` refreshes the administrator user list after a create, update, delete or
-    restore. This includes a self-registration, a provider sign-up, a role assign or remove, an
+  - `user_crud_events` keeps the administrator user list current after a create, update, delete
+    or restore, with no reload of the loaded pages. An update or a restore of a loaded row reads
+    that user with `GET /users/:id` and replaces the row. A delete removes a loaded row, and a
+    create shows the banner "The user list has changed." with a Refresh action. An event for a
+    row that is not loaded changes nothing. This includes a self-registration, a provider sign-up, a role assign or remove, an
     own name change and a confirmed email change. The server sends it only to a connected client
     whose current abilities permit `users:search` on the changed user. Thus an ordinary user
     never sees these events, and a grant with a condition sees only the users that its list shows.
-  - `user_list_stale` refreshes the same list after a role rename or delete, which changes the
+  - `user_list_stale` shows the same banner after a role rename or delete, which changes the
     role chip of every holder. It names no user and goes to each client that may search users.
 
   The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches

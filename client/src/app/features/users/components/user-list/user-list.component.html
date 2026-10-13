@@ -14,6 +14,16 @@
 
       <mat-divider></mat-divider>
 
+      @if (stale()) {
+        <div class="stale-notice" role="status">
+          <mat-icon>info</mat-icon>
+          <span class="stale-text">{{ t('users.list.staleNotice') }}</span>
+          <button mat-button type="button" (click)="refresh()">
+            {{ t('users.list.actionRefresh') }}
+          </button>
+        </div>
+      }
+
       @if (loading() && displayedUsers().length === 0) {
         <nxs-list-skeleton [cells]="skeletonCells" [topBorder]="false" />
       } @else if (displayedUsers().length === 0) {

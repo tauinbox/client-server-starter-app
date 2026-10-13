@@ -20,6 +20,8 @@
     "signInPassword": "Has a password",
     "signInOAuthOnly": "Provider only",
     "empty": "No users yet.",
+    "staleNotice": "The user list has changed.",
+    "actionRefresh": "Refresh",
     "confirmDeleteTitle": "Confirm delete",
     "confirmDeleteMessage": "Are you sure you want to delete user {{ firstName }} {{ lastName }}?",
     "successDeleted": "User deleted successfully",

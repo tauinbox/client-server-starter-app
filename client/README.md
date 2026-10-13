@@ -650,6 +650,13 @@ The store has one `load()` and `loadMore()` pair with **infinite scroll**. The p
 `upsertEntities` appends each page. The `hasMore` computed signal controls the sentinel. The
 `isLoadingMore` signal shows the spinner.
 
+A live event never reloads the list, because a reload drops the pages that the admin scrolled
+through. `applyUserEvent` reads an updated or restored row with `GET /users/:id` and replaces it,
+and removes a deleted row. A row that is not loaded is left alone. A created user, a
+`user_list_stale` event, and a read that fails with a status other than 404 call `markStale()`,
+and the page then shows the banner "The user list has changed." with a Refresh action. The next
+first-page load clears the mark.
+
 The filters and the sort live in the URL (`users.q`, `users.sortBy`, ...). The component calls
 `bindListToUrl(store)`: the filter bar and the table sort write the URL, and the binding calls
 `setFilters()`, `setSorting()` and `load()` once for each URL change.

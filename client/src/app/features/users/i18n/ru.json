@@ -20,6 +20,8 @@
     "signInPassword": "Есть пароль",
     "signInOAuthOnly": "Только провайдер",
     "empty": "Пока нет пользователей.",
+    "staleNotice": "Список пользователей изменился.",
+    "actionRefresh": "Обновить",
     "confirmDeleteTitle": "Подтверждение удаления",
     "confirmDeleteMessage": "Вы уверены, что хотите удалить пользователя {{ firstName }} {{ lastName }}?",
     "successDeleted": "Пользователь успешно удалён",
