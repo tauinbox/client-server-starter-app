@@ -242,7 +242,7 @@ const FREE_PLAN_KEY = 'free';
  * moves what the plan grants tells that one client, never a broadcast.
  */
 function notifyEntitlementsChanged(userId: string): void {
-  pushToUser(userId, { type: 'entitlements_updated', userId });
+  pushToUser(userId, { type: 'entitlements_updated' });
 }
 
 function findPlanByKey(key: string): MockPlan | undefined {

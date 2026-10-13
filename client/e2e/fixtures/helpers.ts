@@ -258,8 +258,8 @@ export async function loginViaUiKeepSse(
     { timeout: 10_000 }
   );
   // Wait for the SSE stream request to be issued — sse-hub.ts only pushes to
-  // currently-connected users, so any /__control/notify call before the stream
-  // is open silently drops on the floor. The request itself is fire-and-keep
+  // currently-connected users, so any push before the stream is open silently
+  // drops on the floor. The request itself is fire-and-keep
   // (the body never resolves), so we wait for the request, not the response.
   const sseRequest = page.waitForRequest(
     (r) => r.url().includes('/api/v1/notifications/stream'),

@@ -1,16 +1,7 @@
 import { expect, loginViaUiKeepSse, test } from '../fixtures/base.fixture';
 
-// Regression for BKL-013. The route guard checks the OR-of-three admin
-// permission set on navigation, but if the admin loses their privileges WHILE
-// already inside /admin/* (e.g. another admin revokes their role and the SSE
-// `permissions_updated` event fires), no further navigation happens, so the
-// guard never re-runs. AdminPanelComponent owns the live re-evaluation: when
-// the signal flips false, navigate to /forbidden so the user is not left
-// staring at an admin tab they can no longer act on.
-//
-// Given an admin is sitting on /admin,
-// when their role is revoked server-side and the SSE event fires,
-// then the page must auto-redirect to /forbidden — no click, no reload.
+// The route guard runs only on navigation, so a permission loss inside /admin
+// (a `permissions_updated` push) must redirect from AdminPanelComponent.
 test.describe('Admin panel — auto-redirect on permission loss (BKL-013)', () => {
   test('admin on /admin is booted to /forbidden when SSE strips their role', async ({
     _mockServer,
@@ -32,12 +23,7 @@ test.describe('Admin panel — auto-redirect on permission loss (BKL-013)', () =
     // Confirm we landed on /admin (a tab nav is present).
     await expect(page).toHaveURL(/\/admin\b/);
 
-    // Server-side: drop the user's roles and push the SSE event WITHOUT
-    // revoking tokens. The client's NotificationsService delivers
-    // `permissions_updated` over the open stream; AuthService re-fetches
-    // permissions; the new (empty) ability flips canAccessAdmin to false;
-    // the AdminPanelComponent effect navigates to /forbidden. Tokens stay
-    // valid so the user is not booted to /login — that's the BKL-013 fix.
+    // Tokens stay valid, so the user goes to /forbidden, not to /login.
     await _mockServer.changeUserRoles(userId, []);
 
     await expect(page).toHaveURL(/\/forbidden\b/, { timeout: 15_000 });

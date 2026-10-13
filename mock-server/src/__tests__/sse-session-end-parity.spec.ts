@@ -99,12 +99,10 @@ async function openStream(token: string): Promise<OpenStream> {
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-const invalidatedFrame = (userId: string): string =>
-  `data: ${JSON.stringify({ type: 'session_invalidated', userId })}`;
+const invalidatedFrame = `data: ${JSON.stringify({ type: 'session_invalidated' })}`;
 
 describe('an SSE stream ends with its session', () => {
   it('ends the stream of a signed-out session and keeps the stream of another session', async () => {
-    const userId = findUserByEmail(USER_EMAIL)!.id;
     const a = await signIn();
     const b = await signIn();
     const streamA = await openStream(a.accessToken);
@@ -122,7 +120,7 @@ describe('an SSE stream ends with its session', () => {
     await wait(HEARTBEAT_MS * 4);
 
     expect(streamA.ended()).toBe(true);
-    expect(streamA.body()).toContain(invalidatedFrame(userId));
+    expect(streamA.body()).toContain(invalidatedFrame);
     expect(streamB.ended()).toBe(false);
     expect(streamB.body()).not.toContain('session_invalidated');
   });
@@ -136,7 +134,7 @@ describe('an SSE stream ends with its session', () => {
     await wait(HEARTBEAT_MS * 4);
 
     expect(stream.ended()).toBe(true);
-    expect(stream.body()).toContain(invalidatedFrame(userId));
+    expect(stream.body()).toContain(invalidatedFrame);
   });
 
   it('keeps the stream of a live session open across heartbeats', async () => {

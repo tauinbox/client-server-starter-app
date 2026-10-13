@@ -284,16 +284,13 @@ describe('Feature flags end-to-end', () => {
   let flagService: FeatureFlagService;
   let resolver: FeatureFlagResolverService;
   let listener: FeatureFlagChangedListener;
-  let notifications: {
-    push: jest.Mock;
-    pushToAll: jest.Mock;
-  };
+  let notifications: { pushToAll: jest.Mock };
   let cache: ReturnType<typeof makeCacheMock>;
 
   beforeEach(async () => {
     stores = createStores();
     cache = makeCacheMock();
-    notifications = { push: jest.fn(), pushToAll: jest.fn() };
+    notifications = { pushToAll: jest.fn() };
 
     const flagRepo = makeFlagRepoMock(stores);
     const ruleRepo = makeRuleRepoMock(stores);
@@ -500,14 +497,6 @@ describe('Feature flags end-to-end', () => {
     expect(notifications.pushToAll).toHaveBeenCalledWith({
       type: 'feature_flags_updated'
     });
-  });
-
-  it('UserRoleChangedEvent notifies only the affected user', () => {
-    listener.handleUserRoleChanged({ userId: 'u-42' });
-    expect(notifications.push).toHaveBeenCalledWith('u-42', {
-      type: 'feature_flags_updated'
-    });
-    expect(notifications.pushToAll).not.toHaveBeenCalled();
   });
 
   it('preview() returns included-by-rule with matchedRule index for a synthetic role context', async () => {

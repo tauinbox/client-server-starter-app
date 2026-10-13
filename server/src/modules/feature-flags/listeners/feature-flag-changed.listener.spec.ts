@@ -5,16 +5,15 @@ import {
 } from './feature-flag-changed.listener';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { NotificationsService } from '../../notifications/notifications.service';
-import { UserRoleChangedEvent } from '../../auth/events/user-role-changed.event';
 
 describe('FeatureFlagChangedListener', () => {
   let listener: FeatureFlagChangedListener;
   let resolver: { invalidateAll: jest.Mock };
-  let notifications: { push: jest.Mock; pushToAll: jest.Mock };
+  let notifications: { pushToAll: jest.Mock };
 
   beforeEach(async () => {
     resolver = { invalidateAll: jest.fn().mockResolvedValue(undefined) };
-    notifications = { push: jest.fn(), pushToAll: jest.fn() };
+    notifications = { pushToAll: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FeatureFlagChangedListener,
@@ -72,14 +71,5 @@ describe('FeatureFlagChangedListener', () => {
       jest.advanceTimersByTime(FLAGS_BROADCAST_COALESCE_MS);
       expect(notifications.pushToAll).not.toHaveBeenCalled();
     });
-  });
-
-  it('tells only the affected user to reload flags on role change', () => {
-    listener.handleUserRoleChanged(new UserRoleChangedEvent('u-1'));
-    expect(resolver.invalidateAll).not.toHaveBeenCalled();
-    expect(notifications.push).toHaveBeenCalledWith('u-1', {
-      type: 'feature_flags_updated'
-    });
-    expect(notifications.pushToAll).not.toHaveBeenCalled();
   });
 });

@@ -7,10 +7,10 @@ import { mockId } from '../fixtures/ids';
 // live — the server emits `RolePermissionsChangedEvent(holderIds)` →
 // `NotificationsListener` pushes a `permissions_updated` SSE frame per holder.
 //
-// This is deliberately distinct from `role-revocation-via-sse.spec.ts` (which
-// strips a user's role): here the user keeps their role, but the role loses the
-// permission that gated a control. Tokens are NOT revoked — abilities are
-// re-derived from the DB per request, so the session continues.
+// This is deliberately distinct from `role-change-sign-out.spec.ts` (a change
+// of a user's roles ends the sessions): here the user keeps their role, but the
+// role loses the permission that gated a control. Tokens are NOT revoked —
+// abilities are re-derived from the DB per request, so the session continues.
 //
 // Given a user holds a non-super role whose only permission (`read Role`) makes
 // the sidenav admin link visible, when an admin revokes that permission from

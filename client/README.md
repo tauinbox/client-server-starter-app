@@ -716,7 +716,8 @@ automatically. The service parses `HttpDownloadProgressEvent.partialText` and ke
 
 The service supplies three streams:
 
-- `sessionInvalidated$` calls `tokenService.forceLogout()`.
+- `sessionInvalidated$`: `AuthService` calls `tokenService.forceLogout(router.url)`, so the login
+  page gets the current page as `returnUrl`.
 - `permissionsUpdated$` starts `authService.fetchPermissions()`, and then the permission-gated
   `fetchRbacMetadata()`.
 - `userCrudEvents$` refreshes the user list. The server sends these events only to a client whose
@@ -1160,7 +1161,7 @@ axe rule `aria-progressbar-name` requires a name for it. Use `[attr.aria-label]=
 **Live RBAC and authentication regression net.** The suite holds these specs:
 
 - refresh-token reuse detection, and a lost rotation response that signs out only its own device (`refresh-token-reuse.spec.ts`)
-- role revocation through SSE hides the admin link (`role-revocation-via-sse.spec.ts`)
+- a role assignment signs the user out with the return URL (`role-change-sign-out.spec.ts`)
 - an administrator on `/admin` goes to `/forbidden` (`admin/admin-panel-permission-loss.spec.ts`)
 - a reactive 401 causes a refresh and a retry (`reactive-token-refresh.spec.ts`)
 - logout and then the browser Back button (`logout-back-button.spec.ts`)

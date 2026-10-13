@@ -53,7 +53,7 @@ router.get('/stream', authGuard, (req, res) => {
     if (!isSessionLive(sessionId)) {
       clearInterval(keepalive);
       removeSseConnection(userId, connectionId);
-      const event: NotificationEvent = { type: 'session_invalidated', userId };
+      const event: NotificationEvent = { type: 'session_invalidated' };
       res.end(`data: ${JSON.stringify(event)}\n\n`);
       return;
     }

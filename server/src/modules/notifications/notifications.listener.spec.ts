@@ -3,11 +3,9 @@ import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { NotificationsListener } from './notifications.listener';
 import { NotificationsService } from './notifications.service';
 import { UserDeletedEvent } from '../users/events/user-deleted.event';
-import { UserPasswordChangedByAdminEvent } from '../users/events/user-password-changed-by-admin.event';
 import { UserCreatedEvent } from '../users/events/user-created.event';
 import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
-import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
 import { RoleRenamedEvent } from '../auth/events/role-renamed.event';
 import { RoleDeletedEvent } from '../auth/events/role-deleted.event';
@@ -53,13 +51,10 @@ describe('NotificationsListener', () => {
     listener = module.get<NotificationsListener>(NotificationsListener);
   });
 
-  it('should push session_invalidated and user_crud_events deleted on UserDeletedEvent', async () => {
+  it('should push user_crud_events deleted, and nothing to the deleted user, on UserDeletedEvent', async () => {
     await listener.handleUserDeleted(new UserDeletedEvent('user-1'));
 
-    expect(service.push).toHaveBeenCalledWith('user-1', {
-      type: 'session_invalidated',
-      userId: 'user-1'
-    });
+    expect(service.push).not.toHaveBeenCalled();
     expect(service.pushToAuthorized).toHaveBeenCalledWith(
       { type: 'user_crud_events', action: 'deleted', userId: 'user-1' },
       expect.any(Function)
@@ -127,22 +122,6 @@ describe('NotificationsListener', () => {
 
     await listener.handleUserDeleted(new UserDeletedEvent('user-10'));
 
-    expect(service.push).toHaveBeenCalledWith('user-10', {
-      type: 'session_invalidated',
-      userId: 'user-10'
-    });
-    expect(service.pushToAuthorized).not.toHaveBeenCalled();
-  });
-
-  it('should push session_invalidated on UserPasswordChangedByAdminEvent', () => {
-    listener.handlePasswordChangedByAdmin(
-      new UserPasswordChangedByAdminEvent('user-2')
-    );
-
-    expect(service.push).toHaveBeenCalledWith('user-2', {
-      type: 'session_invalidated',
-      userId: 'user-2'
-    });
     expect(service.pushToAuthorized).not.toHaveBeenCalled();
   });
 
@@ -173,27 +152,16 @@ describe('NotificationsListener', () => {
     );
   });
 
-  it('should push permissions_updated on UserRoleChangedEvent', () => {
-    listener.handleUserRoleChanged(new UserRoleChangedEvent('user-6'));
-
-    expect(service.push).toHaveBeenCalledWith('user-6', {
-      type: 'permissions_updated',
-      userId: 'user-6'
-    });
-  });
-
   it('should push permissions_updated to every holder on RolePermissionsChangedEvent', () => {
     listener.handleRolePermissionsChanged(
       new RolePermissionsChangedEvent(['user-7', 'user-8'])
     );
 
     expect(service.push).toHaveBeenCalledWith('user-7', {
-      type: 'permissions_updated',
-      userId: 'user-7'
+      type: 'permissions_updated'
     });
     expect(service.push).toHaveBeenCalledWith('user-8', {
-      type: 'permissions_updated',
-      userId: 'user-8'
+      type: 'permissions_updated'
     });
     expect(service.push).toHaveBeenCalledTimes(2);
   });

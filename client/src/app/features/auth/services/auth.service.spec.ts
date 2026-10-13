@@ -1,6 +1,6 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -107,6 +107,7 @@ describe('AuthService', () => {
     clear: ReturnType<typeof vi.fn>;
   };
   let entitlementsUpdated$: Subject<NotificationEvent>;
+  let sessionInvalidated$: Subject<NotificationEvent>;
   let permissionsUpdated$: Subject<NotificationEvent>;
   let featureFlagsUpdated$: Subject<NotificationEvent>;
   let reconnected$: Subject<void>;
@@ -156,6 +157,7 @@ describe('AuthService', () => {
       clear: vi.fn()
     };
     entitlementsUpdated$ = new Subject<NotificationEvent>();
+    sessionInvalidated$ = new Subject<NotificationEvent>();
     permissionsUpdated$ = new Subject<NotificationEvent>();
     featureFlagsUpdated$ = new Subject<NotificationEvent>();
     reconnected$ = new Subject<void>();
@@ -176,6 +178,7 @@ describe('AuthService', () => {
           useValue: {
             connect: notificationsConnect,
             disconnect: vi.fn(),
+            sessionInvalidated$,
             permissionsUpdated$,
             featureFlagsUpdated$,
             entitlementsUpdated$: entitlementsUpdated$,
@@ -624,14 +627,25 @@ describe('AuthService', () => {
     });
   });
 
+  describe('session_invalidated push', () => {
+    it('signs out and keeps the current URL as the return URL', () => {
+      vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue(
+        '/admin/users?q=x'
+      );
+
+      sessionInvalidated$.next({ type: 'session_invalidated' });
+
+      expect(tokenServiceMock.forceLogout).toHaveBeenCalledExactlyOnceWith(
+        '/admin/users?q=x'
+      );
+    });
+  });
+
   describe('entitlements_updated push', () => {
     it('re-fetches the mirror when it is already loaded', () => {
       entitlementsStoreMock.loaded.set(true);
 
-      entitlementsUpdated$.next({
-        type: 'entitlements_updated',
-        userId: 'user-1'
-      });
+      entitlementsUpdated$.next({ type: 'entitlements_updated' });
 
       expect(entitlementsStoreMock.reload).toHaveBeenCalledTimes(1);
     });
@@ -639,10 +653,7 @@ describe('AuthService', () => {
     it('stays silent for a session that never resolved entitlements', () => {
       entitlementsStoreMock.loaded.set(false);
 
-      entitlementsUpdated$.next({
-        type: 'entitlements_updated',
-        userId: 'user-1'
-      });
+      entitlementsUpdated$.next({ type: 'entitlements_updated' });
 
       expect(entitlementsStoreMock.reload).not.toHaveBeenCalled();
     });
@@ -691,10 +702,7 @@ describe('AuthService', () => {
     });
 
     it('does not reload the flags on a permission change alone', () => {
-      permissionsUpdated$.next({
-        type: 'permissions_updated',
-        userId: 'user-1'
-      });
+      permissionsUpdated$.next({ type: 'permissions_updated' });
       vi.advanceTimersByTime(5000);
 
       expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();

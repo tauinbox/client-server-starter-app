@@ -3,11 +3,9 @@ import { subject } from '@casl/ability';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsService } from './notifications.service';
 import { UserDeletedEvent } from '../users/events/user-deleted.event';
-import { UserPasswordChangedByAdminEvent } from '../users/events/user-password-changed-by-admin.event';
 import { UserCreatedEvent } from '../users/events/user-created.event';
 import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
-import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
 import { RoleRenamedEvent } from '../auth/events/role-renamed.event';
 import { RoleDeletedEvent } from '../auth/events/role-deleted.event';
@@ -34,19 +32,7 @@ export class NotificationsListener {
 
   @OnEvent(UserDeletedEvent.name)
   async handleUserDeleted(event: UserDeletedEvent): Promise<void> {
-    this.notificationsService.push(event.userId, {
-      type: 'session_invalidated',
-      userId: event.userId
-    });
     await this.#pushUserCrudEvent('deleted', event.userId);
-  }
-
-  @OnEvent(UserPasswordChangedByAdminEvent.name)
-  handlePasswordChangedByAdmin(event: UserPasswordChangedByAdminEvent): void {
-    this.notificationsService.push(event.userId, {
-      type: 'session_invalidated',
-      userId: event.userId
-    });
   }
 
   @OnEvent(UserCreatedEvent.name)
@@ -62,14 +48,6 @@ export class NotificationsListener {
   @OnEvent(UserRestoredEvent.name)
   async handleUserRestored(event: UserRestoredEvent): Promise<void> {
     await this.#pushUserCrudEvent('restored', event.userId);
-  }
-
-  @OnEvent(UserRoleChangedEvent.name)
-  handleUserRoleChanged(event: UserRoleChangedEvent): void {
-    this.notificationsService.push(event.userId, {
-      type: 'permissions_updated',
-      userId: event.userId
-    });
   }
 
   @OnEvent(RoleRenamedEvent.name)
@@ -104,10 +82,7 @@ export class NotificationsListener {
   @OnEvent(RolePermissionsChangedEvent.name)
   handleRolePermissionsChanged(event: RolePermissionsChangedEvent): void {
     for (const userId of event.userIds) {
-      this.notificationsService.push(userId, {
-        type: 'permissions_updated',
-        userId
-      });
+      this.notificationsService.push(userId, { type: 'permissions_updated' });
     }
   }
 

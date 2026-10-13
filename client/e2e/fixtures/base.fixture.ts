@@ -174,13 +174,6 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify({ roleName, permissionIds })
         });
       },
-      async revokeUserSessions(userId, newRoles) {
-        await fetch(`${baseUrl}/__control/revoke-user-sessions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, newRoles })
-        });
-      },
       async setCaptcha(enabled, siteKey) {
         await fetch(`${baseUrl}/__control/captcha`, {
           method: 'POST',

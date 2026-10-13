@@ -194,16 +194,9 @@ function findGrantError(
 export function notifyRoleHolders(roleName: string): void {
   for (const user of getState().users.values()) {
     if (user.roles.includes(roleName)) {
-      pushToUser(user.id, { type: 'permissions_updated', userId: user.id });
+      pushToUser(user.id, { type: 'permissions_updated' });
     }
   }
-}
-
-// A role assignment changes the role names of the user, so it can change the
-// user's flags too. Mirrors the two server listeners of UserRoleChangedEvent.
-export function notifyUserRolesChanged(userId: string): void {
-  pushToUser(userId, { type: 'permissions_updated', userId });
-  pushToUser(userId, { type: 'feature_flags_updated' });
 }
 
 // GET /api/v1/roles
@@ -538,7 +531,7 @@ router.delete(
     rewriteRoleNameInRules(role.name, null);
 
     for (const userId of holderIds) {
-      pushToUser(userId, { type: 'permissions_updated', userId });
+      pushToUser(userId, { type: 'permissions_updated' });
     }
     pushUserListStale();
 
@@ -977,7 +970,6 @@ router.post(
       ip: req.ip
     });
 
-    notifyUserRolesChanged(userId);
     pushUserCrudEvent('updated', userId);
     // The server route is a @Post with no @HttpCode, so Nest answers 201.
     res.status(201).send();
@@ -1051,7 +1043,6 @@ router.delete(
       ip: req.ip
     });
 
-    notifyUserRolesChanged(userId);
     pushUserCrudEvent('updated', userId);
     res.send();
   }
