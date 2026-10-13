@@ -10,12 +10,31 @@ import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
 import type { AppAbility } from '../auth/casl/app-ability';
 import { RefreshTokenService } from '../auth/services/refresh-token.service';
 import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
+import { NotificationsBus } from './notifications-bus';
+import type { BusPeer } from './notifications-bus';
 
 const mockSseRef: SseConnectionsRef = { getCount: () => 0 };
 const HEARTBEAT_MS = 1_000;
 
+class FakeBus extends NotificationsBus {
+  peer: BusPeer | null = null;
+  remoteUserIds: string[] | null = null;
+  readonly publish = jest.fn<void, Parameters<NotificationsBus['publish']>>();
+  readonly userConnected = jest.fn<void, [string]>();
+  readonly userDisconnected = jest.fn<void, [string]>();
+
+  attach(peer: BusPeer): void {
+    this.peer = peer;
+  }
+
+  connectedUserIds(): Promise<string[] | null> {
+    return Promise.resolve(this.remoteUserIds);
+  }
+}
+
 describe('NotificationsService', () => {
   let service: NotificationsService;
+  let bus: FakeBus;
   let caslAbilityFactory: { resolveForUser: jest.Mock };
   let refreshTokenService: { hasLiveSession: jest.Mock };
   /** userIds the mocked ability grants search:User to */
@@ -24,6 +43,7 @@ describe('NotificationsService', () => {
   beforeEach(async () => {
     mockSseRef.getCount = () => 0;
     usersWithListAccess = new Set<string>();
+    bus = new FakeBus();
 
     caslAbilityFactory = {
       resolveForUser: jest.fn().mockImplementation((userId: string) =>
@@ -45,7 +65,8 @@ describe('NotificationsService', () => {
         { provide: SSE_CONNECTIONS_REF, useValue: mockSseRef },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactory },
         { provide: RefreshTokenService, useValue: refreshTokenService },
-        { provide: SSE_HEARTBEAT_INTERVAL_MS, useValue: HEARTBEAT_MS }
+        { provide: SSE_HEARTBEAT_INTERVAL_MS, useValue: HEARTBEAT_MS },
+        { provide: NotificationsBus, useValue: bus }
       ]
     }).compile();
 
@@ -276,6 +297,77 @@ describe('NotificationsService', () => {
       usersWithListAccess.add('user-a');
       await service.pushToAuthorized(crudEvent, canSearchUsers);
       expect(received).toHaveLength(1);
+    });
+
+    it('checks the users of other instances here and publishes only the allowed ones', async () => {
+      const local = service.createStream('local-admin', 'conn-1');
+      const received: unknown[] = [];
+      local.subscribe((e) => received.push(e));
+      bus.remoteUserIds = ['remote-admin', 'remote-basic', 'local-admin'];
+      usersWithListAccess.add('local-admin');
+      usersWithListAccess.add('remote-admin');
+
+      await service.pushToAuthorized(crudEvent, canSearchUsers);
+
+      expect(received).toEqual([{ data: crudEvent }]);
+      expect(bus.publish).toHaveBeenCalledTimes(1);
+      expect(bus.publish).toHaveBeenCalledWith({
+        userIds: ['local-admin', 'remote-admin'],
+        event: crudEvent
+      });
+      expect(caslAbilityFactory.resolveForUser).toHaveBeenCalledTimes(3);
+    });
+
+    it('publishes nothing when no user is allowed', async () => {
+      service.createStream('basic-2', 'conn-1');
+      bus.remoteUserIds = ['remote-basic'];
+
+      await service.pushToAuthorized(crudEvent, canSearchUsers);
+
+      expect(bus.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('bus', () => {
+    const event = { type: 'feature_flags_updated' } as const;
+
+    it('publishes each push for the other instances', () => {
+      service.push('user-1', event);
+      service.pushToAll(event);
+
+      expect(bus.publish.mock.calls).toEqual([
+        [{ userIds: ['user-1'], event }],
+        [{ event }]
+      ]);
+    });
+
+    it('delivers a push from another instance to the streams of this one', () => {
+      const first = service.createStream('user-1', 'conn-1');
+      const second = service.createStream('user-2', 'conn-1');
+      const firstReceived: unknown[] = [];
+      const secondReceived: unknown[] = [];
+      first.subscribe((e) => firstReceived.push(e));
+      second.subscribe((e) => secondReceived.push(e));
+
+      bus.peer?.deliver({ userIds: ['user-1', 'absent'], event });
+      bus.peer?.deliver({ event });
+
+      expect(firstReceived).toEqual([{ data: event }, { data: event }]);
+      expect(secondReceived).toEqual([{ data: event }]);
+      expect(bus.publish).not.toHaveBeenCalled();
+    });
+
+    it('registers a user on the first stream and removes it after the last', () => {
+      service.createStream('user-1', 'conn-1');
+      service.createStream('user-1', 'conn-2');
+      expect(bus.userConnected.mock.calls).toEqual([['user-1']]);
+      expect(bus.peer?.localUserIds()).toEqual(['user-1']);
+
+      service.closeStream('user-1', 'conn-1');
+      expect(bus.userDisconnected).not.toHaveBeenCalled();
+      service.closeStream('user-1', 'conn-2');
+      expect(bus.userDisconnected.mock.calls).toEqual([['user-1']]);
+      expect(bus.peer?.localUserIds()).toEqual([]);
     });
   });
 

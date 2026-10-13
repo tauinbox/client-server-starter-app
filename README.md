@@ -1105,7 +1105,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
-| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting and a shared permission cache for a deployment with more than one instance |
+| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting, a shared permission cache and SSE pushes across instances for a deployment with more than one instance |
 | `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | The Express `trust proxy` setting. It is necessary behind nginx, Caddy, a K8s ingress or Cloudflare, thus `req.ip` gives the true client IP. The throttlers and the audit-log IP record use that value. It accepts `loopback`, `linklocal`, `uniquelocal`, an IP-CIDR list, a hop count, or `true`. The application has no built-in default. `docker-compose.yml` gives `loopback,uniquelocal` for a production deployment. Refer to "Deployment behind a reverse proxy" in `server/README.md` |
 | `SWAGGER_ENABLED` | - | Set it to `true` to enable the Swagger UI in staging or in production. It is always on in `local` and `development` |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry |
@@ -1875,8 +1875,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2939 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 628 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 617 pass and 11 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2946 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 629 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 617 pass and 12 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1565 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 318 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1047 tests pass |

@@ -42,7 +42,7 @@ async function bootstrap() {
     app
       .get(Logger)
       .warn(
-        'REDIS_URL is not set — rate limiting and cache invalidation are per-instance only',
+        'REDIS_URL is not set — rate limiting, cache invalidation and SSE pushes are per-instance only',
         'Bootstrap'
       );
   }
