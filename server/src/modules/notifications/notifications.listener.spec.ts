@@ -89,6 +89,29 @@ describe('NotificationsListener', () => {
     expect(allowsOther(none)).toBe(false);
   });
 
+  it('should send an update to a viewer that saw the record before the change', async () => {
+    usersService.findByIdWithDeleted.mockResolvedValue({
+      id: 'user-11',
+      isActive: false
+    });
+
+    await listener.handleUserUpdated(
+      // @ts-expect-error partial record: the condition reads only isActive
+      new UserUpdatedEvent('user-11', { id: 'user-11', isActive: true })
+    );
+
+    const [[, allows]] = service.pushToAuthorized.mock.calls as [
+      unknown,
+      (ability: AppAbility) => boolean
+    ][];
+    expect(
+      allows(abilityOf((can) => can('search', 'User', { isActive: true })))
+    ).toBe(true);
+    expect(
+      allows(abilityOf((can) => can('search', 'User', { email: 'x' })))
+    ).toBe(false);
+  });
+
   it('should read the user with soft-deleted rows, so a deleted event still has its record', async () => {
     await listener.handleUserDeleted(new UserDeletedEvent('user-9'));
 

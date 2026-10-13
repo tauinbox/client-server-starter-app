@@ -101,15 +101,7 @@ describe('SSE user_crud_events scoping', () => {
     const state = getState();
     const viewer = findUserByEmail('user@example.com')!;
     const other = findUserByEmail('admin@example.com')!;
-    const resourceId = [...state.resources.values()].find(
-      (r) => r.subject === 'User'
-    )!.id;
-    const actionId = [...state.actions.values()].find(
-      (a) => a.name === 'search'
-    )!.id;
-    const permission = [...state.permissions.values()].find(
-      (p) => p.resourceId === resourceId && p.actionId === actionId
-    )!;
+    const permission = searchUserPermission();
     state.roles.set('role-own-search', {
       id: 'role-own-search',
       name: 'own-search',
@@ -155,4 +147,78 @@ describe('SSE user_crud_events scoping', () => {
     );
     expect(frames).not.toContain(other.id);
   });
+
+  it('sends an update to a viewer whose list showed the user before the change', async () => {
+    const state = getState();
+    const viewer = findUserByEmail('user@example.com')!;
+    const target = findUserByEmail('admin@example.com')!;
+    const permission = searchUserPermission();
+    state.roles.set('role-active-search', {
+      id: 'role-active-search',
+      name: 'active-search',
+      description: null,
+      isSystem: false,
+      isSuper: false,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z'
+    });
+    state.rolePermissions.push({
+      id: 'rp-active-search',
+      roleId: 'role-active-search',
+      permissionId: permission.id,
+      conditions: { fieldMatch: { isActive: [true] } }
+    });
+    viewer.roles = [...viewer.roles, 'active-search'];
+    const created = await fetch(`${baseUrl}/api/v1/users`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await login(target.email)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: 'sse-leaves@example.com',
+        firstName: 'Sse',
+        lastName: 'Leaves',
+        password: 'Sunrise-Kettle-19'
+      })
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+
+    const adminToken = await login(target.email);
+    const viewerStream = await openStream(await login('user@example.com'));
+    const res = await fetch(`${baseUrl}/api/v1/users/${id}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ isActive: false })
+    });
+    expect(res.status).toBe(200);
+
+    await wait(100);
+    viewerStream.close();
+
+    expect(viewerStream.frames.join('')).toContain(
+      JSON.stringify({
+        type: 'user_crud_events',
+        action: 'updated',
+        userId: id
+      })
+    );
+  });
 });
+
+function searchUserPermission() {
+  const state = getState();
+  const resourceId = [...state.resources.values()].find(
+    (r) => r.subject === 'User'
+  )!.id;
+  const actionId = [...state.actions.values()].find(
+    (a) => a.name === 'search'
+  )!.id;
+  return [...state.permissions.values()].find(
+    (p) => p.resourceId === resourceId && p.actionId === actionId
+  )!;
+}

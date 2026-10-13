@@ -54,7 +54,7 @@ import {
 } from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import { filterByAbility } from '../helpers/ability-filter.helpers';
-import type { AuthenticatedRequest } from '../types';
+import type { AuthenticatedRequest, MockUser } from '../types';
 import { pushToUser, pushToUsersMatching } from '../sse-hub';
 import {
   requireUuid,
@@ -66,18 +66,24 @@ type UserCrudAction = 'created' | 'updated' | 'deleted' | 'restored';
 // user_crud_events only drive the admin user list, so they go only to the
 // clients whose list shows the user - a broadcast would leak user IDs and the
 // fact that an account was created/updated/deleted to every client. A `search`
-// grant can carry conditions, so the check runs on the record.
-function pushUserCrudEvent(action: UserCrudAction, userId: string): void {
+// grant can carry conditions, so the check runs on the record. A viewer that
+// saw the record before the change (`previous`) must learn of it too.
+function pushUserCrudEvent(
+  action: UserCrudAction,
+  userId: string,
+  previous?: MockUser
+): void {
   const user = findUserByIdWithDeleted(userId);
   if (!user) return;
-  const record = caslSubject('User', user);
+  const records = [user, ...(previous ? [previous] : [])].map((row) =>
+    caslSubject('User', row)
+  );
   pushToUsersMatching(
     (connectedUserId) => {
       const viewer = findUserById(connectedUserId);
-      return (
-        viewer !== undefined &&
-        buildAbilityForUser(viewer).can('search', record)
-      );
+      if (viewer === undefined) return false;
+      const ability = buildAbilityForUser(viewer);
+      return records.some((record) => ability.can('search', record));
     },
     { type: 'user_crud_events', action, userId }
   );
@@ -404,6 +410,7 @@ router.patch(
     ) {
       changed.push('unlockAccount');
     }
+    const previous = { ...user };
 
     let previousEmail: string | undefined;
     if (email !== undefined) {
@@ -503,7 +510,7 @@ router.patch(
       pushToUser(id, { type: 'session_invalidated', userId: id });
     }
 
-    pushUserCrudEvent('updated', id);
+    pushUserCrudEvent('updated', id, previous);
     res.json(toAdminUserResponse(user));
   }
 );

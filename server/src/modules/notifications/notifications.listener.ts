@@ -10,6 +10,7 @@ import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
 import { UsersService } from '../users/services/users.service';
+import type { User } from '../users/entities/user.entity';
 import type { NotificationEvent } from '@app/shared/types';
 
 type UserCrudAction = Extract<
@@ -51,7 +52,7 @@ export class NotificationsListener {
 
   @OnEvent(UserUpdatedEvent.name)
   async handleUserUpdated(event: UserUpdatedEvent): Promise<void> {
-    await this.#pushUserCrudEvent('updated', event.userId);
+    await this.#pushUserCrudEvent('updated', event.userId, event.previous);
   }
 
   @OnEvent(UserRestoredEvent.name)
@@ -79,16 +80,21 @@ export class NotificationsListener {
 
   async #pushUserCrudEvent(
     action: UserCrudAction,
-    userId: string
+    userId: string,
+    previous?: User
   ): Promise<void> {
     // A `search` grant can carry conditions, so the check runs on the record:
-    // a type-level check is true for any conditional rule.
+    // a type-level check is true for any conditional rule. A viewer that saw
+    // the record before the change must learn of it, so that its list can
+    // drop a user that left its scope.
     const user = await this.usersService.findByIdWithDeleted(userId);
     if (!user) return;
-    const record = subject('User', user);
+    const records = [user, ...(previous ? [previous] : [])].map((row) =>
+      subject('User', row)
+    );
     await this.notificationsService.pushToAuthorized(
       { type: 'user_crud_events', action, userId },
-      (ability) => ability.can('search', record)
+      (ability) => records.some((record) => ability.can('search', record))
     );
   }
 }

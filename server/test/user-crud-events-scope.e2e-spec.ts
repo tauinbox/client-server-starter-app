@@ -35,6 +35,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
   const emails = {
     scoped: `${tag}-scoped@example.com`,
     wide: `${tag}-wide@example.com`,
+    activeOnly: `${tag}-active-only@example.com`,
     other: `${tag}-other@example.com`
   };
 
@@ -115,14 +116,23 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       { permissionId: searchUser.id }
     ]);
     await roleService.assignRoleToUser(users.wide.id, wideRole.id);
+
+    const activeRole = await roleService.create({ name: `${tag}-active` });
+    await roleService.setPermissionsForRole(activeRole.id, [
+      {
+        permissionId: searchUser.id,
+        conditions: { fieldMatch: { isActive: [true] } }
+      }
+    ]);
+    await roleService.assignRoleToUser(users.activeOnly.id, activeRole.id);
   }, 60000);
 
   afterAll(async () => {
     for (const req of requests) req.destroy();
     if (dataSource) {
-      await dataSource
-        .getRepository(Role)
-        .delete({ name: In([`${tag}-scoped`, `${tag}-wide`]) });
+      await dataSource.getRepository(Role).delete({
+        name: In([`${tag}-scoped`, `${tag}-wide`, `${tag}-active`])
+      });
       await dataSource
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });
@@ -248,5 +258,33 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     await frame(wide, ownUpdate);
     await frame(scoped, ownUpdate);
     expect(scoped()).toEqual([ownUpdate]);
+  }, 30000);
+
+  it('sends an update to a viewer whose list showed the user before the change', async () => {
+    const activeOnly = await openStream(users.activeOnly);
+    const other = users.other.id;
+    const before = pushes.length;
+
+    await usersController.update(
+      other,
+      { isActive: false },
+      adminRequest(),
+      superAbility()
+    );
+    await usersController.update(
+      other,
+      { firstName: 'Inactive' },
+      adminRequest(),
+      superAbility()
+    );
+    await settle(before + 2);
+
+    const left: UserCrudEvent = {
+      type: 'user_crud_events',
+      action: 'updated',
+      userId: other
+    };
+    await frame(activeOnly, left);
+    expect(activeOnly()).toEqual([left]);
   }, 30000);
 });
