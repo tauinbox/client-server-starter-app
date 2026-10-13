@@ -1,6 +1,15 @@
 import { computed, inject } from '@angular/core';
+import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { pipe, switchMap, tap } from 'rxjs';
+import {
+  catchError,
+  EMPTY,
+  groupBy,
+  mergeMap,
+  pipe,
+  switchMap,
+  tap
+} from 'rxjs';
 import { tapResponse } from '@ngrx/operators';
 import {
   patchState,
@@ -12,6 +21,7 @@ import {
 import { removeEntity, setEntity, updateEntity } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { USER_LIST_QUERY } from '@app/shared/constants';
+import type { NotificationEvent } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { type ListFetcher, withList } from '@shared/store/with-list';
 import {
@@ -27,6 +37,8 @@ import type {
   UserSearch,
   UserSortColumn
 } from '../models/user.types';
+
+type UserCrudEvent = Extract<NotificationEvent, { type: 'user_crud_events' }>;
 
 type UsersState = {
   detailLoading: boolean;
@@ -73,7 +85,50 @@ export const UsersStore = signalStore(
     const userService = inject(UserService);
     const notify = inject(NotifyService);
 
+    // A row the list did not load is left alone: it may not belong to the
+    // loaded pages at all. A change that adds rows needs a reload, and a
+    // reload would drop the pages the admin scrolled through, so the list
+    // only marks itself stale.
+    function applyUserEvent({ action, userId }: UserCrudEvent) {
+      const row = store.entityMap()[userId];
+      if (action === 'created') {
+        store.markStale();
+        return EMPTY;
+      }
+      if (!row) return EMPTY;
+      if (action === 'deleted') {
+        if (!store.filters().includeDeleted) {
+          patchState(store, removeEntity(userId));
+        } else if (!row.deletedAt) {
+          store.markStale();
+        }
+        return EMPTY;
+      }
+      return userService.getListRow(userId).pipe(
+        tap((user) => {
+          // A reload while the request ran may have dropped the row.
+          patchState(store, updateEntity({ id: userId, changes: user }));
+        }),
+        catchError((error: HttpErrorResponse) => {
+          if (error.status === 404 && !store.filters().includeDeleted) {
+            patchState(store, removeEntity(userId));
+          } else {
+            store.markStale();
+          }
+          return EMPTY;
+        })
+      );
+    }
+
     return {
+      /** Only the latest event of a user is applied. */
+      applyUserEvent: rxMethod<UserCrudEvent>(
+        pipe(
+          groupBy((event) => event.userId),
+          mergeMap((events) => events.pipe(switchMap(applyUserEvent)))
+        )
+      ),
+
       loadOne: rxMethod<string>(
         pipe(
           tap(() =>

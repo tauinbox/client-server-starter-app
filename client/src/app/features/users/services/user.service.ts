@@ -31,6 +31,13 @@ export class UserService {
     return this.#http.get<User>(`${USERS_API_V1}/${id}`);
   }
 
+  /** A row refresh after a live event; the list answers a refusal itself. */
+  getListRow(id: string): Observable<User> {
+    return this.#http.get<User>(`${USERS_API_V1}/${id}`, {
+      context: silentContext()
+    });
+  }
+
   create(user: CreateUser): Observable<User> {
     return this.#http.post<User>(USERS_API_V1, user);
   }

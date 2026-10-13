@@ -8,7 +8,9 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, merge, of } from 'rxjs';
+import { catchError, of } from 'rxjs';
+import { MatButton } from '@angular/material/button';
+import { MatIcon } from '@angular/material/icon';
 import {
   MatCard,
   MatCardContent,
@@ -48,6 +50,8 @@ import type { RoleAdminResponse } from '@app/shared/types';
 @Component({
   selector: 'nxs-user-list',
   imports: [
+    MatButton,
+    MatIcon,
     MatCard,
     MatCardHeader,
     MatCardContent,
@@ -174,6 +178,7 @@ export class UserListComponent implements OnInit {
   readonly displayedUsers = this.#usersStore.displayedUsers;
   readonly hasMore = this.#usersStore.hasMore;
   readonly isLoadingMore = this.#usersStore.isLoadingMore;
+  readonly stale = this.#usersStore.stale;
   readonly busy = computed(
     () => this.#usersStore.loading() || this.#usersStore.isLoadingMore()
   );
@@ -190,14 +195,16 @@ export class UserListComponent implements OnInit {
         takeUntilDestroyed(this.#destroyRef)
       )
       .subscribe((roles) => this.roles.set(roles));
-    merge(
-      this.#notificationsService.userCrudEvents$,
-      this.#notificationsService.userListStale$
-    )
+    this.#notificationsService.userCrudEvents$
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe(() => {
-        this.#usersStore.load();
-      });
+      .subscribe((event) => this.#usersStore.applyUserEvent(event));
+    this.#notificationsService.userListStale$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => this.#usersStore.markStale());
+  }
+
+  refresh(): void {
+    this.#usersStore.load();
   }
 
   sortData(sort: Sort): void {

@@ -178,12 +178,15 @@ management and theming.
   - `permissions_updated` starts a silent permissions read. The server sends it when the roles of a
     user change, and when the permission set of a role that they hold changes. It goes to each
     connected holder of that role.
-  - `user_crud_events` refreshes the administrator user list after a create, update, delete or
-    restore. This includes a self-registration, a provider sign-up, a role assign or remove, an
+  - `user_crud_events` keeps the administrator user list current after a create, update, delete
+    or restore, with no reload of the loaded pages. An update or a restore of a loaded row reads
+    that user with `GET /users/:id` and replaces the row. A delete removes a loaded row, and a
+    create shows the banner "The user list has changed." with a Refresh action. An event for a
+    row that is not loaded changes nothing. This includes a self-registration, a provider sign-up, a role assign or remove, an
     own name change and a confirmed email change. The server sends it only to a connected client
     whose current abilities permit `users:search` on the changed user. Thus an ordinary user
     never sees these events, and a grant with a condition sees only the users that its list shows.
-  - `user_list_stale` refreshes the same list after a role rename or delete, which changes the
+  - `user_list_stale` shows the same banner after a role rename or delete, which changes the
     role chip of every holder. It names no user and goes to each client that may search users.
 
   The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches
@@ -1877,8 +1880,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2946 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 630 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 618 pass and 12 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1565 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 318 tests |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1579 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 320 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1048 tests pass |
 
 ## CI/CD

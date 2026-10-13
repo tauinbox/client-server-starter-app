@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { of, Subject, throwError } from 'rxjs';
 import { storeOverrideWarnings } from '../../../../test-utils/store-override-warnings';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
@@ -55,6 +56,7 @@ describe('UsersStore', () => {
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     restore: ReturnType<typeof vi.fn>;
+    getListRow: ReturnType<typeof vi.fn>;
   };
   let store: InstanceType<typeof UsersStore>;
 
@@ -65,7 +67,8 @@ describe('UsersStore', () => {
       getById: vi.fn().mockReturnValue(of(mockUser)),
       update: vi.fn().mockReturnValue(of(mockUser)),
       delete: vi.fn().mockReturnValue(of(void 0)),
-      restore: vi.fn().mockReturnValue(of(mockUser))
+      restore: vi.fn().mockReturnValue(of(mockUser)),
+      getListRow: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -150,6 +153,154 @@ describe('UsersStore', () => {
       store.restoreUser('user-1').subscribe();
 
       expect(store.entities()[0].isActive).toBe(false);
+    });
+  });
+
+  describe('applyUserEvent', () => {
+    const alice: User = { ...mockUser, id: 'alice', firstName: 'Alice' };
+    const bob: User = { ...mockUser, id: 'bob', firstName: 'Bob' };
+    const event = (
+      action: 'created' | 'updated' | 'deleted' | 'restored',
+      userId: string
+    ) => ({ type: 'user_crud_events' as const, action, userId });
+
+    beforeEach(async () => {
+      userServiceMock.getAllCursor
+        .mockReturnValueOnce(
+          of({
+            data: [alice],
+            meta: { nextCursor: 'c1', hasMore: true, limit: 1 }
+          })
+        )
+        .mockReturnValueOnce(
+          of({
+            data: [bob],
+            meta: { nextCursor: 'c2', hasMore: true, limit: 1 }
+          })
+        );
+      store.load();
+      await settled();
+      store.loadMore();
+      await settled();
+    });
+
+    it('updates a loaded row in place and keeps the other pages and the cursor', () => {
+      userServiceMock.getListRow.mockReturnValue(
+        of({ ...bob, firstName: 'Robert' })
+      );
+
+      store.applyUserEvent(event('updated', 'bob'));
+
+      expect(userServiceMock.getListRow).toHaveBeenCalledWith('bob');
+      expect(store.entities().map((user) => user.firstName)).toEqual([
+        'Alice',
+        'Robert'
+      ]);
+      expect(store.nextCursor()).toBe('c2');
+      expect(userServiceMock.getAllCursor).toHaveBeenCalledTimes(2);
+      expect(store.stale()).toBe(false);
+    });
+
+    it('sends no request for a row that is not loaded', () => {
+      store.applyUserEvent(event('updated', 'carol'));
+      store.applyUserEvent(event('restored', 'carol'));
+      store.applyUserEvent(event('deleted', 'carol'));
+
+      expect(userServiceMock.getListRow).not.toHaveBeenCalled();
+      expect(store.entities()).toHaveLength(2);
+      expect(store.stale()).toBe(false);
+    });
+
+    it('removes a deleted row with no request', () => {
+      store.applyUserEvent(event('deleted', 'alice'));
+
+      expect(userServiceMock.getListRow).not.toHaveBeenCalled();
+      expect(store.entities().map((user) => user.id)).toEqual(['bob']);
+      expect(store.stale()).toBe(false);
+    });
+
+    it('marks the list stale for a delete while deleted users are shown', () => {
+      store.setFilters({ includeDeleted: true });
+      store.applyUserEvent(event('deleted', 'alice'));
+
+      expect(store.entities()).toHaveLength(2);
+      expect(store.stale()).toBe(true);
+    });
+
+    it('does not mark the list stale for a delete that the row already shows', () => {
+      store.setFilters({ includeDeleted: true });
+      store.deleteUser('alice').subscribe();
+
+      store.applyUserEvent(event('deleted', 'alice'));
+
+      expect(store.stale()).toBe(false);
+    });
+
+    it('marks the list stale for a created user and sends no request', () => {
+      store.applyUserEvent(event('created', 'carol'));
+
+      expect(userServiceMock.getListRow).not.toHaveBeenCalled();
+      expect(userServiceMock.getAllCursor).toHaveBeenCalledTimes(2);
+      expect(store.stale()).toBe(true);
+    });
+
+    it('removes a row that the server no longer finds', () => {
+      userServiceMock.getListRow.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 404 }))
+      );
+
+      store.applyUserEvent(event('updated', 'alice'));
+
+      expect(store.entities().map((user) => user.id)).toEqual(['bob']);
+    });
+
+    it('keeps the row and marks the list stale when the read is refused', () => {
+      userServiceMock.getListRow.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 403 }))
+      );
+
+      store.applyUserEvent(event('updated', 'alice'));
+
+      expect(store.entities()).toHaveLength(2);
+      expect(store.stale()).toBe(true);
+    });
+
+    it('applies only the latest event of a user', () => {
+      const first = new Subject<User>();
+      const second = new Subject<User>();
+      userServiceMock.getListRow
+        .mockReturnValueOnce(first)
+        .mockReturnValueOnce(second);
+
+      store.applyUserEvent(event('updated', 'alice'));
+      store.applyUserEvent(event('updated', 'alice'));
+      second.next({ ...alice, firstName: 'New' });
+      first.next({ ...alice, firstName: 'Old' });
+
+      expect(store.entityMap()['alice']?.firstName).toBe('New');
+    });
+
+    it('does not bring back a row that a reload dropped while the read ran', async () => {
+      const read = new Subject<User>();
+      userServiceMock.getListRow.mockReturnValue(read);
+      userServiceMock.getAllCursor.mockReturnValueOnce(of(page([bob])));
+
+      store.applyUserEvent(event('updated', 'alice'));
+      store.load();
+      await settled();
+      read.next({ ...alice, firstName: 'Late' });
+
+      expect(store.entities().map((user) => user.id)).toEqual(['bob']);
+    });
+
+    it('clears the stale mark on the next first-page load', async () => {
+      userServiceMock.getAllCursor.mockReturnValueOnce(of(page([alice])));
+      store.markStale();
+
+      store.load();
+      await settled();
+
+      expect(store.stale()).toBe(false);
     });
   });
 });

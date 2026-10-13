@@ -29,6 +29,8 @@ export type CursorListState = {
   isLoadingMore: boolean;
   nextCursor: string | null;
   hasMore: boolean;
+  /** The loaded rows miss a change that only a reload can show. */
+  stale: boolean;
   sortBy: string;
   sortOrder: SortOrder;
 };
@@ -38,6 +40,7 @@ const initialCursorListState: CursorListState = {
   isLoadingMore: false,
   nextCursor: null,
   hasMore: false,
+  stale: false,
   sortBy: DEFAULT_SORT_BY,
   sortOrder: DEFAULT_SORT_ORDER
 };
@@ -95,7 +98,8 @@ export function withCursorList<Entity extends { id: string }>(config: {
           patchState(store, setAllEntities(page.data));
           patchState(store, {
             nextCursor: page.meta.nextCursor,
-            hasMore: page.meta.hasMore
+            hasMore: page.meta.hasMore,
+            stale: false
           });
         } catch (error) {
           if (token !== sequence) return;
@@ -154,7 +158,12 @@ export function withCursorList<Entity extends { id: string }>(config: {
         });
       }
 
-      return { loadFirstPage, loadNextPage, setSorting };
+      /** A successful first-page load clears the mark. */
+      function markStale(): void {
+        patchState(store, { stale: true });
+      }
+
+      return { loadFirstPage, loadNextPage, setSorting, markStale };
     })
   );
 }

@@ -44,4 +44,15 @@ describe('UserService', () => {
     ).toBe(false);
     req.flush({});
   });
+
+  it('reads a list row without the global error snackbar', () => {
+    service.getListRow('user-1').subscribe();
+
+    const req = httpMock.expectOne(`${USERS_API_V1}/user-1`);
+    expect(req.request.method).toBe('GET');
+    expect(
+      req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
+    ).toBe(true);
+    req.flush({});
+  });
 });

@@ -59,6 +59,9 @@ describe('UserListComponent', () => {
       totalUsers: signal(0),
       displayedUsers: signal<User[]>([]),
       hasMore: signal(false),
+      stale: signal(false),
+      applyUserEvent: vi.fn(),
+      markStale: vi.fn(),
       filters: signal<UserSearch>({}),
       hasActiveFilters: signal(false),
       loadMore: vi.fn(),
@@ -131,16 +134,36 @@ describe('UserListComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('reloads the list on a user change and on a stale list', () => {
-    usersStoreMock.load.mockClear();
-
-    userCrudEvents$.next({
+  it('hands a user change to the store and does not reload the list', () => {
+    const event = {
       type: 'user_crud_events',
-      action: 'created',
+      action: 'updated',
       userId: 'u-1'
-    });
+    };
+
+    userCrudEvents$.next(event);
+
+    expect(usersStoreMock.applyUserEvent).toHaveBeenCalledWith(event);
+    expect(usersStoreMock.load).toHaveBeenCalledTimes(1); // only on init
+  });
+
+  it('marks the list stale on a stale-list event and does not reload it', () => {
     userListStale$.next({ type: 'user_list_stale' });
 
+    expect(usersStoreMock.markStale).toHaveBeenCalledTimes(1);
+    expect(usersStoreMock.load).toHaveBeenCalledTimes(1); // only on init
+  });
+
+  it('shows the stale banner, and its refresh action reloads the list', () => {
+    const banner = () =>
+      (fixture.nativeElement as HTMLElement).querySelector('.stale-notice');
+    expect(banner()).toBeNull();
+
+    usersStoreMock.stale.set(true);
+    fixture.detectChanges();
+    expect(banner()?.textContent).toContain('The user list has changed.');
+
+    banner()?.querySelector('button')?.click();
     expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
   });
 

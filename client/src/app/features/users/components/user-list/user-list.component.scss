@@ -17,6 +17,25 @@
     margin-block: vars.$spacing-md;
   }
 
+  .stale-notice {
+    display: flex;
+    gap: vars.$space-component-gap;
+    align-items: center;
+    padding: vars.$spacing-xs vars.$spacing-sm;
+    margin-bottom: vars.$space-section-gap;
+    color: var(--mat-sys-on-secondary-container);
+    background: var(--mat-sys-secondary-container);
+    border-radius: func.rem(8);
+
+    mat-icon {
+      flex-shrink: 0;
+    }
+  }
+
+  .stale-text {
+    flex: 1;
+  }
+
   .scroll-sentinel {
     height: func.rem(1);
   }
