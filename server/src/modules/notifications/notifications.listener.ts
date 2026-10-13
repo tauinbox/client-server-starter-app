@@ -18,6 +18,8 @@ type UserCrudAction = Extract<
   { type: 'user_crud_events' }
 >['action'];
 
+const SEARCH_USER = { action: 'search', subject: 'User' } as const;
+
 // user_crud_events only drive the admin user list, so they go only to the
 // clients whose list shows the user - a broadcast would leak user IDs and the
 // fact that an account was created/updated/deleted to every client.
@@ -67,7 +69,8 @@ export class NotificationsListener {
       .then(() =>
         this.notificationsService.pushToAuthorized(
           { type: 'user_list_stale' },
-          (ability) => ability.can('search', 'User')
+          (ability) => ability.can('search', 'User'),
+          SEARCH_USER
         )
       )
       .catch((error: unknown) =>
@@ -102,7 +105,8 @@ export class NotificationsListener {
     );
     await this.notificationsService.pushToAuthorized(
       { type: 'user_crud_events', action, userId },
-      (ability) => records.some((record) => ability.can('search', record))
+      (ability) => records.some((record) => ability.can('search', record)),
+      SEARCH_USER
     );
   }
 }

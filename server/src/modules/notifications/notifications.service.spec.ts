@@ -8,6 +8,7 @@ import {
 import { NotificationsService } from './notifications.service';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
 import type { AppAbility } from '../auth/casl/app-ability';
+import { PermissionService } from '../auth/services/permission.service';
 import { RefreshTokenService } from '../auth/services/refresh-token.service';
 import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
 import { NotificationsBus } from './notifications-bus';
@@ -37,6 +38,7 @@ describe('NotificationsService', () => {
   let bus: FakeBus;
   let caslAbilityFactory: { resolveForUser: jest.Mock };
   let refreshTokenService: { hasLiveSession: jest.Mock };
+  let permissionService: { filterGrantHolders: jest.Mock };
   /** userIds the mocked ability grants search:User to */
   let usersWithListAccess: Set<string>;
 
@@ -44,6 +46,12 @@ describe('NotificationsService', () => {
     mockSseRef.getCount = () => 0;
     usersWithListAccess = new Set<string>();
     bus = new FakeBus();
+
+    permissionService = {
+      filterGrantHolders: jest
+        .fn()
+        .mockImplementation((userIds: string[]) => Promise.resolve(userIds))
+    };
 
     caslAbilityFactory = {
       resolveForUser: jest.fn().mockImplementation((userId: string) =>
@@ -64,6 +72,7 @@ describe('NotificationsService', () => {
         NotificationsService,
         { provide: SSE_CONNECTIONS_REF, useValue: mockSseRef },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactory },
+        { provide: PermissionService, useValue: permissionService },
         { provide: RefreshTokenService, useValue: refreshTokenService },
         { provide: SSE_HEARTBEAT_INTERVAL_MS, useValue: HEARTBEAT_MS },
         { provide: NotificationsBus, useValue: bus }
@@ -255,6 +264,74 @@ describe('NotificationsService', () => {
     } as const;
     const canSearchUsers = (ability: AppAbility) =>
       ability.can('search', 'User');
+    const searchUser = { action: 'search', subject: 'User' } as const;
+
+    it('resolves only the abilities of the grant holders', async () => {
+      service.createStream('admin-3', 'conn-1');
+      service.createStream('basic-3', 'conn-1');
+      bus.remoteUserIds = ['remote-basic'];
+      usersWithListAccess.add('admin-3');
+      permissionService.filterGrantHolders.mockResolvedValue(['admin-3']);
+
+      await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
+
+      expect(permissionService.filterGrantHolders).toHaveBeenCalledWith(
+        ['admin-3', 'basic-3', 'remote-basic'],
+        'search',
+        'User'
+      );
+      expect(caslAbilityFactory.resolveForUser.mock.calls).toEqual([
+        ['admin-3']
+      ]);
+      expect(bus.publish).toHaveBeenCalledWith({
+        userIds: ['admin-3'],
+        event: crudEvent
+      });
+    });
+
+    it('should fail closed when the grant holder lookup throws', async () => {
+      const subject = service.createStream('admin-4', 'conn-1');
+      usersWithListAccess.add('admin-4');
+      permissionService.filterGrantHolders.mockRejectedValue(
+        new Error('db down')
+      );
+      const received: unknown[] = [];
+      subject.subscribe((e) => received.push(e));
+
+      await expect(
+        service.pushToAuthorized(crudEvent, canSearchUsers, searchUser)
+      ).resolves.toBeUndefined();
+      expect(received).toEqual([]);
+      expect(caslAbilityFactory.resolveForUser).not.toHaveBeenCalled();
+    });
+
+    it('resolves at most 50 abilities at a time', async () => {
+      const userIds = Array.from({ length: 120 }, (_, i) => `admin-${i}`);
+      bus.remoteUserIds = userIds;
+      userIds.forEach((userId) => usersWithListAccess.add(userId));
+      let running = 0;
+      let peak = 0;
+      caslAbilityFactory.resolveForUser.mockImplementation(
+        async (userId: string) => {
+          peak = Math.max(peak, ++running);
+          await Promise.resolve();
+          running--;
+          return {
+            ability: { can: () => usersWithListAccess.has(userId) },
+            roles: [],
+            permissions: []
+          };
+        }
+      );
+
+      await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
+
+      expect(peak).toBe(50);
+      expect(bus.publish).toHaveBeenCalledWith({
+        userIds,
+        event: crudEvent
+      });
+    });
 
     it('should deliver only to users whose ability satisfies the check', async () => {
       const adminSub = service.createStream('admin-1', 'conn-1');
@@ -266,7 +343,7 @@ describe('NotificationsService', () => {
       adminSub.subscribe((e) => adminReceived.push(e));
       basicSub.subscribe((e) => basicReceived.push(e));
 
-      await service.pushToAuthorized(crudEvent, canSearchUsers);
+      await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
 
       expect(adminReceived).toEqual([{ data: crudEvent }]);
       expect(basicReceived).toEqual([]);
@@ -281,7 +358,7 @@ describe('NotificationsService', () => {
       subject.subscribe((e) => received.push(e));
 
       await expect(
-        service.pushToAuthorized(crudEvent, canSearchUsers)
+        service.pushToAuthorized(crudEvent, canSearchUsers, searchUser)
       ).resolves.toBeUndefined();
       expect(received).toEqual([]);
     });
@@ -291,11 +368,11 @@ describe('NotificationsService', () => {
       const received: unknown[] = [];
       subject.subscribe((e) => received.push(e));
 
-      await service.pushToAuthorized(crudEvent, canSearchUsers);
+      await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
       expect(received).toHaveLength(0);
 
       usersWithListAccess.add('user-a');
-      await service.pushToAuthorized(crudEvent, canSearchUsers);
+      await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
       expect(received).toHaveLength(1);
     });
 
@@ -307,7 +384,7 @@ describe('NotificationsService', () => {
       usersWithListAccess.add('local-admin');
       usersWithListAccess.add('remote-admin');
 
-      await service.pushToAuthorized(crudEvent, canSearchUsers);
+      await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
 
       expect(received).toEqual([{ data: crudEvent }]);
       expect(bus.publish).toHaveBeenCalledTimes(1);
@@ -322,7 +399,7 @@ describe('NotificationsService', () => {
       service.createStream('basic-2', 'conn-1');
       bus.remoteUserIds = ['remote-basic'];
 
-      await service.pushToAuthorized(crudEvent, canSearchUsers);
+      await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
 
       expect(bus.publish).not.toHaveBeenCalled();
     });

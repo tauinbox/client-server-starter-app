@@ -111,8 +111,8 @@ runWithInfra(
         notifications.pushToAuthorized.bind(notifications);
       jest
         .spyOn(notifications, 'pushToAuthorized')
-        .mockImplementation((event, allows) => {
-          const push = pushToAuthorized(event, allows);
+        .mockImplementation((event, allows, grant) => {
+          const push = pushToAuthorized(event, allows, grant);
           pushes.push(push);
           return push;
         });

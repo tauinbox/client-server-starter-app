@@ -469,8 +469,10 @@ allow rule and keeps it for a deny rule.
 `notifications-bus.ts` and `redis-notifications-bus.ts` carry each push to the other server
 instances. With `REDIS_URL`, a push goes to the connections of this instance and to a Redis
 pub/sub channel, and each other instance delivers it to its own connections. A Redis registry
-holds the users that have a stream on each instance, so `pushToAuthorized` checks the abilities of
-all of them on the sending instance and sends only user IDs. Without `REDIS_URL`, and under Jest,
+holds the users that have a stream on each instance, so `pushToAuthorized` checks all of them on
+the sending instance and sends only user IDs. One query first keeps the users that hold the grant
+of the push (or a super role), so the abilities of the other users are not resolved. Without
+`REDIS_URL`, and under Jest,
 the bus does nothing.
 
 `notifications.listener.ts` holds the `@OnEvent()` handlers. They react to `UserDeleted`,

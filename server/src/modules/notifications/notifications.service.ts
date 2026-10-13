@@ -24,11 +24,15 @@ import {
   type SseConnectionsRef
 } from '../core/metrics/metrics.module';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
-import type { AppAbility } from '../auth/casl/app-ability';
+import type { KnownSubjects } from '@app/shared/generated/casl-subjects';
+import type { Actions, AppAbility } from '../auth/casl/app-ability';
+import { PermissionService } from '../auth/services/permission.service';
 import { RefreshTokenService } from '../auth/services/refresh-token.service';
 import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
 import { NotificationsBus } from './notifications-bus';
 import type { BusPush } from './notifications-bus';
+
+const ABILITY_BATCH_SIZE = 50;
 
 @Injectable()
 export class NotificationsService {
@@ -38,6 +42,7 @@ export class NotificationsService {
   constructor(
     @Inject(SSE_CONNECTIONS_REF) private readonly sseRef: SseConnectionsRef,
     private readonly caslAbilityFactory: CaslAbilityFactory,
+    private readonly permissionService: PermissionService,
     private readonly refreshTokenService: RefreshTokenService,
     @Inject(SSE_HEARTBEAT_INTERVAL_MS)
     private readonly heartbeatIntervalMs: number,
@@ -155,21 +160,47 @@ export class NotificationsService {
    * permission change takes effect on the next event rather than on reconnect.
    * The check runs here for the users of every instance, so only user IDs
    * cross to the other instances.
+   *
+   * `allows` can pass only for a holder of `grant`. One query finds the
+   * holders, so the abilities of the other connected users are not resolved.
    */
   async pushToAuthorized(
     event: NotificationEvent,
-    allows: (ability: AppAbility) => boolean
+    allows: (ability: AppAbility) => boolean,
+    grant: { action: Actions; subject: KnownSubjects }
   ): Promise<void> {
     const userIds = new Set([
       ...this.#connections.keys(),
       ...((await this.bus.connectedUserIds()) ?? [])
     ]);
-    const allowed = await Promise.all(
-      Array.from(userIds, async (userId) =>
-        (await this.#can(userId, allows)) ? userId : null
-      )
-    );
-    const recipients = allowed.filter((userId) => userId !== null);
+    let holders: string[];
+    try {
+      holders = await this.permissionService.filterGrantHolders(
+        Array.from(userIds),
+        grant.action,
+        grant.subject
+      );
+    } catch (error) {
+      // Fail closed, as for one user in #can
+      this.#logger.warn(
+        `Grant holder lookup failed - skipping notification: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return;
+    }
+    const recipients: string[] = [];
+    // A batch limit: on a cache miss each resolution reads the database.
+    for (let i = 0; i < holders.length; i += ABILITY_BATCH_SIZE) {
+      const allowed = await Promise.all(
+        holders
+          .slice(i, i + ABILITY_BATCH_SIZE)
+          .map(async (userId) =>
+            (await this.#can(userId, allows)) ? userId : null
+          )
+      );
+      recipients.push(...allowed.filter((userId) => userId !== null));
+    }
     if (recipients.length > 0) {
       this.#send({ userIds: recipients, event });
     }
