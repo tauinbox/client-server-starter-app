@@ -1,4 +1,6 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { MAX_SSE_STREAMS_PER_USER } from '@app/shared/constants';
 import {
   SSE_CONNECTIONS_REF,
   type SseConnectionsRef
@@ -126,6 +128,29 @@ describe('NotificationsService', () => {
       stream.subscription.unsubscribe();
 
       expect(mockSseRef.getCount()).toBe(0);
+    });
+
+    it('refuses a stream over the limit of one user with 429 and counts users apart', () => {
+      for (let i = 0; i < MAX_SSE_STREAMS_PER_USER; i++) {
+        service.openStream('user-1', 'session-1', `conn-${i}`);
+      }
+
+      let error: unknown;
+      try {
+        service.openStream('user-1', 'session-1', 'conn-over');
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(
+        HttpStatus.TOO_MANY_REQUESTS
+      );
+      expect(mockSseRef.getCount()).toBe(MAX_SSE_STREAMS_PER_USER);
+
+      service.openStream('user-2', 'session-2', 'conn-other');
+      service.closeStream('user-1', 'conn-0');
+      service.openStream('user-1', 'session-1', 'conn-again');
+      expect(mockSseRef.getCount()).toBe(MAX_SSE_STREAMS_PER_USER + 1);
     });
   });
 

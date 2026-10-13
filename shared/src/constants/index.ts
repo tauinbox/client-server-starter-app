@@ -93,6 +93,8 @@ export { ErrorKeys } from './error-keys';
 
 export { httpStatusText } from './http-status.constants';
 
+export { MAX_SSE_STREAMS_PER_USER } from './notification.constants';
+
 export {
   OAUTH_PROVIDER_FLAGS,
   type OAuthProviderFlag

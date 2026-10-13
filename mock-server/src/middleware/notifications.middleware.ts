@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import type { NotificationEvent } from '@app/shared/types';
+import { MAX_SSE_STREAMS_PER_USER } from '@app/shared/constants';
 import { authGuard } from '../helpers/auth.helpers';
 import { isSessionLive } from '../state';
 import {
+  countSseConnections,
   pushToAll,
   pushToUser,
   registerSseConnection,
@@ -25,14 +27,20 @@ const router = Router();
 
 // GET /api/v1/notifications/stream
 router.get('/stream', authGuard, (req, res) => {
+  const { user, sessionId } = req as AuthenticatedRequest;
+  const userId = user.id;
+  if (countSseConnections(userId) >= MAX_SSE_STREAMS_PER_USER) {
+    // eslint-disable-next-line no-restricted-syntax -- the server sends this 429 with no key
+    res.status(429).json({ message: 'Too many open notification streams' });
+    return;
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  const { user, sessionId } = req as AuthenticatedRequest;
-  const userId = user.id;
   const connectionId = randomUUID();
   registerSseConnection(userId, connectionId, res);
 
