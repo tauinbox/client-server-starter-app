@@ -49,7 +49,6 @@ import { assertCan } from '../../../common/utils/assert-can.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
-import { UserPasswordChangedByAdminEvent } from '../events/user-password-changed-by-admin.event';
 import { UserSessionRevocationRequiredEvent } from '../events/user-session-revocation-required.event';
 import { UserCreatedEvent } from '../events/user-created.event';
 import { UserUpdatedEvent } from '../events/user-updated.event';
@@ -385,11 +384,6 @@ export class UsersController {
       previousEmail !== undefined && updatedUser.email !== previousEmail;
 
     if (password) {
-      this.eventEmitter.emit(
-        UserPasswordChangedByAdminEvent.name,
-        new UserPasswordChangedByAdminEvent(id)
-      );
-
       this.mailService
         .sendPasswordChangedNotification(
           updatedUser.email,

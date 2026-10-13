@@ -8,7 +8,6 @@ import {
 import { signal } from '@angular/core';
 import { NotificationsService } from './notifications.service';
 import { AuthStore } from '@features/auth/store/auth.store';
-import { TokenService } from '@features/auth/services/token.service';
 import type { NotificationEvent } from '@app/shared/types';
 
 const RECYCLE_MIN_DELAY_MS = 4 * 60 * 60 * 1000;
@@ -28,13 +27,10 @@ function makeProgressEvent(
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let httpController: HttpTestingController;
-  let forceLogoutSpy: ReturnType<typeof vi.fn>;
 
   const isAuthenticatedSignal = signal(true);
 
   beforeEach(() => {
-    forceLogoutSpy = vi.fn();
-
     TestBed.configureTestingModule({
       providers: [
         NotificationsService,
@@ -43,10 +39,6 @@ describe('NotificationsService', () => {
         {
           provide: AuthStore,
           useValue: { isAuthenticated: isAuthenticatedSignal }
-        },
-        {
-          provide: TokenService,
-          useValue: { forceLogout: forceLogoutSpy }
         }
       ]
     });
@@ -114,35 +106,25 @@ describe('NotificationsService', () => {
   });
 
   it('should only process new content on subsequent chunks', () => {
-    const received: Extract<
-      NotificationEvent,
-      { type: 'permissions_updated' }
-    >[] = [];
-    service.permissionsUpdated$.subscribe((e) => received.push(e));
+    const received: NotificationEvent[] = [];
+    service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
     const req = httpController.expectOne('/api/v1/notifications/stream');
 
-    const chunk1 = 'data: {"type":"permissions_updated","userId":"u-2"}\n\n';
+    const chunk1 =
+      'data: {"type":"user_crud_events","action":"created","userId":"u-2"}\n\n';
     req.event(makeProgressEvent(chunk1, chunk1.length));
 
     const chunk2 =
-      chunk1 + 'data: {"type":"permissions_updated","userId":"u-3"}\n\n';
+      chunk1 +
+      'data: {"type":"user_crud_events","action":"created","userId":"u-3"}\n\n';
     req.event(makeProgressEvent(chunk2, chunk2.length));
 
-    expect(received).toHaveLength(2);
-    expect(received[0].userId).toBe('u-2');
-    expect(received[1].userId).toBe('u-3');
-  });
-
-  it('should call tokenService.forceLogout() on session_invalidated event', () => {
-    service.connect();
-    const req = httpController.expectOne('/api/v1/notifications/stream');
-
-    const chunk = 'data: {"type":"session_invalidated","userId":"u-4"}\n\n';
-    req.event(makeProgressEvent(chunk, chunk.length));
-
-    expect(forceLogoutSpy).toHaveBeenCalledTimes(1);
+    expect(received).toEqual([
+      { type: 'user_crud_events', action: 'created', userId: 'u-2' },
+      { type: 'user_crud_events', action: 'created', userId: 'u-3' }
+    ]);
   });
 
   it('emits on featureFlagsUpdated$ when a feature_flags_updated event arrives', () => {
@@ -179,17 +161,15 @@ describe('NotificationsService', () => {
     const req = httpController.expectOne('/api/v1/notifications/stream');
 
     const chunk =
-      'data: {"type":"session_invalidated","userId":"u-1"}\n\n' +
-      'data: {"type":"permissions_updated","userId":"u-2"}\n\n' +
+      'data: {"type":"session_invalidated"}\n\n' +
+      'data: {"type":"permissions_updated"}\n\n' +
       'data: {"type":"user_crud_events","action":"created","userId":"u-3"}\n\n' +
       'data: {"type":"feature_flags_updated"}\n\n' +
       'data: {"type":"user_list_stale"}\n\n';
     req.event(makeProgressEvent(chunk, chunk.length));
 
-    expect(session).toEqual([{ type: 'session_invalidated', userId: 'u-1' }]);
-    expect(permissions).toEqual([
-      { type: 'permissions_updated', userId: 'u-2' }
-    ]);
+    expect(session).toEqual([{ type: 'session_invalidated' }]);
+    expect(permissions).toEqual([{ type: 'permissions_updated' }]);
     expect(userCrud).toEqual([
       { type: 'user_crud_events', action: 'created', userId: 'u-3' }
     ]);
@@ -204,39 +184,41 @@ describe('NotificationsService', () => {
     service.connect();
     const req = httpController.expectOne('/api/v1/notifications/stream');
 
-    const frame = 'data: {"type":"session_invalidated","userId":"u-9"}\n\n';
+    const frame = 'data: {"type":"session_invalidated"}\n\n';
     const firstHalf = frame.slice(0, 25); // ends mid-JSON
     req.event(makeProgressEvent(firstHalf, firstHalf.length));
     expect(received).toHaveLength(0);
 
     req.event(makeProgressEvent(frame, frame.length));
 
-    expect(received).toEqual([{ type: 'session_invalidated', userId: 'u-9' }]);
+    expect(received).toEqual([{ type: 'session_invalidated' }]);
   });
 
   it('parses complete frames immediately while buffering an incomplete trailing frame', () => {
-    const received: Extract<
-      NotificationEvent,
-      { type: 'permissions_updated' }
-    >[] = [];
-    service.permissionsUpdated$.subscribe((e) => received.push(e));
+    const received: NotificationEvent[] = [];
+    service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
     const req = httpController.expectOne('/api/v1/notifications/stream');
 
-    const frameA = 'data: {"type":"permissions_updated","userId":"u-a"}\n\n';
-    const frameB = 'data: {"type":"permissions_updated","userId":"u-b"}\n\n';
+    const frameA =
+      'data: {"type":"user_crud_events","action":"created","userId":"u-a"}\n\n';
+    const frameB =
+      'data: {"type":"user_crud_events","action":"created","userId":"u-b"}\n\n';
     const chunk1 = frameA + frameB.slice(0, 30);
     req.event(makeProgressEvent(chunk1, chunk1.length));
 
-    expect(received).toHaveLength(1);
-    expect(received[0].userId).toBe('u-a');
+    expect(received).toEqual([
+      { type: 'user_crud_events', action: 'created', userId: 'u-a' }
+    ]);
 
     const chunk2 = frameA + frameB;
     req.event(makeProgressEvent(chunk2, chunk2.length));
 
-    expect(received).toHaveLength(2);
-    expect(received[1].userId).toBe('u-b');
+    expect(received).toEqual([
+      { type: 'user_crud_events', action: 'created', userId: 'u-a' },
+      { type: 'user_crud_events', action: 'created', userId: 'u-b' }
+    ]);
   });
 
   it('does not emit anything for a chunk with no complete frame', () => {

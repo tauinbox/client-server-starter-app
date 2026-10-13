@@ -54,8 +54,7 @@ describe('EntitlementChangedListener', () => {
     await listener.handleBillingChange(new InvoicePaidEvent('user-2', 'inv-1'));
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith('user-2', {
-      type: 'entitlements_updated',
-      userId: 'user-2'
+      type: 'entitlements_updated'
     });
   });
 

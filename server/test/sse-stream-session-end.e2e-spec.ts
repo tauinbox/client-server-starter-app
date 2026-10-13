@@ -9,6 +9,9 @@ import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
+import { RoleService } from '../src/modules/auth/services/role.service';
+import { RolesController } from '../src/modules/auth/controllers/roles.controller';
+import { Role } from '../src/modules/auth/entities/role.entity';
 import {
   AbilityBuilder,
   createMongoAbility,
@@ -41,8 +44,11 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
   let refreshTokenService: RefreshTokenService;
   let usersService: UsersService;
   let usersController: UsersController;
+  let roleService: RoleService;
+  let rolesController: RolesController;
   let port: number;
   const email = `sse-session-end-${Date.now()}@example.com`;
+  const roleName = `sse-session-end-${Date.now()}`;
   let userId: string;
   const streams: OpenStream[] = [];
 
@@ -65,6 +71,8 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
     refreshTokenService = app.get(RefreshTokenService);
     usersService = app.get(UsersService);
     usersController = app.get(UsersController);
+    roleService = app.get(RoleService);
+    rolesController = app.get(RolesController);
 
     jest.spyOn(app.get(AuditService), 'log').mockResolvedValue(undefined);
     jest
@@ -94,6 +102,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
 
   afterAll(async () => {
     await dataSource?.getRepository(User).delete({ email });
+    await dataSource?.getRepository(Role).delete({ name: roleName });
     await app?.close();
   });
 
@@ -179,7 +188,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
     );
     expect(stream.ended()).toBe(true);
     expect(stream.body()).toContain(
-      `data: ${JSON.stringify({ type: 'session_invalidated', userId })}`
+      `data: ${JSON.stringify({ type: 'session_invalidated' })}`
     );
   };
 
@@ -220,6 +229,28 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
     );
 
     await expectInvalidatedAndEnded(stream);
+  }, 30000);
+
+  it('sends only session_invalidated when a role assignment ends the session', async () => {
+    const role = await roleService.create({ name: roleName });
+    const a = await signIn();
+    const stream = await openStream(a.token);
+
+    await rolesController.assignRole(
+      userId,
+      { roleId: role.id },
+      superAbility(),
+      adminRequest()
+    );
+
+    await expectInvalidatedAndEnded(stream);
+    const frames = stream
+      .body()
+      .split('\n')
+      .filter((line) => line.startsWith('data: {'));
+    expect(frames).toEqual([
+      `data: ${JSON.stringify({ type: 'session_invalidated' })}`
+    ]);
   }, 30000);
 
   it('keeps the stream of a live session open across heartbeats', async () => {

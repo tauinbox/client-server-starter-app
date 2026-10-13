@@ -22,7 +22,7 @@ import type {
 export function notifyEntitlementsChanged(customerId: string): void {
   const userId = getState().billingCustomers.get(customerId)?.userId;
   if (!userId) return;
-  pushToUser(userId, { type: 'entitlements_updated', userId });
+  pushToUser(userId, { type: 'entitlements_updated' });
 }
 
 /**

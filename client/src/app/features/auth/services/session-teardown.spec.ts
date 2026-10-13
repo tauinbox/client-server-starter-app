@@ -101,6 +101,7 @@ describe('session teardown', () => {
   let notificationsServiceMock: {
     connect: ReturnType<typeof vi.fn>;
     disconnect: ReturnType<typeof vi.fn>;
+    sessionInvalidated$: typeof EMPTY;
     permissionsUpdated$: typeof EMPTY;
     featureFlagsUpdated$: typeof EMPTY;
     entitlementsUpdated$: typeof EMPTY;
@@ -114,6 +115,7 @@ describe('session teardown', () => {
     notificationsServiceMock = {
       connect: vi.fn(),
       disconnect: vi.fn(),
+      sessionInvalidated$: EMPTY,
       permissionsUpdated$: EMPTY,
       featureFlagsUpdated$: EMPTY,
       entitlementsUpdated$: EMPTY,

@@ -79,8 +79,7 @@ export class NotificationsService {
           ? { data: '' }
           : {
               data: {
-                type: 'session_invalidated',
-                userId
+                type: 'session_invalidated'
               } satisfies NotificationEvent
             }
       ),

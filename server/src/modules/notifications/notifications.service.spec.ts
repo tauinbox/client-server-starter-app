@@ -131,7 +131,7 @@ describe('NotificationsService', () => {
       expect(stream.frames).toEqual([
         '',
         { type: 'feature_flags_updated' },
-        { type: 'session_invalidated', userId: 'user-1' }
+        { type: 'session_invalidated' }
       ]);
       expect(stream.isCompleted()).toBe(true);
       expect(refreshTokenService.hasLiveSession).toHaveBeenCalledTimes(1);
@@ -203,14 +203,14 @@ describe('NotificationsService', () => {
         received.push(event);
         if (received.length === 1) {
           expect(received[0]).toEqual({
-            data: { type: 'session_invalidated', userId: 'user-2' }
+            data: { type: 'session_invalidated' }
           });
           done();
         }
       }
     });
 
-    service.push('user-2', { type: 'session_invalidated', userId: 'user-2' });
+    service.push('user-2', { type: 'session_invalidated' });
   });
 
   it('should fan out to multiple connections for the same user', () => {
@@ -222,7 +222,7 @@ describe('NotificationsService', () => {
     subject1.subscribe((e) => received1.push(e));
     subject2.subscribe((e) => received2.push(e));
 
-    service.push('user-3', { type: 'permissions_updated', userId: 'user-3' });
+    service.push('user-3', { type: 'permissions_updated' });
 
     expect(received1).toHaveLength(1);
     expect(received2).toHaveLength(1);
@@ -387,7 +387,7 @@ describe('NotificationsService', () => {
 
     // After close, push should not throw
     expect(() =>
-      service.push('user-6', { type: 'session_invalidated', userId: 'user-6' })
+      service.push('user-6', { type: 'session_invalidated' })
     ).not.toThrow();
   });
 

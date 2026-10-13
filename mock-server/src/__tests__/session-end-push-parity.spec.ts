@@ -58,17 +58,15 @@ async function post(
 
 const USER_ID = mockId('user-2');
 
-// The server pushes both events for every UserRoleChangedEvent, from
-// NotificationsListener and FeatureFlagChangedListener.
-function expectRoleChangePushes(): void {
-  expect(push.mock.calls).toEqual([
-    [USER_ID, { type: 'permissions_updated', userId: USER_ID }],
-    [USER_ID, { type: 'feature_flags_updated' }]
-  ]);
+// An action that ends the sessions of the user pushes nothing to that user:
+// the keep-alive check of the stream sends `session_invalidated`, as on the
+// server.
+function expectNoPushToTarget(): void {
+  expect(push.mock.calls.filter(([userId]) => userId === USER_ID)).toEqual([]);
 }
 
-describe('role change pushes parity with server', () => {
-  it('pushes permissions and flags events on role assign', async () => {
+describe('session-ending actions push parity with server', () => {
+  it('pushes nothing to the user on role assign', async () => {
     const token = await loginAsAdmin();
 
     const res = await post(
@@ -78,10 +76,10 @@ describe('role change pushes parity with server', () => {
     );
 
     expect(res.status).toBe(201);
-    expectRoleChangePushes();
+    expectNoPushToTarget();
   });
 
-  it('pushes permissions and flags events on role unassign', async () => {
+  it('pushes nothing to the user on role unassign', async () => {
     const token = await loginAsAdmin();
 
     const res = await fetch(
@@ -90,25 +88,49 @@ describe('role change pushes parity with server', () => {
     );
 
     expect(res.status).toBe(200);
-    expectRoleChangePushes();
+    expectNoPushToTarget();
   });
 
-  it('pushes both events from the change-user-roles control route', async () => {
+  it('pushes nothing to the user on an admin password change', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await fetch(`${baseUrl}/api/v1/users/${USER_ID}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        password: 'Quartz-Lantern-82',
+        currentPassword: 'Password1'
+      })
+    });
+
+    expect(res.status).toBe(200);
+    expectNoPushToTarget();
+  });
+
+  it('pushes nothing to the user on delete', async () => {
+    const token = await loginAsAdmin();
+
+    const res = await fetch(`${baseUrl}/api/v1/users/${USER_ID}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(res.status).toBe(200);
+    expectNoPushToTarget();
+  });
+
+  it('pushes only permissions_updated from the change-user-roles control route', async () => {
     const res = await post('/__control/change-user-roles', {
       userId: USER_ID,
       newRoles: []
     });
 
     expect(res.status).toBe(200);
-    expectRoleChangePushes();
-  });
-
-  it('pushes both events from the revoke-user-sessions control route', async () => {
-    const res = await post('/__control/revoke-user-sessions', {
-      userId: USER_ID
-    });
-
-    expect(res.status).toBe(200);
-    expectRoleChangePushes();
+    expect(push.mock.calls).toEqual([
+      [USER_ID, { type: 'permissions_updated' }]
+    ]);
   });
 });

@@ -500,8 +500,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
       await refund(adminToken, invoice.id);
       const userId = mockId('user-2');
       expect(push).toHaveBeenCalledWith(userId, {
-        type: 'entitlements_updated',
-        userId
+        type: 'entitlements_updated'
       });
     } finally {
       push.mockRestore();

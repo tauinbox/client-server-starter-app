@@ -75,6 +75,10 @@ export class AuthService {
   readonly isAuthenticated = this.#authStore.isAuthenticated;
 
   constructor() {
+    this.#notificationsService.sessionInvalidated$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => this.#tokenService.forceLogout(this.#router.url));
+
     this.#notificationsService.permissionsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.#reloadPermissions());

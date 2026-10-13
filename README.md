@@ -172,12 +172,12 @@ management and theming.
   page reload.
 - **Real-time notifications through SSE.** `GET /api/v1/notifications/stream` is JWT-protected. It
   pushes three event types:
-  - `session_invalidated` forces a logout after an administrator changes a password or deletes a
-    user. It is also the last frame of a stream whose session has ended: each heartbeat checks the
-    session, and the server then ends the stream.
-  - `permissions_updated` starts a silent permissions read. The server sends it when the roles of a
-    user change, and when the permission set of a role that they hold changes. It goes to each
-    connected holder of that role.
+  - `session_invalidated` forces a logout and keeps the current page as the return URL. It is the
+    last frame of a stream whose session has ended: each heartbeat (30 s) checks the session, and
+    the server then ends the stream. This is the one source of the event, so an administrator
+    password change, a user delete and a role change reach the client the same way.
+  - `permissions_updated` starts a silent permissions read. The server sends it when the permission
+    set of a role changes. It goes to each connected holder of that role.
   - `user_crud_events` keeps the administrator user list current after a create, update, delete
     or restore, with no reload of the loaded pages. An update or a restore of a loaded row reads
     that user with `GET /users/:id` and replaces the row. A delete removes a loaded row, and a
@@ -1003,7 +1003,7 @@ fullstack-starter-app/
         ├── sse-hub.ts      # SSE connection registry and push helpers
         ├── helpers/        # Auth helper utilities + requireUuid param guard
         ├── utils/          # mockId (slug -> stable UUID), cursor, period, listen, validation (class-validator mirrors)
-        └── control.routes.ts  # Test control API (reset, seed, notify, invalidate-access-tokens, revoke-user-sessions)
+        └── control.routes.ts  # Test control API (reset, seed, invalidate-access-tokens, change-user-roles)
 ```
 
 Each seed entity has a UUID id. `mockId()` (`utils/mock-id.ts`) makes the id from a readable slug,
@@ -1880,11 +1880,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2946 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2941 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 630 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 618 pass and 12 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1581 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 320 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1048 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1049 tests pass |
 
 ## CI/CD
 

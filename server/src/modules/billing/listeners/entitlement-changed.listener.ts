@@ -47,9 +47,6 @@ export class EntitlementChangedListener implements OnApplicationBootstrap {
     // Invalidate before notifying: the push makes the client re-read, and a
     // read issued against a still-cached value would re-cache the stale set.
     await this.entitlements.invalidateUser(event.userId);
-    this.notifications.push(event.userId, {
-      type: 'entitlements_updated',
-      userId: event.userId
-    });
+    this.notifications.push(event.userId, { type: 'entitlements_updated' });
   }
 }

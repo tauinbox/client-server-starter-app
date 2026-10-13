@@ -6,7 +6,6 @@ import {
   getState,
   rekeyUserSessions,
   resetState,
-  revokeUserSessions,
   toInvoiceResponse,
   toSubscriptionResponse,
   toUsageResponse,
@@ -39,18 +38,14 @@ import {
   billClosingUsagePeriod,
   sumPlanMeterUnits
 } from './helpers/billing.helpers';
-import type { NotificationEvent } from '@app/shared/types';
-import { pushToAll, pushToUser } from './sse-hub';
+import { pushToUser } from './sse-hub';
 import {
   activateSubscription,
   notifyEntitlementsChanged,
   settlePurchase
 } from './helpers/billing-settle.helpers';
 import { nextPeriodEnd } from './utils/period';
-import {
-  notifyRoleHolders,
-  notifyUserRolesChanged
-} from './middleware/roles.middleware';
+import { notifyRoleHolders } from './middleware/roles.middleware';
 
 const router = Router();
 
@@ -419,10 +414,8 @@ router.post('/totp-ledger', (req, res) => {
   res.json({ message: `totp ledger cleared for user ${userId}` });
 });
 
-// POST /__control/change-user-roles — mutate user.roles and push SSE without
-// revoking tokens. Lets tests verify live RBAC reactivity on the client (the
-// next /auth/permissions fetch reflects the new roles, but the existing
-// session keeps working — no forced logout).
+// POST /__control/change-user-roles - a permission change of a live session.
+// No API path does this, because a role assignment ends the sessions.
 router.post('/change-user-roles', (req, res) => {
   const { userId, newRoles } = req.body as {
     userId?: string;
@@ -439,7 +432,7 @@ router.post('/change-user-roles', (req, res) => {
     return;
   }
   user.roles = newRoles;
-  notifyUserRolesChanged(userId);
+  pushToUser(userId, { type: 'permissions_updated' });
   res.json({ message: `roles updated for user ${userId}` });
 });
 
@@ -476,33 +469,6 @@ router.post('/change-role-permissions', (req, res) => {
   ];
   notifyRoleHolders(roleName);
   res.json({ message: `permissions updated for role ${roleName}` });
-});
-
-// POST /__control/revoke-user-sessions — full simulation of the server's
-// UserRoleChangedListener. Optionally swaps user.roles, deletes ALL refresh
-// tokens for the user, sets tokenRevokedAt, and pushes the `permissions_updated`
-// and `feature_flags_updated` SSE events. Use to verify forced-logout semantics on role revocation.
-router.post('/revoke-user-sessions', (req, res) => {
-  const { userId, newRoles } = req.body as {
-    userId?: string;
-    newRoles?: string[];
-  };
-  if (!userId) {
-    res.status(400).json({ message: 'userId is required' });
-    return;
-  }
-  const state = getState();
-  const user = state.users.get(userId);
-  if (!user) {
-    res.status(404).json({ message: 'user not found' });
-    return;
-  }
-  if (Array.isArray(newRoles)) {
-    user.roles = newRoles;
-  }
-  revokeUserSessions(userId);
-  notifyUserRolesChanged(userId);
-  res.json({ message: `sessions revoked for user ${userId}` });
 });
 
 // POST /__control/captcha — toggle captcha enablement and reset attempts.
@@ -567,25 +533,6 @@ router.post('/billing/provider-enabled', (req, res) => {
     if (flag.key === flagKey) flag.enabled = enabled;
   }
   res.json({ message: `${flagKey} ${enabled ? 'enabled' : 'disabled'}` });
-});
-
-// POST /__control/notify — push a test notification event (E2E helper)
-router.post('/notify', (req, res) => {
-  const event = req.body as NotificationEvent;
-  if (!event || !event.type) {
-    res.status(400).json({ message: 'Body must be a valid NotificationEvent' });
-    return;
-  }
-  if (
-    event.type === 'session_invalidated' ||
-    event.type === 'permissions_updated' ||
-    event.type === 'entitlements_updated'
-  ) {
-    pushToUser(event.userId, event);
-  } else {
-    pushToAll(event);
-  }
-  res.json({ ok: true });
 });
 
 // POST /__control/billing/activate-subscription - put a user on a plan for E2E

@@ -187,9 +187,7 @@ runWithInfra(
         const found = events().filter((e) => e.type === 'entitlements_updated');
         return Promise.resolve(found.length > 0 ? found : null);
       });
-      expect(pushed).toEqual([
-        { type: 'entitlements_updated', userId: user.id }
-      ]);
+      expect(pushed).toEqual([{ type: 'entitlements_updated' }]);
       expect(
         (await entitlements.capabilitiesFor(user.id)).capabilities
       ).not.toContain(CAPABILITY);

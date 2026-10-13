@@ -291,6 +291,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
   let notificationsMock: {
     connect: ReturnType<typeof vi.fn>;
     disconnect: ReturnType<typeof vi.fn>;
+    sessionInvalidated$: typeof EMPTY;
     permissionsUpdated$: typeof EMPTY;
     featureFlagsUpdated$: typeof EMPTY;
     entitlementsUpdated$: typeof EMPTY;
@@ -336,6 +337,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
     notificationsMock = {
       connect: vi.fn(),
       disconnect: vi.fn(),
+      sessionInvalidated$: EMPTY,
       permissionsUpdated$: EMPTY,
       featureFlagsUpdated$: EMPTY,
       entitlementsUpdated$: EMPTY,

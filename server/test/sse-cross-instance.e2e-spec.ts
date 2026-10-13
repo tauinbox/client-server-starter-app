@@ -152,7 +152,6 @@ runWithRedis('server pushes across instances (e2e)', () => {
               .split('\n')
               .filter((line) => line.startsWith('data: {'))
               .map((line) => JSON.parse(line.slice(6)) as NotificationEvent)
-              .filter((event) => event.type !== 'permissions_updated')
           );
         }
       );
@@ -181,7 +180,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
         : null;
     });
 
-    const direct = { type: 'session_invalidated', userId: plain.id } as const;
+    const direct = { type: 'session_invalidated' } as const;
     const broadcast = { type: 'feature_flags_updated' } as const;
     const authorized = {
       type: 'user_crud_events',

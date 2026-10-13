@@ -5,7 +5,6 @@ import { filter, Subject } from 'rxjs';
 import type { Observable, OperatorFunction, Subscription } from 'rxjs';
 import type { NotificationEvent } from '@app/shared/types';
 import { AuthStore } from '@features/auth/store/auth.store';
-import { TokenService } from '@features/auth/services/token.service';
 import { silentContext } from '@core/context-tokens/error-notifications';
 
 const NOTIFICATIONS_STREAM_URL = '/api/v1/notifications/stream';
@@ -18,7 +17,6 @@ const RECYCLE_JITTER_MS = 4 * 60 * 60 * 1000;
 export class NotificationsService {
   readonly #http = inject(HttpClient);
   readonly #authStore = inject(AuthStore);
-  readonly #tokenService = inject(TokenService);
 
   readonly #events$ = new Subject<NotificationEvent>();
   readonly #reconnected$ = new Subject<void>();
@@ -55,14 +53,6 @@ export class NotificationsService {
   readonly entitlementsUpdated$ = this.#events$.pipe(
     this.#ofType('entitlements_updated')
   );
-
-  constructor() {
-    // Subscribe once — service is a root singleton, no need to unsubscribe
-    this.sessionInvalidated$.subscribe(() => {
-      this.disconnect();
-      this.#tokenService.forceLogout();
-    });
-  }
 
   connect(): void {
     if (this.#subscription) return;

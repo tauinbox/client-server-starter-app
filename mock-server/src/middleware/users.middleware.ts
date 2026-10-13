@@ -53,7 +53,6 @@ import {
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import { filterByAbility } from '../helpers/ability-filter.helpers';
 import type { AuthenticatedRequest } from '../types';
-import { pushToUser } from '../sse-hub';
 import { pushUserCrudEvent } from '../helpers/user-list-events.helpers';
 import {
   requireUuid,
@@ -478,7 +477,6 @@ router.patch(
       console.log(
         `[PASSWORD CHANGED] To: ${user.email}\n  Source: administrator | IP: ${req.ip}`
       );
-      pushToUser(id, { type: 'session_invalidated', userId: id });
     }
 
     pushUserCrudEvent('updated', id, previous);
@@ -531,7 +529,6 @@ router.delete(
       ip: req.ip
     });
 
-    pushToUser(id, { type: 'session_invalidated', userId: id });
     pushUserCrudEvent('deleted', id);
     res.json({});
   }
