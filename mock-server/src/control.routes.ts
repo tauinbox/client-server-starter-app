@@ -414,7 +414,7 @@ router.post('/totp-ledger', (req, res) => {
   res.json({ message: `totp ledger cleared for user ${userId}` });
 });
 
-// POST /__control/change-user-roles — a permission change of a live session.
+// POST /__control/change-user-roles - a permission change of a live session.
 // No API path does this, because a role assignment ends the sessions.
 router.post('/change-user-roles', (req, res) => {
   const { userId, newRoles } = req.body as {

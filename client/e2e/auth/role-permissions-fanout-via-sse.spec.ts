@@ -9,7 +9,7 @@ import { mockId } from '../fixtures/ids';
 //
 // This is deliberately distinct from `role-change-sign-out.spec.ts` (a change
 // of a user's roles ends the sessions): here the user keeps their role, but the
-// role loses the permission that gated a control. Tokens are NOT revoked —
+// role loses the permission that gated a control. Tokens are NOT revoked:
 // abilities are re-derived from the DB per request, so the session continues.
 //
 // Given a user holds a non-super role whose only permission (`read Role`) makes
