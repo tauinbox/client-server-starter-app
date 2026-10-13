@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { subject as caslSubject } from '@casl/ability';
 import type { Request, Response } from 'express';
 import {
   ErrorKeys,
@@ -23,6 +24,7 @@ import {
   rejectInvalidCursor
 } from '../helpers/list-query.helpers';
 import {
+  buildAbilityForUser,
   findUserByEmail,
   findUserById,
   findUserByIdWithDeleted,
@@ -61,13 +63,22 @@ import {
 
 type UserCrudAction = 'created' | 'updated' | 'deleted' | 'restored';
 
-// user_crud_events only drive the admin user list, so they are limited to
-// clients that may list users - a broadcast would leak user IDs and the fact
-// that an account was created/updated/deleted to every authenticated client.
+// user_crud_events only drive the admin user list, so they go only to the
+// clients whose list shows the user - a broadcast would leak user IDs and the
+// fact that an account was created/updated/deleted to every client. A `search`
+// grant can carry conditions, so the check runs on the record.
 function pushUserCrudEvent(action: UserCrudAction, userId: string): void {
+  const user = findUserByIdWithDeleted(userId);
+  if (!user) return;
+  const record = caslSubject('User', user);
   pushToUsersMatching(
-    (connectedUserId) =>
-      findUserById(connectedUserId)?.roles?.includes('admin') === true,
+    (connectedUserId) => {
+      const viewer = findUserById(connectedUserId);
+      return (
+        viewer !== undefined &&
+        buildAbilityForUser(viewer).can('search', record)
+      );
+    },
     { type: 'user_crud_events', action, userId }
   );
 }

@@ -5,6 +5,7 @@ import {
 } from '../core/metrics/metrics.module';
 import { NotificationsService } from './notifications.service';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
+import type { AppAbility } from '../auth/casl/app-ability';
 import { RefreshTokenService } from '../auth/services/refresh-token.service';
 import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
 
@@ -197,6 +198,8 @@ describe('NotificationsService', () => {
       action: 'created',
       userId: 'new-user'
     } as const;
+    const canSearchUsers = (ability: AppAbility) =>
+      ability.can('search', 'User');
 
     it('should deliver only to users whose ability satisfies the check', async () => {
       const adminSub = service.createStream('admin-1', 'conn-1');
@@ -208,7 +211,7 @@ describe('NotificationsService', () => {
       adminSub.subscribe((e) => adminReceived.push(e));
       basicSub.subscribe((e) => basicReceived.push(e));
 
-      await service.pushToAuthorized(crudEvent, ['search', 'User']);
+      await service.pushToAuthorized(crudEvent, canSearchUsers);
 
       expect(adminReceived).toEqual([{ data: crudEvent }]);
       expect(basicReceived).toEqual([]);
@@ -223,7 +226,7 @@ describe('NotificationsService', () => {
       subject.subscribe((e) => received.push(e));
 
       await expect(
-        service.pushToAuthorized(crudEvent, ['search', 'User'])
+        service.pushToAuthorized(crudEvent, canSearchUsers)
       ).resolves.toBeUndefined();
       expect(received).toEqual([]);
     });
@@ -233,11 +236,11 @@ describe('NotificationsService', () => {
       const received: unknown[] = [];
       subject.subscribe((e) => received.push(e));
 
-      await service.pushToAuthorized(crudEvent, ['search', 'User']);
+      await service.pushToAuthorized(crudEvent, canSearchUsers);
       expect(received).toHaveLength(0);
 
       usersWithListAccess.add('user-a');
-      await service.pushToAuthorized(crudEvent, ['search', 'User']);
+      await service.pushToAuthorized(crudEvent, canSearchUsers);
       expect(received).toHaveLength(1);
     });
   });
