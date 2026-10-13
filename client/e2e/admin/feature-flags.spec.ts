@@ -5,7 +5,8 @@ import { mockId } from '../fixtures/ids';
 // in this case) broadcasts `{ type: 'feature_flags_updated' }` to every
 // connected SSE consumer. The client's `NotificationsService` translates that
 // into a `featureFlagsUpdated$` emission, which `AuthService` listens to and
-// calls `featureFlagsStore.reload()`. The downstream effect is a fresh
+// calls `featureFlagsStore.reload()` after a random wait of up to 5 s. The
+// downstream effect is a fresh
 // `GET /api/v1/feature-flags` request, with the new evaluated state landing
 // in the store without a page reload.
 //
