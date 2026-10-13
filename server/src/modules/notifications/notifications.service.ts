@@ -1,5 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Subject } from 'rxjs';
+import {
+  exhaustMap,
+  finalize,
+  interval,
+  map,
+  merge,
+  Observable,
+  Subject,
+  takeWhile
+} from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
 import type { NotificationEvent } from '@app/shared/types';
 import {
@@ -8,6 +17,8 @@ import {
 } from '../core/metrics/metrics.module';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
 import type { PermissionCheck } from '../auth/casl/app-ability';
+import { RefreshTokenService } from '../auth/services/refresh-token.service';
+import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
 
 @Injectable()
 export class NotificationsService {
@@ -16,9 +27,59 @@ export class NotificationsService {
 
   constructor(
     @Inject(SSE_CONNECTIONS_REF) private readonly sseRef: SseConnectionsRef,
-    private readonly caslAbilityFactory: CaslAbilityFactory
+    private readonly caslAbilityFactory: CaslAbilityFactory,
+    private readonly refreshTokenService: RefreshTokenService,
+    @Inject(SSE_HEARTBEAT_INTERVAL_MS)
+    private readonly heartbeatIntervalMs: number
   ) {
     this.sseRef.getCount = () => this.#countConnections();
+  }
+
+  /**
+   * The events of one connection and a heartbeat that also checks the session.
+   * The stream is authenticated only when it opens, so without the check an
+   * ended session keeps receiving events. A dead session gets
+   * `session_invalidated` as the last frame, then the stream completes.
+   */
+  openStream(
+    userId: string,
+    sessionId: string,
+    connectionId: string
+  ): Observable<MessageEvent> {
+    const subject = this.createStream(userId, connectionId);
+    const heartbeat$ = interval(this.heartbeatIntervalMs).pipe(
+      exhaustMap(() => this.#isSessionLive(sessionId)),
+      takeWhile((live) => live, true),
+      map((live): MessageEvent =>
+        live
+          ? { data: '' }
+          : {
+              data: {
+                type: 'session_invalidated',
+                userId
+              } satisfies NotificationEvent
+            }
+      ),
+      // The merge completes only when the subject completes too.
+      finalize(() => this.closeStream(userId, connectionId))
+    );
+    return merge(subject.asObservable(), heartbeat$);
+  }
+
+  async #isSessionLive(sessionId: string): Promise<boolean> {
+    try {
+      return await this.refreshTokenService.hasLiveSession(sessionId);
+    } catch (error) {
+      // Keep the stream on a failed read: ending every stream at once would
+      // make every client reconnect at the same moment. HTTP requests of the
+      // session still fail on their own check.
+      this.#logger.warn(
+        `Session check failed for the stream of session ${sessionId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return true;
+    }
   }
 
   createStream(userId: string, connectionId: string): Subject<MessageEvent> {

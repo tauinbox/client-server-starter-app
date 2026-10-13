@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
+import type { NotificationEvent } from '@app/shared/types';
 import { authGuard } from '../helpers/auth.helpers';
+import { isSessionLive } from '../state';
 import {
   pushToAll,
   pushToUser,
@@ -9,7 +11,15 @@ import {
 } from '../sse-hub';
 import type { AuthenticatedRequest } from '../types';
 
-const KEEPALIVE_INTERVAL_MS = 30_000;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
+
+/** A test can shorten the heartbeat, which also checks the session. */
+function heartbeatIntervalMs(): number {
+  return (
+    Number(process.env['MOCK_SSE_HEARTBEAT_MS']) ||
+    DEFAULT_HEARTBEAT_INTERVAL_MS
+  );
+}
 
 const router = Router();
 
@@ -21,18 +31,28 @@ router.get('/stream', authGuard, (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  const userId = (req as AuthenticatedRequest).user.id;
+  const { user, sessionId } = req as AuthenticatedRequest;
+  const userId = user.id;
   const connectionId = randomUUID();
   registerSseConnection(userId, connectionId, res);
 
-  // Keep-alive comment to prevent proxy timeouts
+  // The stream is authenticated only when it opens, so the keep-alive also
+  // checks the session, as the server does: an ended session gets
+  // `session_invalidated` as the last frame and the response ends.
   const keepalive = setInterval(() => {
+    if (!isSessionLive(sessionId)) {
+      clearInterval(keepalive);
+      removeSseConnection(userId, connectionId);
+      const event: NotificationEvent = { type: 'session_invalidated', userId };
+      res.end(`data: ${JSON.stringify(event)}\n\n`);
+      return;
+    }
     try {
       res.write(': ping\n\n');
     } catch {
       clearInterval(keepalive);
     }
-  }, KEEPALIVE_INTERVAL_MS);
+  }, heartbeatIntervalMs());
 
   req.on('close', () => {
     clearInterval(keepalive);

@@ -5,12 +5,16 @@ import {
 } from '../core/metrics/metrics.module';
 import { NotificationsService } from './notifications.service';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
+import { RefreshTokenService } from '../auth/services/refresh-token.service';
+import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
 
 const mockSseRef: SseConnectionsRef = { getCount: () => 0 };
+const HEARTBEAT_MS = 1_000;
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let caslAbilityFactory: { resolveForUser: jest.Mock };
+  let refreshTokenService: { hasLiveSession: jest.Mock };
   /** userIds the mocked ability grants search:User to */
   let usersWithListAccess: Set<string>;
 
@@ -28,15 +32,100 @@ describe('NotificationsService', () => {
       )
     };
 
+    refreshTokenService = {
+      hasLiveSession: jest.fn().mockResolvedValue(true)
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
         { provide: SSE_CONNECTIONS_REF, useValue: mockSseRef },
-        { provide: CaslAbilityFactory, useValue: caslAbilityFactory }
+        { provide: CaslAbilityFactory, useValue: caslAbilityFactory },
+        { provide: RefreshTokenService, useValue: refreshTokenService },
+        { provide: SSE_HEARTBEAT_INTERVAL_MS, useValue: HEARTBEAT_MS }
       ]
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
+  });
+
+  describe('openStream', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    const collect = (userId: string, sessionId: string) => {
+      const frames: unknown[] = [];
+      let completed = false;
+      const subscription = service
+        .openStream(userId, sessionId, 'conn-1')
+        .subscribe({
+          next: (frame) => frames.push(frame.data),
+          complete: () => {
+            completed = true;
+          }
+        });
+      return {
+        frames,
+        subscription,
+        isCompleted: () => completed
+      };
+    };
+
+    it('sends a heartbeat while the session is live and keeps the stream open', async () => {
+      const stream = collect('user-1', 'session-1');
+
+      await jest.advanceTimersByTimeAsync(HEARTBEAT_MS * 2);
+
+      expect(refreshTokenService.hasLiveSession).toHaveBeenCalledWith(
+        'session-1'
+      );
+      expect(stream.frames).toEqual(['', '']);
+      expect(stream.isCompleted()).toBe(false);
+      stream.subscription.unsubscribe();
+    });
+
+    it('sends session_invalidated and completes when the session has ended', async () => {
+      const stream = collect('user-1', 'session-1');
+      service.push('user-1', { type: 'feature_flags_updated' });
+
+      refreshTokenService.hasLiveSession.mockResolvedValue(false);
+      await jest.advanceTimersByTimeAsync(HEARTBEAT_MS * 3);
+
+      expect(stream.frames).toEqual([
+        { type: 'feature_flags_updated' },
+        { type: 'session_invalidated', userId: 'user-1' }
+      ]);
+      expect(stream.isCompleted()).toBe(true);
+      expect(refreshTokenService.hasLiveSession).toHaveBeenCalledTimes(1);
+      expect(mockSseRef.getCount()).toBe(0);
+    });
+
+    it('keeps the stream open when the session check fails', async () => {
+      const stream = collect('user-1', 'session-1');
+
+      refreshTokenService.hasLiveSession.mockRejectedValueOnce(
+        new Error('connection refused')
+      );
+      await jest.advanceTimersByTimeAsync(HEARTBEAT_MS);
+
+      expect(stream.frames).toEqual(['']);
+      expect(stream.isCompleted()).toBe(false);
+      stream.subscription.unsubscribe();
+    });
+
+    it('removes the connection when the subscriber goes away', () => {
+      const stream = collect('user-1', 'session-1');
+      expect(mockSseRef.getCount()).toBe(1);
+
+      stream.subscription.unsubscribe();
+
+      expect(mockSseRef.getCount()).toBe(0);
+    });
   });
 
   it('should create a stream for a new userId/connectionId', () => {

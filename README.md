@@ -173,7 +173,8 @@ management and theming.
 - **Real-time notifications through SSE.** `GET /api/v1/notifications/stream` is JWT-protected. It
   pushes three event types:
   - `session_invalidated` forces a logout after an administrator changes a password or deletes a
-    user.
+    user. It is also the last frame of a stream whose session has ended: each heartbeat checks the
+    session, and the server then ends the stream.
   - `permissions_updated` starts a silent permissions read. The server sends it when the roles of a
     user change, and when the permission set of a role that they hold changes. It goes to each
     connected holder of that role.

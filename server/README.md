@@ -470,8 +470,10 @@ allow rule and keeps it for a deny rule.
 `UserPasswordChanged`, `UserCreated`, `UserUpdated`, `UserRestored`, `UserRoleChanged` and
 `UserRolePermissionsChanged`, and each one pushes a message.
 
-`notifications.controller.ts` holds `GET /stream`. The `@Sse()` decorator returns an
-`Observable<MessageEvent>` that merges with a heartbeat each 30 s.
+`notifications.controller.ts` holds `GET /stream`. The `@Sse()` decorator returns
+`NotificationsService.openStream()`: the events of the connection, merged with a heartbeat each
+30 s. Each heartbeat also checks the session of the stream (`RefreshTokenService.hasLiveSession`).
+When the session has ended, the stream sends `session_invalidated` as the last frame and ends.
 
 #### feature-flags
 
