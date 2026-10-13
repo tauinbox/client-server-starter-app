@@ -6,7 +6,7 @@ import { ThrottledFailureLog } from '../../common/utils/redis-client';
 import { NotificationsBus } from './notifications-bus';
 import type { BusPeer, BusPush } from './notifications-bus';
 
-export const DEFAULT_BUS_NAMESPACE = 'nexus:sse';
+const DEFAULT_BUS_NAMESPACE = 'nexus:sse';
 const REGISTRY_REFRESH_MS = 30_000;
 // Three missed refreshes: a crashed instance leaves the registry after this.
 const REGISTRY_TTL_MS = 90_000;
