@@ -173,7 +173,8 @@ management and theming.
 - **Real-time notifications through SSE.** `GET /api/v1/notifications/stream` is JWT-protected. It
   pushes three event types:
   - `session_invalidated` forces a logout after an administrator changes a password or deletes a
-    user.
+    user. It is also the last frame of a stream whose session has ended: each heartbeat checks the
+    session, and the server then ends the stream.
   - `permissions_updated` starts a silent permissions read. The server sends it when the roles of a
     user change, and when the permission set of a role that they hold changes. It goes to each
     connected holder of that role.
@@ -1868,11 +1869,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2924 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 615 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 604 pass and 11 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1551 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2928 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 619 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 608 pass and 11 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1552 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 318 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1035 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1038 tests pass |
 
 ## CI/CD
 

@@ -5,10 +5,8 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { interval, map, merge, Observable } from 'rxjs';
+import { Observable } from 'rxjs';
 import { randomUUID } from 'crypto';
-
-const HEARTBEAT_INTERVAL_MS = 30_000;
 import type { Response } from 'express';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthRequest } from '../auth/types/auth.request';
@@ -34,19 +32,15 @@ export class NotificationsController {
     // before calling the controller via lazy Observable subscription, so
     // res.setHeader() must not be called here — it would throw ERR_HTTP_HEADERS_SENT.
     const connectionId = randomUUID();
-    const subject = this.notificationsService.createStream(
-      req.user.userId,
-      connectionId
-    );
     res.on('close', () => {
       this.notificationsService.closeStream(req.user.userId, connectionId);
     });
 
-    // Keep-alive heartbeat to prevent nginx/proxy idle timeout
-    const heartbeat$ = interval(HEARTBEAT_INTERVAL_MS).pipe(
-      map((): MessageEvent => ({ data: '' }))
+    // The heartbeat also keeps nginx/proxy from closing an idle stream.
+    return this.notificationsService.openStream(
+      req.user.userId,
+      req.user.sessionId,
+      connectionId
     );
-
-    return merge(subject.asObservable(), heartbeat$);
   }
 }
