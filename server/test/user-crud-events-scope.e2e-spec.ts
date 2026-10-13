@@ -14,7 +14,9 @@ import {
   createMongoAbility,
   type AppAbility
 } from '../src/modules/auth/casl/app-ability';
+import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
+import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
@@ -36,7 +38,10 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     scoped: `${tag}-scoped@example.com`,
     wide: `${tag}-wide@example.com`,
     activeOnly: `${tag}-active-only@example.com`,
-    other: `${tag}-other@example.com`
+    other: `${tag}-other@example.com`,
+    denied: `${tag}-denied@example.com`,
+    superUser: `${tag}-super@example.com`,
+    deleted: `${tag}-deleted@example.com`
   };
 
   let app: INestApplication;
@@ -77,8 +82,8 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     const pushToAuthorized = notifications.pushToAuthorized.bind(notifications);
     jest
       .spyOn(notifications, 'pushToAuthorized')
-      .mockImplementation((event, allows) => {
-        const push = pushToAuthorized(event, allows);
+      .mockImplementation((event, allows, grant) => {
+        const push = pushToAuthorized(event, allows, grant);
         pushes.push(push);
         return push;
       });
@@ -125,13 +130,32 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       }
     ]);
     await roleService.assignRoleToUser(users.activeOnly.id, activeRole.id);
+
+    const deniedRole = await roleService.create({ name: `${tag}-denied` });
+    await roleService.setPermissionsForRole(deniedRole.id, [
+      { permissionId: searchUser.id, conditions: { effect: 'deny' } }
+    ]);
+    await roleService.assignRoleToUser(users.denied.id, deniedRole.id);
+
+    const superRole = await dataSource
+      .getRepository(Role)
+      .findOneByOrFail({ isSuper: true });
+    await roleService.assignRoleToUser(users.superUser.id, superRole.id);
+
+    await roleService.assignRoleToUser(users.deleted.id, wideRole.id);
+    await repository.softDelete(users.deleted.id);
   }, 60000);
 
   afterAll(async () => {
     for (const req of requests) req.destroy();
     if (dataSource) {
       await dataSource.getRepository(Role).delete({
-        name: In([`${tag}-scoped`, `${tag}-wide`, `${tag}-active`])
+        name: In([
+          `${tag}-scoped`,
+          `${tag}-wide`,
+          `${tag}-active`,
+          `${tag}-denied`
+        ])
       });
       await dataSource
         .getRepository(User)
@@ -286,5 +310,46 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     };
     await frame(activeOnly, left);
     expect(activeOnly()).toEqual([left]);
+  }, 30000);
+
+  it('keeps only the users that hold an allow of search:User or a super role', async () => {
+    const holders = await app.get(PermissionService).filterGrantHolders(
+      Object.values(users).map((user) => user.id),
+      'search',
+      'User'
+    );
+
+    expect(holders.sort()).toEqual(
+      [users.scoped, users.wide, users.activeOnly, users.superUser]
+        .map((user) => user.id)
+        .sort()
+    );
+  });
+
+  it('resolves no ability for a connected user without the grant', async () => {
+    const plain = await openStream(users.other);
+    const wide = await openStream(users.wide);
+    const resolve = jest.spyOn(app.get(CaslAbilityFactory), 'resolveForUser');
+    const before = pushes.length;
+
+    await usersController.update(
+      users.scoped.id,
+      { firstName: 'Again' },
+      adminRequest(),
+      superAbility()
+    );
+    await settle(before + 1);
+
+    const update: UserCrudEvent = {
+      type: 'user_crud_events',
+      action: 'updated',
+      userId: users.scoped.id
+    };
+    await frame(wide, update);
+    expect(plain()).toEqual([]);
+    const resolved = resolve.mock.calls.map(([userId]) => userId);
+    expect(resolved).toContain(users.wide.id);
+    expect(resolved).not.toContain(users.other.id);
+    resolve.mockRestore();
   }, 30000);
 });

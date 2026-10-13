@@ -190,8 +190,10 @@ runWithRedis('server pushes across instances (e2e)', () => {
 
     notifications.push(plain.id, direct);
     notifications.pushToAll(broadcast);
-    await notifications.pushToAuthorized(authorized, (ability) =>
-      ability.can('search', 'User')
+    await notifications.pushToAuthorized(
+      authorized,
+      (ability) => ability.can('search', 'User'),
+      { action: 'search', subject: 'User' }
     );
 
     await settle(viewerOnSecond, 2);

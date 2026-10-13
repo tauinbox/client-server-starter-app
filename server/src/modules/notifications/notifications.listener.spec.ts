@@ -19,6 +19,8 @@ function abilityOf(define: (can: AbilityBuilder<AppAbility>['can']) => void) {
   return builder.build();
 }
 
+const searchUser = { action: 'search', subject: 'User' };
+
 describe('NotificationsListener', () => {
   let listener: NotificationsListener;
   let service: {
@@ -57,7 +59,8 @@ describe('NotificationsListener', () => {
     expect(service.push).not.toHaveBeenCalled();
     expect(service.pushToAuthorized).toHaveBeenCalledWith(
       { type: 'user_crud_events', action: 'deleted', userId: 'user-1' },
-      expect.any(Function)
+      expect.any(Function),
+      searchUser
     );
   });
 
@@ -130,7 +133,8 @@ describe('NotificationsListener', () => {
 
     expect(service.pushToAuthorized).toHaveBeenCalledWith(
       { type: 'user_crud_events', action: 'created', userId: 'user-3' },
-      expect.any(Function)
+      expect.any(Function),
+      searchUser
     );
   });
 
@@ -139,7 +143,8 @@ describe('NotificationsListener', () => {
 
     expect(service.pushToAuthorized).toHaveBeenCalledWith(
       { type: 'user_crud_events', action: 'updated', userId: 'user-4' },
-      expect.any(Function)
+      expect.any(Function),
+      searchUser
     );
   });
 
@@ -148,7 +153,8 @@ describe('NotificationsListener', () => {
 
     expect(service.pushToAuthorized).toHaveBeenCalledWith(
       { type: 'user_crud_events', action: 'restored', userId: 'user-5' },
-      expect.any(Function)
+      expect.any(Function),
+      searchUser
     );
   });
 
@@ -195,7 +201,8 @@ describe('NotificationsListener', () => {
 
       expect(service.pushToAuthorized).toHaveBeenCalledWith(
         { type: 'user_list_stale' },
-        expect.any(Function)
+        expect.any(Function),
+        searchUser
       );
       const [[, allows]] = service.pushToAuthorized.mock.calls as [
         unknown,

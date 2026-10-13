@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
@@ -112,6 +112,45 @@ export class PermissionService {
   async getRoleNamesForUser(userId: string): Promise<string[]> {
     const roles = await this.getRolesForUser(userId);
     return roles.map((r) => r.name);
+  }
+
+  /**
+   * The users of `userIds` that can pass a check of `action` on `subject`: a
+   * super role, or an allow of that action on that subject. Read from the
+   * database without the cache, so the result is never older than the cache.
+   * The ability still decides; this only removes users it cannot allow.
+   */
+  async filterGrantHolders(
+    userIds: string[],
+    action: string,
+    subject: string
+  ): Promise<string[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+    const rows = await this.userRepository
+      .createQueryBuilder('user')
+      .select('user.id', 'id')
+      .distinct(true)
+      .innerJoin('user.roles', 'role')
+      .leftJoin('role.rolePermissions', 'rp')
+      .leftJoin('rp.permission', 'permission')
+      .leftJoin('permission.action', 'action')
+      .leftJoin('permission.resource', 'resource')
+      // One array parameter: a spread list stops at the 65535 parameters of
+      // the Postgres protocol.
+      .where('user.id = ANY(CAST(:userIds AS uuid[]))', { userIds })
+      .andWhere(
+        new Brackets((qb) =>
+          qb.where('role.isSuper = true').orWhere(
+            `action.name = :action AND resource.subject = :subject
+              AND (rp.conditions IS NULL OR rp.conditions->>'effect' IS DISTINCT FROM 'deny')`,
+            { action, subject }
+          )
+        )
+      )
+      .getRawMany<{ id: string }>();
+    return rows.map((row) => row.id);
   }
 
   async invalidateUserCache(userId: string): Promise<void> {
