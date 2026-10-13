@@ -52,7 +52,9 @@ import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 
-const RECONNECT_RELOAD_JITTER_MS = 5000;
+// A flag change and a deploy reach every connected client at once; a random
+// wait up to this bound spreads their reloads.
+const STREAM_RELOAD_JITTER_MS = 5000;
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -78,18 +80,20 @@ export class AuthService {
       .subscribe(() => this.#reloadPermissions());
 
     this.#notificationsService.featureFlagsUpdated$
-      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .pipe(
+        switchMap(() => timer(Math.random() * STREAM_RELOAD_JITTER_MS)),
+        filter(() => this.#authStore.isAuthenticated()),
+        takeUntilDestroyed(this.#destroyRef)
+      )
       .subscribe(() => void this.#featureFlagsStore.reload());
 
     this.#notificationsService.entitlementsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.#reloadEntitlements());
 
-    // A deploy reconnects every client within a few seconds; the random wait
-    // spreads their reloads.
     this.#notificationsService.reconnected$
       .pipe(
-        switchMap(() => timer(Math.random() * RECONNECT_RELOAD_JITTER_MS)),
+        switchMap(() => timer(Math.random() * STREAM_RELOAD_JITTER_MS)),
         filter(() => this.#authStore.isAuthenticated()),
         takeUntilDestroyed(this.#destroyRef)
       )

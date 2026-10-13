@@ -2551,8 +2551,9 @@ over SSE at each change of a flag. It also sends the event to one user when the 
 change.
 
 The system invalidates the cache at each change. It coalesces the broadcast in a window of 500 ms.
-Thus a burst of changes causes one synchronized refetch on the client, and not one refetch for each
-change. Several saves in quick succession are such a burst; one save emits one event.
+Thus a burst of changes causes one refetch on the client, and not one refetch for each change.
+Several saves in quick succession are such a burst; one save emits one event. Each client waits a
+random 0 to 5 s before it refetches, thus the refetches of all clients do not arrive at the same time.
 
 The server keeps no per-user cache, so a user event invalidates nothing. `UserRoleChangedEvent` only
 sends `feature_flags_updated` to the affected user.

@@ -243,8 +243,10 @@ management and theming.
   across sign-in on that browser. The default, `user`, hashes the user id.
 
   `FeatureFlagChangedListener` invalidates the cache on each change. It also coalesces the SSE
-  broadcast of `{ type: 'feature_flags_updated' }`, thus a burst of changes causes one synchronized
-  client refetch. The flag-list reload behind those refetches is single-flight.
+  broadcast of `{ type: 'feature_flags_updated' }`, thus a burst of changes causes one client
+  refetch. Each client waits a random 0 to 5 s before it refetches, thus the refetches of all
+  connected clients do not start at the same time. The flag-list reload behind those refetches is
+  single-flight.
 
   The server does not cache an evaluated result. Each check evaluates the cached flag list against the
   user as the database holds it now, thus a change of email or roles applies on the next check.
@@ -1880,7 +1882,7 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2946 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 630 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 618 pass and 12 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1579 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1581 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 320 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1048 tests pass |
 

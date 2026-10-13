@@ -648,15 +648,46 @@ describe('AuthService', () => {
     });
   });
 
-  describe('role change push', () => {
-    it('reloads the flags once when both role change events arrive', () => {
-      permissionsUpdated$.next({
-        type: 'permissions_updated',
-        userId: 'user-1'
-      });
+  describe('flag change push', () => {
+    let randomSpy: { mockRestore: () => void };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(1);
+      authStoreMock.isAuthenticated.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('reloads the flags after the random wait', () => {
       featureFlagsUpdated$.next({ type: 'feature_flags_updated' });
+      vi.advanceTimersByTime(4999);
+
+      expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1);
 
       expect(featureFlagsStoreMock.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('reloads once for flag changes that come during the wait', () => {
+      featureFlagsUpdated$.next({ type: 'feature_flags_updated' });
+      vi.advanceTimersByTime(2000);
+      featureFlagsUpdated$.next({ type: 'feature_flags_updated' });
+      vi.advanceTimersByTime(5000);
+
+      expect(featureFlagsStoreMock.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('reloads nothing when the session ended during the wait', () => {
+      featureFlagsUpdated$.next({ type: 'feature_flags_updated' });
+      authStoreMock.isAuthenticated.mockReturnValue(false);
+      vi.advanceTimersByTime(5000);
+
+      expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();
     });
 
     it('does not reload the flags on a permission change alone', () => {
@@ -664,6 +695,7 @@ describe('AuthService', () => {
         type: 'permissions_updated',
         userId: 'user-1'
       });
+      vi.advanceTimersByTime(5000);
 
       expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();
     });

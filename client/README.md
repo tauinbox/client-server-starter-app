@@ -876,6 +876,10 @@ placeholder in the first paint. On logout the app calls `clear()` on the store.
 
 The flags stay live. `NotificationsService.featureFlagsUpdated$` is a filter on the SSE stream. It
 starts `featureFlagsStore.reload()` each time the server sends `{ type: 'feature_flags_updated' }`.
+`AuthService` waits a random 0 to 5 s before the reload, because the server sends the event to all
+connected clients at the same time. A new event in that wait replaces the waiting one, and a
+session that ends in the wait reloads nothing. Thus the UI can show a flag change up to 5 s later.
+The server checks of a flag are not delayed.
 The computed signal of each key sends the new value to its consumers. Thus `*nxsHasFeature` and
 `featureEnabled` show the new value with no page reload.
 
@@ -1190,8 +1194,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 318 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1551 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 320 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1581 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the
