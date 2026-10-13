@@ -15,6 +15,10 @@ export function registerSseConnection(
   connections.get(userId)!.set(connectionId, res);
 }
 
+export function countSseConnections(userId: string): number {
+  return connections.get(userId)?.size ?? 0;
+}
+
 export function removeSseConnection(
   userId: string,
   connectionId: string

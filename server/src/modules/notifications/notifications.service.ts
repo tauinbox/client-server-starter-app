@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger
+} from '@nestjs/common';
 import {
   exhaustMap,
   finalize,
@@ -11,6 +17,7 @@ import {
 } from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
 import type { NotificationEvent } from '@app/shared/types';
+import { MAX_SSE_STREAMS_PER_USER } from '@app/shared/constants';
 import {
   SSE_CONNECTIONS_REF,
   type SseConnectionsRef
@@ -46,6 +53,15 @@ export class NotificationsService {
     sessionId: string,
     connectionId: string
   ): Observable<MessageEvent> {
+    if (
+      (this.#connections.get(userId)?.size ?? 0) >= MAX_SSE_STREAMS_PER_USER
+    ) {
+      // eslint-disable-next-line no-restricted-syntax -- the stream request is silent; no user sees this text
+      throw new HttpException(
+        'Too many open notification streams',
+        HttpStatus.TOO_MANY_REQUESTS
+      );
+    }
     const subject = this.createStream(userId, connectionId);
     const heartbeat$ = interval(this.heartbeatIntervalMs).pipe(
       exhaustMap(() => this.#isSessionLive(sessionId)),
