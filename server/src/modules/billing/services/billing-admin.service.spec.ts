@@ -23,8 +23,10 @@ import { Invoice } from '../entities/invoice.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
-import { EntitlementService } from '../../entitlements/entitlement.service';
-import { SubscriptionCanceledEvent } from '../events/billing.events';
+import {
+  InvoiceRefundedEvent,
+  SubscriptionCanceledEvent
+} from '../events/billing.events';
 import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 
@@ -144,9 +146,6 @@ async function build() {
     getProviderById: jest.fn()
   };
   const renewals = { billClosingUsagePeriod: jest.fn() };
-  const entitlements = {
-    invalidateUser: jest.fn().mockResolvedValue(undefined)
-  };
   const credits = {
     clawbackPurchase: jest.fn().mockResolvedValue(undefined)
   };
@@ -192,7 +191,6 @@ async function build() {
       { provide: getRepositoryToken(Product), useValue: products },
       { provide: BillingService, useValue: billing },
       { provide: RenewalService, useValue: renewals },
-      { provide: EntitlementService, useValue: entitlements },
       { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } },
       { provide: getDataSourceToken(), useValue: dataSource }
@@ -209,7 +207,6 @@ async function build() {
     products,
     billing,
     renewals,
-    entitlements,
     credits,
     emit,
     manager,
@@ -795,7 +792,7 @@ describe('BillingAdminService', () => {
         });
       }
 
-      it('full refund of an sku purchase revokes its grant and drops the cached entitlements', async () => {
+      it('full refund of an sku purchase revokes its grant and emits the refund event', async () => {
         const ctx = await build();
         ctx.invoices.findOne.mockResolvedValue(makeOneTimeInvoice());
         ctx.grants.update.mockResolvedValue({ affected: 1 });
@@ -813,7 +810,10 @@ describe('BillingAdminService', () => {
           { sourceInvoiceId: 'inv-1', revokedAt: IsNull() },
           { revokedAt: expect.any(Date) as Date }
         );
-        expect(ctx.entitlements.invalidateUser).toHaveBeenCalledWith('user-1');
+        expect(ctx.emit).toHaveBeenCalledWith(
+          InvoiceRefundedEvent.name,
+          new InvoiceRefundedEvent('user-1', 'inv-1')
+        );
       });
 
       it('two partial refunds summing to the total settle the invoice and revoke the sku grant once', async () => {
@@ -836,7 +836,7 @@ describe('BillingAdminService', () => {
         const second = await ctx.service.refundInvoice('inv-1', 24500);
         expect(second.status).toBe('refunded');
         expect(ctx.grants.update).toHaveBeenCalledTimes(1);
-        expect(ctx.entitlements.invalidateUser).toHaveBeenCalledTimes(1);
+        expect(ctx.emit).toHaveBeenCalledTimes(1);
 
         // Each leg keys on the cumulative-after total, so the provider sees two
         // distinct refunds (the original bug let identical-amount legs collide).
@@ -890,7 +890,7 @@ describe('BillingAdminService', () => {
 
         expect(saved.status).toBe('paid');
         expect(ctx.grants.update).not.toHaveBeenCalled();
-        expect(ctx.entitlements.invalidateUser).not.toHaveBeenCalled();
+        expect(ctx.emit).not.toHaveBeenCalled();
       });
 
       it('full refund of a custom purchase is a plain refund (no grants matched)', async () => {
@@ -905,7 +905,7 @@ describe('BillingAdminService', () => {
         const saved = await ctx.service.refundInvoice('inv-1');
 
         expect(saved.status).toBe('refunded');
-        expect(ctx.entitlements.invalidateUser).not.toHaveBeenCalled();
+        expect(ctx.emit).not.toHaveBeenCalled();
       });
 
       it('never touches grants when refunding a subscription invoice', async () => {

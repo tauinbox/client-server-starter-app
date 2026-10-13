@@ -652,8 +652,10 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
   writes a second audit entry.
 - `POST invoices/:id/refund`. The system tracks the refunds cumulatively in `refunded_minor`, and
   the sum cannot be more than `amount_minor`. When the cumulative refunds reach the total, the
-  invoice becomes `refunded`. That flip revokes the `CustomerGrant` of a one-time sku, drops the
-  cached entitlements of the buyer, and takes the units of a credit pack back. The balance can become
+  invoice becomes `refunded`. That flip revokes the `CustomerGrant` of a one-time sku and takes the
+  units of a credit pack back. After the commit, a revoked grant emits `InvoiceRefundedEvent`, thus
+  the entitlement listener drops the cached entitlements of the buyer and pushes
+  `entitlements_updated`. The balance can become
   negative, which blocks usage until the customer adds credits. A refund that leaves a remaining
   balance keeps the grant and the credits.
 - `POST usage` is the internal metering ingest. It is idempotent on
@@ -822,8 +824,8 @@ The request DTOs cover the checkout, the change, the cancel, the region, the ref
 and the purchase.
 
 **Events (`events/billing.events.ts`).** The events are `SubscriptionActivated`,
-`SubscriptionRenewed`, `SubscriptionPastDue`, `SubscriptionCanceled`, `PlanChanged`, `InvoicePaid`
-and `PaymentFailed`. Each one carries a `userId`. `UsagePeriodClosed` comes from a provider-managed
+`SubscriptionRenewed`, `SubscriptionPastDue`, `SubscriptionCanceled`, `PlanChanged`, `InvoicePaid`,
+`InvoiceRefunded` and `PaymentFailed`. Each one carries a `userId`. `UsagePeriodClosed` comes from a provider-managed
 usage rollover or from a cancellation, and the usage-invoicing listener reads it.
 
 **Listeners.** `entitlement-changed.listener` reacts to each event that changes an entitlement. It

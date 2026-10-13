@@ -9,6 +9,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
+import * as sseHub from '../sse-hub';
 
 let server: Server;
 let baseUrl: string;
@@ -494,12 +495,39 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     });
     expect(before.status).toBe(200);
 
-    await refund(adminToken, invoice.id);
+    const push = jest.spyOn(sseHub, 'pushToUser');
+    try {
+      await refund(adminToken, invoice.id);
+      const userId = mockId('user-2');
+      expect(push).toHaveBeenCalledWith(userId, {
+        type: 'entitlements_updated',
+        userId
+      });
+    } finally {
+      push.mockRestore();
+    }
 
     const after = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
       headers: { authorization: `Bearer ${token}` }
     });
     expect(after.status).toBe(403);
+  });
+
+  it('a partial refund of an sku purchase tells the client nothing', async () => {
+    const token = await login();
+    const adminToken = await login('admin@example.com');
+    const purchase = await postPurchase(token, { productKey: 'report-pack' });
+    const session = (await purchase.json()) as PurchaseSessionResponse;
+    const complete = await completePurchase({ sessionRef: session.sessionRef });
+    const invoice = (await complete.json()) as InvoiceResponse;
+
+    const push = jest.spyOn(sseHub, 'pushToUser');
+    try {
+      await refund(adminToken, invoice.id, { amountMinor: 100 });
+      expect(push).not.toHaveBeenCalled();
+    } finally {
+      push.mockRestore();
+    }
   });
 
   it('two partial refunds summing to the total revoke the sku grant once', async () => {

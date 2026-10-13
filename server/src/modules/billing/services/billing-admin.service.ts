@@ -24,7 +24,7 @@ import { Invoice } from '../entities/invoice.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
-import { EntitlementService } from '../../entitlements/entitlement.service';
+import { InvoiceRefundedEvent } from '../events/billing.events';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
   INVOICE_LIST_COLUMNS,
@@ -74,7 +74,6 @@ export class BillingAdminService {
     private readonly webhookEvents: Repository<WebhookEvent>,
     private readonly billing: BillingService,
     private readonly renewals: RenewalService,
-    private readonly entitlements: EntitlementService,
     private readonly credits: CreditService,
     private readonly events: EventEmitter2,
     @InjectDataSource() private readonly dataSource: DataSource
@@ -238,7 +237,7 @@ export class BillingAdminService {
     }
 
     // The money side is already recorded, so settling is only the status flip.
-    const { saved, invalidateUserId } = await withTransaction(
+    const { saved, revokedUserId } = await withTransaction(
       this.dataSource,
       async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
@@ -254,22 +253,23 @@ export class BillingAdminService {
           cumulativeRefunded.compare(invoice.amountMinor) < 0 ||
           invoice.status !== 'paid'
         ) {
-          return { saved: invoice, invalidateUserId: null };
+          return { saved: invoice, revokedUserId: null };
         }
         invoice.status = 'refunded';
-        const invalidateUserId = await this.revokeOneTimeGrants(
-          manager,
-          invoice
-        );
+        const revokedUserId = await this.revokeOneTimeGrants(manager, invoice);
         await this.clawbackCreditPurchase(manager, invoice);
         const saved = await manager.save(Invoice, invoice);
-        return { saved, invalidateUserId };
+        return { saved, revokedUserId };
       }
     );
 
-    // Cache invalidation is non-transactional — only after a durable commit.
-    if (invalidateUserId) {
-      await this.entitlements.invalidateUser(invalidateUserId);
+    // Emitted only after a durable commit: the listener drops the cached
+    // entitlements, then tells the client.
+    if (revokedUserId) {
+      this.events.emit(
+        InvoiceRefundedEvent.name,
+        new InvoiceRefundedEvent(revokedUserId, id)
+      );
     }
     return saved;
   }

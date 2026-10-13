@@ -81,6 +81,14 @@ export class FirstPaymentUnclaimedEvent {
   ) {}
 }
 
+/** A full refund of a one-time purchase revoked the grants it gave. */
+export class InvoiceRefundedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly invoiceId: string
+  ) {}
+}
+
 export class PaymentFailedEvent {
   constructor(
     public readonly userId: string,
@@ -96,5 +104,6 @@ export const ENTITLEMENT_CHANGING_EVENTS = [
   SubscriptionCanceledEvent.name,
   PlanChangedEvent.name,
   InvoicePaidEvent.name,
+  InvoiceRefundedEvent.name,
   PaymentFailedEvent.name
 ];

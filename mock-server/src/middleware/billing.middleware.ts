@@ -1294,20 +1294,24 @@ billingAdminRouter.post(
 );
 
 // A full refund of a one-time purchase takes back what it granted, mirroring
-// the server's BillingAdminService: the sku's CustomerGrant is revoked and a
-// credit pack's units are clawed back (the balance may go negative, which
-// blocks further usage until topped up). Partial refunds keep the invoice
-// `paid`, so grants and credits survive them by construction.
+// the server's BillingAdminService: the sku's CustomerGrant is revoked, which
+// tells the owner, and a credit pack's units are clawed back (the balance may
+// go negative, which blocks further usage until topped up). Partial refunds
+// keep the invoice `paid`, so grants and credits survive them by construction.
 function revokeOneTimeEffects(invoice: MockInvoice): void {
   if (invoice.kind !== 'one_time') return;
   const state = getState();
   const nowIso = new Date().toISOString();
 
+  let revoked = false;
   for (const grant of state.billingCustomerGrants.values()) {
     if (grant.sourceInvoiceId === invoice.id && !grant.revokedAt) {
       grant.revokedAt = nowIso;
+      revoked = true;
     }
   }
+  const ownerId = state.billingCustomers.get(invoice.customerId)?.userId;
+  if (revoked && ownerId) notifyEntitlementsChanged(ownerId);
 
   const product = invoice.productId
     ? state.billingProducts.get(invoice.productId)
