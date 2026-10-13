@@ -6,12 +6,14 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import {
   EMPTY,
+  filter,
   finalize,
   firstValueFrom,
   from,
   switchMap,
   tap,
-  throwError
+  throwError,
+  timer
 } from 'rxjs';
 import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
@@ -50,6 +52,8 @@ import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 
+const RECONNECT_RELOAD_JITTER_MS = 5000;
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly #http = inject(HttpClient);
@@ -71,26 +75,28 @@ export class AuthService {
   constructor() {
     this.#notificationsService.permissionsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe(() => {
-        // Metadata fetch is permission-gated, so re-evaluate it after the
-        // refreshed rules arrive (e.g. the user was just granted admin access).
-        void this.fetchPermissions().then(() => this.fetchRbacMetadata());
-      });
+      .subscribe(() => this.#reloadPermissions());
 
     this.#notificationsService.featureFlagsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe(() => {
-        void this.#featureFlagsStore.reload();
-      });
+      .subscribe(() => void this.#featureFlagsStore.reload());
 
     this.#notificationsService.entitlementsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => this.#reloadEntitlements());
+
+    // A deploy reconnects every client within a few seconds; the random wait
+    // spreads their reloads.
+    this.#notificationsService.reconnected$
+      .pipe(
+        switchMap(() => timer(Math.random() * RECONNECT_RELOAD_JITTER_MS)),
+        filter(() => this.#authStore.isAuthenticated()),
+        takeUntilDestroyed(this.#destroyRef)
+      )
       .subscribe(() => {
-        // The mirror loads lazily, so a session that never resolved
-        // entitlements has nothing stale to refresh.
-        if (this.#entitlementsStore.loaded()) {
-          void this.#entitlementsStore.reload();
-        }
+        void this.#featureFlagsStore.reload();
+        this.#reloadPermissions();
+        this.#reloadEntitlements();
       });
 
     this.#tokenService.sessionCleared$
@@ -102,6 +108,20 @@ export class AuthService {
       .subscribe(() => this.logout(this.#router.url, SESSION_ENDED.Idle));
 
     this.#listenForCrossTabLogout();
+  }
+
+  #reloadPermissions(): void {
+    // Metadata fetch is permission-gated, so re-evaluate it after the
+    // refreshed rules arrive (e.g. the user was just granted admin access).
+    void this.fetchPermissions().then(() => this.fetchRbacMetadata());
+  }
+
+  #reloadEntitlements(): void {
+    // The mirror loads lazily, so a session that never resolved
+    // entitlements has nothing stale to refresh.
+    if (this.#entitlementsStore.loaded()) {
+      void this.#entitlementsStore.reload();
+    }
   }
 
   /**
@@ -275,6 +295,9 @@ export class AuthService {
     // Drop any mirror left by a previous session rather than re-fetching:
     // the store is lazy, so the next gated surface loads it for this user.
     this.#entitlementsStore.clear();
+    // Open the stream first: a change pushed while the loads run then
+    // reloads once more instead of being lost.
+    this.#notificationsService.connect();
     await Promise.all([
       // reload(), not load(): flags may already be loaded from the
       // anonymous bootstrap and the authenticated set can differ.
@@ -282,7 +305,6 @@ export class AuthService {
       // The metadata fetch is permission-gated, so it waits for the rules.
       this.fetchPermissions().then(() => this.fetchRbacMetadata())
     ]);
-    this.#notificationsService.connect();
   }
 
   register(

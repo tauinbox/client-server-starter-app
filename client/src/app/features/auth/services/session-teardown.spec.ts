@@ -104,6 +104,7 @@ describe('session teardown', () => {
     permissionsUpdated$: typeof EMPTY;
     featureFlagsUpdated$: typeof EMPTY;
     entitlementsUpdated$: typeof EMPTY;
+    reconnected$: typeof EMPTY;
   };
 
   beforeEach(() => {
@@ -115,7 +116,8 @@ describe('session teardown', () => {
       disconnect: vi.fn(),
       permissionsUpdated$: EMPTY,
       featureFlagsUpdated$: EMPTY,
-      entitlementsUpdated$: EMPTY
+      entitlementsUpdated$: EMPTY,
+      reconnected$: EMPTY
     };
 
     TestBed.configureTestingModule({

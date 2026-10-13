@@ -185,7 +185,9 @@ management and theming.
 
   The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches
   the Bearer token. `NotificationsService` connects at login and disconnects at logout, and it
-  reconnects with exponential backoff. It also recycles the connection each 4 h to 8 h, with jitter.
+  reconnects with exponential backoff and jitter. After a reconnect it reloads the feature flags, the
+  permissions and the entitlements, because the server keeps no event history. It also recycles the
+  connection each 4 h to 8 h, with jitter.
   Angular keeps the transport buffers for the life of a request, thus the recycle stops unbounded
   growth on a tab that stays open.
 - **Role-Based Access Control (RBAC).** The resources and the actions are dynamic, and

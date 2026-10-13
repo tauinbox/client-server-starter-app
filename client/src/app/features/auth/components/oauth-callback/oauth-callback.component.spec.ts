@@ -294,6 +294,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
     permissionsUpdated$: typeof EMPTY;
     featureFlagsUpdated$: typeof EMPTY;
     entitlementsUpdated$: typeof EMPTY;
+    reconnected$: typeof EMPTY;
   };
   let featureFlagsStoreMock: {
     load: ReturnType<typeof vi.fn>;
@@ -337,7 +338,8 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
       disconnect: vi.fn(),
       permissionsUpdated$: EMPTY,
       featureFlagsUpdated$: EMPTY,
-      entitlementsUpdated$: EMPTY
+      entitlementsUpdated$: EMPTY,
+      reconnected$: EMPTY
     };
     featureFlagsStoreMock = {
       load: vi.fn().mockResolvedValue(undefined),

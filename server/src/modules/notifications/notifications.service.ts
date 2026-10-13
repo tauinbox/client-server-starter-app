@@ -12,6 +12,7 @@ import {
   map,
   merge,
   Observable,
+  startWith,
   Subject,
   takeWhile
 } from 'rxjs';
@@ -79,7 +80,11 @@ export class NotificationsService {
       // The merge completes only when the subject completes too.
       finalize(() => this.closeStream(userId, connectionId))
     );
-    return merge(subject.asObservable(), heartbeat$);
+    // The first frame tells the client at once that the stream is live, so it
+    // can reload what it missed while it was not connected.
+    return merge(subject.asObservable(), heartbeat$).pipe(
+      startWith<MessageEvent>({ data: '' })
+    );
   }
 
   async #isSessionLive(sessionId: string): Promise<boolean> {

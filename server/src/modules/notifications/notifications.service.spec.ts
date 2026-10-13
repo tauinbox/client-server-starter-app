@@ -79,6 +79,14 @@ describe('NotificationsService', () => {
       };
     };
 
+    it('sends one heartbeat frame at once, before the first session check', () => {
+      const stream = collect('user-1', 'session-1');
+
+      expect(stream.frames).toEqual(['']);
+      expect(refreshTokenService.hasLiveSession).not.toHaveBeenCalled();
+      stream.subscription.unsubscribe();
+    });
+
     it('sends a heartbeat while the session is live and keeps the stream open', async () => {
       const stream = collect('user-1', 'session-1');
 
@@ -87,7 +95,7 @@ describe('NotificationsService', () => {
       expect(refreshTokenService.hasLiveSession).toHaveBeenCalledWith(
         'session-1'
       );
-      expect(stream.frames).toEqual(['', '']);
+      expect(stream.frames).toEqual(['', '', '']);
       expect(stream.isCompleted()).toBe(false);
       stream.subscription.unsubscribe();
     });
@@ -100,6 +108,7 @@ describe('NotificationsService', () => {
       await jest.advanceTimersByTimeAsync(HEARTBEAT_MS * 3);
 
       expect(stream.frames).toEqual([
+        '',
         { type: 'feature_flags_updated' },
         { type: 'session_invalidated', userId: 'user-1' }
       ]);
@@ -116,7 +125,7 @@ describe('NotificationsService', () => {
       );
       await jest.advanceTimersByTimeAsync(HEARTBEAT_MS);
 
-      expect(stream.frames).toEqual(['']);
+      expect(stream.frames).toEqual(['', '']);
       expect(stream.isCompleted()).toBe(false);
       stream.subscription.unsubscribe();
     });

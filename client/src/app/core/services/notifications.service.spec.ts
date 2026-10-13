@@ -281,8 +281,8 @@ describe('NotificationsService', () => {
     // Server closes the connection (complete)
     req.flush('');
 
-    // Advance past RECONNECT_DELAY_MS (5000)
-    vi.advanceTimersByTime(5000);
+    // The first reconnect waits at most 3 s
+    vi.advanceTimersByTime(3000);
 
     // A new connection should have been attempted
     httpController.expectOne('/api/v1/notifications/stream').flush('');
@@ -417,6 +417,121 @@ describe('NotificationsService', () => {
 
     randomSpy.mockRestore();
     vi.useRealTimers();
+  });
+
+  describe('reconnect delay', () => {
+    const STREAM = '/api/v1/notifications/stream';
+    let randomSpy: { mockRestore: () => void };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      randomSpy.mockRestore();
+    });
+
+    const expectReconnectAfter = (delayMs: number) => {
+      vi.advanceTimersByTime(delayMs - 1);
+      httpController.expectNone(STREAM);
+      vi.advanceTimersByTime(1);
+      return httpController.expectOne(STREAM);
+    };
+
+    it('doubles while the stream fails and resets after a first frame', () => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(1);
+      service.connect();
+
+      httpController.expectOne(STREAM).flush('');
+      expectReconnectAfter(3000).flush('');
+      expectReconnectAfter(6000).flush('');
+      const live = expectReconnectAfter(12_000);
+
+      live.event(makeProgressEvent('data: \n\n', 8));
+      live.flush('');
+
+      expectReconnectAfter(3000).flush('');
+      expectReconnectAfter(6000);
+    });
+
+    it('stops growing at 60 s', () => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(1);
+      service.connect();
+
+      httpController.expectOne(STREAM).flush('');
+      for (const delay of [3000, 6000, 12_000, 24_000, 48_000, 60_000]) {
+        expectReconnectAfter(delay).flush('');
+      }
+      expectReconnectAfter(60_000);
+    });
+
+    it('waits at least half of the delay', () => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+      service.connect();
+
+      httpController.expectOne(STREAM).flush('');
+      expectReconnectAfter(1500).flush('');
+      expectReconnectAfter(3000);
+    });
+  });
+
+  describe('reconnected$', () => {
+    const STREAM = '/api/v1/notifications/stream';
+    const heartbeat = makeProgressEvent('data: \n\n', 8);
+    let reconnects: number;
+
+    beforeEach(() => {
+      reconnects = 0;
+      service.reconnected$.subscribe(() => reconnects++);
+    });
+
+    it('does not emit for the first stream of a connect()', () => {
+      service.connect();
+      httpController.expectOne(STREAM).event(heartbeat);
+
+      expect(reconnects).toBe(0);
+    });
+
+    it('emits once when a reopened stream sends its first frame', () => {
+      vi.useFakeTimers();
+      service.connect();
+      const first = httpController.expectOne(STREAM);
+      first.event(heartbeat);
+      first.flush('');
+
+      vi.advanceTimersByTime(3000);
+      const second = httpController.expectOne(STREAM);
+      expect(reconnects).toBe(0);
+
+      second.event(heartbeat);
+      second.event(makeProgressEvent('data: \n\ndata: \n\n', 16));
+
+      expect(reconnects).toBe(1);
+    });
+
+    it('emits when the recycled stream sends its first frame', () => {
+      vi.useFakeTimers();
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+      service.connect();
+      httpController.expectOne(STREAM).event(heartbeat);
+
+      vi.advanceTimersByTime(RECYCLE_MIN_DELAY_MS);
+      httpController.expectOne(STREAM).event(heartbeat);
+
+      expect(reconnects).toBe(1);
+      randomSpy.mockRestore();
+    });
+
+    it('does not emit for a new connect() after disconnect()', () => {
+      service.connect();
+      httpController.expectOne(STREAM).event(heartbeat);
+      service.disconnect();
+
+      service.connect();
+      httpController.expectOne(STREAM).event(heartbeat);
+
+      expect(reconnects).toBe(0);
+    });
   });
 
   it('should not reconnect if user is not authenticated', () => {

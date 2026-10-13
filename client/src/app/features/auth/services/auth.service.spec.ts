@@ -109,6 +109,8 @@ describe('AuthService', () => {
   let entitlementsUpdated$: Subject<NotificationEvent>;
   let permissionsUpdated$: Subject<NotificationEvent>;
   let featureFlagsUpdated$: Subject<NotificationEvent>;
+  let reconnected$: Subject<void>;
+  let notificationsConnect: ReturnType<typeof vi.fn>;
   let notifyMock: { error: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -156,6 +158,8 @@ describe('AuthService', () => {
     entitlementsUpdated$ = new Subject<NotificationEvent>();
     permissionsUpdated$ = new Subject<NotificationEvent>();
     featureFlagsUpdated$ = new Subject<NotificationEvent>();
+    reconnected$ = new Subject<void>();
+    notificationsConnect = vi.fn();
     notifyMock = { error: vi.fn() };
 
     TestBed.configureTestingModule({
@@ -170,11 +174,12 @@ describe('AuthService', () => {
         {
           provide: NotificationsService,
           useValue: {
-            connect: vi.fn(),
+            connect: notificationsConnect,
             disconnect: vi.fn(),
             permissionsUpdated$,
             featureFlagsUpdated$,
-            entitlementsUpdated$: entitlementsUpdated$
+            entitlementsUpdated$: entitlementsUpdated$,
+            reconnected$
           }
         },
         { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock },
@@ -661,6 +666,79 @@ describe('AuthService', () => {
       });
 
       expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stream reconnect', () => {
+    let randomSpy: { mockRestore: () => void };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(1);
+      authStoreMock.isAuthenticated.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('reloads the flags, the permissions and the loaded entitlements after the random wait', () => {
+      entitlementsStoreMock.loaded.set(true);
+
+      reconnected$.next();
+      vi.advanceTimersByTime(4999);
+
+      expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();
+      httpMock.expectNone(AuthApiEnum.Permissions);
+
+      vi.advanceTimersByTime(1);
+
+      expect(featureFlagsStoreMock.reload).toHaveBeenCalledTimes(1);
+      expect(entitlementsStoreMock.reload).toHaveBeenCalledTimes(1);
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+    });
+
+    it('does not load entitlements that the session never resolved', () => {
+      entitlementsStoreMock.loaded.set(false);
+
+      reconnected$.next();
+      vi.advanceTimersByTime(5000);
+
+      expect(entitlementsStoreMock.reload).not.toHaveBeenCalled();
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+    });
+
+    it('reloads once for reconnects that come during the wait', () => {
+      reconnected$.next();
+      vi.advanceTimersByTime(2000);
+      reconnected$.next();
+      vi.advanceTimersByTime(5000);
+
+      expect(featureFlagsStoreMock.reload).toHaveBeenCalledTimes(1);
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+    });
+
+    it('reloads nothing when the session ended during the wait', () => {
+      reconnected$.next();
+      authStoreMock.isAuthenticated.mockReturnValue(false);
+      vi.advanceTimersByTime(5000);
+
+      expect(featureFlagsStoreMock.reload).not.toHaveBeenCalled();
+      httpMock.expectNone(AuthApiEnum.Permissions);
+    });
+  });
+
+  describe('completeAuthentication', () => {
+    it('opens the stream before it loads the flags and the permissions', async () => {
+      const done = service.completeAuthentication();
+
+      expect(notificationsConnect).toHaveBeenCalledTimes(1);
+      expect(notificationsConnect.mock.invocationCallOrder[0]).toBeLessThan(
+        featureFlagsStoreMock.reload.mock.invocationCallOrder[0]
+      );
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+      await done;
     });
   });
 

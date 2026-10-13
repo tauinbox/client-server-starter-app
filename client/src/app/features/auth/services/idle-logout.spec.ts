@@ -78,7 +78,8 @@ describe('idle logout wiring', () => {
             disconnect: vi.fn(),
             permissionsUpdated$: EMPTY,
             featureFlagsUpdated$: EMPTY,
-            entitlementsUpdated$: EMPTY
+            entitlementsUpdated$: EMPTY,
+            reconnected$: EMPTY
           }
         }
       ]
