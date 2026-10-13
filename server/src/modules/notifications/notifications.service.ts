@@ -16,7 +16,7 @@ import {
   type SseConnectionsRef
 } from '../core/metrics/metrics.module';
 import { CaslAbilityFactory } from '../auth/casl/casl-ability.factory';
-import type { PermissionCheck } from '../auth/casl/app-ability';
+import type { AppAbility } from '../auth/casl/app-ability';
 import { RefreshTokenService } from '../auth/services/refresh-token.service';
 import { SSE_HEARTBEAT_INTERVAL_MS } from './notifications.constants';
 
@@ -131,18 +131,18 @@ export class NotificationsService {
   }
 
   /**
-   * Deliver only to connected users whose current abilities satisfy `check`.
+   * Deliver only to connected users whose current abilities satisfy `allows`.
    * Abilities are resolved per push (not cached on the connection) so a
    * permission change takes effect on the next event rather than on reconnect.
    */
   async pushToAuthorized(
     event: NotificationEvent,
-    check: PermissionCheck
+    allows: (ability: AppAbility) => boolean
   ): Promise<void> {
     const userIds = Array.from(this.#connections.keys());
     await Promise.all(
       userIds.map(async (userId) => {
-        if (await this.#can(userId, check)) {
+        if (await this.#can(userId, allows)) {
           this.push(userId, event);
         }
       })
@@ -151,11 +151,11 @@ export class NotificationsService {
 
   async #can(
     userId: string,
-    [action, subject]: PermissionCheck
+    allows: (ability: AppAbility) => boolean
   ): Promise<boolean> {
     try {
       const { ability } = await this.caslAbilityFactory.resolveForUser(userId);
-      return ability.can(action, subject);
+      return allows(ability);
     } catch (error) {
       // Fail closed: an unresolvable ability must not widen the audience
       this.#logger.warn(

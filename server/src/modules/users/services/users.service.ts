@@ -230,6 +230,13 @@ export class UsersService {
     });
   }
 
+  /** `findById` that also returns a soft-deleted account. */
+  async findByIdWithDeleted(id: string): Promise<User | null> {
+    if (!id) return null;
+
+    return this.userRepository.findOne({ where: { id }, withDeleted: true });
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { email },

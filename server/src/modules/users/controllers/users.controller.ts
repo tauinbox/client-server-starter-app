@@ -430,7 +430,10 @@ export class UsersController {
       );
     }
 
-    this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
+    this.eventEmitter.emit(
+      UserUpdatedEvent.name,
+      new UserUpdatedEvent(id, target)
+    );
     return updatedUser;
   }
 

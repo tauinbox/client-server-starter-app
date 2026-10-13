@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { subject } from '@casl/ability';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsService } from './notifications.service';
 import { UserDeletedEvent } from '../users/events/user-deleted.event';
@@ -8,7 +9,8 @@ import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
-import type { PermissionCheck } from '../auth/casl/app-ability';
+import { UsersService } from '../users/services/users.service';
+import type { User } from '../users/entities/user.entity';
 import type { NotificationEvent } from '@app/shared/types';
 
 type UserCrudAction = Extract<
@@ -16,14 +18,15 @@ type UserCrudAction = Extract<
   { type: 'user_crud_events' }
 >['action'];
 
-// user_crud_events only drive the admin user list, so they are limited to
-// clients that may list users - a broadcast would leak user IDs and the fact
-// that an account was created/updated/deleted to every authenticated client.
-const USER_LIST_ACCESS: PermissionCheck = ['search', 'User'];
-
+// user_crud_events only drive the admin user list, so they go only to the
+// clients whose list shows the user - a broadcast would leak user IDs and the
+// fact that an account was created/updated/deleted to every client.
 @Injectable()
 export class NotificationsListener {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService
+  ) {}
 
   @OnEvent(UserDeletedEvent.name)
   async handleUserDeleted(event: UserDeletedEvent): Promise<void> {
@@ -49,7 +52,7 @@ export class NotificationsListener {
 
   @OnEvent(UserUpdatedEvent.name)
   async handleUserUpdated(event: UserUpdatedEvent): Promise<void> {
-    await this.#pushUserCrudEvent('updated', event.userId);
+    await this.#pushUserCrudEvent('updated', event.userId, event.previous);
   }
 
   @OnEvent(UserRestoredEvent.name)
@@ -75,10 +78,23 @@ export class NotificationsListener {
     }
   }
 
-  #pushUserCrudEvent(action: UserCrudAction, userId: string): Promise<void> {
-    return this.notificationsService.pushToAuthorized(
+  async #pushUserCrudEvent(
+    action: UserCrudAction,
+    userId: string,
+    previous?: User
+  ): Promise<void> {
+    // A `search` grant can carry conditions, so the check runs on the record:
+    // a type-level check is true for any conditional rule. A viewer that saw
+    // the record before the change must learn of it, so that its list can
+    // drop a user that left its scope.
+    const user = await this.usersService.findByIdWithDeleted(userId);
+    if (!user) return;
+    const records = [user, ...(previous ? [previous] : [])].map((row) =>
+      subject('User', row)
+    );
+    await this.notificationsService.pushToAuthorized(
       { type: 'user_crud_events', action, userId },
-      USER_LIST_ACCESS
+      (ability) => records.some((record) => ability.can('search', record))
     );
   }
 }

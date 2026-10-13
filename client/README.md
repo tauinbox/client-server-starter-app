@@ -713,7 +713,7 @@ The service supplies three streams:
 - `permissionsUpdated$` starts `authService.fetchPermissions()`, and then the permission-gated
   `fetchRbacMetadata()`.
 - `userCrudEvents$` refreshes the user list. The server sends these events only to a client whose
-  ability permits `users:search`.
+  ability permits `users:search` on the changed user.
 
 `connect()` runs after a login and after a session restore. `disconnect()` runs on each session
 teardown. This includes an explicit logout and a forced logout.
