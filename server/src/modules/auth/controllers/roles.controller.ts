@@ -47,6 +47,7 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
+import { UserUpdatedEvent } from '../../users/events/user-updated.event';
 import type { JwtAuthRequest } from '../types/auth.request';
 
 @ApiTags('Roles API')
@@ -81,6 +82,16 @@ export class RolesController {
       actorEmail: req.user?.email ?? null,
       context: extractAuditContext(req)
     };
+  }
+
+  // No `previous` record: the user list check reads the row without its
+  // roles, so a role change cannot move the user out of a viewer's scope.
+  private async emitUserRolesChanged(userId: string): Promise<void> {
+    await this.eventEmitter.emitAsync(
+      UserRoleChangedEvent.name,
+      new UserRoleChangedEvent(userId)
+    );
+    this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(userId));
   }
 
   @Get('cursor')
@@ -379,10 +390,7 @@ export class RolesController {
         details: { roleId: dto.roleId }
       })
     );
-    await this.eventEmitter.emitAsync(
-      UserRoleChangedEvent.name,
-      new UserRoleChangedEvent(userId)
-    );
+    await this.emitUserRolesChanged(userId);
     return result;
   }
 
@@ -411,10 +419,7 @@ export class RolesController {
         details: { roleId }
       })
     );
-    await this.eventEmitter.emitAsync(
-      UserRoleChangedEvent.name,
-      new UserRoleChangedEvent(userId)
-    );
+    await this.emitUserRolesChanged(userId);
     return result;
   }
 }

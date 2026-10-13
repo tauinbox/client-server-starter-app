@@ -1,7 +1,9 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
+import { UserCreatedEvent } from '../../users/events/user-created.event';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
@@ -38,7 +40,8 @@ export class OAuthService {
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
     private readonly mfaService: MfaService,
-    private readonly metricsService: MetricsService
+    private readonly metricsService: MetricsService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   /**
@@ -190,6 +193,10 @@ export class OAuthService {
         context: auditContext
       });
       this.metricsService.recordAuthEvent('register');
+      this.eventEmitter.emit(
+        UserCreatedEvent.name,
+        new UserCreatedEvent(createdUserId)
+      );
 
       if (verification) {
         this.mailService

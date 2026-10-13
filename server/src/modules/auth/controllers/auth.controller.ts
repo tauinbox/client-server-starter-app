@@ -13,6 +13,7 @@ import {
   UnauthorizedException
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import {
   ApiBearerAuth,
@@ -44,6 +45,7 @@ import { MailService } from '../../mail/mail.service';
 import { AuthResponseDto, TokensResponseDto } from '../dtos/auth-response.dto';
 import { MfaRequiredResponseDto } from '../dtos/mfa.dto';
 import { User } from '../../users/entities/user.entity';
+import { UserUpdatedEvent } from '../../users/events/user-updated.event';
 import { JwtAuthRequest, LocalAuthRequest } from '../types/auth.request';
 import { VerifyEmailDto } from '../dtos/verify-email.dto';
 import { ResendVerificationDto } from '../dtos/resend-verification.dto';
@@ -91,7 +93,8 @@ export class AuthController {
     private readonly mailService: MailService,
     private readonly metricsService: MetricsService,
     private readonly cookies: AuthCookies,
-    private readonly signIn: SignInCompletionService
+    private readonly signIn: SignInCompletionService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   /**
@@ -267,6 +270,11 @@ export class AuthController {
     }
 
     const { currentPassword: _ignored, ...updatePayload } = updateProfileDto;
+    const previous =
+      updatePayload.firstName !== undefined ||
+      updatePayload.lastName !== undefined
+        ? await this.userService.findOne(req.user.userId)
+        : undefined;
     // Self-service route: the target is pinned to the authenticated caller and
     // the route is already gated by @Authorize(['update', 'Profile']), so no
     // instance-level check on another user's record can apply here.
@@ -275,6 +283,16 @@ export class AuthController {
       updatePayload,
       SYSTEM_ABILITY
     );
+    if (
+      previous &&
+      (previous.firstName !== updatedUser.firstName ||
+        previous.lastName !== updatedUser.lastName)
+    ) {
+      this.eventEmitter.emit(
+        UserUpdatedEvent.name,
+        new UserUpdatedEvent(req.user.userId, previous)
+      );
+    }
 
     if (updateProfileDto.password) {
       await this.authService.revokeAllUserSessions(req.user.userId);

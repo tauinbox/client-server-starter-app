@@ -2,6 +2,7 @@
 // invisible to a service-level check, and /exchange loads the OAuth user again
 // rather than echoing one out of the oauth_data cookie.
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { VersioningType, type INestApplication } from '@nestjs/common';
@@ -175,6 +176,7 @@ describe('Auth response serialization (e2e)', () => {
       imports: [JwtModule.register({ secret: 'test-secret' })],
       controllers: [AuthController, OAuthController],
       providers: [
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         RESPONSE_SERIALIZER,
         AuthCookies,
         SignInCompletionService,

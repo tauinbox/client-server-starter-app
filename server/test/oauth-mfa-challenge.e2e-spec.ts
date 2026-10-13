@@ -3,6 +3,7 @@
 // the row is written by SessionIssuerService through the real repository, so
 // only a run against the real table proves the session was never created.
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -54,6 +55,7 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
 
     module = await Test.createTestingModule({
       providers: [
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         // Everything on the session write path is the real thing; only the
         // collaborators the already-linked branch never reaches are stubbed.
         OAuthService,

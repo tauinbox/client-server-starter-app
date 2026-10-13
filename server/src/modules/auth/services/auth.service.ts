@@ -6,6 +6,7 @@ import {
   Logger
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -14,6 +15,8 @@ import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { RegisterDto } from '../dtos/register.dto';
 import { User } from '../../users/entities/user.entity';
+import { UserCreatedEvent } from '../../users/events/user-created.event';
+import { UserUpdatedEvent } from '../../users/events/user-updated.event';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { LocalAuthRequest } from '../types/auth.request';
 import { RefreshTokenService } from './refresh-token.service';
@@ -66,6 +69,7 @@ type ConfirmEmailChangeOutcome =
   | {
       kind: 'applied';
       userId: string;
+      previous: User;
       oldEmail: string;
       newEmail: string;
       locale: string;
@@ -159,6 +163,7 @@ export class AuthService {
     private jwtService: JwtService,
     private breachedPasswordService: BreachedPasswordService,
     private mfaService: MfaService,
+    private eventEmitter: EventEmitter2,
     @Inject(CACHE_MANAGER) cache: Cache
   ) {
     this.reauthProofLedger = new SingleUseTokenLedger(
@@ -359,6 +364,10 @@ export class AuthService {
     });
 
     this.metricsService.recordAuthEvent('register');
+    this.eventEmitter.emit(
+      UserCreatedEvent.name,
+      new UserCreatedEvent(user.id)
+    );
 
     // Send verification email (fire-and-forget — delivery failure is non-fatal)
     this.mailService
@@ -937,6 +946,7 @@ export class AuthService {
           return {
             kind: 'applied',
             userId: user.id,
+            previous: user,
             oldEmail,
             newEmail,
             locale: user.locale
@@ -978,6 +988,10 @@ export class AuthService {
       details: { oldEmail: result.oldEmail, newEmail: result.newEmail },
       context: auditContext
     });
+    this.eventEmitter.emit(
+      UserUpdatedEvent.name,
+      new UserUpdatedEvent(result.userId, result.previous)
+    );
 
     this.mailService
       .sendEmailChangeCompletedNotification(

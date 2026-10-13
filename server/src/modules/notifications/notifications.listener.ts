@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { subject } from '@casl/ability';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsService } from './notifications.service';
@@ -9,6 +9,8 @@ import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { UserRoleChangedEvent } from '../auth/events/user-role-changed.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
+import { RoleRenamedEvent } from '../auth/events/role-renamed.event';
+import { RoleDeletedEvent } from '../auth/events/role-deleted.event';
 import { UsersService } from '../users/services/users.service';
 import type { User } from '../users/entities/user.entity';
 import type { NotificationEvent } from '@app/shared/types';
@@ -23,6 +25,8 @@ type UserCrudAction = Extract<
 // fact that an account was created/updated/deleted to every client.
 @Injectable()
 export class NotificationsListener {
+  readonly #logger = new Logger(NotificationsListener.name);
+
   constructor(
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService
@@ -66,6 +70,35 @@ export class NotificationsListener {
       type: 'permissions_updated',
       userId: event.userId
     });
+  }
+
+  @OnEvent(RoleRenamedEvent.name)
+  handleRoleRenamed(event: RoleRenamedEvent): void {
+    this.#pushUserListStale(event.committed);
+  }
+
+  @OnEvent(RoleDeletedEvent.name)
+  handleRoleDeleted(event: RoleDeletedEvent): void {
+    this.#pushUserListStale(event.committed);
+  }
+
+  // The role events are emitted inside the role transaction. The push waits
+  // for the commit, but the handler must not: the commit waits for it.
+  #pushUserListStale(committed: Promise<void>): void {
+    void committed
+      .then(() =>
+        this.notificationsService.pushToAuthorized(
+          { type: 'user_list_stale' },
+          (ability) => ability.can('search', 'User')
+        )
+      )
+      .catch((error: unknown) =>
+        this.#logger.warn(
+          `user_list_stale push failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        )
+      );
   }
 
   @OnEvent(RolePermissionsChangedEvent.name)

@@ -2,7 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
-import { config, of, throwError } from 'rxjs';
+import { config, of, Subject, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import type { Sort } from '@angular/material/sort';
@@ -12,6 +12,7 @@ import { UserListComponent } from './user-list.component';
 import { UsersStore } from '../../store/users.store';
 import { NotifyService } from '@core/services/notify.service';
 import { RoleCatalogService } from '@core/services/role-catalog.service';
+import { NotificationsService } from '@core/services/notifications.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { USER_LIST_QUERY } from '@app/shared/constants';
@@ -75,6 +76,8 @@ describe('UserListComponent', () => {
   };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
   let roleCatalogMock: { getAll: ReturnType<typeof vi.fn> };
+  let userCrudEvents$: Subject<unknown>;
+  let userListStale$: Subject<unknown>;
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -99,6 +102,8 @@ describe('UserListComponent', () => {
     };
     dialogMock = { open: vi.fn() };
     roleCatalogMock = { getAll: vi.fn().mockReturnValue(of([mockUserRole])) };
+    userCrudEvents$ = new Subject();
+    userListStale$ = new Subject();
 
     await TestBed.configureTestingModule({
       imports: [UserListComponent, TranslocoTestingModuleWithLangs],
@@ -108,7 +113,11 @@ describe('UserListComponent', () => {
         { provide: UsersStore, useValue: usersStoreMock },
         { provide: NotifyService, useValue: notifyMock },
         { provide: MatDialog, useValue: dialogMock },
-        { provide: RoleCatalogService, useValue: roleCatalogMock }
+        { provide: RoleCatalogService, useValue: roleCatalogMock },
+        {
+          provide: NotificationsService,
+          useValue: { userCrudEvents$, userListStale$ }
+        }
       ]
     }).compileComponents();
 
@@ -120,6 +129,19 @@ describe('UserListComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('reloads the list on a user change and on a stale list', () => {
+    usersStoreMock.load.mockClear();
+
+    userCrudEvents$.next({
+      type: 'user_crud_events',
+      action: 'created',
+      userId: 'u-1'
+    });
+    userListStale$.next({ type: 'user_list_stale' });
+
+    expect(usersStoreMock.load).toHaveBeenCalledTimes(2);
   });
 
   it('tells an empty list from a filter that matches no user', () => {

@@ -10,6 +10,7 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
+import { UserUpdatedEvent } from '../../users/events/user-updated.event';
 import type { AppAbility } from '../casl/app-ability';
 import {
   LOG_AUDIT_KEY,
@@ -430,7 +431,10 @@ describe('RolesController', () => {
         UserRoleChangedEvent.name,
         new UserRoleChangedEvent('user-99')
       );
-      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emit).toHaveBeenCalledWith(
+        UserUpdatedEvent.name,
+        new UserUpdatedEvent('user-99')
+      );
     });
 
     it('should fail the request when the revocation listener rejects', async () => {
@@ -444,6 +448,7 @@ describe('RolesController', () => {
           mockReq
         )
       ).rejects.toThrow('db down');
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
     });
   });
 
@@ -478,7 +483,10 @@ describe('RolesController', () => {
         UserRoleChangedEvent.name,
         new UserRoleChangedEvent('user-99')
       );
-      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+      expect(eventEmitterMock.emit).toHaveBeenCalledWith(
+        UserUpdatedEvent.name,
+        new UserUpdatedEvent('user-99')
+      );
     });
 
     it('should fail the request when the revocation listener rejects', async () => {
@@ -487,6 +495,7 @@ describe('RolesController', () => {
       await expect(
         controller.removeRole('user-99', 'role-1', mockAbility, mockReq)
       ).rejects.toThrow('db down');
+      expect(eventEmitterMock.emit).not.toHaveBeenCalled();
     });
   });
 

@@ -2,6 +2,7 @@
 // Set-Cookie header itself, so a name, a path or a Secure flag that a unit test
 // sees on a mocked `res.cookie` call proves nothing about what reaches it.
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { VersioningType, type INestApplication } from '@nestjs/common';
@@ -143,6 +144,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
       imports: [JwtModule.register({ secret: 'test-secret' })],
       controllers: [AuthController, OAuthController],
       providers: [
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         RESPONSE_SERIALIZER,
         AuthCookies,
         SignInCompletionService,

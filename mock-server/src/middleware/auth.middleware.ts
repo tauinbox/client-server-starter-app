@@ -59,6 +59,7 @@ import {
   trackAttemptAndSetHeader
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest } from '../types';
+import { pushUserCrudEvent } from '../helpers/user-list-events.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
   AUTH_COOKIE_PATH,
@@ -171,6 +172,7 @@ router.post('/register', (req, res) => {
     targetType: 'User',
     ip: req.ip
   });
+  pushUserCrudEvent('created', user.id);
 
   const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
   console.log(
@@ -861,6 +863,7 @@ router.patch(
       }
     }
 
+    const previous = { ...user };
     if (firstName !== undefined) user.firstName = firstName;
     if (lastName !== undefined) user.lastName = lastName;
     if (locale !== undefined) user.locale = locale as string;
@@ -887,6 +890,12 @@ router.patch(
       clearOAuthIntentCookies(res);
     }
     user.updatedAt = new Date().toISOString();
+    if (
+      previous.firstName !== user.firstName ||
+      previous.lastName !== user.lastName
+    ) {
+      pushUserCrudEvent('updated', user.id, previous);
+    }
 
     res.json(toUserResponse(user));
   }
@@ -1102,6 +1111,7 @@ router.post('/profile/email/confirm', (req, res) => {
 
   const oldEmail = user.email;
   const newEmail = user.pendingEmail;
+  const previous = { ...user };
 
   user.email = newEmail;
   user.isEmailVerified = true;
@@ -1121,6 +1131,7 @@ router.post('/profile/email/confirm', (req, res) => {
     details: { oldEmail, newEmail },
     ip: req.ip
   });
+  pushUserCrudEvent('updated', user.id, previous);
 
   console.log(
     `[EMAIL CHANGE COMPLETE] To: ${oldEmail}\n  New address: ${newEmail}`

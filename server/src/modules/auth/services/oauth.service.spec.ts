@@ -10,6 +10,8 @@ import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MfaService } from './mfa.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserCreatedEvent } from '../../users/events/user-created.event';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
@@ -51,6 +53,7 @@ describe('OAuthService', () => {
   let mockMetricsService: {
     recordAuthEvent: jest.Mock;
   };
+  let mockEventEmitter: { emit: jest.Mock };
   let mockMailService: {
     sendEmailVerification: jest.Mock;
     sendOAuthLinkedNotification: jest.Mock;
@@ -125,6 +128,7 @@ describe('OAuthService', () => {
     };
 
     mockMetricsService = { recordAuthEvent: jest.fn() };
+    mockEventEmitter = { emit: jest.fn() };
 
     mockMailService = {
       sendEmailVerification: jest.fn().mockResolvedValue(undefined),
@@ -147,7 +151,8 @@ describe('OAuthService', () => {
         { provide: AuditService, useValue: mockAuditService },
         { provide: MailService, useValue: mockMailService },
         { provide: MfaService, useValue: mockMfaService },
-        { provide: MetricsService, useValue: mockMetricsService }
+        { provide: MetricsService, useValue: mockMetricsService },
+        { provide: EventEmitter2, useValue: mockEventEmitter }
       ]
     }).compile();
 
@@ -627,6 +632,10 @@ describe('OAuthService', () => {
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
         'register'
       );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        UserCreatedEvent.name,
+        new UserCreatedEvent('oauth-user-1')
+      );
     });
 
     it('records no registration row when the provider identity is already linked', async () => {
@@ -639,6 +648,7 @@ describe('OAuthService', () => {
 
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
       expect(mockMetricsService.recordAuthEvent).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     // When the provider does NOT assert email verification (e.g. VK, or
