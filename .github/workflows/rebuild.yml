@@ -315,6 +315,10 @@ jobs:
               echo "Redeploy successful — sha-${DEPLOY_SHA}"
               cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
               echo "$DEPLOY_SHA" > .deployed-sha
+              # Drop rollback leftovers - see the same step in deploy.yml.
+              docker images --format '{{.Repository}}:{{.Tag}}' \
+                | grep -E '^ghcr\.io/[^/]+/nexus-(server|client):(sha-|pre-rebuild$)' \
+                | xargs -r docker rmi || true
               docker image prune -f
               exit 0
             fi

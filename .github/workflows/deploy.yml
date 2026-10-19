@@ -340,6 +340,15 @@ jobs:
               echo "Deploy successful — sha-${DEPLOY_SHA}"
               cp -f .deployed-sha .prev-deployed-sha 2>/dev/null || true
               echo "$DEPLOY_SHA" > .deployed-sha
+              # A rollback pulls the app images by their sha- or pre-rebuild
+              # tag, and a tagged image is never dangling, so the prune below
+              # kept each such pair for good: on 2026-10-19 one pair from a
+              # rollback eight days earlier held 0.8 GB of the 20 GB disk. The
+              # containers run :latest, and removing a tag that shares its
+              # image with :latest drops only the tag.
+              docker images --format '{{.Repository}}:{{.Tag}}' \
+                | grep -E '^ghcr\.io/[^/]+/nexus-(server|client):(sha-|pre-rebuild$)' \
+                | xargs -r docker rmi || true
               docker image prune -f
               exit 0
             fi
