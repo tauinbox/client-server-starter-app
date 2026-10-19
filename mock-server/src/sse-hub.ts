@@ -34,11 +34,8 @@ export function removeSseConnection(
 function sendEvent(res: Response, event: NotificationEvent): void {
   try {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
-    // Flush immediately so the client receives the event without buffering
-    // compression middleware adds an optional flush() method to the response
-    (res as Response & { flush?: () => void }).flush?.();
   } catch {
-    // Connection already closed — ignore
+    // Connection already closed - ignore
   }
 }
 
@@ -64,9 +61,5 @@ export function pushToUsersMatching(
 }
 
 export function pushToAll(event: NotificationEvent): void {
-  for (const userConns of connections.values()) {
-    for (const res of userConns.values()) {
-      sendEvent(res, event);
-    }
-  }
+  pushToUsersMatching(() => true, event);
 }
