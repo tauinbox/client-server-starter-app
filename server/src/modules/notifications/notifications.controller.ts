@@ -5,7 +5,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { Observable } from 'rxjs';
+import { EMPTY, Observable } from 'rxjs';
 import { randomUUID } from 'crypto';
 import type { Response } from 'express';
 import { NotificationsService } from './notifications.service';
@@ -28,9 +28,9 @@ export class NotificationsController {
     @Req() req: JwtAuthRequest,
     @Res({ passthrough: true }) res: Response
   ): Observable<MessageEvent> {
-    // NestJS's SseStream.pipe() sends headers (including X-Accel-Buffering: no)
-    // before calling the controller via lazy Observable subscription, so
-    // res.setHeader() must not be called here — it would throw ERR_HTTP_HEADERS_SENT.
+    // The client can leave while the guard runs. Nest and the close listener
+    // below do not see that close, so the stream would stay registered.
+    if (req.socket.destroyed) return EMPTY;
     const connectionId = randomUUID();
     res.on('close', () => {
       this.notificationsService.closeStream(req.user.userId, connectionId);
