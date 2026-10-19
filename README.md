@@ -189,6 +189,8 @@ management and theming.
     never sees these events, and a grant with a condition sees only the users that its list shows.
   - `user_list_stale` shows the same banner after a role rename or delete, which changes the
     role chip of every holder. It names no user and goes to each client that may search users.
+    A reopened stream shows the same banner, because an event sent while the stream was down is
+    lost.
 
   The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches
   the Bearer token. `NotificationsService` connects at login and disconnects at logout, and it
