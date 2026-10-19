@@ -720,6 +720,49 @@ describe('AuthService', () => {
     });
   });
 
+  describe('permission change push', () => {
+    let randomSpy: { mockRestore: () => void };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(1);
+      authStoreMock.isAuthenticated.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('reloads the permissions after the random wait', () => {
+      permissionsUpdated$.next({ type: 'permissions_updated' });
+      vi.advanceTimersByTime(4999);
+
+      httpMock.expectNone(AuthApiEnum.Permissions);
+
+      vi.advanceTimersByTime(1);
+
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+    });
+
+    it('reloads once for permission changes that come during the wait', () => {
+      permissionsUpdated$.next({ type: 'permissions_updated' });
+      vi.advanceTimersByTime(2000);
+      permissionsUpdated$.next({ type: 'permissions_updated' });
+      vi.advanceTimersByTime(5000);
+
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+    });
+
+    it('reloads nothing when the session ended during the wait', () => {
+      permissionsUpdated$.next({ type: 'permissions_updated' });
+      authStoreMock.isAuthenticated.mockReturnValue(false);
+      vi.advanceTimersByTime(5000);
+
+      httpMock.expectNone(AuthApiEnum.Permissions);
+    });
+  });
+
   describe('stream reconnect', () => {
     let randomSpy: { mockRestore: () => void };
 

@@ -177,7 +177,8 @@ management and theming.
     the server then ends the stream. This is the one source of the event, so an administrator
     password change, a user delete and a role change reach the client the same way.
   - `permissions_updated` starts a silent permissions read. The server sends it when the permission
-    set of a role changes. It goes to each connected holder of that role.
+    set of a role changes. It goes to each connected holder of that role. The client first waits a
+    random 0 to 5 s, thus the holders do not all read their permissions at the same moment.
   - `user_crud_events` keeps the administrator user list current after a create, update, delete
     or restore, with no reload of the loaded pages. An update or a restore of a loaded row reads
     that user with `GET /users/:id` and replaces the row. A delete removes a loaded row, and a
