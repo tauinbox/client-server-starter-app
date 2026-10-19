@@ -1,6 +1,6 @@
 import { DestroyRef, inject, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DOCUMENT } from '@angular/common';
+import { DOCUMENT, Location } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
@@ -35,7 +35,7 @@ import type {
 } from '../models/auth.types';
 import { AuthStore, AUTH_USER_KEY } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
-import { navigateToLogin } from '../utils/navigate-to-login';
+import { currentReturnUrl, navigateToLogin } from '../utils/navigate-to-login';
 import type { SessionEndedValue } from '../constants/session-ended.const';
 import {
   SESSION_ENDED,
@@ -60,6 +60,7 @@ const STREAM_RELOAD_JITTER_MS = 5000;
 export class AuthService {
   readonly #http = inject(HttpClient);
   readonly #router = inject(Router);
+  readonly #location = inject(Location);
   readonly #authStore = inject(AuthStore);
   readonly #tokenService = inject(TokenService);
   readonly #idleTimeout = inject(IdleTimeoutService);
@@ -77,7 +78,7 @@ export class AuthService {
   constructor() {
     this.#notificationsService.sessionInvalidated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe(() => this.#tokenService.forceLogout(this.#router.url));
+      .subscribe(() => this.#tokenService.forceLogout(this.#returnUrl()));
 
     this.#notificationsService.permissionsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
@@ -113,9 +114,13 @@ export class AuthService {
 
     this.#idleTimeout.timedOut$
       .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe(() => this.logout(this.#router.url, SESSION_ENDED.Idle));
+      .subscribe(() => this.logout(this.#returnUrl(), SESSION_ENDED.Idle));
 
     this.#listenForCrossTabLogout();
+  }
+
+  #returnUrl(): string {
+    return currentReturnUrl(this.#router, this.#location);
   }
 
   #reloadPermissions(): void {
@@ -172,7 +177,7 @@ export class AuthService {
 
     // The other tab already revoked the session server-side, so this is exactly
     // the forceLogout case: full teardown, no HTTP call, land on /login.
-    this.#tokenService.forceLogout(this.#router.url);
+    this.#tokenService.forceLogout(this.#returnUrl());
   }
 
   /**

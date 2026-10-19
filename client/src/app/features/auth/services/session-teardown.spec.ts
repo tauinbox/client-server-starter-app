@@ -297,6 +297,7 @@ describe('session teardown', () => {
       TestBed.inject(AuthService);
       const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
       const router = TestBed.inject(Router);
+      router.navigated = true;
       const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
       const { featureFlagsStore, entitlementsStore } = await loadCaches();
 

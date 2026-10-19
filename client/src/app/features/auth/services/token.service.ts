@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { DOCUMENT } from '@angular/common';
+import { DOCUMENT, Location } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import type { Observable, Subscription } from 'rxjs';
 import {
@@ -15,7 +15,7 @@ import { Router } from '@angular/router';
 import type { AuthResponse, TokensResponse } from '../models/auth.types';
 import { AuthStore } from '../store/auth.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
-import { navigateToLogin } from '../utils/navigate-to-login';
+import { currentReturnUrl, navigateToLogin } from '../utils/navigate-to-login';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { silentContext } from '@core/context-tokens/error-notifications';
 import { TOKEN_REFRESH_WINDOW_SECONDS } from '@app/shared/constants';
@@ -27,6 +27,7 @@ const MIN_REFRESH_DELAY_MS = 1000;
 export class TokenService {
   readonly #http = inject(HttpClient);
   readonly #router = inject(Router);
+  readonly #location = inject(Location);
   readonly #authStore = inject(AuthStore);
   readonly #window = inject(DOCUMENT).defaultView;
 
@@ -76,11 +77,13 @@ export class TokenService {
     const timeToRefresh =
       expiryTime - now - TOKEN_REFRESH_WINDOW_SECONDS * 1000;
 
+    const signOut = () =>
+      this.forceLogout(currentReturnUrl(this.#router, this.#location));
     const handleRefreshResult = {
       next: (tokens: TokensResponse | null) => {
-        if (!tokens) this.forceLogout(this.#router.url);
+        if (!tokens) signOut();
       },
-      error: () => this.forceLogout(this.#router.url)
+      error: signOut
     };
 
     // Refreshing at once would re-enter here from #doRefresh once per round
