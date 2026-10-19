@@ -154,6 +154,18 @@ export class NotificationsService {
     this.#send({ event });
   }
 
+  /** Deliver to the users of `userIds` that have a stream on any instance. */
+  async pushToUsers(
+    userIds: string[],
+    event: NotificationEvent
+  ): Promise<void> {
+    const connected = await this.#connectedUserIds();
+    const recipients = userIds.filter((userId) => connected.has(userId));
+    if (recipients.length > 0) {
+      this.#send({ userIds: recipients, event });
+    }
+  }
+
   /**
    * Deliver only to connected users whose current abilities satisfy `allows`.
    * Abilities are resolved per push (not cached on the connection) so a
@@ -169,10 +181,7 @@ export class NotificationsService {
     allows: (ability: AppAbility) => boolean,
     grant: { action: Actions; subject: KnownSubjects }
   ): Promise<void> {
-    const userIds = new Set([
-      ...this.#connections.keys(),
-      ...((await this.bus.connectedUserIds()) ?? [])
-    ]);
+    const userIds = await this.#connectedUserIds();
     let holders: string[];
     try {
       holders = await this.permissionService.filterGrantHolders(
@@ -204,6 +213,13 @@ export class NotificationsService {
     if (recipients.length > 0) {
       this.#send({ userIds: recipients, event });
     }
+  }
+
+  async #connectedUserIds(): Promise<Set<string>> {
+    return new Set([
+      ...this.#connections.keys(),
+      ...((await this.bus.connectedUserIds()) ?? [])
+    ]);
   }
 
   #send(push: BusPush): void {

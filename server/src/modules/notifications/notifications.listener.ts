@@ -83,10 +83,12 @@ export class NotificationsListener {
   }
 
   @OnEvent(RolePermissionsChangedEvent.name)
-  handleRolePermissionsChanged(event: RolePermissionsChangedEvent): void {
-    for (const userId of event.userIds) {
-      this.notificationsService.push(userId, { type: 'permissions_updated' });
-    }
+  async handleRolePermissionsChanged(
+    event: RolePermissionsChangedEvent
+  ): Promise<void> {
+    await this.notificationsService.pushToUsers(event.userIds, {
+      type: 'permissions_updated'
+    });
   }
 
   async #pushUserCrudEvent(
