@@ -1,7 +1,14 @@
 import type { Mock } from 'vitest';
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Location } from '@angular/common';
+import { provideLocationMocks } from '@angular/common/testing';
 import { provideRouter, Router } from '@angular/router';
-import { loginUrlTree, navigateToLogin } from './navigate-to-login';
+import {
+  currentReturnUrl,
+  loginUrlTree,
+  navigateToLogin
+} from './navigate-to-login';
 
 describe('navigateToLogin', () => {
   let router: Router;
@@ -41,5 +48,38 @@ describe('loginUrlTree', () => {
     expect(loginUrlTree(router, '/dashboard').toString()).toBe(
       '/login?returnUrl=%2Fdashboard'
     );
+  });
+});
+
+@Component({ template: '' })
+class BlankComponent {}
+
+describe('currentReturnUrl', () => {
+  let router: Router;
+  let location: Location;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: '**', component: BlankComponent }]),
+        provideLocationMocks()
+      ]
+    });
+    router = TestBed.inject(Router);
+    location = TestBed.inject(Location);
+  });
+
+  it('should return the address bar before the first navigation ends', () => {
+    location.go('/profile?tab=security');
+
+    expect(router.url).toBe('/');
+    expect(currentReturnUrl(router, location)).toBe('/profile?tab=security');
+  });
+
+  it('should return the router URL after the first navigation', async () => {
+    await router.navigateByUrl('/users/1');
+    location.go('/elsewhere');
+
+    expect(currentReturnUrl(router, location)).toBe('/users/1');
   });
 });

@@ -1,4 +1,5 @@
 import { DOCUMENT, inject } from '@angular/core';
+import { Location } from '@angular/common';
 import type {
   HttpErrorResponse,
   HttpHandlerFn,
@@ -15,6 +16,7 @@ import {
   TOKEN_REFRESH_EXCLUDED_URLS
 } from '@features/auth/utils/auth-url-lists';
 import { isSameOriginUrl } from '@features/auth/utils/is-same-origin-url';
+import { currentReturnUrl } from '@features/auth/utils/navigate-to-login';
 
 const withBearer = (
   request: HttpRequest<unknown>,
@@ -28,6 +30,7 @@ export const jwtInterceptor: HttpInterceptorFn = (
 ) => {
   const tokenService = inject(TokenService);
   const router = inject(Router);
+  const location = inject(Location);
   const authStore = inject(AuthStore);
   const token = authStore.getAccessToken();
   const baseOrigin = inject(DOCUMENT).defaultView?.location.origin ?? '';
@@ -46,7 +49,7 @@ export const jwtInterceptor: HttpInterceptorFn = (
     catchError((error: HttpErrorResponse) => {
       if (error.status === 401 && !skipsRefresh) {
         const handleError = () => {
-          tokenService.forceLogout(router.url);
+          tokenService.forceLogout(currentReturnUrl(router, location));
           return throwError(() => error);
         };
 

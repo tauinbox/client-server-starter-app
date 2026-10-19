@@ -1,5 +1,6 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Location } from '@angular/common';
 import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -629,14 +630,24 @@ describe('AuthService', () => {
 
   describe('session_invalidated push', () => {
     it('signs out and keeps the current URL as the return URL', () => {
-      vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue(
-        '/admin/users?q=x'
-      );
+      const router = TestBed.inject(Router);
+      router.navigated = true;
+      vi.spyOn(router, 'url', 'get').mockReturnValue('/admin/users?q=x');
 
       sessionInvalidated$.next({ type: 'session_invalidated' });
 
       expect(tokenServiceMock.forceLogout).toHaveBeenCalledExactlyOnceWith(
         '/admin/users?q=x'
+      );
+    });
+
+    it('keeps the address bar as the return URL before the first navigation ends', () => {
+      vi.spyOn(TestBed.inject(Location), 'path').mockReturnValue('/profile');
+
+      sessionInvalidated$.next({ type: 'session_invalidated' });
+
+      expect(tokenServiceMock.forceLogout).toHaveBeenCalledExactlyOnceWith(
+        '/profile'
       );
     });
   });

@@ -246,6 +246,7 @@ describe('jwtInterceptor', () => {
     tokenServiceMock.refreshTokens.mockReturnValue(
       throwError(() => new Error('Refresh failed'))
     );
+    router.navigated = true;
     vi.spyOn(router, 'url', 'get').mockReturnValue('/dashboard');
 
     let caughtError = false;
@@ -264,6 +265,7 @@ describe('jwtInterceptor', () => {
   it('should force-logout when refresh returns null', () => {
     authStoreMock.getAccessToken.mockReturnValue('expired-token');
     tokenServiceMock.refreshTokens.mockReturnValue(of(null));
+    router.navigated = true;
     vi.spyOn(router, 'url', 'get').mockReturnValue('/settings');
 
     let caughtError = false;

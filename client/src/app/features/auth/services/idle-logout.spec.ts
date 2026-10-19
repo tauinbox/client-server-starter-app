@@ -105,6 +105,7 @@ describe('idle logout wiring', () => {
 
   it('revokes the session and lands on /login with the idle marker', async () => {
     const router = TestBed.inject(Router);
+    router.navigated = true;
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     TestBed.inject(AuthService);
     TestBed.inject(AuthStore).saveAuthResponse(createAuthResponse());
