@@ -6,8 +6,6 @@ import { authGuard } from '../helpers/auth.helpers';
 import { isSessionLive } from '../state';
 import {
   countSseConnections,
-  pushToAll,
-  pushToUser,
   registerSseConnection,
   removeSseConnection
 } from '../sse-hub';
@@ -70,5 +68,4 @@ router.get('/stream', authGuard, (req, res) => {
   });
 });
 
-export { pushToAll, pushToUser };
 export default router;

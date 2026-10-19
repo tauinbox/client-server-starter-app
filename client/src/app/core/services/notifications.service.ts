@@ -205,12 +205,13 @@ export class NotificationsService {
         .split('\n')
         .find((line) => line.startsWith('data:'));
       if (!dataLine) continue;
+      const json = dataLine.slice('data:'.length).trim();
+      if (!json) continue;
       try {
-        const json = dataLine.slice('data:'.length).trim();
         const event = JSON.parse(json) as NotificationEvent;
         this.#events$.next(event);
       } catch {
-        // malformed SSE frame — skip
+        // malformed SSE frame - skip
       }
     }
   }
