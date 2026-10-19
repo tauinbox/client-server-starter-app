@@ -52,6 +52,8 @@
     "@angular/platform-browser": "^22.2.1",
     "@angular/router": "^22.2.1",
     "@casl/ability": "^7.0.1",
+    "@fontsource/material-icons": "^5.3.0",
+    "@fontsource/roboto": "^5.3.0",
     "@jsverse/transloco": "^8.4.0",
     "@ngrx/operators": "^22.0.1",
     "@ngrx/signals": "^22.0.1",

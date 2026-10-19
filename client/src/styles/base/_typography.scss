@@ -1,5 +1,36 @@
+@use '@fontsource/roboto/300' as roboto-300;
+@use '@fontsource/roboto/400' as roboto-400;
+@use '@fontsource/roboto/500' as roboto-500;
 @use '../abstracts/variables' as vars;
 @use '../abstracts/functions' as func;
+
+// Not the package face: its font-display: swap shows the ligature name as text
+// until the font loads. Block hides the text for that time instead.
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  src: url('@fontsource/material-icons/files/material-icons-latin-400-normal.woff2')
+    format('woff2');
+  font-display: block;
+}
+
+// Mat-icon sets this class by default. The package does not ship the rules.
+.material-icons {
+  display: inline-block;
+  font-family: 'Material Icons', sans-serif;
+  font-size: func.rem(24);
+  font-style: normal;
+  font-weight: normal;
+  font-feature-settings: 'liga';
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
 
 // Base font settings
 body {
