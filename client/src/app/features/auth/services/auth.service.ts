@@ -80,37 +80,25 @@ export class AuthService {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.#tokenService.forceLogout(this.#returnUrl()));
 
-    this.#notificationsService.permissionsUpdated$
-      .pipe(
-        switchMap(() => timer(Math.random() * STREAM_RELOAD_JITTER_MS)),
-        filter(() => this.#authStore.isAuthenticated()),
-        takeUntilDestroyed(this.#destroyRef)
-      )
-      .subscribe(() => this.#reloadPermissions());
+    this.#afterReloadJitter(
+      this.#notificationsService.permissionsUpdated$
+    ).subscribe(() => this.#reloadPermissions());
 
-    this.#notificationsService.featureFlagsUpdated$
-      .pipe(
-        switchMap(() => timer(Math.random() * STREAM_RELOAD_JITTER_MS)),
-        filter(() => this.#authStore.isAuthenticated()),
-        takeUntilDestroyed(this.#destroyRef)
-      )
-      .subscribe(() => void this.#featureFlagsStore.reload());
+    this.#afterReloadJitter(
+      this.#notificationsService.featureFlagsUpdated$
+    ).subscribe(() => void this.#featureFlagsStore.reload());
 
     this.#notificationsService.entitlementsUpdated$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.#reloadEntitlements());
 
-    this.#notificationsService.reconnected$
-      .pipe(
-        switchMap(() => timer(Math.random() * STREAM_RELOAD_JITTER_MS)),
-        filter(() => this.#authStore.isAuthenticated()),
-        takeUntilDestroyed(this.#destroyRef)
-      )
-      .subscribe(() => {
+    this.#afterReloadJitter(this.#notificationsService.reconnected$).subscribe(
+      () => {
         void this.#featureFlagsStore.reload();
         this.#reloadPermissions();
         this.#reloadEntitlements();
-      });
+      }
+    );
 
     this.#tokenService.sessionCleared$
       .pipe(takeUntilDestroyed(this.#destroyRef))
@@ -125,6 +113,14 @@ export class AuthService {
 
   #returnUrl(): string {
     return currentReturnUrl(this.#router, this.#location);
+  }
+
+  #afterReloadJitter(source$: Observable<unknown>): Observable<number> {
+    return source$.pipe(
+      switchMap(() => timer(Math.random() * STREAM_RELOAD_JITTER_MS)),
+      filter(() => this.#authStore.isAuthenticated()),
+      takeUntilDestroyed(this.#destroyRef)
+    );
   }
 
   #reloadPermissions(): void {
