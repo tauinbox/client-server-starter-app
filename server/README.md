@@ -2709,9 +2709,8 @@ repository.
 
   A `no-restricted-syntax` ESLint rule bans an `as unknown as T` double cast.
 
-  The `no-console` ESLint rule applies to `src/`, except the spec files and the two CLI entry
-  points that run outside Nest (`postgres-data-source.ts`, `seed-admin.ts`). Runtime code uses the
-  logger.
+  The `no-console` ESLint rule applies to `src/`, except the spec files and the CLI entry point
+  that runs outside Nest (`seed-admin.ts`). Runtime code uses the logger.
 
   The reusable fakes for a context, a configuration and an Express object are in
   `src/common/testing/`. The billing service specs share their repository and provider stubs
@@ -2844,7 +2843,7 @@ version in `server/package.json` automatically.
 | Technology | Version |
 |------------|---------|
 | NestJS | 12.1.2 |
-| TypeORM | 0.3.31 |
+| TypeORM | 1.1.2 |
 | PostgreSQL | through `pg` 8.23.1 |
 | Passport | 0.7.0 |
 | bcrypt | 6.0.0 |

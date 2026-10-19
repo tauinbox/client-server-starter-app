@@ -11,7 +11,7 @@ management and theming.
 | Frontend | Angular | 22.2.1 |
 | UI Library | Angular Material + CDK | 22.2.1 |
 | Backend | NestJS | 12.1.2 |
-| Database | PostgreSQL (TypeORM) | 0.3.31 |
+| Database | PostgreSQL (TypeORM) | 1.1.2 |
 | Language | TypeScript | 6.0.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
 | Client Tests | Vitest (unit), Playwright (e2e) | 5.0.3 / 1.63.0 |

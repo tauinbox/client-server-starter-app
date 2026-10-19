@@ -44,13 +44,16 @@ export class PermissionService {
 
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: [
-        'roles',
-        'roles.rolePermissions',
-        'roles.rolePermissions.permission',
-        'roles.rolePermissions.permission.resource',
-        'roles.rolePermissions.permission.action'
-      ]
+      relations: {
+        roles: {
+          rolePermissions: {
+            permission: {
+              resource: true,
+              action: true
+            }
+          }
+        }
+      }
     });
 
     if (!user) {
@@ -100,7 +103,7 @@ export class PermissionService {
 
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['roles']
+      relations: { roles: true }
     });
 
     const roles: RoleInfo[] =

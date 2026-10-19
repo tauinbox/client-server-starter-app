@@ -717,7 +717,7 @@ describe('RoleService', () => {
       // cannot be modified without being restored first.
       expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
         where: { id: 'user-99' },
-        relations: ['roles']
+        relations: { roles: true }
       });
       expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
@@ -846,7 +846,7 @@ describe('RoleService', () => {
 
       expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
         where: { id: 'user-99' },
-        relations: ['roles']
+        relations: { roles: true }
       });
       expect(mockRelationQueryBuilder.remove).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
@@ -936,7 +936,7 @@ describe('RoleService', () => {
 
       expect(mockRolePermissionRepo.find).toHaveBeenCalledWith({
         where: { roleId: 'role-2' },
-        relations: ['permission']
+        relations: { permission: true }
       });
       expect(result).toEqual(perms);
     });

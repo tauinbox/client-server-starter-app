@@ -88,9 +88,10 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
           // `roles` hydrated exactly as the real service returns it.
           useValue: {
             findOne: (id: string) =>
-              ds
-                .getRepository(User)
-                .findOneOrFail({ where: { id }, relations: ['roles'] })
+              ds.getRepository(User).findOneOrFail({
+                where: { id },
+                relations: { roles: true }
+              })
           }
         },
         {

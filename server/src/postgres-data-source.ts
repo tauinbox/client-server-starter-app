@@ -4,15 +4,7 @@ import { postgresConfig } from './postgres.config';
 
 dotenv.config();
 
+// The CLI that loads this file calls initialize(); a second call throws.
 const postgresDataSource = new DataSource(postgresConfig());
-
-postgresDataSource
-  .initialize()
-  .then(() => {
-    console.log('Data Source has been initialized!');
-  })
-  .catch((err) => {
-    console.error('Error during Data Source initialization', err);
-  });
 
 export default postgresDataSource;

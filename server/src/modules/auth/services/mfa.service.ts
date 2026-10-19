@@ -495,7 +495,7 @@ export class MfaService {
 
     const user = await this.dataSource.getRepository(User).findOne({
       where: { id: payload.sub },
-      relations: ['roles']
+      relations: { roles: true }
     });
 
     // Anything that ended the account's sessions since the password check
