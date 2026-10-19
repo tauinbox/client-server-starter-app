@@ -131,4 +131,38 @@ test.describe('User list - live changes', () => {
     expect(firstPageLoads()).toBe(1);
     await expect(page.getByText('newcomer@example.com')).toBeVisible();
   });
+
+  test('a new user registered while the stream reconnects shows the stale banner', async ({
+    _mockServer,
+    _workerMockServer,
+    page
+  }) => {
+    await openListWithStream(page, _mockServer.url);
+    await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
+
+    const reconnect = page.waitForRequest((r) =>
+      r.url().includes('/api/v1/notifications/stream')
+    );
+    _workerMockServer.server.closeAllConnections();
+    // The client waits at least 1.5 s before it reconnects, so the push of
+    // this registration goes to no open stream.
+    const register = await fetch(`${_mockServer.url}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'gap-newcomer@example.com',
+        password: 'Tq7-vRw2-Lp9z',
+        firstName: 'Gap',
+        lastName: 'Newcomer'
+      })
+    });
+    expect(register.status).toBe(201);
+    await reconnect;
+
+    await expect(
+      page.getByRole('status').filter({
+        hasText: 'The user list has changed.'
+      })
+    ).toBeVisible();
+  });
 });

@@ -653,7 +653,8 @@ The store has one `load()` and `loadMore()` pair with **infinite scroll**. The p
 A live event never reloads the list, because a reload drops the pages that the admin scrolled
 through. `applyUserEvent` reads an updated or restored row with `GET /users/:id` and replaces it,
 and removes a deleted row. A row that is not loaded is left alone. A created user, a
-`user_list_stale` event, and a read that fails with a status other than 404 call `markStale()`,
+`user_list_stale` event, a reopened stream (`reconnected$`, because an event sent while the stream
+was down is lost), and a read that fails with a status other than 404 call `markStale()`,
 and the page then shows the banner "The user list has changed." with a Refresh action. The next
 first-page load clears the mark.
 
@@ -739,7 +740,8 @@ refresh gets 401, and the tab signs out.
 The server keeps no event history, thus an event sent while the tab was not connected is lost.
 `reconnected$` emits when a reopened stream sends its first frame (not for the first stream after
 `connect()`). On it, `AuthService` waits a random 0 to 5 s and then reloads the feature flags, the
-permissions and, when they are loaded, the entitlements.
+permissions and, when they are loaded, the entitlements. The user list marks itself stale and
+shows its banner.
 
 The service recycles the connection each 4 h to 8 h. The interval has jitter for each client, thus
 the clients do not reconnect at the same time. The recycle closes the stream and opens a new one,
@@ -1195,8 +1197,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 323 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1581 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 324 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1588 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

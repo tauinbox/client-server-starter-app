@@ -8,7 +8,7 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, of } from 'rxjs';
+import { catchError, merge, of } from 'rxjs';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import {
@@ -198,7 +198,12 @@ export class UserListComponent implements OnInit {
     this.#notificationsService.userCrudEvents$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((event) => this.#usersStore.applyUserEvent(event));
-    this.#notificationsService.userListStale$
+    // The server keeps no event history, so a change made while the stream
+    // was down is lost: the list can be stale after any reconnect.
+    merge(
+      this.#notificationsService.userListStale$,
+      this.#notificationsService.reconnected$
+    )
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.#usersStore.markStale());
   }

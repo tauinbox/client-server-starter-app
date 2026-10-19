@@ -189,6 +189,8 @@ management and theming.
     never sees these events, and a grant with a condition sees only the users that its list shows.
   - `user_list_stale` shows the same banner after a role rename or delete, which changes the
     role chip of every holder. It names no user and goes to each client that may search users.
+    A reopened stream shows the same banner, because an event sent while the stream was down is
+    lost.
 
   The client uses `HttpClient` with `observe: 'events'`, thus the existing JWT interceptor attaches
   the Bearer token. `NotificationsService` connects at login and disconnects at logout, and it
@@ -1883,8 +1885,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2948 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 634 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 621 pass and 12 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1587 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 323 tests |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1588 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 324 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1049 tests pass |
 
 ## CI/CD

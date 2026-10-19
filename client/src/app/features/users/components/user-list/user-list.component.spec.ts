@@ -81,6 +81,7 @@ describe('UserListComponent', () => {
   let roleCatalogMock: { getAll: ReturnType<typeof vi.fn> };
   let userCrudEvents$: Subject<unknown>;
   let userListStale$: Subject<unknown>;
+  let reconnected$: Subject<void>;
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -107,6 +108,7 @@ describe('UserListComponent', () => {
     roleCatalogMock = { getAll: vi.fn().mockReturnValue(of([mockUserRole])) };
     userCrudEvents$ = new Subject();
     userListStale$ = new Subject();
+    reconnected$ = new Subject();
 
     await TestBed.configureTestingModule({
       imports: [UserListComponent, TranslocoTestingModuleWithLangs],
@@ -119,7 +121,7 @@ describe('UserListComponent', () => {
         { provide: RoleCatalogService, useValue: roleCatalogMock },
         {
           provide: NotificationsService,
-          useValue: { userCrudEvents$, userListStale$ }
+          useValue: { userCrudEvents$, userListStale$, reconnected$ }
         }
       ]
     }).compileComponents();
@@ -149,6 +151,13 @@ describe('UserListComponent', () => {
 
   it('marks the list stale on a stale-list event and does not reload it', () => {
     userListStale$.next({ type: 'user_list_stale' });
+
+    expect(usersStoreMock.markStale).toHaveBeenCalledTimes(1);
+    expect(usersStoreMock.load).toHaveBeenCalledTimes(1); // only on init
+  });
+
+  it('marks the list stale when the stream reconnects and does not reload it', () => {
+    reconnected$.next();
 
     expect(usersStoreMock.markStale).toHaveBeenCalledTimes(1);
     expect(usersStoreMock.load).toHaveBeenCalledTimes(1); // only on init
