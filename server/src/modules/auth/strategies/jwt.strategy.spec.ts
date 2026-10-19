@@ -98,7 +98,7 @@ describe('JwtStrategy', () => {
       expect(mockDataSource.getRepository).toHaveBeenCalled();
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        select: ['id', 'tokenRevokedAt']
+        select: { id: true, tokenRevokedAt: true }
       });
     });
 

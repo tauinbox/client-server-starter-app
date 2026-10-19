@@ -88,9 +88,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const userId = payload.sub;
-    const user = await this.dataSource
-      .getRepository(User)
-      .findOne({ where: { id: userId }, select: ['id', 'tokenRevokedAt'] });
+    const user = await this.dataSource.getRepository(User).findOne({
+      where: { id: userId },
+      select: { id: true, tokenRevokedAt: true }
+    });
 
     if (!user) {
       throw new HttpException(

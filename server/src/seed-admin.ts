@@ -34,7 +34,7 @@ export async function seedAdmin(): Promise<void> {
 
     const existing = await userRepo.findOne({
       where: { email },
-      relations: ['roles']
+      relations: { roles: true }
     });
 
     if (existing) {

@@ -11,7 +11,7 @@ management and theming.
 | Frontend | Angular | 22.2.1 |
 | UI Library | Angular Material + CDK | 22.2.1 |
 | Backend | NestJS | 12.1.2 |
-| Database | PostgreSQL (TypeORM) | 0.3.31 |
+| Database | PostgreSQL (TypeORM) | 1.1.2 |
 | Language | TypeScript | 6.0.3 |
 | Auth | JWT + HttpOnly-cookie refresh tokens + OAuth (Passport) | - |
 | Client Tests | Vitest (unit), Playwright (e2e) | 5.0.3 / 1.63.0 |
@@ -1880,7 +1880,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2944 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2945 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 632 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 620 pass and 12 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1581 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 323 tests |

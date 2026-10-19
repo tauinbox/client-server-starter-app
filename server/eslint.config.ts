@@ -117,12 +117,8 @@ export default defineConfig(
   {
     basePath: __dirname,
     files: ['src/**/*.ts'],
-    // CLI entry points that run outside Nest, so no logger exists there.
-    ignores: [
-      '**/*.spec.ts',
-      'src/postgres-data-source.ts',
-      'src/seed-admin.ts'
-    ],
+    // A CLI entry point that runs outside Nest, so no logger exists there.
+    ignores: ['**/*.spec.ts', 'src/seed-admin.ts'],
     rules: { 'no-console': 'error' }
   },
   prettierConfig

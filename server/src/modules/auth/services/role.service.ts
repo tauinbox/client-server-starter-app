@@ -510,7 +510,7 @@ export class RoleService {
   private async loadRoleAssignmentTarget(userId: string): Promise<User> {
     const targetUser = await this.roleRepository.manager.findOne(User, {
       where: { id: userId },
-      relations: ['roles']
+      relations: { roles: true }
     });
     if (!targetUser) {
       throw new HttpException(
@@ -676,7 +676,7 @@ export class RoleService {
     await this.findOne(roleId);
     return this.rolePermissionRepository.find({
       where: { roleId },
-      relations: ['permission']
+      relations: { permission: true }
     });
   }
 
@@ -785,7 +785,7 @@ export class RoleService {
 
   async findAllPermissions(): Promise<Permission[]> {
     return this.permissionRepository.find({
-      relations: ['resource', 'action'],
+      relations: { resource: true, action: true },
       order: { resourceId: 'ASC', actionId: 'ASC' }
     });
   }

@@ -201,7 +201,7 @@ export class UsersService {
 
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles']
+      relations: { roles: true }
     });
     if (!user) {
       throw new HttpException(
@@ -226,7 +226,7 @@ export class UsersService {
 
     return this.userRepository.findOne({
       where: { id },
-      relations: ['roles']
+      relations: { roles: true }
     });
   }
 
@@ -240,7 +240,7 @@ export class UsersService {
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { email },
-      relations: ['roles']
+      relations: { roles: true }
     });
   }
 
@@ -547,7 +547,7 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles'],
+      relations: { roles: true },
       withDeleted: true
     });
     if (!user) {

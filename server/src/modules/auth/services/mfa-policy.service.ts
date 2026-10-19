@@ -69,7 +69,7 @@ export class MfaPolicyService {
 
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['id', 'totpEnabledAt']
+      select: { id: true, totpEnabledAt: true }
     });
 
     return user === null || user.totpEnabledAt === null;

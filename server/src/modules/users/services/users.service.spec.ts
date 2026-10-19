@@ -305,7 +305,7 @@ describe('UsersService', () => {
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        relations: ['roles']
+        relations: { roles: true }
       });
       expect(result).toEqual(mockUser);
     });
@@ -330,7 +330,7 @@ describe('UsersService', () => {
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
-        relations: ['roles']
+        relations: { roles: true }
       });
       expect(result).toEqual(mockUser);
     });
@@ -931,7 +931,7 @@ describe('UsersService', () => {
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        relations: ['roles']
+        relations: { roles: true }
       });
       expect(manager.softRemove).toHaveBeenCalledWith(mockUser);
     });
@@ -1043,7 +1043,7 @@ describe('UsersService', () => {
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        relations: ['roles'],
+        relations: { roles: true },
         withDeleted: true
       });
       expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
