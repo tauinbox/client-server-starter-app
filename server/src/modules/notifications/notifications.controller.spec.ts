@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { of } from 'rxjs';
+import { lastValueFrom, of } from 'rxjs';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import type { JwtAuthRequest } from '../auth/types/auth.request';
@@ -20,8 +20,9 @@ describe('NotificationsController', () => {
     controller = new NotificationsController(service);
   });
 
-  const buildReq = (userId: string): JwtAuthRequest => {
+  const buildReq = (userId: string, destroyed = false): JwtAuthRequest => {
     const req = {
+      socket: { destroyed },
       user: {
         userId,
         email: 'a@b.c',
@@ -78,5 +79,18 @@ describe('NotificationsController', () => {
     res.emitter.emit('close');
 
     expect(service.closeStream).toHaveBeenCalledWith('user-2', connectionId);
+  });
+
+  it('returns a stream that completes at once and opens nothing when the client left during the guard', async () => {
+    const req = buildReq('user-3', true);
+    const res = buildRes();
+    // @ts-expect-error partial Response mock
+    const stream$ = controller.stream(req, res);
+
+    await expect(
+      lastValueFrom(stream$, { defaultValue: 'empty' })
+    ).resolves.toBe('empty');
+    expect(service.openStream).not.toHaveBeenCalled();
+    expect(res.emitter.listenerCount('close')).toBe(0);
   });
 });
