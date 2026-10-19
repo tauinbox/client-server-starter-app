@@ -405,6 +405,43 @@ describe('NotificationsService', () => {
     });
   });
 
+  describe('pushToUsers', () => {
+    const event = { type: 'permissions_updated' } as const;
+
+    it('publishes one message with only the connected users', async () => {
+      const local = service.createStream('local-1', 'conn-1');
+      const received: unknown[] = [];
+      local.subscribe((e) => received.push(e));
+      bus.remoteUserIds = ['remote-1', 'other-1'];
+
+      await service.pushToUsers(['local-1', 'remote-1', 'offline-1'], event);
+
+      expect(received).toEqual([{ data: event }]);
+      expect(bus.publish.mock.calls).toEqual([
+        [{ userIds: ['local-1', 'remote-1'], event }]
+      ]);
+    });
+
+    it('publishes nothing when no user is connected', async () => {
+      service.createStream('local-1', 'conn-1');
+      bus.remoteUserIds = ['remote-1'];
+
+      await service.pushToUsers(['offline-1', 'offline-2'], event);
+
+      expect(bus.publish).not.toHaveBeenCalled();
+    });
+
+    it('uses the local streams when the registry is unknown', async () => {
+      service.createStream('local-1', 'conn-1');
+
+      await service.pushToUsers(['local-1', 'offline-1'], event);
+
+      expect(bus.publish.mock.calls).toEqual([
+        [{ userIds: ['local-1'], event }]
+      ]);
+    });
+  });
+
   describe('bus', () => {
     const event = { type: 'feature_flags_updated' } as const;
 

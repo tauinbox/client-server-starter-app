@@ -27,6 +27,7 @@ describe('NotificationsListener', () => {
     push: jest.Mock;
     pushToAll: jest.Mock;
     pushToAuthorized: jest.Mock;
+    pushToUsers: jest.Mock;
   };
   let usersService: { findByIdWithDeleted: jest.Mock };
 
@@ -34,7 +35,8 @@ describe('NotificationsListener', () => {
     service = {
       push: jest.fn(),
       pushToAll: jest.fn(),
-      pushToAuthorized: jest.fn().mockResolvedValue(undefined)
+      pushToAuthorized: jest.fn().mockResolvedValue(undefined),
+      pushToUsers: jest.fn().mockResolvedValue(undefined)
     };
     usersService = {
       findByIdWithDeleted: jest
@@ -158,23 +160,14 @@ describe('NotificationsListener', () => {
     );
   });
 
-  it('should push permissions_updated to every holder on RolePermissionsChangedEvent', () => {
-    listener.handleRolePermissionsChanged(
+  it('should push permissions_updated to the holders in one call on RolePermissionsChangedEvent', async () => {
+    await listener.handleRolePermissionsChanged(
       new RolePermissionsChangedEvent(['user-7', 'user-8'])
     );
 
-    expect(service.push).toHaveBeenCalledWith('user-7', {
-      type: 'permissions_updated'
-    });
-    expect(service.push).toHaveBeenCalledWith('user-8', {
-      type: 'permissions_updated'
-    });
-    expect(service.push).toHaveBeenCalledTimes(2);
-  });
-
-  it('should push nothing when no holders on RolePermissionsChangedEvent', () => {
-    listener.handleRolePermissionsChanged(new RolePermissionsChangedEvent([]));
-
+    expect(service.pushToUsers.mock.calls).toEqual([
+      [['user-7', 'user-8'], { type: 'permissions_updated' }]
+    ]);
     expect(service.push).not.toHaveBeenCalled();
   });
 

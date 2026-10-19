@@ -31,7 +31,8 @@ runWithRedis('server pushes across instances (e2e)', () => {
   const namespace = `${tag}:${randomUUID()}`;
   const emails = {
     viewer: `${tag}-viewer@example.com`,
-    plain: `${tag}-plain@example.com`
+    plain: `${tag}-plain@example.com`,
+    idle: `${tag}-idle@example.com`
   };
   const roleName = `${tag}-viewer`;
 
@@ -40,6 +41,9 @@ runWithRedis('server pushes across instances (e2e)', () => {
   let redis: Redis;
   let viewer: User;
   let plain: User;
+  let idle: User;
+  let role: Role;
+  let searchUser: Permission;
   const requests: { destroy: () => void }[] = [];
 
   const startInstance = async (): Promise<INestApplication> => {
@@ -77,18 +81,21 @@ runWithRedis('server pushes across instances (e2e)', () => {
       );
     viewer = await saveUser(emails.viewer);
     plain = await saveUser(emails.plain);
+    idle = await saveUser(emails.idle);
 
-    const searchUser = await dataSource.getRepository(Permission).findOne({
+    const permission = await dataSource.getRepository(Permission).findOne({
       where: { action: { name: 'search' }, resource: { subject: 'User' } },
       relations: { action: true, resource: true }
     });
-    if (!searchUser) throw new Error('Permission search:User missing');
+    if (!permission) throw new Error('Permission search:User missing');
+    searchUser = permission;
     const roleService = first.get(RoleService);
-    const role = await roleService.create({ name: roleName });
+    role = await roleService.create({ name: roleName });
     await roleService.setPermissionsForRole(role.id, [
       { permissionId: searchUser.id }
     ]);
     await roleService.assignRoleToUser(viewer.id, role.id);
+    await roleService.assignRoleToUser(idle.id, role.id);
 
     // Both instances listen before any push is raised.
     const channel = `${namespace}:push:${redis.options.db ?? 0}`;
@@ -202,5 +209,38 @@ runWithRedis('server pushes across instances (e2e)', () => {
     expect(plainOnSecond()).toEqual([direct, broadcast]);
     // The sending instance delivers once, not again from its own message.
     expect(viewerOnFirst()).toEqual([broadcast, authorized]);
+  });
+
+  it('sends a role permission change to the connected holders only, in one message', async () => {
+    const viewerOnSecond = await openStream(second, viewer);
+    await eventually(async () => {
+      const userIds = await first.get(NotificationsBus).connectedUserIds();
+      return userIds?.includes(viewer.id) ? true : null;
+    });
+    const listener = redis.duplicate();
+    const messages: { userIds?: string[]; event: NotificationEvent }[] = [];
+    listener.on('message', (_channel: string, raw: string) => {
+      messages.push(
+        JSON.parse(raw) as { userIds?: string[]; event: NotificationEvent }
+      );
+    });
+    await listener.subscribe(`${namespace}:push:${redis.options.db ?? 0}`);
+
+    try {
+      await first
+        .get(RoleService)
+        .setPermissionsForRole(role.id, [{ permissionId: searchUser.id }]);
+
+      await settle(viewerOnSecond, 1);
+      expect(viewerOnSecond()).toEqual([{ type: 'permissions_updated' }]);
+      expect(messages).toEqual([
+        expect.objectContaining({
+          userIds: [viewer.id],
+          event: { type: 'permissions_updated' }
+        })
+      ]);
+    } finally {
+      await listener.quit();
+    }
   });
 });
