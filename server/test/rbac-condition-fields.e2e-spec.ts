@@ -146,11 +146,11 @@ runWithInfra('Grant condition fields (e2e)', () => {
 
   it('turns a stored deny on a misspelt field into a blanket deny', async () => {
     await storeRows([{ effect: 'deny', fieldMatch: { lastname: ['Typo'] } }]);
-    const denyRole = await roleService.create({ name: `${tag}-allow` });
-    await roleService.setPermissionsForRole(denyRole.id, [
+    const allowRole = await roleService.create({ name: `${tag}-allow` });
+    await roleService.setPermissionsForRole(allowRole.id, [
       { permissionId: readUser.id }
     ]);
-    await roleService.assignRoleToUser(users.actor.id, denyRole.id);
+    await roleService.assignRoleToUser(users.actor.id, allowRole.id);
 
     try {
       expect(await canReadTarget()).toBe(false);
@@ -160,7 +160,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
       ]);
       expect(await canReadTarget()).toBe(true);
     } finally {
-      await dataSource.getRepository(Role).delete({ id: denyRole.id });
+      await dataSource.getRepository(Role).delete({ id: allowRole.id });
     }
   });
 });
