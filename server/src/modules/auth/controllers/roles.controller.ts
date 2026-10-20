@@ -39,7 +39,7 @@ import { CurrentAbility } from '../decorators/current-ability.decorator';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import type { AppAbility } from '../casl/app-ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { changedFields } from '@app/shared/utils/changed-fields';
+import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditLogParams } from '../../audit/audit.service';
 import { assertCan } from '../../../common/utils/assert-can.util';
@@ -223,14 +223,18 @@ export class RolesController {
     @CurrentAbility() ability: AppAbility
   ) {
     const role = await this.roleService.findOne(id);
-    assertCan(
-      ability,
-      'update',
-      subject('Role', role),
-      this.auditService,
-      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
-      this.metricsService
-    );
+    // The record after the write is checked too: else a grant scoped by a
+    // writable field lets the caller move a role out of its own scope.
+    for (const record of [role, withChanges(role, updateRoleDto)]) {
+      assertCan(
+        ability,
+        'update',
+        subject('Role', record),
+        this.auditService,
+        { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
+        this.metricsService
+      );
+    }
     const changed = changedFields(role, updateRoleDto);
     return this.roleService.update(
       id,

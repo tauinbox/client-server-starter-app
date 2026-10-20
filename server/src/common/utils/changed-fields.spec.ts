@@ -1,4 +1,4 @@
-import { changedFields } from '@app/shared/utils/changed-fields';
+import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 
 describe('changedFields', () => {
   const before = {
@@ -47,5 +47,28 @@ describe('changedFields', () => {
 
   it('skips a key whose value is undefined', () => {
     expect(changedFields(before, { description: undefined })).toEqual([]);
+  });
+});
+
+describe('withChanges', () => {
+  const before = { name: 'team-a', description: 'old', note: null };
+
+  it('applies each defined key and keeps the other fields', () => {
+    expect(withChanges(before, { name: 'team-b' })).toEqual({
+      name: 'team-b',
+      description: 'old',
+      note: null
+    });
+  });
+
+  it('applies null and skips undefined', () => {
+    expect(withChanges(before, { description: null, name: undefined })).toEqual(
+      { name: 'team-a', description: null, note: null }
+    );
+  });
+
+  it('does not change the record', () => {
+    withChanges(before, { name: 'team-b' });
+    expect(before.name).toBe('team-a');
   });
 });

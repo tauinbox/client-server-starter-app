@@ -13,7 +13,7 @@ import {
 
 import type { PermissionCondition } from '@app/shared/types';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
-import { changedFields } from '@app/shared/utils/changed-fields';
+import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import {
   findConditionActionError,
@@ -410,8 +410,20 @@ router.patch(
     }
 
     // `RoleService.update` raises the isSystem 400, so it sits below the
-    // instance check on the server.
-    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
+    // instance check on the server. The record after the write is checked too.
+    if (
+      !assertInstancePermission(req, res, 'update', 'Role', role) ||
+      !assertInstancePermission(
+        req,
+        res,
+        'update',
+        'Role',
+        withChanges(role, {
+          name: normalized?.ok ? normalized.name : undefined,
+          description
+        })
+      )
+    ) {
       return;
     }
 

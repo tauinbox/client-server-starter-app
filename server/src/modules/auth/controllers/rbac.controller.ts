@@ -29,7 +29,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { subject } from '@casl/ability';
 import { ErrorKeys } from '@app/shared/constants';
-import { changedFields } from '@app/shared/utils/changed-fields';
+import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { ResourceCursorQueryDto } from '../../../common/dtos';
 import { ResourceService } from '../services/resource.service';
 import { Authorize } from '../decorators/authorize.decorator';
@@ -183,14 +183,18 @@ export class RbacController {
         HttpStatus.NOT_FOUND
       );
     }
-    assertCan(
-      ability,
-      'update',
-      subject('Permission', resource),
-      this.auditService,
-      { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
-      this.metricsService
-    );
+    // The record after the write is checked too: else a grant scoped by a
+    // writable field lets the caller move a resource out of its own scope.
+    for (const record of [resource, withChanges(resource, dto)]) {
+      assertCan(
+        ability,
+        'update',
+        subject('Permission', record),
+        this.auditService,
+        { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
+        this.metricsService
+      );
+    }
     const changed = changedFields(resource, dto);
     const result = await this.resourceService.update(id, dto, {
       action: AuditAction.RESOURCE_UPDATE,

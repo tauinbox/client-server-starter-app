@@ -20,6 +20,7 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
 import { MailService } from '../../mail/mail.service';
 import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util';
+import { withChanges } from '@app/shared/utils/changed-fields';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -280,12 +281,25 @@ export class UsersService {
     audit?: UserAuditRows
   ): Promise<User> {
     const user = await this.findOne(id);
+    const { unlockAccount, ...rest } = updateUserDto;
 
     if (ability !== SYSTEM_ABILITY) {
       this.assertCanWrite(ability, 'update', user, actorId);
+      // The record after the write is checked too: else a grant scoped by a
+      // writable field lets the caller move a user out of its own scope. The
+      // secrets of the body are not fields that a condition reads.
+      this.assertCanWrite(
+        ability,
+        'update',
+        withChanges(user, {
+          ...rest,
+          password: undefined,
+          currentPassword: undefined,
+          code: undefined
+        }),
+        actorId
+      );
     }
-
-    const { unlockAccount, ...rest } = updateUserDto;
     const changes: Partial<User> = { ...rest };
 
     if (rest.password) {
