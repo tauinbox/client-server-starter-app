@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
+import {
+  grantableActionNames,
+  reofferedActionNames
+} from '@app/shared/utils/grantable-actions';
 import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
 import {
   listPage,
@@ -12,6 +16,7 @@ import {
   assertInstancePermission,
   permissionGuard
 } from '../helpers/auth.helpers';
+import { assertCanWiden } from '../helpers/grant-scope.helpers';
 import type { AuthenticatedRequest } from '../types';
 import {
   requireUuid,
@@ -103,6 +108,13 @@ router.post(
         statusCode: 400,
         errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
       });
+      return;
+    }
+
+    if (
+      resource.isOrphaned &&
+      !assertCanWiden(req, res, resource, grantableActionNames(resource))
+    ) {
       return;
     }
 
@@ -210,6 +222,18 @@ router.patch(
         statusCode: 400,
         errorKey: ErrorKeys.RESOURCES.ACTION_NOT_DECLARED
       });
+      return;
+    }
+
+    if (
+      allowedActionNames !== undefined &&
+      !assertCanWiden(
+        req,
+        res,
+        resource,
+        reofferedActionNames(resource, allowedActionNames as string[] | null)
+      )
+    ) {
       return;
     }
 

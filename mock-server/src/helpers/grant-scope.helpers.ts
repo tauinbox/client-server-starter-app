@@ -117,6 +117,38 @@ export function assertDenyScope(
   return true;
 }
 
+/**
+ * Mirrors `ResourceService.assertCanWiden`: offering a narrowed or orphaned
+ * action again wakes its dormant grants, so only a super caller may. Answers
+ * 403, audits the refusal, and returns false when the write must stop.
+ */
+export function assertCanWiden(
+  req: Request,
+  res: Response,
+  resource: { id: string; name: string; subject: string },
+  reEnabled: string[]
+): boolean {
+  if (reEnabled.length === 0) return true;
+  const { user } = req as AuthenticatedRequest;
+  if (buildAbilityForUser(user).can('manage', 'all')) return true;
+  logAudit('PERMISSION_GRANT_DENIED', {
+    actorId: user.id,
+    targetId: resource.id,
+    targetType: 'Resource',
+    details: {
+      subject: resource.subject,
+      actions: reEnabled,
+      reason: 'resource-widen'
+    }
+  });
+  res.status(403).json({
+    message: `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`,
+    statusCode: 403,
+    errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN
+  });
+  return false;
+}
+
 /** The deny rows a role holds today. */
 export function denyRowsOf(roleId: string): ScopeItem[] {
   return getState().rolePermissions.filter(

@@ -170,7 +170,8 @@
       "notFound": "Resource not found",
       "cannotRestore": "Cannot restore resource: its controller is not registered. Restore the controller code first.",
       "subjectReserved": "Resource subject is reserved and cannot be used",
-      "actionNotDeclared": "Only the actions that the code checks for this resource can be offered"
+      "actionNotDeclared": "Only the actions that the code checks for this resource can be offered",
+      "cannotWiden": "Only a super administrator can offer an action again or restore a resource"
     },
     "featureFlags": {
       "notFound": "Feature flag not found",

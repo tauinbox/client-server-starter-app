@@ -147,7 +147,7 @@ export class RbacController {
       { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
       this.metricsService
     );
-    const result = await this.resourceService.restore(id, {
+    const result = await this.resourceService.restore(id, ability, {
       action: AuditAction.RESOURCE_RESTORE,
       actorId: req.user.userId,
       actorEmail: req.user.email,
@@ -196,7 +196,7 @@ export class RbacController {
       );
     }
     const changed = changedFields(resource, dto);
-    const result = await this.resourceService.update(id, dto, {
+    const result = await this.resourceService.update(id, dto, ability, {
       action: AuditAction.RESOURCE_UPDATE,
       actorId: req.user.userId,
       actorEmail: req.user.email,
