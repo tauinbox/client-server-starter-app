@@ -33,6 +33,7 @@ import {
 } from '../utils/can-grant.util';
 import {
   findConditionActionError,
+  findConditionFieldError,
   findConditionSupportError
 } from '@app/shared/utils/permission-condition-shape';
 import { AuditService } from '../../audit/audit.service';
@@ -191,7 +192,9 @@ export class RoleService {
    *   permission matrix, and buildAbility drops it;
    * - a restriction on an action whose checks never read the record passes
    *   the type-level route check as a full grant;
-   * - an identity-bound branch on a `create` grant denies every create.
+   * - an identity-bound branch on a `create` grant denies every create;
+   * - a condition on a field outside `CONDITION_FIELDS` is vetoed at run
+   *   time.
    * Unknown permission ids are left to the grant check, which reports them.
    */
   private async assertGrantsApplicable(
@@ -247,6 +250,20 @@ export class RoleService {
           {
             message: `Cannot grant ${label} - ${actionError}`,
             errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      const fieldError = findConditionFieldError(
+        resource.subject,
+        item.conditions
+      );
+      if (fieldError) {
+        throw new HttpException(
+          {
+            message: `Cannot grant ${label} - ${fieldError}`,
+            errorKey: ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN
           },
           HttpStatus.BAD_REQUEST
         );

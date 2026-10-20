@@ -74,6 +74,7 @@ export const ErrorKeys = {
     CANNOT_LIFT_DENY: 'errors.roles.cannotLiftDeny',
     CONDITION_NOT_APPLICABLE: 'errors.roles.conditionNotApplicable',
     CONDITION_NOT_SUPPORTED: 'errors.roles.conditionNotSupported',
+    CONDITION_FIELD_UNKNOWN: 'errors.roles.conditionFieldUnknown',
     ACTION_NOT_GRANTABLE: 'errors.roles.actionNotGrantable',
     CONDITION_BROADER_THAN_CALLER: 'errors.roles.conditionBroaderThanCaller',
     CONDITION_UNRESOLVABLE: 'errors.roles.conditionUnresolvable',

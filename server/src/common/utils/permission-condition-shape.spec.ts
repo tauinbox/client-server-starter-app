@@ -1,6 +1,7 @@
 import {
   CONDITION_MAX_KEY_LENGTH,
   findConditionActionError,
+  findConditionFieldError,
   findFieldMatchShapeError,
   findIdentityBoundBranch,
   findOwnershipShapeError,
@@ -100,6 +101,63 @@ describe('permission condition shape key validation', () => {
         findConditionActionError('create', { ownership: null })
       ).toBeNull();
       expect(findIdentityBoundBranch(null)).toBeNull();
+    });
+  });
+
+  describe('findConditionFieldError', () => {
+    it.each([
+      ['a misspelt fieldMatch key', { fieldMatch: { lastname: ['Typo'] } }],
+      ['an excluded column', { fieldMatch: { password: ['x'] } }],
+      ['an ownership field', { ownership: { userField: 'createdBy' } }],
+      ['a userAttr key', { userAttr: { ownerId: 'id' } }],
+      ['a custom field', { custom: '{"lockedUntil":{"$ne":null}}' }],
+      [
+        'a custom field under a logical operator',
+        { custom: '{"$or":[{"id":"u-1"},{"$not":{"tokenRevokedAt":1}}]}' }
+      ]
+    ])('rejects %s on User', (_case, conditions) => {
+      expect(findConditionFieldError('User', conditions)).toContain('User');
+    });
+
+    it('accepts every allowed field, operators under a field included', () => {
+      expect(
+        findConditionFieldError('User', {
+          effect: 'deny',
+          ownership: { userField: 'id' },
+          fieldMatch: { lastName: ['Alpha'], isActive: [true] },
+          custom: '{"$and":[{"email":{"$nin":["a@x.io"]}},{"firstName":"A"}]}'
+        })
+      ).toBeNull();
+    });
+
+    it('reads the allow-list of the subject', () => {
+      expect(
+        findConditionFieldError('Permission', {
+          fieldMatch: { displayName: ['Users'] }
+        })
+      ).toBeNull();
+      expect(
+        findConditionFieldError('Role', { fieldMatch: { description: ['x'] } })
+      ).toContain('description');
+    });
+
+    it('allows no field on an unlisted subject or a prototype key', () => {
+      expect(
+        findConditionFieldError('Billing', { ownership: { userField: 'id' } })
+      ).toContain('Billing');
+      expect(
+        findConditionFieldError('constructor', {
+          ownership: { userField: 'id' }
+        })
+      ).not.toBeNull();
+    });
+
+    it('accepts an unconditional rule and leaves invalid JSON to the shape checks', () => {
+      expect(findConditionFieldError('User', { effect: 'deny' })).toBeNull();
+      expect(findConditionFieldError('User', null)).toBeNull();
+      expect(
+        findConditionFieldError('User', { custom: '{ not json' })
+      ).toBeNull();
     });
   });
 

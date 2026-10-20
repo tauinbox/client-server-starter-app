@@ -367,6 +367,13 @@ management and theming.
 
   `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users` and
   `POST /roles` evaluates them against the submitted payload.
+- **A condition names only the fields of its subject.** `CONDITION_FIELDS` in
+  `shared/src/constants/permission.constants.ts` lists the record fields that a condition on each
+  subject can use. No condition can read a column that no response sends, such as the password hash.
+  A deny on a misspelt field cannot silently deny nothing. A write with another field gets a 400 with
+  `errors.roles.conditionFieldUnknown`, for a super role too. A stored row with such a field fails
+  closed: the allow grants nothing, and the deny denies everything. The permissions dialog shows the
+  allowed fields, and the mock server mirrors the rule.
 - **A condition only where a check reads the record.** CASL answers a route check on a subject type
   from the rule alone, so a conditional allow passes it as a full grant and a conditional deny stops
   nothing. A grant can carry a restriction (`ownership`, `fieldMatch`, `userAttr`, `custom`) only on an
@@ -1883,11 +1890,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2957 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 645 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 632 pass and 13 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1588 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2969 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 648 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 635 pass and 13 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1589 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 324 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1058 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1060 tests pass |
 
 ## CI/CD
 

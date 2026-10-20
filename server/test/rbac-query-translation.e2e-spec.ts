@@ -276,7 +276,7 @@ describe('CASL → SQL query translation (e2e)', () => {
         action: 'search',
         permission: 'users:search:bad',
         conditions: {
-          custom: JSON.stringify({ legacyField: 'x' }) // unknown field
+          custom: JSON.stringify({ locale: 'ru' }) // not a filter field
         }
       },
       {
@@ -354,7 +354,7 @@ describe('CASL → SQL query translation (e2e)', () => {
         permission: 'users:search:deny-legacy',
         conditions: {
           effect: 'deny',
-          custom: JSON.stringify({ legacyField: 'x' }) // unknown field
+          custom: JSON.stringify({ locale: 'ru' }) // not a filter field
         }
       }
     ];

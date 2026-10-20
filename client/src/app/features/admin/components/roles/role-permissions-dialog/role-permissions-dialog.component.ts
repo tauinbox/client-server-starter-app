@@ -32,6 +32,7 @@ import type {
   RoleAdminResponse
 } from '@app/shared/types';
 import {
+  conditionFieldsOf,
   findFieldMatchShapeError,
   findOwnershipShapeError,
   findUserAttrShapeError
@@ -275,6 +276,11 @@ export class RolePermissionsDialogComponent implements OnInit {
     return permission.resource.conditionalActionNames.includes(
       permission.action.name
     );
+  }
+
+  /** The record fields a condition on this permission may name. */
+  conditionFields(permission: PermissionResponse): string {
+    return conditionFieldsOf(permission.resource.subject).join(', ');
   }
 
   /** Drops every restriction branch and keeps the effect. */

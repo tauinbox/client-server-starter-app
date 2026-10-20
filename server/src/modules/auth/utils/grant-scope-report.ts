@@ -9,7 +9,10 @@ import { resolveConditions } from '../casl/resolve-conditions';
 import type { SubjectMaps } from '../services/resource.service';
 import { assertCanGrantPermissions } from './can-grant.util';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
-import { findConditionSupportError } from '@app/shared/utils/permission-condition-shape';
+import {
+  findConditionFieldError,
+  findConditionSupportError
+} from '@app/shared/utils/permission-condition-shape';
 
 /**
  * Analysis behind `npm run check:grant-scope`: which stored grants the
@@ -86,7 +89,8 @@ export interface GrantScopeReport {
   /**
    * Grants that register nothing as authored, and that the grant rule rejects
    * on rewrite: an allow on an action the resource does not offer, a condition
-   * no check of the action reads, or a condition the resolver vetoes.
+   * no check of the action reads, a condition on a field outside
+   * `CONDITION_FIELDS`, or a condition the resolver vetoes.
    */
   inert: GrantRow[];
   /** Attributed grants the check rejects today. */
@@ -222,7 +226,8 @@ export function analyzeGrants(input: {
         g.action_name,
         g.conditional_action_names,
         g.conditions
-      )
+      ) ||
+      findConditionFieldError(g.resource_subject, g.conditions)
     ) {
       inert.push(g);
       continue;

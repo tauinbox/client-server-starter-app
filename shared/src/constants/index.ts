@@ -69,6 +69,7 @@ export {
   SYSTEM_ROLES,
   ROLE_NAME_MAX_LENGTH,
   ABILITY_FILTER_FIELDS,
+  CONDITION_FIELDS,
   type SystemRole,
   type AbilityFilterSubject
 } from './permission.constants';

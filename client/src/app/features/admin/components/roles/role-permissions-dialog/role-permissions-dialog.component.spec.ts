@@ -204,6 +204,18 @@ describe('RolePermissionsDialogComponent', () => {
       expect(logic).toEqual(expect.arrayContaining(['AND', 'OR']));
     });
 
+    it('lists the fields a condition on the subject may name', () => {
+      const { fixture } = setup([makeRolePermItem('perm-a')]);
+      const host = fixture.nativeElement as HTMLElement;
+
+      (host.querySelector('.condition-toggle') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(host.querySelector('.condition-editor')?.textContent).toContain(
+        'id, email, firstName, lastName, isActive, locale'
+      );
+    });
+
     it('explains instead of offering conditions on an action that takes none', () => {
       const { fixture } = setup(
         [
