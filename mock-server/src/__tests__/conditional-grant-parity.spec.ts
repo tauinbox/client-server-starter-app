@@ -216,6 +216,51 @@ describe('conditional grants on FeatureFlag', () => {
   });
 });
 
+describe('conditional update checks the record after the write', () => {
+  const johnId = (): string =>
+    [...getState().users.values()].find((u) => u.email === 'john@example.com')!
+      .id;
+  const flagsResource = `/rbac/resources/${mockId('res-feature-flags')}`;
+
+  beforeEach(() => {
+    grant([
+      ['users', 'update', { fieldMatch: { lastName: ['Smith'] } }],
+      ['roles', 'update', { fieldMatch: { name: ['scoped'] } }],
+      [
+        'permissions',
+        'update',
+        { fieldMatch: { displayName: ['Feature Flags'] } }
+      ]
+    ]);
+  });
+
+  it('refuses a user write that leaves the condition', async () => {
+    const path = `/users/${johnId()}`;
+    expect((await call('PATCH', path, { lastName: 'Moved' })).status).toBe(403);
+    expect(getState().users.get(johnId())?.lastName).toBe('Smith');
+    expect((await call('PATCH', path, { firstName: 'Jon' })).status).toBe(200);
+  });
+
+  it('refuses a role write that leaves the condition', async () => {
+    const path = `/roles/${SCOPED_ROLE_ID}`;
+    expect((await call('PATCH', path, { name: 'moved' })).status).toBe(403);
+    expect(getState().roles.get(SCOPED_ROLE_ID)?.name).toBe('scoped');
+    expect((await call('PATCH', path, { description: 'x' })).status).toBe(200);
+  });
+
+  it('refuses a resource write that leaves the condition', async () => {
+    expect(
+      (await call('PATCH', flagsResource, { displayName: 'Moved' })).status
+    ).toBe(403);
+    expect(
+      getState().resources.get(mockId('res-feature-flags'))?.displayName
+    ).toBe('Feature Flags');
+    expect(
+      (await call('PATCH', flagsResource, { description: 'x' })).status
+    ).toBe(200);
+  });
+});
+
 describe('conditional assign:Role', () => {
   const johnId = (): string =>
     [...getState().users.values()].find((u) => u.email === 'john@example.com')!

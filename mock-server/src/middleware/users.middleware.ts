@@ -8,7 +8,7 @@ import {
   USER_LIST_QUERY
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
-import { changedFields } from '@app/shared/utils/changed-fields';
+import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
   emailErrors,
@@ -326,7 +326,16 @@ router.patch(
       return;
     }
 
-    if (!assertCanWriteUser(req, res, 'update', user)) {
+    // The record after the write is checked too, as in UsersService.update.
+    if (
+      !assertCanWriteUser(req, res, 'update', user) ||
+      !assertCanWriteUser(
+        req,
+        res,
+        'update',
+        withChanges(user, { email, firstName, lastName, locale, isActive })
+      )
+    ) {
       return;
     }
 

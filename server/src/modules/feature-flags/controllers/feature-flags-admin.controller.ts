@@ -32,6 +32,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { subject } from '@casl/ability';
 import { ErrorKeys } from '@app/shared/constants';
 import { parseIfMatchVersion } from '@app/shared/utils/if-match';
+import { withChanges } from '@app/shared/utils/changed-fields';
 import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
@@ -170,14 +171,7 @@ export class FeatureFlagsAdminController {
     this.assertCanFlag(
       ability,
       'update',
-      {
-        ...current,
-        ...Object.fromEntries(
-          Object.entries(dto).filter(
-            ([field, value]) => field !== 'rules' && value !== undefined
-          )
-        )
-      },
+      withChanges(current, { ...dto, rules: undefined }),
       req,
       id
     );

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { changedFields } from '@app/shared/utils/changed-fields';
+import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
 import {
   listPage,
@@ -172,6 +172,12 @@ router.patch(
       return;
     }
 
+    // The record after the write is checked too, as on the server.
+    const after = withChanges(resource, {
+      displayName,
+      description,
+      allowedActionNames
+    });
     if (
       !assertInstancePermission(
         req,
@@ -179,6 +185,14 @@ router.patch(
         'update',
         'Permission',
         resource,
+        'Resource'
+      ) ||
+      !assertInstancePermission(
+        req,
+        res,
+        'update',
+        'Permission',
+        after,
         'Resource'
       )
     ) {
