@@ -82,13 +82,13 @@ runWithRedis('entitlement version counter (real Redis)', () => {
 
   it('starts at version 0 with no write, then keys per-user entries by the counter', async () => {
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:v0')).toBeDefined();
+    expect(await cache.get('entitlements:user:u1:v0:u0')).toBeDefined();
     expect(await redis.exists(COUNTER_KEY)).toBe(0);
 
     await service.invalidateAll();
     // The bumped suffix orphans the previous entry instead of serving it.
-    expect(await cache.get('entitlements:user:u1:v1')).toBeUndefined();
+    expect(await cache.get('entitlements:user:u1:v1:u0')).toBeUndefined();
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:v1')).toBeDefined();
+    expect(await cache.get('entitlements:user:u1:v1:u0')).toBeDefined();
   });
 });

@@ -50,7 +50,9 @@ describe('PermissionService', () => {
     };
 
     mockCacheManager = {
-      get: jest.fn().mockResolvedValue(null),
+      get: jest.fn((key: string) =>
+        Promise.resolve(key === 'permissions:user-version:user-1' ? 7 : null)
+      ),
       set: jest.fn().mockResolvedValue(undefined),
       del: jest.fn().mockResolvedValue(undefined)
     };
@@ -127,7 +129,7 @@ describe('PermissionService', () => {
         }
       ]);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'permissions:v2:user-1',
+        'permissions:v2:user-1:v7',
         result,
         120_000
       );
@@ -333,7 +335,7 @@ describe('PermissionService', () => {
         { name: 'user', isSuper: false }
       ]);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'roles:user-1',
+        'roles:user-1:v7',
         result,
         120_000
       );
@@ -368,14 +370,21 @@ describe('PermissionService', () => {
   });
 
   describe('invalidateUserCache', () => {
-    it('should delete both permissions and roles cache entries', async () => {
+    it('bumps the version of the user instead of deleting the entries', async () => {
       await service.invalidateUserCache('user-1');
 
-      expect(mockCacheManager.del).toHaveBeenCalledWith(
-        'permissions:v2:user-1'
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        'permissions:user-version:user-1',
+        expect.any(Number),
+        0
       );
-      expect(mockCacheManager.del).toHaveBeenCalledWith('roles:user-1');
-      expect(mockCacheManager.del).toHaveBeenCalledTimes(2);
+      const [, version] = mockCacheManager.set.mock.calls[0] as [
+        string,
+        number,
+        number
+      ];
+      expect(version).toBeGreaterThan(7);
+      expect(mockCacheManager.del).not.toHaveBeenCalled();
     });
   });
 });

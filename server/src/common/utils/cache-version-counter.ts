@@ -18,6 +18,12 @@ import { redisClientOf, ThrottledFailureLog } from './redis-client';
  * counter, so the read-modify-write below cannot lose to another instance. It
  * is also the degradation path when Redis is unreachable: a cache outage must
  * not take down entitlement resolution.
+ *
+ * A `scope` (a user id) selects one counter of a family: both keys get the
+ * scope as a suffix. A reader reads the version before its query and writes
+ * under it, so a read that started before an invalidation writes a key that
+ * nobody reads again. A delete of the key cannot give this: the late write
+ * puts the old value back.
  */
 export class CacheVersionCounter {
   readonly #cache: Cache;
@@ -44,11 +50,13 @@ export class CacheVersionCounter {
     );
   }
 
-  async read(): Promise<number> {
+  async read(scope?: string): Promise<number> {
+    const counterKey = this.#scoped(this.#counterKey, scope);
+    const fallbackKey = this.#scoped(this.#fallbackKey, scope);
     const redis = redisClientOf(this.#cache);
     if (redis) {
       try {
-        const raw = await redis.get(this.#counterKey);
+        const raw = await redis.get(counterKey);
         // Nothing invalidated yet, so nothing to orphan: 0 is a valid suffix.
         if (raw === null) return 0;
         const parsed = Number(raw);
@@ -58,18 +66,20 @@ export class CacheVersionCounter {
       }
     }
 
-    const cached = await this.#cache.get<number>(this.#fallbackKey);
+    const cached = await this.#cache.get<number>(fallbackKey);
     if (typeof cached === 'number') return cached;
     const initial = Date.now();
-    await this.#cache.set(this.#fallbackKey, initial, 0);
+    await this.#cache.set(fallbackKey, initial, 0);
     return initial;
   }
 
-  async bump(): Promise<void> {
+  async bump(scope?: string): Promise<void> {
+    const counterKey = this.#scoped(this.#counterKey, scope);
+    const fallbackKey = this.#scoped(this.#fallbackKey, scope);
     const redis = redisClientOf(this.#cache);
     if (redis) {
       try {
-        await redis.incr(this.#counterKey);
+        await redis.incr(counterKey);
         return;
       } catch (error: unknown) {
         this.#failureLog.log(error);
@@ -79,11 +89,15 @@ export class CacheVersionCounter {
     // Date.now() has millisecond granularity, so two invalidations inside one
     // millisecond would re-emit the same version and leave stale per-user cache
     // keys reachable; max(prev + 1) keeps the suffix strictly fresh.
-    const previous = await this.#cache.get<number>(this.#fallbackKey);
+    const previous = await this.#cache.get<number>(fallbackKey);
     const next = Math.max(
       Date.now(),
       (typeof previous === 'number' ? previous : 0) + 1
     );
-    await this.#cache.set(this.#fallbackKey, next, 0);
+    await this.#cache.set(fallbackKey, next, 0);
+  }
+
+  #scoped(key: string, scope: string | undefined): string {
+    return scope === undefined ? key : `${key}:${scope}`;
   }
 }

@@ -503,9 +503,9 @@ also rolls back the flag write. The service validates each rule payload after th
 validated above that point, by the `ValidationPipe` on the `rules` field of `CreateFeatureFlagDto`.
 A request without `rules` keeps the stored rules.
 
-`services/feature-flag-resolver.service.ts` does the cached evaluation. A per-user key ends with the
-shared `CacheVersionCounter` value (`common/utils/cache-version-counter.ts`). Thus a flag change
-orphans each per-user entry with no Redis `SCAN`.
+`services/feature-flag-resolver.service.ts` does the evaluation. It caches the flag list only, not a
+result for each user. A flag change deletes the list and increments an in-process generation, so a
+load that started before the change does not write its rows to the cache.
 
 `services/attribute-registry.service.ts` is the extensibility seam. Another module calls
 `registerAttribute(key, resolver)` from its `onModuleInit` method.
@@ -1167,9 +1167,14 @@ trialing or past_due in the grace window gives `plan.entitlements`. Each other c
 Free entitlements. The result is the union with the active `CustomerGrant` rows, that is the grants
 that are not revoked and not expired, from a paid one-time sku purchase.
 
-The per-user cache is keyed by the shared `CacheVersionCounter` value
-(`common/utils/cache-version-counter.ts`). That counter uses an atomic Redis `INCR`. Without Redis it
-falls back to an in-memory read, modify and write sequence.
+The per-user cache key carries two `CacheVersionCounter` values
+(`common/utils/cache-version-counter.ts`): a global one that `invalidateAll` increments on a plan
+change, and one for each user that `invalidateUser` increments on a subscription change. A read gets
+both versions before its query, so a read that started before an invalidation writes a key that no
+later read uses. The counter uses an atomic Redis `INCR`. Without Redis it falls back to an
+in-memory read, modify and write sequence. `PermissionService` (one counter for each user, for the
+permissions and the roles) and `ResourceService.getSubjectMaps` (one global counter) use the same
+mechanism.
 
 `limitFor(userId, key)` reads the resolved limits from that same cache. A `null` result means that
 the plan carries no limit under that key, and the caller then applies its own default.

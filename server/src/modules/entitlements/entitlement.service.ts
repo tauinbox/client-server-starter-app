@@ -19,12 +19,15 @@ import {
 
 const VERSION_KEY = 'entitlements:version';
 const VERSION_COUNTER_KEY = 'entitlements:version:counter';
+const USER_VERSION_KEY = 'entitlements:user-version';
+const USER_VERSION_COUNTER_KEY = 'entitlements:user-version:counter';
 const USER_TTL_MS = 60_000;
 
 @Injectable()
 export class EntitlementService {
   readonly #logger = new Logger(EntitlementService.name);
   readonly #version: CacheVersionCounter;
+  readonly #userVersion: CacheVersionCounter;
 
   constructor(
     @InjectRepository(Customer)
@@ -44,16 +47,25 @@ export class EntitlementService {
       VERSION_KEY,
       this.#logger
     );
+    this.#userVersion = new CacheVersionCounter(
+      cache,
+      USER_VERSION_COUNTER_KEY,
+      USER_VERSION_KEY,
+      this.#logger
+    );
   }
 
   /**
    * Resolves the capability set + limits in effect for a user. Cached per-user,
    * keyed by a monotonic global version so a plan-level change (`invalidateAll`)
-   * orphans every user key at once without a SCAN+DEL.
+   * orphans every user key at once without a SCAN+DEL, and by a per-user
+   * version so a subscription change (`invalidateUser`) orphans the key a
+   * concurrent read is about to write.
    */
   async capabilitiesFor(userId: string): Promise<ResolvedEntitlements> {
     const version = await this.getVersion();
-    const cacheKey = `entitlements:user:${userId}:v${version}`;
+    const userVersion = await this.#userVersion.read(userId);
+    const cacheKey = `entitlements:user:${userId}:v${version}:u${userVersion}`;
     const cached = await this.cache.get<ResolvedEntitlements>(cacheKey);
     this.metrics.recordCacheAccess('entitlements', cached ? 'hit' : 'miss');
     if (cached) return cached;
@@ -87,8 +99,7 @@ export class EntitlementService {
 
   /** Drops the cached entitlements for a single user (subscription change). */
   async invalidateUser(userId: string): Promise<void> {
-    const version = await this.getVersion();
-    await this.cache.del(`entitlements:user:${userId}:v${version}`);
+    await this.#userVersion.bump(userId);
   }
 
   /** Bumps the version so every per-user cache key orphans (plan edits). */
