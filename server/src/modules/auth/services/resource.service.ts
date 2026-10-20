@@ -22,7 +22,12 @@ import { ResourceRegistryService } from './resource-registry.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditLogParams } from '../../audit/audit.service';
-import { grantableActionNames } from '@app/shared/utils/grantable-actions';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import {
+  grantableActionNames,
+  reofferedActionNames
+} from '@app/shared/utils/grantable-actions';
+import type { AppAbility } from '../casl/app-ability';
 
 // Key is versioned: the cached value's shape changes between releases (a flat
 // resource -> subject record, then the split maps, then conditionalActions),
@@ -105,6 +110,7 @@ export class ResourceService {
       description?: string | null;
       allowedActionNames?: string[] | null;
     },
+    ability: AppAbility,
     audit?: AuditLogParams
   ): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
@@ -129,10 +135,56 @@ export class ResourceService {
         HttpStatus.BAD_REQUEST
       );
     }
+    if (data.allowedActionNames !== undefined) {
+      this.assertCanWiden(
+        ability,
+        resource,
+        reofferedActionNames(resource, data.allowedActionNames),
+        audit?.actorId
+      );
+    }
     Object.assign(resource, data);
     const saved = await this.saveAudited(resource, audit);
     await this.invalidateSubjectMapCache();
     return saved;
+  }
+
+  /**
+   * Narrowing or orphaning a resource keeps the role rows of its actions, so
+   * offering an action again wakes every dormant grant of it, in every role.
+   * Only a super caller may do that: buildAbility registers no allow on a
+   * dormant action, so no other caller holds what the write would grant.
+   */
+  private assertCanWiden(
+    ability: AppAbility,
+    resource: Resource,
+    reEnabled: string[],
+    actorId?: string | null
+  ): void {
+    if (reEnabled.length === 0 || ability.can('manage', 'all')) return;
+    this.auditService.logFireAndForget({
+      action: AuditAction.PERMISSION_GRANT_DENIED,
+      actorId: actorId ?? null,
+      targetId: resource.id,
+      targetType: 'Resource',
+      details: {
+        subject: resource.subject,
+        actions: reEnabled,
+        reason: 'resource-widen'
+      }
+    });
+    this.metrics.recordPermissionDenied(
+      'instance',
+      reEnabled[0],
+      resource.subject
+    );
+    throw new HttpException(
+      {
+        message: `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`,
+        errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN
+      },
+      HttpStatus.FORBIDDEN
+    );
   }
 
   /** Saves the resource and the audit row of the change in one transaction. */
@@ -181,7 +233,11 @@ export class ResourceService {
     return maps;
   }
 
-  async restore(id: string, audit?: AuditLogParams): Promise<Resource> {
+  async restore(
+    id: string,
+    ability: AppAbility,
+    audit?: AuditLogParams
+  ): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
       throw new HttpException(
@@ -199,6 +255,14 @@ export class ResourceService {
           errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
         },
         HttpStatus.BAD_REQUEST
+      );
+    }
+    if (resource.isOrphaned) {
+      this.assertCanWiden(
+        ability,
+        resource,
+        grantableActionNames(resource),
+        audit?.actorId
       );
     }
     resource.isOrphaned = false;

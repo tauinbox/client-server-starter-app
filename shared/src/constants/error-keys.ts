@@ -84,7 +84,8 @@ export const ErrorKeys = {
     NOT_FOUND: 'errors.resources.notFound',
     CANNOT_RESTORE: 'errors.resources.cannotRestore',
     SUBJECT_RESERVED: 'errors.resources.subjectReserved',
-    ACTION_NOT_DECLARED: 'errors.resources.actionNotDeclared'
+    ACTION_NOT_DECLARED: 'errors.resources.actionNotDeclared',
+    CANNOT_WIDEN: 'errors.resources.cannotWiden'
   },
   FEATURE_FLAGS: {
     NOT_FOUND: 'errors.featureFlags.notFound',

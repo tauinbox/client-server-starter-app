@@ -187,6 +187,7 @@ describe('RbacController', () => {
       expect(resourceServiceMock.update).toHaveBeenCalledWith(
         'res-1',
         dto,
+        mockAbility,
         expect.objectContaining({ action: AuditAction.RESOURCE_UPDATE })
       );
       expect(result).toBe(updated);
@@ -243,6 +244,7 @@ describe('RbacController', () => {
       expect(resourceServiceMock.update).toHaveBeenCalledWith(
         'res-1',
         dto,
+        mockAbility,
         expect.objectContaining({
           action: AuditAction.RESOURCE_UPDATE,
           actorId: 'user-42',
@@ -296,6 +298,7 @@ describe('RbacController', () => {
       expect(auditServiceMock.log).not.toHaveBeenCalled();
       expect(resourceServiceMock.restore).toHaveBeenCalledWith(
         'res-1',
+        mockAbility,
         expect.objectContaining({
           action: AuditAction.RESOURCE_RESTORE,
           actorId: 'user-99',
