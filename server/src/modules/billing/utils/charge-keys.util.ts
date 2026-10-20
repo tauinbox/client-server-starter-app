@@ -38,14 +38,20 @@ export function changeRefundKey(subscriptionId: string, seq: number): string {
   return `${CHANGE_REFUND_KEY_PREFIX}${subscriptionId}:${seq}`;
 }
 
+export const RENEWAL_CHARGE_KEY_PREFIX = 'renewal:';
+export const CLOSING_CHARGE_KEY_PREFIX = 'cancel:';
+
 /**
  * Whether the flow behind `chargeKey` records its invoice row BEFORE asking the
  * provider for the money. Only such a flow can read "the confirming webhook
- * matched no invoice" as an anomaly worth alerting on: the renewal and
- * closing-cancel charges (`renewal:`, `cancel:`) record once the provider has
- * answered or thrown, so a webhook that wins that race routinely finds nothing
- * and the local path inserts moments later.
+ * matched no invoice" as an anomaly worth alerting on. The plan-change charge,
+ * the renewal charge and the closing charge all record first: their row holds
+ * the credit units the amount assumes before the money moves.
  */
 export function isPlantedBeforeCharge(chargeKey: string): boolean {
-  return chargeKey.startsWith(CHANGE_CHARGE_KEY_PREFIX);
+  return [
+    CHANGE_CHARGE_KEY_PREFIX,
+    RENEWAL_CHARGE_KEY_PREFIX,
+    CLOSING_CHARGE_KEY_PREFIX
+  ].some((prefix) => chargeKey.startsWith(prefix));
 }

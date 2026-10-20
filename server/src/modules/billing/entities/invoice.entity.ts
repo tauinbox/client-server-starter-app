@@ -23,6 +23,15 @@ import {
   moneyColumnTransformer
 } from '../../../common/utils/money-column.transformer';
 
+/**
+ * The statuses of an invoice whose outcome is still open: a settle may flip it
+ * to `paid`, and until then it holds its `creditUnitsApplied`.
+ */
+export const UNPAID_INVOICE_STATUSES: readonly InvoiceStatus[] = [
+  'pending',
+  'failed'
+];
+
 @Entity('billing_invoices')
 @Unique('UQ_billing_invoices_provider_event_id', ['providerEventId'])
 export class Invoice {
@@ -89,6 +98,12 @@ export class Invoice {
   @Column({ name: 'credit_units_applied', type: 'int', default: 0 })
   @Exclude()
   creditUnitsApplied: number;
+
+  // Set when an unpaid invoice stops holding its `creditUnitsApplied`: its
+  // charge was declined, its dunning ran out, or its subscription closed.
+  @Column({ name: 'credits_released_at', type: 'timestamptz', nullable: true })
+  @Exclude()
+  creditsReleasedAt: Date | null;
 
   @Column({ name: 'billing_mode', type: 'varchar', length: 16 })
   billingMode: BillingMode;

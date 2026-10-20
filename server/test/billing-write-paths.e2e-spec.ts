@@ -804,32 +804,33 @@ runWithInfra('billing write paths (e2e)', () => {
 
     it('walks one dunning rung when two scans race the same decline', async () => {
       await resetSubscription(FIXED_PLAN);
-      // Both scans load the row before either writes; the winner's guarded
-      // UPDATE must leave the loser's WHERE with nothing to match in Postgres.
-      let arrived = 0;
+      // The second scan fails the row the first one recorded while that charge
+      // waits, then the first declines too: both read rung 0, so the loser's
+      // guarded UPDATE must match nothing in Postgres.
+      let charging: () => void = () => undefined;
+      const charged = new Promise<void>((resolve) => {
+        charging = resolve;
+      });
       let openGate: () => void = () => undefined;
       const gate = new Promise<void>((resolve) => {
         openGate = resolve;
       });
-      const decline = () => {
-        if (++arrived === 2) openGate();
+      provider.chargeOffSession.mockImplementationOnce(() => {
+        charging();
         return gate.then<never>(() =>
           Promise.reject(new Error('card declined'))
         );
-      };
-      provider.chargeOffSession
-        .mockImplementationOnce(decline)
-        .mockImplementationOnce(decline);
+      });
       const emit = jest.fn();
       const renewals = await buildWithEmitter(emit);
 
       const now = new Date();
-      await Promise.all([
-        renewals.runDueRenewals(now),
-        renewals.runDueRenewals(now)
-      ]);
+      const first = renewals.runDueRenewals(now);
+      await charged;
+      await renewals.runDueRenewals(now);
+      openGate();
+      await first;
 
-      expect(arrived).toBe(2);
       const sub = await ds
         .getRepository(Subscription)
         .findOneOrFail({ where: { id: subscriptionId } });

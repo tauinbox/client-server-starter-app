@@ -356,7 +356,8 @@ describe('Billing payment-method update flow (e2e)', () => {
         {
           provide: CreditService,
           useValue: {
-            availableUnits: jest.fn().mockResolvedValue(0),
+            availableUnitsForUpdate: jest.fn().mockResolvedValue(0),
+            releaseHolds: jest.fn(),
             spendOnUsage: jest.fn(),
             addPurchase: jest.fn()
           }

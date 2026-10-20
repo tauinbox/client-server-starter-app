@@ -15,7 +15,7 @@ import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
-import { Invoice } from '../entities/invoice.entity';
+import { Invoice, UNPAID_INVOICE_STATUSES } from '../entities/invoice.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
@@ -321,6 +321,11 @@ export class BillingEventReducer {
         snapshot.meteredFrom = null;
       }
       await manager.update(Subscription, { id: subscription.id }, snapshot);
+      if (payload.status === 'canceled') {
+        await this.credits.releaseHolds(manager, {
+          subscriptionId: subscription.id
+        });
+      }
       if (payload.status === 'trialing') {
         await this.markTrialUsed(manager, subscription.customerId, now);
       }
@@ -408,24 +413,24 @@ export class BillingEventReducer {
   }
 
   /**
-   * A settled off-session charge that matched no pending invoice. For a flow
+   * A settled off-session charge that closed no unpaid invoice. For a flow
    * that plants its row before charging this is money the core cannot account
-   * for - either nothing was ever recorded under the key, or the row is not in
-   * a state this settle can close - so it is reported at `error` with a counter
-   * behind it. It stays a report, never a throw: throwing would leave the
+   * for when nothing was ever recorded under the key, or when the recorded row
+   * holds another payment - so it is reported at `error` with a counter behind
+   * it. A row already settled with this payment is a repeat delivery and stays
+   * silent. It stays a report, never a throw: throwing would leave the
    * delivery `received` and the reconciliation sweep would replay it forever.
-   *
-   * The renewal and closing-cancel charges record after the provider answers,
-   * so a webhook winning that race matches nothing routinely; reporting those
-   * would emit a warning per off-session charge and train operators to ignore
-   * the signal.
    */
   private reportUnsettledCharge(
     provider: BillingProviderId,
     chargeKey: string,
+    recorded: Invoice | null,
     payload: NormalizedInvoicePayload
   ): void {
-    if (!isPlantedBeforeCharge(chargeKey)) {
+    if (
+      !isPlantedBeforeCharge(chargeKey) ||
+      recorded?.providerInvoiceRef === payload.providerInvoiceRef
+    ) {
       return;
     }
     this.metrics.recordUnmatchedOffSessionCharge(provider);
@@ -449,9 +454,10 @@ export class BillingEventReducer {
     const customerId = payload.ref.customerId;
     const selfManaged = lifecycleOwnerFor(provider) === 'self';
 
-    // The core already recorded this off-session charge's invoice: settle a
-    // still-pending one, otherwise only reconcile the payment ref. Never
-    // insert here - that would claim the unique key the period-advance relies on.
+    // The core already recorded this off-session charge's invoice: settle an
+    // unpaid one, otherwise only reconcile the payment ref. A `failed` row
+    // settles too - a charge that threw can still be captured. Never insert
+    // here - that would claim the unique key the period-advance relies on.
     if (payload.offSessionChargeKey) {
       const chargeKey = payload.offSessionChargeKey;
       const settled = await withTransaction(
@@ -459,7 +465,10 @@ export class BillingEventReducer {
         async (manager) => {
           const flip = await manager.update(
             Invoice,
-            { providerEventId: chargeKey, status: 'pending' },
+            {
+              providerEventId: chargeKey,
+              status: In([...UNPAID_INVOICE_STATUSES])
+            },
             {
               status: 'paid',
               providerInvoiceRef: payload.providerInvoiceRef,
@@ -467,12 +476,15 @@ export class BillingEventReducer {
             }
           );
           if (!flip.affected) {
+            const recorded = await manager.findOne(Invoice, {
+              where: { providerEventId: chargeKey }
+            });
             await manager.update(
               Invoice,
               { providerEventId: chargeKey },
               { providerInvoiceRef: payload.providerInvoiceRef }
             );
-            this.reportUnsettledCharge(provider, chargeKey, payload);
+            this.reportUnsettledCharge(provider, chargeKey, recorded, payload);
             return null;
           }
           const invoice = await manager.findOne(Invoice, {
@@ -482,8 +494,8 @@ export class BillingEventReducer {
             return null;
           }
           this.reconcileChargeAmount(invoice, payload);
-          // The winning pending->paid flip spends the credits the charged
-          // amount was rated against - exactly once, whichever side settles.
+          // The winning flip to paid spends the credits the charged amount
+          // was rated against - exactly once, whichever side settles.
           if (invoice.creditUnitsApplied > 0) {
             await this.credits.spendOnUsage(
               manager,
@@ -511,12 +523,14 @@ export class BillingEventReducer {
 
       // A postpaid usage charge round-trips its `usage:{sub}:{periodEnd}` key
       // through the provider's price custom data; the payment settles the
-      // pending invoice the usage-invoicing listener planted instead of
-      // inserting a second row.
+      // planted invoice, `failed` included because Paddle retries a charge.
       if (payload.usageChargeKey) {
         const reconciled = await manager.update(
           Invoice,
-          { providerEventId: payload.usageChargeKey, status: 'pending' },
+          {
+            providerEventId: payload.usageChargeKey,
+            status: In([...UNPAID_INVOICE_STATUSES])
+          },
           {
             status: 'paid',
             providerInvoiceRef: payload.providerInvoiceRef,
@@ -527,6 +541,14 @@ export class BillingEventReducer {
           where: { providerEventId: payload.usageChargeKey }
         });
         if (invoice) {
+          if (reconciled.affected && invoice.creditUnitsApplied > 0) {
+            await this.credits.spendOnUsage(
+              manager,
+              invoice.customerId,
+              invoice.id,
+              invoice.creditUnitsApplied
+            );
+          }
           // No pending row matched but the invoice exists — an already-settled
           // replay; never insert a duplicate alongside it.
           return reconciled.affected
@@ -853,25 +875,31 @@ export class BillingEventReducer {
     }
 
     const failed = await withTransaction(this.dataSource, async (manager) => {
-      // A failed postpaid usage charge surfaces on its pending invoice; the
-      // subscription stays as the provider reports it (Paddle owns dunning).
+      const subscription = payload.providerSubscriptionId
+        ? await manager.findOne(Subscription, {
+            where: { providerSubscriptionId: payload.providerSubscriptionId }
+          })
+        : null;
+
+      // The failed row keeps its credit hold while Paddle retries. A canceled
+      // subscription has no later release point, so its hold ends here.
       if (payload.usageChargeKey) {
-        await manager.update(
+        const flip = await manager.update(
           Invoice,
           { providerEventId: payload.usageChargeKey, status: 'pending' },
           { status: 'failed' }
         );
+        if (flip.affected && subscription?.status === 'canceled') {
+          await this.credits.releaseHolds(manager, {
+            providerEventId: payload.usageChargeKey
+          });
+        }
       }
 
       const userId = await this.resolveUserId(manager, payload.ref);
       if (!userId) {
         return null;
       }
-      const subscription = payload.providerSubscriptionId
-        ? await manager.findOne(Subscription, {
-            where: { providerSubscriptionId: payload.providerSubscriptionId }
-          })
-        : null;
       return { userId, subscriptionId: subscription?.id ?? null };
     });
 

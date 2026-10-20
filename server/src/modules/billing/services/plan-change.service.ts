@@ -26,7 +26,7 @@ import {
 import type { PlanPrice, ProrationPreviewResponse } from '@app/shared/types';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
-import { Invoice } from '../entities/invoice.entity';
+import { Invoice, UNPAID_INVOICE_STATUSES } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import {
@@ -929,7 +929,7 @@ export class PlanChangeService {
   ): Promise<boolean> {
     const flip = await manager.update(
       Invoice,
-      { providerEventId: chargeKey, status: In(['pending', 'failed']) },
+      { providerEventId: chargeKey, status: In([...UNPAID_INVOICE_STATUSES]) },
       { status: 'paid', providerInvoiceRef, paidAt: new Date() }
     );
     return flip.affected === 1;

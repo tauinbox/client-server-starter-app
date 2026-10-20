@@ -135,6 +135,14 @@ function providerStub(id: BillingProviderId) {
 
 async function build() {
   const subscriptions = repo();
+  // The cancel write runs in a transaction on the manager of the repository.
+  const cancelManager = { withRepository: () => subscriptions };
+  Object.assign(subscriptions, {
+    manager: {
+      transaction: (cb: (m: typeof cancelManager) => unknown) =>
+        cb(cancelManager)
+    }
+  });
   const invoices = repo();
   const customers = repo();
   const webhookEvents = repo();
@@ -147,7 +155,8 @@ async function build() {
   };
   const renewals = { billClosingUsagePeriod: jest.fn() };
   const credits = {
-    clawbackPurchase: jest.fn().mockResolvedValue(undefined)
+    clawbackPurchase: jest.fn().mockResolvedValue(undefined),
+    releaseHolds: jest.fn().mockResolvedValue(undefined)
   };
 
   // Transactional manager that routes the refund's entity-typed calls to the

@@ -132,7 +132,8 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
   };
   const credits = {
     addPurchase: jest.fn().mockResolvedValue(undefined),
-    spendOnUsage: jest.fn().mockResolvedValue(undefined)
+    spendOnUsage: jest.fn().mockResolvedValue(undefined),
+    releaseHolds: jest.fn().mockResolvedValue(undefined)
   };
 
   const metrics = { recordUnmatchedOffSessionCharge: jest.fn() };
@@ -357,6 +358,26 @@ describe('BillingEventReducer', () => {
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ subscriptionId: 'sub-1' })
       );
+    });
+
+    it('ends the credit hold of every unpaid invoice when the subscription is canceled', async () => {
+      const existing = {
+        id: 'sub-1',
+        providerSubscriptionId: 'sub_123',
+        currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
+      } as Subscription;
+      const { reducer, manager, credits } = await build({
+        subscription: existing
+      });
+
+      await reducer.reduce(
+        event('subscription.canceled', subPayload({ status: 'canceled' }))
+      );
+      await reducer.reduce(event('subscription.renewed', subPayload()));
+
+      expect(credits.releaseHolds.mock.calls).toEqual([
+        [manager, { subscriptionId: 'sub-1' }]
+      ]);
     });
 
     it('skips when the event carries no customer reference', async () => {
@@ -792,7 +813,7 @@ describe('BillingEventReducer', () => {
         Invoice,
         {
           providerEventId: 'usage:sub-1:1780272000000',
-          status: 'pending'
+          status: In(['pending', 'failed'])
         },
         expect.objectContaining({
           status: 'paid',
@@ -804,6 +825,27 @@ describe('BillingEventReducer', () => {
         InvoicePaidEvent.name,
         expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-usage' })
       );
+    });
+
+    it('spends the credit units the planted invoice holds on the winning flip only', async () => {
+      const invoice = {
+        id: 'inv-usage',
+        customerId: 'cust-1',
+        creditUnitsApplied: 10
+      } as Invoice;
+      const won = await build({ invoice, updateAffected: 1 });
+      const replay = await build({ invoice, updateAffected: 0 });
+
+      await won.reducer.reduce(event('invoice.paid', usagePaidPayload));
+      await replay.reducer.reduce(event('invoice.paid', usagePaidPayload));
+
+      expect(won.credits.spendOnUsage).toHaveBeenCalledWith(
+        won.manager,
+        'cust-1',
+        'inv-usage',
+        10
+      );
+      expect(replay.credits.spendOnUsage).not.toHaveBeenCalled();
     });
 
     it('is a no-op when the keyed invoice is already settled (replay)', async () => {
@@ -1116,7 +1158,10 @@ describe('BillingEventReducer', () => {
       // scheduler's own poll.
       expect(manager.update).toHaveBeenCalledWith(
         Invoice,
-        { providerEventId: 'renewal:sub-1:123:0', status: 'pending' },
+        {
+          providerEventId: 'renewal:sub-1:123:0',
+          status: In(['pending', 'failed'])
+        },
         {
           status: 'paid',
           providerInvoiceRef: 'pay-1',
@@ -1211,7 +1256,7 @@ describe('BillingEventReducer', () => {
       logged.mockRestore();
     });
 
-    it('stays silent when a renewal webhook wins the race against the local insert', async () => {
+    it('reports a renewal charge that settled onto no invoice', async () => {
       const { reducer, metrics } = await build({
         updateAffected: 0,
         invoice: null
@@ -1224,8 +1269,31 @@ describe('BillingEventReducer', () => {
         event('invoice.paid', offSessionPayload, 'yookassa')
       );
 
-      // A renewal records after the provider answers, so losing that race is
-      // routine - reporting it would train operators to ignore the signal.
+      // A renewal records its invoice before it charges.
+      expect(metrics.recordUnmatchedOffSessionCharge).toHaveBeenCalledWith(
+        'yookassa'
+      );
+      logged.mockRestore();
+    });
+
+    it('stays silent when the invoice is already settled with this payment', async () => {
+      const { reducer, metrics } = await build({
+        updateAffected: 0,
+        invoice: {
+          id: 'inv-1',
+          status: 'paid',
+          providerInvoiceRef: 'pay-1'
+        } as Invoice
+      });
+      const logged = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await reducer.reduce(
+        event('invoice.paid', offSessionPayload, 'yookassa')
+      );
+
+      // The local settle won; this delivery repeats it.
       expect(logged).not.toHaveBeenCalled();
       expect(metrics.recordUnmatchedOffSessionCharge).not.toHaveBeenCalled();
       logged.mockRestore();
@@ -1674,6 +1742,32 @@ describe('BillingEventReducer', () => {
         { status: 'failed' }
       );
     });
+
+    it.each([
+      ['canceled', true],
+      ['active', false]
+    ] as const)(
+      'ends the credit hold of a failed usage invoice only when the subscription is %s',
+      async (status, released) => {
+        const payload: NormalizedPaymentFailedPayload = {
+          ref: { customerId: 'cust-1', userId: 'user-1' },
+          providerSubscriptionId: 'sub_123',
+          usageChargeKey: 'usage:sub-1:1780272000000'
+        };
+        const { reducer, manager, credits } = await build({
+          subscription: { id: 'sub-1', status } as Subscription,
+          updateAffected: 1
+        });
+
+        await reducer.reduce(event('payment.failed', payload));
+
+        expect(credits.releaseHolds.mock.calls).toEqual(
+          released
+            ? [[manager, { providerEventId: 'usage:sub-1:1780272000000' }]]
+            : []
+        );
+      }
+    );
 
     it('emits PaymentFailed with the linked subscription id', async () => {
       const payload: NormalizedPaymentFailedPayload = {

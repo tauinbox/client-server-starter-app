@@ -44,6 +44,14 @@ function cursorQuery(overrides: Partial<InvoiceCursorQueryDto> = {}) {
 async function build() {
   const customers = repo();
   const subscriptions = repo();
+  // The cancel write runs in a transaction on the manager of the repository.
+  const cancelManager = { withRepository: () => subscriptions };
+  Object.assign(subscriptions, {
+    manager: {
+      transaction: (cb: (m: typeof cancelManager) => unknown) =>
+        cb(cancelManager)
+    }
+  });
   const invoices = repo();
   const paymentMethods = repo();
   const plans = repo();
@@ -52,7 +60,10 @@ async function build() {
   const emit = jest.fn();
 
   const usageRating = { summarizeForPeriod: jest.fn() };
-  const credits = { getBalance: jest.fn().mockResolvedValue(null) };
+  const credits = {
+    getBalance: jest.fn().mockResolvedValue(null),
+    releaseHolds: jest.fn().mockResolvedValue(undefined)
+  };
   const renewals = { billClosingUsagePeriod: jest.fn() };
 
   const billing = {
@@ -803,6 +814,31 @@ describe('BillingUserService', () => {
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
       );
     });
+
+    it.each([
+      ['immediate', true],
+      ['period_end', false]
+    ] as const)(
+      'ends the credit holds of the subscription on a %s cancel: %s',
+      async (mode, released) => {
+        const ctx = await build();
+        ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+        ctx.subscriptions.findOne.mockResolvedValue({
+          id: 'sub-1',
+          provider: 'yookassa' as const,
+          providerSubscriptionId: null,
+          status: 'active',
+          cancelAtPeriodEnd: false
+        });
+        ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
+
+        await ctx.service.cancelSubscription('user-1', mode);
+
+        expect(ctx.credits.releaseHolds.mock.calls).toEqual(
+          released ? [[expect.anything(), { subscriptionId: 'sub-1' }]] : []
+        );
+      }
+    );
 
     it('bills the closing metered period before an immediate cancel', async () => {
       const ctx = await build();

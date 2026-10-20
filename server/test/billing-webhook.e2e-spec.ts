@@ -166,7 +166,24 @@ function makeManager(stores: Stores) {
       }
       return Promise.resolve(undefined);
     },
-    createQueryBuilder: () => {
+    createQueryBuilder: (entity?: unknown) => {
+      if (entity === Invoice) {
+        // CreditService's hold read: the units of the unpaid invoices.
+        const held = stores.invoices
+          .filter(
+            (i) =>
+              (i.status === 'pending' || i.status === 'failed') &&
+              !i.creditsReleasedAt
+          )
+          .reduce((sum, i) => sum + (i.creditUnitsApplied ?? 0), 0);
+        const sum = {
+          select: () => sum,
+          where: () => sum,
+          andWhere: () => sum,
+          getRawOne: () => Promise.resolve({ held: String(held) })
+        };
+        return sum;
+      }
       const captured: { values?: Record<string, unknown> } = {};
       const builder = {
         insert: () => builder,
@@ -1009,7 +1026,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
     });
   });
 
-  it('spends prepaid credits before charging and charges only the remainder', async () => {
+  it('holds prepaid credits on the pending invoice and spends them when it is paid', async () => {
     stores.creditBalances.push({
       customerId: 'cust-1',
       balanceUnits: Money.fromMinor(10),
@@ -1029,8 +1046,29 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
     );
     expect(stores.invoices[0]).toMatchObject({
       amountMinor: Money.fromMinor(64),
-      status: 'pending'
+      status: 'pending',
+      creditUnitsApplied: 10
     });
+    expect(stores.creditBalances[0].balanceUnits).toEqual(Money.fromMinor(10));
+    expect(stores.creditLedger).toEqual([]);
+
+    await postWebhook({
+      provider: 'paddle',
+      providerEventId: 'evt_txn_credits',
+      type: 'invoice.paid',
+      payload: {
+        ref: { customerId: 'cust-1', userId: 'user-1' },
+        providerInvoiceRef: 'txn_usage_credits',
+        providerSubscriptionId: 'sub_paddle_1',
+        amountMinor: 64,
+        currency: 'USD',
+        periodStart: null,
+        periodEnd: null,
+        paidAt: '2026-06-01T00:05:00Z',
+        usageChargeKey: CHARGE_KEY
+      }
+    });
+
     expect(stores.creditBalances[0].balanceUnits).toEqual(Money.fromMinor(0));
     expect(stores.creditLedger).toEqual([
       expect.objectContaining({

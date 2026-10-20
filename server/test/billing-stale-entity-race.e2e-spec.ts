@@ -233,7 +233,11 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         },
         {
           provide: CreditService,
-          useValue: { addPurchase: jest.fn(), spendOnUsage: jest.fn() }
+          useValue: {
+            addPurchase: jest.fn(),
+            spendOnUsage: jest.fn(),
+            releaseHolds: jest.fn()
+          }
         },
         { provide: EventEmitter2, useValue: { emit } }
       ]

@@ -238,7 +238,8 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         {
           provide: CreditService,
           useValue: {
-            availableUnits: () => Promise.resolve(0),
+            availableUnitsForUpdate: () => Promise.resolve(0),
+            releaseHolds: jest.fn(),
             spendOnUsage: jest.fn()
           }
         },
