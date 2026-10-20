@@ -1,21 +1,14 @@
-import type { Logger } from '@nestjs/common';
-import type { ResolvedPermission } from '@app/shared/types';
+import type { ResolvedPermission, SubjectMaps } from '@app/shared/types';
 import {
-  AbilityBuilder,
+  compileAbilityRules,
+  type AbilityLogger
+} from '@app/shared/utils/ability-rules';
+import {
+  Actions,
   AppAbility,
   createMongoAbility,
   Subjects
 } from './app-ability';
-import { resolveConditions } from '@app/shared/utils/resolve-conditions';
-import {
-  CASL_RESERVED_ACTION_NAMES,
-  CASL_RESERVED_SUBJECT_NAMES
-} from './constants';
-import type { SubjectMaps } from '../services/resource.service';
-import {
-  findConditionFieldError,
-  findConditionSupportError
-} from '@app/shared/utils/permission-condition-shape';
 
 /**
  * Builds a user's ability from already-loaded permissions and resource maps.
@@ -30,146 +23,15 @@ export function buildAbility(
   isSuper: boolean,
   permissions: ResolvedPermission[],
   subjectMaps: SubjectMaps,
-  logger: Logger
+  logger: AbilityLogger
 ): AppAbility {
-  const { can, cannot, build } = new AbilityBuilder<AppAbility>(
-    createMongoAbility
-  );
-
-  if (isSuper) {
-    can('manage', 'all');
-    return build();
-  }
-
-  // CASL evaluates rules in order; inverted rules (cannot) must come after
-  // direct rules (can) to override them. Partition so allows are registered
-  // first, denies last.
-  const ordered = [
-    ...permissions.filter((p) => p.conditions?.effect !== 'deny'),
-    ...permissions.filter((p) => p.conditions?.effect === 'deny')
-  ];
-
-  for (const p of ordered) {
-    const action = p.action;
-    const isDeny = p.conditions?.effect === 'deny';
-    const register = isDeny ? cannot : can;
-
-    // Fail closed in both directions, as the condition veto below does: an
-    // allow needs a live resource, while a deny must outlive its resource
-    // going orphaned rather than vanish with it.
-    const rawSubject = isDeny
-      ? (subjectMaps.active[p.resource] ?? subjectMaps.orphaned[p.resource])
-      : subjectMaps.active[p.resource];
-
-    if (!rawSubject) {
-      if (isDeny) {
-        logger.error(
-          `Deny permission "${p.permission}" for user ${userId} names unknown resource "${p.resource}" - the deny cannot be registered`
-        );
-      } else {
-        logger.warn(
-          `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
-        );
-      }
-      continue;
-    }
-
-    // Cast to Extract<Subjects, string> because AbilityBuilder.can()/cannot()
-    // take constructors or string literals — never entity instances (those
-    // are for ability.can() checks).
-    const subject = rawSubject as Extract<Subjects, string>;
-
-    // A reserved keyword reaching here bypassed the write-time checks, and
-    // can('manage', X) / can(X, 'all') grant far beyond what the permission
-    // names. The deny stays registered - inverting a wildcard is strictly
-    // more restrictive, and dropping an authored deny would fail open.
-    if (
-      CASL_RESERVED_ACTION_NAMES.includes(action) ||
-      CASL_RESERVED_SUBJECT_NAMES.includes(subject.toLowerCase())
-    ) {
-      logger.error(
-        `Permission "${p.permission}" for user ${userId} uses a reserved CASL keyword (action "${action}", subject "${subject}") - ${
-          isDeny ? 'registered as a blanket deny' : 'not registered'
-        }`
-      );
-      if (isDeny) {
-        register(action, subject);
-      }
-      continue;
-    }
-
-    // An allow on an action the resource does not offer is invisible in the
-    // permission matrix, so it must grant nothing.
-    if (
-      !isDeny &&
-      !subjectMaps.grantableActions[p.resource]?.includes(action)
-    ) {
-      continue;
-    }
-
-    if (!p.conditions) {
-      register(action, subject);
-      continue;
-    }
-
-    // The route check of this action ignores conditions (CASL answers a
-    // subject-type check from the rule alone), so a restriction here would
-    // pass as a full grant. Fail closed as for an unusable condition: the
-    // allow grants nothing, the deny denies everything.
-    if (
-      findConditionSupportError(
-        action,
-        subjectMaps.conditionalActions[p.resource] ?? [],
-        p.conditions
-      )
-    ) {
-      logger.error(
-        `Permission "${p.permission}" for user ${userId} carries a condition that no check of "${action}" on "${subject}" reads - ${
-          isDeny ? 'registered as a blanket deny' : 'not registered'
-        }`
-      );
-      if (isDeny) {
-        register(action, subject);
-      }
-      continue;
-    }
-
-    const queryResult = resolveConditions(p.conditions, {
+  return createMongoAbility<AppAbility>(
+    compileAbilityRules<Actions, Extract<Subjects, string>>(
       userId,
-      permissionLabel: p.permission,
+      isSuper,
+      permissions,
+      subjectMaps,
       logger
-    });
-
-    // A field off the allow-list is a typo that matches nothing or a column
-    // that no response sends.
-    const fieldError = queryResult.skipPermission
-      ? null
-      : findConditionFieldError(subject, p.conditions);
-    if (fieldError) {
-      logger.error(
-        `Permission "${p.permission}" for user ${userId} carries a condition on "${subject}" that cannot apply (${fieldError}) - ${
-          isDeny ? 'registered as a blanket deny' : 'not registered'
-        }`
-      );
-    }
-
-    if (queryResult.skipPermission || fieldError) {
-      // Fail closed in both directions: a vetoed allow grants nothing,
-      // while a vetoed deny must still deny everything rather than vanish.
-      if (isDeny) {
-        register(action, subject);
-      }
-      continue;
-    }
-
-    if (Object.keys(queryResult.query).length > 0) {
-      register(action, subject, queryResult.query);
-    } else {
-      // Empty query here means the condition object carried no restriction
-      // branches at all (e.g. only `effect`) - an unconditional rule.
-      register(action, subject);
-    }
-  }
-
-  return build();
+    )
+  );
 }

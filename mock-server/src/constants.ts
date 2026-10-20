@@ -1,10 +1,5 @@
 import type { CookieOptions } from 'express';
 
-// Mirrors server/src/modules/auth/casl/constants.ts.
-export const CASL_RESERVED_ACTION_NAMES: readonly string[] = ['manage', 'all'];
-
-export const CASL_RESERVED_SUBJECT_NAMES: readonly string[] = ['all'];
-
 /**
  * Mirrors HOST_COOKIE_PATH on the server. Outside `local` the server prefixes
  * every cookie with `__Host-`, which requires this path. The mock only serves

@@ -1,15 +1,5 @@
-import {
-  AbilityBuilder,
-  createMongoAbility,
-  ForcedSubject,
-  MongoAbility
-} from '@casl/ability';
-import type { MongoQuery } from '@casl/ability';
+import { createMongoAbility, ForcedSubject, MongoAbility } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
-import {
-  CASL_RESERVED_ACTION_NAMES,
-  CASL_RESERVED_SUBJECT_NAMES
-} from './constants';
 import { generateSessionId } from './jwt.utils';
 import type {
   AdminUserResponse,
@@ -44,17 +34,16 @@ import type {
   ResourceResponse,
   ActionResponse,
   RoleResponse,
-  RoleAdminResponse
+  RoleAdminResponse,
+  SubjectMaps
 } from '@app/shared/types';
 import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import {
-  findConditionFieldError,
-  findConditionSupportError
-} from '@app/shared/utils/permission-condition-shape';
-import {
-  resolveConditions,
-  type ResolverLogger
-} from '@app/shared/utils/resolve-conditions';
+  compileAbilityRules,
+  dedupPermissions,
+  type AbilityLogger,
+  type GrantRow
+} from '@app/shared/utils/ability-rules';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import type {
   KnownActions,
@@ -567,40 +556,25 @@ export function getResolvedPermissionsForUser(
 ): ResolvedPermission[] {
   const currentState = getState();
 
-  const roleIds: string[] = [];
-  for (const [id, role] of currentState.roles) {
-    if (user.roles.includes(role.name)) {
-      roleIds.push(id);
-    }
-  }
-
-  // Dedup keyed by effect:resource:action:conditions, first wins - mirrors
-  // PermissionService.getPermissionsForUser on the server.
-  const permissionMap = new Map<string, ResolvedPermission>();
-
-  for (const roleId of roleIds) {
-    for (const rp of currentState.rolePermissions.filter(
-      (p) => p.roleId === roleId
-    )) {
+  const grants: GrantRow[] = [];
+  for (const [roleId, role] of currentState.roles) {
+    if (!user.roles.includes(role.name)) continue;
+    for (const rp of currentState.rolePermissions) {
+      if (rp.roleId !== roleId) continue;
       const permission = currentState.permissions.get(rp.permissionId);
       if (!permission) continue;
       const resource = currentState.resources.get(permission.resourceId);
       const action = currentState.actions.get(permission.actionId);
       if (!resource || !action) continue;
-      const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
-      const key = `${effect}:${resource.name}:${action.name}:${JSON.stringify(rp.conditions ?? null)}`;
-      if (!permissionMap.has(key)) {
-        permissionMap.set(key, {
-          resource: resource.name,
-          action: action.name,
-          permission: `${resource.name}:${action.name}`,
-          conditions: rp.conditions
-        });
-      }
+      grants.push({
+        resource: resource.name,
+        action: action.name,
+        conditions: rp.conditions
+      });
     }
   }
 
-  return Array.from(permissionMap.values());
+  return dedupPermissions(grants);
 }
 
 /**
@@ -635,121 +609,43 @@ export function mustEnrolMfa(user: MockUser): boolean {
 }
 
 /** The server logs a vetoed condition; the mock has no log to write it to. */
-export const SILENT_RESOLVER_LOGGER: ResolverLogger = { warn: () => undefined };
+export const SILENT_RESOLVER_LOGGER: AbilityLogger = {
+  warn: () => undefined,
+  error: () => undefined
+};
 
 /**
- * Compiles the caller's CASL ability - the same object the server's
- * CaslAbilityFactory produces. Route guards evaluate it directly, so the mock
+ * Compiles the caller's CASL ability from the same rules the server's
+ * CaslAbilityFactory compiles. Route guards evaluate it directly, so the mock
  * authorizes by permission the way PermissionsGuard does, not by role name.
  */
 export function buildAbilityForUser(user: MockUser): MockAbility {
-  const { can, cannot, build } = new AbilityBuilder<MockAbility>(
-    createMongoAbility
+  const subjectMaps: SubjectMaps = {
+    active: {},
+    orphaned: {},
+    grantableActions: {},
+    conditionalActions: {}
+  };
+  for (const resource of getState().resources.values()) {
+    const target = resource.isOrphaned
+      ? subjectMaps.orphaned
+      : subjectMaps.active;
+    target[resource.name] = resource.subject;
+    subjectMaps.grantableActions[resource.name] =
+      grantableActionNames(resource);
+    subjectMaps.conditionalActions[resource.name] =
+      resource.conditionalActionNames;
+  }
+
+  return createMongoAbility<MockAbility>(
+    compileAbilityRules<Actions, SubjectNames | 'all'>(
+      user.id,
+      hasSuperRole(user),
+      getResolvedPermissionsForUser(user),
+      subjectMaps,
+      SILENT_RESOLVER_LOGGER
+    )
   );
-
-  const currentState = getState();
-
-  if (hasSuperRole(user)) {
-    can('manage', 'all');
-    return build();
-  }
-
-  // Mirrors the server factory: the subject map is split in two, because an
-  // allow needs a live resource while a deny must outlive its resource going
-  // orphaned rather than vanish with it.
-  const activeSubjects = new Map<string, string>();
-  const orphanedSubjects = new Map<string, string>();
-  const grantableActions = new Map<string, string[]>();
-  const conditionalActions = new Map<string, string[]>();
-  for (const resource of currentState.resources.values()) {
-    const target = resource.isOrphaned ? orphanedSubjects : activeSubjects;
-    target.set(resource.name, resource.subject);
-    grantableActions.set(resource.name, grantableActionNames(resource));
-    conditionalActions.set(resource.name, resource.conditionalActionNames);
-  }
-
-  const resolved = getResolvedPermissionsForUser(user);
-
-  // Build CASL abilities — mirrors casl-ability.factory.ts logic.
-  // Inverted rules (cannot) must come after direct rules (can) in CASL, so
-  // partition entries into allow-first / deny-last order.
-  const orderedEntries = [
-    ...resolved.filter((e) => e.conditions?.effect !== 'deny'),
-    ...resolved.filter((e) => e.conditions?.effect === 'deny')
-  ];
-
-  for (const { resource, action, conditions } of orderedEntries) {
-    const isDeny = conditions?.effect === 'deny';
-    const register = isDeny ? cannot : can;
-
-    const subject = (
-      isDeny
-        ? (activeSubjects.get(resource) ?? orphanedSubjects.get(resource))
-        : activeSubjects.get(resource)
-    ) as SubjectNames | undefined;
-    if (!subject) continue;
-
-    // Mirrors the server factory: a reserved keyword bypassed the write-time
-    // checks, and can('manage', X) / can(X, 'all') grant far beyond what the
-    // permission names. The deny stays registered - it only ever restricts.
-    if (
-      CASL_RESERVED_ACTION_NAMES.includes(action) ||
-      CASL_RESERVED_SUBJECT_NAMES.includes(subject.toLowerCase())
-    ) {
-      if (isDeny) {
-        register(action as Actions, subject);
-      }
-      continue;
-    }
-
-    // Mirrors the server factory: an allow the permission matrix does not
-    // show grants nothing.
-    if (!isDeny && !grantableActions.get(resource)?.includes(action)) {
-      continue;
-    }
-
-    if (!conditions) {
-      register(action as Actions, subject);
-      continue;
-    }
-
-    // Mirrors the server factory: a condition no check of the action reads,
-    // or one on a field off the allow-list, fails closed - the allow grants
-    // nothing, the deny denies everything.
-    if (
-      findConditionSupportError(
-        action,
-        conditionalActions.get(resource) ?? [],
-        conditions
-      ) ||
-      findConditionFieldError(subject, conditions)
-    ) {
-      if (isDeny) {
-        register(action as Actions, subject);
-      }
-      continue;
-    }
-
-    const { query, skipPermission } = resolveConditions(conditions, {
-      userId: user.id,
-      permissionLabel: `${resource}:${action}`,
-      logger: SILENT_RESOLVER_LOGGER
-    });
-
-    // A vetoed allow grants nothing, a vetoed deny denies everything; a
-    // condition with no restriction branch (bare `effect`) is unconditional.
-    if (skipPermission) {
-      if (isDeny) {
-        register(action as Actions, subject);
-      }
-    } else if (Object.keys(query).length > 0) {
-      register(action as Actions, subject, query as MongoQuery<never>);
-    } else {
-      register(action as Actions, subject);
-    }
-  }
-
-  return build();
 }
 
 export function getPackedRulesForUser(user: MockUser): unknown[][] {

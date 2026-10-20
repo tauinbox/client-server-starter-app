@@ -52,7 +52,8 @@ export type {
 export type {
   ResourceResponse,
   ActionResponse,
-  RbacMetadataResponse
+  RbacMetadataResponse,
+  SubjectMaps
 } from './rbac.types';
 
 export type { NotificationEvent } from './notification.types';

@@ -11,7 +11,7 @@ import { Permission } from '../entities/permission.entity';
 import { Action } from '../entities/action.entity';
 import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
-import { CASL_RESERVED_ACTION_NAMES } from '../casl/constants';
+import { CASL_RESERVED_ACTION_NAMES } from '@app/shared/constants';
 
 @Injectable()
 export class ResourceSyncService implements OnApplicationBootstrap {
