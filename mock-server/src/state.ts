@@ -49,6 +49,7 @@ import type {
 import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
+  findConditionFieldError,
   findConditionSupportError,
   findFieldMatchShapeError,
   findOwnershipShapeError,
@@ -709,14 +710,16 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
       continue;
     }
 
-    // Mirrors the server factory: a condition no check of the action reads
-    // fails closed - the allow grants nothing, the deny denies everything.
+    // Mirrors the server factory: a condition no check of the action reads,
+    // or one on a field off the allow-list, fails closed - the allow grants
+    // nothing, the deny denies everything.
     if (
       findConditionSupportError(
         action,
         conditionalActions.get(resource) ?? [],
         conditions
-      )
+      ) ||
+      findConditionFieldError(subject, conditions)
     ) {
       if (isDeny) {
         register(action as Actions, subject);

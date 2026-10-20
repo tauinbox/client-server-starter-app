@@ -12,7 +12,10 @@ import {
   CASL_RESERVED_SUBJECT_NAMES
 } from './constants';
 import type { SubjectMaps } from '../services/resource.service';
-import { findConditionSupportError } from '@app/shared/utils/permission-condition-shape';
+import {
+  findConditionFieldError,
+  findConditionSupportError
+} from '@app/shared/utils/permission-condition-shape';
 
 /**
  * Builds a user's ability from already-loaded permissions and resource maps.
@@ -137,7 +140,20 @@ export function buildAbility(
       logger
     });
 
-    if (queryResult.skipPermission) {
+    // A field off the allow-list is a typo that matches nothing or a column
+    // that no response sends.
+    const fieldError = queryResult.skipPermission
+      ? null
+      : findConditionFieldError(subject, p.conditions);
+    if (fieldError) {
+      logger.error(
+        `Permission "${p.permission}" for user ${userId} carries a condition on "${subject}" that cannot apply (${fieldError}) - ${
+          isDeny ? 'registered as a blanket deny' : 'not registered'
+        }`
+      );
+    }
+
+    if (queryResult.skipPermission || fieldError) {
       // Fail closed in both directions: a vetoed allow grants nothing,
       // while a vetoed deny must still deny everything rather than vanish.
       if (isDeny) {

@@ -13,7 +13,12 @@
  * value matches the declared shape.
  */
 
-import { isJsonScalar, PROTOTYPE_KEYS } from './mongo-query-safety';
+import { CONDITION_FIELDS } from '../constants/permission.constants';
+import {
+  isJsonScalar,
+  MAX_MONGO_QUERY_DEPTH,
+  PROTOTYPE_KEYS
+} from './mongo-query-safety';
 
 export const CONDITION_MAX_FIELDS = 32;
 export const CONDITION_MAX_FIELD_MATCH_VALUES = 100;
@@ -162,6 +167,65 @@ export function findConditionSupportError(
     return null;
   }
   return `conditions.${branch} cannot apply to "${actionName}": no check of this action reads the record`;
+}
+
+/**
+ * Collects the field keys of a MongoQuery. A key under a field is an operator
+ * or a part of the value, so the walk descends only through operators.
+ */
+function collectQueryFields(query: unknown, fields: string[], depth = 0): void {
+  if (depth >= MAX_MONGO_QUERY_DEPTH) return;
+  if (Array.isArray(query)) {
+    for (const item of query) collectQueryFields(item, fields, depth + 1);
+    return;
+  }
+  if (!isPlainObject(query)) return;
+  for (const [key, value] of Object.entries(query)) {
+    if (key.startsWith('$')) {
+      collectQueryFields(value, fields, depth + 1);
+    } else {
+      fields.push(key);
+    }
+  }
+}
+
+function conditionFieldNames(conditions: Record<string, unknown>): string[] {
+  const fields: string[] = [];
+  const { ownership, fieldMatch, userAttr, custom } = conditions;
+  if (isPlainObject(ownership) && typeof ownership['userField'] === 'string') {
+    fields.push(ownership['userField']);
+  }
+  if (isPlainObject(fieldMatch)) fields.push(...Object.keys(fieldMatch));
+  if (isPlainObject(userAttr)) fields.push(...Object.keys(userAttr));
+  if (typeof custom === 'string') {
+    try {
+      collectQueryFields(JSON.parse(custom), fields);
+    } catch {
+      // Invalid JSON is the concern of the shape checks.
+    }
+  }
+  return fields;
+}
+
+/** The fields a condition on the subject may name; none for an unlisted one. */
+export function conditionFieldsOf(subject: string): readonly string[] {
+  return Object.prototype.hasOwnProperty.call(CONDITION_FIELDS, subject)
+    ? CONDITION_FIELDS[subject as keyof typeof CONDITION_FIELDS]
+    : [];
+}
+
+/** Rejects a condition that names a field outside `conditionFieldsOf`. */
+export function findConditionFieldError(
+  subject: string,
+  conditions: unknown
+): string | null {
+  if (!isPlainObject(conditions)) return null;
+  const allowed = conditionFieldsOf(subject);
+  const unknown = conditionFieldNames(conditions).find(
+    (field) => !allowed.includes(field)
+  );
+  if (unknown === undefined) return null;
+  return `conditions name the field "${unknown}", which a condition on ${subject} cannot use`;
 }
 
 export const IDENTITY_BOUND_CONDITION_BRANCHES = [

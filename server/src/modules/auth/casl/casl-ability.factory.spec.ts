@@ -112,6 +112,23 @@ describe('CaslAbilityFactory', () => {
       expect(ability.can('read', 'User')).toBe(false);
     });
 
+    it('registers no allow whose condition names a field off the allow-list', async () => {
+      const ability = await factory.createForUser('user-1', viewer, [
+        grant('update', { fieldMatch: { password: ['x'] } })
+      ]);
+
+      expect(ability.can('update', 'User')).toBe(false);
+    });
+
+    it('widens a deny on a misspelt field into a blanket deny', async () => {
+      const ability = await factory.createForUser('user-1', viewer, [
+        grant('update'),
+        grant('update', { effect: 'deny', fieldMatch: { lastname: ['Typo'] } })
+      ]);
+
+      expect(ability.can('update', 'User')).toBe(false);
+    });
+
     it('keeps a condition on an action whose checks read the record', async () => {
       const ability = await factory.createForUser('user-1', viewer, [
         grant('update', OWN_RECORD)
@@ -202,7 +219,7 @@ describe('CaslAbilityFactory', () => {
         resource: 'users',
         action: 'update',
         permission: 'users:update:own',
-        conditions: { ownership: { userField: 'createdBy' } }
+        conditions: { ownership: { userField: 'email' } }
       }
     ];
 
@@ -211,13 +228,13 @@ describe('CaslAbilityFactory', () => {
     expect(
       ability.can('update', {
         __caslSubjectType__: 'User',
-        createdBy: 'user-1'
+        email: 'user-1'
       } as never)
     ).toBe(true);
     expect(
       ability.can('update', {
         __caslSubjectType__: 'User',
-        createdBy: 'user-2'
+        email: 'user-2'
       } as never)
     ).toBe(false);
   });
@@ -478,7 +495,7 @@ describe('CaslAbilityFactory', () => {
         resource: 'users',
         action: 'read',
         permission: 'users:read',
-        conditions: { custom: '{"status":{"$in":["active","pending"]}}' }
+        conditions: { custom: '{"lastName":{"$in":["active","pending"]}}' }
       }
     ];
 
@@ -487,13 +504,13 @@ describe('CaslAbilityFactory', () => {
     expect(
       ability.can('read', {
         __caslSubjectType__: 'User',
-        status: 'active'
+        lastName: 'active'
       } as never)
     ).toBe(true);
     expect(
       ability.can('read', {
         __caslSubjectType__: 'User',
-        status: 'deleted'
+        lastName: 'deleted'
       } as never)
     ).toBe(false);
   });
@@ -528,7 +545,7 @@ describe('CaslAbilityFactory', () => {
         action: 'read',
         permission: 'users:read',
         conditions: {
-          custom: '{"$or":[{"status":"active"},{"$where":"hack"}]}'
+          custom: '{"$or":[{"lastName":"active"},{"$where":"hack"}]}'
         }
       }
     ];
@@ -633,9 +650,9 @@ describe('CaslAbilityFactory', () => {
         action: 'update',
         permission: 'users:update',
         conditions: {
-          ownership: { userField: 'createdBy' },
+          ownership: { userField: 'email' },
           custom:
-            '{"$or":[{"status":"active"},{"profile":{"constructor":{"x":1}}}]}'
+            '{"$or":[{"lastName":"active"},{"profile":{"constructor":{"x":1}}}]}'
         }
       }
     ];
@@ -646,8 +663,8 @@ describe('CaslAbilityFactory', () => {
     expect(
       ability.can('update', {
         __caslSubjectType__: 'User',
-        createdBy: 'user-1',
-        status: 'active'
+        email: 'user-1',
+        lastName: 'active'
       } as never)
     ).toBe(false);
     expect(warnSpy).toHaveBeenCalledWith(
@@ -724,7 +741,7 @@ describe('CaslAbilityFactory', () => {
           permission: 'users:update',
           conditions: {
             effect: 'deny',
-            custom: '{"status":{"$in":["archived"]}}'
+            custom: '{"lastName":{"$in":["archived"]}}'
           }
         }
       ];
@@ -735,19 +752,19 @@ describe('CaslAbilityFactory', () => {
       // reports false because it cannot decide the conditional deny.
       expect(ability.can('update', 'User')).toBe(true);
 
-      // Instance with non-matching status → only the allow applies.
+      // Instance with non-matching lastName → only the allow applies.
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          status: 'active'
+          lastName: 'active'
         } as never)
       ).toBe(true);
 
-      // Instance with matching status → deny rule blocks.
+      // Instance with matching lastName → deny rule blocks.
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          status: 'archived'
+          lastName: 'archived'
         } as never)
       ).toBe(false);
     });
@@ -759,7 +776,7 @@ describe('CaslAbilityFactory', () => {
           resource: 'users',
           action: 'update',
           permission: 'users:update:own',
-          conditions: { ownership: { userField: 'createdBy' } }
+          conditions: { ownership: { userField: 'email' } }
         },
         {
           resource: 'users',
@@ -767,7 +784,7 @@ describe('CaslAbilityFactory', () => {
           permission: 'users:update',
           conditions: {
             effect: 'deny',
-            fieldMatch: { status: ['locked'] }
+            fieldMatch: { lastName: ['locked'] }
           }
         }
       ];
@@ -778,8 +795,8 @@ describe('CaslAbilityFactory', () => {
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-1',
-          status: 'active'
+          email: 'user-1',
+          lastName: 'active'
         } as never)
       ).toBe(true);
 
@@ -787,8 +804,8 @@ describe('CaslAbilityFactory', () => {
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-1',
-          status: 'locked'
+          email: 'user-1',
+          lastName: 'locked'
         } as never)
       ).toBe(false);
 
@@ -796,8 +813,8 @@ describe('CaslAbilityFactory', () => {
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-2',
-          status: 'active'
+          email: 'user-2',
+          lastName: 'active'
         } as never)
       ).toBe(false);
     });
@@ -854,7 +871,7 @@ describe('CaslAbilityFactory', () => {
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-1'
+          email: 'user-1'
         } as never)
       ).toBe(false);
 
@@ -875,7 +892,7 @@ describe('CaslAbilityFactory', () => {
           resource: 'users',
           action: 'update',
           permission: 'users:update',
-          conditions: { effect: 'deny', fieldMatch: { status: [] } }
+          conditions: { effect: 'deny', fieldMatch: { lastName: [] } }
         }
       ];
 
@@ -959,8 +976,8 @@ describe('CaslAbilityFactory', () => {
           action: 'update',
           permission: 'users:update:own',
           conditions: {
-            ownership: { userField: 'createdBy' },
-            fieldMatch: { status: [] }
+            ownership: { userField: 'email' },
+            fieldMatch: { lastName: [] }
           }
         }
       ];
@@ -970,13 +987,13 @@ describe('CaslAbilityFactory', () => {
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-1'
+          email: 'user-1'
         } as never)
       ).toBe(false);
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-2'
+          email: 'user-2'
         } as never)
       ).toBe(false);
     });
@@ -989,7 +1006,7 @@ describe('CaslAbilityFactory', () => {
           action: 'update',
           permission: 'users:update:own',
           conditions: {
-            ownership: { userField: 'createdBy' },
+            ownership: { userField: 'email' },
             custom: '{}'
           }
         }
@@ -1000,13 +1017,13 @@ describe('CaslAbilityFactory', () => {
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-1'
+          email: 'user-1'
         } as never)
       ).toBe(true);
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          createdBy: 'user-2'
+          email: 'user-2'
         } as never)
       ).toBe(false);
     });

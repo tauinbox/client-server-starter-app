@@ -367,6 +367,13 @@ management and theming.
 
   `fieldMatch` and `custom` stay usable on `create`. The instance-level check on `POST /users` and
   `POST /roles` evaluates them against the submitted payload.
+- **A condition names only the fields of its subject.** `CONDITION_FIELDS` in
+  `shared/src/constants/permission.constants.ts` lists the record fields that a condition on each
+  subject can use. No condition can read a column that no response sends, such as the password hash.
+  A deny on a misspelt field cannot silently deny nothing. A write with another field gets a 400 with
+  `errors.roles.conditionFieldUnknown`, for a super role too. A stored row with such a field fails
+  closed: the allow grants nothing, and the deny denies everything. The permissions dialog shows the
+  allowed fields, and the mock server mirrors the rule.
 - **A condition only where a check reads the record.** CASL answers a route check on a subject type
   from the rule alone, so a conditional allow passes it as a full grant and a conditional deny stops
   nothing. A grant can carry a restriction (`ownership`, `fieldMatch`, `userAttr`, `custom`) only on an

@@ -223,6 +223,7 @@
     "effectDenyBadgeHint": "This permission is a deny rule — it revokes matching access granted by other rules",
     "errorLoadFailed": "Failed to load permissions. Please try again.",
     "errorSaveFailed": "Failed to save permissions.",
+    "conditionFieldsHint": "A condition can use these fields: {{ fields }}.",
     "conditionsNotSupported": "No check of this action reads the record, so it takes no restriction. It can be allowed or denied as a whole.",
     "clearRestrictions": "Remove the restriction"
   },

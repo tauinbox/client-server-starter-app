@@ -17,6 +17,7 @@ import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import {
   findConditionActionError,
+  findConditionFieldError,
   findConditionSupportError,
   findFieldMatchShapeError,
   findOwnershipShapeError,
@@ -183,6 +184,13 @@ function findGrantError(
     return {
       message: `Cannot grant ${label} - ${actionError}`,
       errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
+    };
+  }
+  const fieldError = findConditionFieldError(resource.subject, conditions);
+  if (fieldError) {
+    return {
+      message: `Cannot grant ${label} - ${fieldError}`,
+      errorKey: ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN
     };
   }
   return null;

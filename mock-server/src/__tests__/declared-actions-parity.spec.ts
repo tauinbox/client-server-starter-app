@@ -93,6 +93,46 @@ describe('declared action lists parity with server', () => {
     });
   });
 
+  it('refuses a condition on a field the subject does not allow', async () => {
+    const res = await send('PUT', `/roles/${EDITOR_ROLE_ID}/permissions`, {
+      items: [
+        {
+          permissionId: permissionId('res-users', 'act-update'),
+          conditions: { fieldMatch: { password: ['x'] } }
+        }
+      ]
+    });
+
+    expect(res).toEqual({
+      status: 400,
+      errorKey: ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN
+    });
+  });
+
+  it('turns a stored deny on a misspelt field into a blanket deny', () => {
+    const state = getState();
+    state.rolePermissions = [
+      {
+        id: 'rp-stored-read',
+        roleId: EDITOR_ROLE_ID,
+        permissionId: permissionId('res-users', 'act-read'),
+        conditions: null
+      },
+      {
+        id: 'rp-stored-typo-deny',
+        roleId: EDITOR_ROLE_ID,
+        permissionId: permissionId('res-users', 'act-read'),
+        conditions: { effect: 'deny', fieldMatch: { lastname: ['Typo'] } }
+      }
+    ];
+    const user = state.users.get(mockId('user-2'))!;
+    user.roles = ['editor'];
+
+    const ability = buildAbilityForUser(user);
+
+    expect(ability.can('read', 'User')).toBe(false);
+  });
+
   it('refuses an allow on an action the admin stopped offering', async () => {
     getState().resources.get(mockId('res-billing'))!.allowedActionNames = [
       'search'
