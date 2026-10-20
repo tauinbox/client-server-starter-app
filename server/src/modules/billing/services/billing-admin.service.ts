@@ -156,6 +156,7 @@ export class BillingAdminService {
         subscriptions: this.subscriptions,
         billing: this.billing,
         renewals: this.renewals,
+        credits: this.credits,
         events: this.events
       },
       subscription,

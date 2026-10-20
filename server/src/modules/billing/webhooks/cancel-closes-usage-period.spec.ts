@@ -127,6 +127,7 @@ async function build() {
         useValue: {
           availableUnitsForUpdate: jest.fn().mockResolvedValue(0),
           spendOnUsage: jest.fn().mockResolvedValue(undefined),
+          releaseHolds: jest.fn().mockResolvedValue(undefined),
           addPurchase: jest.fn().mockResolvedValue(undefined)
         }
       }

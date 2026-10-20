@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { Money } from '@app/shared/utils/money';
+import { Invoice } from '../entities/invoice.entity';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { Customer } from '../entities/customer.entity';
 import { Plan } from '../entities/plan.entity';
@@ -246,7 +247,7 @@ describe('UsageInvoicingService', () => {
     );
   });
 
-  it('spends partial credits with the insert and charges only the remainder', async () => {
+  it('holds partial credits on the pending invoice and charges only the remainder', async () => {
     const { service, chargeUsage, credits, capturedValues } = await build({
       availableCredits: 10,
       summary: {
@@ -265,15 +266,12 @@ describe('UsageInvoicingService', () => {
 
     await service.handlePeriodClosed(EVENT);
 
-    expect(credits.spendOnUsage).toHaveBeenCalledWith(
-      expect.anything(),
-      'cust-1',
-      'inv-1',
-      10
-    );
+    // Spent by the settle of the paid charge, not by the plant.
+    expect(credits.spendOnUsage).not.toHaveBeenCalled();
     expect(capturedValues.value).toMatchObject({
       amountMinor: Money.fromMinor(6400),
-      status: 'pending'
+      status: 'pending',
+      creditUnitsApplied: 10
     });
     expect(chargeUsage).toHaveBeenCalledWith(
       'psub_1',
@@ -358,7 +356,12 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
   async function buildLocked() {
     // Single shared balance row; both the FOR-UPDATE read and the upsert hit it.
     const ledger: Array<{ delta: number }> = [];
-    const invoices: Array<{ id: string; providerEventId: string }> = [];
+    const invoices: Array<{
+      id: string;
+      providerEventId: string;
+      status: string;
+      creditUnitsApplied: number;
+    }> = [];
     const state = { balance: STARTING_CREDITS };
     let seq = 0;
 
@@ -381,12 +384,35 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
           ledger.push({ delta: entity.delta.toNumber() });
         return Promise.resolve(entity);
       },
-      createQueryBuilder: () => {
-        const captured: { values?: { providerEventId: string } } = {};
+      createQueryBuilder: (entity?: unknown) => {
+        if (entity === Invoice) {
+          // The hold read: the credit units of the unpaid invoices.
+          const held = invoices
+            .filter((i) => i.status === 'pending' || i.status === 'failed')
+            .reduce((sum, i) => sum + i.creditUnitsApplied, 0);
+          const sum = {
+            select: () => sum,
+            where: () => sum,
+            andWhere: () => sum,
+            getRawOne: () => Promise.resolve({ held: String(held) })
+          };
+          return sum;
+        }
+        const captured: {
+          values?: {
+            providerEventId: string;
+            status: string;
+            creditUnitsApplied: number;
+          };
+        } = {};
         const builder = {
           insert: () => builder,
           into: () => builder,
-          values: (v: { providerEventId: string }) => {
+          values: (v: {
+            providerEventId: string;
+            status: string;
+            creditUnitsApplied: number;
+          }) => {
             captured.values = v;
             return builder;
           },
@@ -398,7 +424,12 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
               return Promise.resolve({ raw: [] });
             }
             const id = `inv-${++seq}`;
-            invoices.push({ id, providerEventId: v.providerEventId });
+            invoices.push({
+              id,
+              providerEventId: v.providerEventId,
+              status: v.status,
+              creditUnitsApplied: v.creditUnitsApplied
+            });
             return Promise.resolve({ raw: [{ id }] });
           }
         };
@@ -500,7 +531,7 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
     };
   }
 
-  it('applies no more credits than the balance holds across two overlapping closes', async () => {
+  it('holds no more credits than the balance has across two overlapping closes', async () => {
     const { service, state, ledger, invoices } = await buildLocked();
 
     await Promise.all([
@@ -522,11 +553,13 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
       )
     ]);
 
-    // The second close rated against the decremented balance: exactly one spend
-    // of the full 30 credits, balance settled at 0 and never went negative.
-    expect(invoices).toHaveLength(2);
-    const spent = ledger.reduce((sum, l) => sum + l.delta, 0);
-    expect(spent).toBe(-STARTING_CREDITS);
-    expect(state.balance).toBe(0);
+    // The second close rated against the units the first one holds: the two
+    // pending invoices hold the 30 credits once, and nothing is spent until a
+    // charge is paid.
+    expect(
+      invoices.map((i) => i.creditUnitsApplied).sort((a, b) => b - a)
+    ).toEqual([STARTING_CREDITS, 0]);
+    expect(ledger).toEqual([]);
+    expect(state.balance).toBe(STARTING_CREDITS);
   });
 });

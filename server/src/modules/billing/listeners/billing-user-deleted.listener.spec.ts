@@ -2,17 +2,26 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { In } from 'typeorm';
+import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { UserDeletedEvent } from '../../users/events/user-deleted.event';
 import { Customer } from '../entities/customer.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
+import { CreditService } from '../services/credit.service';
 import { BillingUserDeletedListener } from './billing-user-deleted.listener';
 
 describe('BillingUserDeletedListener', () => {
   let listener: BillingUserDeletedListener;
   let customers: { findOne: jest.Mock };
-  let subscriptions: { find: jest.Mock; save: jest.Mock; update: jest.Mock };
+  let subscriptions: {
+    find: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
+  let credits: { releaseHolds: jest.Mock };
   let paddleCancel: jest.Mock;
   let yookassaCancel: jest.Mock;
   let emit: jest.Mock;
@@ -24,8 +33,16 @@ describe('BillingUserDeletedListener', () => {
       save: jest
         .fn()
         .mockImplementation((s: Subscription) => Promise.resolve(s)),
-      update: jest.fn().mockResolvedValue({ affected: 1 })
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      // The cancel write runs in a transaction on the manager of the repository.
+      manager: {
+        transaction: jest.fn(
+          (cb: (m: { withRepository: () => unknown }) => unknown) =>
+            cb({ withRepository: () => subscriptions })
+        )
+      }
     };
+    credits = { releaseHolds: jest.fn().mockResolvedValue(undefined) };
     paddleCancel = jest.fn().mockResolvedValue(undefined);
     yookassaCancel = jest.fn().mockResolvedValue(undefined);
     emit = jest.fn();
@@ -42,6 +59,7 @@ describe('BillingUserDeletedListener', () => {
             { id: 'yookassa', cancel: yookassaCancel }
           ]
         },
+        { provide: CreditService, useValue: credits },
         { provide: EventEmitter2, useValue: { emit } }
       ]
     }).compile();
@@ -111,7 +129,7 @@ describe('BillingUserDeletedListener', () => {
     // database by however long the provider cancel took.
     expect(subscriptions.save).not.toHaveBeenCalled();
     expect(subscriptions.update).toHaveBeenCalledWith(
-      { id: 'sub-2' },
+      { id: 'sub-2', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
       {
         status: 'canceled',
         cancelAtPeriodEnd: false,
@@ -122,7 +140,28 @@ describe('BillingUserDeletedListener', () => {
       SubscriptionCanceledEvent.name,
       new SubscriptionCanceledEvent('user-1', 'sub-2')
     );
+    expect(credits.releaseHolds).toHaveBeenCalledWith(expect.anything(), {
+      subscriptionId: 'sub-2'
+    });
     expect(yookassaCancel).not.toHaveBeenCalled();
+  });
+
+  it('emits nothing when a cancel committed between the read and the write', async () => {
+    customers.findOne.mockResolvedValue({ id: 'cust-1', userId: 'user-1' });
+    subscriptions.find.mockResolvedValue([
+      {
+        id: 'sub-2',
+        provider: 'yookassa',
+        status: 'active',
+        providerSubscriptionId: null
+      }
+    ]);
+    subscriptions.update.mockResolvedValue({ affected: 0 });
+
+    await listener.handleUserDeleted(new UserDeletedEvent('user-1'));
+
+    expect(emit).not.toHaveBeenCalled();
+    expect(credits.releaseHolds).not.toHaveBeenCalled();
   });
 
   it('swallows a local-cancel write failure so account deletion is not blocked', async () => {

@@ -11,6 +11,7 @@ import type { BillingService } from '../billing.service';
 import type { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { RenewalService } from '../renewals/renewal.service';
+import type { CreditService } from '../services/credit.service';
 import { cancelFields } from './cancel-fields.util';
 
 function alreadyCanceled(): ConflictException {
@@ -25,6 +26,7 @@ export interface CancelSubscriptionDeps {
   subscriptions: Repository<Subscription>;
   billing: BillingService;
   renewals: RenewalService;
+  credits: CreditService;
   events: EventEmitter2;
 }
 
@@ -41,6 +43,9 @@ export interface CancelSubscriptionDeps {
  * cancel re-runs the whole flow — a second provider call, a second event, and a
  * second audit row — and a `period_end` repeat leaves `canceled` together with
  * `cancelAtPeriodEnd`, a pair no other writer can produce.
+ *
+ * An immediate cancel ends the credit hold of every unpaid invoice of the
+ * subscription, in the transaction of its write.
  */
 export async function cancelOpenSubscription(
   deps: CancelSubscriptionDeps,
@@ -69,9 +74,21 @@ export async function cancelOpenSubscription(
   }
 
   const fields = cancelFields(mode);
-  const applied = await deps.subscriptions.update(
-    { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
-    fields
+  const applied = await deps.subscriptions.manager.transaction(
+    async (manager) => {
+      const update = await manager
+        .withRepository(deps.subscriptions)
+        .update(
+          { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
+          fields
+        );
+      if (update.affected === 1 && mode === 'immediate') {
+        await deps.credits.releaseHolds(manager, {
+          subscriptionId: subscription.id
+        });
+      }
+      return update;
+    }
   );
   if (applied.affected !== 1) {
     throw alreadyCanceled();

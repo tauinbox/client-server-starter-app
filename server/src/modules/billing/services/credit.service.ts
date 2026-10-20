@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, type EntityManager } from 'typeorm';
+import { In, IsNull, Repository, type EntityManager } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
 import type { CreditLedgerReason } from '../entities/credit-ledger.entity';
+import { Invoice, UNPAID_INVOICE_STATUSES } from '../entities/invoice.entity';
 
 const ZERO = Money.fromMinor(0);
 
@@ -13,9 +14,10 @@ const ZERO = Money.fromMinor(0);
  * upsert (`balance += delta`, never read-modify-write) paired with an
  * append-only `CreditLedger` entry, both on the caller's `EntityManager` so
  * they commit or roll back with the invoice work that caused them. Exactly-once
- * application is the caller's concern — purchases and usage spend run only
- * after the caller won its unique `provider_event_id` invoice insert; the
- * refund clawback is gated by the invoice's one-way `paid → refunded` flip.
+ * application is the caller's concern — a purchase runs only after the caller
+ * won its unique `provider_event_id` invoice insert, a usage spend only on the
+ * winning flip of its invoice to `paid`, and the refund clawback is gated by
+ * the invoice's one-way `paid → refunded` flip.
  */
 @Injectable()
 export class CreditService {
@@ -28,29 +30,64 @@ export class CreditService {
     return this.balances.findOne({ where: { customerId } });
   }
 
-  /** Units usage rating may spend — a clawed-back negative balance offers none. */
-  async availableUnits(customerId: string): Promise<number> {
-    const balance = await this.getBalance(customerId);
-    return positiveUnits(balance);
-  }
-
   /**
-   * Reads available units while holding a `FOR UPDATE` lock on the balance row
-   * on the caller's transactional `EntityManager`. Concurrent usage spenders
-   * for the same customer serialize on the lock: the second waits, then reads
-   * the balance the first already decremented, so credits cannot be applied
-   * twice off one stale read. A customer with no balance row has nothing to
-   * lock and nothing to spend (0 units) - the race is irrelevant there.
+   * The units a usage rating may apply: the balance minus the units that the
+   * customer's unpaid invoices still hold. Credits are spent only when an
+   * invoice becomes `paid`, so an open charge holds its `creditUnitsApplied`
+   * until its outcome is final. The balance row is read `FOR UPDATE` on the
+   * caller's transaction, and the caller writes its own invoice in that
+   * transaction: two ratings of one customer serialize on the lock, and the
+   * second sees the hold of the first. `excludeInvoiceId` keeps the row that a
+   * retry re-rates out of its own hold. A customer with no balance row has
+   * nothing to lock and nothing to apply.
    */
   async availableUnitsForUpdate(
     manager: EntityManager,
-    customerId: string
+    customerId: string,
+    excludeInvoiceId?: string
   ): Promise<number> {
     const balance = await manager.findOne(CreditBalance, {
       where: { customerId },
       lock: { mode: 'pessimistic_write' }
     });
-    return positiveUnits(balance);
+    const units = positiveUnits(balance);
+    if (units === 0) {
+      return 0;
+    }
+    const query = manager
+      .createQueryBuilder(Invoice, 'i')
+      .select('COALESCE(SUM(i.creditUnitsApplied), 0)', 'held')
+      .where('i.customerId = :customerId', { customerId })
+      .andWhere('i.status IN (:...statuses)', {
+        statuses: [...UNPAID_INVOICE_STATUSES]
+      })
+      .andWhere('i.creditsReleasedAt IS NULL');
+    if (excludeInvoiceId) {
+      query.andWhere('i.id <> :excludeInvoiceId', { excludeInvoiceId });
+    }
+    const held = await query.getRawOne<{ held: string }>();
+    return Math.max(0, units - Number(held?.held ?? 0));
+  }
+
+  /**
+   * Ends the hold of unpaid invoices whose outcome is final: a declined
+   * charge (`providerEventId`), or every unpaid invoice of a subscription that
+   * ran out of dunning or closed (`subscriptionId`). Runs on the caller's
+   * transaction, together with the state change that makes the outcome final.
+   */
+  async releaseHolds(
+    manager: EntityManager,
+    where: { providerEventId: string } | { subscriptionId: string }
+  ): Promise<void> {
+    await manager.update(
+      Invoice,
+      {
+        ...where,
+        status: In([...UNPAID_INVOICE_STATUSES]),
+        creditsReleasedAt: IsNull()
+      },
+      { creditsReleasedAt: () => 'now()' }
+    );
   }
 
   /** Negative balance (refund of already-spent credits) blocks usage. */
@@ -69,7 +106,7 @@ export class CreditService {
     return this.applyDelta(manager, customerId, invoiceId, credits, 'purchase');
   }
 
-  /** Usage rating spends prepaid units before money is charged. */
+  /** A paid usage invoice spends the units its amount was rated against. */
   spendOnUsage(
     manager: EntityManager,
     customerId: string,

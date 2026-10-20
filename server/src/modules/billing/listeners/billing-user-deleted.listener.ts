@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { UserDeletedEvent } from '../../users/events/user-deleted.event';
 import { Customer } from '../entities/customer.entity';
 import { Subscription } from '../entities/subscription.entity';
@@ -10,6 +11,7 @@ import {
   BILLING_PROVIDERS,
   type PaymentProvider
 } from '../providers/payment-provider.interface';
+import { CreditService } from '../services/credit.service';
 import { cancelFields } from '../utils/cancel-fields.util';
 
 /**
@@ -31,6 +33,7 @@ export class BillingUserDeletedListener {
     private readonly subscriptions: Repository<Subscription>,
     @Inject(BILLING_PROVIDERS)
     private readonly providers: PaymentProvider[],
+    private readonly credits: CreditService,
     private readonly events: EventEmitter2
   ) {}
 
@@ -73,10 +76,28 @@ export class BillingUserDeletedListener {
     userId: string
   ): Promise<void> {
     try {
-      await this.subscriptions.update(
-        { id: subscription.id },
-        { ...cancelFields('immediate'), nextRenewalAttemptAt: null }
+      // Guarded like every other cancel writer: a cancel that committed after
+      // the read above wins, and this one emits nothing.
+      const applied = await this.subscriptions.manager.transaction(
+        async (manager) => {
+          const update = await manager
+            .withRepository(this.subscriptions)
+            .update(
+              {
+                id: subscription.id,
+                status: In([...OPEN_SUBSCRIPTION_STATUSES])
+              },
+              { ...cancelFields('immediate'), nextRenewalAttemptAt: null }
+            );
+          if (update.affected === 1) {
+            await this.credits.releaseHolds(manager, {
+              subscriptionId: subscription.id
+            });
+          }
+          return update;
+        }
       );
+      if (applied.affected !== 1) return;
       this.events.emit(
         SubscriptionCanceledEvent.name,
         new SubscriptionCanceledEvent(userId, subscription.id)

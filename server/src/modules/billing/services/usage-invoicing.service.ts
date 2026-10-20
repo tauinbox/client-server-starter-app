@@ -28,9 +28,10 @@ import { CreditService } from './credit.service';
  * double-charges, while a switch and the later period end get distinct keys. The charge's `transaction.completed` webhook carries the key
  * back and the reducer settles the pending row; `payment.failed` marks it
  * failed (dunning for provider-managed subscriptions stays with the provider).
- * Prepaid credits offset billable units first — they are deducted in the same
- * transaction as the winning insert. A period whose charge nets to zero (no
- * usage, or credits cover it all) skips the provider and is recorded paid at 0.
+ * Prepaid credits offset billable units first — the pending row holds them,
+ * and they are spent when it becomes `paid`. A period whose charge nets to
+ * zero (no usage, or credits cover it all) skips the provider and is recorded
+ * paid at 0, which spends its units at once.
  */
 @Injectable()
 export class UsageInvoicingService {
@@ -90,10 +91,10 @@ export class UsageInvoicingService {
 
     const chargeKey = `usage:${subscription.id}:${event.periodEnd.getTime()}`;
 
-    // Read, rate against, and deduct the credit balance in one FOR-UPDATE-locked
-    // transaction so concurrent closes for the same customer serialize: the
-    // second rates against the balance the first already spent (deduction gated
-    // on the winning insert, so a replay spends nothing twice).
+    // Rate and plant the invoice in one transaction that holds the balance row,
+    // so a concurrent rating of the same customer sees this invoice's hold. The
+    // units are spent when the row becomes `paid`: here for a zero charge,
+    // otherwise by the reducer's settle.
     const result = await withTransaction(this.dataSource, async (manager) => {
       const availableCredits = await this.credits.availableUnitsForUpdate(
         manager,
@@ -120,12 +121,13 @@ export class UsageInvoicingService {
         periodStart: event.periodStart,
         periodEnd: event.periodEnd,
         paidAt: zeroCharge ? new Date() : null,
-        receiptRef: null
+        receiptRef: null,
+        creditUnitsApplied: summary.creditUnitsApplied
       });
       if (!invoiceId) {
         return null;
       }
-      if (summary.creditUnitsApplied > 0) {
+      if (zeroCharge && summary.creditUnitsApplied > 0) {
         await this.credits.spendOnUsage(
           manager,
           subscription.customerId,

@@ -99,7 +99,10 @@ runWithInfra('One trial for each customer (e2e)', () => {
         },
         {
           provide: CreditService,
-          useValue: { getBalance: () => Promise.resolve(null) }
+          useValue: {
+            getBalance: () => Promise.resolve(null),
+            releaseHolds: () => Promise.resolve()
+          }
         },
         { provide: UsageRating, useValue: { summarizeForPeriod: jest.fn() } },
         {

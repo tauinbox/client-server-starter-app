@@ -1,6 +1,5 @@
 // An immediate cancel that lands while the renewal scan charges the same due
-// usage period must charge under the renewal key, so that the invoice insert
-// and the provider's idempotence key collapse the two charges into one.
+// usage period must not charge that period a second time.
 
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -331,7 +330,9 @@ runWithInfra(
       await scan;
 
       expect(canceled.status).toBe('canceled');
-      expect(gate.keys).toEqual([renewalKey, renewalKey]);
+      // The renewal recorded the period before it charged, so the cancel
+      // finds it and bills only the tail, which rates to zero here.
+      expect(gate.keys).toEqual([renewalKey]);
 
       const invoices = await ds.getRepository(Invoice).find({
         where: { customerId, subscriptionId: subscription.id },
