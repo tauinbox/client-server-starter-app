@@ -774,7 +774,7 @@ export class RenewalService {
 
   /**
    * Marks the recorded row as a provider-accepted but not yet captured charge
-   * and attaches the payment reference, without advancing the period — the
+   * and attaches the payment reference, without advancing the period - the
    * confirming webhook or a later scan's poll settles or fails it. `from` is
    * the status the row holds: `pending` for the charge this scan recorded,
    * `failed` for the open charge of an earlier attempt. The row keeps the

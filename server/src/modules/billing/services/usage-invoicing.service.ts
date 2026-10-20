@@ -28,7 +28,7 @@ import { CreditService } from './credit.service';
  * double-charges, while a switch and the later period end get distinct keys. The charge's `transaction.completed` webhook carries the key
  * back and the reducer settles the pending row; `payment.failed` marks it
  * failed (dunning for provider-managed subscriptions stays with the provider).
- * Prepaid credits offset billable units first — the pending row holds them,
+ * Prepaid credits offset billable units first: the pending row holds them,
  * and they are spent when it becomes `paid`. A period whose charge nets to
  * zero (no usage, or credits cover it all) skips the provider and is recorded
  * paid at 0, which spends its units at once.

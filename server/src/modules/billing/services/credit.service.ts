@@ -14,10 +14,10 @@ const ZERO = Money.fromMinor(0);
  * upsert (`balance += delta`, never read-modify-write) paired with an
  * append-only `CreditLedger` entry, both on the caller's `EntityManager` so
  * they commit or roll back with the invoice work that caused them. Exactly-once
- * application is the caller's concern — a purchase runs only after the caller
+ * application is the caller's concern: a purchase runs only after the caller
  * won its unique `provider_event_id` invoice insert, a usage spend only on the
  * winning flip of its invoice to `paid`, and the refund clawback is gated by
- * the invoice's one-way `paid → refunded` flip.
+ * the invoice's one-way `paid -> refunded` flip.
  */
 @Injectable()
 export class CreditService {
