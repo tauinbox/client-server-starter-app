@@ -1,12 +1,12 @@
 import { HttpException, Logger } from '@nestjs/common';
 import type {
   PermissionCondition,
-  ResolvedPermission
+  ResolvedPermission,
+  SubjectMaps
 } from '@app/shared/types';
 import type { AppAbility } from '../casl/app-ability';
 import { buildAbility } from '../casl/build-ability';
 import { resolveConditions } from '@app/shared/utils/resolve-conditions';
-import type { SubjectMaps } from '../services/resource.service';
 import { assertCanGrantPermissions } from './can-grant.util';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import {

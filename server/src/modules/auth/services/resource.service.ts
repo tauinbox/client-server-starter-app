@@ -17,8 +17,12 @@ import type {
 import { applyList } from '../../../common/utils/apply-list-query.util';
 import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { RESOURCE_LIST_COLUMNS } from '../utils/rbac-sort-columns.util';
-import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
-import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
+import {
+  CASL_RESERVED_SUBJECT_NAMES,
+  ErrorKeys,
+  RESOURCE_LIST_QUERY
+} from '@app/shared/constants';
+import type { SubjectMaps } from '@app/shared/types';
 import { ResourceRegistryService } from './resource-registry.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditService } from '../../audit/audit.service';
@@ -37,27 +41,6 @@ const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map:v3';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
 const SUBJECT_MAP_VERSION_KEY = 'rbac:subject_map:version';
 const SUBJECT_MAP_VERSION_COUNTER_KEY = 'rbac:subject_map:version:counter';
-
-/**
- * Resource name -> CASL subject, split by orphan state.
- *
- * Only `active` may grant: an orphaned resource has lost the controller that
- * registered it, so nothing may be allowed on it. Denies resolve against
- * `orphaned` as a fallback so that removing a controller cannot quietly drop a
- * deny rule (see CaslAbilityFactory).
- */
-export interface SubjectMaps {
-  active: Record<string, string>;
-  orphaned: Record<string, string>;
-  /**
-   * Resource name -> actions a role may hold on it: the admin's narrowing, or
-   * every declared action. buildAbility registers no allow outside this set,
-   * so a grant hidden from the permission matrix grants nothing.
-   */
-  grantableActions: Record<string, string[]>;
-  /** Resource name -> actions whose checks read the record (see buildAbility). */
-  conditionalActions: Record<string, string[]>;
-}
 
 @Injectable()
 export class ResourceService {

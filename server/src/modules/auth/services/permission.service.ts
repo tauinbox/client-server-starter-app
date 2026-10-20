@@ -5,6 +5,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
 import { ResolvedPermission } from '@app/shared/types';
+import { dedupPermissions } from '@app/shared/utils/ability-rules';
 import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
@@ -75,29 +76,15 @@ export class PermissionService {
       return [];
     }
 
-    // Conditions are part of the key: two restriction roles on one permission
-    // are two denies, and dropping either widens the grant. jsonb key order is
-    // stable, so equal conditions still dedup.
-    const permissionMap = new Map<string, ResolvedPermission>();
-
-    for (const role of user.roles) {
-      for (const rp of role.rolePermissions) {
-        const resourceName = rp.permission.resource.name;
-        const actionName = rp.permission.action.name;
-        const effect = rp.conditions?.effect === 'deny' ? 'deny' : 'allow';
-        const key = `${effect}:${resourceName}:${actionName}:${JSON.stringify(rp.conditions ?? null)}`;
-        if (!permissionMap.has(key)) {
-          permissionMap.set(key, {
-            resource: resourceName,
-            action: actionName,
-            permission: `${resourceName}:${actionName}`,
-            conditions: rp.conditions
-          });
-        }
-      }
-    }
-
-    const permissions = Array.from(permissionMap.values());
+    const permissions = dedupPermissions(
+      user.roles.flatMap((role) =>
+        role.rolePermissions.map((rp) => ({
+          resource: rp.permission.resource.name,
+          action: rp.permission.action.name,
+          conditions: rp.conditions
+        }))
+      )
+    );
     await this.cacheManager.set(cacheKey, permissions, CACHE_TTL);
     return permissions;
   }
