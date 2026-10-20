@@ -1,12 +1,15 @@
-import type { Logger } from '@nestjs/common';
-import type { PermissionCondition } from '@app/shared/types';
-import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
+import type { PermissionCondition } from '../types/role.types';
+import { validateMongoQueryKeys } from './mongo-query-safety';
 import {
   findFieldMatchShapeError,
   findOwnershipShapeError,
   findRestrictionBranch,
   findUserAttrShapeError
-} from '@app/shared/utils/permission-condition-shape';
+} from './permission-condition-shape';
+
+export interface ResolverLogger {
+  warn(message: string): void;
+}
 
 /**
  * Runtime context for condition resolution. Carries the user identity used by
@@ -16,14 +19,14 @@ import {
 export interface ResolverContext {
   userId: string;
   permissionLabel: string;
-  logger: Logger;
+  logger: ResolverLogger;
 }
 
 /**
  * Translates a `PermissionCondition` into a single MongoQuery conditions object.
  *
- * Branches are merged in a fixed order — ownership → fieldMatch → userAttr →
- * custom — so when two branches write the same field key the later one wins,
+ * Branches are merged in a fixed order - ownership, fieldMatch, userAttr,
+ * custom - so when two branches write the same field key the later one wins,
  * with one exception: the `ownership` key is protected. A later branch that
  * writes `ownership.userField` would silently replace the owner-scoping
  * predicate with a broader one, so such a collision vetoes the permission.

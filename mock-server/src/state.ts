@@ -47,14 +47,14 @@ import type {
   RoleAdminResponse
 } from '@app/shared/types';
 import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
-import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
 import {
   findConditionFieldError,
-  findConditionSupportError,
-  findFieldMatchShapeError,
-  findOwnershipShapeError,
-  findUserAttrShapeError
+  findConditionSupportError
 } from '@app/shared/utils/permission-condition-shape';
+import {
+  resolveConditions,
+  type ResolverLogger
+} from '@app/shared/utils/resolve-conditions';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import type {
   KnownActions,
@@ -634,6 +634,9 @@ export function mustEnrolMfa(user: MockUser): boolean {
   return isMfaMandatoryFor(user) && !user.totpEnabledAt;
 }
 
+/** The server logs a vetoed condition; the mock has no log to write it to. */
+export const SILENT_RESOLVER_LOGGER: ResolverLogger = { warn: () => undefined };
+
 /**
  * Compiles the caller's CASL ability - the same object the server's
  * CaslAbilityFactory produces. Route guards evaluate it directly, so the mock
@@ -727,94 +730,21 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
       continue;
     }
 
-    const query: Record<string, unknown> = {};
+    const { query, skipPermission } = resolveConditions(conditions, {
+      userId: user.id,
+      permissionLabel: `${resource}:${action}`,
+      logger: SILENT_RESOLVER_LOGGER
+    });
 
-    // Mirrors the server's resolveConditions: a malformed branch, or a later
-    // branch colliding with the protected ownership key, vetoes the whole
-    // permission (fail closed) instead of widening the effective grant.
-    let vetoed = false;
-    let ownershipField: string | undefined;
-
-    if (conditions.ownership != null) {
-      if (findOwnershipShapeError(conditions.ownership)) {
-        vetoed = true;
-      } else {
-        ownershipField = conditions.ownership.userField;
-        query[ownershipField] = user.id;
+    // A vetoed allow grants nothing, a vetoed deny denies everything; a
+    // condition with no restriction branch (bare `effect`) is unconditional.
+    if (skipPermission) {
+      if (isDeny) {
+        register(action as Actions, subject);
       }
-    }
-
-    if (!vetoed && conditions.fieldMatch != null) {
-      if (findFieldMatchShapeError(conditions.fieldMatch)) {
-        vetoed = true;
-      } else {
-        for (const [field, values] of Object.entries(conditions.fieldMatch)) {
-          if (field === ownershipField) {
-            vetoed = true;
-            break;
-          }
-          query[field] = { $in: values };
-        }
-      }
-    }
-
-    if (!vetoed && conditions.userAttr != null) {
-      if (findUserAttrShapeError(conditions.userAttr)) {
-        vetoed = true;
-      } else {
-        const userContext: Record<string, unknown> = { id: user.id };
-        for (const [field, attrName] of Object.entries(conditions.userAttr)) {
-          const attr = attrName as string;
-          if (
-            !Object.prototype.hasOwnProperty.call(userContext, attr) ||
-            field === ownershipField
-          ) {
-            vetoed = true;
-            break;
-          }
-          query[field] = userContext[attr];
-        }
-      }
-    }
-
-    if (!vetoed && conditions.custom != null) {
-      try {
-        const parsed: unknown = JSON.parse(conditions.custom);
-        if (
-          parsed === null ||
-          typeof parsed !== 'object' ||
-          Array.isArray(parsed) ||
-          validateMongoQueryKeys(parsed, '') !== null ||
-          (ownershipField !== undefined &&
-            Object.prototype.hasOwnProperty.call(parsed, ownershipField))
-        ) {
-          vetoed = true;
-        } else {
-          for (const [k, v] of Object.entries(parsed)) {
-            query[k] = v;
-          }
-        }
-      } catch {
-        // invalid JSON vetoes the permission - same as server behaviour
-        vetoed = true;
-      }
-    }
-
-    const hasRestrictionBranches =
-      conditions.ownership != null ||
-      conditions.fieldMatch != null ||
-      conditions.userAttr != null ||
-      conditions.custom != null;
-
-    // Mirrors the server's fail-closed semantics: restriction branches that
-    // veto or resolve to an empty query grant nothing for an allow and deny
-    // everything for a deny; only a branch-less condition (bare `effect`)
-    // registers unconditionally.
-    if (!vetoed && Object.keys(query).length > 0) {
+    } else if (Object.keys(query).length > 0) {
       register(action as Actions, subject, query as MongoQuery<never>);
-    } else if (!vetoed && !hasRestrictionBranches) {
-      register(action as Actions, subject);
-    } else if (isDeny) {
+    } else {
       register(action as Actions, subject);
     }
   }

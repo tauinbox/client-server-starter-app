@@ -5,7 +5,7 @@ import type {
 } from '@app/shared/types';
 import type { AppAbility } from '../casl/app-ability';
 import { buildAbility } from '../casl/build-ability';
-import { resolveConditions } from '../casl/resolve-conditions';
+import { resolveConditions } from '@app/shared/utils/resolve-conditions';
 import type { SubjectMaps } from '../services/resource.service';
 import { assertCanGrantPermissions } from './can-grant.util';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';

@@ -456,13 +456,16 @@ describe('permission-based route authorization', () => {
     });
 
     it('applies a conditional update:Role grant to the three role-permission routes', async () => {
+      const granted = permissionId('res-profile', 'act-update');
+      // The caller holds the granted pair, so only the instance check on the
+      // role can refuse.
       const token = await delegate([
         {
           permissionId: permissionId('res-roles', 'act-update'),
           conditions: { fieldMatch: { name: ['moderator'] } }
-        }
+        },
+        { permissionId: granted }
       ]);
-      const granted = permissionId('res-profile', 'act-update');
 
       expect(
         (

@@ -1,5 +1,8 @@
 import { Logger } from '@nestjs/common';
-import { resolveConditions, ResolverContext } from './resolve-conditions';
+import {
+  resolveConditions,
+  type ResolverContext
+} from '@app/shared/utils/resolve-conditions';
 
 describe('resolveConditions', () => {
   let logger: Logger;

@@ -30,7 +30,7 @@ import {
   type AppAbility,
   type Subjects
 } from '../src/modules/auth/casl/app-ability';
-import { resolveConditions } from '../src/modules/auth/casl/resolve-conditions';
+import { resolveConditions } from '@app/shared/utils/resolve-conditions';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
