@@ -37,11 +37,8 @@ import {
   permissionGuard
 } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
-import {
-  assertDenyScope,
-  denyRowsOf,
-  sameConditions
-} from '../helpers/grant-scope.helpers';
+import { sameConditions } from '@app/shared/utils/grant-scope';
+import { assertGrantScope, denyRowsOf } from '../helpers/grant-scope.helpers';
 import { pushToUser } from '../sse-hub';
 import {
   pushUserCrudEvent,
@@ -528,7 +525,7 @@ router.delete(
       return;
     }
 
-    if (!assertDenyScope(req, res, 'lift', id, denyRowsOf(id))) {
+    if (!assertGrantScope(req, res, 'lift', id, denyRowsOf(id))) {
       return;
     }
 
@@ -657,7 +654,7 @@ router.put(
       permissionId: item.permissionId,
       conditions: (item.conditions as PermissionCondition | null) ?? null
     }));
-    if (!assertDenyScope(req, res, 'grant', id, grantItems)) {
+    if (!assertGrantScope(req, res, 'grant', id, grantItems)) {
       return;
     }
 
@@ -670,7 +667,7 @@ router.put(
             sameConditions(item.conditions, row.conditions)
         )
     );
-    if (!assertDenyScope(req, res, 'lift', id, liftedRows)) {
+    if (!assertGrantScope(req, res, 'lift', id, liftedRows)) {
       return;
     }
 
@@ -800,7 +797,7 @@ router.post(
       permissionId,
       conditions: (conditions as PermissionCondition | undefined) ?? null
     }));
-    if (!assertDenyScope(req, res, 'grant', id, grantItems)) {
+    if (!assertGrantScope(req, res, 'grant', id, grantItems)) {
       return;
     }
 
@@ -881,7 +878,7 @@ router.delete(
     const removedRows = denyRowsOf(id).filter(
       (row) => row.permissionId === permissionId
     );
-    if (!assertDenyScope(req, res, 'lift', id, removedRows)) {
+    if (!assertGrantScope(req, res, 'lift', id, removedRows)) {
       return;
     }
 
@@ -959,7 +956,7 @@ router.post(
     // `RoleService.assignRoleToUser` checks the rows of the role before the
     // insert that raises the duplicate 409.
     const roleRows = state.rolePermissions.filter((rp) => rp.roleId === roleId);
-    if (!assertDenyScope(req, res, 'grant', roleId, roleRows)) {
+    if (!assertGrantScope(req, res, 'grant', roleId, roleRows)) {
       return;
     }
 
@@ -1044,7 +1041,7 @@ router.delete(
       return;
     }
 
-    if (!assertDenyScope(req, res, 'lift', roleId, denyRowsOf(roleId))) {
+    if (!assertGrantScope(req, res, 'lift', roleId, denyRowsOf(roleId))) {
       return;
     }
 

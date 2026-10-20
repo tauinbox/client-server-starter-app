@@ -8,12 +8,14 @@ import {
   type AppAbility,
   type Subjects
 } from '../casl/app-ability';
-import { resolveConditions } from '../casl/resolve-conditions';
+import { resolveConditions } from '@app/shared/utils/resolve-conditions';
+import {
+  sameConditions,
+  type GrantScopeItem
+} from '@app/shared/utils/grant-scope';
 import {
   assertCanGrantPermissions,
-  assertCanLiftDenies,
-  sameConditions,
-  type ResolvedGrantItem
+  assertCanLiftDenies
 } from './can-grant.util';
 
 const CALLER_ID = 'caller-id';
@@ -61,9 +63,7 @@ describe('assertCanGrantPermissions', () => {
     return build();
   }
 
-  function item(
-    bodyConditions?: PermissionCondition | null
-  ): ResolvedGrantItem {
+  function item(bodyConditions?: PermissionCondition | null): GrantScopeItem {
     return {
       permissionId: 'perm-1',
       actionName: 'update',
@@ -361,7 +361,7 @@ function restrictedAbility(): AppAbility {
 
 function denyItem(
   bodyConditions: PermissionCondition | null = DENY_CEO
-): ResolvedGrantItem {
+): GrantScopeItem {
   return {
     permissionId: 'perm-1',
     actionName: 'update',

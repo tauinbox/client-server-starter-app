@@ -52,7 +52,9 @@ export const MAX_MONGO_QUERY_DEPTH = 32;
 
 export const LIST_OPERATOR_KEYS = new Set(['$in', '$nin']);
 
-export function isJsonScalar(value: unknown): boolean {
+export type JsonScalar = string | number | boolean | null;
+
+export function isJsonScalar(value: unknown): value is JsonScalar {
   return (
     value === null ||
     typeof value === 'string' ||

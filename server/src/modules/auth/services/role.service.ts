@@ -25,11 +25,13 @@ import { PermissionCondition } from '@app/shared/types';
 import { ErrorKeys, ROLE_LIST_QUERY } from '@app/shared/constants';
 import type { AppAbility } from '../casl/app-ability';
 import {
-  assertCanGrantPermissions,
-  assertCanLiftDenies,
   isDenyCondition,
   sameConditions,
-  type ResolvedGrantItem
+  type GrantScopeItem
+} from '@app/shared/utils/grant-scope';
+import {
+  assertCanGrantPermissions,
+  assertCanLiftDenies
 } from '../utils/can-grant.util';
 import {
   findConditionActionError,
@@ -66,7 +68,7 @@ export class RoleService {
 
   private async resolveGrantItems(
     items: { permissionId: string; conditions?: PermissionCondition | null }[]
-  ): Promise<ResolvedGrantItem[]> {
+  ): Promise<GrantScopeItem[]> {
     if (items.length === 0) return [];
     const permissions = await this.permissionRepository.find({
       where: items.map((i) => ({ id: i.permissionId }))

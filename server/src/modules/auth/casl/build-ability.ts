@@ -6,7 +6,7 @@ import {
   createMongoAbility,
   Subjects
 } from './app-ability';
-import { resolveConditions } from './resolve-conditions';
+import { resolveConditions } from '@app/shared/utils/resolve-conditions';
 import {
   CASL_RESERVED_ACTION_NAMES,
   CASL_RESERVED_SUBJECT_NAMES

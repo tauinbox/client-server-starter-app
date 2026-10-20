@@ -329,7 +329,7 @@ management and theming.
   operators. It also cannot bind anything except a scalar into `IN (:...p)`. For that reason the
   element rule of `fieldMatch` now also applies to raw `custom` JSON.
 - **Condition translation.** `resolveConditions()` in
-  `server/src/modules/auth/casl/resolve-conditions.ts` translates each branch of `PermissionCondition`
+  `shared/src/utils/resolve-conditions.ts` translates each branch of `PermissionCondition`
   to a MongoQuery. The branches are ownership, fieldMatch, userAttr and custom. The function merges
   them in that fixed order, and a later branch wins. The `ownership.userField` key is protected: a
   collision on it vetoes the permission. To add a new condition type, add a branch to
@@ -484,7 +484,7 @@ It resolves the attribute name from a user context object: `query[field] = userC
 
 The user context currently has one attribute: `{ id: userId }`. To add more, for example
 `departmentId` or `tenantId`, extend the `userContext` object in `resolveConditions()`
-(`server/src/modules/auth/casl/resolve-conditions.ts`).
+(`shared/src/utils/resolve-conditions.ts`).
 
 The difference from `ownership`: `ownership` always maps to `userId`. `userAttr` maps to any attribute
 of the user. When the user context has more attributes, this becomes the most flexible built-in type.
@@ -1894,7 +1894,7 @@ activates the git hooks through the `prepare` script.
 | Server E2E tests | Jest | A separate configuration in `test/` | 659 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 646 pass and 13 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1589 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 324 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1060 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1074 tests pass |
 
 ## CI/CD
 
