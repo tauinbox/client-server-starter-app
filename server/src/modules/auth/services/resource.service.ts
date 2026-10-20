@@ -15,6 +15,7 @@ import type {
   ResourceCursorQueryDto
 } from '../../../common/dtos';
 import { applyList } from '../../../common/utils/apply-list-query.util';
+import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { RESOURCE_LIST_COLUMNS } from '../utils/rbac-sort-columns.util';
 import { CASL_RESERVED_SUBJECT_NAMES } from '../casl/constants';
 import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
@@ -34,6 +35,8 @@ import type { AppAbility } from '../casl/app-ability';
 // and a Redis entry written by a previous release outlives the deploy.
 const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map:v3';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
+const SUBJECT_MAP_VERSION_KEY = 'rbac:subject_map:version';
+const SUBJECT_MAP_VERSION_COUNTER_KEY = 'rbac:subject_map:version:counter';
 
 /**
  * Resource name -> CASL subject, split by orphan state.
@@ -59,6 +62,7 @@ export interface SubjectMaps {
 @Injectable()
 export class ResourceService {
   private readonly logger = new Logger(ResourceService.name);
+  readonly #subjectMapVersion: CacheVersionCounter;
 
   constructor(
     @InjectRepository(Resource)
@@ -68,7 +72,14 @@ export class ResourceService {
     private readonly registry: ResourceRegistryService,
     private readonly metrics: MetricsService,
     private readonly auditService: AuditService
-  ) {}
+  ) {
+    this.#subjectMapVersion = new CacheVersionCounter(
+      cacheManager,
+      SUBJECT_MAP_VERSION_COUNTER_KEY,
+      SUBJECT_MAP_VERSION_KEY,
+      this.logger
+    );
+  }
 
   /**
    * Cursor-paginated resources for the admin list page. The unpaginated
@@ -200,9 +211,9 @@ export class ResourceService {
   }
 
   async getSubjectMaps(): Promise<SubjectMaps> {
-    const cached = await this.cacheManager.get<SubjectMaps>(
-      SUBJECT_MAP_CACHE_KEY
-    );
+    const version = await this.#subjectMapVersion.read();
+    const cacheKey = `${SUBJECT_MAP_CACHE_KEY}:v${version}`;
+    const cached = await this.cacheManager.get<SubjectMaps>(cacheKey);
     this.metrics.recordCacheAccess('resources', cached ? 'hit' : 'miss');
     if (cached) {
       return cached;
@@ -225,11 +236,7 @@ export class ResourceService {
       }
     }
 
-    await this.cacheManager.set(
-      SUBJECT_MAP_CACHE_KEY,
-      maps,
-      SUBJECT_MAP_CACHE_TTL
-    );
+    await this.cacheManager.set(cacheKey, maps, SUBJECT_MAP_CACHE_TTL);
     return maps;
   }
 
@@ -321,6 +328,6 @@ export class ResourceService {
   }
 
   async invalidateSubjectMapCache(): Promise<void> {
-    await this.cacheManager.del(SUBJECT_MAP_CACHE_KEY);
+    await this.#subjectMapVersion.bump();
   }
 }

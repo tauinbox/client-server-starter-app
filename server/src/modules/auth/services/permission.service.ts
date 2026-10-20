@@ -1,10 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
 import { ResolvedPermission } from '@app/shared/types';
+import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
 const CACHE_TTL = 120_000; // 2 minutes
@@ -12,6 +13,9 @@ const CACHE_TTL = 120_000; // 2 minutes
 // list that still carries them.
 const CACHE_PREFIX = 'permissions:v2:';
 const ROLES_CACHE_PREFIX = 'roles:';
+// One counter per user for both lists: a role change alters both.
+const VERSION_KEY = 'permissions:user-version';
+const VERSION_COUNTER_KEY = 'permissions:user-version:counter';
 
 export interface RoleInfo {
   name: string;
@@ -20,13 +24,23 @@ export interface RoleInfo {
 
 @Injectable()
 export class PermissionService {
+  readonly #logger = new Logger(PermissionService.name);
+  readonly #version: CacheVersionCounter;
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
     private readonly metrics: MetricsService
-  ) {}
+  ) {
+    this.#version = new CacheVersionCounter(
+      cacheManager,
+      VERSION_COUNTER_KEY,
+      VERSION_KEY,
+      this.#logger
+    );
+  }
 
   async getPermissionsForUser(userId: string): Promise<ResolvedPermission[]> {
     // A falsy id is dropped from the WHERE clause and would resolve to an
@@ -35,7 +49,8 @@ export class PermissionService {
       return [];
     }
 
-    const cacheKey = `${CACHE_PREFIX}${userId}`;
+    const version = await this.#version.read(userId);
+    const cacheKey = `${CACHE_PREFIX}${userId}:v${version}`;
     const cached = await this.cacheManager.get<ResolvedPermission[]>(cacheKey);
     this.metrics.recordCacheAccess('permissions', cached ? 'hit' : 'miss');
     if (cached) {
@@ -94,7 +109,8 @@ export class PermissionService {
       return [];
     }
 
-    const cacheKey = `${ROLES_CACHE_PREFIX}${userId}`;
+    const version = await this.#version.read(userId);
+    const cacheKey = `${ROLES_CACHE_PREFIX}${userId}:v${version}`;
     const cached = await this.cacheManager.get<RoleInfo[]>(cacheKey);
     this.metrics.recordCacheAccess('roles', cached ? 'hit' : 'miss');
     if (cached) {
@@ -157,7 +173,6 @@ export class PermissionService {
   }
 
   async invalidateUserCache(userId: string): Promise<void> {
-    await this.cacheManager.del(`${CACHE_PREFIX}${userId}`);
-    await this.cacheManager.del(`${ROLES_CACHE_PREFIX}${userId}`);
+    await this.#version.bump(userId);
   }
 }

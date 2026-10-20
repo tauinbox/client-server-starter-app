@@ -102,6 +102,15 @@ describe('ResourceService', () => {
     createdAt: new Date()
   };
 
+  function expectSubjectMapVersionBumped(): void {
+    expect(mockCacheManager.set).toHaveBeenCalledWith(
+      'rbac:subject_map:version',
+      expect.any(Number),
+      0
+    );
+    expect(mockCacheManager.del).not.toHaveBeenCalled();
+  }
+
   beforeEach(async () => {
     mockResourceRepo = {
       find: jest.fn(),
@@ -131,7 +140,9 @@ describe('ResourceService', () => {
     };
 
     mockCacheManager = {
-      get: jest.fn().mockResolvedValue(undefined),
+      get: jest.fn((key: string) =>
+        Promise.resolve(key === 'rbac:subject_map:version' ? 4 : undefined)
+      ),
       set: jest.fn().mockResolvedValue(undefined),
       del: jest.fn().mockResolvedValue(undefined)
     };
@@ -238,7 +249,7 @@ describe('ResourceService', () => {
 
       await service.update('res-1', { description: 'New desc' }, superAbility);
 
-      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v3');
+      expectSubjectMapVersionBumped();
     });
 
     it('should apply partial update data via Object.assign', async () => {
@@ -441,7 +452,6 @@ describe('ResourceService', () => {
     });
 
     it('should build maps from DB on cache miss and store in cache', async () => {
-      mockCacheManager.get.mockResolvedValue(undefined);
       mockResourceRepo.find.mockResolvedValue([resource1, resource2]);
 
       const result = await service.getSubjectMaps();
@@ -455,7 +465,7 @@ describe('ResourceService', () => {
       expect(result).toEqual(expected);
       expect(mockResourceRepo.find).toHaveBeenCalled();
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'rbac:subject_map:v3',
+        'rbac:subject_map:v3:v4',
         expected,
         300_000
       );
@@ -466,7 +476,6 @@ describe('ResourceService', () => {
     });
 
     it('offers only declared actions, whatever the admin narrowing names', async () => {
-      mockCacheManager.get.mockResolvedValue(undefined);
       mockResourceRepo.find.mockResolvedValue([
         { ...resource1, allowedActionNames: ['update', 'search'] }
       ]);
@@ -477,7 +486,6 @@ describe('ResourceService', () => {
     });
 
     it('should keep orphaned resources out of the active map but expose them separately', async () => {
-      mockCacheManager.get.mockResolvedValue(undefined);
       mockResourceRepo.find.mockResolvedValue([resource1, orphanedResource]);
 
       const result = await service.getSubjectMaps();
@@ -503,7 +511,6 @@ describe('ResourceService', () => {
     });
 
     it('should return empty maps when no resources exist', async () => {
-      mockCacheManager.get.mockResolvedValue(undefined);
       mockResourceRepo.find.mockResolvedValue([]);
 
       const result = await service.getSubjectMaps();
@@ -515,7 +522,7 @@ describe('ResourceService', () => {
         conditionalActions: {}
       });
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'rbac:subject_map:v3',
+        'rbac:subject_map:v3:v4',
         {
           active: {},
           orphaned: {},
@@ -804,7 +811,7 @@ describe('ResourceService', () => {
 
       await service.restore('res-3', superAbility);
 
-      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v3');
+      expectSubjectMapVersionBumped();
     });
 
     it('should throw NotFoundException if resource not found', async () => {
@@ -864,9 +871,9 @@ describe('ResourceService', () => {
   });
 
   describe('invalidateSubjectMapCache', () => {
-    it('should delete the subject map cache entry', async () => {
+    it('bumps the subject map version instead of deleting the entry', async () => {
       await service.invalidateSubjectMapCache();
-      expect(mockCacheManager.del).toHaveBeenCalledWith('rbac:subject_map:v3');
+      expectSubjectMapVersionBumped();
     });
   });
 });

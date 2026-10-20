@@ -89,14 +89,19 @@ runWithInfra(
         })
         .expect(201);
 
-      // Any resource row serves: its display name and description are put back
-      // after the suite.
-      resource = await dataSource
-        .getRepository(Resource)
-        .findOneOrFail({ where: { subject: 'FeatureFlag' } });
-      await dataSource
-        .getRepository(Resource)
-        .update(resource.id, { displayName: resourceLabel });
+      // A row of its own: the startup sync of a parallel suite writes the
+      // declared display name back onto a registered resource.
+      const resourceRepository = dataSource.getRepository(Resource);
+      resource = await resourceRepository.save(
+        resourceRepository.create({
+          name: `post-image-${stamp}`,
+          subject: `PostImage${stamp}`,
+          displayName: resourceLabel,
+          actionNames: ['read'],
+          conditionalActionNames: [],
+          allowedActionNames: null
+        })
+      );
 
       const roleService = app.get(RoleService);
       const permissions = await dataSource.getRepository(Permission).find();
@@ -132,10 +137,7 @@ runWithInfra(
 
     afterAll(async () => {
       if (resource) {
-        await dataSource?.getRepository(Resource).update(resource.id, {
-          displayName: resource.displayName,
-          description: resource.description
-        });
+        await dataSource?.getRepository(Resource).delete({ id: resource.id });
       }
       await dataSource
         ?.getRepository(Role)
