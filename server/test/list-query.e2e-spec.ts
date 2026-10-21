@@ -16,6 +16,7 @@ import {
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
@@ -66,10 +67,12 @@ runWithInfra('List search and filters (e2e)', () => {
       .findOneByOrFail({ isSuper: true });
     const usersService = app.get(UsersService);
     const adminId = await userId(adminEmail);
-    await app.get(RoleService).assignRoleToUser(adminId, superRole.id);
+    await app
+      .get(RoleService)
+      .assignRoleToUser(adminId, superRole.id, SYSTEM_ABILITY);
     const { tokens } = await app
       .get(AuthService)
-      .login(await usersService.findOne(adminId), {
+      .login(await usersService.findOne(adminId, SYSTEM_ABILITY), {
         userAgent: 'list-query-e2e',
         ipAddress: null
       });

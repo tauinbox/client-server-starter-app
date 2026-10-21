@@ -15,8 +15,11 @@ import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
-import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
-import type { AppAbility } from '../../auth/casl/app-ability';
+import {
+  createMongoAbility,
+  SYSTEM_ABILITY,
+  type AppAbility
+} from '../../auth/casl/app-ability';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -173,7 +176,7 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
-      const result = await service.create(createUserDto);
+      const result = await service.create(createUserDto, SYSTEM_ABILITY);
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: [
@@ -202,7 +205,9 @@ describe('UsersService', () => {
         )
       );
 
-      await expect(service.create(createUserDto)).rejects.toMatchObject({
+      await expect(
+        service.create(createUserDto, SYSTEM_ABILITY)
+      ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
       });
       expect(mockRepository.findOne).not.toHaveBeenCalled();
@@ -215,7 +220,10 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
-      await service.create({ ...createUserDto, password: 'kettlesunrise' });
+      await service.create(
+        { ...createUserDto, password: 'kettlesunrise' },
+        SYSTEM_ABILITY
+      );
 
       expect(bcrypt.hash).toHaveBeenCalledWith(
         prehashPassword('kettlesunrise'),
@@ -226,12 +234,12 @@ describe('UsersService', () => {
     it('should throw HttpException when email already exists', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
-      await expect(service.create(createUserDto)).rejects.toThrow(
-        HttpException
-      );
-      await expect(service.create(createUserDto)).rejects.toThrow(
-        'User with this email already exists'
-      );
+      await expect(
+        service.create(createUserDto, SYSTEM_ABILITY)
+      ).rejects.toThrow(HttpException);
+      await expect(
+        service.create(createUserDto, SYSTEM_ABILITY)
+      ).rejects.toThrow('User with this email already exists');
     });
 
     it('translates a unique violation on save into the same 409', async () => {
@@ -243,7 +251,7 @@ describe('UsersService', () => {
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
       try {
-        await service.create(createUserDto);
+        await service.create(createUserDto, SYSTEM_ABILITY);
         fail('Expected HttpException');
       } catch (err) {
         expect(err).toBeInstanceOf(HttpException);
@@ -261,9 +269,9 @@ describe('UsersService', () => {
       mockRepository.save.mockRejectedValue(new Error('connection lost'));
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
-      await expect(service.create(createUserDto)).rejects.toThrow(
-        'connection lost'
-      );
+      await expect(
+        service.create(createUserDto, SYSTEM_ABILITY)
+      ).rejects.toThrow('connection lost');
     });
 
     it('writes the audit rows of the saved record in the transaction of the save', async () => {
@@ -272,7 +280,7 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
-      await service.create(createUserDto, (user) => [
+      await service.create(createUserDto, SYSTEM_ABILITY, undefined, (user) => [
         { action: AuditAction.USER_CREATE, targetId: user.id }
       ]);
 
@@ -290,10 +298,59 @@ describe('UsersService', () => {
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
       await expect(
-        service.create(createUserDto, () => [
+        service.create(createUserDto, SYSTEM_ABILITY, undefined, () => [
           { action: AuditAction.USER_CREATE }
         ])
       ).rejects.toThrow('audit down');
+    });
+
+    it('refuses a record outside a conditional create grant before any read', async () => {
+      const ability = createMongoAbility<AppAbility>([
+        {
+          action: 'create',
+          subject: 'User',
+          conditions: { lastName: { $in: ['Smith'] } }
+        }
+      ]);
+
+      await expect(
+        service.create(createUserDto, ability, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'actor-1', targetType: 'User' })
+      );
+    });
+
+    it('keeps the password out of the subject of the create check', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockUser);
+      mockRepository.save.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
+      const ability = createMongoAbility<AppAbility>([
+        { action: 'create', subject: 'User' },
+        {
+          action: 'create',
+          subject: 'User',
+          inverted: true,
+          conditions: { password: { $exists: true } }
+        }
+      ]);
+
+      await expect(service.create(createUserDto, ability)).resolves.toBe(
+        mockUser
+      );
+    });
+
+    it('requires the ability argument and fails closed without it', async () => {
+      await expect(
+        // @ts-expect-error the ability is required: a skipped check is written as SYSTEM_ABILITY
+        service.create(createUserDto)
+      ).rejects.toThrow(TypeError);
+      expect(mockRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -301,7 +358,7 @@ describe('UsersService', () => {
     it('should return a user by id', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
-      const result = await service.findOne('user-1');
+      const result = await service.findOne('user-1', SYSTEM_ABILITY);
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
@@ -313,12 +370,48 @@ describe('UsersService', () => {
     it('should throw HttpException when user not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(
-        HttpException
+      await expect(
+        service.findOne('nonexistent', SYSTEM_ABILITY)
+      ).rejects.toThrow(HttpException);
+      await expect(
+        service.findOne('nonexistent', SYSTEM_ABILITY)
+      ).rejects.toThrow('User with ID nonexistent not found');
+    });
+
+    it('refuses a user outside a conditional read grant and audits the actor', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      const ability = createMongoAbility<AppAbility>([
+        {
+          action: 'read',
+          subject: 'User',
+          conditions: { lastName: { $in: ['Smith'] } }
+        }
+      ]);
+
+      await expect(
+        service.findOne('user-1', ability, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'actor-1', targetId: 'user-1' })
       );
-      await expect(service.findOne('nonexistent')).rejects.toThrow(
-        'User with ID nonexistent not found'
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'read',
+        'User'
       );
+    });
+
+    it('returns a user inside a conditional read grant', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      const ability = createMongoAbility<AppAbility>([
+        {
+          action: 'read',
+          subject: 'User',
+          conditions: { lastName: { $in: ['Doe'] } }
+        }
+      ]);
+
+      await expect(service.findOne('user-1', ability)).resolves.toBe(mockUser);
     });
   });
 

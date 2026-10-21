@@ -20,6 +20,7 @@ import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // A conditional `update` grant scoped by a field that the body can write is
@@ -113,25 +114,33 @@ runWithInfra(
         return found.id;
       };
 
-      await roleService.create({ name: teamA });
-      const actorRole = await roleService.create({ name: actorRoleName });
-      await roleService.setPermissionsForRole(actorRole.id, [
-        {
-          permissionId: permissionId('User'),
-          conditions: { fieldMatch: { lastName: ['Alpha'] } }
-        },
-        {
-          permissionId: permissionId('Role'),
-          conditions: { fieldMatch: { name: [teamA] } }
-        },
-        {
-          permissionId: permissionId('Permission'),
-          conditions: { fieldMatch: { displayName: [resourceLabel] } }
-        }
-      ]);
+      await roleService.create({ name: teamA }, SYSTEM_ABILITY);
+      const actorRole = await roleService.create(
+        { name: actorRoleName },
+        SYSTEM_ABILITY
+      );
+      await roleService.setPermissionsForRole(
+        actorRole.id,
+        [
+          {
+            permissionId: permissionId('User'),
+            conditions: { fieldMatch: { lastName: ['Alpha'] } }
+          },
+          {
+            permissionId: permissionId('Role'),
+            conditions: { fieldMatch: { name: [teamA] } }
+          },
+          {
+            permissionId: permissionId('Permission'),
+            conditions: { fieldMatch: { displayName: [resourceLabel] } }
+          }
+        ],
+        SYSTEM_ABILITY
+      );
       await roleService.assignRoleToUser(
         await userId(actorEmail),
-        actorRole.id
+        actorRole.id,
+        SYSTEM_ABILITY
       );
     }, 60000);
 
@@ -160,7 +169,10 @@ runWithInfra(
     }
 
     async function token(): Promise<string> {
-      const user = await usersService.findOne(await userId(actorEmail));
+      const user = await usersService.findOne(
+        await userId(actorEmail),
+        SYSTEM_ABILITY
+      );
       const { tokens } = await authService.login(user, {
         userAgent: 'post-image-e2e',
         ipAddress: null

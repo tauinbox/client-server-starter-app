@@ -11,6 +11,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { RolePermission } from '../src/modules/auth/entities/role-permission.entity';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 
 // A deny on a misspelt field matched no record, so it denied nothing. A
@@ -99,8 +100,8 @@ runWithInfra('Grant condition fields (e2e)', () => {
       );
     }
 
-    role = await roleService.create({ name: `${tag}-role` });
-    await roleService.assignRoleToUser(users.actor.id, role.id);
+    role = await roleService.create({ name: `${tag}-role` }, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(users.actor.id, role.id, SYSTEM_ABILITY);
   }, 60000);
 
   afterAll(async () => {
@@ -115,12 +116,16 @@ runWithInfra('Grant condition fields (e2e)', () => {
 
   it('refuses to store a condition on a field the subject does not allow', async () => {
     const outcome = await roleService
-      .setPermissionsForRole(role.id, [
-        {
-          permissionId: readUser.id,
-          conditions: { fieldMatch: { password: ['x'] } }
-        }
-      ])
+      .setPermissionsForRole(
+        role.id,
+        [
+          {
+            permissionId: readUser.id,
+            conditions: { fieldMatch: { password: ['x'] } }
+          }
+        ],
+        SYSTEM_ABILITY
+      )
       .then(
         () => 'RESOLVED',
         (error: unknown) => {
@@ -146,11 +151,20 @@ runWithInfra('Grant condition fields (e2e)', () => {
 
   it('turns a stored deny on a misspelt field into a blanket deny', async () => {
     await storeRows([{ effect: 'deny', fieldMatch: { lastname: ['Typo'] } }]);
-    const allowRole = await roleService.create({ name: `${tag}-allow` });
-    await roleService.setPermissionsForRole(allowRole.id, [
-      { permissionId: readUser.id }
-    ]);
-    await roleService.assignRoleToUser(users.actor.id, allowRole.id);
+    const allowRole = await roleService.create(
+      { name: `${tag}-allow` },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      allowRole.id,
+      [{ permissionId: readUser.id }],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(
+      users.actor.id,
+      allowRole.id,
+      SYSTEM_ABILITY
+    );
 
     try {
       expect(await canReadTarget()).toBe(false);

@@ -24,7 +24,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { subject } from '@casl/ability';
 import { RoleCursorQueryDto } from '../../../common/dtos';
 import { RoleService } from '../services/role.service';
 import { CreateRoleDto } from '../dtos/create-role.dto';
@@ -39,12 +38,9 @@ import { CurrentAbility } from '../decorators/current-ability.decorator';
 import { RegisterResource } from '../decorators/register-resource.decorator';
 import type { AppAbility } from '../casl/app-ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
-import { AuditService } from '../../audit/audit.service';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import type { AuditLogParams } from '../../audit/audit.service';
-import { assertCan } from '../../../common/utils/assert-can.util';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
 import { UserUpdatedEvent } from '../../users/events/user-updated.event';
@@ -67,9 +63,7 @@ import type { JwtAuthRequest } from '../types/auth.request';
 export class RolesController {
   constructor(
     private readonly roleService: RoleService,
-    private readonly eventEmitter: EventEmitter2,
-    private readonly auditService: AuditService,
-    private readonly metricsService: MetricsService
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   private auditRow(
@@ -135,21 +129,12 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'The role' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  async findOne(
+  findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const role = await this.roleService.findOne(id);
-    assertCan(
-      ability,
-      'read',
-      subject('Role', role),
-      this.auditService,
-      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
-      this.metricsService
-    );
-    return role;
+    return this.roleService.findOne(id, ability, req.user?.userId);
   }
 
   @Get(':id/permissions')
@@ -159,21 +144,16 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiOkResponse({ description: 'List of role permissions' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  async getPermissionsForRole(
+  getPermissionsForRole(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const role = await this.roleService.findOne(id);
-    assertCan(
+    return this.roleService.getPermissionsForRole(
+      id,
       ability,
-      'read',
-      subject('Role', role),
-      this.auditService,
-      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
-      this.metricsService
+      req.user?.userId
     );
-    return this.roleService.getPermissionsForRole(id);
   }
 
   @Post()
@@ -187,24 +167,17 @@ export class RolesController {
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    // The route-level @Authorize check is type-level and ignores conditions,
-    // so a conditional create grant is re-evaluated against the record the
-    // caller is asking to create.
-    assertCan(
+    return this.roleService.create(
+      createRoleDto,
       ability,
-      'create',
-      subject('Role', createRoleDto),
-      this.auditService,
-      { actorId: req.user?.userId, targetType: 'Role' },
-      this.metricsService
-    );
-    return this.roleService.create(createRoleDto, (role) =>
-      this.auditRow(req, {
-        action: AuditAction.ROLE_CREATE,
-        targetType: 'Role',
-        targetId: role.id,
-        details: { name: createRoleDto.name }
-      })
+      req.user?.userId,
+      (role) =>
+        this.auditRow(req, {
+          action: AuditAction.ROLE_CREATE,
+          targetType: 'Role',
+          targetId: role.id,
+          details: { name: createRoleDto.name }
+        })
     );
   }
 
@@ -216,35 +189,24 @@ export class RolesController {
   @ApiBody({ type: UpdateRoleDto })
   @ApiOkResponse({ description: 'Role updated' })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  async update(
+  update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateRoleDto: UpdateRoleDto,
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const role = await this.roleService.findOne(id);
-    // The record after the write is checked too: else a grant scoped by a
-    // writable field lets the caller move a role out of its own scope.
-    for (const record of [role, withChanges(role, updateRoleDto)]) {
-      assertCan(
-        ability,
-        'update',
-        subject('Role', record),
-        this.auditService,
-        { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
-        this.metricsService
-      );
-    }
-    const changed = changedFields(role, updateRoleDto);
     return this.roleService.update(
       id,
       updateRoleDto,
-      this.auditRow(req, {
-        action: AuditAction.ROLE_UPDATE,
-        targetType: 'Role',
-        targetId: id,
-        details: { changedFields: changed }
-      })
+      ability,
+      req.user?.userId,
+      (before) =>
+        this.auditRow(req, {
+          action: AuditAction.ROLE_UPDATE,
+          targetType: 'Role',
+          targetId: id,
+          details: { changedFields: changedFields(before, updateRoleDto) }
+        })
     );
   }
 
@@ -260,21 +222,9 @@ export class RolesController {
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const role = await this.roleService.findOne(id);
-    assertCan(
-      ability,
-      'delete',
-      subject('Role', role),
-      this.auditService,
-      { actorId: req.user?.userId, targetId: id, targetType: 'Role' },
-      this.metricsService
-    );
     // The row is gone after the delete, so the name is recorded here: a bare
     // targetId resolves to nothing once the role no longer exists.
-    await this.roleService.delete(
-      id,
-      ability,
-      req.user?.userId,
+    await this.roleService.delete(id, ability, req.user?.userId, (role) =>
       this.auditRow(req, {
         action: AuditAction.ROLE_DELETE,
         targetType: 'Role',

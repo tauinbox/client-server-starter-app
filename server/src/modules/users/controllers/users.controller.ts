@@ -16,7 +16,6 @@ import {
   SerializeOptions
 } from '@nestjs/common';
 import { packRules } from '@casl/ability/extra';
-import { subject } from '@casl/ability';
 import { UsersService } from '../services/users.service';
 import { MailService } from '../../mail/mail.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
@@ -40,13 +39,12 @@ import { AdminUserResponseDto } from '../dtos/admin-user-response.dto';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { CurrentAbility } from '../../auth/decorators/current-ability.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
+import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AppAbility } from '../../auth/casl/app-ability';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserDeletedEvent } from '../events/user-deleted.event';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { assertCan } from '../../../common/utils/assert-can.util';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
 import { UserSessionRevocationRequiredEvent } from '../events/user-session-revocation-required.event';
@@ -86,7 +84,6 @@ export class UsersController {
     private readonly mailService: MailService,
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
-    private readonly metricsService: MetricsService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly authService: AuthService,
     private readonly mfaService: MfaService
@@ -112,21 +109,10 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    // The route-level @Authorize check is type-level and ignores conditions,
-    // so a conditional create grant is re-evaluated against the record the
-    // caller is asking to create. The password is deliberately left out of the
-    // subject: no authorization condition can legitimately be written over it.
-    const { password: _password, ...subjectFields } = createUserDto;
-    assertCan(
-      ability,
-      'create',
-      subject('User', subjectFields),
-      this.auditService,
-      { actorId: req.user.userId, targetType: 'User' },
-      this.metricsService
-    );
     const createdUser = await this.usersService.create(
       createUserDto,
+      ability,
+      req.user.userId,
       (user) => [
         {
           action: AuditAction.USER_CREATE,
@@ -193,21 +179,12 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  async findOne(
+  findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const user = await this.usersService.findOne(id);
-    assertCan(
-      ability,
-      'read',
-      subject('User', user),
-      this.auditService,
-      { actorId: req.user.userId, targetId: id, targetType: 'User' },
-      this.metricsService
-    );
-    return user;
+    return this.usersService.findOne(id, ability, req.user.userId);
   }
 
   @Get(':id/permissions')
@@ -227,14 +204,10 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() callerAbility: AppAbility
   ) {
-    const user = await this.usersService.findOne(id);
-    assertCan(
+    const user = await this.usersService.findOne(
+      id,
       callerAbility,
-      'read',
-      subject('User', user),
-      this.auditService,
-      { actorId: req.user.userId, targetId: id, targetType: 'User' },
-      this.metricsService
+      req.user.userId
     );
     const { ability, permissions } =
       await this.caslAbilityFactory.resolveForUser(id);
@@ -292,7 +265,7 @@ export class UsersController {
     // The service rewrites the address only when it actually differs, so the
     // pre-image is the only way to tell a real change from a form resubmit -
     // and revoking on a resubmit would log the target out for nothing.
-    const target = await this.usersService.findOne(id);
+    const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
     let previousEmail: string | undefined;
     if (changes.email !== undefined || changes.password !== undefined) {
       if (changes.email !== undefined) {
@@ -467,7 +440,7 @@ export class UsersController {
       );
     }
 
-    const target = await this.usersService.findOne(id);
+    const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
     // Before the step-up, so a request refused anyway spends no code; the
     // instance check leads so an outsider cannot probe for the factor.
     this.usersService.assertCanWrite(
@@ -506,7 +479,7 @@ export class UsersController {
       new UserSessionRevocationRequiredEvent(id)
     );
     this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
-    return this.usersService.findOne(id);
+    return this.usersService.findOne(id, SYSTEM_ABILITY);
   }
 
   // No step-up: the same permission deactivates the account without one, and
@@ -539,7 +512,7 @@ export class UsersController {
       );
     }
 
-    const target = await this.usersService.findOne(id);
+    const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
     this.usersService.assertCanWrite(
       ability,
       'update',
@@ -590,7 +563,7 @@ export class UsersController {
       req.user.userId
     );
     await this.authService.assertStepUp(
-      await this.usersService.findOne(req.user.userId),
+      await this.usersService.findOne(req.user.userId, SYSTEM_ABILITY),
       currentPassword,
       undefined,
       STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,

@@ -700,7 +700,10 @@ describe('AuthController', () => {
 
       const result = await controller.getProfile(req);
 
-      expect(userServiceMock.findOne).toHaveBeenCalledWith('user-5');
+      expect(userServiceMock.findOne).toHaveBeenCalledWith(
+        'user-5',
+        SYSTEM_ABILITY
+      );
       expect(result).toEqual({ id: 'user-1', email: 'admin@example.com' });
     });
   });

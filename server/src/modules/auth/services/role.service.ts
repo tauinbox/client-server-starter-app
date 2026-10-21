@@ -23,7 +23,9 @@ import { PermissionService } from './permission.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import { PermissionCondition } from '@app/shared/types';
 import { ErrorKeys, ROLE_LIST_QUERY } from '@app/shared/constants';
-import type { AppAbility } from '../casl/app-ability';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
+import type { AbilityOrSystem, AppAbility } from '../casl/app-ability';
+import { withChanges } from '@app/shared/utils/changed-fields';
 import {
   isDenyCondition,
   sameConditions,
@@ -95,11 +97,11 @@ export class RoleService {
   }
 
   private async assertGrantAllowed(
-    ability: AppAbility | undefined,
+    ability: AbilityOrSystem,
     items: { permissionId: string; conditions?: PermissionCondition | null }[],
     context: { actorId?: string; roleId: string }
   ): Promise<void> {
-    if (!ability) return;
+    if (ability === SYSTEM_ABILITY) return;
     // Resolve before the super bypass so unknown permission ids fail with a
     // clean 400 for every caller instead of an opaque FK-violation 409.
     const resolved = await this.resolveGrantItems(items);
@@ -121,7 +123,7 @@ export class RoleService {
    * without a deny effect are ignored.
    */
   private async assertDenyLiftAllowed(
-    ability: AppAbility | undefined,
+    ability: AbilityOrSystem,
     rows: { permissionId: string; conditions: PermissionCondition | null }[],
     context: { actorId?: string; roleId: string }
   ): Promise<void> {
@@ -137,10 +139,8 @@ export class RoleService {
     }
   }
 
-  private isScopeChecked(
-    ability: AppAbility | undefined
-  ): ability is AppAbility {
-    return ability !== undefined && !ability.can('manage', 'all');
+  private isScopeChecked(ability: AbilityOrSystem): ability is AppAbility {
+    return ability !== SYSTEM_ABILITY && !ability.can('manage', 'all');
   }
 
   private async findDenyRows(roleId: string): Promise<RolePermission[]> {
@@ -274,29 +274,30 @@ export class RoleService {
   }
 
   /**
-   * Re-evaluate a conditional `update:Role` grant against the loaded row.
-   * The route-level @Authorize check is type-level only, so without this a
-   * caller scoped to one role could mutate any other role's permission set.
+   * Re-evaluate a conditional `Role` grant against the record. The route-level
+   * @Authorize check is type-level only, so without this a caller scoped to
+   * one role could read or change any other role.
    */
-  private assertCanUpdateRole(
-    role: Role,
-    ability?: AppAbility,
+  private assertCanRole(
+    ability: AbilityOrSystem,
+    action: string,
+    record: Partial<Role>,
     actorId?: string
   ): void {
-    if (!ability) return;
+    if (ability === SYSTEM_ABILITY) return;
     assertCan(
       ability,
-      'update',
-      subject('Role', role),
+      action,
+      subject('Role', record),
       this.auditService,
-      { actorId, targetId: role.id, targetType: 'Role' },
+      { actorId, targetId: record.id, targetType: 'Role' },
       this.metricsService
     );
   }
 
-  private assertNotSystem(role: Role, ability?: AppAbility): void {
+  private assertNotSystem(role: Role, ability: AbilityOrSystem): void {
     if (!role.isSystem) return;
-    if (ability && ability.can('manage', 'all')) return;
+    if (ability !== SYSTEM_ABILITY && ability.can('manage', 'all')) return;
     throw new HttpException(
       {
         message: 'Cannot modify system roles',
@@ -328,7 +329,17 @@ export class RoleService {
     );
   }
 
-  async findOne(id: string): Promise<Role> {
+  async findOne(
+    id: string,
+    ability: AbilityOrSystem,
+    actorId?: string
+  ): Promise<Role> {
+    const role = await this.loadRole(id);
+    this.assertCanRole(ability, 'read', role, actorId);
+    return role;
+  }
+
+  private async loadRole(id: string): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { id } });
     if (!role) {
       throw new HttpException(
@@ -345,8 +356,11 @@ export class RoleService {
       description?: string;
       isSuper?: boolean;
     },
+    ability: AbilityOrSystem,
+    actorId?: string,
     audit?: (role: Role) => AuditLogParams
   ): Promise<Role> {
+    this.assertCanRole(ability, 'create', data, actorId);
     if (data.isSuper !== undefined) {
       throw new HttpException(
         {
@@ -376,12 +390,20 @@ export class RoleService {
     });
   }
 
+  /** `audit` gets the role as it is before the write. */
   async update(
     id: string,
     data: { name?: string; description?: string; isSuper?: boolean },
-    audit?: AuditLogParams
+    ability: AbilityOrSystem,
+    actorId?: string,
+    audit?: (before: Role) => AuditLogParams
   ): Promise<Role> {
-    const role = await this.findOne(id);
+    const role = await this.loadRole(id);
+    // The record after the write is checked too: else a grant scoped by a
+    // writable field lets the caller move a role out of its own scope.
+    for (const record of [role, withChanges(role, data)]) {
+      this.assertCanRole(ability, 'update', record, actorId);
+    }
     if (role.isSystem) {
       throw new HttpException(
         {
@@ -415,12 +437,13 @@ export class RoleService {
       }
     }
     const oldName = role.name;
+    const auditRow = audit?.({ ...role });
     Object.assign(role, data);
     if (role.name === oldName) {
       return this.writeAudited(
         this.roleRepository.manager,
         (em) => em.save(Role, role),
-        audit
+        auditRow
       );
     }
 
@@ -429,7 +452,7 @@ export class RoleService {
       RoleRenamedEvent.name,
       (em, committed) =>
         new RoleRenamedEvent(oldName, role.name, em, committed),
-      audit
+      auditRow
     );
     // Holders have the old name in the cached role names that flag rules use.
     await this.invalidateUsersWithRole(id);
@@ -438,11 +461,12 @@ export class RoleService {
 
   async delete(
     id: string,
-    ability?: AppAbility,
+    ability: AbilityOrSystem,
     actorId?: string,
-    audit?: AuditLogParams
+    audit?: (role: Role) => AuditLogParams
   ): Promise<void> {
-    const role = await this.findOne(id);
+    const role = await this.loadRole(id);
+    this.assertCanRole(ability, 'delete', role, actorId);
     if (role.isSystem) {
       throw new HttpException(
         {
@@ -462,11 +486,12 @@ export class RoleService {
     // re-caches the deleted grants for the TTL. Holders are read first: the
     // remove cascades.
     const holderIds = await this.findHolderIds(id);
+    const auditRow = audit?.(role);
     await this.writeWithRoleEvent(
       (em) => em.remove(Role, role),
       RoleDeletedEvent.name,
       (em, committed) => new RoleDeletedEvent(role.name, em, committed),
-      audit
+      auditRow
     );
     await this.invalidateHolders(holderIds);
   }
@@ -543,17 +568,21 @@ export class RoleService {
     return targetUser;
   }
 
+  /**
+   * No API path assigns a super role: every route passes the ability of the
+   * caller. `SYSTEM_ABILITY` may, because seeders and tests need it.
+   */
   async assignRoleToUser(
     userId: string,
     roleId: string,
-    ability?: AppAbility,
+    ability: AbilityOrSystem,
     actorId?: string,
     audit?: AuditLogParams
   ): Promise<void> {
     const targetUser = await this.loadRoleAssignmentTarget(userId);
-    const role = await this.findOne(roleId);
+    const role = await this.loadRole(roleId);
 
-    if (ability) {
+    if (ability !== SYSTEM_ABILITY) {
       if (role.isSuper) {
         this.metricsService.recordPermissionDenied(
           'instance',
@@ -616,14 +645,14 @@ export class RoleService {
   async removeRoleFromUser(
     userId: string,
     roleId: string,
-    ability?: AppAbility,
+    ability: AbilityOrSystem,
     actorId?: string,
     audit?: AuditLogParams
   ): Promise<void> {
     const targetUser = await this.loadRoleAssignmentTarget(userId);
-    const role = await this.findOne(roleId);
+    const role = await this.loadRole(roleId);
 
-    if (ability) {
+    if (ability !== SYSTEM_ABILITY) {
       if (role.isSuper) {
         this.metricsService.recordPermissionDenied(
           'instance',
@@ -691,8 +720,12 @@ export class RoleService {
       .getMany();
   }
 
-  async getPermissionsForRole(roleId: string): Promise<RolePermission[]> {
-    await this.findOne(roleId);
+  async getPermissionsForRole(
+    roleId: string,
+    ability: AbilityOrSystem,
+    actorId?: string
+  ): Promise<RolePermission[]> {
+    await this.findOne(roleId, ability, actorId);
     return this.rolePermissionRepository.find({
       where: { roleId },
       relations: { permission: true }
@@ -702,12 +735,12 @@ export class RoleService {
   async setPermissionsForRole(
     roleId: string,
     items: { permissionId: string; conditions?: PermissionCondition | null }[],
-    ability?: AppAbility,
+    ability: AbilityOrSystem,
     actorId?: string,
     audit?: AuditLogParams
   ): Promise<void> {
-    const role = await this.findOne(roleId);
-    this.assertCanUpdateRole(role, ability, actorId);
+    const role = await this.loadRole(roleId);
+    this.assertCanRole(ability, 'update', role, actorId);
     this.assertNotSystem(role, ability);
     await this.assertGrantsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
@@ -747,13 +780,13 @@ export class RoleService {
   async assignPermissionsToRole(
     roleId: string,
     permissionIds: string[],
-    conditions?: PermissionCondition,
-    ability?: AppAbility,
+    conditions: PermissionCondition | undefined,
+    ability: AbilityOrSystem,
     actorId?: string,
     audit?: AuditLogParams
   ): Promise<void> {
-    const role = await this.findOne(roleId);
-    this.assertCanUpdateRole(role, ability, actorId);
+    const role = await this.loadRole(roleId);
+    this.assertCanRole(ability, 'update', role, actorId);
     this.assertNotSystem(role, ability);
     const items = permissionIds.map((permissionId) => ({
       permissionId,
@@ -779,12 +812,12 @@ export class RoleService {
   async removePermissionFromRole(
     roleId: string,
     permissionId: string,
-    ability?: AppAbility,
+    ability: AbilityOrSystem,
     actorId?: string,
     audit?: AuditLogParams
   ): Promise<void> {
-    const role = await this.findOne(roleId);
-    this.assertCanUpdateRole(role, ability, actorId);
+    const role = await this.loadRole(roleId);
+    this.assertCanRole(ability, 'update', role, actorId);
     this.assertNotSystem(role, ability);
     if (this.isScopeChecked(ability)) {
       const row = await this.rolePermissionRepository.findOne({

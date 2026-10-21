@@ -1,14 +1,7 @@
-// Integration regression for a type-level @Authorize bypass on
-// single-entity endpoints. Conditional CASL rules (e.g. `read:User` with
-// `{ id: '${user.id}' }`) pass the type-level check but MUST be re-evaluated
-// against the loaded entity, otherwise any conditional grant becomes an
-// unconditional grant on the affected endpoint.
-//
-// Drives full HTTP path against each affected controller with a real
-// MongoAbility built via AbilityBuilder + condition resolvers analogous to
-// the production CASL factory.
+// A conditional grant passes the type-level @Authorize check, so the record
+// must be checked too. The HTTP path runs through each controller and the REAL
+// service that does the check; only the repositories are stubbed.
 
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   CanActivate,
   ExecutionContext,
@@ -18,7 +11,9 @@ import {
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
+import { DataSource } from 'typeorm';
 import type { Subjects } from '../src/modules/auth/casl/app-ability';
 import request from 'supertest';
 import { Server } from 'http';
@@ -34,11 +29,18 @@ import { RbacController } from '../src/modules/auth/controllers/rbac.controller'
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { ResourceService } from '../src/modules/auth/services/resource.service';
+import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
+import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { User } from '../src/modules/users/entities/user.entity';
+import { Role } from '../src/modules/auth/entities/role.entity';
+import { Permission } from '../src/modules/auth/entities/permission.entity';
+import { RolePermission } from '../src/modules/auth/entities/role-permission.entity';
+import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
@@ -78,61 +80,70 @@ class TestPermissionsGuard implements CanActivate {
   }
 }
 
-interface FixtureMocks {
-  usersService: {
-    findOne: jest.Mock;
-  };
-  roleService: {
-    findOne: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-    getPermissionsForRole: jest.Mock;
-  };
-  resourceService: {
-    findOne: jest.Mock;
-    update: jest.Mock;
-    restore: jest.Mock;
+/** Rows that the stubbed `findOne` of a repository answers, by id. */
+type Rows = Map<string, Record<string, unknown>>;
+
+function repositoryOf(rows: Rows, save: jest.Mock) {
+  return {
+    findOne: jest.fn(({ where }: { where: { id: string } }) =>
+      Promise.resolve(rows.get(where.id) ?? null)
+    ),
+    manager: {
+      transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
+        work({
+          save: (...args: unknown[]): unknown => save(args[args.length - 1])
+        })
+      )
+    }
   };
 }
 
 describe('Instance-level @Authorize re-check', () => {
   let app: INestApplication;
-  let mocks: FixtureMocks;
   let holder: AbilityHolder;
+  const userRows: Rows = new Map();
+  const roleRows: Rows = new Map();
+  const resourceRows: Rows = new Map();
+  // Every write of the three services goes through the transaction manager
+  // above, so one spy shows whether a refused request wrote anything.
+  const save = jest.fn((entity: unknown) => Promise.resolve(entity));
 
   beforeAll(async () => {
-    mocks = {
-      usersService: {
-        findOne: jest.fn()
-      },
-      roleService: {
-        findOne: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-        getPermissionsForRole: jest.fn().mockResolvedValue([])
-      },
-      resourceService: {
-        findOne: jest.fn(),
-        update: jest.fn(),
-        restore: jest.fn()
-      }
-    };
-
     holder = new AbilityHolder();
 
     @Module({
       controllers: [UsersController, RolesController, RbacController],
       providers: [
         RESPONSE_SERIALIZER,
+        UsersService,
+        RoleService,
+        ResourceService,
         // Stubbed: the step-up has its own suite, user-credential-step-up.
         { provide: AuthService, useValue: { assertStepUp: jest.fn() } },
         { provide: MfaService, useValue: {} },
         { provide: AbilityHolder, useValue: holder },
         { provide: APP_GUARD, useClass: TestJwtAuthGuard },
         { provide: APP_GUARD, useClass: TestPermissionsGuard },
-        { provide: UsersService, useValue: mocks.usersService },
-        { provide: RoleService, useValue: mocks.roleService },
-        { provide: ResourceService, useValue: mocks.resourceService },
+        {
+          provide: getRepositoryToken(User),
+          useValue: repositoryOf(userRows, save)
+        },
+        {
+          provide: getRepositoryToken(Role),
+          useValue: repositoryOf(roleRows, save)
+        },
+        {
+          provide: getRepositoryToken(Resource),
+          useValue: repositoryOf(resourceRows, save)
+        },
+        { provide: getRepositoryToken(Permission), useValue: {} },
+        { provide: getRepositoryToken(RolePermission), useValue: {} },
+        { provide: DataSource, useValue: {} },
+        { provide: BreachedPasswordService, useValue: {} },
+        {
+          provide: ResourceRegistryService,
+          useValue: { isRegistered: () => true }
+        },
         {
           provide: PermissionService,
           useValue: {
@@ -200,6 +211,9 @@ describe('Instance-level @Authorize re-check', () => {
   afterEach(() => {
     jest.clearAllMocks();
     holder.current = undefined;
+    userRows.clear();
+    roleRows.clear();
+    resourceRows.clear();
   });
 
   function http(): Server {
@@ -226,11 +240,8 @@ describe('Instance-level @Authorize re-check', () => {
     const OTHER_ID = '22222222-2222-4222-8222-222222222222';
 
     beforeEach(() => {
-      mocks.usersService.findOne.mockImplementation((id: string) => {
-        if (id === SELF_ID) return Promise.resolve({ id: SELF_ID });
-        if (id === OTHER_ID) return Promise.resolve({ id: OTHER_ID });
-        return Promise.reject(new Error('not found'));
-      });
+      userRows.set(SELF_ID, { id: SELF_ID, roles: [] });
+      userRows.set(OTHER_ID, { id: OTHER_ID, roles: [] });
       // CASL rule allowing read of users where id matches the caller's id.
       // Type-level ability.can('read', 'User') returns true (any allow rule
       // for the type passes). Instance-level ability.can('read',
@@ -255,20 +266,15 @@ describe('Instance-level @Authorize re-check', () => {
     const CUSTOM_ROLE = '44444444-4444-4444-8444-444444444444';
 
     beforeEach(() => {
-      mocks.roleService.findOne.mockImplementation((id: string) => {
-        if (id === SYSTEM_ROLE)
-          return Promise.resolve({
-            id: SYSTEM_ROLE,
-            name: 'admin',
-            isSystem: true
-          });
-        if (id === CUSTOM_ROLE)
-          return Promise.resolve({
-            id: CUSTOM_ROLE,
-            name: 'editor',
-            isSystem: false
-          });
-        return Promise.reject(new Error('not found'));
+      roleRows.set(SYSTEM_ROLE, {
+        id: SYSTEM_ROLE,
+        name: 'admin',
+        isSystem: true
+      });
+      roleRows.set(CUSTOM_ROLE, {
+        id: CUSTOM_ROLE,
+        name: 'editor',
+        isSystem: false
       });
       holder.current = abilityWithRule('read', 'Role', { isSystem: false });
     });
@@ -287,14 +293,8 @@ describe('Instance-level @Authorize re-check', () => {
     const ROLE_B = '66666666-6666-4666-8666-666666666666';
 
     beforeEach(() => {
-      mocks.roleService.findOne.mockImplementation((id: string) => {
-        if (id === ROLE_A)
-          return Promise.resolve({ id: ROLE_A, name: 'editor-a' });
-        if (id === ROLE_B)
-          return Promise.resolve({ id: ROLE_B, name: 'editor-b' });
-        return Promise.reject(new Error('not found'));
-      });
-      mocks.roleService.update.mockResolvedValue({ id: ROLE_A });
+      roleRows.set(ROLE_A, { id: ROLE_A, name: 'editor-a', isSystem: false });
+      roleRows.set(ROLE_B, { id: ROLE_B, name: 'editor-b', isSystem: false });
       // Allow update only on the role named 'editor-a'.
       holder.current = abilityWithRule('update', 'Role', { name: 'editor-a' });
     });
@@ -304,7 +304,7 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/roles/${ROLE_B}`)
         .send({ description: 'x' })
         .expect(403);
-      expect(mocks.roleService.update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
     });
 
     it('returns 200 when patching a role that satisfies the condition', async () => {
@@ -312,10 +312,8 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/roles/${ROLE_A}`)
         .send({ description: 'x' })
         .expect(200);
-      expect(mocks.roleService.update).toHaveBeenCalledWith(
-        ROLE_A,
-        expect.objectContaining({ description: 'x' }),
-        expect.objectContaining({ action: AuditAction.ROLE_UPDATE })
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: ROLE_A, description: 'x' })
       );
     });
   });
@@ -327,14 +325,16 @@ describe('Instance-level @Authorize re-check', () => {
     const ROLES_RESOURCE = '88888888-8888-4888-8888-888888888888';
 
     beforeEach(() => {
-      mocks.resourceService.findOne.mockImplementation((id: string) => {
-        if (id === USERS_RESOURCE)
-          return Promise.resolve({ id: USERS_RESOURCE, name: 'users' });
-        if (id === ROLES_RESOURCE)
-          return Promise.resolve({ id: ROLES_RESOURCE, name: 'roles' });
-        return Promise.resolve(null);
+      resourceRows.set(USERS_RESOURCE, {
+        id: USERS_RESOURCE,
+        name: 'users',
+        actionNames: ['read']
       });
-      mocks.resourceService.update.mockResolvedValue({ id: USERS_RESOURCE });
+      resourceRows.set(ROLES_RESOURCE, {
+        id: ROLES_RESOURCE,
+        name: 'roles',
+        actionNames: ['read']
+      });
       holder.current = abilityWithRule('update', 'Permission', {
         name: { $in: ['users'] }
       });
@@ -345,7 +345,7 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/rbac/resources/${ROLES_RESOURCE}`)
         .send({ displayName: 'Roles' })
         .expect(403);
-      expect(mocks.resourceService.update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
     });
 
     it('returns 200 when the resource satisfies the condition', async () => {
@@ -353,7 +353,9 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/rbac/resources/${USERS_RESOURCE}`)
         .send({ displayName: 'Accounts' })
         .expect(200);
-      expect(mocks.resourceService.update).toHaveBeenCalled();
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: USERS_RESOURCE, displayName: 'Accounts' })
+      );
     });
   });
 });

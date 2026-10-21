@@ -27,6 +27,7 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import type { MfaRequiredResponse } from '@app/shared/types';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 
 @Injectable()
 export class OAuthService {
@@ -84,7 +85,10 @@ export class OAuthService {
     if (existingOAuth) {
       // `lockedUntil` counts password guesses; locking the provider path too
       // would let an attacker deny the owner every way in.
-      user = await this.usersService.findOne(existingOAuth.userId);
+      user = await this.usersService.findOne(
+        existingOAuth.userId,
+        SYSTEM_ABILITY
+      );
       if (!user.isActive) {
         throw new HttpException(
           {
@@ -211,7 +215,7 @@ export class OAuthService {
 
       // Re-read with `roles` relation so the response includes the full
       // RoleResponse[] shape expected by UserResponseDto.
-      user = await this.usersService.findOne(createdUserId);
+      user = await this.usersService.findOne(createdUserId, SYSTEM_ABILITY);
     }
 
     return user;
@@ -339,7 +343,7 @@ export class OAuthService {
     userId: string,
     intentIssuedAt: number
   ): Promise<User> {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
     if (!user.isActive) {
       throw new HttpException(
         {

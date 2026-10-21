@@ -21,6 +21,7 @@ import { AttributeRegistryService } from './attribute-registry.service';
 import { PermissionService } from '../../auth/services/permission.service';
 import { UsersService } from '../../users/services/users.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 
 export interface ResolverUser {
   userId: string;
@@ -76,12 +77,14 @@ export class FeatureFlagResolverService {
    */
   async buildResolverUser(userId: string): Promise<ResolverUser> {
     const [user, roles] = await Promise.all([
-      this.usersService.findOne(userId).catch((err: unknown) => {
-        if (err instanceof HttpException && err.getStatus() === 404) {
-          return null;
-        }
-        throw err;
-      }),
+      this.usersService
+        .findOne(userId, SYSTEM_ABILITY)
+        .catch((err: unknown) => {
+          if (err instanceof HttpException && err.getStatus() === 404) {
+            return null;
+          }
+          throw err;
+        }),
       this.permissionService.getRoleNamesForUser(userId)
     ]);
     return {

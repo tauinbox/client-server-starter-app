@@ -16,6 +16,7 @@ import { RoleService } from '../src/modules/auth/services/role.service';
 import {
   AbilityBuilder,
   createMongoAbility,
+  SYSTEM_ABILITY,
   type AppAbility
 } from '../src/modules/auth/casl/app-ability';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
@@ -126,11 +127,20 @@ runWithInfra(
       viewer = await saveUser(emails.viewer);
       plain = await saveUser(emails.plain);
       target = await saveUser(emails.target);
-      const viewerRole = await roleService.create({ name: `${tag}-viewer` });
-      await roleService.setPermissionsForRole(viewerRole.id, [
-        { permissionId: searchUser.id }
-      ]);
-      await roleService.assignRoleToUser(viewer.id, viewerRole.id);
+      const viewerRole = await roleService.create(
+        { name: `${tag}-viewer` },
+        SYSTEM_ABILITY
+      );
+      await roleService.setPermissionsForRole(
+        viewerRole.id,
+        [{ permissionId: searchUser.id }],
+        SYSTEM_ABILITY
+      );
+      await roleService.assignRoleToUser(
+        viewer.id,
+        viewerRole.id,
+        SYSTEM_ABILITY
+      );
     }, 60000);
 
     afterAll(async () => {
@@ -146,7 +156,7 @@ runWithInfra(
 
     async function openStream(user: User): Promise<() => ListEvent[]> {
       const { tokens } = await authService.login(
-        await usersService.findOne(user.id),
+        await usersService.findOne(user.id, SYSTEM_ABILITY),
         { userAgent: 'crud-events-triggers-e2e', ipAddress: '203.0.113.11' }
       );
       return new Promise((resolve, reject) => {
@@ -256,7 +266,10 @@ runWithInfra(
 
     it('sends updated for a role assign and a role remove', async () => {
       const stream = await openStream(viewer);
-      const extra = await roleService.create({ name: `${tag}-extra` });
+      const extra = await roleService.create(
+        { name: `${tag}-extra` },
+        SYSTEM_ABILITY
+      );
       const req = requestOf(randomUUID());
 
       await rolesController.assignRole(
@@ -316,7 +329,10 @@ runWithInfra(
     it('sends user_list_stale after a role rename and a role delete, only to list viewers', async () => {
       const stream = await openStream(viewer);
       const plainStream = await openStream(plain);
-      const renamed = await roleService.create({ name: `${tag}-doomed` });
+      const renamed = await roleService.create(
+        { name: `${tag}-doomed` },
+        SYSTEM_ABILITY
+      );
       const req = requestOf(randomUUID());
 
       await rolesController.update(

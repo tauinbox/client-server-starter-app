@@ -18,6 +18,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
@@ -75,10 +76,12 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
         .getRepository(User)
         .findOneOrFail({ where: { email: adminEmail } })
     ).id;
-    await app.get(RoleService).assignRoleToUser(adminId, superRole.id);
+    await app
+      .get(RoleService)
+      .assignRoleToUser(adminId, superRole.id, SYSTEM_ABILITY);
     const { tokens } = await app
       .get(AuthService)
-      .login(await app.get(UsersService).findOne(adminId), {
+      .login(await app.get(UsersService).findOne(adminId, SYSTEM_ABILITY), {
         userAgent: 'flag-audit-tx-e2e',
         ipAddress: null
       });

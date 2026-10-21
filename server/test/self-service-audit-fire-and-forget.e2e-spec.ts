@@ -19,6 +19,7 @@ import {
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersService } from '../src/modules/users/services/users.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -70,12 +71,15 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
     failures = app.get(getToken('audit_write_failures_total'));
 
     ownerId = (
-      await usersService.create({
-        email: ownerEmail,
-        password,
-        firstName: 'Self',
-        lastName: 'Service'
-      })
+      await usersService.create(
+        {
+          email: ownerEmail,
+          password,
+          firstName: 'Self',
+          lastName: 'Service'
+        },
+        SYSTEM_ABILITY
+      )
     ).id;
     await dataSource
       .getRepository(User)
@@ -114,7 +118,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
   }
 
   async function owner(): Promise<User> {
-    return usersService.findOne(ownerId);
+    return usersService.findOne(ownerId, SYSTEM_ABILITY);
   }
 
   it('register answers 201, stores the account and counts the lost row', async () => {

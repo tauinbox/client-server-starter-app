@@ -20,6 +20,7 @@ import { CoreModule } from '../src/modules/core/core.module';
 import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { UsersService } from '../src/modules/users/services/users.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -128,10 +129,13 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
     const { id } = await dataSource
       .getRepository(User)
       .findOneByOrFail({ email });
-    const { tokens } = await authService.login(await usersService.findOne(id), {
-      userAgent: 'Previous-Device',
-      ipAddress: null
-    });
+    const { tokens } = await authService.login(
+      await usersService.findOne(id, SYSTEM_ABILITY),
+      {
+        userAgent: 'Previous-Device',
+        ipAddress: null
+      }
+    );
     return `${refreshCookieName}=${tokens.refresh_token}`;
   }
 

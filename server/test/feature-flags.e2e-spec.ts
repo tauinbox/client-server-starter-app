@@ -41,6 +41,7 @@ import { NotificationsService } from '../src/modules/notifications/notifications
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { FeatureFlagsController } from '../src/modules/feature-flags/controllers/feature-flags.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
@@ -62,8 +63,8 @@ async function setRules(
   rules: FeatureFlagRuleDto[],
   actor: FlagAuditActor
 ): Promise<FeatureFlag> {
-  const current = await service.findOne(id);
-  return service.update(current, { rules }, current.version, actor);
+  const current = await service.findOne(id, SYSTEM_ABILITY);
+  return service.update(id, { rules }, current.version, SYSTEM_ABILITY, actor);
 }
 
 // ── In-memory repository stand-ins ─────────────────────────────────────────
@@ -338,6 +339,7 @@ describe('Feature flags end-to-end', () => {
   it('happy path: admin creates flag, adds 10% rule, bucketed user sees true after bump to 100%', async () => {
     const flag = await flagService.create(
       { key: 'beta-export', enabled: true, public: false },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
 
@@ -417,6 +419,7 @@ describe('Feature flags end-to-end', () => {
   it('deny-overrides: exclude rule beats include rule for the same user', async () => {
     const flag = await flagService.create(
       { key: 'risky-feature', enabled: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await setRules(
@@ -458,22 +461,30 @@ describe('Feature flags end-to-end', () => {
   it('PATCH /:id rejects a stale version with HTTP 409', async () => {
     const flag = await flagService.create(
       { key: 'v-lock', enabled: false },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     expect(flag.version).toBe(1);
 
     // Concurrent edit from another caller — bumps version to 2.
     const next = await flagService.update(
-      flag,
+      flag.id,
       { enabled: true },
       1,
+      SYSTEM_ABILITY,
       flagAuditActor('actor-2')
     );
     expect(next.version).toBe(2);
 
     // Stale PATCH at v1 → 409.
     await expect(
-      flagService.update(flag, { enabled: false }, 1, flagAuditActor('actor-3'))
+      flagService.update(
+        flag.id,
+        { enabled: false },
+        1,
+        SYSTEM_ABILITY,
+        flagAuditActor('actor-3')
+      )
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -502,6 +513,7 @@ describe('Feature flags end-to-end', () => {
   it('preview() returns included-by-rule with matchedRule index for a synthetic role context', async () => {
     const flag = await flagService.create(
       { key: 'beta-preview', enabled: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await setRules(
@@ -520,9 +532,12 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
 
-    const result = flagService.preview(await flagService.findOne(flag.id), {
-      roles: ['beta-tester']
-    });
+    const result = flagService.preview(
+      await flagService.findOne(flag.id, SYSTEM_ABILITY),
+      {
+        roles: ['beta-tester']
+      }
+    );
     expect(result).toEqual({
       result: true,
       reason: 'included-by-rule',
@@ -533,6 +548,7 @@ describe('Feature flags end-to-end', () => {
   it('preview() returns excluded when an exclude rule fires before any include', async () => {
     const flag = await flagService.create(
       { key: 'gated-preview', enabled: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await setRules(
@@ -551,9 +567,12 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
 
-    const result = flagService.preview(await flagService.findOne(flag.id), {
-      roles: ['beta', 'banned']
-    });
+    const result = flagService.preview(
+      await flagService.findOne(flag.id, SYSTEM_ABILITY),
+      {
+        roles: ['beta', 'banned']
+      }
+    );
     expect(result.result).toBe(false);
     expect(result.reason).toBe('excluded');
     expect(result.matchedRule).toEqual({
@@ -566,6 +585,7 @@ describe('Feature flags end-to-end', () => {
   it('preview() reports not-included when no include rule matched', async () => {
     const flag = await flagService.create(
       { key: 'unmatched-preview', enabled: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await setRules(
@@ -580,9 +600,12 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
 
-    const result = flagService.preview(await flagService.findOne(flag.id), {
-      roles: ['plain']
-    });
+    const result = flagService.preview(
+      await flagService.findOne(flag.id, SYSTEM_ABILITY),
+      {
+        roles: ['plain']
+      }
+    );
     expect(result).toEqual({
       result: false,
       reason: 'not-included',
@@ -593,6 +616,7 @@ describe('Feature flags end-to-end', () => {
   it('rejects a createdAt rule with an operator that can never match', async () => {
     const flag = await flagService.create(
       { key: 'created-eq', enabled: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await expect(
@@ -637,6 +661,7 @@ describe('Feature flags end-to-end', () => {
   ])('rejects a rule with %s', async (_label, payload, message) => {
     const flag = await flagService.create(
       { key: `bad-payload-${payload.type}`, enabled: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await expect(
@@ -647,7 +672,9 @@ describe('Feature flags end-to-end', () => {
         flagAuditActor('actor-1')
       )
     ).rejects.toMatchObject({ status: 400, message });
-    await expect(flagService.findOne(flag.id)).resolves.toMatchObject({
+    await expect(
+      flagService.findOne(flag.id, SYSTEM_ABILITY)
+    ).resolves.toMatchObject({
       rules: []
     });
   });
@@ -657,6 +684,7 @@ describe('Feature flags end-to-end', () => {
     const dayBefore = new Date(createdAt.getTime() - 24 * 60 * 60 * 1000);
     const flag = await flagService.create(
       { key: 'new-accounts', enabled: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await setRules(
@@ -677,9 +705,12 @@ describe('Feature flags end-to-end', () => {
     );
     await resolver.invalidateAll();
 
-    const preview = flagService.preview(await flagService.findOne(flag.id), {
-      attributes: { createdAt: createdAt.toISOString() }
-    });
+    const preview = flagService.preview(
+      await flagService.findOne(flag.id, SYSTEM_ABILITY),
+      {
+        attributes: { createdAt: createdAt.toISOString() }
+      }
+    );
     expect(preview.result).toBe(true);
 
     const evaluated = await resolver.evaluateForUser(
@@ -692,11 +723,15 @@ describe('Feature flags end-to-end', () => {
   it('preview() reports disabled when the flag itself is off', async () => {
     const flag = await flagService.create(
       { key: 'off-preview', enabled: false },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    const result = flagService.preview(await flagService.findOne(flag.id), {
-      roles: ['anyone']
-    });
+    const result = flagService.preview(
+      await flagService.findOne(flag.id, SYSTEM_ABILITY),
+      {
+        roles: ['anyone']
+      }
+    );
     expect(result).toEqual({
       result: false,
       reason: 'disabled',
@@ -707,10 +742,12 @@ describe('Feature flags end-to-end', () => {
   it('authenticated evaluation omits disabled non-public flag keys', async () => {
     await flagService.create(
       { key: 'unreleased-internal', enabled: false, public: false },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await flagService.create(
       { key: 'shipped-internal', enabled: true, public: false },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
 
@@ -726,10 +763,12 @@ describe('Feature flags end-to-end', () => {
   it('anonymous evaluation filters to public flags only', async () => {
     await flagService.create(
       { key: 'public-banner', enabled: true, public: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await flagService.create(
       { key: 'private-tool', enabled: true, public: false },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
 
@@ -927,6 +966,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
   ): Promise<void> {
     const flag = await flagService.create(
       { key, enabled: true, public: isPublic },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await setRules(
@@ -953,10 +993,12 @@ describe('GET /feature-flags anonymous rollout id', () => {
   it('issues no cookie while no public flag has a percentage rule', async () => {
     await flagService.create(
       { key: 'public-banner', enabled: true, public: true },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     const hidden = await flagService.create(
       { key: 'private-rollout', enabled: true, public: false },
+      SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
     await setRules(

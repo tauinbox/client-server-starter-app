@@ -12,6 +12,7 @@ import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { PermissionService } from '../../auth/services/permission.service';
 import { UsersService } from '../../users/services/users.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 
 describe('FeatureFlagResolverService', () => {
   let service: FeatureFlagResolverService;
@@ -110,7 +111,7 @@ describe('FeatureFlagResolverService', () => {
 
   it('buildResolverUser assembles the user record and roles', async () => {
     const user = await service.buildResolverUser('u1');
-    expect(usersService.findOne).toHaveBeenCalledWith('u1');
+    expect(usersService.findOne).toHaveBeenCalledWith('u1', SYSTEM_ABILITY);
     expect(permissionService.getRoleNamesForUser).toHaveBeenCalledWith('u1');
     expect(user).toEqual({
       userId: 'u1',
@@ -186,7 +187,7 @@ describe('FeatureFlagResolverService', () => {
     expect(await service.isEnabledForUserId('u1', 'role-gated')).toBe(false);
     expect(await service.isEnabledForUserId('u1', 'on')).toBe(true);
     expect(await service.isEnabledForUserId('u1', 'missing')).toBe(false);
-    expect(usersService.findOne).toHaveBeenCalledWith('u1');
+    expect(usersService.findOne).toHaveBeenCalledWith('u1', SYSTEM_ABILITY);
   });
 
   it('returns evaluated booleans for an authenticated user', async () => {

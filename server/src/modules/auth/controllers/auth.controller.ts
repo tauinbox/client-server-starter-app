@@ -228,7 +228,7 @@ export class AuthController {
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getProfile(@Request() req: JwtAuthRequest) {
-    return await this.userService.findOne(req.user.userId);
+    return await this.userService.findOne(req.user.userId, SYSTEM_ABILITY);
   }
 
   @Authorize(['update', 'Profile'])
@@ -273,7 +273,7 @@ export class AuthController {
     const previous =
       updatePayload.firstName !== undefined ||
       updatePayload.lastName !== undefined
-        ? await this.userService.findOne(req.user.userId)
+        ? await this.userService.findOne(req.user.userId, SYSTEM_ABILITY)
         : undefined;
     // Self-service route: the target is pinned to the authenticated caller and
     // the route is already gated by @Authorize(['update', 'Profile']), so no

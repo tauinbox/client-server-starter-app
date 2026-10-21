@@ -17,6 +17,7 @@ import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { ErrorKeys, OAUTH_ERROR } from '@app/shared/constants';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 
 describe('OAuthService', () => {
   let service: OAuthService;
@@ -596,7 +597,10 @@ describe('OAuthService', () => {
           providerId: 'google-123'
         })
       );
-      expect(mockUsersService.findOne).toHaveBeenCalledWith('oauth-user-1');
+      expect(mockUsersService.findOne).toHaveBeenCalledWith(
+        'oauth-user-1',
+        SYSTEM_ABILITY
+      );
       // Verification email is NOT sent when provider already verified.
       expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
       // The new user carries its roles, which the exchange signs into the
@@ -754,7 +758,10 @@ describe('OAuthService', () => {
         LINK_TOKEN_IAT
       );
 
-      expect(mockUsersService.findOne).toHaveBeenCalledWith('user-1');
+      expect(mockUsersService.findOne).toHaveBeenCalledWith(
+        'user-1',
+        SYSTEM_ABILITY
+      );
       expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
         'user-1',
         'google',

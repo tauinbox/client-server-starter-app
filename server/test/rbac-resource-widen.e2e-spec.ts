@@ -18,6 +18,7 @@ import { PermissionService } from '../src/modules/auth/services/permission.servi
 import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
 import { ResourceService } from '../src/modules/auth/services/resource.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 
 // A narrowed or orphaned action keeps its role rows, so offering it again
@@ -145,12 +146,16 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
     // The grant is written while the action is offered; the narrowing then
     // leaves its row dormant.
-    const role = await roleService.create({ name: `${tag}-admin` });
-    await roleService.setPermissionsForRole(role.id, [
-      { permissionId: updatePermission.id },
-      { permissionId: deleteProbe.id }
-    ]);
-    await roleService.assignRoleToUser(actor.id, role.id);
+    const role = await roleService.create(
+      { name: `${tag}-admin` },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      role.id,
+      [{ permissionId: updatePermission.id }, { permissionId: deleteProbe.id }],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(actor.id, role.id, SYSTEM_ABILITY);
     await resourceService.update(
       resource.id,
       { allowedActionNames: ['read'] },

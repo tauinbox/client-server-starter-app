@@ -64,6 +64,7 @@ import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import { readJwtMinIat } from '../jwt-module-options.factory';
 import type { SessionClient } from '../utils/session-client';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 
 type ConfirmEmailChangeOutcome =
   | {
@@ -783,7 +784,7 @@ export class AuthService {
     reauthProof?: string,
     auditContext?: AuditContext
   ): Promise<{ message: string }> {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
 
     await this.assertStepUp(
       user,
@@ -1217,7 +1218,7 @@ export class AuthService {
     operation: StepUpOperation,
     auditContext?: AuditContext
   ): Promise<void> {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
 
     await this.assertStepUp(
       user,

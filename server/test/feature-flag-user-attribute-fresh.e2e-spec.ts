@@ -78,6 +78,7 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
           }
         ]
       },
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
     const resolver = app.get(FeatureFlagResolverService);

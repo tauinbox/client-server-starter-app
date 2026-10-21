@@ -19,6 +19,7 @@ import {
 } from '../src/modules/core/http-body.config';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { UsersService } from '../src/modules/users/services/users.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
@@ -92,7 +93,7 @@ runWithInfra('Active sessions (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
-    const user = await usersService.findOne(found.id);
+    const user = await usersService.findOne(found.id, SYSTEM_ABILITY);
     const { tokens } = await authService.login(user, {
       userAgent,
       ipAddress: '203.0.113.7'

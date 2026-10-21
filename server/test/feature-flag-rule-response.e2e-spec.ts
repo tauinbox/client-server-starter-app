@@ -19,6 +19,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // A rule on the wire is FeatureFlagRuleResponse: the rule type is in
@@ -87,10 +88,12 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
     const admin = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email: adminEmail } });
-    await app.get(RoleService).assignRoleToUser(admin.id, superRole.id);
+    await app
+      .get(RoleService)
+      .assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
     const { tokens } = await app
       .get(AuthService)
-      .login(await app.get(UsersService).findOne(admin.id), {
+      .login(await app.get(UsersService).findOne(admin.id, SYSTEM_ABILITY), {
         userAgent: 'flag-rule-shape-e2e',
         ipAddress: null
       });

@@ -13,6 +13,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { UsersService } from '../src/modules/users/services/users.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -56,7 +57,7 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
     );
     const { tokens } = await app
       .get(AuthService)
-      .login(await app.get(UsersService).findOne(user.id), {
+      .login(await app.get(UsersService).findOne(user.id, SYSTEM_ABILITY), {
         userAgent: 'sse-e2e',
         ipAddress: '203.0.113.9'
       });

@@ -10,6 +10,13 @@ import { FeatureFlagService } from './feature-flag.service';
 import { AttributeRegistryService } from './attribute-registry.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
+import { MetricsService } from '../../core/metrics/metrics.service';
+import {
+  AbilityBuilder,
+  createMongoAbility,
+  SYSTEM_ABILITY,
+  type AppAbility
+} from '../../auth/casl/app-ability';
 
 interface QueryBuilderMock {
   update: jest.Mock;
@@ -43,7 +50,8 @@ describe('FeatureFlagService', () => {
   let dataSource: { transaction: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
   let configService: { getOrThrow: jest.Mock };
-  let auditService: { log: jest.Mock };
+  let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
+  let metricsService: { recordPermissionDenied: jest.Mock };
 
   const actor = {
     actorId: 'actor-1',
@@ -92,7 +100,11 @@ describe('FeatureFlagService', () => {
         key === 'ENVIRONMENT' ? 'production' : undefined
       )
     };
-    auditService = { log: jest.fn().mockResolvedValue(undefined) };
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logFireAndForget: jest.fn()
+    };
+    metricsService = { recordPermissionDenied: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -102,7 +114,8 @@ describe('FeatureFlagService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: AttributeRegistryService, useValue: attributeRegistry },
         { provide: ConfigService, useValue: configService },
-        { provide: AuditService, useValue: auditService }
+        { provide: AuditService, useValue: auditService },
+        { provide: MetricsService, useValue: metricsService }
       ]
     }).compile();
 
@@ -129,7 +142,7 @@ describe('FeatureFlagService', () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       const rule = { id: 'r1', flagId: 'flag-1' };
       ruleRepo.find.mockResolvedValueOnce([rule]);
-      const result = await service.findOne('flag-1');
+      const result = await service.findOne('flag-1', SYSTEM_ABILITY);
       expect(result).toBe(sampleFlag);
       expect(result.rules).toEqual([rule]);
       expect(flagRepo.findOne).toHaveBeenCalledWith({
@@ -143,7 +156,9 @@ describe('FeatureFlagService', () => {
 
     it('throws NotFound when flag is missing', async () => {
       flagRepo.findOne.mockResolvedValue(null);
-      await expect(service.findOne('missing')).rejects.toThrow();
+      await expect(
+        service.findOne('missing', SYSTEM_ABILITY)
+      ).rejects.toThrow();
     });
   });
 
@@ -179,7 +194,7 @@ describe('FeatureFlagService', () => {
     it('rejects duplicate key with 409', async () => {
       flagRepo.findOne.mockResolvedValueOnce(sampleFlag);
       await expect(
-        service.create({ key: sampleFlag.key }, actor)
+        service.create({ key: sampleFlag.key }, SYSTEM_ABILITY, actor)
       ).rejects.toMatchObject({ status: 409 });
     });
 
@@ -192,6 +207,7 @@ describe('FeatureFlagService', () => {
       });
       const result = await service.create(
         { key: 'beta-export', enabled: true },
+        SYSTEM_ABILITY,
         actor
       );
       expect(result.id).toBe('new-id');
@@ -222,7 +238,7 @@ describe('FeatureFlagService', () => {
       auditService.log.mockRejectedValueOnce(new Error('audit down'));
 
       await expect(
-        service.create({ key: 'beta-export' }, actor)
+        service.create({ key: 'beta-export' }, SYSTEM_ABILITY, actor)
       ).rejects.toThrow('audit down');
     });
 
@@ -238,6 +254,7 @@ describe('FeatureFlagService', () => {
       });
       await service.create(
         { key: 'beta-export', rules: [percentRule(25), percentRule(50)] },
+        SYSTEM_ABILITY,
         actor
       );
       expect(dataSource.transaction).toHaveBeenCalledTimes(1);
@@ -260,7 +277,11 @@ describe('FeatureFlagService', () => {
     it('rejects an invalid rule payload before the transaction opens', async () => {
       flagRepo.findOne.mockResolvedValueOnce(null);
       await expect(
-        service.create({ key: 'beta-export', rules: [percentRule(150)] }, actor)
+        service.create(
+          { key: 'beta-export', rules: [percentRule(150)] },
+          SYSTEM_ABILITY,
+          actor
+        )
       ).rejects.toBeInstanceOf(HttpException);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
@@ -272,7 +293,7 @@ describe('FeatureFlagService', () => {
       });
 
       await expect(
-        service.create({ key: sampleFlag.key }, actor)
+        service.create({ key: sampleFlag.key }, SYSTEM_ABILITY, actor)
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS }
@@ -286,7 +307,7 @@ describe('FeatureFlagService', () => {
       });
 
       await expect(
-        service.create({ key: sampleFlag.key }, actor)
+        service.create({ key: sampleFlag.key }, SYSTEM_ABILITY, actor)
       ).rejects.toMatchObject({ status: 409 });
     });
 
@@ -297,15 +318,19 @@ describe('FeatureFlagService', () => {
       });
 
       await expect(
-        service.create({ key: sampleFlag.key }, actor)
+        service.create({ key: sampleFlag.key }, SYSTEM_ABILITY, actor)
       ).rejects.toThrow('connection reset');
     });
   });
 
   describe('update — optimistic lock', () => {
-    it('returns 409 before the write when the given flag is not at the expected version', async () => {
+    beforeEach(() => {
+      flagRepo.findOne.mockResolvedValue({ ...sampleFlag });
+    });
+
+    it('returns 409 before the write when the stored flag is not at the expected version', async () => {
       await expect(
-        service.update(sampleFlag, { enabled: true }, 2, actor)
+        service.update('flag-1', { enabled: true }, 2, SYSTEM_ABILITY, actor)
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT }
@@ -315,7 +340,13 @@ describe('FeatureFlagService', () => {
 
     it('reports a bad rule payload before a version mismatch, as the mock does', async () => {
       await expect(
-        service.update(sampleFlag, { rules: [percentRule(150)] }, 2, actor)
+        service.update(
+          'flag-1',
+          { rules: [percentRule(150)] },
+          2,
+          SYSTEM_ABILITY,
+          actor
+        )
       ).rejects.toMatchObject({ status: 400 });
     });
 
@@ -325,35 +356,35 @@ describe('FeatureFlagService', () => {
       });
       await expect(
         service.update(
-          sampleFlag,
+          'flag-1',
           { enabled: true, rules: [percentRule(25)] },
           1,
+          SYSTEM_ABILITY,
           actor
         )
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT }
       });
-      expect(flagRepo.findOne).not.toHaveBeenCalled();
+      expect(flagRepo.findOne).toHaveBeenCalledTimes(1);
       expect(em.delete).not.toHaveBeenCalled();
       expect(em.save).not.toHaveBeenCalled();
       expect(auditService.log).not.toHaveBeenCalled();
     });
 
     it('updates and increments version when match (affected = 1)', async () => {
-      flagRepo.findOne.mockResolvedValueOnce({
-        ...sampleFlag,
-        enabled: true,
-        version: 2
-      });
+      flagRepo.findOne
+        .mockResolvedValueOnce({ ...sampleFlag })
+        .mockResolvedValueOnce({ ...sampleFlag, enabled: true, version: 2 });
       const qb = createQueryBuilder(1);
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(qb)
       });
       const result = await service.update(
-        sampleFlag,
+        'flag-1',
         { enabled: true },
         1,
+        SYSTEM_ABILITY,
         actor
       );
       expect(qb.where).toHaveBeenCalledWith(
@@ -361,7 +392,7 @@ describe('FeatureFlagService', () => {
         { id: 'flag-1', expected: 1 }
       );
       expect(result.version).toBe(2);
-      expect(flagRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(flagRepo.findOne).toHaveBeenCalledTimes(2);
       expect(em.delete).not.toHaveBeenCalled();
       expect(auditService.log).toHaveBeenCalledWith(
         {
@@ -380,7 +411,7 @@ describe('FeatureFlagService', () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(qb)
       });
-      await service.update(sampleFlag, { rules: [] }, 1, actor);
+      await service.update('flag-1', { rules: [] }, 1, SYSTEM_ABILITY, actor);
       expect(qb.execute).toHaveBeenCalledTimes(1);
       expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
         flagId: 'flag-1'
@@ -394,9 +425,10 @@ describe('FeatureFlagService', () => {
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(1))
       });
       await service.update(
-        sampleFlag,
+        'flag-1',
         { enabled: true, rules: [percentRule(25)] },
         1,
+        SYSTEM_ABILITY,
         actor
       );
       expect(auditService.log).toHaveBeenCalledWith(
@@ -415,15 +447,120 @@ describe('FeatureFlagService', () => {
       auditService.log.mockRejectedValueOnce(new Error('audit down'));
 
       await expect(
-        service.update(sampleFlag, { enabled: true }, 1, actor)
+        service.update('flag-1', { enabled: true }, 1, SYSTEM_ABILITY, actor)
       ).rejects.toThrow('audit down');
     });
 
     it('rejects an invalid rule payload before the transaction opens', async () => {
       await expect(
-        service.update(sampleFlag, { rules: [percentRule(150)] }, 1, actor)
+        service.update(
+          'flag-1',
+          { rules: [percentRule(150)] },
+          1,
+          SYSTEM_ABILITY,
+          actor
+        )
       ).rejects.toBeInstanceOf(HttpException);
       expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('instance check of a conditional grant', () => {
+    // A grant on flags of the `production` environment only.
+    const scoped = (() => {
+      const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+      for (const action of ['read', 'create', 'update', 'delete']) {
+        builder.can(action, 'FeatureFlag', {
+          environments: { $all: ['production'] }
+        });
+      }
+      return builder.build();
+    })();
+    const refused = {
+      status: 403,
+      response: { errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS }
+    };
+    const inScope = { ...sampleFlag, environments: ['production'] };
+
+    it('refuses a read of a flag outside the grant and audits the actor', async () => {
+      flagRepo.findOne.mockResolvedValue({ ...sampleFlag });
+
+      await expect(
+        service.findOne('flag-1', scoped, 'actor-1')
+      ).rejects.toMatchObject(refused);
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'actor-1', targetId: 'flag-1' })
+      );
+      expect(metricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'read',
+        'FeatureFlag'
+      );
+    });
+
+    it('reads a flag inside the grant', async () => {
+      flagRepo.findOne.mockResolvedValue({ ...inScope });
+
+      await expect(service.findOne('flag-1', scoped)).resolves.toMatchObject({
+        id: 'flag-1'
+      });
+    });
+
+    it('refuses a create of a flag outside the grant before any read', async () => {
+      await expect(
+        service.create({ key: 'beta-export' }, scoped, actor)
+      ).rejects.toMatchObject(refused);
+      expect(flagRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('checks a create with the defaults that the service writes', async () => {
+      const disabledOnly = createMongoAbility<AppAbility>([
+        {
+          action: 'create',
+          subject: 'FeatureFlag',
+          conditions: { enabled: false }
+        }
+      ]);
+      flagRepo.findOne.mockResolvedValue({ ...sampleFlag });
+
+      await expect(
+        service.create(
+          { key: 'beta-export', enabled: true },
+          disabledOnly,
+          actor
+        )
+      ).rejects.toMatchObject(refused);
+      // The default `enabled: false` is inside the grant; the duplicate check
+      // then answers, so the create check passed.
+      await expect(
+        service.create({ key: 'beta-export' }, disabledOnly, actor)
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it('refuses an update that moves the flag out of the grant', async () => {
+      flagRepo.findOne.mockResolvedValue({ ...inScope });
+
+      await expect(
+        service.update('flag-1', { environments: [] }, 1, scoped, actor)
+      ).rejects.toMatchObject(refused);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses a delete of a flag outside the grant', async () => {
+      flagRepo.findOne.mockResolvedValue({ ...sampleFlag });
+
+      await expect(
+        service.delete('flag-1', scoped, actor)
+      ).rejects.toMatchObject(refused);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('requires the ability argument and fails closed without it', async () => {
+      flagRepo.findOne.mockResolvedValue({ ...inScope });
+      await expect(
+        // @ts-expect-error the ability is required: a skipped check is written as SYSTEM_ABILITY
+        service.findOne('flag-1')
+      ).rejects.toThrow(TypeError);
     });
   });
 
@@ -568,10 +705,10 @@ describe('FeatureFlagService', () => {
   });
 
   describe('delete', () => {
-    it('removes the given flag and audits its key in one transaction', async () => {
+    it('removes the flag and audits its key in one transaction', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
       const em = mockTransaction();
-      await service.delete(sampleFlag, actor);
-      expect(flagRepo.findOne).not.toHaveBeenCalled();
+      await service.delete('flag-1', SYSTEM_ABILITY, actor);
       expect(em.remove).toHaveBeenCalledWith(FeatureFlag, sampleFlag);
       expect(auditService.log).toHaveBeenCalledWith(
         {
@@ -585,12 +722,13 @@ describe('FeatureFlagService', () => {
     });
 
     it('fails the delete when the audit row cannot be written', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
       mockTransaction();
       auditService.log.mockRejectedValueOnce(new Error('audit down'));
 
-      await expect(service.delete(sampleFlag, actor)).rejects.toThrow(
-        'audit down'
-      );
+      await expect(
+        service.delete('flag-1', SYSTEM_ABILITY, actor)
+      ).rejects.toThrow('audit down');
     });
   });
 });

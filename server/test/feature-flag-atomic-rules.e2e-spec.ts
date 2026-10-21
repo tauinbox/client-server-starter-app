@@ -1,7 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
@@ -96,6 +98,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   async function seed(name: string): Promise<FeatureFlag> {
     return flagService.create(
       { key: `${tag}-${name}`, enabled: false, rules: [percentRule(10)] },
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
   }
@@ -104,9 +107,10 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     const flag = await seed('replace');
 
     const updated = await flagService.update(
-      flag,
+      flag.id,
       { enabled: true, rules: [percentRule(20), percentRule(30)] },
       flag.version,
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
 
@@ -118,9 +122,10 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     const flag = await seed('keep');
 
     await flagService.update(
-      flag,
+      flag.id,
       { enabled: true },
       flag.version,
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
 
@@ -132,14 +137,15 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
     await expect(
       flagService.update(
-        flag,
+        flag.id,
         { enabled: true, rules: [percentRule(20), percentRule(150)] },
         flag.version,
+        SYSTEM_ABILITY,
         flagAuditActor()
       )
     ).rejects.toMatchObject({ status: 400 });
 
-    expect(await flagService.findOne(flag.id)).toMatchObject({
+    expect(await flagService.findOne(flag.id, SYSTEM_ABILITY)).toMatchObject({
       enabled: false,
       version: flag.version
     });
@@ -149,17 +155,19 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   it('writes no rule on a stale version', async () => {
     const flag = await seed('stale');
     await flagService.update(
-      flag,
+      flag.id,
       { enabled: true },
       flag.version,
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
 
     await expect(
       flagService.update(
-        flag,
+        flag.id,
         { rules: [percentRule(20)] },
         flag.version,
+        SYSTEM_ABILITY,
         flagAuditActor()
       )
     ).rejects.toMatchObject({ status: 409 });
@@ -170,22 +178,28 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   it('refuses an If-Match version that a concurrent write reached after the read', async () => {
     const flag = await seed('raced');
     await flagService.update(
-      flag,
+      flag.id,
       { enabled: true },
       flag.version,
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
+    // The read of the next update returns the row as it was before that write.
+    jest
+      .spyOn(app.get(getRepositoryToken(FeatureFlag)), 'findOne')
+      .mockResolvedValueOnce(flag);
 
     await expect(
       flagService.update(
-        flag,
+        flag.id,
         { rules: [percentRule(20)] },
         flag.version + 1,
+        SYSTEM_ABILITY,
         flagAuditActor()
       )
     ).rejects.toMatchObject({ status: 409 });
 
-    expect(await flagService.findOne(flag.id)).toMatchObject({
+    expect(await flagService.findOne(flag.id, SYSTEM_ABILITY)).toMatchObject({
       enabled: true,
       version: flag.version + 1
     });
@@ -198,17 +212,18 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
     await expect(
       flagService.update(
-        flag,
+        flag.id,
         {
           enabled: true,
           rules: [percentRule(20), percentRule(FAILING_PERCENT)]
         },
         flag.version,
+        SYSTEM_ABILITY,
         flagAuditActor()
       )
     ).rejects.toThrow('rule insert failed');
 
-    expect(await flagService.findOne(flag.id)).toMatchObject({
+    expect(await flagService.findOne(flag.id, SYSTEM_ABILITY)).toMatchObject({
       enabled: false,
       version: flag.version
     });
@@ -222,6 +237,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await expect(
       flagService.create(
         { key, rules: [percentRule(20), percentRule(FAILING_PERCENT)] },
+        SYSTEM_ABILITY,
         flagAuditActor()
       )
     ).rejects.toThrow('rule insert failed');

@@ -9,6 +9,7 @@ import type { NotificationEvent } from '@app/shared/types';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
@@ -90,12 +91,14 @@ runWithRedis('server pushes across instances (e2e)', () => {
     if (!permission) throw new Error('Permission search:User missing');
     searchUser = permission;
     const roleService = first.get(RoleService);
-    role = await roleService.create({ name: roleName });
-    await roleService.setPermissionsForRole(role.id, [
-      { permissionId: searchUser.id }
-    ]);
-    await roleService.assignRoleToUser(viewer.id, role.id);
-    await roleService.assignRoleToUser(idle.id, role.id);
+    role = await roleService.create({ name: roleName }, SYSTEM_ABILITY);
+    await roleService.setPermissionsForRole(
+      role.id,
+      [{ permissionId: searchUser.id }],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(viewer.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(idle.id, role.id, SYSTEM_ABILITY);
 
     // Both instances listen before any push is raised.
     const channel = `${namespace}:push:${redis.options.db ?? 0}`;
@@ -130,7 +133,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
     const usersService = app.get(UsersService);
     const { tokens } = await app
       .get(AuthService)
-      .login(await usersService.findOne(user.id), {
+      .login(await usersService.findOne(user.id, SYSTEM_ABILITY), {
         userAgent: 'sse-cross-instance-e2e',
         ipAddress: '203.0.113.12'
       });
@@ -229,7 +232,11 @@ runWithRedis('server pushes across instances (e2e)', () => {
     try {
       await first
         .get(RoleService)
-        .setPermissionsForRole(role.id, [{ permissionId: searchUser.id }]);
+        .setPermissionsForRole(
+          role.id,
+          [{ permissionId: searchUser.id }],
+          SYSTEM_ABILITY
+        );
 
       await settle(viewerOnSecond, 1);
       expect(viewerOnSecond()).toEqual([{ type: 'permissions_updated' }]);

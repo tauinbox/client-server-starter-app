@@ -600,10 +600,12 @@ system vetoes the whole permission and fails closed.
 **On the server,** a controller injects `@CurrentAbility()` and gives it to the service. The service
 loads the entity and calls `ability.can(action, entity)`. It returns a 403 on a denial.
 
-On `UsersService` the ability parameter is **necessary**, and its type is `AbilityOrSystem`. Thus a
-new caller cannot omit it and skip the filter or the instance check. A caller that truly acts with no
-requesting principal gives the explicit `SYSTEM_ABILITY` sentinel. The self-service
-`PATCH /auth/profile` route is such a caller, because its target is the authenticated user.
+On `UsersService`, `RoleService`, `ResourceService` and `FeatureFlagService` the ability parameter
+is **necessary**, and its type is `AbilityOrSystem`. Thus a new caller cannot omit it and skip the
+filter or the instance check, and no controller calls `assertCan` itself. A caller that truly acts
+with no requesting principal gives the explicit `SYSTEM_ABILITY` sentinel. The self-service routes
+(`GET` and `PATCH /auth/profile`, the MFA and session routes) are such callers, because their
+target is the authenticated user.
 
 **On the client** there are three mechanisms.
 
@@ -1890,7 +1892,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2990 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2996 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 659 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 646 pass and 13 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1589 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 324 tests |

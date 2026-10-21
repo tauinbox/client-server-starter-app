@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
-import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
 import type { UserAuditRows } from '../services/users.service';
@@ -8,7 +7,6 @@ import type { User } from '../entities/user.entity';
 import { MailService } from '../../mail/mail.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../../audit/audit.service';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { CaslAbilityFactory } from '../../auth/casl/casl-ability.factory';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { JwtAuthRequest } from '../../auth/types/auth.request';
@@ -61,7 +59,6 @@ describe('UsersController', () => {
   };
   let eventEmitterMock: { emit: jest.Mock; emitAsync: jest.Mock };
   let auditServiceMock: { log: jest.Mock; logFireAndForget: jest.Mock };
-  let metricsServiceMock: { recordPermissionDenied: jest.Mock };
   let caslAbilityFactoryMock: { resolveForUser: jest.Mock };
   let mailServiceMock: {
     sendPasswordChangedNotification: jest.Mock;
@@ -95,8 +92,6 @@ describe('UsersController', () => {
       logFireAndForget: jest.fn()
     };
 
-    metricsServiceMock = { recordPermissionDenied: jest.fn() };
-
     caslAbilityFactoryMock = { resolveForUser: jest.fn() };
 
     mailServiceMock = {
@@ -123,9 +118,11 @@ describe('UsersController', () => {
     }
     const usersService = {
       ...usersServiceMock,
-      create: async (dto: CreateUserDto, audit?: UserAuditRows) => {
-        const created: unknown = await usersServiceMock.create(dto, audit);
-        await writeRows(created, audit);
+      create: async (
+        ...args: [CreateUserDto, AppAbility, string, UserAuditRows?]
+      ) => {
+        const created: unknown = await usersServiceMock.create(...args);
+        await writeRows(created, args[3]);
         return created;
       },
       update: async (
@@ -154,7 +151,6 @@ describe('UsersController', () => {
         { provide: UsersService, useValue: usersService },
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: AuditService, useValue: auditServiceMock },
-        { provide: MetricsService, useValue: metricsServiceMock },
         { provide: CaslAbilityFactory, useValue: caslAbilityFactoryMock },
         { provide: MailService, useValue: mailServiceMock },
         { provide: AuthService, useValue: authServiceMock },
@@ -182,8 +178,10 @@ describe('UsersController', () => {
 
   // ── create ────────────────────────────────────────────────────────
 
+  // The instance checks of create, findOne and getPermissions run in
+  // UsersService (users.service.spec.ts); the controller passes the ability.
   describe('create', () => {
-    it('should call usersService.create with the dto and return the created user', async () => {
+    it('should call usersService.create with the dto, the ability and the actor and return the created user', async () => {
       const dto: CreateUserDto = {
         email: 'new@example.com',
         firstName: 'New',
@@ -198,6 +196,8 @@ describe('UsersController', () => {
 
       expect(usersServiceMock.create).toHaveBeenCalledWith(
         dto,
+        mockAbility,
+        'user-1',
         expect.any(Function)
       );
       expect(result).toBe(createdUser);
@@ -228,79 +228,6 @@ describe('UsersController', () => {
           targetType: 'User'
         })
       );
-    });
-
-    // Built on a real CASL ability: a mocked `can` cannot show the difference
-    // between the type-level check the route guard runs and the instance-level
-    // one, which is the whole point of this path.
-    describe('conditional create grant', () => {
-      function abilityWithLocaleCondition(): AppAbility {
-        const { can, build } = new AbilityBuilder<AppAbility>(
-          createMongoAbility
-        );
-        can('create', 'User', { locale: { $in: ['ru'] } });
-        return build();
-      }
-
-      const dto: CreateUserDto = {
-        email: 'new@example.com',
-        firstName: 'New',
-        lastName: 'User',
-        password: 'Password1',
-        locale: 'ru'
-      };
-
-      it('creates the user when the record satisfies the condition', async () => {
-        const createdUser = { id: 'user-99', email: 'new@example.com' };
-        usersServiceMock.create.mockResolvedValue(createdUser);
-        const req = mockJwtRequest() as JwtAuthRequest;
-
-        const result = await controller.create(
-          dto,
-          req,
-          abilityWithLocaleCondition()
-        );
-
-        expect(result).toBe(createdUser);
-      });
-
-      it('throws ForbiddenException and audits when the record fails the condition', async () => {
-        const req = mockJwtRequest('actor-1') as JwtAuthRequest;
-
-        await expect(
-          controller.create(
-            { ...dto, locale: 'en' },
-            req,
-            abilityWithLocaleCondition()
-          )
-        ).rejects.toBeInstanceOf(ForbiddenException);
-
-        expect(usersServiceMock.create).not.toHaveBeenCalled();
-        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
-          expect.objectContaining({
-            action: AuditAction.PERMISSION_CHECK_FAILURE,
-            actorId: 'actor-1',
-            targetType: 'User'
-          })
-        );
-        expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
-          'instance',
-          'create',
-          'User'
-        );
-      });
-
-      it('does not expose the password to condition evaluation', async () => {
-        const { can, build } = new AbilityBuilder<AppAbility>(
-          createMongoAbility
-        );
-        can('create', 'User', { password: { $exists: true } });
-        const req = mockJwtRequest() as JwtAuthRequest;
-
-        await expect(
-          controller.create(dto, req, build())
-        ).rejects.toBeInstanceOf(ForbiddenException);
-      });
     });
   });
 
@@ -350,44 +277,19 @@ describe('UsersController', () => {
   // ── findOne ───────────────────────────────────────────────────────
 
   describe('findOne', () => {
-    it('should load the user via usersService.findOne and return it when ability allows', async () => {
+    it('passes the ability and the actor to usersService.findOne', async () => {
       const user = { id: 'user-5', email: 'user5@example.com' };
       usersServiceMock.findOne.mockResolvedValue(user);
       const req = mockJwtRequest() as JwtAuthRequest;
 
       const result = await controller.findOne('user-5', req, mockAbility);
 
-      expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-5');
+      expect(usersServiceMock.findOne).toHaveBeenCalledWith(
+        'user-5',
+        mockAbility,
+        'user-1'
+      );
       expect(result).toBe(user);
-    });
-
-    it('should throw ForbiddenException and audit when ability denies the loaded instance', async () => {
-      const user = { id: 'user-5', email: 'user5@example.com' };
-      usersServiceMock.findOne.mockResolvedValue(user);
-      const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
-
-      await expect(
-        controller.findOne('user-5', req, denyAbility)
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: AuditAction.PERMISSION_CHECK_FAILURE,
-          actorId: 'actor-deny',
-          targetId: 'user-5',
-          targetType: 'User',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          details: expect.objectContaining({
-            instanceCheck: true,
-            deniedAction: 'read',
-            subject: 'User'
-          })
-        })
-      );
-      expect(metricsServiceMock.recordPermissionDenied).toHaveBeenCalledWith(
-        'instance',
-        'read',
-        'User'
-      );
     });
   });
 
@@ -1572,7 +1474,11 @@ describe('UsersController', () => {
         mockAbility
       );
 
-      expect(usersServiceMock.findOne).toHaveBeenCalledWith('user-12');
+      expect(usersServiceMock.findOne).toHaveBeenCalledWith(
+        'user-12',
+        mockAbility,
+        'user-1'
+      );
       expect(caslAbilityFactoryMock.resolveForUser).toHaveBeenCalledWith(
         'user-12'
       );
@@ -1592,27 +1498,14 @@ describe('UsersController', () => {
       expect(caslAbilityFactoryMock.resolveForUser).not.toHaveBeenCalled();
     });
 
-    it('should throw ForbiddenException before reading roles/permissions when ability denies', async () => {
-      const user = {
-        id: 'user-12',
-        email: 'target@example.com',
-        roles: []
-      };
-      usersServiceMock.findOne.mockResolvedValue(user);
+    it('reads no roles or permissions when the checked read refuses', async () => {
+      usersServiceMock.findOne.mockRejectedValue(new ForbiddenException());
       const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
 
       await expect(
-        controller.getPermissions('user-12', req, denyAbility)
+        controller.getPermissions('user-12', req, mockAbility)
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(caslAbilityFactoryMock.resolveForUser).not.toHaveBeenCalled();
-      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: AuditAction.PERMISSION_CHECK_FAILURE,
-          actorId: 'actor-deny',
-          targetId: 'user-12',
-          targetType: 'User'
-        })
-      );
     });
   });
 });

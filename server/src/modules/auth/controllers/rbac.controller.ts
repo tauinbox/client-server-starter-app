@@ -3,8 +3,6 @@ import {
   Controller,
   Get,
   HttpCode,
-  HttpException,
-  HttpStatus,
   Inject,
   Param,
   ParseUUIDPipe,
@@ -27,18 +25,13 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import { subject } from '@casl/ability';
-import { ErrorKeys } from '@app/shared/constants';
-import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
+import { changedFields } from '@app/shared/utils/changed-fields';
 import { ResourceCursorQueryDto } from '../../../common/dtos';
 import { ResourceService } from '../services/resource.service';
 import { Authorize } from '../decorators/authorize.decorator';
 import { CurrentAbility } from '../decorators/current-ability.decorator';
 import { UpdateResourceDto } from '../dtos/update-resource.dto';
-import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { assertCan } from '../../../common/utils/assert-can.util';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../types/auth.request';
 import type { AppAbility } from '../casl/app-ability';
@@ -63,8 +56,6 @@ const METADATA_CACHE_TTL = 60_000; // 1 minute
 export class RbacController {
   constructor(
     private readonly resourceService: ResourceService,
-    private readonly auditService: AuditService,
-    private readonly metricsService: MetricsService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
   ) {}
 
@@ -129,32 +120,19 @@ export class RbacController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const resource = await this.resourceService.findOne(id);
-    if (!resource) {
-      throw new HttpException(
-        {
-          message: 'Resource not found',
-          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
-      );
-    }
-    assertCan(
+    const result = await this.resourceService.restore(
+      id,
       ability,
-      'update',
-      subject('Permission', resource),
-      this.auditService,
-      { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
-      this.metricsService
+      req.user.userId,
+      {
+        action: AuditAction.RESOURCE_RESTORE,
+        actorId: req.user.userId,
+        actorEmail: req.user.email,
+        targetId: id,
+        targetType: 'Resource',
+        context: extractAuditContext(req)
+      }
     );
-    const result = await this.resourceService.restore(id, ability, {
-      action: AuditAction.RESOURCE_RESTORE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: id,
-      targetType: 'Resource',
-      context: extractAuditContext(req)
-    });
     await this.cacheManager.del(METADATA_CACHE_KEY);
     return result;
   }
@@ -173,38 +151,21 @@ export class RbacController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const resource = await this.resourceService.findOne(id);
-    if (!resource) {
-      throw new HttpException(
-        {
-          message: 'Resource not found',
-          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
-      );
-    }
-    // The record after the write is checked too: else a grant scoped by a
-    // writable field lets the caller move a resource out of its own scope.
-    for (const record of [resource, withChanges(resource, dto)]) {
-      assertCan(
-        ability,
-        'update',
-        subject('Permission', record),
-        this.auditService,
-        { actorId: req.user.userId, targetId: id, targetType: 'Resource' },
-        this.metricsService
-      );
-    }
-    const changed = changedFields(resource, dto);
-    const result = await this.resourceService.update(id, dto, ability, {
-      action: AuditAction.RESOURCE_UPDATE,
-      actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: id,
-      targetType: 'Resource',
-      details: { changedFields: changed },
-      context: extractAuditContext(req)
-    });
+    const result = await this.resourceService.update(
+      id,
+      dto,
+      ability,
+      req.user.userId,
+      (before) => ({
+        action: AuditAction.RESOURCE_UPDATE,
+        actorId: req.user.userId,
+        actorEmail: req.user.email,
+        targetId: id,
+        targetType: 'Resource',
+        details: { changedFields: changedFields(before, dto) },
+        context: extractAuditContext(req)
+      })
+    );
     await this.cacheManager.del(METADATA_CACHE_KEY);
     return result;
   }

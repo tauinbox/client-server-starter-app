@@ -22,6 +22,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // An edit form sends every field on each save, so the audit row must list the
@@ -75,10 +76,12 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
       .findOneByOrFail({ isSuper: true });
     const usersService = app.get(UsersService);
     const adminId = await userId(adminEmail);
-    await app.get(RoleService).assignRoleToUser(adminId, superRole.id);
+    await app
+      .get(RoleService)
+      .assignRoleToUser(adminId, superRole.id, SYSTEM_ABILITY);
     const { tokens } = await app
       .get(AuthService)
-      .login(await usersService.findOne(adminId), {
+      .login(await usersService.findOne(adminId, SYSTEM_ABILITY), {
         userAgent: 'audit-fields-e2e',
         ipAddress: null
       });
@@ -166,7 +169,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
   it('role: a resubmit logs [] and a description edit logs ["description"]', async () => {
     const role = await app
       .get(RoleService)
-      .create({ name: roleName, description: 'old' });
+      .create({ name: roleName, description: 'old' }, SYSTEM_ABILITY);
 
     await patch(`roles/${role.id}`, { name: roleName, description: 'old' });
     expect(await lastChangedFields(AuditAction.ROLE_UPDATE, role.id)).toEqual(

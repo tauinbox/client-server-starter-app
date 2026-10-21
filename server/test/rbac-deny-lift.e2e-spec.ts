@@ -7,6 +7,7 @@ import type { PermissionCondition } from '@app/shared/types';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
@@ -78,11 +79,11 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
   const grantRefused = `403 ${ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION}`;
 
   const createRole = (name: string): Promise<Role> =>
-    roleService.create({ name: `${tag}-${name}` });
+    roleService.create({ name: `${tag}-${name}` }, SYSTEM_ABILITY);
 
   const giveRoles = async (user: User, roles: Role[]): Promise<void> => {
     for (const role of roles) {
-      await roleService.assignRoleToUser(user.id, role.id);
+      await roleService.assignRoleToUser(user.id, role.id, SYSTEM_ABILITY);
     }
   };
 
@@ -115,6 +116,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
     updateUser = find('update', 'User');
     const updateRole = find('update', 'Role');
     const assignRole = find('assign', 'Role');
+    const deleteRole = find('delete', 'Role');
 
     const userRepository = dataSource.getRepository(User);
     for (const key of Object.keys(emails) as (keyof typeof emails)[]) {
@@ -130,15 +132,22 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
     }
 
     adminRole = await createRole('admin');
-    await roleService.setPermissionsForRole(adminRole.id, [
-      { permissionId: updateUser.id },
-      { permissionId: updateRole.id },
-      { permissionId: assignRole.id }
-    ]);
+    await roleService.setPermissionsForRole(
+      adminRole.id,
+      [
+        { permissionId: updateUser.id },
+        { permissionId: updateRole.id },
+        { permissionId: assignRole.id },
+        { permissionId: deleteRole.id }
+      ],
+      SYSTEM_ABILITY
+    );
     restrictRole = await createRole('restrict');
-    await roleService.setPermissionsForRole(restrictRole.id, [
-      { permissionId: updateUser.id, conditions: denyCeo() }
-    ]);
+    await roleService.setPermissionsForRole(
+      restrictRole.id,
+      [{ permissionId: updateUser.id, conditions: denyCeo() }],
+      SYSTEM_ABILITY
+    );
     accompliceRole = await createRole('accomplice');
 
     await giveRoles(users.actor, [adminRole, restrictRole]);
@@ -292,9 +301,11 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       )
     ).toBe('RESOLVED');
 
-    await roleService.setPermissionsForRole(restrictRole.id, [
-      { permissionId: updateUser.id, conditions: denyCeo() }
-    ]);
+    await roleService.setPermissionsForRole(
+      restrictRole.id,
+      [{ permissionId: updateUser.id, conditions: denyCeo() }],
+      SYSTEM_ABILITY
+    );
     expect(
       await outcome(
         roleService.setPermissionsForRole(
@@ -306,9 +317,11 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       )
     ).toBe('RESOLVED');
 
-    await roleService.setPermissionsForRole(restrictRole.id, [
-      { permissionId: updateUser.id, conditions: denyCeo() }
-    ]);
+    await roleService.setPermissionsForRole(
+      restrictRole.id,
+      [{ permissionId: updateUser.id, conditions: denyCeo() }],
+      SYSTEM_ABILITY
+    );
     expect(
       await outcome(roleService.delete(restrictRole.id, adminAbility, actingId))
     ).toBe('RESOLVED');
