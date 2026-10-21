@@ -5,6 +5,7 @@ import type {
   BillingProviderId,
   BillingRegion,
   BillingRegionResponse,
+  CancelMode,
   EntitlementLimitKey,
   EntitlementsResponse,
   PlanResponse,
@@ -48,7 +49,7 @@ import {
   billClosingUsagePeriod,
   sumPlanMeterUnits
 } from '../helpers/billing.helpers';
-import { pushToUser } from '../sse-hub';
+import { notifyEntitlementsChanged } from '../helpers/billing-settle.helpers';
 import { mockCheckoutUrl } from '../routes/mock-checkout';
 import {
   listPage,
@@ -236,14 +237,6 @@ function findCustomer(userId: string): MockCustomer | undefined {
 
 /** Plan key of the default (no-subscription) tier - mirrors FREE_PLAN_KEY. */
 const FREE_PLAN_KEY = 'free';
-
-/**
- * Mirrors the server's entitlement-changed listener: a billing change that
- * moves what the plan grants tells that one client, never a broadcast.
- */
-function notifyEntitlementsChanged(userId: string): void {
-  pushToUser(userId, { type: 'entitlements_updated' });
-}
 
 function findPlanByKey(key: string): MockPlan | undefined {
   for (const plan of getState().plans.values()) {
@@ -1022,7 +1015,7 @@ billingRouter.post(
     sub.billingMode = toPlan.billingMode;
     if (modeChanges) sub.meteredFrom = nowIso;
     sub.updatedAt = nowIso;
-    notifyEntitlementsChanged(customer.userId);
+    notifyEntitlementsChanged(customer.id);
     res.json(toSubscriptionResponse(sub));
   }
 );
@@ -1067,6 +1060,69 @@ billingRouter.post(
   }
 );
 
+/** Mirrors `cancelRefusal` of the server cancel tail. */
+function cancelRefusal(
+  sub: MockSubscription,
+  mode: CancelMode
+): { message: string; errorKey: string } | null {
+  if (!OPEN_SUBSCRIPTION_STATUSES.includes(sub.status)) {
+    return {
+      message: 'This subscription is already canceled.',
+      errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED
+    };
+  }
+  if (mode === 'immediate') return null;
+  if (sub.status === 'incomplete') {
+    return {
+      message: 'This subscription has no paid period to end.',
+      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+    };
+  }
+  if (sub.cancelAtPeriodEnd) {
+    return {
+      message: 'A cancellation is already scheduled for the end of the period.',
+      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+    };
+  }
+  return null;
+}
+
+/**
+ * Mirrors `cancelOpenSubscription` of the server, which both cancel routes
+ * share. Returns false after it sent the 409 refusal.
+ */
+function cancelOpenSubscription(
+  res: Response,
+  sub: MockSubscription,
+  mode: CancelMode
+): boolean {
+  const refusal = cancelRefusal(sub, mode);
+  if (refusal) {
+    res.status(409).json({
+      message: refusal.message,
+      errorKey: refusal.errorKey,
+      statusCode: 409
+    });
+    return false;
+  }
+
+  if (mode === 'immediate') {
+    // Ending a metered period now means its postpaid units are owed now. A
+    // provider-managed row is billed by its cancel webhook instead, and a
+    // period-end cancel by the renewal scan at the boundary.
+    if (sub.lifecycleOwner === 'self') billClosingUsagePeriod(sub);
+    sub.status = 'canceled';
+    sub.cancelAtPeriodEnd = false;
+  } else {
+    sub.cancelAtPeriodEnd = true;
+  }
+  sub.updatedAt = new Date().toISOString();
+  // Only an immediate cancel revokes access now; a period-end cancel leaves
+  // entitlements untouched until the boundary, so it pushes nothing.
+  if (mode === 'immediate') notifyEntitlementsChanged(sub.customerId);
+  return true;
+}
+
 // POST /billing/subscription/cancel — cancel current sub (period-end default).
 billingRouter.post(
   '/subscription/cancel',
@@ -1087,20 +1143,7 @@ billingRouter.post(
       return;
     }
 
-    if (mode === 'immediate') {
-      // Ending a metered period now means its postpaid units are owed now. A
-      // provider-managed row is billed by its cancel webhook instead, and a
-      // period-end cancel by the renewal scan at the boundary.
-      if (sub.lifecycleOwner === 'self') billClosingUsagePeriod(sub);
-      sub.status = 'canceled';
-      sub.cancelAtPeriodEnd = false;
-    } else {
-      sub.cancelAtPeriodEnd = true;
-    }
-    sub.updatedAt = new Date().toISOString();
-    // Only an immediate cancel revokes access now; a period-end cancel leaves
-    // entitlements untouched until the boundary, so it pushes nothing.
-    if (mode === 'immediate') notifyEntitlementsChanged(user.id);
+    if (!cancelOpenSubscription(res, sub, mode)) return;
     res.json(toSubscriptionResponse(sub));
   }
 );
@@ -1268,25 +1311,7 @@ billingAdminRouter.post(
       });
       return;
     }
-    // Addressed by id, so a canceled row can be handed in — the self-service
-    // route cannot reach one because it looks up through the open statuses.
-    if (!OPEN_SUBSCRIPTION_STATUSES.includes(sub.status)) {
-      res.status(409).json({
-        message: 'This subscription is already canceled.',
-        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED,
-        statusCode: 409
-      });
-      return;
-    }
-
-    if (mode === 'immediate') {
-      if (sub.lifecycleOwner === 'self') billClosingUsagePeriod(sub);
-      sub.status = 'canceled';
-      sub.cancelAtPeriodEnd = false;
-    } else {
-      sub.cancelAtPeriodEnd = true;
-    }
-    sub.updatedAt = new Date().toISOString();
+    if (!cancelOpenSubscription(res, sub, mode)) return;
     auditAdminAction(
       req,
       'BILLING_SUBSCRIPTION_CANCEL',
@@ -1315,8 +1340,7 @@ function revokeOneTimeEffects(invoice: MockInvoice): void {
       revoked = true;
     }
   }
-  const ownerId = state.billingCustomers.get(invoice.customerId)?.userId;
-  if (revoked && ownerId) notifyEntitlementsChanged(ownerId);
+  if (revoked) notifyEntitlementsChanged(invoice.customerId);
 
   const product = invoice.productId
     ? state.billingProducts.get(invoice.productId)

@@ -12,6 +12,7 @@ import { In } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import {
   DEFAULT_CURSOR_PAGE_SIZE,
+  ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
@@ -782,7 +783,11 @@ describe('BillingUserService', () => {
       // was cancelling, and the whole entity would carry it back.
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
+        {
+          id: 'sub-1',
+          status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
+          cancelAtPeriodEnd: false
+        },
         { cancelAtPeriodEnd: true }
       );
     });

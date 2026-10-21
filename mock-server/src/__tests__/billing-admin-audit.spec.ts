@@ -1,8 +1,10 @@
 import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
+import { ErrorKeys } from '@app/shared/constants';
 import { getState, resetState } from '../state';
-import type { MockAuditLog } from '../types';
+import * as sseHub from '../sse-hub';
+import type { MockAuditLog, MockSubscription } from '../types';
 
 let server: Server;
 let baseUrl: string;
@@ -37,14 +39,15 @@ async function loginAdmin(): Promise<{ token: string; userId: string }> {
 }
 
 async function activateSubscription(
-  userId: string
+  userId: string,
+  status: MockSubscription['status'] = 'active'
 ): Promise<{ subscriptionId: string; customerId: string }> {
   const res = await fetch(
     `${baseUrl}/__control/billing/activate-subscription`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId, planKey: 'pro' })
+      body: JSON.stringify({ userId, planKey: 'pro', status })
     }
   );
   expect(res.status).toBe(200);
@@ -123,6 +126,69 @@ describe('admin billing mutations write audit entries', () => {
     ).toBe(false);
 
     expect(entriesFor('BILLING_SUBSCRIPTION_CANCEL')).toHaveLength(1);
+  });
+
+  it('refuses a period-end repeat and writes no second audit entry', async () => {
+    const { token, userId } = await loginAdmin();
+    const { subscriptionId } = await activateSubscription(userId);
+    const path = `/admin/billing/subscriptions/${subscriptionId}/cancel`;
+
+    expect((await post(token, path, { mode: 'period_end' })).status).toBe(200);
+
+    const repeat = await post(token, path, { mode: 'period_end' });
+    expect(repeat.status).toBe(409);
+    expect(await repeat.json()).toMatchObject({
+      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+    });
+    expect(entriesFor('BILLING_SUBSCRIPTION_CANCEL')).toHaveLength(1);
+
+    // An immediate cancel still ends the scheduled row.
+    expect((await post(token, path, { mode: 'immediate' })).status).toBe(200);
+    expect(getState().billingSubscriptions.get(subscriptionId)?.status).toBe(
+      'canceled'
+    );
+  });
+
+  it('refuses a period-end cancel of an incomplete row', async () => {
+    const { token, userId } = await loginAdmin();
+    const { subscriptionId } = await activateSubscription(userId, 'incomplete');
+
+    const res = await post(
+      token,
+      `/admin/billing/subscriptions/${subscriptionId}/cancel`,
+      { mode: 'period_end' }
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      message: 'This subscription has no paid period to end.',
+      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+    });
+    expect(
+      getState().billingSubscriptions.get(subscriptionId)?.cancelAtPeriodEnd
+    ).toBe(false);
+    expect(entriesFor('BILLING_SUBSCRIPTION_CANCEL')).toHaveLength(0);
+  });
+
+  it('pushes entitlements_updated to the owner on an immediate cancel', async () => {
+    const { token, userId } = await loginAdmin();
+    const { subscriptionId } = await activateSubscription(userId);
+
+    const push = jest.spyOn(sseHub, 'pushToUser');
+    try {
+      const res = await post(
+        token,
+        `/admin/billing/subscriptions/${subscriptionId}/cancel`,
+        { mode: 'immediate' }
+      );
+      expect(res.status).toBe(200);
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith(userId, {
+        type: 'entitlements_updated'
+      });
+    } finally {
+      push.mockRestore();
+    }
   });
 
   it('audits a refund with the requested amount', async () => {

@@ -12,6 +12,7 @@ import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import {
   DEFAULT_CURSOR_PAGE_SIZE,
+  ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
@@ -448,6 +449,99 @@ describe('BillingAdminService', () => {
       // `canceled` together with `cancelAtPeriodEnd` is a pair no other writer
       // in the module can produce.
       expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses a period-end repeat of a scheduled row before the provider call', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({
+          cancelAtPeriodEnd: true,
+          providerSubscriptionId: 'sub_ext_1'
+        })
+      );
+      const yoo = providerStub('yookassa');
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(
+        ctx.service.cancelSubscription('sub-1', 'period_end')
+      ).rejects.toMatchObject({
+        status: 409,
+        response: {
+          errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+        }
+      });
+
+      expect(yoo.cancel).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses a period-end cancel of an incomplete row, which has no period to end', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ status: 'incomplete' })
+      );
+
+      await expect(
+        ctx.service.cancelSubscription('sub-1', 'period_end')
+      ).rejects.toMatchObject({
+        status: 409,
+        response: {
+          message: 'This subscription has no paid period to end.',
+          errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+        }
+      });
+
+      expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a scheduled', { cancelAtPeriodEnd: true }],
+      ['an incomplete', { status: 'incomplete' as const }]
+    ])('still ends %s row immediately', async (_label, overrides) => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(makeSubscription(overrides));
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
+
+      const saved = await ctx.service.cancelSubscription('sub-1', 'immediate');
+
+      expect(saved.status).toBe('canceled');
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-1', status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
+        { status: 'canceled', cancelAtPeriodEnd: false }
+      );
+    });
+
+    it('writes a period-end cancel only to an unscheduled row with a paid period', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne.mockResolvedValue(makeSubscription());
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
+
+      await ctx.service.cancelSubscription('sub-1', 'period_end');
+
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        {
+          id: 'sub-1',
+          status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
+          cancelAtPeriodEnd: false
+        },
+        { cancelAtPeriodEnd: true }
+      );
+    });
+
+    it('names the concurrent period-end cancel that won the write', async () => {
+      const ctx = await build();
+      ctx.subscriptions.findOne
+        .mockResolvedValueOnce(makeSubscription())
+        .mockResolvedValueOnce(makeSubscription({ cancelAtPeriodEnd: true }));
+      ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
+
+      await expect(
+        ctx.service.cancelSubscription('sub-1', 'period_end')
+      ).rejects.toMatchObject({
+        response: {
+          errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+        }
+      });
     });
 
     it('answers 409 when a concurrent cancel lands during the provider call', async () => {

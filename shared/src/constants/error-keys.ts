@@ -116,6 +116,8 @@ export const ErrorKeys = {
     SUBSCRIPTION_BUSY: 'errors.billing.subscriptionBusy',
     SUBSCRIPTION_ALREADY_CANCELED: 'errors.billing.subscriptionAlreadyCanceled',
     CANCELLATION_SCHEDULED: 'errors.billing.cancellationScheduled',
+    CANCELLATION_ALREADY_SCHEDULED:
+      'errors.billing.cancellationAlreadyScheduled',
     RENEWAL_IN_PROGRESS: 'errors.billing.renewalInProgress',
     PLAN_CHANGE_CONFLICT: 'errors.billing.planChangeConflict',
     PLAN_CHANGE_PAYMENT_CONFLICT: 'errors.billing.planChangePaymentConflict',

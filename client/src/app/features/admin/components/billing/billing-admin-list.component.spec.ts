@@ -250,6 +250,31 @@ describe('BillingAdminListComponent', () => {
     expect(rowActionButtons(fixture.nativeElement).length).toBe(0);
   });
 
+  it.each([
+    ['an unscheduled', {}, ['period_end', 'immediate']],
+    ['a scheduled', { cancelAtPeriodEnd: true }, ['immediate']],
+    ['an incomplete', { status: 'incomplete' as const }, ['immediate']]
+  ])(
+    'offers the cancel modes the server accepts for %s row',
+    async (_label, overrides, modes) => {
+      subscriptionsMock.subscriptions.set([{ ...activeSub, ...overrides }]);
+      const fixture = await setup();
+      fixture.detectChanges();
+
+      rowActionButtons(fixture.nativeElement)[0].click();
+      fixture.detectChanges();
+
+      const items = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('[mat-menu-item]')
+      );
+      expect(items.map((item) => item.textContent?.trim())).toEqual(
+        modes.map((mode) =>
+          mode === 'period_end' ? 'Cancel at period end' : 'Cancel immediately'
+        )
+      );
+    }
+  );
+
   it('exposes canCancel/canRefund guards matching server rules', async () => {
     const fixture = await setup();
     const cmp = fixture.componentInstance;

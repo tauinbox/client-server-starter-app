@@ -53,12 +53,14 @@
                     <mat-icon>more_vert</mat-icon>
                   </button>
                   <mat-menu #subMenu="matMenu">
-                    <button
-                      mat-menu-item
-                      (click)="confirmCancel(sub, 'period_end')"
-                    >
-                      {{ t('admin.billing.cancelPeriodEnd') }}
-                    </button>
+                    @if (canCancelAtPeriodEnd(sub)) {
+                      <button
+                        mat-menu-item
+                        (click)="confirmCancel(sub, 'period_end')"
+                      >
+                        {{ t('admin.billing.cancelPeriodEnd') }}
+                      </button>
+                    }
                     <button
                       mat-menu-item
                       (click)="confirmCancel(sub, 'immediate')"
@@ -148,12 +150,14 @@
                     <mat-icon>more_vert</mat-icon>
                   </button>
                   <mat-menu #rowSubMenu="matMenu">
-                    <button
-                      mat-menu-item
-                      (click)="confirmCancel(sub, 'period_end')"
-                    >
-                      {{ t('admin.billing.cancelPeriodEnd') }}
-                    </button>
+                    @if (canCancelAtPeriodEnd(sub)) {
+                      <button
+                        mat-menu-item
+                        (click)="confirmCancel(sub, 'period_end')"
+                      >
+                        {{ t('admin.billing.cancelPeriodEnd') }}
+                      </button>
+                    }
                     <button
                       mat-menu-item
                       (click)="confirmCancel(sub, 'immediate')"

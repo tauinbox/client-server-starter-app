@@ -200,7 +200,8 @@ src/app/
 │       │                                      # cursor pagination and its own infinite-scroll
 │       │                                      # sentinel. Each row has a cancel action (a menu
 │       │                                      # with period-end and immediate, plus a
-│       │                                      # confirmation) and a refund action (a
+│       │                                      # confirmation; period-end only for a paid row
+│       │                                      # with no scheduled cancel) and a refund action (a
 │       │                                      # confirmation). The status-chip mixin is shared
 │       │                                      # with the billing settings page.
 │       ├── services/       # RoleService reads /api/v1/roles for role administration only. To
