@@ -411,6 +411,42 @@ test.describe('Billing', () => {
     );
   });
 
+  test('an unpaid YooKassa checkout does not block a change to the international region', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: USER_ID,
+      roles: ['user'],
+      locale: 'ru'
+    });
+
+    await page.goto('/billing');
+    await page
+      .locator('nxs-plan-card', { hasText: 'Pro' })
+      .getByRole('button', { name: 'Choose' })
+      .click();
+    await expect(page).toHaveURL(MOCK_CHECKOUT_URL);
+    await page.getByRole('link', { name: 'Cancel' }).click();
+    await expect(page).toHaveURL(/\/billing\/cancel$/);
+
+    await page.goto('/billing/settings');
+    const region = page.locator('.settings-header .region-control');
+    await expect(region.getByRole('radio', { name: 'Auto' })).toBeChecked();
+    const changed = page.waitForResponse(
+      (response) =>
+        response.url().includes('/billing/region') &&
+        response.request().method() === 'PUT'
+    );
+    await region.getByRole('radio', { name: 'International' }).click();
+
+    expect((await changed).status()).toBe(200);
+    await expect(
+      region.getByRole('radio', { name: 'International' })
+    ).toBeChecked();
+    await expect(page.locator('mat-snack-bar-container')).toHaveCount(0);
+  });
+
   test('a Paddle plan change via the proration dialog adds no local receipt', async ({
     page,
     _mockServer

@@ -1340,6 +1340,81 @@ describe('BillingUserService', () => {
       expect(ctx.customers.save).not.toHaveBeenCalled();
     });
 
+    it('releases an unpaid self-managed checkout on another provider and changes the region', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'yookassa',
+        status: 'incomplete',
+        lifecycleOwner: 'self'
+      });
+
+      await ctx.service.setRegion('user-1', 'world');
+
+      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
+        { id: 'sub-1', status: 'incomplete' },
+        { status: 'canceled' }
+      );
+      expect(ctx.customers.update).toHaveBeenCalledWith(
+        { id: 'cust-1' },
+        { providerOverride: 'paddle' }
+      );
+    });
+
+    it('rejects a region change when the unpaid checkout was paid before the release', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'RU',
+        providerOverride: null
+      });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'yookassa',
+        status: 'incomplete',
+        lifecycleOwner: 'self'
+      });
+      ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
+
+      await expectRefusal(
+        ctx.service.setRegion('user-1', 'world'),
+        ConflictException,
+        ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
+      );
+      expect(ctx.customers.update).not.toHaveBeenCalled();
+    });
+
+    it('keeps blocking a provider-owned incomplete subscription', async () => {
+      const ctx = await build();
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1',
+        country: 'US',
+        providerOverride: null
+      });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'paddle',
+        status: 'incomplete',
+        lifecycleOwner: 'provider'
+      });
+
+      await expectRefusal(
+        ctx.service.setRegion('user-1', 'ru'),
+        ConflictException,
+        ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
+      );
+      expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+      expect(ctx.customers.update).not.toHaveBeenCalled();
+    });
+
     it('rejects a region whose provider is unavailable before the subscription guard', async () => {
       const ctx = await build();
       ctx.customers.findOne.mockResolvedValue({

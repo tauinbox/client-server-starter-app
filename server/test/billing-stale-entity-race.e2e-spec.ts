@@ -249,8 +249,9 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     duringWindow: () => Promise<unknown>
   ): Promise<BillingUserService> {
     const subscriptions = ds.getRepository(Subscription);
-    // `setRegion` reads the open subscription and nothing else off this
-    // repository, so the stub carries only that read plus the window hook.
+    // With an open row on the same provider, `setRegion` reads the open
+    // subscription and nothing else off this repository, so the stub carries
+    // only that read plus the window hook.
     const racingSubscriptions = {
       findOne: async (options: FindOneOptions<Subscription>) => {
         const found = await subscriptions.findOne(options);

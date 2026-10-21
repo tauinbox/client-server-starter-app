@@ -1145,13 +1145,18 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
 
   const open = findCurrentSubscription(customer.id);
   if (open && open.provider !== newEffective) {
-    res.status(409).json({
-      message:
-        'Cancel the current subscription before changing your billing region.',
-      errorKey: ErrorKeys.BILLING.REGION_CHANGE_BLOCKED,
-      statusCode: 409
-    });
-    return;
+    if (open.status !== 'incomplete' || open.lifecycleOwner !== 'self') {
+      res.status(409).json({
+        message:
+          'Cancel the current subscription before changing your billing region.',
+        errorKey: ErrorKeys.BILLING.REGION_CHANGE_BLOCKED,
+        statusCode: 409
+      });
+      return;
+    }
+    // Release the unpaid self-managed checkout, as checkout does.
+    open.status = 'canceled';
+    open.updatedAt = new Date().toISOString();
   }
 
   customer.providerOverride = newOverride;

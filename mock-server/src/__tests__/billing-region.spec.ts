@@ -4,6 +4,7 @@ import type { BillingProviderId } from '@app/shared/types';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
+import type { MockSubscription } from '../types';
 import { mockId } from '../utils/mock-id';
 import { readErrorBody } from '../utils/error-body';
 
@@ -130,6 +131,64 @@ describe('PUT /billing/region provider availability (server parity)', () => {
 
     expect(refused.status).toBe(409);
     expect(refused.body['errorKey']).toBe(ErrorKeys.BILLING.REGION_UNAVAILABLE);
+  });
+});
+
+describe('PUT /billing/region with an unpaid checkout (server parity)', () => {
+  async function checkout(token: string): Promise<void> {
+    const res = await fetch(`${baseUrl}/api/v1/billing/checkout`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ planKey: 'pro' })
+    });
+    expect(res.status).toBe(200);
+  }
+
+  async function yookassaCheckout(token: string): Promise<MockSubscription> {
+    expect((await region('PUT', token, { region: 'ru' })).status).toBe(200);
+    const before = new Set(getState().billingSubscriptions.keys());
+    await checkout(token);
+    const created = [...getState().billingSubscriptions.values()].find(
+      (s) => !before.has(s.id)
+    );
+    expect(created).toMatchObject({
+      status: 'incomplete',
+      provider: 'yookassa',
+      lifecycleOwner: 'self'
+    });
+    return created!;
+  }
+
+  it('releases a self-managed incomplete row and changes the region', async () => {
+    const token = await login('user@example.com');
+    const pending = await yookassaCheckout(token);
+
+    const changed = await region('PUT', token, { region: 'world' });
+
+    expect(changed.status).toBe(200);
+    expect(changed.body).toMatchObject({
+      region: 'world',
+      effectiveProvider: 'paddle'
+    });
+    expect(pending.status).toBe('canceled');
+  });
+
+  it('keeps blocking a provider-owned incomplete row', async () => {
+    const token = await login('user@example.com');
+    const pending = await yookassaCheckout(token);
+    pending.provider = 'paddle';
+    pending.lifecycleOwner = 'provider';
+
+    const refused = await region('PUT', token, { region: 'ru' });
+
+    expect(refused.status).toBe(409);
+    expect(refused.body['errorKey']).toBe(
+      ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
+    );
+    expect(pending.status).toBe('incomplete');
   });
 });
 

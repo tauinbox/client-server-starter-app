@@ -70,6 +70,14 @@ function alreadySubscribed(): ConflictException {
   });
 }
 
+function regionChangeBlocked(): ConflictException {
+  return new ConflictException({
+    message:
+      'Cancel the current subscription before changing your billing region.',
+    errorKey: ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
+  });
+}
+
 /**
  * One-time product types listed in the purchase catalog.
  * `custom` is listed too: its price entry carries the amount bounds and
@@ -455,18 +463,20 @@ export class BillingUserService {
    * can activate it inside that window — committing the whole entity would put a
    * paid subscription back to `incomplete` with no period and no payment method,
    * outside both the entitled statuses and the renewal sweep. On a miss the
-   * customer does have a live subscription, which is the guard's own answer.
+   * customer does have a live subscription, and `onMiss` is the caller's
+   * refusal for that case.
    */
   private async reuseIncompleteRow(
     pending: Subscription,
-    fields: QueryDeepPartialEntity<Subscription>
+    fields: QueryDeepPartialEntity<Subscription>,
+    onMiss: () => ConflictException = alreadySubscribed
   ): Promise<void> {
     const applied = await this.subscriptions.update(
       { id: pending.id, status: 'incomplete' },
       fields
     );
     if (applied.affected !== 1) {
-      throw alreadySubscribed();
+      throw onMiss();
     }
   }
 
@@ -568,6 +578,8 @@ export class BillingUserService {
 
     // No in-place cross-provider migration: if a live subscription
     // is on a different provider than the new region resolves to, reject.
+    // An unpaid self-managed checkout is released instead, as checkout does;
+    // a provider-owned `incomplete` row has a subscription at the provider.
     const open = await this.subscriptions.findOne({
       where: {
         customerId: customer.id,
@@ -575,11 +587,14 @@ export class BillingUserService {
       }
     });
     if (open && open.provider !== newEffective) {
-      throw new ConflictException({
-        message:
-          'Cancel the current subscription before changing your billing region.',
-        errorKey: ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
-      });
+      if (open.status !== 'incomplete' || open.lifecycleOwner !== 'self') {
+        throw regionChangeBlocked();
+      }
+      await this.reuseIncompleteRow(
+        open,
+        { status: 'canceled' },
+        regionChangeBlocked
+      );
     }
 
     // The override is the only column this call owns; saving the entity would
