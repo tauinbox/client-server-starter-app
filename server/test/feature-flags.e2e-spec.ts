@@ -799,7 +799,6 @@ class PassThroughJwtGuard implements CanActivate {
     req.user = {
       userId: 'caller-1',
       email: 'caller@example.com',
-      roles: [],
       sessionId: 'session-1'
     };
     return true;
@@ -930,7 +929,6 @@ describe('GET /feature-flags anonymous rollout id', () => {
         req.user = {
           userId,
           email: 'u@example.com',
-          roles: [],
           sessionId: 's'
         };
       }

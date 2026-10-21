@@ -884,12 +884,9 @@ describe('AuthService', () => {
     it('should generate tokens with correct payload', async () => {
       await service.login(mockUser, { userAgent: null, ipAddress: null });
 
-      // JWT payload keeps role names as string[] (CASL / storage contract),
-      // even though the response body carries RoleResponse[] objects.
       expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
         'user-1',
         'test@example.com',
-        ['user'],
         expect.any(String)
       );
     });
@@ -1586,7 +1583,6 @@ describe('AuthService', () => {
       expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
         'user-1',
         'test@example.com',
-        ['user'],
         'session-1'
       );
       expect(result.tokens.access_token).toBe('mock-access-token');

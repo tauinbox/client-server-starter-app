@@ -21,13 +21,11 @@ export class TokenGeneratorService {
   generateTokens(
     userId: string,
     email: string,
-    roles: string[],
     sessionId: string
   ): TokensResponseDto {
     const jwtPayload: CustomJwtPayload = {
       sub: userId,
       email,
-      roles,
       purpose: TOKEN_PURPOSE.ACCESS,
       sid: sessionId
     };

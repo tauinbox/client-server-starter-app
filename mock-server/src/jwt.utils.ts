@@ -22,7 +22,6 @@ export function generateAccessToken(
   const payload = base64url({
     sub: user.id,
     email: user.email,
-    roles: user.roles,
     purpose: TOKEN_PURPOSE.ACCESS,
     sid: sessionId,
     iat: Math.floor(Date.now() / 1000),
@@ -79,7 +78,6 @@ export function generateSessionId(): string {
 export interface DecodedToken {
   sub: string;
   email: string;
-  roles: string[];
   purpose?: string;
   sid?: string;
   iat: number;
