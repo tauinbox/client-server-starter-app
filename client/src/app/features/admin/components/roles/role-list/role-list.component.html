@@ -100,7 +100,7 @@
                   <mat-icon>security</mat-icon>
                 </button>
               }
-              @if (canUpdate() && !role.isSystem) {
+              @if (canUpdate(role) && !role.isSystem) {
                 <button
                   matIconButton
                   (click)="openEditDialog(role)"
@@ -112,7 +112,7 @@
                   <mat-icon>edit</mat-icon>
                 </button>
               }
-              @if (canDelete() && !role.isSystem) {
+              @if (canDelete(role) && !role.isSystem) {
                 <button
                   matIconButton
                   class="app-btn-danger"

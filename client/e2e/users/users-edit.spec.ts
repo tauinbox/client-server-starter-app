@@ -1,3 +1,5 @@
+import type { PermissionCondition } from '@app/shared/types';
+import type { MockServerApi } from '../fixtures/base.fixture';
 import {
   expect,
   expectAuthRedirect,
@@ -6,6 +8,48 @@ import {
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
+import {
+  seedActions,
+  seedPermissions,
+  seedResources,
+  seedRolePermissions
+} from '../../../mock-server/src/seed';
+
+/** Seeds a role that holds the given `User` actions with their conditions. */
+async function seedUserRole(
+  mockServer: MockServerApi,
+  name: string,
+  grants: Record<string, PermissionCondition | null>
+): Promise<void> {
+  const roleId = mockId(`role-${name}`);
+  const resourceId = seedResources.find((r) => r.subject === 'User')!.id;
+  await mockServer.seedRoles([
+    {
+      id: roleId,
+      name,
+      description: null,
+      isSystem: false,
+      isSuper: false,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z'
+    }
+  ]);
+  await mockServer.seedRolePermissions([
+    ...seedRolePermissions,
+    ...Object.entries(grants).map(([action, conditions]) => {
+      const actionId = seedActions.find((a) => a.name === action)!.id;
+      const permission = seedPermissions.find(
+        (p) => p.resourceId === resourceId && p.actionId === actionId
+      )!;
+      return {
+        id: mockId(`rp-${name}-${action}`),
+        roleId,
+        permissionId: permission.id,
+        conditions
+      };
+    })
+  ]);
+}
 
 test.describe('User Edit page', () => {
   test('should redirect to login when not authenticated', async ({
@@ -101,22 +145,58 @@ test.describe('User Edit page', () => {
     await expect(page).toHaveURL(new RegExp(`/users/${selfId}$`));
   });
 
-  // The seeded `user` role holds update:User only as
-  // { ownership: { userField: 'id' } }, so the route guard must compare the
-  // grant against the record in the URL, not against the subject type.
   test('admits the owner of the record behind the ownership grant', async ({
     _mockServer,
     page
   }) => {
+    const ownership = { ownership: { userField: 'id' } };
+    await seedUserRole(_mockServer, 'self-editor', {
+      read: ownership,
+      update: ownership
+    });
     const ownId = mockId('user-owner');
     await loginViaUi(page, _mockServer.url, {
       id: ownId,
-      email: 'owner@example.com'
+      email: 'owner@example.com',
+      firstName: 'Olivia',
+      roles: ['self-editor']
     });
 
     await page.goto(`/users/${ownId}/edit`);
 
+    await expect(page.getByLabel('First name')).toHaveValue('Olivia');
     await expect(page).toHaveURL(new RegExp(`/users/${ownId}/edit$`));
+  });
+
+  // The route guard checks the type; the form checks the loaded record, so a
+  // condition on any field of the record decides.
+  test('admits a record that a field condition covers and sends another back', async ({
+    _mockServer,
+    page
+  }) => {
+    await seedUserRole(_mockServer, 'smith-editor', {
+      search: null,
+      read: null,
+      update: { fieldMatch: { lastName: ['Smith'] } }
+    });
+    await loginViaUi(page, _mockServer.url, {
+      id: mockId('user-scoped'),
+      email: 'scoped@example.com',
+      roles: ['smith-editor']
+    });
+
+    await page.goto(`/users/${mockId('user-3')}/edit`);
+    await expect(page.getByLabel('Last name')).toHaveValue('Smith');
+    // The editor holds no read:Role, so the form must not ask for the catalog.
+    await expectNoSnackbar(page);
+
+    await page.goto(`/users/${mockId('user-4')}/edit`);
+    await expect(page.locator('mat-snack-bar-container')).toContainText(
+      'You cannot edit this user'
+    );
+    await expect(page).toHaveURL(
+      new RegExp(`/admin/users/${mockId('user-4')}$`)
+    );
   });
 
   test('refuses a record the ownership grant does not cover', async ({

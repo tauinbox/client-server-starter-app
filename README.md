@@ -204,7 +204,7 @@ management and theming.
   administrator bypass.
 
   On the server, `@Authorize(['action', 'Subject'])` takes a typed tuple. On the client there are
-  `permissionGuard(action, subject)`, `instancePermissionGuard(action, subject, instanceFactory)` and
+  `permissionGuard(action, subject)`, `AuthStore.hasPermissions({ action, subject, instance? })` and
   the `*appRequirePermissions="{ action, subject, instance? }"` directive. The `/api/v1/rbac/`
   endpoints manage the resources and the actions.
 
@@ -627,18 +627,20 @@ target is the authenticated user.
    </ng-template>
    ```
 
-2. **`instancePermissionGuard`** works on a route. It runs before the route activation:
+2. **`permissionGuard`** works on a route. It checks the type only, because the route has an id and
+   not the record. The page loads the record and checks it; a 403 on the load goes to `/forbidden`:
    ```typescript
-   canActivate: [instancePermissionGuard('update', 'User', (route) => ({ id: route.params['id'] }))]
+   canActivate: [permissionGuard('update', 'User')]
    ```
 
-3. A **computed property** works in a component with complex logic:
+3. A **computed property or a row method** works in a component. A check of an action in
+   `conditionalActions` passes the whole record, because a condition can name any field of it:
    ```typescript
    canManageUser = computed(() => {
      const u = this.user();
      if (!u) return false;
      return this.authStore.hasPermissions({
-       action: 'update', subject: 'User', instance: { id: u.id }
+       action: 'update', subject: 'User', instance: u
      });
    });
    ```

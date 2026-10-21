@@ -76,6 +76,7 @@
     "confirmEmailChangeButton": "Change email",
     "errorLoadFailed": "Failed to load user details. Please try again.",
     "superTargetReadOnly": "Only a super administrator can change this account.",
+    "errorNoAccess": "You cannot edit this user",
     "successUnlocked": "Account unlocked successfully",
     "errorUnlockFailed": "Failed to unlock account",
     "successUpdated": "User updated successfully",
