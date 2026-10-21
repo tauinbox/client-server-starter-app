@@ -11,13 +11,13 @@ import {
 import {
   buildAbilityForUser,
   getState,
-  logAudit,
   SILENT_RESOLVER_LOGGER,
   type Actions,
   type MockAbility,
   type SubjectNames
 } from '../state';
 import type { AuthenticatedRequest } from '../types';
+import { logRefusal } from './auth.helpers';
 
 type ScopeItem = {
   permissionId: string;
@@ -82,8 +82,8 @@ export function assertGrantScope(
       : findLiftRefusal(ability, grantItems);
   if (!refused) return true;
 
-  logAudit('PERMISSION_GRANT_DENIED', {
-    actorId: user.id,
+  logRefusal(req, user.id, {
+    action: 'PERMISSION_GRANT_DENIED',
     targetId: roleId,
     targetType: 'Role',
     // The server audits the details; its exception filter keeps them out
@@ -112,8 +112,8 @@ export function assertCanWiden(
   if (reEnabled.length === 0) return true;
   const { user } = req as AuthenticatedRequest;
   if (buildAbilityForUser(user).can('manage', 'all')) return true;
-  logAudit('PERMISSION_GRANT_DENIED', {
-    actorId: user.id,
+  logRefusal(req, user.id, {
+    action: 'PERMISSION_GRANT_DENIED',
     targetId: resource.id,
     targetType: 'Resource',
     details: {

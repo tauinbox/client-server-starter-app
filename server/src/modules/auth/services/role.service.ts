@@ -45,6 +45,8 @@ import type { AuditLogParams } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-target.util';
+import { refuseAccess } from '../../../common/utils/refuse-access.util';
+import { auditContextOf } from '../casl/ability-context';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
@@ -112,7 +114,7 @@ export class RoleService {
         logger: this.logger
       });
     } catch (err) {
-      this.recordGrantRefusal(err, context);
+      this.recordGrantRefusal(err, ability, context);
       throw err;
     }
   }
@@ -134,7 +136,7 @@ export class RoleService {
     try {
       assertCanLiftDenies(ability, resolved);
     } catch (err) {
-      this.recordGrantRefusal(err, context);
+      this.recordGrantRefusal(err, ability, context);
       throw err;
     }
   }
@@ -150,8 +152,10 @@ export class RoleService {
     return rows.filter((row) => isDenyCondition(row.conditions));
   }
 
+  /** Rethrows a 403 through `refuseAccess`; any other error is left alone. */
   private recordGrantRefusal(
     err: unknown,
+    ability: AppAbility,
     context: { actorId?: string; roleId: string }
   ): void {
     if (!(err instanceof HttpException) || err.getStatus() !== 403) return;
@@ -162,13 +166,6 @@ export class RoleService {
             body
           })
         : { message: String(body) };
-    this.auditService.logFireAndForget({
-      action: AuditAction.PERMISSION_GRANT_DENIED,
-      actorId: context.actorId ?? null,
-      targetId: context.roleId,
-      targetType: 'Role',
-      details
-    });
     const rawAction =
       typeof details === 'object' && 'action' in details
         ? (details as { action?: unknown }).action
@@ -177,13 +174,56 @@ export class RoleService {
       typeof details === 'object' && 'subject' in details
         ? (details as { subject?: unknown }).subject
         : undefined;
-    const deniedAction = typeof rawAction === 'string' ? rawAction : 'grant';
-    const deniedSubject =
-      typeof rawSubject === 'string' ? rawSubject : 'Permission';
-    this.metricsService.recordPermissionDenied(
-      'instance',
-      deniedAction,
-      deniedSubject
+    refuseAccess(
+      this.auditService,
+      this.metricsService,
+      {
+        auditAction: AuditAction.PERMISSION_GRANT_DENIED,
+        actorId: context.actorId,
+        targetId: context.roleId,
+        targetType: 'Role',
+        details,
+        context: auditContextOf(ability),
+        level: 'instance',
+        denied: [
+          {
+            action: typeof rawAction === 'string' ? rawAction : 'grant',
+            subject: typeof rawSubject === 'string' ? rawSubject : 'Permission'
+          }
+        ]
+      },
+      err
+    );
+  }
+
+  /** No API path assigns or removes a super role, a super caller included. */
+  private refuseSuperRole(
+    ability: AppAbility,
+    action: 'assign' | 'unassign',
+    roleId: string,
+    actorId: string | undefined
+  ): never {
+    return refuseAccess(
+      this.auditService,
+      this.metricsService,
+      {
+        actorId,
+        targetId: roleId,
+        targetType: 'Role',
+        details: { deniedAction: action, subject: 'Role', superRole: true },
+        context: auditContextOf(ability),
+        level: 'instance',
+        denied: [{ action, subject: 'Role' }]
+      },
+      action === 'assign'
+        ? new ForbiddenException({
+            message: 'Cannot assign super roles',
+            errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
+          })
+        : new ForbiddenException({
+            message: 'Cannot remove super roles',
+            errorKey: ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
+          })
     );
   }
 
@@ -295,15 +335,38 @@ export class RoleService {
     );
   }
 
-  private assertNotSystem(role: Role, ability: AbilityOrSystem): void {
+  /**
+   * A super caller may change the grants of a system role, so a refusal of
+   * any other caller is a refusal by privilege (403). `SYSTEM_ABILITY` has no
+   * principal and is refused as a misuse (400).
+   */
+  private assertNotSystem(
+    role: Role,
+    ability: AbilityOrSystem,
+    actorId?: string
+  ): void {
     if (!role.isSystem) return;
-    if (ability !== SYSTEM_ABILITY && ability.can('manage', 'all')) return;
-    throw new HttpException(
+    const error = {
+      message: 'Cannot modify system roles',
+      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+    };
+    if (ability === SYSTEM_ABILITY) {
+      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+    }
+    if (ability.can('manage', 'all')) return;
+    refuseAccess(
+      this.auditService,
+      this.metricsService,
       {
-        message: 'Cannot modify system roles',
-        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+        actorId,
+        targetId: role.id,
+        targetType: 'Role',
+        details: { deniedAction: 'update', subject: 'Role', systemRole: true },
+        context: auditContextOf(ability),
+        level: 'instance',
+        denied: [{ action: 'update', subject: 'Role' }]
       },
-      HttpStatus.BAD_REQUEST
+      new HttpException(error, HttpStatus.FORBIDDEN)
     );
   }
 
@@ -565,15 +628,7 @@ export class RoleService {
 
     if (ability !== SYSTEM_ABILITY) {
       if (role.isSuper) {
-        this.metricsService.recordPermissionDenied(
-          'instance',
-          'assign',
-          'Role'
-        );
-        throw new ForbiddenException({
-          message: 'Cannot assign super roles',
-          errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
-        });
+        this.refuseSuperRole(ability, 'assign', roleId, actorId);
       }
       assertCan(
         ability,
@@ -635,15 +690,7 @@ export class RoleService {
 
     if (ability !== SYSTEM_ABILITY) {
       if (role.isSuper) {
-        this.metricsService.recordPermissionDenied(
-          'instance',
-          'unassign',
-          'Role'
-        );
-        throw new ForbiddenException({
-          message: 'Cannot remove super roles',
-          errorKey: ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
-        });
+        this.refuseSuperRole(ability, 'unassign', roleId, actorId);
       }
       assertCan(
         ability,
@@ -722,7 +769,7 @@ export class RoleService {
   ): Promise<void> {
     const role = await this.loadRole(roleId);
     this.assertCanRole(ability, 'update', role, actorId);
-    this.assertNotSystem(role, ability);
+    this.assertNotSystem(role, ability, actorId);
     await this.assertGrantsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     if (this.isScopeChecked(ability)) {
@@ -768,7 +815,7 @@ export class RoleService {
   ): Promise<void> {
     const role = await this.loadRole(roleId);
     this.assertCanRole(ability, 'update', role, actorId);
-    this.assertNotSystem(role, ability);
+    this.assertNotSystem(role, ability, actorId);
     const items = permissionIds.map((permissionId) => ({
       permissionId,
       conditions: conditions ?? null
@@ -799,7 +846,7 @@ export class RoleService {
   ): Promise<void> {
     const role = await this.loadRole(roleId);
     this.assertCanRole(ability, 'update', role, actorId);
-    this.assertNotSystem(role, ability);
+    this.assertNotSystem(role, ability, actorId);
     if (this.isScopeChecked(ability)) {
       const row = await this.rolePermissionRepository.findOne({
         where: { roleId, permissionId }

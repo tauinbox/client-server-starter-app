@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
 import {
   ErrorKeys,
@@ -34,6 +34,7 @@ import {
   assertCanWriteUser,
   assertInstancePermission,
   isActorSuper,
+  logRefusal,
   permissionGuard
 } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
@@ -194,6 +195,47 @@ function findGrantError(
     };
   }
   return null;
+}
+
+// Mirrors RoleService.assertNotSystem: a super caller may change the grants of
+// a system role, so refusing any other caller is a refusal by privilege.
+function refuseSystemRole(req: Request, res: Response, roleId: string): void {
+  logRefusal(req, (req as AuthenticatedRequest).user.id, {
+    targetId: roleId,
+    targetType: 'Role',
+    details: { deniedAction: 'update', subject: 'Role', systemRole: true }
+  });
+  res.status(403).json({
+    message: 'Cannot modify system roles',
+    statusCode: 403,
+    errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
+  });
+}
+
+// Mirrors RoleService.refuseSuperRole: no API path assigns or removes a super
+// role, a super caller included.
+function refuseSuperRole(
+  req: Request,
+  res: Response,
+  action: 'assign' | 'unassign',
+  roleId: string
+): void {
+  logRefusal(req, (req as AuthenticatedRequest).user.id, {
+    targetId: roleId,
+    targetType: 'Role',
+    details: { deniedAction: action, subject: 'Role', superRole: true }
+  });
+  res.status(403).json({
+    message:
+      action === 'assign'
+        ? 'Cannot assign super roles'
+        : 'Cannot remove super roles',
+    statusCode: 403,
+    errorKey:
+      action === 'assign'
+        ? ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
+        : ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
+  });
 }
 
 // Notify every connected holder of a role that its effective permission set
@@ -612,11 +654,7 @@ router.put(
     }
 
     if (role.isSystem && !isActorSuper(req)) {
-      res.status(400).json({
-        message: 'Cannot modify system roles',
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-      });
+      refuseSystemRole(req, res, role.id);
       return;
     }
 
@@ -754,11 +792,7 @@ router.post(
     }
 
     if (role.isSystem && !isActorSuper(req)) {
-      res.status(400).json({
-        message: 'Cannot modify system roles',
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-      });
+      refuseSystemRole(req, res, role.id);
       return;
     }
 
@@ -859,11 +893,7 @@ router.delete(
     }
 
     if (role.isSystem && !isActorSuper(req)) {
-      res.status(400).json({
-        message: 'Cannot modify system roles',
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-      });
+      refuseSystemRole(req, res, role.id);
       return;
     }
 
@@ -927,11 +957,7 @@ router.post(
     // `RoleService.assignRoleToUser` refuses a super role to every caller of
     // this route, a super caller included: no API path grants one.
     if (role.isSuper) {
-      res.status(403).json({
-        message: 'Cannot assign super roles',
-        statusCode: 403,
-        errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
-      });
+      refuseSuperRole(req, res, 'assign', roleId);
       return;
     }
 
@@ -1018,11 +1044,7 @@ router.delete(
     // `RoleService.removeRoleFromUser` refuses a super role to every caller of
     // this route, a super caller included: no API path removes one.
     if (role.isSuper) {
-      res.status(403).json({
-        message: 'Cannot remove super roles',
-        statusCode: 403,
-        errorKey: ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
-      });
+      refuseSuperRole(req, res, 'unassign', roleId);
       return;
     }
 

@@ -35,6 +35,8 @@ import {
 import { subject } from '@casl/ability';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { refuseAccess } from '../../../common/utils/refuse-access.util';
+import { auditContextOf } from '../casl/ability-context';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import type { AbilityOrSystem } from '../casl/app-ability';
 
@@ -195,28 +197,30 @@ export class ResourceService {
     ) {
       return;
     }
-    this.auditService.logFireAndForget({
-      action: AuditAction.PERMISSION_GRANT_DENIED,
-      actorId: actorId ?? null,
-      targetId: resource.id,
-      targetType: 'Resource',
-      details: {
-        subject: resource.subject,
-        actions: reEnabled,
-        reason: 'resource-widen'
-      }
-    });
-    this.metrics.recordPermissionDenied(
-      'instance',
-      reEnabled[0],
-      resource.subject
-    );
-    throw new HttpException(
+    refuseAccess(
+      this.auditService,
+      this.metrics,
       {
-        message: `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`,
-        errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN
+        auditAction: AuditAction.PERMISSION_GRANT_DENIED,
+        actorId,
+        targetId: resource.id,
+        targetType: 'Resource',
+        details: {
+          subject: resource.subject,
+          actions: reEnabled,
+          reason: 'resource-widen'
+        },
+        context: auditContextOf(ability),
+        level: 'instance',
+        denied: [{ action: reEnabled[0], subject: resource.subject }]
       },
-      HttpStatus.FORBIDDEN
+      new HttpException(
+        {
+          message: `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`,
+          errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN
+        },
+        HttpStatus.FORBIDDEN
+      )
     );
   }
 

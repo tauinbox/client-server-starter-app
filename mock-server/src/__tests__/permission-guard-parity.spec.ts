@@ -769,7 +769,7 @@ describe('permission-based route authorization', () => {
         // server omits targetId there.
         targetId: null,
         targetType: 'Role',
-        ipAddress: null,
+        ipAddress: expect.any(String) as string,
         details: {
           instanceCheck: true,
           deniedAction: 'create',

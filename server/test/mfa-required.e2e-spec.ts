@@ -19,6 +19,9 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { Server } from 'http';
 import { ErrorKeys } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { AuditService } from '../src/modules/audit/audit.service';
+import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { Authorize } from '../src/modules/auth/decorators/authorize.decorator';
 import { SkipMfaEnrolmentGate } from '../src/modules/auth/decorators/skip-mfa-enrolment-gate.decorator';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
@@ -78,6 +81,7 @@ describe('Two-factor requirement on the @Authorize surface (e2e)', () => {
   let app: INestApplication;
   const roles = { getRolesForUser: jest.fn() };
   const userRepository = { findOne: jest.fn() };
+  const auditService = { logFireAndForget: jest.fn() };
 
   beforeAll(async () => {
     const config = createMockConfigService({
@@ -93,6 +97,11 @@ describe('Two-factor requirement on the @Authorize surface (e2e)', () => {
         { provide: ConfigService, useValue: config },
         { provide: PermissionService, useValue: roles },
         { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: AuditService, useValue: auditService },
+        {
+          provide: MetricsService,
+          useValue: { recordPermissionDenied: jest.fn() }
+        },
         { provide: APP_GUARD, useClass: TestJwtAuthGuard }
       ]
     })
@@ -134,6 +143,16 @@ describe('Two-factor requirement on the @Authorize surface (e2e)', () => {
     const body = res.body as { errorKey: string };
 
     expect(body.errorKey).toBe(ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED);
+    expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.PERMISSION_CHECK_FAILURE,
+        actorId: 'admin-1',
+        details: { required: ['read:Role'], mfaEnrolmentRequired: true },
+        context: expect.objectContaining({
+          ip: expect.any(String) as string
+        }) as Record<string, unknown>
+      })
+    );
   });
 
   it('admits the same account once the factor is on', async () => {
