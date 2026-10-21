@@ -1,4 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
 import type {
   BillingProviderId,
   CancelMode,
@@ -233,11 +234,15 @@ export interface ChargeResult {
  * only on this error, and leaves it `pending` for the rest.
  *
  * Extends `ServiceUnavailableException` so the HTTP surface is unchanged: a
- * declined self-service plan change still answers 503.
+ * declined self-service plan change still answers 503. The body names no
+ * customer; the provider logs the customer id where it throws.
  */
 export class ChargeDeclinedError extends ServiceUnavailableException {
-  constructor(message: string) {
-    super(message);
+  constructor() {
+    super({
+      message: 'The payment was declined',
+      errorKey: ErrorKeys.BILLING.PAYMENT_DECLINED
+    });
     this.name = 'ChargeDeclinedError';
   }
 }

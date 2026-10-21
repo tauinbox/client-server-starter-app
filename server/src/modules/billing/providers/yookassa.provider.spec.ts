@@ -1,16 +1,20 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ServiceUnavailableException } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import type { ICreatePayment, ICreateRefund } from '@a2seven/yoo-checkout';
 import type { FindOneOptions } from 'typeorm';
+import { ErrorKeys } from '@app/shared/constants';
 import { User } from '../../users/entities/user.entity';
 import { YooKassaProvider } from './yookassa.provider';
 import { YOOKASSA_CLIENT } from './yookassa.client';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
-import { WEBHOOK_IGNORED } from './payment-provider.interface';
+import {
+  ChargeDeclinedError,
+  WEBHOOK_IGNORED
+} from './payment-provider.interface';
 import {
   ProviderTimeoutError,
   withProviderDeadline
@@ -514,16 +518,29 @@ describe('YooKassaProvider', () => {
       ).resolves.toEqual({ providerInvoiceRef: 'pay-5', status: 'pending' });
     });
 
-    it('throws when the charge is declined (canceled)', async () => {
+    it('throws a keyed decline that names no customer when the charge is declined (canceled)', async () => {
       const { provider, client } = await build();
       client!.createPayment.mockResolvedValue({
         id: 'pay-6',
         status: 'canceled'
       });
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
 
-      await expect(
-        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      const error: unknown = await provider
+        .chargeOffSession(savedCustomer, 99000, 'RUB', items)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ChargeDeclinedError);
+      expect((error as ChargeDeclinedError).getResponse()).toEqual({
+        message: 'The payment was declined',
+        errorKey: ErrorKeys.BILLING.PAYMENT_DECLINED
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'YooKassa charge pay-6 for customer cust-1 was declined'
+      );
+      warn.mockRestore();
     });
 
     it('generates an idempotency key when the caller omits one', async () => {

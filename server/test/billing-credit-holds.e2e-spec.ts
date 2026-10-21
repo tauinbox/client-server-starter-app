@@ -433,11 +433,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
     }, 30000);
 
     it.each([
-      [
-        'a decline releases',
-        () => new ChargeDeclinedError('card declined'),
-        CREDITS
-      ],
+      ['a decline releases', () => new ChargeDeclinedError(), CREDITS],
       ['a timeout keeps', () => new Error('deadline'), 0]
     ])(
       '%s the hold of the renewal at once',

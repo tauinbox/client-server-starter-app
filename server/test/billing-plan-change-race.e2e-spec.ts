@@ -406,9 +406,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   it('marks the planted charge failed when the provider declines the card', async () => {
     const { subscription, user, provider } = await setup('yookassa', null);
-    provider.chargeOffSession.mockRejectedValue(
-      new ChargeDeclinedError('declined')
-    );
+    provider.chargeOffSession.mockRejectedValue(new ChargeDeclinedError());
 
     await expect(
       service.changePlan(user, 'race-business')
@@ -729,9 +727,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   it('lets a declined switch be followed by a switch to another target', async () => {
     const { subscription, user, provider } = await setup('yookassa', null);
     await seedPlan('race-max', 500000);
-    provider.chargeOffSession.mockRejectedValueOnce(
-      new ChargeDeclinedError('declined')
-    );
+    provider.chargeOffSession.mockRejectedValueOnce(new ChargeDeclinedError());
     await expect(
       service.changePlan(user, 'race-business')
     ).rejects.toBeInstanceOf(ChargeDeclinedError);

@@ -23,6 +23,8 @@ import { EntitlementGuard } from '../src/modules/entitlements/entitlement.guard'
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
+import { ChargeDeclinedError } from '../src/modules/billing/providers/payment-provider.interface';
+import { ProviderTimeoutError } from '../src/modules/billing/providers/provider-deadline';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { ErrorKeys, MAX_PAGE_SIZE } from '@app/shared/constants';
@@ -395,6 +397,31 @@ describe('Billing user self-service (e2e)', () => {
 
     expect(planChange.changePlan).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [
+      'a declined charge',
+      new ChargeDeclinedError(),
+      ErrorKeys.BILLING.PAYMENT_DECLINED
+    ],
+    [
+      'a provider timeout',
+      new ProviderTimeoutError('yookassa', 'chargeOffSession', 20000),
+      ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+    ]
+  ])(
+    'answers a plan change that fails on %s with 503 and its key',
+    async (_case, error, errorKey) => {
+      planChange.changePlan.mockRejectedValue(error);
+
+      const res = await request(server)
+        .post('/api/v1/billing/subscription/change')
+        .send({ planKey: 'business' })
+        .expect(503);
+
+      expect((res.body as { errorKey?: string }).errorKey).toBe(errorKey);
+    }
+  );
 
   it('cancels the current subscription at period end', async () => {
     billingUser.cancelSubscription.mockResolvedValue(

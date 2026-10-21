@@ -1,3 +1,5 @@
+import { ServiceUnavailableException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
 import type { BillingProviderId, CancelMode } from '@app/shared/types';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
@@ -28,14 +30,21 @@ export const DEFAULT_BILLING_PROVIDER_TIMEOUT_MS = 20_000;
  */
 export const MAX_BILLING_PROVIDER_TIMEOUT_MS = 120_000;
 
-/** Raised when a provider call outlives its deadline. */
-export class ProviderTimeoutError extends Error {
+/**
+ * Raised when a provider call outlives its deadline. It answers 503 with
+ * `PROVIDER_STATE_UNCERTAIN`: the deadline does not cancel the provider's
+ * request, so money may have moved.
+ */
+export class ProviderTimeoutError extends ServiceUnavailableException {
   constructor(
     readonly provider: BillingProviderId,
     readonly method: string,
     readonly timeoutMs: number
   ) {
-    super(`${provider}.${method} did not respond within ${timeoutMs}ms`);
+    super({
+      message: `${provider}.${method} did not respond within ${timeoutMs}ms`,
+      errorKey: ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+    });
     this.name = 'ProviderTimeoutError';
   }
 }

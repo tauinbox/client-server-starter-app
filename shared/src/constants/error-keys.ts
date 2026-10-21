@@ -138,6 +138,7 @@ export const ErrorKeys = {
     PROVIDER_CHECKOUT_FAILED: 'errors.billing.providerCheckoutFailed',
     PROVIDER_REFUND_FAILED: 'errors.billing.providerRefundFailed',
     PROVIDER_STATE_UNCERTAIN: 'errors.billing.providerStateUncertain',
+    PAYMENT_DECLINED: 'errors.billing.paymentDeclined',
     PAYMENT_METHOD_MISSING: 'errors.billing.paymentMethodMissing'
   },
   DB: {

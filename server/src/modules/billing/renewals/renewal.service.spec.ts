@@ -2508,7 +2508,7 @@ describe('RenewalService', () => {
     });
 
     it.each([
-      ['a decline', new ChargeDeclinedError('declined'), true],
+      ['a decline', new ChargeDeclinedError(), true],
       ['a timeout', new Error('deadline'), false]
     ])(
       'keeps the units held after %s unless the outcome is known',
