@@ -221,6 +221,7 @@
       "providerCheckoutFailed": "The payment provider did not start the payment. Please try again later.",
       "providerRefundFailed": "The payment provider cannot refund this payment.",
       "providerStateUncertain": "The payment provider did not confirm the state of the payment. Please try again later.",
+      "paymentDeclined": "Your card was declined. Update the payment method and try again.",
       "paymentMethodMissing": "No saved payment method was found. Add a payment method and try again."
     },
     "db": {

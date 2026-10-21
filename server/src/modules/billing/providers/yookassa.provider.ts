@@ -401,9 +401,10 @@ export class YooKassaProvider implements PaymentProvider {
     // payment-after-receipt fiscalization window) may still cancel at capture,
     // so it is reported as `pending`, never as captured funds.
     if (payment.status === 'canceled') {
-      throw new ChargeDeclinedError(
-        `YooKassa charge for customer "${customer.id}" was declined`
+      this.logger.warn(
+        `YooKassa charge ${payment.id} for customer ${customer.id} was declined`
       );
+      throw new ChargeDeclinedError();
     }
     return {
       providerInvoiceRef: payment.id,

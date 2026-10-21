@@ -1,3 +1,5 @@
+import { ServiceUnavailableException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import type { PaymentProvider } from './payment-provider.interface';
@@ -45,6 +47,23 @@ describe('withProviderDeadline', () => {
       provider.startCheckout(customer, plan, urls, true)
     ).rejects.toThrow(
       new ProviderTimeoutError('yookassa', 'startCheckout', TIMEOUT_MS)
+    );
+  });
+
+  it('answers 503 with the uncertain-state key, since money may have moved', () => {
+    const error = new ProviderTimeoutError(
+      'yookassa',
+      'chargeOffSession',
+      TIMEOUT_MS
+    );
+
+    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    expect(error.getResponse()).toEqual({
+      message: `yookassa.chargeOffSession did not respond within ${TIMEOUT_MS}ms`,
+      errorKey: ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+    });
+    expect(error.message).toBe(
+      `yookassa.chargeOffSession did not respond within ${TIMEOUT_MS}ms`
     );
   });
 

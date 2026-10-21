@@ -1162,9 +1162,7 @@ describe('PlanChangeService', () => {
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
-      yoo.chargeOffSession.mockRejectedValue(
-        new ChargeDeclinedError('card declined')
-      );
+      yoo.chargeOffSession.mockRejectedValue(new ChargeDeclinedError());
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await expect(

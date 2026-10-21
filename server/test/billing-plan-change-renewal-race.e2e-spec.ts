@@ -418,7 +418,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     await seed();
     answerCharges((key) =>
       key.startsWith('change-charge:')
-        ? Promise.reject(new ChargeDeclinedError('declined'))
+        ? Promise.reject(new ChargeDeclinedError())
         : Promise.resolve()
     );
 
