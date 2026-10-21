@@ -9,8 +9,15 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ErrorKeys } from '@app/shared/constants';
 import { SKIP_MFA_ENROLMENT_GATE_KEY } from '../decorators/skip-mfa-enrolment-gate.decorator';
+import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
+import type { PermissionCheck } from '../casl/app-ability';
 import { MfaPolicyService } from '../services/mfa-policy.service';
 import { JwtAuthRequest } from '../types/auth.request';
+import { AuditService } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { refuseAccess } from '../../../common/utils/refuse-access.util';
+import { describeChecks, requiredLabels } from './permissions.guard';
 
 /**
  * Refuses the protected surface to an account that owes a two-factor
@@ -23,13 +30,16 @@ import { JwtAuthRequest } from '../types/auth.request';
 export class MfaRequiredGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly mfaPolicy: MfaPolicyService
+    private readonly mfaPolicy: MfaPolicyService,
+    private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const targets = [context.getHandler(), context.getClass()];
     const skip = this.reflector.getAllAndOverride<boolean>(
       SKIP_MFA_ENROLMENT_GATE_KEY,
-      [context.getHandler(), context.getClass()]
+      targets
     );
 
     if (skip === true) {
@@ -45,13 +55,32 @@ export class MfaRequiredGuard implements CanActivate {
     }
 
     if (await this.mfaPolicy.mustEnrol(user.userId)) {
-      throw new HttpException(
+      const required =
+        this.reflector.getAllAndOverride<PermissionCheck[] | undefined>(
+          PERMISSIONS_KEY,
+          targets
+        ) ?? [];
+      refuseAccess(
+        this.auditService,
+        this.metricsService,
         {
-          message:
-            'Two-factor authentication must be turned on before this account can use the administration surface',
-          errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED
+          actorId: user.userId,
+          details: {
+            required: requiredLabels(required),
+            mfaEnrolmentRequired: true
+          },
+          context: extractAuditContext(req),
+          level: 'guard',
+          denied: describeChecks(required)
         },
-        HttpStatus.FORBIDDEN
+        new HttpException(
+          {
+            message:
+              'Two-factor authentication must be turned on before this account can use the administration surface',
+            errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED
+          },
+          HttpStatus.FORBIDDEN
+        )
       );
     }
 

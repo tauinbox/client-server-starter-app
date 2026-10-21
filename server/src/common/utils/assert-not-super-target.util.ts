@@ -1,9 +1,10 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { AppAbility } from '../../modules/auth/casl/app-ability';
+import { auditContextOf } from '../../modules/auth/casl/ability-context';
 import type { AuditService } from '../../modules/audit/audit.service';
 import type { MetricsService } from '../../modules/core/metrics/metrics.service';
+import { refuseAccess } from './refuse-access.util';
 
 /**
  * An account that holds a super role is out of reach of every actor that is
@@ -32,24 +33,29 @@ export function assertNotSuperTarget(
     return;
   }
 
-  auditService.logFireAndForget({
-    action: AuditAction.PERMISSION_CHECK_FAILURE,
-    actorId: actorId ?? null,
-    targetId: target.id,
-    targetType: 'User',
-    details: {
-      instanceCheck: true,
-      deniedAction: action,
-      subject: 'User',
-      superTarget: true
-    }
-  });
-  metricsService.recordPermissionDenied('instance', action, 'User');
-  throw new HttpException(
+  refuseAccess(
+    auditService,
+    metricsService,
     {
-      message: 'Only a super actor can modify a super account',
-      errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
+      actorId,
+      targetId: target.id,
+      targetType: 'User',
+      details: {
+        instanceCheck: true,
+        deniedAction: action,
+        subject: 'User',
+        superTarget: true
+      },
+      context: auditContextOf(ability),
+      level: 'instance',
+      denied: [{ action, subject: 'User' }]
     },
-    HttpStatus.FORBIDDEN
+    new HttpException(
+      {
+        message: 'Only a super actor can modify a super account',
+        errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
+      },
+      HttpStatus.FORBIDDEN
+    )
   );
 }

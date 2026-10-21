@@ -49,6 +49,29 @@ export function requireAuth(req: Request): AuthResult | { error: number } {
   return result;
 }
 
+/**
+ * Mirrors `refuseAccess` on the server: every authorization refusal writes its
+ * row with the caller ip. The mock keeps no request id, so that stays null.
+ */
+export function logRefusal(
+  req: Request,
+  actorId: string,
+  row: {
+    action?: 'PERMISSION_CHECK_FAILURE' | 'PERMISSION_GRANT_DENIED';
+    targetId?: string | null;
+    targetType?: string | null;
+    details: Record<string, unknown>;
+  }
+): void {
+  logAudit(row.action ?? 'PERMISSION_CHECK_FAILURE', {
+    actorId,
+    targetId: row.targetId ?? null,
+    targetType: row.targetType ?? null,
+    details: row.details,
+    ip: req.ip
+  });
+}
+
 export type GuardError = {
   error: number;
   message?: string;
@@ -77,6 +100,12 @@ export function requirePermission(
 
     // Mirrors MfaRequiredGuard, which travels with @Authorize on the server.
     if (!options.skipMfaEnrolmentGate && mustEnrolMfa(result.user)) {
+      logRefusal(req, result.user.id, {
+        details: {
+          required: [`${action}:${subject}`],
+          mfaEnrolmentRequired: true
+        }
+      });
       return {
         error: 403,
         message:
@@ -87,12 +116,10 @@ export function requirePermission(
 
     if (!buildAbilityForUser(result.user).can(action, subject)) {
       // PermissionsGuard writes this row before it throws, and carries only the
-      // required tuple and the caller ip. It passes no actorEmail, so the server
-      // row holds null there.
-      logAudit('PERMISSION_CHECK_FAILURE', {
-        actorId: result.user.id,
-        details: { required: [`${action}:${subject}`] },
-        ip: req.ip
+      // required tuple. It passes no actorEmail, so the server row holds null
+      // there.
+      logRefusal(req, result.user.id, {
+        details: { required: [`${action}:${subject}`] }
       });
       return {
         error: 403,
@@ -166,11 +193,10 @@ export function assertInstancePermission(
   if (buildAbilityForUser(user).can(action, caslSubject(subjectName, record))) {
     return true;
   }
-  // Mirrors assertCan, which audits before it throws. It passes no context, so
-  // the server row holds a null ip, and no actorEmail. A create route submits a
-  // record with no id, which is why targetId reads off the record itself.
-  logAudit('PERMISSION_CHECK_FAILURE', {
-    actorId: user.id,
+  // Mirrors assertCan, which audits before it throws. It passes no actorEmail.
+  // A create route submits a record with no id, which is why targetId reads
+  // off the record itself.
+  logRefusal(req, user.id, {
     targetId: (record as { id?: string }).id ?? null,
     targetType,
     details: {
@@ -216,8 +242,7 @@ export function assertCanWriteUser(
   if (isActorSuper(req) || !roleNamesAreSuper(target.roles)) {
     return true;
   }
-  logAudit('PERMISSION_CHECK_FAILURE', {
-    actorId: (req as AuthenticatedRequest).user.id,
+  logRefusal(req, (req as AuthenticatedRequest).user.id, {
     targetId: target.id,
     targetType: 'User',
     details: {

@@ -720,7 +720,12 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
-      const refusal = service.assignRoleToUser('user-1', 'role-1', ability);
+      const refusal = service.assignRoleToUser(
+        'user-1',
+        'role-1',
+        ability,
+        'actor-1'
+      );
       await expect(refusal).rejects.toThrow(ForbiddenException);
       await expect(refusal).rejects.toMatchObject({
         response: {
@@ -728,6 +733,15 @@ describe('RoleService', () => {
           errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
         }
       });
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.PERMISSION_CHECK_FAILURE,
+          actorId: 'actor-1',
+          targetId: 'role-1',
+          targetType: 'Role',
+          details: { deniedAction: 'assign', subject: 'Role', superRole: true }
+        })
+      );
     });
 
     it('should throw ForbiddenException when ability denies update on target user', async () => {
@@ -1651,9 +1665,23 @@ describe('RoleService', () => {
       await expect(
         service.setPermissionsForRole('role-1', [], ability, 'actor-1')
       ).rejects.toMatchObject({
-        status: 400,
+        status: 403,
         response: { errorKey: 'errors.roles.cannotModifySystem' }
       });
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.PERMISSION_CHECK_FAILURE,
+          actorId: 'actor-1',
+          targetId: systemRole.id,
+          targetType: 'Role',
+          details: { deniedAction: 'update', subject: 'Role', systemRole: true }
+        })
+      );
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        'update',
+        'Role'
+      );
     });
 
     it('assignPermissionsToRole rejects on system role for non-super caller', async () => {
@@ -1669,7 +1697,7 @@ describe('RoleService', () => {
           'actor-1'
         )
       ).rejects.toMatchObject({
-        status: 400,
+        status: 403,
         response: { errorKey: 'errors.roles.cannotModifySystem' }
       });
     });
@@ -1681,7 +1709,7 @@ describe('RoleService', () => {
       await expect(
         service.removePermissionFromRole('role-1', 'perm-1', ability)
       ).rejects.toMatchObject({
-        status: 400,
+        status: 403,
         response: { errorKey: 'errors.roles.cannotModifySystem' }
       });
     });
@@ -1706,6 +1734,7 @@ describe('RoleService', () => {
       await expect(
         service.removePermissionFromRole('role-1', 'perm-1', SYSTEM_ABILITY)
       ).rejects.toMatchObject({ status: 400 });
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
     });
   });
 

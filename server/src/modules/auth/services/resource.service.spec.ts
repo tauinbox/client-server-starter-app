@@ -8,6 +8,7 @@ import { Resource } from '../entities/resource.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { bindAuditContext } from '../casl/ability-context';
 import {
   AbilityBuilder,
   createMongoAbility,
@@ -454,6 +455,29 @@ describe('ResourceService', () => {
         );
       }
     );
+
+    it('writes the request context of the refused caller', async () => {
+      mockResourceRepo.findOne.mockResolvedValue(narrowed());
+      const ability = abilityWith((can) => {
+        can('update', 'Permission');
+      });
+      bindAuditContext(ability, { ip: '203.0.113.7', requestId: 'req-1' });
+
+      await expect(
+        service.update(
+          'res-1',
+          { allowedActionNames: null },
+          ability,
+          'actor-1'
+        )
+      ).rejects.toMatchObject(widenRefused);
+      expect(mockAudit.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.PERMISSION_GRANT_DENIED,
+          context: { ip: '203.0.113.7', requestId: 'req-1' }
+        })
+      );
+    });
 
     it('lets a non-super caller narrow, keep the set, or edit other fields', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });

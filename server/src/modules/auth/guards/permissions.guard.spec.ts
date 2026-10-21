@@ -8,6 +8,7 @@ import { PermissionsGuard } from './permissions.guard';
 import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility, Subjects } from '../casl/app-ability';
+import { auditContextOf } from '../casl/ability-context';
 import type { AuditService } from '../../audit/audit.service';
 import type { MetricsService } from '../../core/metrics/metrics.service';
 
@@ -158,6 +159,23 @@ describe('PermissionsGuard', () => {
       'delete',
       'User'
     );
+  });
+
+  it('binds the request context to the ability for the instance checks', async () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue([['read', 'User']]);
+    const ability = buildAbilityWith('users:read');
+    resolveTo(ability);
+    const { context, req } = createMockContext({ userId: 'user-1' });
+    req['requestId'] = 'req-1';
+
+    await guard.canActivate(context);
+
+    expect(auditContextOf(ability)).toEqual({
+      ip: '127.0.0.1',
+      requestId: 'req-1'
+    });
   });
 
   it('should throw UnauthorizedException when req.user is absent', async () => {

@@ -1,9 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
 import type { AppAbility, Subjects } from '../../modules/auth/casl/app-ability';
+import { auditContextOf } from '../../modules/auth/casl/ability-context';
 import { AuditService } from '../../modules/audit/audit.service';
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
 import type { MetricsService } from '../../modules/core/metrics/metrics.service';
+import { refuseAccess } from './refuse-access.util';
 
 interface AssertCanContext {
   actorId?: string;
@@ -13,8 +14,7 @@ interface AssertCanContext {
 
 /**
  * Assert that the ability allows the given action on the subject.
- * On denial, fires an audit log (fire-and-forget), increments the
- * rbac_permission_denied_total metric with level='instance', and throws.
+ * On denial, refuses through `refuseAccess` with level='instance'.
  */
 export function assertCan(
   ability: AppAbility,
@@ -35,22 +35,25 @@ export function assertCan(
         subject.constructor?.name ??
         'unknown');
 
-  auditService.logFireAndForget({
-    action: AuditAction.PERMISSION_CHECK_FAILURE,
-    actorId: context.actorId ?? null,
-    targetId: context.targetId ?? null,
-    targetType: context.targetType ?? subjectName,
-    details: {
-      instanceCheck: true,
-      deniedAction: action,
-      subject: subjectName
-    }
-  });
-
-  metricsService.recordPermissionDenied('instance', action, subjectName);
-
-  throw new ForbiddenException({
-    message: 'Insufficient permissions',
-    errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
-  });
+  refuseAccess(
+    auditService,
+    metricsService,
+    {
+      actorId: context.actorId,
+      targetId: context.targetId,
+      targetType: context.targetType ?? subjectName,
+      details: {
+        instanceCheck: true,
+        deniedAction: action,
+        subject: subjectName
+      },
+      context: auditContextOf(ability),
+      level: 'instance',
+      denied: [{ action, subject: subjectName }]
+    },
+    new ForbiddenException({
+      message: 'Insufficient permissions',
+      errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+    })
+  );
 }

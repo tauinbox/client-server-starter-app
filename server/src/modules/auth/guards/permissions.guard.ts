@@ -8,12 +8,31 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { bindAuditContext } from '../casl/ability-context';
 import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
 import { AuditService } from '../../audit/audit.service';
-import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import { refuseAccess } from '../../../common/utils/refuse-access.util';
+
+/** The metric labels and the audited `action:subject` of each check. */
+export function describeChecks(
+  checks: PermissionCheck[]
+): { action: string; subject: string }[] {
+  return checks.map(([action, subject]) => ({
+    action: String(action),
+    subject:
+      typeof subject === 'string'
+        ? subject
+        : ((subject as { name?: string })?.name ?? 'unknown')
+  }));
+}
+
+export function requiredLabels(checks: PermissionCheck[]): string[] {
+  return describeChecks(checks).map((c) => `${c.action}:${c.subject}`);
+}
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -44,6 +63,8 @@ export class PermissionsGuard implements CanActivate {
     const { ability } = await this.caslAbilityFactory.resolveForUser(
       user.userId
     );
+    const auditContext = extractAuditContext(req);
+    bindAuditContext(ability, auditContext);
 
     // Attach for downstream instance-level checks via @CurrentAbility()
     req.ability = ability;
@@ -53,31 +74,21 @@ export class PermissionsGuard implements CanActivate {
     );
 
     if (denied.length > 0) {
-      for (const [action, subject] of denied) {
-        const subjectName =
-          typeof subject === 'string'
-            ? subject
-            : ((subject as { name?: string })?.name ?? 'unknown');
-        this.metricsService.recordPermissionDenied(
-          'guard',
-          String(action),
-          subjectName
-        );
-      }
-      this.auditService.logFireAndForget({
-        action: AuditAction.PERMISSION_CHECK_FAILURE,
-        actorId: user.userId,
-        details: {
-          required: requiredPermissions.map(
-            ([a, s]) => `${String(a)}:${typeof s === 'string' ? s : '[object]'}`
-          )
+      refuseAccess(
+        this.auditService,
+        this.metricsService,
+        {
+          actorId: user.userId,
+          details: { required: requiredLabels(requiredPermissions) },
+          context: auditContext,
+          level: 'guard',
+          denied: describeChecks(denied)
         },
-        context: { ip: req.ip }
-      });
-      throw new ForbiddenException({
-        message: 'Insufficient permissions',
-        errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
-      });
+        new ForbiddenException({
+          message: 'Insufficient permissions',
+          errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+        })
+      );
     }
 
     return true;

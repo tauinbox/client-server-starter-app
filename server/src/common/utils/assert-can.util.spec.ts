@@ -1,6 +1,8 @@
 import { ForbiddenException } from '@nestjs/common';
-import { subject } from '@casl/ability';
+import { AbilityBuilder, createMongoAbility, subject } from '@casl/ability';
 import { assertCan } from './assert-can.util';
+import type { AppAbility } from '../../modules/auth/casl/app-ability';
+import { bindAuditContext } from '../../modules/auth/casl/ability-context';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
 import { thrownBy } from '../testing/thrown-by';
@@ -193,6 +195,29 @@ describe('assertCan', () => {
       'instance',
       'update',
       'User'
+    );
+  });
+
+  it('writes the request context that the guard bound to the ability', () => {
+    const ability = new AbilityBuilder<AppAbility>(createMongoAbility).build();
+    bindAuditContext(ability, { ip: '203.0.113.7', requestId: 'req-1' });
+
+    thrownBy(() =>
+      assertCan(
+        ability,
+        'update',
+        subject('User', { id: '8' }),
+        // @ts-expect-error partial mock
+        auditService,
+        { actorId: 'actor-1', targetId: '8', targetType: 'User' },
+        metricsService
+      )
+    );
+
+    expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { ip: '203.0.113.7', requestId: 'req-1' }
+      })
     );
   });
 
