@@ -354,22 +354,12 @@ export class RoleService {
     data: {
       name: string;
       description?: string;
-      isSuper?: boolean;
     },
     ability: AbilityOrSystem,
     actorId?: string,
     audit?: (role: Role) => AuditLogParams
   ): Promise<Role> {
     this.assertCanRole(ability, 'create', data, actorId);
-    if (data.isSuper !== undefined) {
-      throw new HttpException(
-        {
-          message: 'isSuper flag cannot be set via API',
-          errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
-        },
-        HttpStatus.BAD_REQUEST
-      );
-    }
     const existing = await this.roleRepository.findOne({
       where: { name: data.name }
     });
@@ -393,7 +383,7 @@ export class RoleService {
   /** `audit` gets the role as it is before the write. */
   async update(
     id: string,
-    data: { name?: string; description?: string; isSuper?: boolean },
+    data: { name?: string; description?: string },
     ability: AbilityOrSystem,
     actorId?: string,
     audit?: (before: Role) => AuditLogParams
@@ -409,15 +399,6 @@ export class RoleService {
         {
           message: 'Cannot modify system roles',
           errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-        },
-        HttpStatus.BAD_REQUEST
-      );
-    }
-    if (data.isSuper !== undefined) {
-      throw new HttpException(
-        {
-          message: 'isSuper flag cannot be changed via API',
-          errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
         },
         HttpStatus.BAD_REQUEST
       );

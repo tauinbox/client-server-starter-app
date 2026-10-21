@@ -416,8 +416,8 @@ describe('body validation precedes the entity lookup', () => {
     });
 
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { errorKey: string };
-    expect(body.errorKey).toBe(ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN);
+    const body = (await res.json()) as { errors: string[] };
+    expect(body.errors).toEqual(['property isSuper should not exist']);
   });
 
   it('an existing row is still mutated by a well-formed body', async () => {

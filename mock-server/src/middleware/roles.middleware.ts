@@ -49,9 +49,12 @@ import {
   requireUuid,
   validationError
 } from '../helpers/validation-error.helpers';
-import { validateMaxLength } from '../utils/validation';
+import { unknownPropertyErrors, validateMaxLength } from '../utils/validation';
 
 const router = Router();
+
+/** The properties of `CreateRoleDto`; `UpdateRoleDto` is its partial. */
+const ROLE_BODY_KEYS = ['name', 'description'];
 
 type RoleName = { ok: true; name: string } | { ok: false; error: string };
 
@@ -310,11 +313,15 @@ router.get(
 
 // POST /api/v1/roles
 router.post('/', permissionGuard('create', 'Role'), (req, res) => {
-  const { description, isSuper } = req.body;
+  const { description } = req.body;
 
   const normalized = normalizeRoleName(req.body.name);
-  if (!normalized.ok) {
-    res.status(400).json(validationError(normalized.error));
+  const errors = [
+    ...unknownPropertyErrors(req.body, ROLE_BODY_KEYS),
+    ...(normalized.ok ? [] : [normalized.error])
+  ];
+  if (errors.length > 0 || !normalized.ok) {
+    res.status(400).json(validationError(errors));
     return;
   }
   const name = normalized.name;
@@ -324,15 +331,6 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
   if (
     !assertInstancePermission(req, res, 'create', 'Role', { name, description })
   ) {
-    return;
-  }
-
-  if (isSuper !== undefined) {
-    res.status(400).json({
-      message: 'isSuper flag cannot be set via API',
-      statusCode: 400,
-      errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
-    });
     return;
   }
 
@@ -384,22 +382,16 @@ router.patch(
     const state = getState();
 
     // The server's global ValidationPipe runs before the handler, so a body that
-    // fails UpdateRoleDto is a 400 whether or not the role exists. isSuper is not
-    // a DTO property either, so forbidNonWhitelisted rejects it just as early.
-    const { name, description, isSuper } = req.body;
-
-    if (isSuper !== undefined) {
-      res.status(400).json({
-        message: 'isSuper flag cannot be changed via API',
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.SUPER_FLAG_FORBIDDEN
-      });
-      return;
-    }
+    // fails UpdateRoleDto is a 400 whether or not the role exists.
+    const { name, description } = req.body;
 
     const normalized = name === undefined ? undefined : normalizeRoleName(name);
-    if (normalized && !normalized.ok) {
-      res.status(400).json(validationError(normalized.error));
+    const errors = [
+      ...unknownPropertyErrors(req.body, ROLE_BODY_KEYS),
+      ...(normalized && !normalized.ok ? [normalized.error] : [])
+    ];
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
       return;
     }
 

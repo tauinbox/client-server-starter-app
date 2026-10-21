@@ -269,13 +269,6 @@ describe('RoleService', () => {
       ).rejects.toThrow(HttpException);
     });
 
-    it('should throw HttpException if isSuper is provided', async () => {
-      await expect(
-        service.create({ name: 'superrole', isSuper: true }, SYSTEM_ABILITY)
-      ).rejects.toThrow(HttpException);
-      expect(mockRoleRepo.findOne).not.toHaveBeenCalled();
-    });
-
     it('should always create role with isSuper false regardless of input', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
       await service.create({ name: 'viewer' }, SYSTEM_ABILITY);
@@ -941,13 +934,6 @@ describe('RoleService', () => {
   });
 
   describe('update — additional branches', () => {
-    it('should throw HttpException if isSuper is in update payload', async () => {
-      mockRoleRepo.findOne.mockResolvedValue(customRole);
-      await expect(
-        service.update('role-2', { isSuper: true }, SYSTEM_ABILITY)
-      ).rejects.toThrow(HttpException);
-    });
-
     it('should throw HttpException when updating name to an existing name', async () => {
       const conflictRole: Role = {
         ...customRole,
