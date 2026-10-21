@@ -42,9 +42,11 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
     User
   >;
   let updateUser: Permission;
+  let deleteUser: Permission;
   let adminRole: Role;
   let restrictRole: Role;
   let accompliceRole: Role;
+  let blockerRole: Role;
   const denyCeo = (): PermissionCondition => ({
     effect: 'deny',
     fieldMatch: { email: [emails.ceo] }
@@ -114,6 +116,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       return found;
     };
     updateUser = find('update', 'User');
+    deleteUser = find('delete', 'User');
     const updateRole = find('update', 'Role');
     const assignRole = find('assign', 'Role');
     const deleteRole = find('delete', 'Role');
@@ -149,6 +152,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       SYSTEM_ABILITY
     );
     accompliceRole = await createRole('accomplice');
+    blockerRole = await createRole('blocker');
 
     await giveRoles(users.actor, [adminRole, restrictRole]);
     await giveRoles(users.accomplice, [accompliceRole]);
@@ -158,7 +162,11 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
   afterAll(async () => {
     if (dataSource) {
       await dataSource.getRepository(Role).delete({
-        name: In(['admin', 'restrict', 'accomplice'].map((n) => `${tag}-${n}`))
+        name: In(
+          ['admin', 'restrict', 'accomplice', 'blocker'].map(
+            (n) => `${tag}-${n}`
+          )
+        )
       });
       await dataSource
         .getRepository(User)
@@ -272,6 +280,47 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       )
     ).toBe(grantRefused);
     expect(await canUpdateCeo(users.accomplice.id)).toBe(false);
+  });
+
+  it('lets the actor add and assign a deny on a pair it does not hold', async () => {
+    const actorAbility = await abilityOf(users.actor.id);
+    expect(actorAbility.can('delete', 'User')).toBe(false);
+    const denyDelete = { permissionId: deleteUser.id, conditions: denyCeo() };
+
+    expect(
+      await outcome(
+        roleService.setPermissionsForRole(
+          accompliceRole.id,
+          [denyDelete],
+          actorAbility,
+          users.actor.id
+        )
+      )
+    ).toBe('RESOLVED');
+    expect(
+      await outcome(
+        roleService.assignPermissionsToRole(
+          blockerRole.id,
+          [deleteUser.id],
+          denyCeo(),
+          actorAbility,
+          users.actor.id
+        )
+      )
+    ).toBe('RESOLVED');
+    expect(
+      await outcome(
+        roleService.assignRoleToUser(
+          users.accomplice.id,
+          blockerRole.id,
+          actorAbility,
+          users.actor.id
+        )
+      )
+    ).toBe('RESOLVED');
+    expect((await abilityOf(users.accomplice.id)).can('delete', 'User')).toBe(
+      false
+    );
   });
 
   it('lets an unrestricted admin lift the restriction on every path', async () => {
