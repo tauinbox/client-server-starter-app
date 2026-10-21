@@ -16,7 +16,6 @@ import { EMPTY, firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 import { TokenService } from './token.service';
 import { AUTH_USER_KEY, AuthStore } from '../store/auth.store';
-import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import { guestGuard } from '../guards/guest.guard';
 import { ensureAuthenticated } from '../utils/ensure-authenticated';
@@ -28,7 +27,8 @@ import type { EntitlementsResponse, UserResponse } from '@app/shared/types';
 import { LoginComponent } from '../components/login/login.component';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
-const RBAC_CACHE_KEY = 'rbac_metadata';
+// An older release cached the resource catalog under this key.
+const LEGACY_RBAC_CACHE_KEY = 'rbac_metadata';
 const FEATURE_FLAGS_URL = '/api/v1/feature-flags';
 const ENTITLEMENTS_URL = '/api/v1/billing/entitlements';
 
@@ -48,19 +48,8 @@ const cachedUser: UserResponse = {
   deletedAt: null
 };
 
-const cachedMetadata = {
-  resources: [
-    {
-      id: 'res-1',
-      name: 'User',
-      subject: 'User',
-      description: null,
-      allowedActionNames: ['read'],
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z'
-    }
-  ],
-  actions: []
+const legacyCatalog = {
+  resources: [{ id: 'res-1', name: 'users', subject: 'User' }]
 };
 
 function createExpiredAuthResponse(): AuthResponse {
@@ -109,7 +98,7 @@ describe('session teardown', () => {
   };
 
   beforeEach(() => {
-    localStorage.setItem(RBAC_CACHE_KEY, JSON.stringify(cachedMetadata));
+    localStorage.setItem(LEGACY_RBAC_CACHE_KEY, JSON.stringify(legacyCatalog));
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(cachedUser));
 
     notificationsServiceMock = {
@@ -137,7 +126,7 @@ describe('session teardown', () => {
   });
 
   afterEach(() => {
-    localStorage.removeItem(RBAC_CACHE_KEY);
+    localStorage.removeItem(LEGACY_RBAC_CACHE_KEY);
     localStorage.removeItem(AUTH_USER_KEY);
     httpMock.verify();
     TestBed.resetTestingModule();
@@ -158,23 +147,20 @@ describe('session teardown', () => {
     return { featureFlagsStore, entitlementsStore };
   }
 
-  it('forceLogout clears the cached RBAC catalog, the flags and the entitlements', async () => {
+  it('forceLogout clears the legacy RBAC catalog, the flags and the entitlements', async () => {
     // The app initializer constructs AuthService on every boot, which is what
     // subscribes the teardown to TokenService.
     TestBed.inject(AuthService);
     const tokenService = TestBed.inject(TokenService);
-    const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
     const { featureFlagsStore, entitlementsStore } = await loadCaches();
 
-    expect(rbacMetadataStore.resources()).toHaveLength(1);
     expect(featureFlagsStore.isEnabled('beta')()).toBe(true);
     expect(entitlementsStore.planKey()).toBe('pro');
 
     tokenService.forceLogout();
 
-    expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_RBAC_CACHE_KEY)).toBeNull();
     expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
-    expect(rbacMetadataStore.resources()).toEqual([]);
     expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
     expect(entitlementsStore.planKey()).toBeNull();
     expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
@@ -183,7 +169,6 @@ describe('session teardown', () => {
   it('logout clears the same state on the unauthenticated path', async () => {
     const authService = TestBed.inject(AuthService);
     const authStore = TestBed.inject(AuthStore);
-    const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
     const { featureFlagsStore, entitlementsStore } = await loadCaches();
 
     // A persisted user with no access token in memory: the menu is gated on
@@ -194,8 +179,7 @@ describe('session teardown', () => {
 
     httpMock.expectNone(AuthApiEnum.Logout);
     expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
-    expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
-    expect(rbacMetadataStore.resources()).toEqual([]);
+    expect(localStorage.getItem(LEGACY_RBAC_CACHE_KEY)).toBeNull();
     expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
     expect(entitlementsStore.planKey()).toBeNull();
   });
@@ -222,14 +206,11 @@ describe('session teardown', () => {
     ).toHaveLength(1);
   });
 
-  it('the expired session a guarded navigation finds clears the cached RBAC catalog', async () => {
+  it('the expired session a guarded navigation finds clears the legacy RBAC catalog', async () => {
     const authService = TestBed.inject(AuthService);
     const authStore = TestBed.inject(AuthStore);
-    const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
     const router = TestBed.inject(Router);
     const { featureFlagsStore, entitlementsStore } = await loadCaches();
-
-    expect(rbacMetadataStore.resources()).toHaveLength(1);
 
     const guarded = ensureAuthenticated(
       authStore,
@@ -245,8 +226,7 @@ describe('session teardown', () => {
 
     expect(String(await settled)).toBe('/login?returnUrl=%2Fusers');
     expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
-    expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
-    expect(rbacMetadataStore.resources()).toEqual([]);
+    expect(localStorage.getItem(LEGACY_RBAC_CACHE_KEY)).toBeNull();
     expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
     expect(entitlementsStore.planKey()).toBeNull();
     expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
@@ -254,13 +234,11 @@ describe('session teardown', () => {
 
   it('the guest guard clears the same state when the refresh fails', async () => {
     const authStore = TestBed.inject(AuthStore);
-    const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
     const { featureFlagsStore, entitlementsStore } = await loadCaches();
 
     // The guard only reaches the refresh when a session exists but its access
     // token has expired - the state a returning tab lands on /login with.
     authStore.saveAuthResponse(createExpiredAuthResponse());
-    expect(rbacMetadataStore.resources()).toHaveLength(1);
 
     const guarded = TestBed.runInInjectionContext(() =>
       guestGuard(
@@ -277,8 +255,7 @@ describe('session teardown', () => {
 
     expect(await settled).toBe(true);
     expect(localStorage.getItem(AUTH_USER_KEY)).toBeNull();
-    expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
-    expect(rbacMetadataStore.resources()).toEqual([]);
+    expect(localStorage.getItem(LEGACY_RBAC_CACHE_KEY)).toBeNull();
     expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
     expect(entitlementsStore.planKey()).toBeNull();
     expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
@@ -295,21 +272,17 @@ describe('session teardown', () => {
 
     it('logging out elsewhere tears this session down and lands it on /login', async () => {
       TestBed.inject(AuthService);
-      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
       const router = TestBed.inject(Router);
       router.navigated = true;
       const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
       const { featureFlagsStore, entitlementsStore } = await loadCaches();
-
-      expect(rbacMetadataStore.resources()).toHaveLength(1);
 
       // What the other tab actually did: the key is gone before the event
       // reaches this one.
       localStorage.removeItem(AUTH_USER_KEY);
       dispatchStorageEvent({ key: AUTH_USER_KEY, newValue: null });
 
-      expect(localStorage.getItem(RBAC_CACHE_KEY)).toBeNull();
-      expect(rbacMetadataStore.resources()).toEqual([]);
+      expect(localStorage.getItem(LEGACY_RBAC_CACHE_KEY)).toBeNull();
       expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
       expect(entitlementsStore.planKey()).toBeNull();
       expect(notificationsServiceMock.disconnect).toHaveBeenCalled();
@@ -320,7 +293,6 @@ describe('session teardown', () => {
 
     it('logging in elsewhere leaves this session untouched', async () => {
       TestBed.inject(AuthService);
-      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
       const router = TestBed.inject(Router);
       const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
       const { featureFlagsStore, entitlementsStore } = await loadCaches();
@@ -334,7 +306,6 @@ describe('session teardown', () => {
         newValue: JSON.stringify(otherUser)
       });
 
-      expect(rbacMetadataStore.resources()).toHaveLength(1);
       expect(featureFlagsStore.isEnabled('beta')()).toBe(true);
       expect(entitlementsStore.planKey()).toBe('pro');
       expect(notificationsServiceMock.disconnect).not.toHaveBeenCalled();
@@ -343,14 +314,12 @@ describe('session teardown', () => {
 
     it('clearing an unrelated key leaves this session untouched', async () => {
       TestBed.inject(AuthService);
-      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
       const router = TestBed.inject(Router);
       const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
       const { featureFlagsStore } = await loadCaches();
 
-      dispatchStorageEvent({ key: RBAC_CACHE_KEY, newValue: null });
+      dispatchStorageEvent({ key: LEGACY_RBAC_CACHE_KEY, newValue: null });
 
-      expect(rbacMetadataStore.resources()).toHaveLength(1);
       expect(featureFlagsStore.isEnabled('beta')()).toBe(true);
       expect(navigate).not.toHaveBeenCalled();
     });
@@ -359,14 +328,12 @@ describe('session teardown', () => {
       // Order matters: the store reads the key when it is first injected.
       localStorage.removeItem(AUTH_USER_KEY);
       TestBed.inject(AuthService);
-      const rbacMetadataStore = TestBed.inject(RbacMetadataStore);
       const router = TestBed.inject(Router);
       const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
       const { featureFlagsStore } = await loadCaches();
 
       dispatchStorageEvent({ key: AUTH_USER_KEY, newValue: null });
 
-      expect(rbacMetadataStore.resources()).toHaveLength(1);
       expect(featureFlagsStore.isEnabled('beta')()).toBe(true);
       expect(navigate).not.toHaveBeenCalled();
     });

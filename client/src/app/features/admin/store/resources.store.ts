@@ -10,7 +10,6 @@ import {
 import { updateEntity } from '@ngrx/signals/entities';
 import type { ResourceResponse } from '@app/shared/types';
 import { RESOURCE_LIST_QUERY } from '@app/shared/constants';
-import { AuthService } from '@features/auth/services/auth.service';
 import { withList } from '@shared/store/with-list';
 import type { UpdateResource } from '../services/rbac-admin.service';
 import { RbacAdminService } from '../services/rbac-admin.service';
@@ -35,14 +34,12 @@ export const ResourcesStore = signalStore(
   })),
   withMethods((store) => {
     const rbacService = inject(RbacAdminService);
-    const authService = inject(AuthService);
 
     return {
       restoreResource(id: string): Observable<ResourceResponse> {
         return rbacService.restoreResource(id).pipe(
           tap((updated) => {
             patchState(store, updateEntity({ id, changes: updated }));
-            void authService.fetchRbacMetadata();
           })
         );
       },
@@ -54,7 +51,6 @@ export const ResourcesStore = signalStore(
         return rbacService.updateResource(id, dto).pipe(
           tap((updated) => {
             patchState(store, updateEntity({ id, changes: updated }));
-            void authService.fetchRbacMetadata();
           })
         );
       }

@@ -289,7 +289,7 @@ management and theming.
   `read:Permission`. The Resources table edits the display name, the description and the offered
   actions of each resource (`allowedActionNames`). An admin can offer fewer actions than the code
   checks, but never an action that the code does not check: the server answers 400
-  `errors.resources.actionNotDeclared`. Each mutation refreshes `RbacMetadataStore` automatically.
+  `errors.resources.actionNotDeclared`.
 - **Actions come from the code.** Each `@RegisterResource` declares the actions that its `@Authorize`
   decorators check (`actions`) and the actions whose checks read the record (`conditionalActions`).
   The startup sync writes both lists to the resource row and creates a missing action row. No admin
@@ -1624,8 +1624,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign a role to a user. Answers 404 when the user is unknown or soft-deleted |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted |
 | GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events` and `user_list_stale`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
-| GET | `/rbac/metadata` | `permissions:read` | Get the RBAC metadata: the resources. Redis caches it for 60 s |
-| GET | `/rbac/resources` | `permissions:read` | List each resource |
+| GET | `/rbac/resources` | `permissions:read` | List each resource, ordered by name. The user permissions page reads the display names from it |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 400 for an action that the code does not check |
 | POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 400 when no controller registers it |
 | GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
@@ -1896,9 +1895,9 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3014 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3010 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 674 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 661 pass and 13 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1592 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1579 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 326 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1090 tests pass |
 

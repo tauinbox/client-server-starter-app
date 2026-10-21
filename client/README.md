@@ -84,7 +84,7 @@ src/app/
 │   │   │                   # and the token-refresh predicates.
 │   │   ├── interceptors/   # jwtInterceptor
 │   │   ├── services/       # AuthService owns the HTTP calls, the refresh schedule and
-│   │   │                   # fetchPermissions(): Promise<void>. Also rbac-metadata.service.ts.
+│   │   │                   # fetchPermissions(): Promise<void>.
 │   │   │                   # OAuthIntentService holds the proof that this tab started a
 │   │   │                   # provider round trip, for one page load; the callback page
 │   │   │                   # exchanges nothing without it.
@@ -93,7 +93,6 @@ src/app/
 │   │                       # ability: AppAbility | null and mfaMandatory (the server policy, read
 │   │                       # from GET /auth/permissions, never persisted). The computed
 │   │                       # mustEnrolMfa() is mfaMandatory AND a profile with no factor.
-│   │                       # Also RbacMetadataStore.
 │   ├── feature-flags/      # Client core of the feature-flags subsystem
 │   │   ├── services/       # FeatureFlagService calls HttpClient.get('/api/v1/feature-flags').
 │   │   │                   # It uses the silent-error context, thus a
@@ -525,8 +524,7 @@ rejections.
 #### AuthService
 
 `AuthService` uses `providedIn: 'root'`. It owns the HTTP operations: login, register, logout,
-refresh, profile, the OAuth accounts, `fetchPermissions(): Promise<void>` and
-`fetchRbacMetadata(): Promise<void>`.
+refresh, profile, the OAuth accounts and `fetchPermissions(): Promise<void>`.
 
 `register(data, captchaToken?)` and `forgotPassword(email, captchaToken?)` accept an optional
 Turnstile token. If the caller supplies the token, the method puts it in the body.
@@ -570,8 +568,9 @@ bound by `JWT_REFRESH_EXPIRATION` only. `idle-timeout.spec.ts` drives the three 
 The session teardown is one routine. `logout()` runs it on both branches.
 `TokenService.forceLogout()` reaches it through the `sessionCleared$` subject, because `TokenService`
 cannot import `AuthService`. Such an import closes a dependency cycle. Thus each exit path
-disconnects the SSE stream. It also clears the session, the cached RBAC metadata, the feature flags
-and the entitlements.
+disconnects the SSE stream. It also clears the session, the feature flags and the entitlements. It
+also removes the `rbac_metadata` key, the resource catalog that an older release kept in
+`localStorage`, so that a device that ran that release does not keep it.
 
 Four exit paths never reach `logout()`: `ensureAuthenticated` and `guestGuard` after a failed
 refresh, the `catch` block in `restoreSession` (the bootstrap initializer), and `ProfileComponent` after a successful
@@ -620,11 +619,11 @@ The bootstrap initializer (`features/auth/utils/restore-session.ts`) runs only f
 because the access token lives in memory and a bootstrap never holds one. If `hasPersistedUser()` is
 true, it does a cookie refresh and then awaits `completeAuthentication()`. That is the one
 session-start routine: every sign-in (password, second factor, provider) and the restore run it. It
-awaits the feature flags and `fetchPermissions().then(() => fetchRbacMetadata())` together, so a
-caller that navigates next lands on a fully evaluated page.
+awaits the feature flags and `fetchPermissions()` together, so a caller that navigates next lands
+on a fully evaluated page.
 
-A failed `fetchPermissions()` resolves and does not reject, because the callers chain
-`fetchRbacMetadata()` on it. The failure is not silent. The app reports it through
+A failed `fetchPermissions()` resolves and does not reject, because the sign-in awaits it. The
+failure is not silent. The app reports it through
 `NotifyService.error(err, 'errors.general.permissionsUnavailable')`. This report is necessary because
 the ability stays `null`. Each `permissionGuard` then goes to `/forbidden`, which looks the same as a
 true denial.
@@ -632,12 +631,12 @@ true denial.
 The fallback key is a root key and not a key of the `features/auth` scope. `fetchPermissions()` also
 runs from the app initializer and from `features/admin`, where that scope is not loaded.
 
-`fetchRbacMetadata()` has a permission gate. The server requires `permissions:read` on
-`GET /rbac/metadata`. Thus the method resolves and makes no request when
-`hasPermissions({ action: 'read', subject: 'Permission' })` is false. Callers must load the
-permissions first. When the user has the permission, the method uses stale-while-revalidate. It
-returns immediately if `RbacMetadataStore` holds the data. Then it refreshes the data in the
-background.
+A session start loads no resource catalog. The one screen that needs it, the user permissions page
+(`/admin/users/:id/permissions`), reads `GET /rbac/resources` through
+`RbacAdminService.getResources()` when it opens, and shows the display name of each resource. The
+route needs `read:User` only, and the server gates the catalog with `read:Permission`. Thus the page
+makes no request for a viewer without `read:Permission`, and the groups show the resource names. A
+failed request is silent, and the groups also show the resource names.
 
 #### UsersStore
 
@@ -667,24 +666,6 @@ Email, Two-factor, Lock and Sign-in, and the Include deleted checkbox. Each chan
 (the search after 350 ms of idle time); there is no Search or Clear button. The search field has a
 limit of 255 characters (`MAX_LIST_FILTER_LENGTH`). The search endpoint answers a longer filter with
 a 400, thus the bar does not send it and the field shows the error.
-
-#### RbacMetadataStore
-
-`RbacMetadataStore` uses `providedIn: 'root'`. It caches the resources and actions metadata in
-`localStorage` with stale-while-revalidate.
-
-The store reads the cached payload back through the `isCachedRbacMetadata` guard in
-`store/storage-guards.ts`. The guard includes the elements, because `subjectMap` reads `name` and
-`subject` from each resource. If a payload fails the guard, the store discards it. The catalog then
-does a new read.
-
-`AuthService.fetchRbacMetadata()` loads the store at bootstrap. This occurs only for a user with
-`permissions:read`, because the server gates the endpoint in the same way.
-
-`clear()` runs on logout. Thus the role and permission structure of the previous user does not stay
-on a shared device.
-
-Computed signal: `subjectMap` maps a resource name to a CASL subject.
 
 #### Other services
 
@@ -719,8 +700,7 @@ The service supplies three streams:
 
 - `sessionInvalidated$`: `AuthService` calls `tokenService.forceLogout(router.url)`, so the login
   page gets the current page as `returnUrl`.
-- `permissionsUpdated$` starts `authService.fetchPermissions()`, and then the permission-gated
-  `fetchRbacMetadata()`.
+- `permissionsUpdated$` starts `authService.fetchPermissions()`.
 - `userCrudEvents$` refreshes the user list. The server sends these events only to a client whose
   ability permits `users:search` on the changed user.
 
@@ -873,7 +853,7 @@ To gate an attribute binding, disable an action while the flag is off:
 ### Lifecycle
 
 At bootstrap, a restored session reloads the flags through `completeAuthentication()`, together with
-`fetchPermissions()` and `fetchRbacMetadata()`. `FeatureFlagsStore.load()` runs for an anonymous
+`fetchPermissions()`. `FeatureFlagsStore.load()` runs for an anonymous
 visitor. For an anonymous visitor the load does not block, thus a public flag can gate a
 placeholder in the first paint. On logout the app calls `clear()` on the store.
 
@@ -1199,7 +1179,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 326 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1589 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1579 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page
 shows a notice naming that provider in place of the current-password field, and the email change, the

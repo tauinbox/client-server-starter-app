@@ -20,8 +20,6 @@ import { OAuthCallbackComponent } from './oauth-callback.component';
 import { AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
 import { TokenService } from '../../services/token.service';
-import { RbacMetadataService } from '../../services/rbac-metadata.service';
-import { RbacMetadataStore } from '../../store/rbac-metadata.store';
 import { permissionGuard } from '../../guards/permission.guard';
 import { AuthApiEnum } from '../../constants/auth-api.const';
 import { OAUTH_ERROR } from '@app/shared/constants';
@@ -385,22 +383,6 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
             cancelRefresh: vi.fn(),
             forceLogout: vi.fn(),
             sessionCleared$: EMPTY
-          }
-        },
-        {
-          provide: RbacMetadataService,
-          useValue: {
-            getMetadata: vi
-              .fn()
-              .mockReturnValue(of({ resources: [], actions: [] }))
-          }
-        },
-        {
-          provide: RbacMetadataStore,
-          useValue: {
-            resources: vi.fn().mockReturnValue([]),
-            setMetadata: vi.fn(),
-            clear: vi.fn()
           }
         },
         { provide: OAuthIntentService, useValue: { take: () => '/profile' } },

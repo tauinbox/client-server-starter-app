@@ -45,8 +45,7 @@ import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { silentContext } from '@core/context-tokens/error-notifications';
 import { TokenService } from './token.service';
 import { IdleTimeoutService } from './idle-timeout.service';
-import { RbacMetadataService } from './rbac-metadata.service';
-import { RbacMetadataStore } from '../store/rbac-metadata.store';
+import { LocalStorageService } from '@core/services/local-storage.service';
 import { NotificationsService } from '@core/services/notifications.service';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
@@ -56,6 +55,8 @@ import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 // clients at once; a random wait up to this bound spreads their reloads.
 const STREAM_RELOAD_JITTER_MS = 5000;
 
+const LEGACY_RBAC_METADATA_KEY = 'rbac_metadata';
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly #http = inject(HttpClient);
@@ -64,8 +65,7 @@ export class AuthService {
   readonly #authStore = inject(AuthStore);
   readonly #tokenService = inject(TokenService);
   readonly #idleTimeout = inject(IdleTimeoutService);
-  readonly #rbacMetadataService = inject(RbacMetadataService);
-  readonly #rbacMetadataStore = inject(RbacMetadataStore);
+  readonly #storage = inject(LocalStorageService);
   readonly #notificationsService = inject(NotificationsService);
   readonly #notify = inject(NotifyService);
   readonly #featureFlagsStore = inject(FeatureFlagsStore);
@@ -124,9 +124,7 @@ export class AuthService {
   }
 
   #reloadPermissions(): void {
-    // Metadata fetch is permission-gated, so re-evaluate it after the
-    // refreshed rules arrive (e.g. the user was just granted admin access).
-    void this.fetchPermissions().then(() => this.fetchRbacMetadata());
+    void this.fetchPermissions();
   }
 
   #reloadEntitlements(): void {
@@ -299,7 +297,7 @@ export class AuthService {
    * Everything a session needs after `saveAuthResponse`. Shared by every
    * sign-in and by the bootstrap restore: skipping it leaves the CASL ability
    * null, so every permission-guarded route denies without issuing a request.
-   * It resolves once the flags, the permissions and the RBAC metadata are in,
+   * It resolves once the flags and the permissions are in,
    * so a caller that navigates next lands on a fully evaluated page.
    */
   async completeAuthentication(): Promise<void> {
@@ -315,8 +313,7 @@ export class AuthService {
       // reload(), not load(): flags may already be loaded from the
       // anonymous bootstrap and the authenticated set can differ.
       this.#featureFlagsStore.reload(),
-      // The metadata fetch is permission-gated, so it waits for the rules.
-      this.fetchPermissions().then(() => this.fetchRbacMetadata())
+      this.fetchPermissions()
     ]);
   }
 
@@ -393,7 +390,8 @@ export class AuthService {
     this.#idleTimeout.stop();
     this.#notificationsService.disconnect();
     this.#authStore.clearSession();
-    this.#rbacMetadataStore.clear();
+    // A browser that ran an older release still holds this cache.
+    this.#storage.removeItem(LEGACY_RBAC_METADATA_KEY);
     this.#featureFlagsStore.clear();
     this.#entitlementsStore.clear();
   }
@@ -600,34 +598,6 @@ export class AuthService {
         // so the user must be told the denial comes from a failed request.
         this.#notify.error(error, 'errors.general.permissionsUnavailable');
       });
-  }
-
-  fetchRbacMetadata(): Promise<void> {
-    // GET /rbac/metadata requires `read Permission` on the server; skip the
-    // doomed request (and its server-side denial audit entry) for users
-    // without it, and for an account that owes its two-factor enrolment, which
-    // the same route refuses. Callers must ensure permissions are already
-    // loaded.
-    if (
-      this.#authStore.mustEnrolMfa() ||
-      !this.#authStore.hasPermissions({ action: 'read', subject: 'Permission' })
-    ) {
-      return Promise.resolve();
-    }
-    const load = () =>
-      firstValueFrom(this.#rbacMetadataService.getMetadata())
-        .then((data) => {
-          this.#rbacMetadataStore.setMetadata(data.resources);
-        })
-        .catch(
-          () => undefined /* silently ignore — app functions without metadata */
-        );
-
-    if (this.#rbacMetadataStore.resources().length > 0) {
-      void load();
-      return Promise.resolve();
-    }
-    return load();
   }
 }
 

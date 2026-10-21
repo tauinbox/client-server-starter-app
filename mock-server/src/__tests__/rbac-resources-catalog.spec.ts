@@ -32,29 +32,45 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-// Parity with the server: GET /rbac/metadata is gated by `read Permission`
-// like its sibling read endpoints, not just by authentication.
-describe('GET /api/v1/rbac/metadata authorization', () => {
+// Parity with the server: the catalog is gated by `read Permission` like its
+// sibling read endpoints, and `ResourceService.findAll` orders it by name.
+describe('GET /api/v1/rbac/resources', () => {
   it('returns 403 for a basic authenticated user', async () => {
     const token = await login('user@example.com');
 
-    const res = await fetch(`${baseUrl}/api/v1/rbac/metadata`, {
+    const res = await fetch(`${baseUrl}/api/v1/rbac/resources`, {
       headers: { authorization: `Bearer ${token}` }
     });
 
     expect(res.status).toBe(403);
   });
 
-  it('returns the catalog for an authorized admin', async () => {
+  it('returns the catalog sorted by name for an authorized admin', async () => {
+    const token = await login('admin@example.com');
+
+    const res = await fetch(`${baseUrl}/api/v1/rbac/resources`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(res.status).toBe(200);
+    const names = ((await res.json()) as { name: string }[]).map((r) => r.name);
+    expect(names).toEqual([
+      'billing',
+      'feature-flags',
+      'permissions',
+      'profile',
+      'roles',
+      'users'
+    ]);
+  });
+
+  it('has no /rbac/metadata sibling', async () => {
     const token = await login('admin@example.com');
 
     const res = await fetch(`${baseUrl}/api/v1/rbac/metadata`, {
       headers: { authorization: `Bearer ${token}` }
     });
 
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, unknown[]>;
-    expect(Object.keys(body)).toEqual(['resources']);
-    expect(body['resources'].length).toBeGreaterThan(0);
+    expect(res.status).toBe(404);
   });
 });

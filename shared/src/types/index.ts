@@ -52,7 +52,6 @@ export type {
 export type {
   ResourceResponse,
   ActionResponse,
-  RbacMetadataResponse,
   SubjectMaps
 } from './rbac.types';
 

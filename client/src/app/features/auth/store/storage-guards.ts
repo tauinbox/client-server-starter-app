@@ -1,4 +1,4 @@
-import type { RbacMetadataResponse, UserResponse } from '@app/shared/types';
+import type { UserResponse } from '@app/shared/types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -17,28 +17,5 @@ export function isPersistedUser(value: unknown): value is UserResponse {
     typeof value['firstName'] === 'string' &&
     typeof value['lastName'] === 'string' &&
     Array.isArray(value['roles'])
-  );
-}
-
-function isCachedResource(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    typeof value['name'] === 'string' &&
-    typeof value['subject'] === 'string'
-  );
-}
-
-/**
- * Narrows the cached RBAC metadata. The elements are checked too: `subjectMap`
- * reads `name` and `subject` off every resource, so an array of the wrong shape
- * would still build a corrupt map.
- */
-export function isCachedRbacMetadata(
-  value: unknown
-): value is RbacMetadataResponse {
-  return (
-    isRecord(value) &&
-    Array.isArray(value['resources']) &&
-    value['resources'].every(isCachedResource)
   );
 }

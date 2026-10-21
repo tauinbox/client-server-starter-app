@@ -2,11 +2,6 @@
   "routes": [
     {
       "method": "GET",
-      "path": "/api/v1/rbac/metadata",
-      "expectedStatus": 401
-    },
-    {
-      "method": "GET",
       "path": "/api/v1/rbac/resources",
       "expectedStatus": 401
     },

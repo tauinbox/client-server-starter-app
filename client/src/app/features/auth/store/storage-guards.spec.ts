@@ -1,4 +1,4 @@
-import { isCachedRbacMetadata, isPersistedUser } from './storage-guards';
+import { isPersistedUser } from './storage-guards';
 
 const validUser = {
   id: '1',
@@ -22,27 +22,5 @@ describe('isPersistedUser', () => {
     ['a non-array roles', { ...validUser, roles: 'admin' }]
   ])('should reject %s', (_label, value) => {
     expect(isPersistedUser(value)).toBe(false);
-  });
-});
-
-describe('isCachedRbacMetadata', () => {
-  const resource = { name: 'users', subject: 'User' };
-
-  it('should accept resources of the expected shape', () => {
-    expect(isCachedRbacMetadata({ resources: [resource] })).toBe(true);
-  });
-
-  it('should accept an empty collection', () => {
-    expect(isCachedRbacMetadata({ resources: [] })).toBe(true);
-  });
-
-  it.each([
-    ['null', null],
-    ['a string', 'rbac'],
-    ['a missing collection', {}],
-    ['a non-array collection', { resources: 'nope' }],
-    ['a resource without a subject', { resources: [{ name: 'u' }] }]
-  ])('should reject %s', (_label, value) => {
-    expect(isCachedRbacMetadata(value)).toBe(false);
   });
 });

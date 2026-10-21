@@ -26,6 +26,16 @@ export const RBAC_API_V1 = '/api/v1/rbac';
 export class RbacAdminService {
   readonly #http = inject(HttpClient);
 
+  /**
+   * The whole catalog, ordered by name, for a display-name lookup. Silent: the
+   * caller falls back to the resource name.
+   */
+  getResources(): Observable<ResourceResponse[]> {
+    return this.#http.get<ResourceResponse[]>(`${RBAC_API_V1}/resources`, {
+      context: silentContext()
+    });
+  }
+
   /** One page of resources for the admin list page. */
   getResourcesCursor(
     request: CursorPageRequest,
