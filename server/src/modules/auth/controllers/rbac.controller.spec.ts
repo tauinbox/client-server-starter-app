@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { ForbiddenException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { RbacController } from './rbac.controller';
 import { ResourceService } from '../services/resource.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -39,12 +38,6 @@ describe('RbacController', () => {
     update: jest.Mock;
     restore: jest.Mock;
   };
-  let cacheManagerMock: {
-    get: jest.Mock;
-    set: jest.Mock;
-    del: jest.Mock;
-  };
-
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -55,18 +48,9 @@ describe('RbacController', () => {
       restore: jest.fn().mockResolvedValue({ id: 'res-1', isOrphaned: false })
     };
 
-    cacheManagerMock = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-      del: jest.fn().mockResolvedValue(undefined)
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RbacController],
-      providers: [
-        { provide: ResourceService, useValue: resourceServiceMock },
-        { provide: CACHE_MANAGER, useValue: cacheManagerMock }
-      ]
+      providers: [{ provide: ResourceService, useValue: resourceServiceMock }]
     })
       .overrideGuard(JwtAuthGuard)
       .useValue(allowAllGuard)
@@ -87,15 +71,15 @@ describe('RbacController', () => {
     expect(controller).toBeDefined();
   });
 
-  // ── getMetadata ──────────────────────────────────────────────────
+  // ── findAllResources ──────────────────────────────────────────────
 
-  describe('getMetadata', () => {
+  describe('findAllResources', () => {
     it('is gated by @Authorize([read, Permission]) like the sibling read endpoints', () => {
       // Descriptor lookup instead of a direct method reference: the handler is
       // only a Reflect metadata target here, never invoked.
       const handler = Object.getOwnPropertyDescriptor(
         RbacController.prototype,
-        'getMetadata'
+        'findAllResources'
       )!.value as object;
 
       const checks = Reflect.getMetadata(PERMISSIONS_KEY, handler) as unknown;
@@ -105,35 +89,6 @@ describe('RbacController', () => {
       expect(guards).toContain(PermissionsGuard);
     });
 
-    it('should return cached value without fetching services', async () => {
-      const cached = { resources: [] };
-      cacheManagerMock.get.mockResolvedValue(cached);
-
-      const result = await controller.getMetadata();
-
-      expect(result).toBe(cached);
-      expect(resourceServiceMock.findAll).not.toHaveBeenCalled();
-    });
-
-    it('should fetch resources and set cache when no cached value', async () => {
-      const resources = [{ id: 'r1', name: 'users' }];
-      cacheManagerMock.get.mockResolvedValue(null);
-      resourceServiceMock.findAll.mockResolvedValue(resources);
-
-      const result = await controller.getMetadata();
-
-      expect(result).toEqual({ resources });
-      expect(cacheManagerMock.set).toHaveBeenCalledWith(
-        'rbac:metadata',
-        { resources },
-        60_000
-      );
-    });
-  });
-
-  // ── findAllResources ──────────────────────────────────────────────
-
-  describe('findAllResources', () => {
     it('should return all resources from resourceService', () => {
       const resources = [{ id: 'r1', name: 'users' }];
       resourceServiceMock.findAll.mockReturnValue(resources);
@@ -171,24 +126,6 @@ describe('RbacController', () => {
         expect.any(Function)
       );
       expect(result).toBe(updated);
-    });
-
-    it('keeps the metadata cache when the service refuses', async () => {
-      resourceServiceMock.update.mockRejectedValue(new ForbiddenException());
-      const req = mockJwtRequest() as JwtAuthRequest;
-
-      await expect(
-        controller.updateResource('res-1', {}, req, mockAbility)
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(cacheManagerMock.del).not.toHaveBeenCalled();
-    });
-
-    it('should invalidate metadata cache after update', async () => {
-      const req = mockJwtRequest() as JwtAuthRequest;
-
-      await controller.updateResource('res-1', {}, req, mockAbility);
-
-      expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
     });
 
     it('builds the RESOURCE_UPDATE audit row from the resource before the write', async () => {

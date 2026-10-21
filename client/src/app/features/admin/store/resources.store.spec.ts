@@ -5,7 +5,6 @@ import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloc
 
 import { ResourcesStore } from './resources.store';
 import { RbacAdminService } from '../services/rbac-admin.service';
-import { AuthService } from '@features/auth/services/auth.service';
 import { NotifyService } from '@core/services/notify.service';
 import type { ResourceResponse } from '@app/shared/types';
 
@@ -52,7 +51,6 @@ describe('ResourcesStore', () => {
     updateResource: ReturnType<typeof vi.fn>;
     restoreResource: ReturnType<typeof vi.fn>;
   };
-  let authServiceMock: { fetchRbacMetadata: ReturnType<typeof vi.fn> };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
@@ -69,10 +67,6 @@ describe('ResourcesStore', () => {
       restoreResource: vi.fn()
     };
 
-    authServiceMock = {
-      fetchRbacMetadata: vi.fn().mockResolvedValue(undefined)
-    };
-
     notifyMock = {
       success: vi.fn(),
       error: vi.fn(),
@@ -85,7 +79,6 @@ describe('ResourcesStore', () => {
       providers: [
         ResourcesStore,
         { provide: RbacAdminService, useValue: rbacServiceMock },
-        { provide: AuthService, useValue: authServiceMock },
         { provide: NotifyService, useValue: notifyMock }
       ]
     });
@@ -149,7 +142,7 @@ describe('ResourcesStore', () => {
   });
 
   describe('updateResource()', () => {
-    it('replaces the row and refreshes the RBAC metadata', async () => {
+    it('replaces the row', async () => {
       const store = createStore();
       store.load();
       await vi.waitFor(() => expect(store.resources()).toHaveLength(1));
@@ -162,12 +155,11 @@ describe('ResourcesStore', () => {
       );
 
       expect(store.resources()[0].displayName).toBe('People');
-      expect(authServiceMock.fetchRbacMetadata).toHaveBeenCalled();
     });
   });
 
   describe('restoreResource()', () => {
-    it('replaces the row and refreshes the RBAC metadata', async () => {
+    it('replaces the row', async () => {
       const store = createStore();
       store.load();
       await vi.waitFor(() => expect(store.resources()).toHaveLength(1));
@@ -178,7 +170,6 @@ describe('ResourcesStore', () => {
       await firstValueFrom(store.restoreResource('res-1'));
 
       expect(store.resources()[0].isOrphaned).toBe(false);
-      expect(authServiceMock.fetchRbacMetadata).toHaveBeenCalled();
     });
   });
 });

@@ -12,8 +12,6 @@ import type { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
 import { TokenService } from './token.service';
-import { RbacMetadataService } from './rbac-metadata.service';
-import { RbacMetadataStore } from '../store/rbac-metadata.store';
 import { NotificationsService } from '@core/services/notifications.service';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
@@ -71,12 +69,6 @@ function createMockAuthResponse(): AuthResponse {
 describe('AuthService', () => {
   let service: AuthService;
   let httpMock: HttpTestingController;
-  let rbacMetadataServiceMock: { getMetadata: ReturnType<typeof vi.fn> };
-  let rbacMetadataStoreMock: {
-    resources: ReturnType<typeof vi.fn>;
-    setMetadata: ReturnType<typeof vi.fn>;
-    clear: ReturnType<typeof vi.fn>;
-  };
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
@@ -116,14 +108,6 @@ describe('AuthService', () => {
   let notifyMock: { error: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    rbacMetadataServiceMock = {
-      getMetadata: vi.fn().mockReturnValue(of({ resources: [], actions: [] }))
-    };
-    rbacMetadataStoreMock = {
-      resources: vi.fn().mockReturnValue([]),
-      setMetadata: vi.fn(),
-      clear: vi.fn()
-    };
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
@@ -172,8 +156,6 @@ describe('AuthService', () => {
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: authStoreMock },
         { provide: TokenService, useValue: tokenServiceMock },
-        { provide: RbacMetadataService, useValue: rbacMetadataServiceMock },
-        { provide: RbacMetadataStore, useValue: rbacMetadataStoreMock },
         {
           provide: NotificationsService,
           useValue: {
@@ -341,46 +323,17 @@ describe('AuthService', () => {
       expect(featureFlagsStoreMock.reload).toHaveBeenCalled();
     });
 
-    it('should not fetch RBAC metadata when the user lacks read Permission', async () => {
-      authStoreMock.hasPermissions.mockReturnValue(false);
-      const loginPromise = firstValueFrom(
-        service.login({ email: 'test@example.com', password: 'password' })
-      );
-
-      httpMock.expectOne(AuthApiEnum.Login).flush(createMockAuthResponse());
-      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
-      await loginPromise;
-
-      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
-    });
-
-    it('should skip RBAC metadata while the account owes a two-factor enrolment', async () => {
-      authStoreMock.hasPermissions.mockReturnValue(true);
-      authStoreMock.mustEnrolMfa.mockReturnValue(true);
-      const loginPromise = firstValueFrom(
-        service.login({ email: 'test@example.com', password: 'password' })
-      );
-
-      httpMock.expectOne(AuthApiEnum.Login).flush(createMockAuthResponse());
-      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
-      await loginPromise;
-
-      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
-    });
-
-    it('should fetch RBAC metadata after permissions when the user has read Permission', async () => {
+    it('loads no resource catalog for an administrator', async () => {
       authStoreMock.hasPermissions.mockReturnValue(true);
       const loginPromise = firstValueFrom(
         service.login({ email: 'test@example.com', password: 'password' })
       );
 
       httpMock.expectOne(AuthApiEnum.Login).flush(createMockAuthResponse());
-      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
-
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
       await loginPromise;
 
-      expect(rbacMetadataServiceMock.getMetadata).toHaveBeenCalled();
+      httpMock.expectNone((req) => req.url.startsWith('/api/v1/rbac/'));
     });
   });
 
@@ -395,7 +348,7 @@ describe('AuthService', () => {
           { status: 503, statusText: 'Service Unavailable' }
         );
 
-      // The promise must still resolve: callers chain fetchRbacMetadata() on it.
+      // The promise must still resolve: sign-in awaits it.
       await expect(promise).resolves.toBeUndefined();
       expect(notifyMock.error).toHaveBeenCalledWith(
         expect.objectContaining({ status: 503 }),
@@ -404,27 +357,6 @@ describe('AuthService', () => {
       // Fail closed: no rules are written, so the ability stays null and every
       // permission-guarded route keeps denying.
       expect(authStoreMock.setRules).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('fetchRbacMetadata', () => {
-    it('skips the request when the user lacks read Permission', async () => {
-      authStoreMock.hasPermissions.mockReturnValue(false);
-
-      await service.fetchRbacMetadata();
-
-      expect(rbacMetadataServiceMock.getMetadata).not.toHaveBeenCalled();
-      expect(rbacMetadataStoreMock.setMetadata).not.toHaveBeenCalled();
-    });
-
-    it('loads and stores metadata when the user has read Permission', async () => {
-      authStoreMock.hasPermissions.mockReturnValue(true);
-      const resources = [{ id: 'r1', name: 'users' }];
-      rbacMetadataServiceMock.getMetadata.mockReturnValue(of({ resources }));
-
-      await service.fetchRbacMetadata();
-
-      expect(rbacMetadataStoreMock.setMetadata).toHaveBeenCalledWith(resources);
     });
   });
 
@@ -563,7 +495,6 @@ describe('AuthService', () => {
       req.flush({});
 
       expect(authStoreMock.clearSession).toHaveBeenCalled();
-      expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
       // One session's entitlement mirror must never survive into the next.
       expect(entitlementsStoreMock.clear).toHaveBeenCalled();
     });
@@ -592,16 +523,18 @@ describe('AuthService', () => {
       // The menu is gated on isAuthenticated(), but the branch must still not
       // leave the persisted user behind.
       expect(authStoreMock.clearSession).toHaveBeenCalled();
-      expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
       expect(entitlementsStoreMock.clear).toHaveBeenCalled();
     });
   });
 
   describe('sessionCleared$ teardown', () => {
     it('clears every cached store when TokenService tears the session down', () => {
+      localStorage.setItem('rbac_metadata', '{"resources":[]}');
+
       tokenServiceMock.sessionCleared$.next();
 
-      expect(rbacMetadataStoreMock.clear).toHaveBeenCalled();
+      // The cache of an older release must not outlive the session.
+      expect(localStorage.getItem('rbac_metadata')).toBeNull();
       expect(featureFlagsStoreMock.clear).toHaveBeenCalled();
       expect(entitlementsStoreMock.clear).toHaveBeenCalled();
       expect(authStoreMock.clearSession).toHaveBeenCalled();

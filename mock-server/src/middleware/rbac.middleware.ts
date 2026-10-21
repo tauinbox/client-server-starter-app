@@ -30,16 +30,6 @@ import {
 
 const router = Router();
 
-// GET /api/v1/rbac/metadata
-router.get('/metadata', permissionGuard('read', 'Permission'), (_req, res) => {
-  const state = getState();
-  const resources = Array.from(state.resources.values()).map(
-    toResourceResponse
-  );
-  res.json({ resources });
-});
-
-// GET /api/v1/rbac/resources
 // GET /api/v1/rbac/resources/cursor
 router.get(
   '/resources/cursor',
@@ -61,10 +51,11 @@ router.get(
   }
 );
 
+// GET /api/v1/rbac/resources
 router.get('/resources', permissionGuard('read', 'Permission'), (_req, res) => {
-  const resources = Array.from(getState().resources.values()).map(
-    toResourceResponse
-  );
+  const resources = Array.from(getState().resources.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(toResourceResponse);
   res.json(resources);
 });
 

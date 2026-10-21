@@ -2151,7 +2151,6 @@ These routes currently replace the default limit:
 | `PATCH /auth/profile` | 15 min | `login-long-window` only, on a body that carries `password` | The step-up on the password branch verifies a secret. A name or locale edit keeps the application-wide ceiling |
 | `PATCH /users/:id` | 15 min | `login-long-window` only, on a body that carries `currentPassword` or `code` | A password or email change verifies a step-up secret of the caller. An edit that presents no secret keeps the application-wide ceiling, so an administrator is not limited to five edits a minute |
 | `POST /users/:id/mfa/reset` | 15 min | `login-long-window` only, on every request | Each request carries a step-up secret of the caller, so each refused one counts. The route clears the two-factor enrolment of another user and ends the sessions of that user |
-| `GET /rbac/metadata` | 1 min | 30 | The limit is higher, because each administrator route guard reads it |
 
 A rejected request gets the standard `429` answer with
 `{ statusCode, message, error, timestamp, path }`.
@@ -2529,8 +2528,7 @@ The base URL is `/api/v1`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/metadata` | `permissions:read` | Get the RBAC metadata: the resources. Redis caches it for 60 s |
-| GET | `/resources` | `permissions:read` | List each resource |
+| GET | `/resources` | `permissions:read` | List each resource, ordered by name |
 | PATCH | `/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. An action that the code does not check answers 400 `errors.resources.actionNotDeclared` |
 | POST | `/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. It answers 400 when no `@RegisterResource` controller exists |
 
@@ -2812,7 +2810,7 @@ The import covers:
   `RoleWithPermissionsResponse`, `PermissionCondition`, `PermissionEffect`, `ResolvedPermission`,
   `UserPermissionsResponse` and `UserEffectivePermissionsResponse`.
 
-  The RBAC types are `ResourceResponse`, `ActionResponse` and `RbacMetadataResponse`.
+  The RBAC types are `ResourceResponse` and `ActionResponse`.
 - **Constants.** They are `MIN_PASSWORD_LENGTH`,
   `MAX_PASSWORD_LENGTH`,
   `MAX_FAILED_ATTEMPTS`, `LOCKOUT_DURATION_MS`, `MAX_CONCURRENT_SESSIONS`,

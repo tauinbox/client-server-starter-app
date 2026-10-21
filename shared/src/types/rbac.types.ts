@@ -22,10 +22,6 @@ export type ActionResponse = {
   createdAt: string;
 };
 
-export type RbacMetadataResponse = {
-  resources: ResourceResponse[];
-};
-
 /**
  * Resource name -> CASL subject, split by orphan state.
  *

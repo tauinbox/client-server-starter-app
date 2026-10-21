@@ -282,6 +282,30 @@ runWithInfra('List search and filters (e2e)', () => {
         []
       );
     });
+
+    it('serves the whole catalog from /rbac/resources only, ordered by name', async () => {
+      const res = await request(http())
+        .get('/api/v1/rbac/resources')
+        .auth(token, { type: 'bearer' })
+        .expect(200);
+      const names = (res.body as { name: string }[]).map((row) => row.name);
+      const registered = [
+        'billing',
+        'feature-flags',
+        'permissions',
+        'profile',
+        'roles',
+        'users'
+      ];
+      expect(names.filter((name) => registered.includes(name))).toEqual(
+        registered
+      );
+
+      await request(http())
+        .get('/api/v1/rbac/metadata')
+        .auth(token, { type: 'bearer' })
+        .expect(404);
+    });
   });
 
   describe('users', () => {

@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   HttpCode,
-  Inject,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -22,9 +21,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import { ResourceCursorQueryDto } from '../../../common/dtos';
 import { ResourceService } from '../services/resource.service';
@@ -36,9 +32,6 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { JwtAuthRequest } from '../types/auth.request';
 import type { AppAbility } from '../casl/app-ability';
 import { RegisterResource } from '../decorators/register-resource.decorator';
-
-const METADATA_CACHE_KEY = 'rbac:metadata';
-const METADATA_CACHE_TTL = 60_000; // 1 minute
 
 @ApiTags('RBAC Metadata')
 @Controller({
@@ -54,31 +47,7 @@ const METADATA_CACHE_TTL = 60_000; // 1 minute
   conditionalActions: ['update']
 })
 export class RbacController {
-  constructor(
-    private readonly resourceService: ResourceService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
-  ) {}
-
-  // ── Metadata ──────────────────────────────────────────────────────
-
-  @Get('metadata')
-  @Authorize(['read', 'Permission'])
-  @Throttle({ default: { ttl: 60000, limit: 30 } })
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get RBAC metadata (resources)' })
-  @ApiOkResponse({ description: 'RBAC metadata' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiForbiddenResponse({ description: 'Forbidden' })
-  async getMetadata() {
-    // Admin catalog, deliberately unscoped by ABAC: a display-name lookup
-    // over every resource. Conditions apply on mutations and reads by id.
-    const cached = await this.cacheManager.get(METADATA_CACHE_KEY);
-    if (cached) return cached;
-
-    const result = { resources: await this.resourceService.findAll() };
-    await this.cacheManager.set(METADATA_CACHE_KEY, result, METADATA_CACHE_TTL);
-    return result;
-  }
+  constructor(private readonly resourceService: ResourceService) {}
 
   // ── Resources (read + update display info only) ──────────────────
 
@@ -101,7 +70,8 @@ export class RbacController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   findAllResources() {
-    // Admin catalog, deliberately unscoped by ABAC; see getMetadata().
+    // Admin catalog, deliberately unscoped by ABAC: a display-name lookup
+    // over every resource. Conditions apply on mutations and reads by id.
     return this.resourceService.findAll();
   }
 
@@ -120,21 +90,14 @@ export class RbacController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const result = await this.resourceService.restore(
-      id,
-      ability,
-      req.user.userId,
-      {
-        action: AuditAction.RESOURCE_RESTORE,
-        actorId: req.user.userId,
-        actorEmail: req.user.email,
-        targetId: id,
-        targetType: 'Resource',
-        context: extractAuditContext(req)
-      }
-    );
-    await this.cacheManager.del(METADATA_CACHE_KEY);
-    return result;
+    return this.resourceService.restore(id, ability, req.user.userId, {
+      action: AuditAction.RESOURCE_RESTORE,
+      actorId: req.user.userId,
+      actorEmail: req.user.email,
+      targetId: id,
+      targetType: 'Resource',
+      context: extractAuditContext(req)
+    });
   }
 
   @Patch('resources/:id')
@@ -151,7 +114,7 @@ export class RbacController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const result = await this.resourceService.update(
+    return this.resourceService.update(
       id,
       dto,
       ability,
@@ -166,7 +129,5 @@ export class RbacController {
         context: extractAuditContext(req)
       })
     );
-    await this.cacheManager.del(METADATA_CACHE_KEY);
-    return result;
   }
 }

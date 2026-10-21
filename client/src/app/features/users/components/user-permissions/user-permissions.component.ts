@@ -33,11 +33,13 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import type {
   PermissionCondition,
   ResolvedPermission,
+  ResourceResponse,
   RoleAdminResponse,
   UserEffectivePermissionsResponse
 } from '@app/shared/types';
 import { UserService } from '../../services/user.service';
-import { RbacMetadataStore } from '@features/auth/store/rbac-metadata.store';
+import { AuthStore } from '@features/auth/store/auth.store';
+import { RbacAdminService } from '@features/admin/services/rbac-admin.service';
 
 type ResourceGroup = {
   name: string;
@@ -78,11 +80,13 @@ type ResourceGroup = {
 export class UserPermissionsComponent implements OnInit {
   readonly #userService = inject(UserService);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #rbacMetadataStore = inject(RbacMetadataStore);
+  readonly #authStore = inject(AuthStore);
+  readonly #rbacAdminService = inject(RbacAdminService);
 
   readonly id = input.required<string>();
 
   readonly #data = signal<UserEffectivePermissionsResponse | null>(null);
+  readonly #resources = signal<ResourceResponse[]>([]);
   readonly #loading = signal(true);
   readonly #error = signal(false);
   readonly #expanded = signal(false);
@@ -99,7 +103,7 @@ export class UserPermissionsComponent implements OnInit {
   readonly groups = computed<ResourceGroup[]>(() => {
     const data = this.#data();
     if (!data) return [];
-    const resources = this.#rbacMetadataStore.resources();
+    const resources = this.#resources();
     const displayNameByName = new Map(
       resources.map((r) => [r.name, r.displayName])
     );
@@ -148,6 +152,7 @@ export class UserPermissionsComponent implements OnInit {
 
   ngOnInit(): void {
     this.fetch();
+    this.fetchResourceNames();
   }
 
   toggleAll(): void {
@@ -180,6 +185,23 @@ export class UserPermissionsComponent implements OnInit {
           this.#error.set(true);
           this.#loading.set(false);
         }
+      });
+  }
+
+  // The route needs `read User` only; a viewer without `read Permission` would
+  // get a 403 here, so the groups keep the resource names.
+  private fetchResourceNames(): void {
+    if (
+      !this.#authStore.hasPermissions({ action: 'read', subject: 'Permission' })
+    ) {
+      return;
+    }
+    this.#rbacAdminService
+      .getResources()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: (resources) => this.#resources.set(resources),
+        error: () => undefined
       });
   }
 }

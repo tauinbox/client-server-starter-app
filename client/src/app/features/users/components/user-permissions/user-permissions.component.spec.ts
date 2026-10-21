@@ -7,7 +7,8 @@ import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/trans
 
 import { UserPermissionsComponent } from './user-permissions.component';
 import { UserService } from '../../services/user.service';
-import { RbacMetadataStore } from '@features/auth/store/rbac-metadata.store';
+import { AuthStore } from '@features/auth/store/auth.store';
+import { RbacAdminService } from '@features/admin/services/rbac-admin.service';
 import type {
   PermissionCondition,
   ResolvedPermission,
@@ -84,8 +85,11 @@ describe('UserPermissionsComponent', () => {
   let userServiceMock: {
     getPermissions: ReturnType<typeof vi.fn>;
   };
-  let rbacMetadataStoreMock: {
-    resources: ReturnType<typeof vi.fn>;
+  let rbacAdminServiceMock: {
+    getResources: ReturnType<typeof vi.fn>;
+  };
+  let authStoreMock: {
+    hasPermissions: ReturnType<typeof vi.fn>;
   };
 
   const createComponent = (
@@ -106,9 +110,10 @@ describe('UserPermissionsComponent', () => {
 
   beforeEach(() => {
     userServiceMock = { getPermissions: vi.fn() };
-    rbacMetadataStoreMock = {
-      resources: vi.fn().mockReturnValue(mockResources)
+    rbacAdminServiceMock = {
+      getResources: vi.fn().mockReturnValue(of(mockResources))
     };
+    authStoreMock = { hasPermissions: vi.fn().mockReturnValue(true) };
 
     TestBed.configureTestingModule({
       imports: [UserPermissionsComponent, TranslocoTestingModuleWithLangs],
@@ -116,7 +121,8 @@ describe('UserPermissionsComponent', () => {
         provideRouter([]),
         provideNoopMaterialAnimations(),
         { provide: UserService, useValue: userServiceMock },
-        { provide: RbacMetadataStore, useValue: rbacMetadataStoreMock }
+        { provide: RbacAdminService, useValue: rbacAdminServiceMock },
+        { provide: AuthStore, useValue: authStoreMock }
       ]
     });
   });
@@ -257,7 +263,7 @@ describe('UserPermissionsComponent', () => {
     });
 
     it('should fall back to resource name when displayName not found', () => {
-      rbacMetadataStoreMock.resources.mockReturnValue([]);
+      rbacAdminServiceMock.getResources.mockReturnValue(of([]));
       createComponent({
         roles: [mockRole],
         permissions: [buildPermission('Unknown', 'read')],
@@ -265,6 +271,36 @@ describe('UserPermissionsComponent', () => {
       });
 
       expect(component.groups()[0]?.displayName).toBe('Unknown');
+    });
+
+    it('should keep resource names when the catalog request fails', () => {
+      rbacAdminServiceMock.getResources.mockReturnValue(
+        throwError(() => new Error('fail'))
+      );
+      createComponent({
+        roles: [mockRole],
+        permissions: [buildPermission('User', 'read')],
+        rules: []
+      });
+
+      expect(component.error()).toBe(false);
+      expect(component.groups()[0]?.displayName).toBe('User');
+    });
+
+    it('should not request the catalog for a viewer without read Permission', () => {
+      authStoreMock.hasPermissions.mockReturnValue(false);
+      createComponent({
+        roles: [mockRole],
+        permissions: [buildPermission('User', 'read')],
+        rules: []
+      });
+
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith({
+        action: 'read',
+        subject: 'Permission'
+      });
+      expect(rbacAdminServiceMock.getResources).not.toHaveBeenCalled();
+      expect(component.groups()[0]?.displayName).toBe('User');
     });
 
     it('should be empty when data is null', () => {
