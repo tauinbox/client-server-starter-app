@@ -158,6 +158,30 @@ describe('ResourceListComponent', () => {
       );
       expect(editBtns.length).toBeGreaterThan(0);
     });
+
+    it('offers edit only on the rows inside a grant scoped to some resources', async () => {
+      const otherResource: ResourceResponse = {
+        ...mockResource,
+        id: 'res-2',
+        name: 'role',
+        subject: 'Role',
+        displayName: 'Roles'
+      };
+      resourcesStoreMock.resources = signal([mockResource, otherResource]);
+      authStoreMock.hasPermissions.mockImplementation(
+        (check: { instance?: ResourceResponse }) =>
+          check.instance?.id === mockResource.id
+      );
+      await setupComponent();
+      fixture.detectChanges();
+
+      const labels = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          'button[aria-label^="Edit resource"]'
+        )
+      ).map((button) => button.getAttribute('aria-label'));
+      expect(labels).toEqual(['Edit resource Users']);
+    });
   });
 
   describe('dialog interactions', () => {

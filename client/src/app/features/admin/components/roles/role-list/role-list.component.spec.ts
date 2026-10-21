@@ -209,6 +209,52 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     expect(notifyMock.error).not.toHaveBeenCalled();
   });
 
+  describe('a grant scoped to some roles', () => {
+    const otherRole: RoleAdminResponse = {
+      ...mockRole,
+      id: 'role-2',
+      name: 'Viewer'
+    };
+
+    beforeEach(() => {
+      authStoreMock.hasPermissions.mockImplementation(
+        (check: { instance?: RoleAdminResponse }) =>
+          check.instance?.id === mockRole.id
+      );
+      rolesStoreMock.entities.set([mockRole, otherRole]);
+    });
+
+    function rowButtons(name: string): (string | undefined)[] {
+      const fixture = TestBed.createComponent(RoleListComponent);
+      fixture.detectChanges();
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          `td.mat-column-actions button[aria-label$=" ${name}"]`
+        )
+      ).map((button) => button.querySelector('mat-icon')?.textContent?.trim());
+    }
+
+    it('offers edit and delete only on the rows inside the grant', async () => {
+      await setupComponent();
+
+      expect(rowButtons('Editor')).toEqual(['security', 'edit', 'delete']);
+      expect(rowButtons('Viewer')).toEqual(['security']);
+    });
+
+    it('opens the permissions read-only only outside the grant', async () => {
+      const component = await setupComponent();
+      component.openPermissionsDialog(mockRole);
+      component.openPermissionsDialog(otherRole);
+
+      expect(
+        dialogMock.open.mock.calls.map(([, config]) => config.data)
+      ).toEqual([
+        { role: mockRole, readonly: false },
+        { role: otherRole, readonly: true }
+      ]);
+    });
+  });
+
   it('renders a disabled locked-actions marker (and no action buttons) for super-system roles', async () => {
     authStoreMock.hasPermissions.mockReturnValue(true);
     rolesStoreMock.entities.set([mockSuperSystemRole]);

@@ -51,7 +51,7 @@ import {
 import type { UpdateUser, User } from '../../models/user.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { catchError, forkJoin, of, tap } from 'rxjs';
+import { catchError, forkJoin, of, take, tap } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -221,7 +221,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
     return this.#authStore.hasPermissions({
       action: 'update',
       subject: 'User',
-      instance: { id: u.id }
+      instance: u
     });
   });
 
@@ -264,7 +264,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
       this.#authStore.hasPermissions({
         action: 'delete',
         subject: 'User',
-        instance: { id: u.id }
+        instance: u
       }) && !this.#isSelf()
     );
   });
@@ -304,7 +304,16 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
     forkJoin({
       user: this.#userService.getById(this.id()),
-      roles: this.#roleCatalog.getAll().pipe(catchError(() => of([])))
+      roles: this.#authStore.hasPermissions({ action: 'read', subject: 'Role' })
+        ? this.#roleCatalog.getAll().pipe(catchError(() => of([])))
+        : of([]),
+      // The refusal notice must not show a raw key on a fresh page load.
+      i18n: this.#translocoService
+        .load(`users/${this.#translocoService.getActiveLang()}`)
+        .pipe(
+          take(1),
+          catchError(() => of(null))
+        )
     })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
@@ -316,7 +325,11 @@ export class UserEditComponent implements OnInit, OnDestroy {
               instance: user
             })
           ) {
-            this.#notify.info('users.edit.superTargetReadOnly');
+            this.#notify.info(
+              user.roles.some((role) => role.isSuper)
+                ? 'users.edit.superTargetReadOnly'
+                : 'users.edit.errorNoAccess'
+            );
             void this.#router.navigate([
               `/${AppRouteSegmentEnum.Admin}`,
               AppRouteSegmentEnum.Users,
@@ -346,6 +359,13 @@ export class UserEditComponent implements OnInit, OnDestroy {
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          // The route guard checks the type only; the server decides on the record.
+          if (err.status === 403) {
+            void this.#router.navigate([`/${AppRouteSegmentEnum.Forbidden}`], {
+              replaceUrl: true
+            });
+            return;
+          }
           this.loading.set(false);
           this.error.set(
             parseHttpErrorMessage(

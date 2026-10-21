@@ -66,8 +66,7 @@ src/app/
 │   │   │                   # *appRequirePermissions="check; else fallbackTpl".
 │   │   │                   # The optional else template shows a fallback view when access is
 │   │   │                   # denied, for example a disabled button with a tooltip.
-│   │   ├── guards/         # authGuard, guestGuard, permissionGuard(action, subject), and
-│   │   │                   # instancePermissionGuard(action, subject, instanceFactory).
+│   │   ├── guards/         # authGuard, guestGuard and permissionGuard(action, subject).
 │   │   │                   # Every permission guard first calls mfaEnrolmentRedirect(): an account
 │   │   │                   # that owes the two-factor enrolment its role demands goes to /profile,
 │   │   │                   # where the enrolment card is, because the server refuses the same
@@ -433,12 +432,12 @@ src/app/
 | `/register` | RegisterComponent | guestGuard |
 | `/profile` | ProfileComponent | authGuard |
 | `/users` | UserListComponent | permissionGuard('search', 'User') |
-| `/users/:id` | UserDetailComponent | authGuard |
-| `/users/:id/edit` | UserEditComponent | authGuard |
+| `/users/:id` | UserDetailComponent | permissionGuard('read', 'User') |
+| `/users/:id/edit` | UserEditComponent | permissionGuard('update', 'User') |
 | `/admin` | AdminPanelComponent | adminPanelGuard (search/User OR read/Role OR read/Permission OR search/FeatureFlag OR search/Billing) |
 | `/admin/users` | UserListComponent | permissionGuard('search', 'User') |
 | `/admin/users/:id` | UserDetailComponent | permissionGuard('read', 'User') |
-| `/admin/users/:id/edit` | UserEditComponent | instancePermissionGuard('update', 'User') |
+| `/admin/users/:id/edit` | UserEditComponent | permissionGuard('update', 'User') |
 | `/admin/users/:id/permissions` | UserPermissionsComponent | permissionGuard('read', 'User') |
 | `/admin/roles` | RoleListComponent | permissionGuard('read', 'Role') |
 | `/admin/resources` | ResourceListComponent | permissionGuard('read', 'Permission') |
@@ -456,7 +455,7 @@ src/app/
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
 
-Every row that names `permissionGuard`, `instancePermissionGuard` or `adminPanelGuard` also carries
+Every row that names `permissionGuard` or `adminPanelGuard` also carries
 the two-factor gate: while `MFA_REQUIRED_FOR_ADMINS` is on and the account holds a super role with
 no enrolment, the guard answers with a redirect to `/profile` instead of the route.
 
@@ -1184,10 +1183,11 @@ axe rule `aria-progressbar-name` requires a name for it. Use `[attr.aria-label]=
 - an OAuth sign-in completes the session, thus a guarded return URL activates and does not go to
   `/forbidden` (`oauth-callback-session.spec.ts`)
 - a feature-flag toggle propagates through SSE (`admin/feature-flags.spec.ts`)
-- the ownership-scoped `update:User` grant of the seeded `user` role admits the owner of the
-  record on `/users/<own-id>/edit` and refuses every other record (`users/users-edit.spec.ts`).
-  The route runs `instancePermissionGuard`, so the MongoQuery condition of the grant is compared
-  against the record id in the URL
+- a conditional `update:User` grant decides on the loaded record, not on the id in the URL
+  (`users/users-edit.spec.ts`). An ownership grant admits the owner of the record on
+  `/users/<own-id>/edit`, and the seeded `user` role, which cannot read another record, goes to
+  `/forbidden`. A `fieldMatch` grant on `lastName` opens the form of a Smith record and sends a
+  Doe record back to its detail page with the notice "You cannot edit this user"
 - an administrator resets the two-factor enrolment of an enrolled user from the edit page, with
   the administrator's own password in the dialog, and that user then signs in with the password
   alone; a wrong password leaves the factor on (`users/users-mfa-reset.spec.ts`)
@@ -1197,7 +1197,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 324 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 325 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1589 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password, so the profile page

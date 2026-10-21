@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import type { ActivatedRouteSnapshot, CanActivateFn } from '@angular/router';
+import type { CanActivateFn } from '@angular/router';
 import { Router } from '@angular/router';
 import { AuthStore } from '../store/auth.store';
 import { AuthService } from '../services/auth.service';
@@ -26,33 +26,6 @@ export function permissionGuard(
         const enrolment = mfaEnrolmentRedirect(authStore, router);
         if (enrolment) return enrolment;
         if (authStore.hasPermissions({ action, subject })) return true;
-        return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
-      }
-    );
-  };
-}
-
-export function instancePermissionGuard(
-  action: PermissionCheck['action'],
-  subject: PermissionCheck['subject'],
-  instanceFactory: (route: ActivatedRouteSnapshot) => Record<string, unknown>
-): CanActivateFn {
-  return (route, state) => {
-    const authStore = inject(AuthStore);
-    const authService = inject(AuthService);
-    const router = inject(Router);
-
-    return ensureAuthenticated(
-      authStore,
-      authService,
-      router,
-      state.url,
-      () => {
-        const enrolment = mfaEnrolmentRedirect(authStore, router);
-        if (enrolment) return enrolment;
-        const instance = instanceFactory(route);
-        if (authStore.hasPermissions({ action, subject, instance }))
-          return true;
         return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
       }
     );

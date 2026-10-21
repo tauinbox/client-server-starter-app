@@ -163,12 +163,21 @@ export class RoleListComponent {
   readonly canCreate = computed(() =>
     this.authStore.hasPermissions({ action: 'create', subject: 'Role' })
   );
-  readonly canUpdate = computed(() =>
-    this.authStore.hasPermissions({ action: 'update', subject: 'Role' })
-  );
-  readonly canDelete = computed(() =>
-    this.authStore.hasPermissions({ action: 'delete', subject: 'Role' })
-  );
+  canUpdate(role: RoleAdminResponse): boolean {
+    return this.authStore.hasPermissions({
+      action: 'update',
+      subject: 'Role',
+      instance: role
+    });
+  }
+
+  canDelete(role: RoleAdminResponse): boolean {
+    return this.authStore.hasPermissions({
+      action: 'delete',
+      subject: 'Role',
+      instance: role
+    });
+  }
 
   openCreateDialog(): void {
     this.#openFormDialog({}, 'admin.roles.successCreated');
@@ -195,7 +204,7 @@ export class RoleListComponent {
   openPermissionsDialog(role: RoleAdminResponse): void {
     const data: RolePermissionsDialogData = {
       role,
-      readonly: !this.canUpdate()
+      readonly: !this.canUpdate(role)
     };
     this.#dialog
       .open(RolePermissionsDialogComponent, {

@@ -101,7 +101,7 @@
               {{ t('admin.resources.tableHeaderActions') }}
             </th>
             <td mat-cell *matCellDef="let resource">
-              @if (canUpdate()) {
+              @if (canUpdate(resource)) {
                 @if (resource.isOrphaned && resource.isRegistered) {
                   <button
                     matIconButton

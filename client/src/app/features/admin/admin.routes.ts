@@ -1,9 +1,6 @@
 import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
-import {
-  instancePermissionGuard,
-  permissionGuard
-} from '@features/auth/guards/permission.guard';
+import { permissionGuard } from '@features/auth/guards/permission.guard';
 import { adminPanelGuard } from './guards/admin-panel.guard';
 import { UsersStore } from '@features/users/store/users.store';
 import { RolesStore } from './store/roles.store';
@@ -71,11 +68,7 @@ export const adminRoutes: Routes = [
               import('@features/users/components/user-edit/user-edit.component').then(
                 (c) => c.UserEditComponent
               ),
-            canActivate: [
-              instancePermissionGuard('update', 'User', (route) => ({
-                id: route.params['id']
-              }))
-            ]
+            canActivate: [permissionGuard('update', 'User')]
           },
           {
             path: ':id/permissions',

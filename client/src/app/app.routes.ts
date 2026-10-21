@@ -1,10 +1,7 @@
 import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
-import {
-  instancePermissionGuard,
-  permissionGuard
-} from '@features/auth/guards/permission.guard';
+import { permissionGuard } from '@features/auth/guards/permission.guard';
 import { guestGuard } from '@features/auth/guards/guest.guard';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -75,11 +72,7 @@ export const routes: Routes = [
           import('./features/users/components/user-edit/user-edit.component').then(
             (c) => c.UserEditComponent
           ),
-        canActivate: [
-          instancePermissionGuard('update', 'User', (route) => ({
-            id: route.params['id']
-          }))
-        ]
+        canActivate: [permissionGuard('update', 'User')]
       }
     ]
   },

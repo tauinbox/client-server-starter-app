@@ -199,6 +199,18 @@ describe('UserEditComponent', () => {
       expect(component['error']()).toBe('User not found');
     });
 
+    it('does not request the role catalog without read:Role', () => {
+      authStoreMock.hasPermissions.mockImplementation(
+        (check: { action: string; subject: string }) =>
+          !(check.action === 'read' && check.subject === 'Role')
+      );
+
+      fixture.detectChanges();
+
+      expect(roleCatalogMock.getAll).not.toHaveBeenCalled();
+      expect(component['user']()).toEqual(mockUser);
+    });
+
     it('should show fallback error when no server message', () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
       userServiceMock.getById.mockReturnValue(throwError(() => httpError));
@@ -410,11 +422,37 @@ describe('UserEditComponent', () => {
 
       fixture.detectChanges();
 
+      expect(notifyMock.info).toHaveBeenCalledWith('users.edit.errorNoAccess');
+      expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users', 'user-1']);
+      expect(component.user()).toBeNull();
+    });
+
+    it('names the super role when the target holds one', () => {
+      permittedSignal.set(false);
+      userServiceMock.getById.mockReturnValue(
+        of({ ...mockUser, roles: [{ ...mockUserRole, isSuper: true }] })
+      );
+
+      fixture.detectChanges();
+
       expect(notifyMock.info).toHaveBeenCalledWith(
         'users.edit.superTargetReadOnly'
       );
-      expect(navigateSpy).toHaveBeenCalledWith(['/admin', 'users', 'user-1']);
-      expect(component.user()).toBeNull();
+    });
+
+    it('sends a load that the server refuses to the forbidden page', () => {
+      const navigateSpy = vi.spyOn(router, 'navigate');
+      userServiceMock.getById.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 403 }))
+      );
+
+      fixture.detectChanges();
+
+      expect(navigateSpy).toHaveBeenCalledWith(['/forbidden'], {
+        replaceUrl: true
+      });
+      expect(component['error']()).toBeNull();
+      expect(notifyMock.error).not.toHaveBeenCalled();
     });
   });
 
@@ -486,17 +524,21 @@ describe('UserEditComponent', () => {
       expect(component['canManageUser']()).toBe(false);
     });
 
-    it('should pass instance with user id to hasPermissions', () => {
+    it('passes the whole loaded user as the instance', () => {
       fixture.detectChanges();
       component['canManageUser']();
 
-      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith(
-        expect.objectContaining({
+      const updateChecks = authStoreMock.hasPermissions.mock.calls
+        .map(([check]) => check)
+        .filter((check) => check.action === 'update');
+      expect(updateChecks.length).toBeGreaterThan(1);
+      for (const check of updateChecks) {
+        expect(check).toEqual({
           action: 'update',
           subject: 'User',
-          instance: expect.objectContaining({ id: 'user-1' })
-        })
-      );
+          instance: mockUser
+        });
+      }
     });
   });
 
@@ -530,18 +572,16 @@ describe('UserEditComponent', () => {
       expect(component['canDelete']()).toBe(false);
     });
 
-    it('should pass instance with user id to hasPermissions', () => {
+    it('passes the whole loaded user as the instance', () => {
       permittedSignal.set(true);
       currentUserSignal.set({ id: 'admin-id' });
       component['canDelete']();
 
-      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'delete',
-          subject: 'User',
-          instance: expect.objectContaining({ id: 'user-1' })
-        })
-      );
+      expect(authStoreMock.hasPermissions).toHaveBeenCalledWith({
+        action: 'delete',
+        subject: 'User',
+        instance: mockUser
+      });
     });
   });
 

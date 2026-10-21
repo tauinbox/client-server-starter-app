@@ -204,7 +204,7 @@ management and theming.
   administrator bypass.
 
   On the server, `@Authorize(['action', 'Subject'])` takes a typed tuple. On the client there are
-  `permissionGuard(action, subject)`, `instancePermissionGuard(action, subject, instanceFactory)` and
+  `permissionGuard(action, subject)`, `AuthStore.hasPermissions({ action, subject, instance? })` and
   the `*appRequirePermissions="{ action, subject, instance? }"` directive. The `/api/v1/rbac/`
   endpoints manage the resources and the actions.
 
@@ -627,18 +627,20 @@ target is the authenticated user.
    </ng-template>
    ```
 
-2. **`instancePermissionGuard`** works on a route. It runs before the route activation:
+2. **`permissionGuard`** works on a route. It checks the type only, because the route has an id and
+   not the record. The page loads the record and checks it; a 403 on the load goes to `/forbidden`:
    ```typescript
-   canActivate: [instancePermissionGuard('update', 'User', (route) => ({ id: route.params['id'] }))]
+   canActivate: [permissionGuard('update', 'User')]
    ```
 
-3. A **computed property** works in a component with complex logic:
+3. A **computed property or a row method** works in a component. A check of an action in
+   `conditionalActions` passes the whole record, because a condition can name any field of it:
    ```typescript
    canManageUser = computed(() => {
      const u = this.user();
      if (!u) return false;
      return this.authStore.hasPermissions({
-       action: 'update', subject: 'User', instance: { id: u.id }
+       action: 'update', subject: 'User', instance: u
      });
    });
    ```
@@ -1895,7 +1897,7 @@ activates the git hooks through the `prepare` script.
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 2996 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 659 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 646 pass and 13 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1589 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 324 tests |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 325 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1074 tests pass |
 
 ## CI/CD

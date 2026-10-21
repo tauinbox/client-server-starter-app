@@ -162,9 +162,13 @@ export class ResourceListComponent {
     'actions'
   ];
 
-  readonly canUpdate = computed(() =>
-    this.authStore.hasPermissions({ action: 'update', subject: 'Permission' })
-  );
+  canUpdate(resource: ResourceResponse): boolean {
+    return this.authStore.hasPermissions({
+      action: 'update',
+      subject: 'Permission',
+      instance: resource
+    });
+  }
 
   restoreResource(resource: ResourceResponse): void {
     this.#resourcesStore
