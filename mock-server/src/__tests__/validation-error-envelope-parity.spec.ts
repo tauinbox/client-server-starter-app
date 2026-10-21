@@ -97,6 +97,34 @@ describe('validation-error envelope parity with server', () => {
       expect(body.errors).toEqual(['permissionIds should not be empty']);
     });
 
+    it.each([
+      ['POST', '/api/v1/roles', { name: 'escalated', isSuper: true }],
+      ['PATCH', `/api/v1/roles/${mockId('role-editor')}`, { isSuper: true }]
+    ])('roles: %s with isSuper', async (method, path, payload) => {
+      const token = await login('admin@example.com');
+      const { status, body } = await send(method, path, payload, token);
+
+      expect(status).toBe(400);
+      expect(body.errors).toEqual(['property isSuper should not exist']);
+      expect(body.message).toBe('property isSuper should not exist');
+    });
+
+    it('roles: POST with isSuper and a blank name reports both', async () => {
+      const token = await login('admin@example.com');
+      const { status, body } = await send(
+        'POST',
+        '/api/v1/roles',
+        { name: '  ', isSuper: true },
+        token
+      );
+
+      expect(status).toBe(400);
+      expect(body.errors).toEqual([
+        'property isSuper should not exist',
+        'name should not be empty'
+      ]);
+    });
+
     it('billing: an unsupported region', async () => {
       const token = await login('user@example.com');
       const { status, body } = await send(
@@ -179,20 +207,6 @@ describe('validation-error envelope parity with server', () => {
       expect(status).toBe(400);
       expect(body.errors).toBeUndefined();
       expect(body.message).toBe('Invalid or expired verification token');
-    });
-
-    it('roles: setting isSuper through the API', async () => {
-      const token = await login('admin@example.com');
-      const { status, body } = await send(
-        'POST',
-        '/api/v1/roles',
-        { name: 'escalated', isSuper: true },
-        token
-      );
-
-      expect(status).toBe(400);
-      expect(body.errors).toBeUndefined();
-      expect(body.message).toBe('isSuper flag cannot be set via API');
     });
 
     it('billing: a webhook with an empty body', async () => {
