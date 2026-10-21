@@ -15,6 +15,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import {
   AbilityBuilder,
   createMongoAbility,
+  SYSTEM_ABILITY,
   type AppAbility
 } from '../src/modules/auth/casl/app-ability';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
@@ -111,7 +112,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
     refreshToken: string;
     sessionId: string;
   }> {
-    const user = await usersService.findOne(userId);
+    const user = await usersService.findOne(userId, SYSTEM_ABILITY);
     const { tokens } = await authService.login(user, {
       userAgent: 'sse-e2e',
       ipAddress: '203.0.113.9'
@@ -232,7 +233,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
   }, 30000);
 
   it('sends only session_invalidated when a role assignment ends the session', async () => {
-    const role = await roleService.create({ name: roleName });
+    const role = await roleService.create({ name: roleName }, SYSTEM_ABILITY);
     const a = await signIn();
     const stream = await openStream(a.token);
 

@@ -32,7 +32,11 @@ import {
   grantableActionNames,
   reofferedActionNames
 } from '@app/shared/utils/grantable-actions';
-import type { AppAbility } from '../casl/app-ability';
+import { subject } from '@casl/ability';
+import { withChanges } from '@app/shared/utils/changed-fields';
+import { assertCan } from '../../../common/utils/assert-can.util';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
+import type { AbilityOrSystem } from '../casl/app-ability';
 
 // Key is versioned: the cached value's shape changes between releases (a flat
 // resource -> subject record, then the split maps, then conditionalActions),
@@ -93,20 +97,7 @@ export class ResourceService {
     });
   }
 
-  async findOne(id: string): Promise<Resource | null> {
-    return this.resourceRepository.findOne({ where: { id } });
-  }
-
-  async update(
-    id: string,
-    data: {
-      displayName?: string;
-      description?: string | null;
-      allowedActionNames?: string[] | null;
-    },
-    ability: AppAbility,
-    audit?: AuditLogParams
-  ): Promise<Resource> {
+  private async loadResource(id: string): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
       throw new HttpException(
@@ -116,6 +107,47 @@ export class ResourceService {
         },
         HttpStatus.NOT_FOUND
       );
+    }
+    return resource;
+  }
+
+  /**
+   * The route-level @Authorize check is type-level and ignores conditions, so
+   * a conditional `update:Permission` grant is re-evaluated against the record.
+   */
+  private assertCanUpdate(
+    ability: AbilityOrSystem,
+    record: Partial<Resource>,
+    actorId?: string
+  ): void {
+    if (ability === SYSTEM_ABILITY) return;
+    assertCan(
+      ability,
+      'update',
+      subject('Permission', record),
+      this.auditService,
+      { actorId, targetId: record.id, targetType: 'Resource' },
+      this.metrics
+    );
+  }
+
+  /** `audit` gets the resource as it is before the write. */
+  async update(
+    id: string,
+    data: {
+      displayName?: string;
+      description?: string | null;
+      allowedActionNames?: string[] | null;
+    },
+    ability: AbilityOrSystem,
+    actorId?: string,
+    audit?: (before: Resource) => AuditLogParams
+  ): Promise<Resource> {
+    const resource = await this.loadResource(id);
+    // The record after the write is checked too: else a grant scoped by a
+    // writable field lets the caller move a resource out of its own scope.
+    for (const record of [resource, withChanges(resource, data)]) {
+      this.assertCanUpdate(ability, record, actorId);
     }
     const undeclared = (data.allowedActionNames ?? []).filter(
       (name) => !resource.actionNames.includes(name)
@@ -134,11 +166,12 @@ export class ResourceService {
         ability,
         resource,
         reofferedActionNames(resource, data.allowedActionNames),
-        audit?.actorId
+        actorId
       );
     }
+    const auditRow = audit?.({ ...resource });
     Object.assign(resource, data);
-    const saved = await this.saveAudited(resource, audit);
+    const saved = await this.saveAudited(resource, auditRow);
     await this.invalidateSubjectMapCache();
     return saved;
   }
@@ -150,12 +183,18 @@ export class ResourceService {
    * dormant action, so no other caller holds what the write would grant.
    */
   private assertCanWiden(
-    ability: AppAbility,
+    ability: AbilityOrSystem,
     resource: Resource,
     reEnabled: string[],
-    actorId?: string | null
+    actorId?: string
   ): void {
-    if (reEnabled.length === 0 || ability.can('manage', 'all')) return;
+    if (
+      reEnabled.length === 0 ||
+      ability === SYSTEM_ABILITY ||
+      ability.can('manage', 'all')
+    ) {
+      return;
+    }
     this.auditService.logFireAndForget({
       action: AuditAction.PERMISSION_GRANT_DENIED,
       actorId: actorId ?? null,
@@ -225,19 +264,12 @@ export class ResourceService {
 
   async restore(
     id: string,
-    ability: AppAbility,
+    ability: AbilityOrSystem,
+    actorId?: string,
     audit?: AuditLogParams
   ): Promise<Resource> {
-    const resource = await this.resourceRepository.findOne({ where: { id } });
-    if (!resource) {
-      throw new HttpException(
-        {
-          message: 'Resource not found',
-          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
-      );
-    }
+    const resource = await this.loadResource(id);
+    this.assertCanUpdate(ability, resource, actorId);
     if (!this.registry.isRegistered(resource.name)) {
       throw new HttpException(
         {
@@ -252,7 +284,7 @@ export class ResourceService {
         ability,
         resource,
         grantableActionNames(resource),
-        audit?.actorId
+        actorId
       );
     }
     resource.isOrphaned = false;

@@ -39,6 +39,7 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { AuthCookies } from '../utils/auth-cookies';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 
 @ApiTags('Auth API')
 @Controller({
@@ -70,7 +71,10 @@ export class MfaController {
     @Body() dto: MfaSetupDto,
     @Res({ passthrough: true }) res: Response
   ): Promise<MfaSetupResponseDto> {
-    const user = await this.userService.findOne(req.user.userId);
+    const user = await this.userService.findOne(
+      req.user.userId,
+      SYSTEM_ABILITY
+    );
     // A stolen session must not be able to enrol a device of its own, which
     // would lock the owner out of their own account.
     await this.authService.assertStepUp(
@@ -102,7 +106,10 @@ export class MfaController {
     @Request() req: JwtAuthRequest,
     @Body() dto: MfaEnableDto
   ): Promise<MfaRecoveryCodesResponseDto> {
-    const user = await this.userService.findOne(req.user.userId);
+    const user = await this.userService.findOne(
+      req.user.userId,
+      SYSTEM_ABILITY
+    );
     return await this.mfaService.completeEnrolment(
       user,
       dto.code,
@@ -122,7 +129,10 @@ export class MfaController {
     @Body() dto: MfaStepUpDto,
     @Res({ passthrough: true }) res: Response
   ): Promise<{ message: string }> {
-    const user = await this.userService.findOne(req.user.userId);
+    const user = await this.userService.findOne(
+      req.user.userId,
+      SYSTEM_ABILITY
+    );
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,
@@ -152,7 +162,10 @@ export class MfaController {
     @Body() dto: MfaStepUpDto,
     @Res({ passthrough: true }) res: Response
   ): Promise<MfaRecoveryCodesResponseDto> {
-    const user = await this.userService.findOne(req.user.userId);
+    const user = await this.userService.findOne(
+      req.user.userId,
+      SYSTEM_ABILITY
+    );
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,

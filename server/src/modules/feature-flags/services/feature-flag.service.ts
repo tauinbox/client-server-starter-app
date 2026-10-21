@@ -9,7 +9,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ErrorKeys, FEATURE_FLAG_LIST_QUERY } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { changedFields } from '@app/shared/utils/changed-fields';
+import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
+import { subject } from '@casl/ability';
 import type {
   FeatureFlagAttributeKeysResponse,
   FeatureFlagPreviewResult
@@ -30,7 +31,10 @@ import {
 } from '../../../common/utils/apply-list-query.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { applyAbilityToFeatureFlagQuery } from '../../../common/utils/apply-ability.util';
-import type { AppAbility } from '../../auth/casl/app-ability';
+import { assertCan } from '../../../common/utils/assert-can.util';
+import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
+import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditContext } from '../../audit/audit.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
@@ -92,7 +96,8 @@ export class FeatureFlagService {
     private readonly dataSource: DataSource,
     private readonly attributeRegistry: AttributeRegistryService,
     private readonly configService: ConfigService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly metricsService: MetricsService
   ) {}
 
   /**
@@ -144,7 +149,42 @@ export class FeatureFlagService {
     for (const f of flags) f.rules = byFlag.get(f.id) ?? [];
   }
 
-  async findOne(id: string): Promise<FeatureFlag> {
+  async findOne(
+    id: string,
+    ability: AbilityOrSystem,
+    actorId?: string | null
+  ): Promise<FeatureFlag> {
+    const flag = await this.#load(id);
+    this.#assertCan(ability, 'read', flag, actorId);
+    return flag;
+  }
+
+  /**
+   * The route-level @Authorize check is type-level and ignores conditions, so
+   * a conditional grant is re-evaluated against the record.
+   */
+  #assertCan(
+    ability: AbilityOrSystem,
+    action: string,
+    record: Partial<FeatureFlag>,
+    actorId?: string | null
+  ): void {
+    if (ability === SYSTEM_ABILITY) return;
+    assertCan(
+      ability,
+      action,
+      subject('FeatureFlag', record),
+      this.auditService,
+      {
+        actorId: actorId ?? undefined,
+        targetId: record.id,
+        targetType: 'FeatureFlag'
+      },
+      this.metricsService
+    );
+  }
+
+  async #load(id: string): Promise<FeatureFlag> {
     const flag = await this.flagRepo.findOne({ where: { id } });
     if (!flag) {
       throw new NotFoundException({
@@ -160,7 +200,7 @@ export class FeatureFlagService {
   }
 
   /** The fields of a new flag as `create` writes them, defaults included. */
-  newFlagFields(dto: CreateFeatureFlagDto) {
+  #newFlagFields(dto: CreateFeatureFlagDto) {
     return {
       key: dto.key,
       description: dto.description ?? null,
@@ -172,8 +212,10 @@ export class FeatureFlagService {
 
   async create(
     dto: CreateFeatureFlagDto,
+    ability: AbilityOrSystem,
     actor: FlagAuditActor
   ): Promise<FeatureFlag> {
+    this.#assertCan(ability, 'create', this.#newFlagFields(dto), actor.actorId);
     const existing = await this.flagRepo.findOne({ where: { key: dto.key } });
     if (existing) {
       throw keyExistsConflict();
@@ -188,7 +230,7 @@ export class FeatureFlagService {
         const flag = await em.save(
           FeatureFlag,
           em.create(FeatureFlag, {
-            ...this.newFlagFields(dto),
+            ...this.#newFlagFields(dto),
             version: 1,
             updatedByUserId: actor.actorId
           })
@@ -205,16 +247,26 @@ export class FeatureFlagService {
       if (isUniqueViolation(error)) throw keyExistsConflict();
       throw error;
     }
-    return this.findOne(saved.id);
+    return this.#load(saved.id);
   }
 
   async update(
-    current: FeatureFlag,
+    id: string,
     dto: UpdateFeatureFlagDto,
     expectedVersion: number,
+    ability: AbilityOrSystem,
     actor: FlagAuditActor
   ): Promise<FeatureFlag> {
-    const { id } = current;
+    const current = await this.#load(id);
+    // The record after the write is checked too: else a grant scoped by a
+    // writable field lets the caller move a flag out of its own scope.
+    this.#assertCan(ability, 'update', current, actor.actorId);
+    this.#assertCan(
+      ability,
+      'update',
+      withChanges(current, { ...dto, rules: undefined }),
+      actor.actorId
+    );
     const { rules: ruleDtos, ...fields } = dto;
     const rules = this.#validateRules(ruleDtos);
     // A successful write then replaced exactly `current`, the audit diff base.
@@ -249,13 +301,19 @@ export class FeatureFlagService {
         ...(rules ? { ruleCount: rules.length } : {})
       });
     });
-    return this.findOne(id);
+    return this.#load(id);
   }
 
-  async delete(flag: FeatureFlag, actor: FlagAuditActor): Promise<void> {
+  async delete(
+    id: string,
+    ability: AbilityOrSystem,
+    actor: FlagAuditActor
+  ): Promise<void> {
+    const flag = await this.#load(id);
+    this.#assertCan(ability, 'delete', flag, actor.actorId);
     // The row is gone after the delete, so the key is recorded: a bare
     // targetId resolves to nothing once the flag no longer exists.
-    const { id, key } = flag;
+    const { key } = flag;
     await this.dataSource.transaction(async (em) => {
       await em.remove(FeatureFlag, flag);
       await this.#audit(em, actor, AuditAction.FEATURE_FLAG_DELETE, id, {

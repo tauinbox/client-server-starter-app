@@ -4,6 +4,7 @@ import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 import { RolesController } from '../src/modules/auth/controllers/roles.controller';
 import { RoleService } from '../src/modules/auth/services/role.service';
@@ -110,8 +111,8 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
   }
 
   it('keeps the targeting on rename and drops the name on delete', async () => {
-    const role = await roleService.create({ name: roleName });
-    await roleService.assignRoleToUser(holder.id, role.id);
+    const role = await roleService.create({ name: roleName }, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
 
     const key = `${tag}-flag`;
     const flag = await flagService.create(
@@ -133,9 +134,11 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
           }
         ]
       },
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
-    const versionBefore = (await flagService.findOne(flag.id)).version;
+    const versionBefore = (await flagService.findOne(flag.id, SYSTEM_ABILITY))
+      .version;
     expect(await holderSees(key)).toBe(true);
 
     await controller.update(role.id, { name: renamed }, req, ability);
@@ -145,7 +148,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
       [renamed],
       []
     ]);
-    expect((await flagService.findOne(flag.id)).version).toBe(
+    expect((await flagService.findOne(flag.id, SYSTEM_ABILITY)).version).toBe(
       versionBefore + 1
     );
     expect(await holderSees(key)).toBe(true);
@@ -153,14 +156,17 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     await controller.remove(role.id, req, ability);
 
     expect(await roleNamesOf(flag.id)).toEqual([[otherName], [], []]);
-    expect((await flagService.findOne(flag.id)).version).toBe(
+    expect((await flagService.findOne(flag.id, SYSTEM_ABILITY)).version).toBe(
       versionBefore + 2
     );
     expect(await holderSees(key)).toBe(false);
   });
 
   it('leaves the flags alone when no rule names the role', async () => {
-    const role = await roleService.create({ name: `${tag}-unused` });
+    const role = await roleService.create(
+      { name: `${tag}-unused` },
+      SYSTEM_ABILITY
+    );
     const key = `${tag}-other`;
     const flag = await flagService.create(
       {
@@ -173,20 +179,24 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
           }
         ]
       },
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
-    const versionBefore = (await flagService.findOne(flag.id)).version;
+    const versionBefore = (await flagService.findOne(flag.id, SYSTEM_ABILITY))
+      .version;
 
     await controller.update(role.id, { name: `${tag}-unused-2` }, req, ability);
     await controller.remove(role.id, req, ability);
 
     expect(await roleNamesOf(flag.id)).toEqual([[otherName]]);
-    expect((await flagService.findOne(flag.id)).version).toBe(versionBefore);
+    expect((await flagService.findOne(flag.id, SYSTEM_ABILITY)).version).toBe(
+      versionBefore
+    );
   });
 
   it('rolls the rename and the delete back when the rule rewrite fails', async () => {
     const name = `${tag}-atomic`;
-    const role = await roleService.create({ name });
+    const role = await roleService.create({ name }, SYSTEM_ABILITY);
     const flag = await flagService.create(
       {
         key: `${tag}-atomic-flag`,
@@ -198,6 +208,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
           }
         ]
       },
+      SYSTEM_ABILITY,
       flagAuditActor()
     );
     const rewrite = jest

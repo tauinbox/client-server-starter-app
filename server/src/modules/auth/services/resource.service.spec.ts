@@ -201,20 +201,69 @@ describe('ResourceService', () => {
     });
   });
 
-  describe('findOne', () => {
-    it('should return a resource by id', async () => {
-      mockResourceRepo.findOne.mockResolvedValue(resource1);
-      const result = await service.findOne('res-1');
-      expect(result).toEqual(resource1);
-      expect(mockResourceRepo.findOne).toHaveBeenCalledWith({
-        where: { id: 'res-1' }
-      });
+  describe('instance check of update:Permission', () => {
+    const scoped = abilityWith((can) =>
+      can('update', 'Permission', { displayName: { $in: ['Users'] } })
+    );
+    const refused = {
+      status: 403,
+      response: { errorKey: 'errors.general.insufficientPermissions' }
+    };
+
+    it('refuses an update of a record outside the grant', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource2 });
+
+      await expect(
+        service.update('res-2', { description: 'x' }, scoped, 'actor-1')
+      ).rejects.toMatchObject(refused);
+      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+      expect(mockAudit.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'actor-1', targetId: 'res-2' })
+      );
     });
 
-    it('should return null if not found', async () => {
+    it('refuses an update that moves the record out of the grant', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+
+      await expect(
+        service.update('res-1', { displayName: 'Moved' }, scoped)
+      ).rejects.toMatchObject(refused);
+      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('accepts an update that keeps the record inside the grant', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+
+      await service.update('res-1', { description: 'x' }, scoped);
+
+      expect(mockResourceRepo.save).toHaveBeenCalled();
+    });
+
+    it('refuses a restore of a record outside the grant', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource2 });
+
+      await expect(service.restore('res-2', scoped)).rejects.toMatchObject(
+        refused
+      );
+      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 before the check', async () => {
       mockResourceRepo.findOne.mockResolvedValue(null);
-      const result = await service.findOne('bad-id');
-      expect(result).toBeNull();
+
+      await expect(service.restore('bad-id', scoped)).rejects.toMatchObject({
+        status: 404
+      });
+      expect(mockAudit.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('requires the ability argument and fails closed without it', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      await expect(
+        // @ts-expect-error the ability is required: a skipped check is written as SYSTEM_ABILITY
+        service.update('res-1', { description: 'x' })
+      ).rejects.toThrow(TypeError);
+      expect(mockResourceRepo.save).not.toHaveBeenCalled();
     });
   });
 
@@ -288,7 +337,8 @@ describe('ResourceService', () => {
         'res-1',
         { displayName: 'Audited' },
         superAbility,
-        audit
+        undefined,
+        () => audit
       );
 
       expect(mockEm.save).toHaveBeenCalled();
@@ -300,9 +350,13 @@ describe('ResourceService', () => {
       mockAudit.log.mockRejectedValue(new Error('audit down'));
 
       await expect(
-        service.update('res-1', { displayName: 'Audited' }, superAbility, {
-          action: AuditAction.RESOURCE_UPDATE
-        })
+        service.update(
+          'res-1',
+          { displayName: 'Audited' },
+          superAbility,
+          undefined,
+          () => ({ action: AuditAction.RESOURCE_UPDATE })
+        )
       ).rejects.toThrow('audit down');
       expect(mockCacheManager.del).not.toHaveBeenCalled();
     });
@@ -372,10 +426,13 @@ describe('ResourceService', () => {
         mockResourceRepo.findOne.mockResolvedValue(narrowed());
 
         await expect(
-          service.update('res-1', { allowedActionNames }, delegatedAbility, {
-            action: AuditAction.RESOURCE_UPDATE,
-            actorId: 'actor-1'
-          })
+          service.update(
+            'res-1',
+            { allowedActionNames },
+            delegatedAbility,
+            'actor-1',
+            () => ({ action: AuditAction.RESOURCE_UPDATE, actorId: 'actor-1' })
+          )
         ).rejects.toMatchObject(widenRefused);
         expect(mockResourceRepo.save).not.toHaveBeenCalled();
         expect(mockCacheManager.del).not.toHaveBeenCalled();
@@ -795,7 +852,7 @@ describe('ResourceService', () => {
         targetType: 'Resource'
       };
 
-      await service.restore('res-3', superAbility, audit);
+      await service.restore('res-3', superAbility, undefined, audit);
 
       expect(mockEm.save).toHaveBeenCalledWith(
         expect.objectContaining({ isOrphaned: false })

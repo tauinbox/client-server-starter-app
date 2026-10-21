@@ -91,23 +91,34 @@ runWithInfra('User writes on a super target (e2e)', () => {
         throw new Error(`Permission ${action}:${subjectName} missing`);
       return { permissionId: found.id, conditions: null };
     };
-    const support = await roleService.create({ name: supportRoleName });
+    const support = await roleService.create(
+      { name: supportRoleName },
+      SYSTEM_ABILITY
+    );
     supportRoleId = support.id;
-    await roleService.setPermissionsForRole(support.id, [
-      grant('update'),
-      grant('delete'),
-      grant('assign', 'Role')
-    ]);
+    await roleService.setPermissionsForRole(
+      support.id,
+      [grant('update'), grant('delete'), grant('assign', 'Role')],
+      SYSTEM_ABILITY
+    );
     userRoleId = (
       await dataSource.getRepository(Role).findOneByOrFail({ name: 'user' })
     ).id;
-    await roleService.assignRoleToUser(await userId(supportEmail), support.id);
+    await roleService.assignRoleToUser(
+      await userId(supportEmail),
+      support.id,
+      SYSTEM_ABILITY
+    );
 
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     for (const email of [superEmail, otherSuperEmail]) {
-      await roleService.assignRoleToUser(await userId(email), superRole.id);
+      await roleService.assignRoleToUser(
+        await userId(email),
+        superRole.id,
+        SYSTEM_ABILITY
+      );
     }
   }, 60000);
 
@@ -140,7 +151,10 @@ runWithInfra('User writes on a super target (e2e)', () => {
   // Minted through AuthService.login: the login route allows fewer requests
   // a minute than this suite needs.
   async function tokenFor(email: string): Promise<string> {
-    const user = await usersService.findOne(await userId(email));
+    const user = await usersService.findOne(
+      await userId(email),
+      SYSTEM_ABILITY
+    );
     const { tokens } = await authService.login(user, {
       userAgent: 'super-target-e2e',
       ipAddress: null
@@ -263,7 +277,10 @@ runWithInfra('User writes on a super target (e2e)', () => {
       .send({ roleId: supportRoleId });
 
     expectSuperTargetRefusal(res);
-    const target = await usersService.findOne(await userId(superEmail));
+    const target = await usersService.findOne(
+      await userId(superEmail),
+      SYSTEM_ABILITY
+    );
     expect(target.roles.map((r) => r.name)).not.toContain(supportRoleName);
     expect(target.tokenRevokedAt).toBeNull();
   }, 30000);
@@ -276,7 +293,10 @@ runWithInfra('User writes on a super target (e2e)', () => {
       .auth(token, { type: 'bearer' });
 
     expectSuperTargetRefusal(res);
-    const target = await usersService.findOne(await userId(superEmail));
+    const target = await usersService.findOne(
+      await userId(superEmail),
+      SYSTEM_ABILITY
+    );
     expect(target.roles.map((r) => r.name)).toContain('user');
     expect(target.tokenRevokedAt).toBeNull();
   }, 30000);

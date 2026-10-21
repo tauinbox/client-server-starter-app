@@ -8,6 +8,7 @@ import { Role } from '../entities/role.entity';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { PermissionService } from './permission.service';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 import type { AppAbility } from '../casl/app-ability';
 import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
@@ -239,43 +240,45 @@ describe('RoleService', () => {
   describe('findOne', () => {
     it('should return a role by id', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
-      const result = await service.findOne('role-1');
+      const result = await service.findOne('role-1', SYSTEM_ABILITY);
       expect(result.name).toBe('admin');
     });
 
     it('should throw HttpException if not found', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
-      await expect(service.findOne('bad-id')).rejects.toThrow(HttpException);
+      await expect(service.findOne('bad-id', SYSTEM_ABILITY)).rejects.toThrow(
+        HttpException
+      );
     });
   });
 
   describe('create', () => {
     it('should create a new role', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
-      const result = await service.create({
-        name: 'viewer',
-        description: 'View only'
-      });
+      const result = await service.create(
+        { name: 'viewer', description: 'View only' },
+        SYSTEM_ABILITY
+      );
       expect(result.name).toBe('viewer');
     });
 
     it('should throw if name already exists', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      await expect(service.create({ name: 'editor' })).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.create({ name: 'editor' }, SYSTEM_ABILITY)
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw HttpException if isSuper is provided', async () => {
       await expect(
-        service.create({ name: 'superrole', isSuper: true })
+        service.create({ name: 'superrole', isSuper: true }, SYSTEM_ABILITY)
       ).rejects.toThrow(HttpException);
       expect(mockRoleRepo.findOne).not.toHaveBeenCalled();
     });
 
     it('should always create role with isSuper false regardless of input', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
-      await service.create({ name: 'viewer' });
+      await service.create({ name: 'viewer' }, SYSTEM_ABILITY);
       expect(mockRoleRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ isSuper: false })
       );
@@ -286,7 +289,7 @@ describe('RoleService', () => {
     it('should throw if role is system', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
       await expect(
-        service.update('role-1', { name: 'superadmin' })
+        service.update('role-1', { name: 'superadmin' }, SYSTEM_ABILITY)
       ).rejects.toThrow(HttpException);
     });
 
@@ -298,9 +301,11 @@ describe('RoleService', () => {
         description: 'Updated'
       });
 
-      const result = await service.update('role-2', {
-        description: 'Updated'
-      });
+      const result = await service.update(
+        'role-2',
+        { description: 'Updated' },
+        SYSTEM_ABILITY
+      );
       expect(result.description).toBe('Updated');
     });
 
@@ -319,7 +324,7 @@ describe('RoleService', () => {
         }
       );
 
-      await service.update('role-2', { name: 'senior-editor' });
+      await service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY);
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
       expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
@@ -345,7 +350,7 @@ describe('RoleService', () => {
       mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
 
       await expect(
-        service.update('role-2', { name: 'senior-editor' })
+        service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
       ).rejects.toThrow('db down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -355,7 +360,11 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
 
-      await service.update('role-2', { name: 'editor', description: 'New' });
+      await service.update(
+        'role-2',
+        { name: 'editor', description: 'New' },
+        SYSTEM_ABILITY
+      );
 
       expect(mockRoleRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ description: 'New' })
@@ -371,10 +380,12 @@ describe('RoleService', () => {
     it('create builds the row from the saved role', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
 
-      await service.create({ name: 'editor' }, (role) => ({
-        action: AuditAction.ROLE_CREATE,
-        targetId: role.id
-      }));
+      await service.create(
+        { name: 'editor' },
+        SYSTEM_ABILITY,
+        undefined,
+        (role) => ({ action: AuditAction.ROLE_CREATE, targetId: role.id })
+      );
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalled();
       expect(mockAuditService.log).toHaveBeenCalledWith(
@@ -386,7 +397,13 @@ describe('RoleService', () => {
     it('an update without a rename writes the row', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
-      await service.update('role-2', { description: 'New' }, audit);
+      await service.update(
+        'role-2',
+        { description: 'New' },
+        SYSTEM_ABILITY,
+        undefined,
+        () => audit
+      );
 
       expect(mockAuditService.log).toHaveBeenCalledWith(
         audit,
@@ -398,7 +415,13 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
 
-      await service.update('role-2', { name: 'renamed' }, audit);
+      await service.update(
+        'role-2',
+        { name: 'renamed' },
+        SYSTEM_ABILITY,
+        undefined,
+        () => audit
+      );
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
       expect(mockEventEmitter.emitAsync).toHaveBeenCalled();
@@ -414,7 +437,7 @@ describe('RoleService', () => {
       mockAuditService.log.mockRejectedValue(new Error('audit down'));
 
       await expect(
-        service.delete('role-2', undefined, undefined, audit)
+        service.delete('role-2', SYSTEM_ABILITY, undefined, () => audit)
       ).rejects.toThrow('audit down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -422,7 +445,13 @@ describe('RoleService', () => {
     it('a role assignment writes the row and fails without it', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
-      await service.assignRoleToUser('user-1', 'role-2', undefined, 'a', audit);
+      await service.assignRoleToUser(
+        'user-1',
+        'role-2',
+        SYSTEM_ABILITY,
+        'a',
+        audit
+      );
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
       expect(mockAuditService.log).toHaveBeenCalledWith(
         audit,
@@ -432,7 +461,13 @@ describe('RoleService', () => {
       mockAuditService.log.mockRejectedValue(new Error('audit down'));
       mockPermissionService.invalidateUserCache.mockClear();
       await expect(
-        service.removeRoleFromUser('user-1', 'role-2', undefined, 'a', audit)
+        service.removeRoleFromUser(
+          'user-1',
+          'role-2',
+          SYSTEM_ABILITY,
+          'a',
+          audit
+        )
       ).rejects.toThrow('audit down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -440,19 +475,25 @@ describe('RoleService', () => {
     it('a permission write writes the row in the transaction of the grants', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
-      await service.setPermissionsForRole('role-2', [], undefined, 'a', audit);
+      await service.setPermissionsForRole(
+        'role-2',
+        [],
+        SYSTEM_ABILITY,
+        'a',
+        audit
+      );
       await service.assignPermissionsToRole(
         'role-2',
         [],
         undefined,
-        undefined,
+        SYSTEM_ABILITY,
         'a',
         audit
       );
       await service.removePermissionFromRole(
         'role-2',
         'perm-1',
-        undefined,
+        SYSTEM_ABILITY,
         'a',
         audit
       );
@@ -466,7 +507,11 @@ describe('RoleService', () => {
     it('writes no row without audit params', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
-      await service.removePermissionFromRole('role-2', 'perm-1');
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-1',
+        SYSTEM_ABILITY
+      );
 
       expect(mockAuditService.log).not.toHaveBeenCalled();
     });
@@ -475,7 +520,9 @@ describe('RoleService', () => {
   describe('delete', () => {
     it('should throw if role is system', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
-      await expect(service.delete('role-1')).rejects.toThrow(HttpException);
+      await expect(service.delete('role-1', SYSTEM_ABILITY)).rejects.toThrow(
+        HttpException
+      );
     });
 
     it('should delete a custom role and invalidate cache for its members', async () => {
@@ -484,7 +531,7 @@ describe('RoleService', () => {
         { id: 'u-1' },
         { id: 'u-2' }
       ]);
-      await service.delete('role-2');
+      await service.delete('role-2', SYSTEM_ABILITY);
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'u-1'
       );
@@ -497,7 +544,7 @@ describe('RoleService', () => {
     it('should read the members before the remove and invalidate after it', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
-      await service.delete('role-2');
+      await service.delete('role-2', SYSTEM_ABILITY);
       const [read] = mockUserQueryBuilder.getMany.mock.invocationCallOrder;
       const [remove] = mockRoleRepo.remove.mock.invocationCallOrder;
       const [invalidate] =
@@ -508,7 +555,7 @@ describe('RoleService', () => {
 
     it('should delete a custom role with no members without calling invalidate', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      await service.delete('role-2');
+      await service.delete('role-2', SYSTEM_ABILITY);
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
       expect(mockRoleRepo.remove).toHaveBeenCalledWith(customRole);
     });
@@ -516,7 +563,7 @@ describe('RoleService', () => {
     it('should emit RoleDeletedEvent in the transaction of the remove', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.delete('role-2');
+      await service.delete('role-2', SYSTEM_ABILITY);
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
       expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
@@ -533,7 +580,9 @@ describe('RoleService', () => {
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
       mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
 
-      await expect(service.delete('role-2')).rejects.toThrow('db down');
+      await expect(service.delete('role-2', SYSTEM_ABILITY)).rejects.toThrow(
+        'db down'
+      );
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
   });
@@ -547,7 +596,12 @@ describe('RoleService', () => {
         { id: 'u-2' }
       ]);
 
-      await service.assignPermissionsToRole('role-2', ['perm-1', 'perm-2']);
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-1', 'perm-2'],
+        undefined,
+        SYSTEM_ABILITY
+      );
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -562,7 +616,12 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.save.mockResolvedValue([]);
 
-      await service.assignPermissionsToRole('role-2', ['perm-1']);
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-1'],
+        undefined,
+        SYSTEM_ABILITY
+      );
 
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -574,7 +633,11 @@ describe('RoleService', () => {
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
 
-      await service.removePermissionFromRole('role-2', 'perm-1');
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-1',
+        SYSTEM_ABILITY
+      );
 
       expect(mockRolePermissionRepo.delete).toHaveBeenCalledWith({
         roleId: 'role-2',
@@ -589,7 +652,11 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
 
-      await service.removePermissionFromRole('role-2', 'perm-1');
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-1',
+        SYSTEM_ABILITY
+      );
 
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -647,7 +714,7 @@ describe('RoleService', () => {
 
     it('should assign role and invalidate cache', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      await service.assignRoleToUser('user-1', 'role-2');
+      await service.assignRoleToUser('user-1', 'role-2', SYSTEM_ABILITY);
 
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -758,7 +825,7 @@ describe('RoleService', () => {
     it('should remove role and invalidate cache', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.removeRoleFromUser('user-1', 'role-2');
+      await service.removeRoleFromUser('user-1', 'role-2', SYSTEM_ABILITY);
 
       expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-2');
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -855,7 +922,7 @@ describe('RoleService', () => {
     it('should remove super role and invalidate cache (token revocation handled by listener)', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
 
-      await service.removeRoleFromUser('user-1', 'role-1');
+      await service.removeRoleFromUser('user-1', 'role-1', SYSTEM_ABILITY);
 
       expect(mockRelationQueryBuilder.remove).toHaveBeenCalledWith('role-1');
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -876,9 +943,9 @@ describe('RoleService', () => {
   describe('update — additional branches', () => {
     it('should throw HttpException if isSuper is in update payload', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      await expect(service.update('role-2', { isSuper: true })).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.update('role-2', { isSuper: true }, SYSTEM_ABILITY)
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw HttpException when updating name to an existing name', async () => {
@@ -891,7 +958,7 @@ describe('RoleService', () => {
         .mockResolvedValueOnce(customRole) // findOne(id) call
         .mockResolvedValueOnce(conflictRole); // findOne({ name }) conflict check
       await expect(
-        service.update('role-2', { name: 'viewer' })
+        service.update('role-2', { name: 'viewer' }, SYSTEM_ABILITY)
       ).rejects.toThrow(HttpException);
     });
 
@@ -900,7 +967,11 @@ describe('RoleService', () => {
         .mockResolvedValueOnce(customRole) // findOne(id)
         .mockResolvedValueOnce(customRole); // same id → no conflict
       mockRoleRepo.save.mockResolvedValue({ ...customRole, name: 'editor' });
-      const result = await service.update('role-2', { name: 'editor' });
+      const result = await service.update(
+        'role-2',
+        { name: 'editor' },
+        SYSTEM_ABILITY
+      );
       expect(result.name).toBe('editor');
     });
   });
@@ -932,7 +1003,10 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.find.mockResolvedValue(perms);
 
-      const result = await service.getPermissionsForRole('role-2');
+      const result = await service.getPermissionsForRole(
+        'role-2',
+        SYSTEM_ABILITY
+      );
 
       expect(mockRolePermissionRepo.find).toHaveBeenCalledWith({
         where: { roleId: 'role-2' },
@@ -943,9 +1017,9 @@ describe('RoleService', () => {
 
     it('should throw HttpException when role does not exist', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
-      await expect(service.getPermissionsForRole('bad-id')).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.getPermissionsForRole('bad-id', SYSTEM_ABILITY)
+      ).rejects.toThrow(HttpException);
     });
   });
 
@@ -955,7 +1029,7 @@ describe('RoleService', () => {
       mockUserQueryBuilder.getMany.mockResolvedValue([]);
       const items = [{ permissionId: 'perm-1' }, { permissionId: 'perm-2' }];
 
-      await service.setPermissionsForRole('role-2', items);
+      await service.setPermissionsForRole('role-2', items, SYSTEM_ABILITY);
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
     });
@@ -964,7 +1038,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([]);
 
-      await service.setPermissionsForRole('role-2', []);
+      await service.setPermissionsForRole('role-2', [], SYSTEM_ABILITY);
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
     });
@@ -973,9 +1047,11 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
 
-      await service.setPermissionsForRole('role-2', [
-        { permissionId: 'perm-1' }
-      ]);
+      await service.setPermissionsForRole(
+        'role-2',
+        [{ permissionId: 'perm-1' }],
+        SYSTEM_ABILITY
+      );
 
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'u-1'
@@ -1638,11 +1714,11 @@ describe('RoleService', () => {
       });
     });
 
-    it('blocks isSystem mutation even when no ability is passed (defense in depth)', async () => {
+    it('blocks isSystem mutation under SYSTEM_ABILITY too (defense in depth)', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
 
       await expect(
-        service.removePermissionFromRole('role-1', 'perm-1')
+        service.removePermissionFromRole('role-1', 'perm-1', SYSTEM_ABILITY)
       ).rejects.toMatchObject({ status: 400 });
     });
   });
@@ -1669,6 +1745,7 @@ describe('RoleService', () => {
       const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
       builder.can('update', 'Role');
       builder.can('assign', 'Role');
+      builder.can('delete', 'Role');
       define(builder);
       return builder.build();
     }
@@ -1871,9 +1948,11 @@ describe('RoleService', () => {
     it('emits once with all holders on setPermissionsForRole', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.setPermissionsForRole('role-2', [
-        { permissionId: 'perm-1' }
-      ]);
+      await service.setPermissionsForRole(
+        'role-2',
+        [{ permissionId: 'perm-1' }],
+        SYSTEM_ABILITY
+      );
 
       expectFannedOutTo(['u-1', 'u-2']);
       expect(mockEventEmitter.emit).toHaveBeenCalledTimes(1);
@@ -1883,7 +1962,12 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.save.mockResolvedValue([]);
 
-      await service.assignPermissionsToRole('role-2', ['perm-1']);
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-1'],
+        undefined,
+        SYSTEM_ABILITY
+      );
 
       expectFannedOutTo(['u-1', 'u-2']);
     });
@@ -1892,7 +1976,11 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
 
-      await service.removePermissionFromRole('role-2', 'perm-1');
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-1',
+        SYSTEM_ABILITY
+      );
 
       expectFannedOutTo(['u-1', 'u-2']);
     });
@@ -1900,7 +1988,7 @@ describe('RoleService', () => {
     it('captures holders before deletion on delete', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.delete('role-2');
+      await service.delete('role-2', SYSTEM_ABILITY);
 
       expectFannedOutTo(['u-1', 'u-2']);
       // The remove cascades to user_roles, so the holders are read before it;
@@ -1918,7 +2006,12 @@ describe('RoleService', () => {
       mockUserQueryBuilder.getMany.mockResolvedValue([]);
       mockRolePermissionRepo.save.mockResolvedValue([]);
 
-      await service.assignPermissionsToRole('role-2', ['perm-1']);
+      await service.assignPermissionsToRole(
+        'role-2',
+        ['perm-1'],
+        undefined,
+        SYSTEM_ABILITY
+      );
 
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
@@ -1926,7 +2019,11 @@ describe('RoleService', () => {
     it('never emits the token-revoking UserRoleChangedEvent on a permission change', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.removePermissionFromRole('role-2', 'perm-1');
+      await service.removePermissionFromRole(
+        'role-2',
+        'perm-1',
+        SYSTEM_ABILITY
+      );
 
       expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
         'UserRoleChangedEvent',
@@ -1998,6 +2095,170 @@ describe('RoleService', () => {
       );
 
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+    });
+  });
+
+  describe('instance check of a conditional Role grant', () => {
+    // Every Role action, on the role named `editor` only.
+    const scoped = createMongoAbility<AppAbility>(
+      ['read', 'create', 'update', 'delete'].map((action) => ({
+        action,
+        subject: 'Role',
+        conditions: { name: { $in: ['editor'] } }
+      }))
+    );
+    const otherRole: Role = { ...customRole, id: 'role-3', name: 'viewer' };
+
+    function expectRefusal(action: string, targetId?: string): void {
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.PERMISSION_CHECK_FAILURE,
+          actorId: 'actor-1',
+          targetId: targetId ?? null,
+          targetType: 'Role'
+        })
+      );
+      expect(mockMetricsService.recordPermissionDenied).toHaveBeenCalledWith(
+        'instance',
+        action,
+        'Role'
+      );
+    }
+
+    it('findOne refuses a role outside the grant and returns one inside it', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(otherRole);
+      await expect(
+        service.findOne('role-3', scoped, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+      expectRefusal('read', 'role-3');
+
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      await expect(service.findOne('role-2', scoped)).resolves.toBe(customRole);
+    });
+
+    it('getPermissionsForRole refuses a role outside the grant before reading its rows', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(otherRole);
+
+      await expect(
+        service.getPermissionsForRole('role-3', scoped, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRolePermissionRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('create refuses a record outside the grant before the name check', async () => {
+      await expect(
+        service.create({ name: 'viewer' }, scoped, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRoleRepo.findOne).not.toHaveBeenCalled();
+      expectRefusal('create');
+    });
+
+    it('update refuses a write that moves the role out of the grant', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+
+      await expect(
+        service.update('role-2', { name: 'viewer' }, scoped, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockRoleRepo.save).not.toHaveBeenCalled();
+      expectRefusal('update', 'role-2');
+    });
+
+    it('update checks the role before the system-role lock', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...systemRole });
+
+      await expect(
+        service.update('role-1', { description: 'x' }, scoped, 'actor-1')
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('delete refuses a role outside the grant and removes one inside it', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...otherRole });
+      await expect(service.delete('role-3', scoped, 'actor-1')).rejects.toThrow(
+        ForbiddenException
+      );
+      expect(mockRoleRepo.remove).not.toHaveBeenCalled();
+      expectRefusal('delete', 'role-3');
+
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+      await service.delete('role-2', scoped, 'actor-1');
+      expect(mockRoleRepo.remove).toHaveBeenCalled();
+    });
+
+    it('builds the audit rows of update and delete from the role before the write', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({
+        ...customRole,
+        description: 'Editor role'
+      });
+      const updateRow = jest.fn((before: Role) => ({
+        action: AuditAction.ROLE_UPDATE,
+        details: { name: before.name }
+      }));
+      await service.update(
+        'role-2',
+        { description: 'New' },
+        SYSTEM_ABILITY,
+        undefined,
+        updateRow
+      );
+      expect(updateRow).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Editor role' })
+      );
+
+      const deleteRow = jest.fn((role: Role) => ({
+        action: AuditAction.ROLE_DELETE,
+        details: { name: role.name }
+      }));
+      await service.delete('role-2', SYSTEM_ABILITY, undefined, deleteRow);
+      expect(mockAuditService.log).toHaveBeenLastCalledWith(
+        { action: AuditAction.ROLE_DELETE, details: { name: 'editor' } },
+        expect.anything()
+      );
+    });
+  });
+
+  describe('the ability argument', () => {
+    // Each call fails `npm run typecheck` when the argument becomes optional
+    // again: the directive then has no error to suppress.
+    it('is required on every method that reads or writes a role, and a missing one fails closed', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+      const calls = [
+        // @ts-expect-error the ability is required: a skipped check is written as SYSTEM_ABILITY
+        () => service.findOne('role-2'),
+        // @ts-expect-error the ability is required
+        () => service.getPermissionsForRole('role-2'),
+        // @ts-expect-error the ability is required
+        () => service.create({ name: 'editor' }),
+        // @ts-expect-error the ability is required
+        () => service.update('role-2', { description: 'x' }),
+        // @ts-expect-error the ability is required
+        () => service.delete('role-2'),
+        // @ts-expect-error the ability is required
+        () => service.assignRoleToUser('user-1', 'role-2'),
+        // @ts-expect-error the ability is required
+        () => service.removeRoleFromUser('user-1', 'role-2'),
+        // @ts-expect-error the ability is required
+        () => service.setPermissionsForRole('role-2', []),
+        // @ts-expect-error the ability is required
+        () => service.assignPermissionsToRole('role-2', [], undefined),
+        // @ts-expect-error the ability is required
+        () => service.removePermissionFromRole('role-2', 'perm-1')
+      ];
+      for (const call of calls) {
+        await expect(call()).rejects.toThrow(TypeError);
+      }
+      expect(mockRoleRepo.save).not.toHaveBeenCalled();
+      expect(mockRoleRepo.remove).not.toHaveBeenCalled();
+      expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(mockRelationQueryBuilder.remove).not.toHaveBeenCalled();
+    });
+
+    it('lets SYSTEM_ABILITY assign a super role, which no API caller can pass', async () => {
+      mockRoleRepo.findOne.mockResolvedValue({ ...systemRole });
+
+      await service.assignRoleToUser('user-1', 'role-1', SYSTEM_ABILITY);
+
+      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-1');
     });
   });
 });

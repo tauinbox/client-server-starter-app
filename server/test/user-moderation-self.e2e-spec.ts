@@ -20,6 +20,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The seeded `user` role may update its own record, and the moderation fields
@@ -79,22 +80,39 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     if (!updateUser) throw new Error('Permission update:User missing');
 
     // The seeded grant of the `user` role: update, on the own record only.
-    const selfEdit = await roleService.create({ name: selfEditRoleName });
-    await roleService.setPermissionsForRole(selfEdit.id, [
-      {
-        permissionId: updateUser.id,
-        conditions: { ownership: { userField: 'id' } }
-      }
-    ]);
-    await roleService.assignRoleToUser(await userId(ownerEmail), selfEdit.id);
+    const selfEdit = await roleService.create(
+      { name: selfEditRoleName },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      selfEdit.id,
+      [
+        {
+          permissionId: updateUser.id,
+          conditions: { ownership: { userField: 'id' } }
+        }
+      ],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(
+      await userId(ownerEmail),
+      selfEdit.id,
+      SYSTEM_ABILITY
+    );
 
-    const moderator = await roleService.create({ name: moderatorRoleName });
-    await roleService.setPermissionsForRole(moderator.id, [
-      { permissionId: updateUser.id }
-    ]);
+    const moderator = await roleService.create(
+      { name: moderatorRoleName },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      moderator.id,
+      [{ permissionId: updateUser.id }],
+      SYSTEM_ABILITY
+    );
     await roleService.assignRoleToUser(
       await userId(moderatorEmail),
-      moderator.id
+      moderator.id,
+      SYSTEM_ABILITY
     );
   }, 60000);
 
@@ -120,7 +138,10 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
   }
 
   async function tokenFor(email: string): Promise<string> {
-    const user = await usersService.findOne(await userId(email));
+    const user = await usersService.findOne(
+      await userId(email),
+      SYSTEM_ABILITY
+    );
     const { tokens } = await authService.login(user, {
       userAgent: 'moderation-self-e2e',
       ipAddress: null

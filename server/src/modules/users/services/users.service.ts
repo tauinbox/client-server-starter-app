@@ -85,9 +85,26 @@ export class UsersService {
 
   async create(
     createUserDto: CreateUserDto,
+    ability: AbilityOrSystem,
+    actorId?: string,
     audit?: UserAuditRows
   ): Promise<User> {
-    const { email, password } = createUserDto;
+    const { email, password, ...subjectFields } = createUserDto;
+
+    // The route-level @Authorize check is type-level and ignores conditions,
+    // so a conditional create grant is re-evaluated against the record the
+    // caller is asking to create. The password is deliberately left out of the
+    // subject: no authorization condition can legitimately be written over it.
+    if (ability !== SYSTEM_ABILITY) {
+      assertCan(
+        ability,
+        'create',
+        subject('User', { email, ...subjectFields }),
+        this.auditService,
+        { actorId, targetType: 'User' },
+        this.metricsService
+      );
+    }
 
     // Ahead of the address conflict, matching AuthService.register: both routes
     // carry the same DTO and must answer the same way for the same body.
@@ -187,7 +204,26 @@ export class UsersService {
     return applyList(qb, USER_LIST_QUERY, USER_LIST_COLUMNS, query);
   }
 
-  async findOne(id: string): Promise<User> {
+  async findOne(
+    id: string,
+    ability: AbilityOrSystem,
+    actorId?: string
+  ): Promise<User> {
+    const user = await this.loadUser(id);
+    if (ability !== SYSTEM_ABILITY) {
+      assertCan(
+        ability,
+        'read',
+        subject('User', user),
+        this.auditService,
+        { actorId, targetId: id, targetType: 'User' },
+        this.metricsService
+      );
+    }
+    return user;
+  }
+
+  private async loadUser(id: string): Promise<User> {
     // A falsy id would be dropped from the WHERE clause and silently resolve to
     // an arbitrary user rather than matching nothing.
     if (!id) {
@@ -280,7 +316,7 @@ export class UsersService {
     actorId?: string,
     audit?: UserAuditRows
   ): Promise<User> {
-    const user = await this.findOne(id);
+    const user = await this.loadUser(id);
     const { unlockAccount, ...rest } = updateUserDto;
 
     if (ability !== SYSTEM_ABILITY) {
@@ -530,7 +566,7 @@ export class UsersService {
     actorId?: string,
     audit?: UserAuditRows
   ): Promise<void> {
-    const user = await this.findOne(id);
+    const user = await this.loadUser(id);
 
     if (ability !== SYSTEM_ABILITY) {
       this.assertCanWrite(ability, 'delete', user, actorId);
@@ -586,6 +622,6 @@ export class UsersService {
       await manager.restore(User, id);
       await this.writeAudit(manager, audit, user);
     });
-    return this.findOne(id);
+    return this.loadUser(id);
   }
 }

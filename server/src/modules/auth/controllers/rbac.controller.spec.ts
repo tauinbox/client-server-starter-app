@@ -1,10 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { ForbiddenException, HttpException, Logger } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { RbacController } from './rbac.controller';
 import { ResourceService } from '../services/resource.service';
-import { AuditService } from '../../audit/audit.service';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { JwtAuthRequest } from '../types/auth.request';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
@@ -18,9 +16,6 @@ const allowAllGuard = { canActivate: () => true };
 
 // @ts-expect-error partial mock — only `can` is needed for controller delegation tests
 const mockAbility: AppAbility = { can: jest.fn().mockReturnValue(true) };
-
-// @ts-expect-error partial mock — drives the deny path of assertCan
-const denyAbility: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
 function mockJwtRequest(
   userId = 'user-1',
@@ -41,15 +36,9 @@ describe('RbacController', () => {
   let controller: RbacController;
   let resourceServiceMock: {
     findAll: jest.Mock;
-    findOne: jest.Mock;
     update: jest.Mock;
     restore: jest.Mock;
   };
-  let auditServiceMock: {
-    log: jest.Mock;
-    logFireAndForget: jest.Mock;
-  };
-  let metricsServiceMock: { recordPermissionDenied: jest.Mock };
   let cacheManagerMock: {
     get: jest.Mock;
     set: jest.Mock;
@@ -62,17 +51,9 @@ describe('RbacController', () => {
 
     resourceServiceMock = {
       findAll: jest.fn().mockResolvedValue([]),
-      findOne: jest.fn().mockResolvedValue({ id: 'res-1', name: 'users' }),
       update: jest.fn().mockResolvedValue({ id: 'res-1' }),
       restore: jest.fn().mockResolvedValue({ id: 'res-1', isOrphaned: false })
     };
-
-    auditServiceMock = {
-      log: jest.fn().mockResolvedValue(undefined),
-      logFireAndForget: jest.fn()
-    };
-
-    metricsServiceMock = { recordPermissionDenied: jest.fn() };
 
     cacheManagerMock = {
       get: jest.fn().mockResolvedValue(null),
@@ -84,8 +65,6 @@ describe('RbacController', () => {
       controllers: [RbacController],
       providers: [
         { provide: ResourceService, useValue: resourceServiceMock },
-        { provide: AuditService, useValue: auditServiceMock },
-        { provide: MetricsService, useValue: metricsServiceMock },
         { provide: CACHE_MANAGER, useValue: cacheManagerMock }
       ]
     })
@@ -168,11 +147,12 @@ describe('RbacController', () => {
 
   // ── updateResource ────────────────────────────────────────────────
 
+  // The 404 and the instance check run in ResourceService
+  // (resource.service.spec.ts, "instance check of update:Permission").
   describe('updateResource', () => {
-    it('should load the resource, assert update access, update, and return result', async () => {
+    it('passes the dto, the ability and the actor to the update and returns its result', async () => {
       const dto = { displayName: 'Users' };
       const updated = { id: 'res-1', displayName: 'Users' };
-      resourceServiceMock.findOne.mockResolvedValue({ id: 'res-1' });
       resourceServiceMock.update.mockResolvedValue(updated);
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -183,110 +163,63 @@ describe('RbacController', () => {
         mockAbility
       );
 
-      expect(resourceServiceMock.findOne).toHaveBeenCalledWith('res-1');
       expect(resourceServiceMock.update).toHaveBeenCalledWith(
         'res-1',
         dto,
         mockAbility,
-        expect.objectContaining({ action: AuditAction.RESOURCE_UPDATE })
+        'user-1',
+        expect.any(Function)
       );
       expect(result).toBe(updated);
     });
 
-    it('should throw 404 when resource does not exist', async () => {
-      resourceServiceMock.findOne.mockResolvedValue(null);
+    it('keeps the metadata cache when the service refuses', async () => {
+      resourceServiceMock.update.mockRejectedValue(new ForbiddenException());
       const req = mockJwtRequest() as JwtAuthRequest;
 
       await expect(
-        controller.updateResource('missing', {}, req, mockAbility)
-      ).rejects.toBeInstanceOf(HttpException);
-      expect(resourceServiceMock.update).not.toHaveBeenCalled();
-    });
-
-    it('should throw ForbiddenException and skip update when ability denies', async () => {
-      resourceServiceMock.findOne.mockResolvedValue({ id: 'res-1' });
-      const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
-
-      await expect(
-        controller.updateResource('res-1', {}, req, denyAbility)
+        controller.updateResource('res-1', {}, req, mockAbility)
       ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(resourceServiceMock.update).not.toHaveBeenCalled();
-      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: AuditAction.PERMISSION_CHECK_FAILURE,
-          actorId: 'actor-deny',
-          targetId: 'res-1',
-          targetType: 'Resource'
-        })
-      );
+      expect(cacheManagerMock.del).not.toHaveBeenCalled();
     });
 
     it('should invalidate metadata cache after update', async () => {
       const req = mockJwtRequest() as JwtAuthRequest;
-      resourceServiceMock.findOne.mockResolvedValue({ id: 'res-1' });
 
       await controller.updateResource('res-1', {}, req, mockAbility);
 
       expect(cacheManagerMock.del).toHaveBeenCalledWith('rbac:metadata');
     });
 
-    it('passes the RESOURCE_UPDATE audit row to the update', async () => {
+    it('builds the RESOURCE_UPDATE audit row from the resource before the write', async () => {
       const dto = { displayName: 'Users', description: 'desc' };
       const req = mockJwtRequest(
         'user-42',
         'editor@example.com'
       ) as JwtAuthRequest;
-      resourceServiceMock.findOne.mockResolvedValue({ id: 'res-1' });
 
       await controller.updateResource('res-1', dto, req, mockAbility);
 
-      expect(auditServiceMock.log).not.toHaveBeenCalled();
-      expect(resourceServiceMock.update).toHaveBeenCalledWith(
-        'res-1',
-        dto,
-        mockAbility,
-        expect.objectContaining({
-          action: AuditAction.RESOURCE_UPDATE,
-          actorId: 'user-42',
-          actorEmail: 'editor@example.com',
-          targetId: 'res-1',
-          targetType: 'Resource',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          details: expect.objectContaining({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            changedFields: expect.arrayContaining([
-              'displayName',
-              'description'
-            ])
-          })
-        })
-      );
+      const [, , , , row] = resourceServiceMock.update.mock.calls[0] as [
+        unknown,
+        unknown,
+        unknown,
+        unknown,
+        (before: { displayName: string; description: string }) => unknown
+      ];
+      expect(row({ displayName: 'Old', description: 'old' })).toMatchObject({
+        action: AuditAction.RESOURCE_UPDATE,
+        actorId: 'user-42',
+        actorEmail: 'editor@example.com',
+        targetId: 'res-1',
+        targetType: 'Resource',
+        details: { changedFields: ['displayName', 'description'] }
+      });
     });
   });
 
   describe('restoreResource', () => {
-    it('should throw 404 when resource does not exist', async () => {
-      resourceServiceMock.findOne.mockResolvedValue(null);
-      const req = mockJwtRequest() as JwtAuthRequest;
-
-      await expect(
-        controller.restoreResource('missing', req, mockAbility)
-      ).rejects.toBeInstanceOf(HttpException);
-      expect(resourceServiceMock.restore).not.toHaveBeenCalled();
-    });
-
-    it('should throw ForbiddenException and skip restore when ability denies', async () => {
-      resourceServiceMock.findOne.mockResolvedValue({ id: 'res-1' });
-      const req = mockJwtRequest('actor-deny') as JwtAuthRequest;
-
-      await expect(
-        controller.restoreResource('res-1', req, denyAbility)
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(resourceServiceMock.restore).not.toHaveBeenCalled();
-    });
-
-    it('should restore resource with the RESOURCE_RESTORE audit row when ability allows', async () => {
-      resourceServiceMock.findOne.mockResolvedValue({ id: 'res-1' });
+    it('should restore resource with the ability, the actor and the RESOURCE_RESTORE audit row', async () => {
       resourceServiceMock.restore.mockResolvedValue({
         id: 'res-1',
         isOrphaned: false
@@ -295,10 +228,10 @@ describe('RbacController', () => {
 
       await controller.restoreResource('res-1', req, mockAbility);
 
-      expect(auditServiceMock.log).not.toHaveBeenCalled();
       expect(resourceServiceMock.restore).toHaveBeenCalledWith(
         'res-1',
         mockAbility,
+        'user-99',
         expect.objectContaining({
           action: AuditAction.RESOURCE_RESTORE,
           actorId: 'user-99',

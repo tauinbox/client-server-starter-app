@@ -23,6 +23,7 @@ import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { MailService } from '../src/modules/mail/mail.service';
 import { maskEmail } from '../src/common/utils/escape-html';
 import { withPrivateThrottlerStorage } from './private-throttler';
@@ -87,21 +88,41 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       (p) => p.action.name === 'update' && p.resource.subject === 'User'
     );
     if (!updateUser) throw new Error('Permission update:User missing');
-    const selfEdit = await roleService.create({ name: selfEditRoleName });
-    await roleService.setPermissionsForRole(selfEdit.id, [
-      {
-        permissionId: updateUser.id,
-        conditions: { ownership: { userField: 'id' } }
-      }
-    ]);
+    const selfEdit = await roleService.create(
+      { name: selfEditRoleName },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      selfEdit.id,
+      [
+        {
+          permissionId: updateUser.id,
+          conditions: { ownership: { userField: 'id' } }
+        }
+      ],
+      SYSTEM_ABILITY
+    );
     for (const email of [ownerEmail, otherEmail]) {
-      await roleService.assignRoleToUser(await userId(email), selfEdit.id);
+      await roleService.assignRoleToUser(
+        await userId(email),
+        selfEdit.id,
+        SYSTEM_ABILITY
+      );
     }
-    const adminEdit = await roleService.create({ name: adminEditRoleName });
-    await roleService.setPermissionsForRole(adminEdit.id, [
-      { permissionId: updateUser.id }
-    ]);
-    await roleService.assignRoleToUser(await userId(adminEmail), adminEdit.id);
+    const adminEdit = await roleService.create(
+      { name: adminEditRoleName },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      adminEdit.id,
+      [{ permissionId: updateUser.id }],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(
+      await userId(adminEmail),
+      adminEdit.id,
+      SYSTEM_ABILITY
+    );
   }, 60000);
 
   afterAll(async () => {
@@ -133,7 +154,10 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   // Minted through AuthService.login: a credential change ends every session,
   // and the login route allows fewer requests a minute than this suite needs.
   async function tokenFor(email: string): Promise<string> {
-    const user = await usersService.findOne(await userId(email));
+    const user = await usersService.findOne(
+      await userId(email),
+      SYSTEM_ABILITY
+    );
     const { tokens } = await authService.login(user, {
       userAgent: 'step-up-e2e',
       ipAddress: null
@@ -254,7 +278,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     await patch(token, id, { firstName: 'Renamed' }).expect(200);
     await patch(token, id, { email: ownerEmail, lastName: 'Kept' }).expect(200);
 
-    const row = await usersService.findOne(id);
+    const row = await usersService.findOne(id, SYSTEM_ABILITY);
     expect(row.firstName).toBe('Renamed');
     expect(row.lastName).toBe('Kept');
   }, 30000);

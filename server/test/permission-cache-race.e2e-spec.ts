@@ -16,6 +16,7 @@ import { PermissionService } from '../src/modules/auth/services/permission.servi
 import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
 import { ResourceService } from '../src/modules/auth/services/resource.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
@@ -138,12 +139,17 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
   });
 
   async function grantDeleteRole(): Promise<Role> {
-    const role = await roleService.create({ name: `${tag}-${roleIds.length}` });
+    const role = await roleService.create(
+      { name: `${tag}-${roleIds.length}` },
+      SYSTEM_ABILITY
+    );
     roleIds.push(role.id);
-    await roleService.setPermissionsForRole(role.id, [
-      { permissionId: deleteRole.id }
-    ]);
-    await roleService.assignRoleToUser(holder.id, role.id);
+    await roleService.setPermissionsForRole(
+      role.id,
+      [{ permissionId: deleteRole.id }],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
     return role;
   }
 
@@ -154,7 +160,11 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
     const reader = permissionService.getPermissionsForUser(holder.id);
     await held.reached;
-    await roleService.removePermissionFromRole(role.id, deleteRole.id);
+    await roleService.removePermissionFromRole(
+      role.id,
+      deleteRole.id,
+      SYSTEM_ABILITY
+    );
     held.release();
     expect((await reader).map((p) => p.permission)).toContain(
       `${deleteRole.resource.name}:delete`
@@ -173,7 +183,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
     const reader = permissionService.getRolesForUser(holder.id);
     await held.reached;
-    await roleService.removeRoleFromUser(holder.id, role.id);
+    await roleService.removeRoleFromUser(holder.id, role.id, SYSTEM_ABILITY);
     held.release();
     expect((await reader).map((r) => r.name)).toContain(role.name);
 

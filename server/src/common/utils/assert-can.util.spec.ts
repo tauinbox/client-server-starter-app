@@ -7,20 +7,26 @@ import { thrownBy } from '../testing/thrown-by';
 
 describe('assertCan', () => {
   let auditService: { logFireAndForget: jest.Mock };
+  let metricsService: { recordPermissionDenied: jest.Mock };
 
   beforeEach(() => {
     auditService = { logFireAndForget: jest.fn() };
+    metricsService = { recordPermissionDenied: jest.fn() };
   });
 
   it('should not throw when ability allows the action', () => {
     const ability = { can: jest.fn().mockReturnValue(true) };
 
     expect(() =>
-      // @ts-expect-error partial mock
-      assertCan(ability, 'update', { id: '1' }, auditService, {
-        targetId: '1',
-        targetType: 'User'
-      })
+      assertCan(
+        // @ts-expect-error partial mock
+        ability,
+        'update',
+        { id: '1' },
+        auditService,
+        { targetId: '1', targetType: 'User' },
+        metricsService
+      )
     ).not.toThrow();
     expect(auditService.logFireAndForget).not.toHaveBeenCalled();
   });
@@ -29,11 +35,15 @@ describe('assertCan', () => {
     const ability = { can: jest.fn().mockReturnValue(false) };
 
     expect(() =>
-      // @ts-expect-error partial mock
-      assertCan(ability, 'delete', { id: '2' }, auditService, {
-        targetId: '2',
-        targetType: 'User'
-      })
+      assertCan(
+        // @ts-expect-error partial mock
+        ability,
+        'delete',
+        { id: '2' },
+        auditService,
+        { targetId: '2', targetType: 'User' },
+        metricsService
+      )
     ).toThrow(ForbiddenException);
   });
 
@@ -42,11 +52,15 @@ describe('assertCan', () => {
 
     expect(
       thrownBy(() =>
-        // @ts-expect-error partial mock
-        assertCan(ability, 'delete', { id: '2' }, auditService, {
-          targetId: '2',
-          targetType: 'User'
-        })
+        assertCan(
+          // @ts-expect-error partial mock
+          ability,
+          'delete',
+          { id: '2' },
+          auditService,
+          { targetId: '2', targetType: 'User' },
+          metricsService
+        )
       )
     ).toMatchObject({
       response: {
@@ -60,12 +74,15 @@ describe('assertCan', () => {
     const ability = { can: jest.fn().mockReturnValue(false) };
 
     try {
-      // @ts-expect-error partial mock
-      assertCan(ability, 'update', { id: '3' }, auditService, {
-        actorId: 'actor-1',
-        targetId: '3',
-        targetType: 'User'
-      });
+      assertCan(
+        // @ts-expect-error partial mock
+        ability,
+        'update',
+        { id: '3' },
+        auditService,
+        { actorId: 'actor-1', targetId: '3', targetType: 'User' },
+        metricsService
+      );
     } catch {
       // expected
     }
@@ -92,11 +109,15 @@ describe('assertCan', () => {
     const user = new User();
 
     try {
-      // @ts-expect-error partial mock
-      assertCan(ability, 'delete', user, auditService, {
-        targetId: '4',
-        targetType: 'User'
-      });
+      assertCan(
+        // @ts-expect-error partial mock
+        ability,
+        'delete',
+        user,
+        auditService,
+        { targetId: '4', targetType: 'User' },
+        metricsService
+      );
     } catch {
       // expected
     }
@@ -110,9 +131,8 @@ describe('assertCan', () => {
     );
   });
 
-  it('records rbac_permission_denied_total with level=instance when metricsService passed', () => {
+  it('records rbac_permission_denied_total with level=instance', () => {
     const ability = { can: jest.fn().mockReturnValue(false) };
-    const metricsService = { recordPermissionDenied: jest.fn() };
 
     class User {
       id = '5';
@@ -142,7 +162,6 @@ describe('assertCan', () => {
 
   it('uses CASL __caslSubjectType__ brand as audit subject when present', () => {
     const ability = { can: jest.fn().mockReturnValue(false) };
-    const metricsService = { recordPermissionDenied: jest.fn() };
 
     class FooEntity {
       id = '7';
@@ -179,7 +198,6 @@ describe('assertCan', () => {
 
   it('does not touch metrics on allow path', () => {
     const ability = { can: jest.fn().mockReturnValue(true) };
-    const metricsService = { recordPermissionDenied: jest.fn() };
 
     assertCan(
       // @ts-expect-error partial mock

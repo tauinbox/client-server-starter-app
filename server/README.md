@@ -515,7 +515,7 @@ load that started before the change does not write its rows to the cache.
 `GET :id` and `POST :id/preview` check `read`, and the create, the update and the
 delete check `create`, `update` and `delete` on `FeatureFlag`. All five actions are
 `conditionalActions`: the two lists filter in SQL with `applyAbilityToFeatureFlagQuery`
-(`GET attribute-keys` returns no flag data), and each route on one flag runs `assertCan` on it.
+(`GET attribute-keys` returns no flag data), and `FeatureFlagService` runs `assertCan` on each read or write of one flag.
 The create checks the record with the defaults that the service writes. The update
 also checks the record as it is after the write, so a grant scoped by a writable field (`enabled`,
 `public`) cannot move a flag out of its own scope. The 3 mutating
@@ -1450,14 +1450,17 @@ unconditionally.
 `common/validators/permission-condition-shape.validator.ts`. Thus the server rejects a partly
 malformed condition with a 400 at authoring time.
 
-**Instance-level enforcement.** Each single-entity endpoint loads the target record and runs
-`assertCan(ability, action, subject(<Subject>, entity))` BEFORE it returns or changes the record.
+**Instance-level enforcement.** The service behind each single-entity endpoint loads the target
+record and runs `assertCan(ability, action, subject(<Subject>, entity))` BEFORE it returns or changes
+the record. The controller only passes `@CurrentAbility()`; the service method takes it as a
+required `AbilityOrSystem` (`doc/architecture.md` §2.5).
 Those endpoints are `GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`, `POST /users/:id/mfa/reset`, `POST /users/:id/sessions/revoke`,
 `GET/PATCH/DELETE /roles/:id`, `GET /roles/:id/permissions`, `PATCH /rbac/resources/:id` and
 `POST /rbac/resources/:id/restore`.
 
-`POST /users` and `POST /roles` run the same check against the record that they make. The subject
-comes from the submitted DTO. `POST /users` removes `password` from it, which no authorization
+`POST /users`, `POST /roles` and `POST /admin/feature-flags` run the same check against the record
+that they make. The subject comes from the submitted DTO. `UsersService.create` removes `password`
+from it, which no authorization
 condition can legitimately test. Thus the server enforces a `create` grant with a `fieldMatch` or
 `custom` condition, and that grant does not collapse to the type-level check.
 
@@ -1479,7 +1482,7 @@ configured becomes unconditional on a single-entity route.
 
 `UsersService.update`, `UsersService.remove`, `UsersService.restore`,
 `RoleService.assignRoleToUser`, `RoleService.removeRoleFromUser` and the mutations of the permission
-set of a role apply the same check in the service layer. The permission-set mutations are
+set of a role apply the same check, as every instance check does, in the service layer. The permission-set mutations are
 `PUT /roles/:id/permissions`, `POST /roles/:id/permissions` and
 `DELETE /roles/:id/permissions/:permId`. `RoleService` checks them before the system-role lock and
 before the grant check.

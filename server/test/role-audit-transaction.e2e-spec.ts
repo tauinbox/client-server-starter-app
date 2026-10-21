@@ -22,6 +22,7 @@ import { RolePermission } from '../src/modules/auth/entities/role-permission.ent
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { ResourceService } from '../src/modules/auth/services/resource.service';
 import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -85,19 +86,25 @@ runWithInfra(
       roleService = app.get(RoleService);
 
       const names = { firstName: 'Role', lastName: 'Tx' };
-      const admin = await usersService.create({
-        email: adminEmail,
-        password,
-        ...names
-      });
+      const admin = await usersService.create(
+        { email: adminEmail, password, ...names },
+        SYSTEM_ABILITY
+      );
       targetId = (
-        await usersService.create({ email: targetEmail, password, ...names })
+        await usersService.create(
+          { email: targetEmail, password, ...names },
+          SYSTEM_ABILITY
+        )
       ).id;
 
       const superRole = await dataSource
         .getRepository(Role)
         .findOneByOrFail({ isSuper: true });
-      await roleService.assignRoleToUser(admin.id, superRole.id);
+      await roleService.assignRoleToUser(
+        admin.id,
+        superRole.id,
+        SYSTEM_ABILITY
+      );
       token = await sessionOf(admin.id);
 
       const permissions = await dataSource.getRepository(Permission).find();
@@ -108,12 +115,20 @@ runWithInfra(
       firstPermissionId = readOf('Role');
       secondPermissionId = readOf('Permission');
 
-      heldRole = await roleService.create({ name: `${prefix}-held` });
-      freeRole = await roleService.create({ name: `${prefix}-free` });
-      await roleService.setPermissionsForRole(heldRole.id, [
-        { permissionId: firstPermissionId }
-      ]);
-      await roleService.assignRoleToUser(targetId, heldRole.id);
+      heldRole = await roleService.create(
+        { name: `${prefix}-held` },
+        SYSTEM_ABILITY
+      );
+      freeRole = await roleService.create(
+        { name: `${prefix}-free` },
+        SYSTEM_ABILITY
+      );
+      await roleService.setPermissionsForRole(
+        heldRole.id,
+        [{ permissionId: firstPermissionId }],
+        SYSTEM_ABILITY
+      );
+      await roleService.assignRoleToUser(targetId, heldRole.id, SYSTEM_ABILITY);
 
       resourceId = (
         await dataSource.getRepository(Resource).save({
@@ -176,7 +191,7 @@ runWithInfra(
 
     async function sessionOf(id: string): Promise<string> {
       const { tokens } = await authService.login(
-        await usersService.findOne(id),
+        await usersService.findOne(id, SYSTEM_ABILITY),
         {
           userAgent: 'role-audit-tx-e2e',
           ipAddress: null

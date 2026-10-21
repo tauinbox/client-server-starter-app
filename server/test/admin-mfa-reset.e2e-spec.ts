@@ -23,6 +23,7 @@ import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
 import { eventually } from './eventually';
 
@@ -81,16 +82,29 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
       (p) => p.action.name === 'update' && p.resource.subject === 'User'
     );
     if (!updateUser) throw new Error('Permission update:User missing');
-    const support = await roleService.create({ name: supportRoleName });
-    await roleService.setPermissionsForRole(support.id, [
-      { permissionId: updateUser.id, conditions: null }
-    ]);
-    await roleService.assignRoleToUser(await userId(supportEmail), support.id);
+    const support = await roleService.create(
+      { name: supportRoleName },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      support.id,
+      [{ permissionId: updateUser.id, conditions: null }],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(
+      await userId(supportEmail),
+      support.id,
+      SYSTEM_ABILITY
+    );
 
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await roleService.assignRoleToUser(await userId(superEmail), superRole.id);
+    await roleService.assignRoleToUser(
+      await userId(superEmail),
+      superRole.id,
+      SYSTEM_ABILITY
+    );
   }, 60000);
 
   afterAll(async () => {
@@ -121,7 +135,10 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
   // Minted through AuthService.login: the reset ends every session, and the
   // login route allows fewer requests a minute than this suite needs.
   async function tokenFor(email: string): Promise<string> {
-    const user = await usersService.findOne(await userId(email));
+    const user = await usersService.findOne(
+      await userId(email),
+      SYSTEM_ABILITY
+    );
     const { tokens } = await authService.login(user, {
       userAgent: 'mfa-reset-e2e',
       ipAddress: null

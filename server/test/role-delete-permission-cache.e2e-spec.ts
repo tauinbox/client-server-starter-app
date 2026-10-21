@@ -9,6 +9,7 @@ import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 
 // A request of a holder can land while the role is being removed. It must not
@@ -70,11 +71,16 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
     );
     if (!deleteRole) throw new Error('Permission delete:Role missing');
 
-    const role = await roleService.create({ name: `${tag}-role` });
-    await roleService.setPermissionsForRole(role.id, [
-      { permissionId: deleteRole.id }
-    ]);
-    await roleService.assignRoleToUser(holder.id, role.id);
+    const role = await roleService.create(
+      { name: `${tag}-role` },
+      SYSTEM_ABILITY
+    );
+    await roleService.setPermissionsForRole(
+      role.id,
+      [{ permissionId: deleteRole.id }],
+      SYSTEM_ABILITY
+    );
+    await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
 
     // Stand-in for a request of the holder that lands after the remove and
     // before its commit: it loads from the DB and fills the cache. The event
@@ -93,7 +99,7 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
         return emitAsync(event, ...values);
       });
 
-    await roleService.delete(role.id);
+    await roleService.delete(role.id, SYSTEM_ABILITY);
 
     expect(readInside).toBe(true);
     const roleRepository = dataSource.getRepository(Role);

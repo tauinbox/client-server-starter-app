@@ -74,23 +74,30 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
     authService = app.get(AuthService);
 
     const names = { firstName: 'Users', lastName: 'Tx' };
-    const admin = await usersService.create({
-      email: adminEmail,
-      password,
-      ...names
-    });
+    const admin = await usersService.create(
+      { email: adminEmail, password, ...names },
+      SYSTEM_ABILITY
+    );
     targetId = (
-      await usersService.create({ email: targetEmail, password, ...names })
+      await usersService.create(
+        { email: targetEmail, password, ...names },
+        SYSTEM_ABILITY
+      )
     ).id;
     deletedId = (
-      await usersService.create({ email: deletedEmail, password, ...names })
+      await usersService.create(
+        { email: deletedEmail, password, ...names },
+        SYSTEM_ABILITY
+      )
     ).id;
     await usersService.remove(deletedId, SYSTEM_ABILITY);
 
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await app.get(RoleService).assignRoleToUser(admin.id, superRole.id);
+    await app
+      .get(RoleService)
+      .assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
     token = await sessionOf(admin.id);
   }, 60000);
 
@@ -124,10 +131,13 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
   }
 
   async function sessionOf(id: string): Promise<string> {
-    const { tokens } = await authService.login(await usersService.findOne(id), {
-      userAgent: 'users-audit-tx-e2e',
-      ipAddress: null
-    });
+    const { tokens } = await authService.login(
+      await usersService.findOne(id, SYSTEM_ABILITY),
+      {
+        userAgent: 'users-audit-tx-e2e',
+        ipAddress: null
+      }
+    );
     return tokens.access_token;
   }
 

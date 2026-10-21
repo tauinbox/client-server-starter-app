@@ -19,6 +19,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The feature-flag rule editor labels a user rule with one request per 100
@@ -74,13 +75,15 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const admin = await users.findOneByOrFail({ email: adminEmail });
-    await app.get(RoleService).assignRoleToUser(admin.id, superRole.id);
+    await app
+      .get(RoleService)
+      .assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
 
     await users.softDelete({ id: ids[2] });
 
     const { tokens } = await app
       .get(AuthService)
-      .login(await app.get(UsersService).findOne(admin.id), {
+      .login(await app.get(UsersService).findOne(admin.id, SYSTEM_ABILITY), {
         userAgent: 'ids-filter-e2e',
         ipAddress: null
       });

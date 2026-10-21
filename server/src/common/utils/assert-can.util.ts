@@ -22,7 +22,7 @@ export function assertCan(
   subject: Subjects,
   auditService: AuditService,
   context: AssertCanContext,
-  metricsService?: MetricsService
+  metricsService: MetricsService
 ): void {
   if (ability.can(action, subject)) {
     return;
@@ -47,7 +47,7 @@ export function assertCan(
     }
   });
 
-  metricsService?.recordPermissionDenied('instance', action, subjectName);
+  metricsService.recordPermissionDenied('instance', action, subjectName);
 
   throw new ForbiddenException({
     message: 'Insufficient permissions',

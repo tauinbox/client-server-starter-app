@@ -7,6 +7,7 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { UsersService } from '../src/modules/users/services/users.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import {
   PasswordHashVersion,
   verifyPassword
@@ -52,12 +53,15 @@ runWithInfra('Password pre-hash (e2e)', () => {
     label: string,
     password: string
   ): Promise<User> => {
-    const user = await usersService.create({
-      email: nextEmail(label),
-      firstName: 'Prehash',
-      lastName: 'Check',
-      password
-    });
+    const user = await usersService.create(
+      {
+        email: nextEmail(label),
+        firstName: 'Prehash',
+        lastName: 'Check',
+        password
+      },
+      SYSTEM_ABILITY
+    );
     await dataSource
       .getRepository(User)
       .update(user.id, { isEmailVerified: true });

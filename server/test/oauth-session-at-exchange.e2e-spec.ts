@@ -22,6 +22,7 @@ import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard'
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { SessionLimitService } from '../src/modules/auth/services/session-limit.service';
 import { UsersService } from '../src/modules/users/services/users.service';
+import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -139,7 +140,7 @@ runWithInfra(
       const cookies: string[] = [];
       for (let i = 0; i < limit; i++) {
         const { tokens } = await authService.login(
-          await usersService.findOne(user.id),
+          await usersService.findOne(user.id, SYSTEM_ABILITY),
           { userAgent: `Device-${i}`, ipAddress: null }
         );
         cookies.push(`${refreshCookieName}=${tokens.refresh_token}`);

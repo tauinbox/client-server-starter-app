@@ -12,6 +12,7 @@ import { RoleService } from '../src/modules/auth/services/role.service';
 import {
   AbilityBuilder,
   createMongoAbility,
+  SYSTEM_ABILITY,
   type AppAbility
 } from '../src/modules/auth/casl/app-ability';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
@@ -107,42 +108,65 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       );
     }
 
-    const scopedRole = await roleService.create({ name: `${tag}-scoped` });
-    await roleService.setPermissionsForRole(scopedRole.id, [
-      {
-        permissionId: searchUser.id,
-        conditions: { ownership: { userField: 'id' } }
-      }
-    ]);
-    await roleService.assignRoleToUser(users.scoped.id, scopedRole.id);
+    const grantRole = async (
+      suffix: string,
+      items: Parameters<RoleService['setPermissionsForRole']>[1],
+      holder: User
+    ): Promise<Role> => {
+      const role = await roleService.create(
+        { name: `${tag}-${suffix}` },
+        SYSTEM_ABILITY
+      );
+      await roleService.setPermissionsForRole(role.id, items, SYSTEM_ABILITY);
+      await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
+      return role;
+    };
 
-    const wideRole = await roleService.create({ name: `${tag}-wide` });
-    await roleService.setPermissionsForRole(wideRole.id, [
-      { permissionId: searchUser.id }
-    ]);
-    await roleService.assignRoleToUser(users.wide.id, wideRole.id);
-
-    const activeRole = await roleService.create({ name: `${tag}-active` });
-    await roleService.setPermissionsForRole(activeRole.id, [
-      {
-        permissionId: searchUser.id,
-        conditions: { fieldMatch: { isActive: [true] } }
-      }
-    ]);
-    await roleService.assignRoleToUser(users.activeOnly.id, activeRole.id);
-
-    const deniedRole = await roleService.create({ name: `${tag}-denied` });
-    await roleService.setPermissionsForRole(deniedRole.id, [
-      { permissionId: searchUser.id, conditions: { effect: 'deny' } }
-    ]);
-    await roleService.assignRoleToUser(users.denied.id, deniedRole.id);
+    await grantRole(
+      'scoped',
+      [
+        {
+          permissionId: searchUser.id,
+          conditions: { ownership: { userField: 'id' } }
+        }
+      ],
+      users.scoped
+    );
+    const wideRole = await grantRole(
+      'wide',
+      [{ permissionId: searchUser.id }],
+      users.wide
+    );
+    await grantRole(
+      'active',
+      [
+        {
+          permissionId: searchUser.id,
+          conditions: { fieldMatch: { isActive: [true] } }
+        }
+      ],
+      users.activeOnly
+    );
+    await grantRole(
+      'denied',
+      [{ permissionId: searchUser.id, conditions: { effect: 'deny' } }],
+      users.denied
+    );
 
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await roleService.assignRoleToUser(users.superUser.id, superRole.id);
+    await roleService.assignRoleToUser(
+      users.superUser.id,
+      superRole.id,
+      SYSTEM_ABILITY
+    );
 
-    await roleService.assignRoleToUser(users.deleted.id, wideRole.id);
+    await roleService.assignRoleToUser(
+      users.deleted.id,
+      wideRole.id,
+      SYSTEM_ABILITY
+    );
     await repository.softDelete(users.deleted.id);
   }, 60000);
 
@@ -166,7 +190,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
 
   async function openStream(user: User): Promise<() => UserCrudEvent[]> {
     const { tokens } = await authService.login(
-      await usersService.findOne(user.id),
+      await usersService.findOne(user.id, SYSTEM_ABILITY),
       { userAgent: 'crud-events-e2e', ipAddress: '203.0.113.10' }
     );
     return new Promise((resolve, reject) => {

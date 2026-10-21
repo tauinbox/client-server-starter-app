@@ -35,6 +35,7 @@ import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { AuthCookies } from '../utils/auth-cookies';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
+import { SYSTEM_ABILITY } from '../casl/app-ability';
 
 /**
  * The signed-in devices of the caller. The list is bounded by the plan
@@ -170,7 +171,10 @@ export class SessionsController {
     req: JwtAuthRequest,
     dto: MfaStepUpDto
   ): Promise<void> {
-    const user = await this.userService.findOne(req.user.userId);
+    const user = await this.userService.findOne(
+      req.user.userId,
+      SYSTEM_ABILITY
+    );
     await this.authService.assertStepUp(
       user,
       dto.currentPassword,
