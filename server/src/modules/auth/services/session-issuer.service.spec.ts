@@ -162,7 +162,7 @@ describe('SessionIssuerService', () => {
     );
   });
 
-  it('signs the JWT with role names and returns the User entity unchanged', async () => {
+  it('signs the JWT and returns the User entity unchanged', async () => {
     const result = await service.issueSession(mockUser, {
       userAgent: 'Mozilla/5.0 Test',
       ipAddress: null
@@ -171,7 +171,6 @@ describe('SessionIssuerService', () => {
     expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
       'user-1',
       'test@example.com',
-      ['user'],
       expect.any(String)
     );
     expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
@@ -190,7 +189,6 @@ describe('SessionIssuerService', () => {
     const signedCall = mockTokenGenerator.generateTokens.mock.calls[0] as [
       string,
       string,
-      string[],
       string
     ];
     const storedCall = mockRefreshTokenService.createRefreshToken.mock
@@ -198,7 +196,7 @@ describe('SessionIssuerService', () => {
 
     // A mismatch would leave the access token naming a session that never
     // existed, so JwtStrategy would refuse the caller on its first request.
-    expect(signedCall[3]).toBe(storedCall[3]);
+    expect(signedCall[2]).toBe(storedCall[3]);
   });
 
   it('mints a distinct session id per sign-in, so one sign-out cannot end another device', async () => {
@@ -208,10 +206,9 @@ describe('SessionIssuerService', () => {
     const calls = mockTokenGenerator.generateTokens.mock.calls as [
       string,
       string,
-      string[],
       string
     ][];
 
-    expect(calls[0][3]).not.toBe(calls[1][3]);
+    expect(calls[0][2]).not.toBe(calls[1][2]);
   });
 });

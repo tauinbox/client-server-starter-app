@@ -2,7 +2,6 @@ import { JwtPayload } from 'jsonwebtoken';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 
 export type CustomJwtPayload = JwtPayload & { email: string } & {
-  roles?: string[];
   purpose?: string;
   // The session the token belongs to. JwtStrategy refuses a token whose
   // session holds no live refresh row, so a sign-out ends the access token of
@@ -12,7 +11,6 @@ export type CustomJwtPayload = JwtPayload & { email: string } & {
 export type PayloadFromJwt = {
   userId: UserResponseDto['id'];
   email: string;
-  roles: string[];
   /** The session of the caller's device, from the `sid` claim. */
   sessionId: string;
 };

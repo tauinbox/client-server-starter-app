@@ -1737,7 +1737,7 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - A **modular NestJS architecture** with a dynamic root `CoreModule`.
 - **Passport strategies.** `LocalStrategy` uses the email and the password. `JwtStrategy` uses the
   Bearer token. It verifies the signature, `tokenRevokedAt` and the `sid` claim, which must name a
-  session that still holds a live refresh row, and it extracts `{ userId, email, roles, sessionId }`. `GoogleStrategy`, `FacebookStrategy` and `VkStrategy` do the OAuth
+  session that still holds a live refresh row, and it extracts `{ userId, email, sessionId }`. `GoogleStrategy`, `FacebookStrategy` and `VkStrategy` do the OAuth
   logins, and the module registers them conditionally.
 - **Routing is secure by default.** `APP_GUARD` registers `JwtAuthGuard` globally. Each endpoint
   requires a valid Bearer token, and `@Public()` is the only exception. The `check-auth-coverage` e2e

@@ -40,7 +40,6 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     user: {
       userId: randomUUID(),
       email: 'admin@example.com',
-      roles: [],
       sessionId: randomUUID()
     },
     ip: '127.0.0.1',

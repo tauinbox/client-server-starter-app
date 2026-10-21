@@ -274,7 +274,6 @@ describe('Admin email change - session revocation through the real event bus', (
     user: {
       userId: 'admin-1',
       email: 'admin@example.com',
-      roles: [],
       sessionId: 'session-1'
     },
     ip: '127.0.0.1',

@@ -47,7 +47,6 @@ function mockJwtRequest(
     user: {
       userId,
       email: 'test@example.com',
-      roles: [],
       sessionId: 'session-1'
     },
     headers: {},

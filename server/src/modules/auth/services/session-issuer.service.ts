@@ -44,12 +44,10 @@ export class SessionIssuerService {
     user: User,
     client: SessionClient
   ): Promise<{ tokens: TokensResponseDto; user: User }> {
-    const roleNames = user.roles.map((r) => r.name);
     const sessionId = randomUUID();
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
       user.email,
-      roleNames,
       sessionId
     );
 

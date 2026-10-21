@@ -11,7 +11,6 @@ function mockJwtRequest(userId = 'user-1'): { user: JwtAuthRequest['user'] } {
     user: {
       userId,
       email: 'user@example.com',
-      roles: [],
       sessionId: 'session-1'
     }
   };

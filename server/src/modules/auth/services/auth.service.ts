@@ -706,14 +706,12 @@ export class AuthService {
       );
     }
 
-    const roleNames = user.roles.map((r) => r.name);
     // Rotation replaces a row inside one session, so the session id carries
     // over. An access token another tab of the same device still holds keeps
     // working, which a per-row id would have ended on every refresh.
     const tokens = this.tokenGenerator.generateTokens(
       user.id,
       user.email,
-      roleNames,
       tokenDoc.sessionId
     );
 

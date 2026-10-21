@@ -1254,7 +1254,7 @@ seconds because `iat` has no finer unit. That rule is `issuedBeforeRevocation` i
 provider re-authentication intent, the link intent and the mock use the same function. It then requires a `sid`
 claim and asks `RefreshTokenService.hasLiveSession`, which looks for a row of that session which is
 not revoked and not expired, so a sign-out on one device refuses that device on its next request
-while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, roles, sessionId }`.
+while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, sessionId }`.
 There is no `isAdmin` flag.
 
 **Sessions.** A sign-in mints a session id in `SessionIssuerService`. The access token carries it as

@@ -85,7 +85,6 @@ describe('JWT token purpose (e2e)', () => {
     const token = jwt.sign({
       sub: 'user-1',
       email: 'user@example.com',
-      roles: ['user'],
       purpose: TOKEN_PURPOSE.ACCESS,
       sid: 'session-1'
     });
@@ -100,7 +99,6 @@ describe('JWT token purpose (e2e)', () => {
     const token = jwt.sign({
       sub: 'user-1',
       email: 'user@example.com',
-      roles: ['user'],
       purpose: TOKEN_PURPOSE.ACCESS
     });
 

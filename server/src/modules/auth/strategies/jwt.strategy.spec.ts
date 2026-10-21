@@ -74,7 +74,6 @@ describe('JwtStrategy', () => {
     const basePayload: CustomJwtPayload = {
       sub: 'user-1',
       email: 'test@example.com',
-      roles: ['user'],
       purpose: TOKEN_PURPOSE.ACCESS,
       sid: 'session-1',
       iat: Math.floor(Date.now() / 1000) - 60, // issued 60 seconds ago
@@ -92,7 +91,6 @@ describe('JwtStrategy', () => {
       expect(result).toEqual({
         userId: 'user-1',
         email: 'test@example.com',
-        roles: ['user'],
         sessionId: 'session-1'
       });
       expect(mockDataSource.getRepository).toHaveBeenCalled();
@@ -138,7 +136,6 @@ describe('JwtStrategy', () => {
       expect(result).toEqual({
         userId: 'user-1',
         email: 'test@example.com',
-        roles: ['user'],
         sessionId: 'session-1'
       });
     });
@@ -153,7 +150,6 @@ describe('JwtStrategy', () => {
       await expect(strategy.validate(basePayload)).resolves.toEqual({
         userId: 'user-1',
         email: 'test@example.com',
-        roles: ['user'],
         sessionId: 'session-1'
       });
     });
@@ -167,26 +163,6 @@ describe('JwtStrategy', () => {
       await expect(strategy.validate(basePayload)).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
       });
-    });
-
-    it('should default roles to empty array when payload has no roles', async () => {
-      mockRepository.findOne.mockResolvedValue({
-        id: 'user-1',
-        tokenRevokedAt: null
-      });
-
-      const payloadWithoutRoles: CustomJwtPayload = {
-        sub: 'user-1',
-        email: 'test@example.com',
-        purpose: TOKEN_PURPOSE.ACCESS,
-        sid: 'session-1',
-        iat: basePayload.iat,
-        exp: basePayload.exp
-      };
-
-      const result = await strategy.validate(payloadWithoutRoles);
-
-      expect(result.roles).toEqual([]);
     });
 
     describe('session claim', () => {
