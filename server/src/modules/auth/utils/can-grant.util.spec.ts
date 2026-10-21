@@ -330,6 +330,19 @@ describe('assertCanGrantPermissions', () => {
     });
   });
 
+  describe('caller does not hold the pair at all', () => {
+    const ability = (): AppAbility =>
+      abilityFor([{ action: 'read', subject: 'User' }]);
+
+    it('lets the caller add a deny, which can only narrow access', () => {
+      expect(() => grant(ability(), DENY_CEO)).not.toThrow();
+    });
+
+    it('still rejects an allow on that pair', () => {
+      expect(() => grant(ability(), null)).toThrow(HttpException);
+    });
+  });
+
   it('still rejects an action the caller does not hold at all', () => {
     const ability = abilityFor([{ action: 'read', subject: 'User' }]);
 

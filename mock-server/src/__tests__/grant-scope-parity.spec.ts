@@ -6,7 +6,8 @@ import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
 
-// Mirrors assertCanGrantPermissions: a caller grants only a pair it holds, and
+// Mirrors assertCanGrantPermissions: a caller grants an allow only on a pair it
+// holds (a deny passes on any pair), and
 // a caller that holds the pair only with a condition grants only a condition
 // at least as narrow. The seeded `user` role holds update:User on its own
 // record only, so the caller below is such a conditional holder.
@@ -216,5 +217,52 @@ describe('grant scope parity with server', () => {
 
     expect(res.status).toBe(200);
     expect(targetRowCount()).toBe(1);
+  });
+
+  describe('allows a deny on a pair the caller does not hold', () => {
+    const deny: PermissionCondition = {
+      effect: 'deny',
+      fieldMatch: { email: ['ceo@example.com'] }
+    };
+
+    it('on POST /:id/permissions', async () => {
+      const token = await login();
+
+      const res = await call(token, 'POST', `/${TARGET_ROLE_ID}/permissions`, {
+        permissionIds: [deleteUserId()],
+        conditions: deny
+      });
+
+      expect(res.status).toBe(200);
+      expect(targetRowCount()).toBe(1);
+    });
+
+    it('on PUT /:id/permissions', async () => {
+      const token = await login();
+
+      const res = await call(token, 'PUT', `/${TARGET_ROLE_ID}/permissions`, {
+        items: [{ permissionId: deleteUserId(), conditions: deny }]
+      });
+
+      expect(res.status).toBe(200);
+      expect(targetRowCount()).toBe(1);
+    });
+
+    it('on POST /assign/:userId of a role that holds it', async () => {
+      getState().rolePermissions.push({
+        id: 'rp-target',
+        roleId: TARGET_ROLE_ID,
+        permissionId: deleteUserId(),
+        conditions: deny
+      });
+      const token = await login();
+
+      const res = await call(token, 'POST', `/assign/${callerId()}`, {
+        roleId: TARGET_ROLE_ID
+      });
+
+      expect(res.status).toBe(201);
+      expect(getState().users.get(callerId())?.roles).toContain('target');
+    });
   });
 });

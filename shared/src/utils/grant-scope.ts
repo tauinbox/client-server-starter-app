@@ -180,6 +180,11 @@ function grantItemRefusal(
   item: GrantScopeItem,
   ctx: GrantScopeContext
 ): GrantRefusal | null {
+  // A deny only narrows the reach of the holders, so adding one is never an
+  // escalation, even on a pair the caller does not hold. Removing one is the
+  // widening, and findLiftRefusal guards it.
+  if (isDenyCondition(item.bodyConditions)) return null;
+
   const permissionLabel = `${item.actionName}:${item.subject}`;
 
   if (!ability.can(item.actionName, item.subject)) {
@@ -195,10 +200,7 @@ function grantItemRefusal(
   // A caller under a deny can still act on the rows it leaves open, but an
   // allow they hand out carries no copy of that deny, so the grantee would
   // reach exactly the rows the caller is barred from.
-  if (
-    !isDenyCondition(item.bodyConditions) &&
-    allRules.some((r) => r.inverted)
-  ) {
+  if (allRules.some((r) => r.inverted)) {
     return refusal(
       item,
       `Cannot grant ${permissionLabel} - caller holds it under a restriction`,
@@ -275,6 +277,8 @@ function grantItemRefusal(
  * the authored `PermissionCondition` while the caller's rules carry the
  * already-resolved MongoQuery. Resolving the body with the caller's own id is
  * what makes the two comparable.
+ *
+ * An item with a deny effect always passes: a deny can only narrow access.
  *
  * Returns the refusal of the first item that fails, or null. Callers with
  * `manage:all` (super) bypass all checks.
