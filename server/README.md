@@ -616,7 +616,8 @@ are:
   stale row on the provider-managed path uses the same guard.
 - `POST subscription/change` does an immediate prorated change of the plan or of the mode.
   `POST subscription/change/preview` gives the cost and applies nothing.
-- `POST subscription/cancel` cancels at the end of the period by default.
+- `POST subscription/cancel` cancels at the end of the period by default. A second period-end
+  cancel answers 409 `errors.billing.cancellationAlreadyScheduled`.
 - `POST payment-method` starts the card replacement at the provider. Paddle gives its
   payment-method-change checkout. YooKassa does a zero-amount re-bind, and its webhook changes the
   default method. A `past_due` subscription can use this route, because it is how dunning recovers.
@@ -651,7 +652,9 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
 - `POST subscriptions/:id/cancel` answers 409 when the subscription is no longer open. The route
   takes an id, thus a person can address a canceled row here. The self-service cancel cannot get
   such a row. Without the 409, a repeat asks the provider again, emits the cancel event again, and
-  writes a second audit entry.
+  writes a second audit entry. A period-end cancel of a row with a scheduled cancel, or of an
+  `incomplete` row, answers 409 `errors.billing.cancellationAlreadyScheduled` for the same reason.
+  An immediate cancel of such a row is allowed.
 - `POST invoices/:id/refund`. The system tracks the refunds cumulatively in `refunded_minor`, and
   the sum cannot be more than `amount_minor`. When the cumulative refunds reach the total, the
   invoice becomes `refunded`. That flip revokes the `CustomerGrant` of a one-time sku and takes the
@@ -726,7 +729,9 @@ It refuses a subscription with a scheduled cancel. It requires a price for the s
 
 The administrator cancel differs from the self-service cancel in two ways only: how it finds the row,
 and how it names the owner. The two run the same `cancelOpenSubscription` tail. That tail refuses a
-row that is not open, asks the provider, and writes the cancel columns under a status predicate. It
+row that is not open, and a period-end cancel of a row that is `incomplete` or already scheduled. It
+asks the provider, and writes the cancel columns under a predicate: an open status for an immediate
+cancel; `trialing`, `active` or `past_due` with no scheduled cancel for a period-end cancel. It
 answers 409 when the predicate matches nothing. Thus a cancel that lands during the provider round
 trip loses, and it does not overwrite the row.
 

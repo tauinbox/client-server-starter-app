@@ -201,6 +201,7 @@
       "subscriptionBusy": "This subscription is already being updated. Please try again.",
       "subscriptionAlreadyCanceled": "This subscription is already canceled.",
       "cancellationScheduled": "A cancellation is scheduled for this subscription, so its plan can no longer be changed.",
+      "cancellationAlreadyScheduled": "A cancellation is already scheduled for the end of the period.",
       "renewalInProgress": "The billing period has ended and its renewal is in progress. Try again shortly.",
       "planChangeConflict": "The subscription changed while the plan change was in progress. Please try again.",
       "planChangePaymentConflict": "The subscription changed while the payment was in progress, so the plan was not switched. Any amount charged is on your invoices.",

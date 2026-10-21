@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, type Repository } from 'typeorm';
 import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
   OPEN_SUBSCRIPTION_STATUSES,
   isOpenStatus
@@ -21,6 +22,37 @@ function alreadyCanceled(): ConflictException {
   });
 }
 
+/**
+ * Why `mode` cannot be applied to the row as it is now, or null. A period-end
+ * cancel needs a paid period that no cancel has claimed yet; an immediate
+ * cancel needs an open row only, so an administrator can still end an
+ * `incomplete` or a scheduled row now.
+ */
+function cancelRefusal(
+  subscription: Subscription,
+  mode: CancelMode
+): ConflictException | null {
+  if (!isOpenStatus(subscription.status)) {
+    return alreadyCanceled();
+  }
+  if (mode === 'immediate') {
+    return null;
+  }
+  if (subscription.status === 'incomplete') {
+    return new ConflictException({
+      message: 'This subscription has no paid period to end.',
+      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+    });
+  }
+  if (subscription.cancelAtPeriodEnd) {
+    return new ConflictException({
+      message: 'A cancellation is already scheduled for the end of the period.',
+      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+    });
+  }
+  return null;
+}
+
 /** What the cancel tail needs from whichever service is running it. */
 export interface CancelSubscriptionDeps {
   subscriptions: Repository<Subscription>;
@@ -36,9 +68,9 @@ export interface CancelSubscriptionDeps {
  * cancel. The two callers differ solely in how they find the row (caller-scoped
  * vs by id) and how they name its owner, so both are passed in.
  *
- * Both ends are guarded on an open status, mirroring `RenewalService`: the
- * pre-check keeps a canceled row from reaching the provider a second time, and
- * the predicate on the write is what makes a cancel that lands during the
+ * Both ends are guarded, mirroring `RenewalService`: the pre-check keeps a
+ * canceled or already scheduled row from reaching the provider a second time,
+ * and the predicate on the write is what makes a cancel that lands during the
  * provider round-trip lose instead of overwriting it. Without them a repeat
  * cancel re-runs the whole flow — a second provider call, a second event, and a
  * second audit row — and a `period_end` repeat leaves `canceled` together with
@@ -53,8 +85,9 @@ export async function cancelOpenSubscription(
   mode: CancelMode,
   resolveUserId: (subscription: Subscription) => Promise<string | null>
 ): Promise<Subscription> {
-  if (!isOpenStatus(subscription.status)) {
-    throw alreadyCanceled();
+  const refusal = cancelRefusal(subscription, mode);
+  if (refusal) {
+    throw refusal;
   }
 
   // Provider-managed lifecycle: ask the provider to cancel; the resulting
@@ -74,14 +107,19 @@ export async function cancelOpenSubscription(
   }
 
   const fields = cancelFields(mode);
+  const predicate =
+    mode === 'immediate'
+      ? { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) }
+      : {
+          id: subscription.id,
+          status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
+          cancelAtPeriodEnd: false
+        };
   const applied = await deps.subscriptions.manager.transaction(
     async (manager) => {
       const update = await manager
         .withRepository(deps.subscriptions)
-        .update(
-          { id: subscription.id, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
-          fields
-        );
+        .update(predicate, fields);
       if (update.affected === 1 && mode === 'immediate') {
         await deps.credits.releaseHolds(manager, {
           subscriptionId: subscription.id
@@ -91,7 +129,11 @@ export async function cancelOpenSubscription(
     }
   );
   if (applied.affected !== 1) {
-    throw alreadyCanceled();
+    // A concurrent writer won: name what it did, not what this call wanted.
+    const current = await deps.subscriptions.findOne({
+      where: { id: subscription.id }
+    });
+    throw (current && cancelRefusal(current, mode)) ?? alreadyCanceled();
   }
 
   Object.assign(subscription, fields);

@@ -200,6 +200,16 @@ export class BillingAdminListComponent implements OnInit {
     return isOpenStatus(subscription.status);
   }
 
+  // A period-end cancel needs a paid period that no cancel has claimed yet
+  // (mirrors the server guard); an immediate cancel stays available.
+  canCancelAtPeriodEnd(subscription: SubscriptionResponse): boolean {
+    return (
+      this.canCancel(subscription) &&
+      subscription.status !== 'incomplete' &&
+      !subscription.cancelAtPeriodEnd
+    );
+  }
+
   // Only paid invoices can be refunded (mirrors the server guard).
   canRefund(invoice: InvoiceResponse): boolean {
     return invoice.status === 'paid';
