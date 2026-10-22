@@ -397,6 +397,11 @@ test.describe('Billing', () => {
     await expect(page).toHaveURL(MOCK_CHECKOUT_URL);
     await page.getByRole('link', { name: 'Cancel' }).click();
     await expect(page).toHaveURL(/\/billing\/cancel$/);
+    // A navigation that aborts the bootstrap refresh of the page ends the
+    // session (lost rotation response), so wait for the page to render.
+    await expect(
+      page.getByRole('heading', { name: 'Checkout canceled' })
+    ).toBeVisible();
 
     await page.goto('/billing');
     const pro = page.locator('nxs-plan-card', { hasText: 'Pro' });
@@ -429,6 +434,9 @@ test.describe('Billing', () => {
     await expect(page).toHaveURL(MOCK_CHECKOUT_URL);
     await page.getByRole('link', { name: 'Cancel' }).click();
     await expect(page).toHaveURL(/\/billing\/cancel$/);
+    await expect(
+      page.getByRole('heading', { name: 'Checkout canceled' })
+    ).toBeVisible();
 
     await page.goto('/billing/settings');
     const region = page.locator('.settings-header .region-control');
@@ -744,5 +752,43 @@ test.describe('Billing', () => {
     await expect(
       page.locator('.invoice-table tbody tr', { hasText: '$2.84' })
     ).toHaveCount(0);
+  });
+
+  test('a switch from a usage plan shows the credits it spent without a reload', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+
+    const subscription = await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'usage'
+    });
+    await page.goto('/billing');
+    await page
+      .locator('nxs-product-card', { hasText: '1000 credits' })
+      .getByRole('button', { name: 'Buy' })
+      .click();
+    await payOnMockCheckout(page);
+    await expect(page).toHaveURL(/\/billing\/success$/);
+    await _mockServer.seedBillingUsage({
+      customerId: subscription.customerId,
+      quantity: 142
+    });
+
+    await page.goto('/billing/settings');
+    const units = page.locator('.credits-card .credits-units');
+    await expect(units).toHaveText('1,000');
+
+    // The switch bills the 142 units of the closing window with credits.
+    await page.getByRole('button', { name: 'Change plan' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: 'Fixed' }).click();
+    await dialog.getByRole('radio', { name: /^Pro/ }).click();
+    await expect(dialog.locator('.due-now dd')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+
+    await expect(page.locator('.plan-summary')).toContainText('Pro');
+    await expect(units).toHaveText('858');
   });
 });

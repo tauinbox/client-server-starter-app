@@ -252,8 +252,9 @@ export const BillingStore = signalStore(
     /**
      * Instantly switch the subscription to another plan (prorated server-side),
      * then quietly refresh the artifacts the switch produces: the proration
-     * receipt rows in the invoice history and the usage summary (the billing
-     * mode may have changed).
+     * receipt rows in the invoice history, the usage summary (the billing
+     * mode may have changed) and the credit balance (a switch from a usage
+     * plan bills the closing window with credits).
      */
     async function changePlan(planKey: string): Promise<boolean> {
       patchState(store, { working: true });
@@ -271,13 +272,14 @@ export const BillingStore = signalStore(
         patchState(store, { working: false });
       }
       try {
-        const [usage] = await Promise.all([
+        const [usage, credits] = await Promise.all([
           firstValueFrom(billing.getUsage()),
+          firstValueFrom(billing.getCredits()),
           refreshInvoices()
         ]);
-        patchState(store, { usage });
+        patchState(store, { usage, credits });
       } catch {
-        // The switch itself succeeded and was reported; a stale invoice list
+        // The switch itself succeeded and was reported; a stale slice
         // self-heals on the next settings load.
       }
       return true;
