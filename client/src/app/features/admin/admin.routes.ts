@@ -3,6 +3,7 @@ import type { Routes } from '@angular/router';
 import { permissionGuard } from '@features/auth/guards/permission.guard';
 import { adminPanelGuard } from './guards/admin-panel.guard';
 import { UsersStore } from '@features/users/store/users.store';
+import { userRoutes } from '@features/users/users.routes';
 import { RolesStore } from './store/roles.store';
 import { ResourcesStore } from './store/resources.store';
 import { FeatureFlagsAdminStore } from './store/feature-flags-admin.store';
@@ -46,30 +47,7 @@ export const adminRoutes: Routes = [
       {
         path: 'users',
         children: [
-          {
-            path: '',
-            loadComponent: () =>
-              import('@features/users/components/user-list/user-list.component').then(
-                (c) => c.UserListComponent
-              ),
-            canActivate: [permissionGuard('search', 'User')]
-          },
-          {
-            path: ':id',
-            loadComponent: () =>
-              import('@features/users/components/user-detail/user-detail.component').then(
-                (c) => c.UserDetailComponent
-              ),
-            canActivate: [permissionGuard('read', 'User')]
-          },
-          {
-            path: ':id/edit',
-            loadComponent: () =>
-              import('@features/users/components/user-edit/user-edit.component').then(
-                (c) => c.UserEditComponent
-              ),
-            canActivate: [permissionGuard('update', 'User')]
-          },
+          ...userRoutes,
           {
             path: ':id/permissions',
             loadComponent: () =>
