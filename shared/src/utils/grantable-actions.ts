@@ -13,6 +13,28 @@ export function grantableActionNames(resource: {
 }
 
 /**
+ * Whether a write of `allowedActionNames` changes the grantable actions, and
+ * so the abilities of each holder of a role with a grant on the resource.
+ */
+export function changesGrantableActions(
+  resource: {
+    actionNames: readonly string[];
+    allowedActionNames: readonly string[] | null;
+  },
+  allowedActionNames: readonly string[] | null
+): boolean {
+  const before = grantableActionNames(resource);
+  const after = grantableActionNames({
+    actionNames: resource.actionNames,
+    allowedActionNames
+  });
+  return (
+    after.some((name) => !before.includes(name)) ||
+    before.some((name) => !after.includes(name))
+  );
+}
+
+/**
  * The actions that a write of `allowedActionNames` offers again: grantable
  * after the write and not before it.
  */

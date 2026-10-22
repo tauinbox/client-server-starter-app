@@ -29,9 +29,12 @@ import { AuditService } from '../../audit/audit.service';
 import type { AuditLogParams } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
+  changesGrantableActions,
   grantableActionNames,
   reofferedActionNames
 } from '@app/shared/utils/grantable-actions';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceActionsChangedEvent } from '../events/resource-actions-changed.event';
 import { subject } from '@casl/ability';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { assertCan } from '../../../common/utils/assert-can.util';
@@ -60,7 +63,8 @@ export class ResourceService {
     private readonly cacheManager: Cache,
     private readonly registry: ResourceRegistryService,
     private readonly metrics: MetricsService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2
   ) {
     this.#subjectMapVersion = new CacheVersionCounter(
       cacheManager,
@@ -171,10 +175,14 @@ export class ResourceService {
         actorId
       );
     }
+    const grantsChange =
+      data.allowedActionNames !== undefined &&
+      changesGrantableActions(resource, data.allowedActionNames);
     const auditRow = audit?.({ ...resource });
     Object.assign(resource, data);
     const saved = await this.saveAudited(resource, auditRow);
     await this.invalidateSubjectMapCache();
+    if (grantsChange) this.#emitActionsChanged();
     return saved;
   }
 
@@ -283,19 +291,21 @@ export class ResourceService {
         HttpStatus.BAD_REQUEST
       );
     }
-    if (resource.isOrphaned) {
-      this.assertCanWiden(
-        ability,
-        resource,
-        grantableActionNames(resource),
-        actorId
-      );
-    }
+    const woken = resource.isOrphaned ? grantableActionNames(resource) : [];
+    this.assertCanWiden(ability, resource, woken, actorId);
     resource.isOrphaned = false;
     const saved = await this.saveAudited(resource, audit);
     await this.invalidateSubjectMapCache();
+    if (woken.length > 0) this.#emitActionsChanged();
     saved.isRegistered = true;
     return saved;
+  }
+
+  #emitActionsChanged(): void {
+    this.eventEmitter.emit(
+      ResourceActionsChangedEvent.name,
+      new ResourceActionsChangedEvent()
+    );
   }
 
   async upsertResource(data: {
