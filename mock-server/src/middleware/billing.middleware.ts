@@ -18,6 +18,7 @@ import {
   meteredWindowStart,
   overrideForRegion,
   prorationAmounts,
+  rateUsage,
   regionForOverride,
   renewalAnchor,
   usageIngestStart
@@ -431,19 +432,17 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
     sub.currentPeriodEnd
   );
 
-  const includedUnits = price.includedUnits ?? 0;
-  const unitPriceMinor = price.unitPriceMinor ?? 0;
-  const billableUnits = Math.max(0, totalUnits - includedUnits);
+  const rated = rateUsage({ totalUnits, price });
   const summary: UsageSummaryResponse = {
     subscriptionId: sub.id,
     meterKey: plan.meterKey,
     periodStart: windowStart,
     periodEnd: sub.currentPeriodEnd,
     totalUnits,
-    includedUnits,
-    billableUnits,
-    unitPriceMinor,
-    amountMinor: billableUnits * unitPriceMinor,
+    includedUnits: rated.includedUnits,
+    billableUnits: rated.billableUnits,
+    unitPriceMinor: rated.unitPriceMinor,
+    amountMinor: rated.amountMinor,
     currency: price.currency
   };
   res.json(summary);

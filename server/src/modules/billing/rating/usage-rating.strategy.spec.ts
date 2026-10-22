@@ -146,34 +146,6 @@ describe('UsageRating', () => {
     });
   });
 
-  it('charges nothing while usage stays within the included units', async () => {
-    mockTotal(99);
-
-    const summary = await rating.summarizeForPeriod(
-      makeSubscription(),
-      makePlan(),
-      PERIOD
-    );
-
-    expect(summary.totalUnits).toBe(99);
-    expect(summary.billableUnits).toBe(0);
-    expect(summary.amountMinor).toBe(0);
-    expect(summary.receiptItems).toEqual([]);
-  });
-
-  it('charges nothing at exactly the included-units boundary', async () => {
-    mockTotal(100);
-
-    const summary = await rating.summarizeForPeriod(
-      makeSubscription(),
-      makePlan(),
-      PERIOD
-    );
-
-    expect(summary.billableUnits).toBe(0);
-    expect(summary.amountMinor).toBe(0);
-  });
-
   it('charges only the overage beyond the included units', async () => {
     mockTotal(142);
 
@@ -193,46 +165,6 @@ describe('UsageRating', () => {
         quantity: 1
       }
     ]);
-  });
-
-  it('treats a price without includedUnits/unitPriceMinor as zero values', async () => {
-    mockTotal(10);
-
-    const summary = await rating.summarizeForPeriod(
-      makeSubscription(),
-      makePlan({ prices: { yookassa: { currency: 'RUB', amountMinor: 0 } } }),
-      PERIOD
-    );
-
-    expect(summary.billableUnits).toBe(10);
-    expect(summary.amountMinor).toBe(0);
-    expect(summary.receiptItems).toEqual([]);
-  });
-
-  it('rates an overage product that exceeds int32 without overflow or precision loss', async () => {
-    // 50_000 billable units at 50_000 minor each = 2_500_000_000 minor, beyond
-    // the old int32 column ceiling (2_147_483_647). The bigint Money path keeps
-    // it exact — the pre-fix integer column threw 22003 on the invoice insert.
-    mockTotal(50_000);
-    const plan = makePlan({
-      prices: {
-        yookassa: {
-          currency: 'RUB',
-          amountMinor: 0,
-          unitPriceMinor: 50_000,
-          includedUnits: 0
-        }
-      }
-    });
-
-    const summary = await rating.summarizeForPeriod(
-      makeSubscription(),
-      plan,
-      PERIOD
-    );
-
-    expect(summary.billableUnits).toBe(50_000);
-    expect(summary.amountMinor).toBe(2_500_000_000);
   });
 
   it('rejects a plan with no price for the subscription’s provider', async () => {
@@ -287,58 +219,6 @@ describe('UsageRating', () => {
         chargedUnits: 0,
         amountMinor: 0,
         receiptItems: []
-      });
-    });
-
-    it('changes nothing with zero credits available', async () => {
-      mockTotal(142);
-
-      const summary = await rating.summarizeForPeriodWithCredits(
-        makeSubscription(),
-        makePlan(),
-        PERIOD,
-        0
-      );
-
-      expect(summary).toMatchObject({
-        creditUnitsApplied: 0,
-        chargedUnits: 42,
-        amountMinor: 8400
-      });
-    });
-
-    it('ignores a negative available balance (nothing to spend)', async () => {
-      mockTotal(142);
-
-      const summary = await rating.summarizeForPeriodWithCredits(
-        makeSubscription(),
-        makePlan(),
-        PERIOD,
-        -100
-      );
-
-      expect(summary).toMatchObject({
-        creditUnitsApplied: 0,
-        chargedUnits: 42,
-        amountMinor: 8400
-      });
-    });
-
-    it('spends no credits on a period with no overage', async () => {
-      mockTotal(99);
-
-      const summary = await rating.summarizeForPeriodWithCredits(
-        makeSubscription(),
-        makePlan(),
-        PERIOD,
-        50
-      );
-
-      expect(summary).toMatchObject({
-        billableUnits: 0,
-        creditUnitsApplied: 0,
-        chargedUnits: 0,
-        amountMinor: 0
       });
     });
   });

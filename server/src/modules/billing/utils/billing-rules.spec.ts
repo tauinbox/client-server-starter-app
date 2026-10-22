@@ -4,6 +4,7 @@ import {
   meteredWindowStart,
   overrideForRegion,
   prorationAmounts,
+  rateUsage,
   regionForOverride,
   renewalAnchor,
   usageIngestStart
@@ -161,5 +162,71 @@ describe('prorationAmounts', () => {
       chargeMinor: 193_333
     });
     expect(fromText).toEqual(fromDates);
+  });
+});
+
+describe('rateUsage', () => {
+  const price = { includedUnits: 100, unitPriceMinor: 200 };
+
+  it.each([
+    [99, 0],
+    [100, 0],
+    [142, 42]
+  ])('bills %i units past the included units as %i', (totalUnits, billable) => {
+    expect(rateUsage({ totalUnits, price })).toEqual({
+      includedUnits: 100,
+      unitPriceMinor: 200,
+      billableUnits: billable,
+      creditUnitsApplied: 0,
+      chargedUnits: billable,
+      amountMinor: billable * 200
+    });
+  });
+
+  it('treats a price without includedUnits and unitPriceMinor as zero values', () => {
+    expect(rateUsage({ totalUnits: 10, price: {} })).toMatchObject({
+      includedUnits: 0,
+      unitPriceMinor: 0,
+      billableUnits: 10,
+      amountMinor: 0
+    });
+  });
+
+  it('prices an amount beyond int32 without precision loss', () => {
+    // 50_000 units at 50_000 minor each exceed the int32 ceiling 2_147_483_647.
+    const rated = rateUsage({
+      totalUnits: 50_000,
+      price: { includedUnits: 0, unitPriceMinor: 50_000 }
+    });
+    expect(rated.amountMinor).toBe(2_500_000_000);
+  });
+
+  it.each([
+    ['partial credits', 10, 10, 32],
+    ['credits beyond the billable units', 1000, 42, 0],
+    ['zero credits', 0, 0, 42],
+    ['a negative balance', -100, 0, 42]
+  ])(
+    'offsets the billable units with %s',
+    (_label, availableCreditUnits, applied, charged) => {
+      expect(
+        rateUsage({ totalUnits: 142, price, availableCreditUnits })
+      ).toMatchObject({
+        billableUnits: 42,
+        creditUnitsApplied: applied,
+        chargedUnits: charged,
+        amountMinor: charged * 200
+      });
+    }
+  );
+
+  it('spends no credits on a period with no overage', () => {
+    expect(
+      rateUsage({ totalUnits: 99, price, availableCreditUnits: 50 })
+    ).toMatchObject({
+      billableUnits: 0,
+      creditUnitsApplied: 0,
+      amountMinor: 0
+    });
   });
 });

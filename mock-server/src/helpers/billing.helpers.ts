@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { meteredWindowStart } from '@app/shared/utils/billing-rules';
+import { meteredWindowStart, rateUsage } from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import type { MockInvoice, MockPlan, MockSubscription } from '../types';
 
@@ -59,12 +59,12 @@ export function billClosingUsagePeriod(
     closedStart,
     nowIso
   );
-  const billableUnits = Math.max(0, totalUnits - (price.includedUnits ?? 0));
   const balance = state.billingCreditBalances.get(subscription.customerId);
-  const creditUnitsApplied = Math.min(
-    Math.max(0, balance?.balanceUnits ?? 0),
-    billableUnits
-  );
+  const { creditUnitsApplied, amountMinor } = rateUsage({
+    totalUnits,
+    price,
+    availableCreditUnits: balance?.balanceUnits ?? 0
+  });
   if (balance && creditUnitsApplied > 0) {
     balance.balanceUnits -= creditUnitsApplied;
     balance.updatedAt = nowIso;
@@ -76,8 +76,7 @@ export function billClosingUsagePeriod(
     subscriptionId: subscription.id,
     provider: subscription.provider,
     providerInvoiceRef: `in_${randomUUID()}`,
-    amountMinor:
-      (billableUnits - creditUnitsApplied) * (price.unitPriceMinor ?? 0),
+    amountMinor,
     currency: price.currency,
     status: 'paid',
     billingMode: 'usage',
