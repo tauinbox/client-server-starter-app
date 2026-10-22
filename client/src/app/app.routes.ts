@@ -1,12 +1,12 @@
 import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
-import { permissionGuard } from '@features/auth/guards/permission.guard';
 import { guestGuard } from '@features/auth/guards/guest.guard';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
 import { UsersStore } from '@features/users/store/users.store';
+import { userRoutes } from '@features/users/users.routes';
 
 export const routes: Routes = [
   {
@@ -49,32 +49,7 @@ export const routes: Routes = [
   {
     path: AppRouteSegmentEnum.Users,
     providers: [UsersStore],
-    children: [
-      {
-        path: '',
-        loadComponent: () =>
-          import('./features/users/components/user-list/user-list.component').then(
-            (c) => c.UserListComponent
-          ),
-        canActivate: [permissionGuard('search', 'User')]
-      },
-      {
-        path: ':id',
-        loadComponent: () =>
-          import('./features/users/components/user-detail/user-detail.component').then(
-            (c) => c.UserDetailComponent
-          ),
-        canActivate: [permissionGuard('read', 'User')]
-      },
-      {
-        path: ':id/edit',
-        loadComponent: () =>
-          import('./features/users/components/user-edit/user-edit.component').then(
-            (c) => c.UserEditComponent
-          ),
-        canActivate: [permissionGuard('update', 'User')]
-      }
-    ]
+    children: userRoutes
   },
   {
     path: AppRouteSegmentEnum.Admin,

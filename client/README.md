@@ -124,7 +124,9 @@ src/app/
 │   │   │   └── user-permissions/  # UserPermissionsComponent is a read-only preview of the
 │   │   │                          # effective permissions. It groups them by resource in a
 │   │   │                          # mat-accordion and shows a deny indicator.
-│   │   └── store/          # UsersStore is an NgRx Signal Store at route level.
+│   │   ├── store/          # UsersStore is an NgRx Signal Store at route level.
+│   │   └── users.routes.ts # userRoutes: list, detail and edit with their guards. /users and
+│   │                       # /admin/users use the same array.
 │   ├── admin/              # Admin panel: roles, resources and users
 │       ├── admin.routes.ts # Child routes below /admin. The router loads them on demand.
 │       ├── components/
