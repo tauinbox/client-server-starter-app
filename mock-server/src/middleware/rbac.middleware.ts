@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import {
+  changesGrantableActions,
   grantableActionNames,
   reofferedActionNames
 } from '@app/shared/utils/grantable-actions';
+import { pushToAll } from '../sse-hub';
 import { ErrorKeys, RESOURCE_LIST_QUERY } from '@app/shared/constants';
 import {
   listPage,
@@ -102,14 +104,16 @@ router.post(
       return;
     }
 
-    if (
-      resource.isOrphaned &&
-      !assertCanWiden(req, res, resource, grantableActionNames(resource))
-    ) {
+    const woken = resource.isOrphaned ? grantableActionNames(resource) : [];
+    if (!assertCanWiden(req, res, resource, woken)) {
       return;
     }
 
     resource.isOrphaned = false;
+    // Mirrors the server's ResourceActionsChangedEvent broadcast.
+    if (woken.length > 0) {
+      pushToAll({ type: 'permissions_updated' });
+    }
 
     const actor = (req as AuthenticatedRequest).user;
     logAudit('RESOURCE_RESTORE', {
@@ -233,6 +237,9 @@ router.patch(
       description,
       allowedActionNames
     });
+    const grantsChange =
+      allowedActionNames !== undefined &&
+      changesGrantableActions(resource, allowedActionNames as string[] | null);
 
     if (displayName !== undefined) {
       resource.displayName = displayName;
@@ -244,6 +251,10 @@ router.patch(
 
     if (allowedActionNames !== undefined) {
       resource.allowedActionNames = allowedActionNames;
+    }
+
+    if (grantsChange) {
+      pushToAll({ type: 'permissions_updated' });
     }
 
     const actor = (req as AuthenticatedRequest).user;

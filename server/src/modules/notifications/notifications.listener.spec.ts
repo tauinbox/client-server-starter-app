@@ -171,6 +171,14 @@ describe('NotificationsListener', () => {
     expect(service.push).not.toHaveBeenCalled();
   });
 
+  it('should broadcast permissions_updated in one call on ResourceActionsChangedEvent', () => {
+    listener.handleResourceActionsChanged();
+
+    expect(service.pushToAll.mock.calls).toEqual([
+      [{ type: 'permissions_updated' }]
+    ]);
+  });
+
   describe('user_list_stale', () => {
     // The listener does not read the manager of a role event.
     const em = {} as EntityManager;

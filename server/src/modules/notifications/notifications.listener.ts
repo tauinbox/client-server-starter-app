@@ -7,6 +7,7 @@ import { UserCreatedEvent } from '../users/events/user-created.event';
 import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
+import { ResourceActionsChangedEvent } from '../auth/events/resource-actions-changed.event';
 import { RoleRenamedEvent } from '../auth/events/role-renamed.event';
 import { RoleDeletedEvent } from '../auth/events/role-deleted.event';
 import { UsersService } from '../users/services/users.service';
@@ -89,6 +90,13 @@ export class NotificationsListener {
     await this.notificationsService.pushToUsers(event.userIds, {
       type: 'permissions_updated'
     });
+  }
+
+  // The event names no users, and a super user's abilities do not change, but
+  // a one-message broadcast costs less than finding the holders.
+  @OnEvent(ResourceActionsChangedEvent.name)
+  handleResourceActionsChanged(): void {
+    this.notificationsService.pushToAll({ type: 'permissions_updated' });
   }
 
   async #pushUserCrudEvent(

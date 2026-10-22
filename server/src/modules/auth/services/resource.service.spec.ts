@@ -2,7 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { HttpException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceService } from './resource.service';
+import { ResourceActionsChangedEvent } from '../events/resource-actions-changed.event';
 import { ResourceRegistryService } from './resource-registry.service';
 import { Resource } from '../entities/resource.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -54,6 +56,7 @@ describe('ResourceService', () => {
     recordCacheAccess: jest.Mock;
     recordPermissionDenied: jest.Mock;
   };
+  let mockEventEmitter: { emit: jest.Mock<boolean, [string, unknown]> };
 
   const resource1: Resource = {
     id: 'res-1',
@@ -158,6 +161,8 @@ describe('ResourceService', () => {
       recordPermissionDenied: jest.fn()
     };
 
+    mockEventEmitter = { emit: jest.fn<boolean, [string, unknown]>() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceService,
@@ -168,7 +173,8 @@ describe('ResourceService', () => {
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: ResourceRegistryService, useValue: mockRegistry },
         { provide: MetricsService, useValue: mockMetrics },
-        { provide: AuditService, useValue: mockAudit }
+        { provide: AuditService, useValue: mockAudit },
+        { provide: EventEmitter2, useValue: mockEventEmitter }
       ]
     }).compile();
 
@@ -405,6 +411,82 @@ describe('ResourceService', () => {
         2,
         expect.objectContaining({ allowedActionNames: null })
       );
+    });
+  });
+
+  describe('push of a change of the grantable actions', () => {
+    const emitted = () =>
+      mockEventEmitter.emit.mock.calls.filter(
+        ([name]) => name === ResourceActionsChangedEvent.name
+      );
+
+    it('emits once after a narrowing, a widening and a reset to null are committed', async () => {
+      const writes: [string[] | null, string[] | null][] = [
+        [null, ['read']],
+        [['read'], ['read', 'update']],
+        [['read'], null]
+      ];
+      for (const [before, allowedActionNames] of writes) {
+        mockResourceRepo.findOne.mockResolvedValue({
+          ...resource1,
+          allowedActionNames: before
+        });
+        mockEventEmitter.emit.mockClear();
+        mockResourceRepo.save.mockImplementationOnce((data: unknown) => {
+          expect(emitted()).toHaveLength(0);
+          return Promise.resolve(data);
+        });
+
+        await service.update('res-1', { allowedActionNames }, superAbility);
+
+        expect(emitted()).toHaveLength(1);
+      }
+    });
+
+    it('emits nothing when the grantable actions stay the same', async () => {
+      const writes = [
+        { displayName: 'Members' },
+        { allowedActionNames: ['update', 'read'] },
+        { allowedActionNames: null }
+      ];
+      for (const data of writes) {
+        mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+        await service.update('res-1', data, superAbility);
+      }
+
+      expect(mockResourceRepo.save).toHaveBeenCalledTimes(3);
+      expect(emitted()).toHaveLength(0);
+    });
+
+    it('emits nothing when the write fails', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      mockResourceRepo.save.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(
+        service.update('res-1', { allowedActionNames: ['read'] }, superAbility)
+      ).rejects.toThrow('db down');
+      expect(emitted()).toHaveLength(0);
+    });
+
+    it('emits once after the restore of an orphaned resource that wakes a grant', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
+
+      await service.restore('res-3', superAbility);
+
+      expect(emitted()).toHaveLength(1);
+    });
+
+    it('emits nothing after a restore that wakes no grant', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      await service.restore('res-1', superAbility);
+      mockResourceRepo.findOne.mockResolvedValue({
+        ...orphanedResource,
+        allowedActionNames: []
+      });
+      await service.restore('res-3', superAbility);
+
+      expect(mockResourceRepo.save).toHaveBeenCalledTimes(2);
+      expect(emitted()).toHaveLength(0);
     });
   });
 

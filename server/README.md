@@ -477,8 +477,11 @@ of the push (or a super role), so the abilities of the other users are not resol
 the bus does nothing.
 
 `notifications.listener.ts` holds the `@OnEvent()` handlers. They react to `UserDeleted`,
-`UserPasswordChanged`, `UserCreated`, `UserUpdated`, `UserRestored`, `UserRoleChanged` and
-`UserRolePermissionsChanged`, and each one pushes a message.
+`UserCreated`, `UserUpdated`, `UserRestored`, `RoleRenamed`, `RoleDeleted`,
+`RolePermissionsChanged` and `ResourceActionsChanged`, and each one pushes a message.
+`ResourceActionsChanged` (a change of the grantable actions of a resource) sends
+`permissions_updated` to every connected user, because a holder of a grant on the resource can
+be in any role.
 
 `notifications.controller.ts` holds `GET /stream`. The `@Sse()` decorator returns
 `NotificationsService.openStream()`: the events of the connection, merged with a heartbeat each
