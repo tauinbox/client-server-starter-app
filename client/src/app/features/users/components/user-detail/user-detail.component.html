@@ -147,7 +147,11 @@
                 {{ t('common.retry') }}
               </button>
             }
-            <button matButton="filled" routerLink="/admin/users">
+            <button
+              *nxsRequirePermissions="{ action: 'search', subject: 'User' }"
+              matButton="filled"
+              routerLink="/admin/users"
+            >
               {{ t('common.back') }}
             </button>
           </div>

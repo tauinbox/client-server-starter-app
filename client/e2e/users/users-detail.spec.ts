@@ -212,6 +212,10 @@ test.describe('User Detail page', () => {
     await expect(
       page.getByRole('heading', { name: 'User not found' })
     ).toBeHidden();
+    // The reader holds no search:User, so the list is not a way back.
+    await expect(
+      page.getByRole('button', { name: 'Back', exact: true })
+    ).toBeHidden();
   });
 
   test('offers a retry when the load fails and shows the user after it', async ({

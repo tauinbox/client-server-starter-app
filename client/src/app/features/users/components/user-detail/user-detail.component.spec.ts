@@ -194,6 +194,20 @@ describe('UserDetailComponent', () => {
         expect(usersStoreMock.loadOne).toHaveBeenLastCalledWith('user-1');
       }
     );
+
+    it.each([false, true])(
+      'shows the way back to the list only when search:User is held (%s)',
+      (canSearch) => {
+        authStoreMock.hasPermissions.mockReturnValue(canSearch);
+        usersStoreMock.detailError.set(403);
+        fixture.detectChanges();
+
+        const back = Array.from(
+          errorCard()?.querySelectorAll<HTMLButtonElement>('button') ?? []
+        ).find((b) => b.textContent?.trim() === 'Back');
+        expect(back !== undefined).toBe(canSearch);
+      }
+    );
   });
 
   describe('edit button visibility', () => {
