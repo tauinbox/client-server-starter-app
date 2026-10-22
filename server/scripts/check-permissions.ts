@@ -5,6 +5,8 @@
  * Fails on:
  *  - a subject used in @Authorize with no matching @RegisterResource
  *  - two resources with one subject
+ *  - two resources with one name: the startup sync keeps the first and skips
+ *    the second, so no permission of the second can be granted
  *  - an @Authorize, client or mock-server check on a reserved CASL action
  *    ('manage', 'all'): only a super role satisfies it, so every grant of the
  *    resource gives nothing
@@ -280,8 +282,18 @@ function main(): void {
 
   // Build lookup: subject → resource
   const subjectToResource = new Map<string, RegisteredResource>();
+  const nameToResource = new Map<string, RegisteredResource>();
   const errors: string[] = [];
   for (const r of allResources) {
+    const nameClash = nameToResource.get(r.name);
+    if (nameClash) {
+      errors.push(
+        `  ${r.file}: resource name "${r.name}" is already registered in ${nameClash.file} — the startup sync skips one of the two, so none of its permissions can be granted`
+      );
+    } else {
+      nameToResource.set(r.name, r);
+    }
+
     const clash = subjectToResource.get(r.subject);
     if (clash) {
       // The DB enforces UQ_resources_subject; without this check the collision

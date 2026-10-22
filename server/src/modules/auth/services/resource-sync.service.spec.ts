@@ -309,16 +309,32 @@ describe('ResourceSyncService', () => {
       );
     });
 
-    it('should deduplicate controllers with the same resource name', async () => {
+    it('syncs the first of two resources with one name and logs an error for the second', async () => {
       const ctrl1 = makeController('ControllerA');
       const ctrl2 = makeController('ControllerB');
       discoveryServiceMock.getControllers.mockReturnValue([ctrl1, ctrl2]);
-      // Both controllers claim the same resource name
-      reflectorMock.get.mockReturnValue(usersMeta);
+      reflectorMock.get.mockImplementation(
+        (_key: string, target: { name: string }) =>
+          target.name === 'ControllerA'
+            ? usersMeta
+            : { ...usersMeta, subject: 'ProbeThing' }
+      );
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
 
       await service.onApplicationBootstrap();
 
       expect(resourceServiceMock.upsertResource).toHaveBeenCalledTimes(1);
+      expect(resourceServiceMock.upsertResource).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'users', subject: 'User' })
+      );
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '"users" on controller "ControllerB" is already registered by "ControllerA"'
+        )
+      );
     });
 
     it('should process multiple distinct resources', async () => {
