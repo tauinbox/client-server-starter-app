@@ -402,7 +402,7 @@ describe('BillingStore', () => {
     expect(notifyMock.success).toHaveBeenCalled();
   });
 
-  it('changePlan patches the subscription and refreshes invoices + usage', async () => {
+  it('changePlan patches the subscription and refreshes invoices, usage and credits', async () => {
     const changeInvoice = { ...invoice, id: 'inv-2', status: 'refunded' };
     billingMock.getInvoices.mockReturnValue(of(page([invoice, changeInvoice])));
     const store = createStore();
@@ -414,6 +414,7 @@ describe('BillingStore', () => {
     expect(store.subscription()?.planKey).toBe('business');
     expect(store.entities()).toHaveLength(2);
     expect(billingMock.getUsage).toHaveBeenCalled();
+    expect(store.credits()).toEqual(creditBalance);
     expect(notifyMock.success).toHaveBeenCalled();
     expect(store.working()).toBe(false);
   });
