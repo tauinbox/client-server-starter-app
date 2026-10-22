@@ -19,6 +19,13 @@
     @include mix.empty-state;
   }
 
+  .error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: vars.$spacing-sm;
+    justify-content: center;
+  }
+
   .user-header {
     display: flex;
     gap: vars.$spacing-md;

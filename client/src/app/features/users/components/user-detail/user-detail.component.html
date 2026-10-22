@@ -123,13 +123,38 @@
           </button>
         </div>
       } @else {
+        @let failure = loadFailure();
         <div class="error-container">
-          <mat-icon class="error-icon">error_outline</mat-icon>
-          <h3>{{ t('users.detail.notFoundTitle') }}</h3>
-          <p>{{ t('users.detail.notFoundMessage') }}</p>
-          <button matButton="filled" routerLink="/admin/users">
-            {{ t('common.back') }}
-          </button>
+          @switch (failure) {
+            @case ('forbidden') {
+              <mat-icon class="error-icon">block</mat-icon>
+              <h3>{{ t('users.detail.errorForbiddenTitle') }}</h3>
+              <p>{{ t('users.detail.errorForbiddenMessage') }}</p>
+            }
+            @case ('notFound') {
+              <mat-icon class="error-icon">error_outline</mat-icon>
+              <h3>{{ t('users.detail.notFoundTitle') }}</h3>
+              <p>{{ t('users.detail.notFoundMessage') }}</p>
+            }
+            @default {
+              <mat-icon class="error-icon">error_outline</mat-icon>
+              <p>{{ t('users.store.errorLoadDetailsFailed') }}</p>
+            }
+          }
+          <div class="error-actions">
+            @if (failure === 'failed') {
+              <button matButton="outlined" (click)="load()">
+                {{ t('common.retry') }}
+              </button>
+            }
+            <button
+              *nxsRequirePermissions="{ action: 'search', subject: 'User' }"
+              matButton="filled"
+              routerLink="/admin/users"
+            >
+              {{ t('common.back') }}
+            </button>
+          </div>
         </div>
       }
     </mat-card-content>

@@ -6,6 +6,7 @@ import {
 } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { mockId } from '../fixtures/ids';
+import { seedUserRole } from '../fixtures/user-roles';
 
 test.describe('User Detail page', () => {
   test('should redirect to login when not authenticated', async ({
@@ -188,5 +189,62 @@ test.describe('User Detail page', () => {
     await expect(
       page.getByRole('heading', { name: 'User not found' })
     ).toBeVisible();
+  });
+
+  test('tells a reader that the grant does not cover the user', async ({
+    _mockServer,
+    page
+  }) => {
+    await seedUserRole(_mockServer, 'smith-reader', {
+      read: { fieldMatch: { lastName: ['Smith'] } }
+    });
+    await loginViaUi(page, _mockServer.url, {
+      id: mockId('user-scoped'),
+      email: 'scoped@example.com',
+      roles: ['smith-reader']
+    });
+
+    await page.goto(`/users/${mockId('user-4')}`);
+
+    await expect(
+      page.getByRole('heading', { name: 'No access to this user' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'User not found' })
+    ).toBeHidden();
+    // The reader holds no search:User, so the list is not a way back.
+    await expect(
+      page.getByRole('button', { name: 'Back', exact: true })
+    ).toBeHidden();
+  });
+
+  test('offers a retry when the load fails and shows the user after it', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    let failures = 1;
+    await page.route(`**/api/v1/users/${mockId('user-3')}`, (route) => {
+      if (route.request().method() === 'GET' && failures-- > 0) {
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Internal error', statusCode: 500 })
+        });
+      }
+      return route.fallback();
+    });
+    await page.goto(`/users/${mockId('user-3')}`);
+
+    await expect(
+      page.getByText('Failed to load user details. Please try again.')
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'User not found' })
+    ).toBeHidden();
+
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+
+    await expect(page.locator('.user-info h2')).toBeVisible();
   });
 });
