@@ -95,6 +95,50 @@ export function renewalAnchor<T extends Instant>(subscription: {
     : subscription.currentPeriodEnd;
 }
 
+export interface UsageRatingInput {
+  totalUnits: number;
+  price: Pick<PlanPrice, 'includedUnits' | 'unitPriceMinor'>;
+  /** Prepaid credit units the period may spend; a negative balance offers none. */
+  availableCreditUnits?: number;
+}
+
+export interface RatedUsage {
+  includedUnits: number;
+  unitPriceMinor: number;
+  /** Units beyond the included units. */
+  billableUnits: number;
+  creditUnitsApplied: number;
+  /** Billable units that credits did not cover: the only units that cost money. */
+  chargedUnits: number;
+  amountMinor: number;
+}
+
+/**
+ * Rates a metered period: the included units are free, prepaid credits offset
+ * the billable units one-for-one, and the remainder is charged at the unit
+ * price. Pure: the caller reads the available units and deducts
+ * `creditUnitsApplied` itself.
+ */
+export function rateUsage(input: UsageRatingInput): RatedUsage {
+  const { totalUnits, price, availableCreditUnits = 0 } = input;
+  const includedUnits = price.includedUnits ?? 0;
+  const unitPriceMinor = price.unitPriceMinor ?? 0;
+  const billableUnits = Math.max(0, totalUnits - includedUnits);
+  const creditUnitsApplied = Math.min(
+    Math.max(0, availableCreditUnits),
+    billableUnits
+  );
+  const chargedUnits = billableUnits - creditUnitsApplied;
+  return {
+    includedUnits,
+    unitPriceMinor,
+    billableUnits,
+    creditUnitsApplied,
+    chargedUnits,
+    amountMinor: Money.fromMinor(unitPriceMinor).mulInt(chargedUnits).toNumber()
+  };
+}
+
 /** The part of a plan that proration reads. */
 interface PricedPlan {
   prices: Partial<

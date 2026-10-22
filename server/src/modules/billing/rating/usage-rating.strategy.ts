@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { rateUsage } from '@app/shared/utils/billing-rules';
 import { Money } from '@app/shared/utils/money';
 import { UsageRecord } from '../entities/usage-record.entity';
 import type { Plan } from '../entities/plan.entity';
@@ -52,38 +53,6 @@ export class UsageRating {
     period: BillingPeriod,
     availableCreditUnits: number
   ): Promise<CreditedUsageSummary> {
-    const base = await this.summarizeForPeriod(subscription, plan, period);
-    const creditUnitsApplied = Math.min(
-      Math.max(0, availableCreditUnits),
-      base.billableUnits
-    );
-    const chargedUnits = base.billableUnits - creditUnitsApplied;
-    const amountMinor = Money.fromMinor(base.unitPriceMinor)
-      .mulInt(chargedUnits)
-      .toNumber();
-    return {
-      ...base,
-      creditUnitsApplied,
-      chargedUnits,
-      amountMinor,
-      receiptItems:
-        amountMinor > 0
-          ? [
-              {
-                description: `${plan.name}: ${plan.meterKey ?? 'usage'} × ${chargedUnits}`,
-                amountMinor,
-                quantity: 1
-              }
-            ]
-          : []
-    };
-  }
-
-  async summarizeForPeriod(
-    subscription: Subscription,
-    plan: Plan,
-    period: BillingPeriod
-  ): Promise<UsagePeriodSummary> {
     const price = plan.prices[subscription.provider];
     if (!price) {
       throw new Error(
@@ -97,31 +66,31 @@ export class UsageRating {
       ? await this.sumUnits(subscription.id, plan.meterKey, period)
       : 0;
 
-    const includedUnits = price.includedUnits ?? 0;
-    const unitPriceMinor = price.unitPriceMinor ?? 0;
-    const billableUnits = Math.max(0, totalUnits - includedUnits);
-    const amountMinor = Money.fromMinor(unitPriceMinor)
-      .mulInt(billableUnits)
-      .toNumber();
-
+    const rated = rateUsage({ totalUnits, price, availableCreditUnits });
     return {
       totalUnits,
-      includedUnits,
-      billableUnits,
-      unitPriceMinor,
+      ...rated,
       currency: price.currency,
-      amountMinor,
       receiptItems:
-        amountMinor > 0
+        rated.amountMinor > 0
           ? [
               {
-                description: `${plan.name}: ${plan.meterKey ?? 'usage'} × ${billableUnits}`,
-                amountMinor,
+                description: `${plan.name}: ${plan.meterKey ?? 'usage'} × ${rated.chargedUnits}`,
+                amountMinor: rated.amountMinor,
                 quantity: 1
               }
             ]
           : []
     };
+  }
+
+  /** The period rated with no prepaid credits applied. */
+  summarizeForPeriod(
+    subscription: Subscription,
+    plan: Plan,
+    period: BillingPeriod
+  ): Promise<UsagePeriodSummary> {
+    return this.summarizeForPeriodWithCredits(subscription, plan, period, 0);
   }
 
   /**

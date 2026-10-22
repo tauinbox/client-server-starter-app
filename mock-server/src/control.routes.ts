@@ -32,7 +32,7 @@ import {
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
-import { meteredWindowStart } from '@app/shared/utils/billing-rules';
+import { meteredWindowStart, rateUsage } from '@app/shared/utils/billing-rules';
 import { generateMfaPendingToken } from './jwt.utils';
 import {
   billClosingUsagePeriod,
@@ -782,22 +782,19 @@ router.post('/billing/advance-renewal', (req, res) => {
       closedStart,
       nowIso
     );
-    const billableUnits = Math.max(0, totalUnits - (price.includedUnits ?? 0));
-    // Prepaid credits offset billable units one-for-one before pricing,
-    // mirroring the server's summarizeForPeriodWithCredits + spend commit: a
-    // clawed-back negative balance offers nothing, and the deduction settles
-    // with the postpaid invoice below.
+    // The deduction settles with the postpaid invoice below, as the server's
+    // spend commit does.
     const balance = state.billingCreditBalances.get(subscription.customerId);
-    const creditUnitsApplied = Math.min(
-      Math.max(0, balance?.balanceUnits ?? 0),
-      billableUnits
-    );
-    if (balance && creditUnitsApplied > 0) {
-      balance.balanceUnits -= creditUnitsApplied;
+    const rated = rateUsage({
+      totalUnits,
+      price,
+      availableCreditUnits: balance?.balanceUnits ?? 0
+    });
+    if (balance && rated.creditUnitsApplied > 0) {
+      balance.balanceUnits -= rated.creditUnitsApplied;
       balance.updatedAt = nowIso;
     }
-    amountMinor =
-      (billableUnits - creditUnitsApplied) * (price.unitPriceMinor ?? 0);
+    amountMinor = rated.amountMinor;
     periodStart = closedStart;
     periodEnd = nowIso;
   }

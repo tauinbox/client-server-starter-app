@@ -964,7 +964,8 @@ rate of this plan. A plan with no `meter_key` rates to zero. The strategy charge
 
 `summarizeForPeriod()` supports `GET /billing/usage`. `summarizeForPeriodWithCredits()` supports the
 usage invoicing of the two providers. The prepaid credits offset the billable units one for one
-before the pricing step, and the caller deducts the applied units.
+before the pricing step, and the caller deducts the applied units. The arithmetic is `rateUsage` in
+`shared/src/utils/billing-rules.ts`, which the mock server also calls.
 
 `ProrationCalculator` computes the split of a self-managed plan change. It uses a whole-day
 remainder. It refunds the old plan and charges the new plan, as in section 17.4 of the billing
