@@ -71,7 +71,13 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         continue;
       }
 
-      if (registeredNames.has(meta.name)) continue;
+      const owner = declared.find(({ meta: m }) => m.name === meta.name);
+      if (owner) {
+        this.logger.error(
+          `@RegisterResource name "${meta.name}" on controller "${metatype.name}" is already registered by "${owner.controllerName}" - skipped, so its permissions cannot be granted. Give the resource its own name.`
+        );
+        continue;
+      }
       registeredNames.add(meta.name);
       declared.push({ meta, controllerName: metatype.name });
     }

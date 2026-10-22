@@ -344,7 +344,8 @@ and `conditionalActions` to `resources.action_names` and `resources.conditional_
 writes the declared `description` when the stored one is empty (an admin edit survives),
 creates a missing `actions` row for a declared action, and creates a `permissions` row for each
 declared pair only. It never creates an action named `manage` or `all`. The admin narrowing
-`allowed_action_names` survives a sync.
+`allowed_action_names` survives a sync. A second `@RegisterResource` with a `name` that the sync
+already read is skipped with an `error` log line, and `npm run check:permissions` fails on it.
 
 `utils/auth-cookies.ts` holds `AuthCookies`, the one owner of the auth cookies: the `Secure`
 decision, the refresh cookie (`SameSite=strict`) and its lifetime, and the short-lived cookies
@@ -1969,7 +1970,7 @@ before the row that gave it, and pages then drop or repeat rows silently.
 | `oauth_accounts` | UUID PK. `provider` and `provider_id` are unique together. The FK to `users` uses CASCADE and has an index |
 | `refresh_tokens` | UUID PK. `token` is a unique SHA-256 hash, and `@Exclude` keeps it off the wire. The FK to `users` uses CASCADE. The row also holds `expires_at` and `revoked` |
 | `roles` | UUID PK, unique `name`, description, `isSystem` flag, `isSuper` flag |
-| `resources` | UUID PK, unique `name`, unique `subject`, `displayName`, description, `isSystem` flag. CASL cannot resolve an ambiguous subject, and `check:permissions` enforces the uniqueness in CI. The `is_orphaned` boolean becomes true when a person removes the controller. The permissions of such a resource then give nothing, and a deny rule continues to apply until a person restores it. `action_names text[]` and `conditional_action_names text[]` hold what `@RegisterResource` declares, and the startup sync rewrites them. `allowed_action_names text[]` is the admin narrowing of `action_names`, and `null` offers every declared action |
+| `resources` | UUID PK, unique `name`, unique `subject`, `displayName`, description, `isSystem` flag. CASL cannot resolve an ambiguous subject, and `check:permissions` enforces both uniqueness rules in CI. The `is_orphaned` boolean becomes true when a person removes the controller. The permissions of such a resource then give nothing, and a deny rule continues to apply until a person restores it. `action_names text[]` and `conditional_action_names text[]` hold what `@RegisterResource` declares, and the startup sync rewrites them. `allowed_action_names text[]` is the admin narrowing of `action_names`, and `null` offers every declared action |
 | `actions` | UUID PK, unique `name`. The startup sync creates a row for each declared action |
 | `permissions` | UUID PK. `resource_id` and `action_id` are unique together, and the two are FKs to `resources` and `actions` |
 | `role_permissions` | FK to `roles` and FK to `permissions`, plus an optional jsonb `conditions` column |
