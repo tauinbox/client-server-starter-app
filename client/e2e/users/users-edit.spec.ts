@@ -1,5 +1,3 @@
-import type { PermissionCondition } from '@app/shared/types';
-import type { MockServerApi } from '../fixtures/base.fixture';
 import {
   expect,
   expectAuthRedirect,
@@ -8,48 +6,7 @@ import {
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
-import {
-  seedActions,
-  seedPermissions,
-  seedResources,
-  seedRolePermissions
-} from '../../../mock-server/src/seed';
-
-/** Seeds a role that holds the given `User` actions with their conditions. */
-async function seedUserRole(
-  mockServer: MockServerApi,
-  name: string,
-  grants: Record<string, PermissionCondition | null>
-): Promise<void> {
-  const roleId = mockId(`role-${name}`);
-  const resourceId = seedResources.find((r) => r.subject === 'User')!.id;
-  await mockServer.seedRoles([
-    {
-      id: roleId,
-      name,
-      description: null,
-      isSystem: false,
-      isSuper: false,
-      createdAt: '2025-01-01T00:00:00.000Z',
-      updatedAt: '2025-01-01T00:00:00.000Z'
-    }
-  ]);
-  await mockServer.seedRolePermissions([
-    ...seedRolePermissions,
-    ...Object.entries(grants).map(([action, conditions]) => {
-      const actionId = seedActions.find((a) => a.name === action)!.id;
-      const permission = seedPermissions.find(
-        (p) => p.resourceId === resourceId && p.actionId === actionId
-      )!;
-      return {
-        id: mockId(`rp-${name}-${action}`),
-        roleId,
-        permissionId: permission.id,
-        conditions
-      };
-    })
-  ]);
-}
+import { seedUserRole } from '../fixtures/user-roles';
 
 test.describe('User Edit page', () => {
   test('should redirect to login when not authenticated', async ({

@@ -42,7 +42,8 @@ type UserCrudEvent = Extract<NotificationEvent, { type: 'user_crud_events' }>;
 
 type UsersState = {
   detailLoading: boolean;
-  detailError: string | null;
+  /** HTTP status of the failed detail load; 0 when no response arrived. */
+  detailError: number | null;
 };
 
 /**
@@ -141,12 +142,12 @@ export const UsersStore = signalStore(
                   patchState(store, setEntity(user));
                   patchState(store, { detailLoading: false });
                 },
-                error: () => {
+                error: (error: HttpErrorResponse) => {
                   patchState(store, {
                     detailLoading: false,
-                    detailError: 'users.store.errorLoadDetailsFailed'
+                    detailError: error.status
                   });
-                  notify.error('users.store.errorLoadDetailsFailed');
+                  notify.error(error, 'users.store.errorLoadDetailsFailed');
                 }
               })
             )

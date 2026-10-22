@@ -156,6 +156,37 @@ describe('UsersStore', () => {
     });
   });
 
+  describe('loadOne', () => {
+    it.each([403, 404, 500, 0])(
+      'keeps the status %i of a failed load and passes the error to the snackbar',
+      (status) => {
+        const error = new HttpErrorResponse({ status });
+        userServiceMock.getById.mockReturnValue(throwError(() => error));
+
+        store.loadOne('user-1');
+
+        expect(store.detailError()).toBe(status);
+        expect(store.detailLoading()).toBe(false);
+        expect(TestBed.inject(NotifyService).error).toHaveBeenCalledWith(
+          error,
+          'users.store.errorLoadDetailsFailed'
+        );
+      }
+    );
+
+    it('clears the status when the next load succeeds', () => {
+      userServiceMock.getById.mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({ status: 500 }))
+      );
+      store.loadOne('user-1');
+
+      store.loadOne('user-1');
+
+      expect(store.detailError()).toBeNull();
+      expect(store.entityMap()['user-1']).toEqual(mockUser);
+    });
+  });
+
   describe('applyUserEvent', () => {
     const alice: User = { ...mockUser, id: 'alice', firstName: 'Alice' };
     const bob: User = { ...mockUser, id: 'bob', firstName: 'Bob' };

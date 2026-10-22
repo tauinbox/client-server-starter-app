@@ -66,8 +66,19 @@ export class UserDetailComponent implements OnInit {
   protected readonly roleIcon = roleIcon;
   protected readonly isAdminRole = isAdminRole;
   readonly loading = this.#usersStore.detailLoading;
+  // Without a recorded failure the record is simply absent: not found.
+  readonly loadFailure = computed(() => {
+    const status = this.#usersStore.detailError();
+    if (status === 403) return 'forbidden';
+    if (status === null || status === 404) return 'notFound';
+    return 'failed';
+  });
 
   ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
     this.#usersStore.loadOne(this.id());
   }
 }

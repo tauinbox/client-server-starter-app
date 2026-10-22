@@ -44,7 +44,9 @@
     "lastUpdated": "Last updated",
     "editNoPermission": "You do not have permission to edit this user",
     "notFoundTitle": "User not found",
-    "notFoundMessage": "The requested user could not be found."
+    "notFoundMessage": "The requested user could not be found.",
+    "errorForbiddenTitle": "No access to this user",
+    "errorForbiddenMessage": "Your role does not allow you to view this user."
   },
   "edit": {
     "title": "Edit user",
