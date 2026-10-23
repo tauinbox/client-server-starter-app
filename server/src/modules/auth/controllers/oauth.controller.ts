@@ -430,6 +430,7 @@ export class OAuthController {
     // before the session limit counts the new one. The account can have been
     // deactivated or deleted since the callback, and it gets the same refusal
     // as a bad cookie so the exchange leaks no account state.
+    // eslint-disable-next-line no-restricted-syntax -- the id comes from the signed, single-use oauth_data cookie that the callback minted
     const user = await this.usersService.findById(data.userId);
     if (!user?.isActive) {
       throw invalidOAuthData();
