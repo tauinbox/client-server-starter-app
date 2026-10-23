@@ -110,7 +110,7 @@ describe('OAuthService', () => {
 
     mockUsersService = {
       findOne: jest.fn(),
-      markEmailVerified: jest.fn().mockResolvedValue(undefined)
+      markEmailVerified: jest.fn().mockResolvedValue(true)
     };
 
     mockOAuthAccountService = {
@@ -279,9 +279,30 @@ describe('OAuthService', () => {
       const result = await loginExpectingUser(oauthProfile);
 
       expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
-        'oauth-user-1'
+        'oauth-user-1',
+        { email: 'oauth@example.com' }
       );
       expect(result.isEmailVerified).toBe(true);
+    });
+
+    // Regression: the write was keyed on the id only, so an administrator
+    // email change that landed after the read got the provider's verification
+    it('leaves a returning OAuth user unverified when the address changed after the read', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue({
+        ...oauthUser,
+        isEmailVerified: false
+      });
+      mockUsersService.markEmailVerified.mockResolvedValueOnce(false);
+
+      const result = await loginExpectingUser(oauthProfile);
+
+      expect(result.isEmailVerified).toBe(false);
     });
 
     it('should not verify a returning OAuth user when the provider asserts nothing', async () => {
@@ -349,7 +370,8 @@ describe('OAuthService', () => {
       });
 
       expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
-        'oauth-user-1'
+        'oauth-user-1',
+        { email: 'oauth@example.com' }
       );
     });
 

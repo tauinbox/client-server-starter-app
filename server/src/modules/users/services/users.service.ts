@@ -527,12 +527,23 @@ export class UsersService {
     });
   }
 
-  async markEmailVerified(userId: string): Promise<void> {
-    await this.userRepository.update(userId, {
-      isEmailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationExpiresAt: null
-    });
+  /**
+   * Keyed on the proof the caller consumed: a change that lands between the
+   * caller's read and this write voids the proof, and the write then misses.
+   */
+  async markEmailVerified(
+    userId: string,
+    proof: { emailVerificationToken: string } | { email: string }
+  ): Promise<boolean> {
+    const result = await this.userRepository.update(
+      { id: userId, isActive: true, ...proof },
+      {
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiresAt: null
+      }
+    );
+    return result.affected !== 0;
   }
 
   async setPasswordResetToken(

@@ -1399,14 +1399,34 @@ describe('UsersService', () => {
   });
 
   describe('markEmailVerified', () => {
-    it('should set isEmailVerified and clear token fields', async () => {
-      await service.markEmailVerified('user-1');
+    it('keys the write on the active row and the proof', async () => {
+      mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
-      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
-        isEmailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationExpiresAt: null
+      const verified = await service.markEmailVerified('user-1', {
+        emailVerificationToken: 'hashed-token'
       });
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        {
+          id: 'user-1',
+          isActive: true,
+          emailVerificationToken: 'hashed-token'
+        },
+        {
+          isEmailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null
+        }
+      );
+      expect(verified).toBe(true);
+    });
+
+    it('reports false when no row matches the proof', async () => {
+      mockRepository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.markEmailVerified('user-1', { email: 'old@example.com' })
+      ).resolves.toBe(false);
     });
   });
 

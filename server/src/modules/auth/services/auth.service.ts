@@ -387,15 +387,18 @@ export class AuthService {
     const hashedToken = hashToken(token);
     const user =
       await this.usersService.findByEmailVerificationToken(hashedToken);
+    const invalidToken = new HttpException(
+      {
+        message: 'Invalid or expired verification token',
+        errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
+      },
+      HttpStatus.BAD_REQUEST
+    );
 
-    if (!user) {
-      throw new HttpException(
-        {
-          message: 'Invalid or expired verification token',
-          errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
-        },
-        HttpStatus.BAD_REQUEST
-      );
+    // A deactivated account is refused like an unknown token, matching
+    // resetPassword, so the response reveals no account state.
+    if (!user || !user.isActive) {
+      throw invalidToken;
     }
 
     if (
@@ -411,7 +414,12 @@ export class AuthService {
       );
     }
 
-    await this.usersService.markEmailVerified(user.id);
+    const verified = await this.usersService.markEmailVerified(user.id, {
+      emailVerificationToken: hashedToken
+    });
+    if (!verified) {
+      throw invalidToken;
+    }
 
     return { message: 'Email verified successfully' };
   }
@@ -928,18 +936,34 @@ export class AuthService {
             return { kind: 'conflict', userId: user.id };
           }
 
-          await manager.update(User, user.id, {
-            email: newEmail,
-            isEmailVerified: true,
-            pendingEmail: null,
-            pendingEmailToken: null,
-            pendingEmailExpiresAt: null,
-            // A reset link mailed to the old address must not take the account
-            // once that address is no longer the one on the row.
-            passwordResetToken: null,
-            passwordResetExpiresAt: null,
-            tokenRevokedAt: new Date()
-          });
+          // Keyed on the token too: an administrator email change that lands
+          // between the read above and this write clears the token, and this
+          // confirmation must then lose instead of overwriting that address.
+          const consumed = await manager.update(
+            User,
+            { id: user.id, pendingEmailToken: hashedToken },
+            {
+              email: newEmail,
+              isEmailVerified: true,
+              pendingEmail: null,
+              pendingEmailToken: null,
+              pendingEmailExpiresAt: null,
+              // A reset link mailed to the old address must not take the account
+              // once that address is no longer the one on the row.
+              passwordResetToken: null,
+              passwordResetExpiresAt: null,
+              tokenRevokedAt: new Date()
+            }
+          );
+          if (consumed.affected === 0) {
+            throw new HttpException(
+              {
+                message: 'Invalid or expired email-change token',
+                errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
+              },
+              HttpStatus.BAD_REQUEST
+            );
+          }
           await manager.delete(RefreshToken, { userId: user.id });
 
           return {

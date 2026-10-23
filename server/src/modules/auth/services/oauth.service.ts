@@ -106,8 +106,10 @@ export class OAuthService {
         profile.emailVerified &&
         this.assertsSameEmail(profile, user)
       ) {
-        await this.usersService.markEmailVerified(user.id);
-        user.isEmailVerified = true;
+        user.isEmailVerified = await this.usersService.markEmailVerified(
+          user.id,
+          { email: user.email }
+        );
       }
     } else {
       // Canonicalized again here rather than trusted from the strategy: this is

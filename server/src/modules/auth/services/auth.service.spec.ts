@@ -215,7 +215,7 @@ describe('AuthService', () => {
       upgradePasswordHash: jest.fn().mockResolvedValue(undefined),
       setEmailVerificationToken: jest.fn().mockResolvedValue(undefined),
       findByEmailVerificationToken: jest.fn(),
-      markEmailVerified: jest.fn().mockResolvedValue(undefined),
+      markEmailVerified: jest.fn().mockResolvedValue(true),
       setPasswordResetToken: jest.fn().mockResolvedValue(undefined),
       findByPasswordResetToken: jest.fn(),
       clearPendingEmailChange: jest.fn().mockResolvedValue(undefined),
@@ -1082,7 +1082,10 @@ describe('AuthService', () => {
 
       const result = await service.verifyEmail('valid-token');
 
-      expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith('user-1');
+      expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith(
+        'user-1',
+        { emailVerificationToken: hashToken('valid-token') }
+      );
       expect(result.message).toContain('verified successfully');
     });
 
@@ -1092,6 +1095,36 @@ describe('AuthService', () => {
       await expect(service.verifyEmail('invalid-token')).rejects.toThrow(
         HttpException
       );
+    });
+
+    it('refuses a deactivated account with the not-found envelope', async () => {
+      mockUsersService.findByEmailVerificationToken.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+        isEmailVerified: false,
+        emailVerificationExpiresAt: new Date(Date.now() + 86400000)
+      });
+
+      await expect(service.verifyEmail('valid-token')).rejects.toMatchObject({
+        response: {
+          message: 'Invalid or expired verification token',
+          errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
+        }
+      });
+      expect(mockUsersService.markEmailVerified).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the token was cleared after the lookup', async () => {
+      mockUsersService.findByEmailVerificationToken.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false,
+        emailVerificationExpiresAt: new Date(Date.now() + 86400000)
+      });
+      mockUsersService.markEmailVerified.mockResolvedValueOnce(false);
+
+      await expect(service.verifyEmail('valid-token')).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN }
+      });
     });
 
     it('should throw 400 when token is expired', async () => {
@@ -2928,7 +2961,7 @@ describe('AuthService', () => {
 
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(),
-        'user-1',
+        { id: 'user-1', pendingEmailToken: hashToken('raw-token') },
         expect.objectContaining({
           email: 'new@example.com',
           isEmailVerified: true,
@@ -2993,6 +3026,29 @@ describe('AuthService', () => {
       expect(mockManager.update).not.toHaveBeenCalled();
       expect(mockManager.delete).not.toHaveBeenCalled();
       expect(mockUsersService.clearPendingEmailChange).not.toHaveBeenCalled();
+    });
+
+    // Regression: the write was keyed on the id only, so an administrator
+    // email change that landed after the read was overwritten
+    it('refuses when the token was cleared after the read', async () => {
+      mockManager.findOne.mockResolvedValue({
+        ...mockUser,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      });
+      mockManager.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.confirmEmailChange('raw-token')
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED }
+      });
+      expect(mockManager.delete).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendEmailChangeCompletedNotification
+      ).not.toHaveBeenCalled();
     });
 
     it('clears state and throws 400 when token is expired', async () => {
