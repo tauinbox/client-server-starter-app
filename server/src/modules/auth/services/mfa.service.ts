@@ -9,7 +9,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import { PurposeTokenService } from './purpose-token.service';
 import type { Cache } from 'cache-manager';
-import { DataSource, IsNull, Not } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Not } from 'typeorm';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
 import {
@@ -124,15 +124,23 @@ export class MfaService {
       period: TOTP_PERIOD_SECONDS
     });
 
-    await this.dataSource.getRepository(User).update(user.id, {
-      totpSecret: this.encryption.encrypt(secret),
-      totpEnabledAt: null,
-      totpRecoveryCodes: null,
-      // The floor belongs to the secret it was recorded against. A fresh
-      // enrolment must not inherit it, or the first code of a new
-      // authenticator is refused for as long as the old floor is ahead.
-      totpLastUsedStep: null
-    });
+    // Conditional on the factor still being off: the caller's copy of the row
+    // can predate an enable, and this write would turn the factor off again.
+    const { affected } = await this.dataSource.getRepository(User).update(
+      { id: user.id, totpEnabledAt: IsNull() },
+      {
+        totpSecret: this.encryption.encrypt(secret),
+        totpEnabledAt: null,
+        totpRecoveryCodes: null,
+        // The floor belongs to the secret it was recorded against. A fresh
+        // enrolment must not inherit it, or the first code of a new
+        // authenticator is refused for as long as the old floor is ahead.
+        totpLastUsedStep: null
+      }
+    );
+    if (!affected) {
+      throw this.alreadyEnabledException();
+    }
 
     return {
       secret,
@@ -164,17 +172,34 @@ export class MfaService {
       );
     }
 
-    if (!(await this.consumeTotp(user, code))) {
+    const recoveryCodes = this.generateRecoveryCodes();
+
+    // The factor goes on under the lock of the code check, against the secret
+    // the code was checked with. A setup that lands after the check replaces
+    // the secret, and the factor must not go on with a secret no code proved.
+    const accepted = await this.consumeTotp(
+      user,
+      code,
+      async (manager, checkedSecret) => {
+        const { affected } = await manager.update(
+          User,
+          { id: user.id, totpEnabledAt: IsNull(), totpSecret: checkedSecret },
+          {
+            totpEnabledAt: new Date(),
+            totpRecoveryCodes: recoveryCodes.map((code) =>
+              hashToken(normalize(code))
+            )
+          }
+        );
+        if (!affected) {
+          throw this.invalidCodeException();
+        }
+      }
+    );
+    if (!accepted) {
       this.recordChallengeFailure(user, 'enrolment', context);
       throw this.invalidCodeException();
     }
-
-    const recoveryCodes = this.generateRecoveryCodes();
-
-    await this.dataSource.getRepository(User).update(user.id, {
-      totpEnabledAt: new Date(),
-      totpRecoveryCodes: recoveryCodes.map((code) => hashToken(normalize(code)))
-    });
 
     this.auditService.logFireAndForget({
       action: AuditAction.MFA_ENABLE,
@@ -208,9 +233,19 @@ export class MfaService {
 
     const recoveryCodes = this.generateRecoveryCodes();
 
-    await this.dataSource.getRepository(User).update(user.id, {
-      totpRecoveryCodes: recoveryCodes.map((code) => hashToken(normalize(code)))
-    });
+    // Conditional on the factor still being on, so a set never lands on an
+    // account that a concurrent disable or reset has just cleared.
+    const { affected } = await this.dataSource.getRepository(User).update(
+      { id: user.id, totpEnabledAt: Not(IsNull()) },
+      {
+        totpRecoveryCodes: recoveryCodes.map((code) =>
+          hashToken(normalize(code))
+        )
+      }
+    );
+    if (!affected) {
+      throw this.notEnabledException();
+    }
 
     this.auditService.logFireAndForget({
       action: AuditAction.MFA_RECOVERY_CODES_REGENERATED,
@@ -247,12 +282,20 @@ export class MfaService {
   async disable(user: User, context?: AuditContext): Promise<void> {
     this.assertEnabled(user);
 
-    await this.dataSource.getRepository(User).update(user.id, {
-      totpSecret: null,
-      totpEnabledAt: null,
-      totpRecoveryCodes: null,
-      totpLastUsedStep: null
-    });
+    // Conditional for the reason given in resetByAdmin: of a disable and a
+    // concurrent reset, only one audits and mails.
+    const { affected } = await this.dataSource.getRepository(User).update(
+      { id: user.id, totpEnabledAt: Not(IsNull()) },
+      {
+        totpSecret: null,
+        totpEnabledAt: null,
+        totpRecoveryCodes: null,
+        totpLastUsedStep: null
+      }
+    );
+    if (!affected) {
+      throw this.notEnabledException();
+    }
 
     this.auditService.logFireAndForget({
       action: AuditAction.MFA_DISABLE,
@@ -521,8 +564,19 @@ export class MfaService {
    * Read and write are one atomic step, the way `consumeRecoveryCode` does it:
    * a plain read-then-write lets two requests carrying the same code both see
    * it unspent, which is the one property this buys.
+   *
+   * `onAccepted` runs after the code is spent, in the same transaction and
+   * under the same lock, with the stored (encrypted) secret the code was
+   * checked against. If it throws, the spend rolls back with it.
    */
-  private async consumeTotp(user: User, code: string): Promise<boolean> {
+  private async consumeTotp(
+    user: User,
+    code: string,
+    onAccepted?: (
+      manager: EntityManager,
+      checkedSecret: string
+    ) => Promise<void>
+  ): Promise<boolean> {
     if (user.totpSecret === null) {
       return false;
     }
@@ -574,6 +628,7 @@ export class MfaService {
       await manager.update(User, user.id, {
         totpLastUsedStep: result.timeStep
       });
+      await onAccepted?.(manager, locked.totpSecret);
       return true;
     });
   }
@@ -623,14 +678,18 @@ export class MfaService {
 
   private assertNotEnabled(user: User): void {
     if (user.totpEnabledAt !== null) {
-      throw new HttpException(
-        {
-          message: 'Two-factor authentication is already enabled',
-          errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED
-        },
-        HttpStatus.CONFLICT
-      );
+      throw this.alreadyEnabledException();
     }
+  }
+
+  private alreadyEnabledException(): HttpException {
+    return new HttpException(
+      {
+        message: 'Two-factor authentication is already enabled',
+        errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED
+      },
+      HttpStatus.CONFLICT
+    );
   }
 
   private recordChallengeFailure(

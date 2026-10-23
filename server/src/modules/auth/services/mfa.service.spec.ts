@@ -102,7 +102,7 @@ describe('MfaService', () => {
           Promise<{ affected?: number } | undefined>,
           [unknown, Partial<User>]
         >()
-        .mockResolvedValue(undefined),
+        .mockResolvedValue({ affected: 1 }),
       findOne: jest.fn().mockResolvedValue(null)
     };
     jwtService = {
@@ -238,6 +238,19 @@ describe('MfaService', () => {
       });
     });
 
+    it('writes only while the factor is off, and refuses when an enable overtook the read', async () => {
+      repository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(service.beginEnrolment(buildUser())).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED }
+      });
+      expect(repository.update.mock.calls[0][0]).toEqual({
+        id: 'user-1',
+        totpEnabledAt: IsNull()
+      });
+    });
+
     it('refuses on a server with no encryption key', async () => {
       await build('');
 
@@ -262,6 +275,12 @@ describe('MfaService', () => {
       expect(result.recoveryCodes).toHaveLength(10);
       const stored = lastUpdate();
       expect(stored.totpEnabledAt).toBeInstanceOf(Date);
+      const { calls } = repository.update.mock;
+      expect(calls[calls.length - 1][0]).toEqual({
+        id: 'user-1',
+        totpEnabledAt: IsNull(),
+        totpSecret: user.totpSecret
+      });
       expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.MFA_ENABLE })
       );
@@ -323,6 +342,25 @@ describe('MfaService', () => {
       );
     });
 
+    it('refuses, and neither audits nor mails, when the checked secret was replaced before the enable', async () => {
+      const { user, secret } = await enrol();
+      // The step write succeeds; the conditional enable finds no row.
+      repository.update
+        .mockResolvedValueOnce({ affected: 1 })
+        .mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.completeEnrolment(user, generateSync({ secret }))
+      ).rejects.toMatchObject({
+        status: 401,
+        response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
+      });
+      expect(auditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.MFA_ENABLE })
+      );
+      expect(mailService.sendMfaEnabledNotification).not.toHaveBeenCalled();
+    });
+
     it('refuses when no enrolment was started', async () => {
       await expect(
         service.completeEnrolment(buildUser(), '000000')
@@ -343,16 +381,34 @@ describe('MfaService', () => {
 
       await service.disable(user);
 
-      expect(repository.update).toHaveBeenCalledWith('user-1', {
-        totpSecret: null,
-        totpEnabledAt: null,
-        totpRecoveryCodes: null,
-        totpLastUsedStep: null
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: 'user-1', totpEnabledAt: Not(IsNull()) },
+        {
+          totpSecret: null,
+          totpEnabledAt: null,
+          totpRecoveryCodes: null,
+          totpLastUsedStep: null
+        }
+      );
       expect(auditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.MFA_DISABLE })
       );
       expect(mailService.sendMfaDisabledNotification).toHaveBeenCalled();
+    });
+
+    it('refuses, and neither audits nor mails, when a concurrent reset cleared the factor first', async () => {
+      repository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.disable(
+          buildUser({ totpSecret: 'v1.a.b.c', totpEnabledAt: new Date() })
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
+      });
+      expect(auditService.logFireAndForget).not.toHaveBeenCalled();
+      expect(mailService.sendMfaDisabledNotification).not.toHaveBeenCalled();
     });
 
     it('refuses when the factor is not on', async () => {
@@ -477,6 +533,27 @@ describe('MfaService', () => {
       const stored = lastUpdate();
 
       expect(Object.keys(stored)).toEqual(['totpRecoveryCodes']);
+      expect(repository.update.mock.calls[0][0]).toEqual({
+        id: 'user-1',
+        totpEnabledAt: Not(IsNull())
+      });
+    });
+
+    it('refuses, and neither audits nor mails, when a concurrent disable cleared the factor first', async () => {
+      repository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.regenerateRecoveryCodes(
+          buildUser({ totpSecret: 'v1.a.b.c', totpEnabledAt: new Date() })
+        )
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
+      });
+      expect(auditService.logFireAndForget).not.toHaveBeenCalled();
+      expect(
+        mailService.sendMfaRecoveryCodesReplacedNotification
+      ).not.toHaveBeenCalled();
     });
 
     it('refuses when the factor is not on', async () => {
