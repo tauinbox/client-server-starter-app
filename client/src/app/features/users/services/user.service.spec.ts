@@ -35,13 +35,25 @@ describe('UserService', () => {
     req.flush({});
   });
 
-  it('keeps the global error snackbar on a read', () => {
+  // The detail and edit pages show a failed load; a snackbar would show it a
+  // second time.
+  it('reads a user without the global error snackbar', () => {
     service.getById('user-1').subscribe();
 
     const req = httpMock.expectOne(`${USERS_API_V1}/user-1`);
     expect(
       req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
-    ).toBe(false);
+    ).toBe(true);
+    req.flush({});
+  });
+
+  it('reads the effective permissions without the global error snackbar', () => {
+    service.getPermissions('user-1').subscribe();
+
+    const req = httpMock.expectOne(`${USERS_API_V1}/user-1/permissions`);
+    expect(
+      req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
+    ).toBe(true);
     req.flush({});
   });
 

@@ -186,7 +186,7 @@ describe('UserEditComponent', () => {
       expect(component.userForm().dirty()).toBe(false);
     });
 
-    it('should show the translated server error on load failure', () => {
+    it('shows the not-found card when the user does not exist', () => {
       const httpError = new HttpErrorResponse({
         error: { errorKey: 'errors.users.notFound', message: 'Not found' },
         status: 404
@@ -195,8 +195,11 @@ describe('UserEditComponent', () => {
 
       fixture.detectChanges();
 
-      expect(component['loading']()).toBe(false);
-      expect(component['error']()).toBe('User not found');
+      expect(component.loading()).toBe(false);
+      expect(component.loadFailed()).toBe(false);
+      const text = (fixture.nativeElement as HTMLElement).textContent;
+      expect(text).toContain('User not found');
+      expect(text).not.toContain('Retry');
     });
 
     it('does not request the role catalog without read:Role', () => {
@@ -211,15 +214,41 @@ describe('UserEditComponent', () => {
       expect(component['user']()).toEqual(mockUser);
     });
 
-    it('should show fallback error when no server message', () => {
-      const httpError = new HttpErrorResponse({ error: null, status: 500 });
-      userServiceMock.getById.mockReturnValue(throwError(() => httpError));
+    it.each([500, 0])(
+      'shows the load-failed card with a retry, not "User not found", for status %i',
+      (status) => {
+        userServiceMock.getById.mockReturnValue(
+          throwError(() => new HttpErrorResponse({ error: null, status }))
+        );
 
+        fixture.detectChanges();
+
+        expect(component.loadFailed()).toBe(true);
+        const text = (fixture.nativeElement as HTMLElement).textContent;
+        expect(text).toContain(
+          'Failed to load user details. Please try again.'
+        );
+        expect(text).not.toContain('User not found');
+        expect(notifyMock.error).not.toHaveBeenCalled();
+      }
+    );
+
+    it('loads the user again on retry', () => {
+      userServiceMock.getById.mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({ status: 500 }))
+      );
       fixture.detectChanges();
 
-      expect(component['error']()).toBe(
-        'Failed to load user details. Please try again.'
-      );
+      const retry = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+      ).find((button) => button.textContent?.trim() === 'Retry');
+      expect(retry).toBeDefined();
+      retry?.click();
+      fixture.detectChanges();
+
+      expect(userServiceMock.getById).toHaveBeenCalledTimes(2);
+      expect(component.loadFailed()).toBe(false);
+      expect(component.user()).toEqual(mockUser);
     });
   });
 

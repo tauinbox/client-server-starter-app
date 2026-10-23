@@ -22,7 +22,6 @@ import { removeEntity, setEntity, updateEntity } from '@ngrx/signals/entities';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { USER_LIST_QUERY } from '@app/shared/constants';
 import type { NotificationEvent } from '@app/shared/types';
-import { NotifyService } from '@core/services/notify.service';
 import { type ListFetcher, withList } from '@shared/store/with-list';
 import {
   type CursorPageRequest,
@@ -84,7 +83,6 @@ export const UsersStore = signalStore(
   })),
   withMethods((store) => {
     const userService = inject(UserService);
-    const notify = inject(NotifyService);
 
     // A row the list did not load is left alone: it may not belong to the
     // loaded pages at all. A change that adds rows needs a reload, and a
@@ -147,7 +145,6 @@ export const UsersStore = signalStore(
                     detailLoading: false,
                     detailError: error.status
                   });
-                  notify.error(error, 'users.store.errorLoadDetailsFailed');
                 }
               })
             )

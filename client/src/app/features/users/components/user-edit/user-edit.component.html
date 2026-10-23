@@ -256,6 +256,19 @@
             </button>
           </div>
         </form>
+      } @else if (loadFailed()) {
+        <div class="error-container">
+          <mat-icon class="error-icon">error_outline</mat-icon>
+          <p>{{ t('users.edit.errorLoadFailed') }}</p>
+          <div class="error-actions">
+            <button matButton="outlined" (click)="loadUser()">
+              {{ t('common.retry') }}
+            </button>
+            <button matButton="filled" routerLink="/admin/users">
+              {{ t('common.back') }}
+            </button>
+          </div>
+        </div>
       } @else {
         <div class="error-container">
           <mat-icon class="error-icon">error_outline</mat-icon>

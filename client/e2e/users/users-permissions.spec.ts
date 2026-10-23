@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  expectNoSnackbar,
+  loginViaUi,
+  test
+} from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
 
 test.describe('User effective permissions page', () => {
@@ -27,5 +32,27 @@ test.describe('User effective permissions page', () => {
       page.locator('.resource-title', { hasText: /^Profile$/ })
     ).toBeVisible();
     expect(rbacRequests).toEqual(['/api/v1/rbac/resources']);
+  });
+
+  test('reports a failed load in the card only', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await page.route(
+      `**/api/v1/users/${mockId('user-2')}/permissions`,
+      (route) =>
+        route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Internal error', statusCode: 500 })
+        })
+    );
+    await page.goto(`/admin/users/${mockId('user-2')}/permissions`);
+
+    await expect(
+      page.getByText('Failed to load effective permissions. Please try again.')
+    ).toBeVisible();
+    await expectNoSnackbar(page);
   });
 });

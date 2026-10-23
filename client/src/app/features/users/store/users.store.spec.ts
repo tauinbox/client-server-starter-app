@@ -158,19 +158,17 @@ describe('UsersStore', () => {
 
   describe('loadOne', () => {
     it.each([403, 404, 500, 0])(
-      'keeps the status %i of a failed load and passes the error to the snackbar',
+      'keeps the status %i of a failed load and leaves the message to the page',
       (status) => {
-        const error = new HttpErrorResponse({ status });
-        userServiceMock.getById.mockReturnValue(throwError(() => error));
+        userServiceMock.getById.mockReturnValue(
+          throwError(() => new HttpErrorResponse({ status }))
+        );
 
         store.loadOne('user-1');
 
         expect(store.detailError()).toBe(status);
         expect(store.detailLoading()).toBe(false);
-        expect(TestBed.inject(NotifyService).error).toHaveBeenCalledWith(
-          error,
-          'users.store.errorLoadDetailsFailed'
-        );
+        expect(TestBed.inject(NotifyService).error).not.toHaveBeenCalled();
       }
     );
 

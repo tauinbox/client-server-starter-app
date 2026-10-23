@@ -1,6 +1,7 @@
 import {
   expect,
   expectAuthRedirect,
+  expectNoSnackbar,
   loginViaUi,
   test
 } from '../fixtures/base.fixture';
@@ -244,6 +245,8 @@ test.describe('User Detail page', () => {
     await expect(
       page.getByRole('heading', { name: 'User not found' })
     ).toBeHidden();
+    // The card reports the failure; a snackbar would report it a second time.
+    await expectNoSnackbar(page);
 
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
 

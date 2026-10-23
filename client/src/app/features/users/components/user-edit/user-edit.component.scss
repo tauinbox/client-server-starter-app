@@ -95,6 +95,10 @@
     @include mix.empty-state;
   }
 
+  .error-actions {
+    @include mix.error-actions;
+  }
+
   .error-message {
     @include mix.error-message;
   }
