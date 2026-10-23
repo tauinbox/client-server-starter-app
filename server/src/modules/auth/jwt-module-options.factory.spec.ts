@@ -5,6 +5,7 @@ import { verify } from 'jsonwebtoken';
 import {
   buildJwtModuleOptions,
   buildJwtVerification,
+  issuedBeforeMinIat,
   readJwtMinIat
 } from './jwt-module-options.factory';
 
@@ -73,5 +74,12 @@ describe('jwt-module-options.factory', () => {
       1700000000
     );
     expect(readJwtMinIat(configOf({}))).toBeUndefined();
+  });
+
+  it('puts an issue time below the cut-off before it, and not one at or above it', () => {
+    expect(issuedBeforeMinIat(1699999999, 1700000000)).toBe(true);
+    expect(issuedBeforeMinIat(1700000000, 1700000000)).toBe(false);
+    expect(issuedBeforeMinIat(1700000001, 1700000000)).toBe(false);
+    expect(issuedBeforeMinIat(0, undefined)).toBe(false);
   });
 });

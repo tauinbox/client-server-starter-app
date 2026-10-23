@@ -10,6 +10,7 @@ import { ErrorKeys, TOKEN_PURPOSE } from '@app/shared/constants';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import {
   buildJwtVerification,
+  issuedBeforeMinIat,
   readJwtMinIat
 } from '../jwt-module-options.factory';
 
@@ -76,7 +77,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // SRV-12: global key rotation — reject tokens issued before the rotation timestamp
-    if (this.minIat !== undefined && iat < this.minIat) {
+    if (issuedBeforeMinIat(iat, this.minIat)) {
       throw new HttpException(
         {
           message:

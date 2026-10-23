@@ -8,6 +8,7 @@ import { OAuthController } from './oauth.controller';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
+import { PurposeTokenService } from '../services/purpose-token.service';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -187,6 +188,7 @@ describe('OAuthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OAuthController],
       providers: [
+        PurposeTokenService,
         AuthCookies,
         SignInCompletionService,
         { provide: UsersService, useValue: usersServiceMock },
@@ -1013,6 +1015,7 @@ describe('OAuthController', () => {
       jwtServiceMock.verify.mockReturnValue({
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        iat: LINK_TOKEN_IAT,
         jti: 'token-id'
       });
 
@@ -1052,6 +1055,7 @@ describe('OAuthController', () => {
       jwtServiceMock.verify.mockReturnValue({
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        iat: LINK_TOKEN_IAT,
         jti: 'token-id'
       });
 
@@ -1089,6 +1093,7 @@ describe('OAuthController', () => {
         jwtServiceMock.verify.mockReturnValue({
           data: SIGN_IN_DATA,
           purpose: TOKEN_PURPOSE.OAUTH_DATA,
+          iat: LINK_TOKEN_IAT,
           jti: 'token-id'
         });
         const res = mockResponse();
@@ -1117,6 +1122,7 @@ describe('OAuthController', () => {
       jwtServiceMock.verify.mockReturnValue({
         data: { mfaRequired: true, mfaToken: 'pending-token', expiresIn: 300 },
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        iat: LINK_TOKEN_IAT,
         jti: 'token-id'
       });
 
@@ -1149,6 +1155,7 @@ describe('OAuthController', () => {
       jwtServiceMock.verify.mockReturnValue({
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        iat: LINK_TOKEN_IAT,
         jti: 'token-id'
       });
 
@@ -1202,6 +1209,7 @@ describe('OAuthController', () => {
       jwtServiceMock.verify.mockReturnValue({
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        iat: LINK_TOKEN_IAT,
         jti: 'replayed-token-id'
       });
 
@@ -1248,6 +1256,7 @@ describe('OAuthController', () => {
       jwtServiceMock.verify.mockReturnValue({
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        iat: LINK_TOKEN_IAT,
         jti: 'token-id'
       });
 

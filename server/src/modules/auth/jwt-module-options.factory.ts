@@ -73,6 +73,14 @@ export function readJwtMinIat(
   return raw !== undefined ? Number(raw) : undefined;
 }
 
+/** True when `iat` (epoch seconds) is below the key-rotation floor. */
+export function issuedBeforeMinIat(
+  iat: number,
+  minIat: number | undefined
+): boolean {
+  return minIat !== undefined && iat < minIat;
+}
+
 function decodeKey(configService: ConfigService, key: string): string {
   return Buffer.from(configService.getOrThrow<string>(key), 'base64').toString(
     'utf-8'

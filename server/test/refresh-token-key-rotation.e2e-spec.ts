@@ -9,6 +9,9 @@ import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { JwtService } from '@nestjs/jwt';
+import { MfaService } from '../src/modules/auth/services/mfa.service';
+import { STEP_UP_OPERATION, TOKEN_PURPOSE } from '@app/shared/constants';
 
 // The rotation cut-off compares a stored `created_at`, and the reuse detector
 // reads the rows the refusal leaves behind, so only a real Postgres proves it.
@@ -20,6 +23,8 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
   let dataSource: DataSource;
   let authService: AuthService;
   let refreshTokenService: RefreshTokenService;
+  let mfaService: MfaService;
+  let jwtService: JwtService;
   let auditSpy: jest.SpyInstance<
     void,
     Parameters<AuditService['logFireAndForget']>
@@ -42,6 +47,8 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     dataSource = app.get(DataSource);
     authService = app.get(AuthService);
     refreshTokenService = app.get(RefreshTokenService);
+    mfaService = app.get(MfaService);
+    jwtService = app.get(JwtService);
 
     auditSpy = jest
       .spyOn(app.get(AuditService), 'logFireAndForget')
@@ -125,5 +132,92 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
 
     const { tokens } = await authService.refreshTokens(postRotation.raw, null);
     expect(tokens.refresh_token).toBeTruthy();
+  }, 30000);
+
+  // jsonwebtoken keeps an `iat` given in the payload, so these mint a token
+  // as it was issued before the cut-off. The fresh token beside each one shows
+  // that the refusal comes from the cut-off and not from the token shape.
+  function signIssuedAt(payload: object, iat: number): string {
+    return jwtService.sign({ ...payload, iat }, { expiresIn: 3600 });
+  }
+
+  it('refuses a pending second-factor token issued before the cut-off', async () => {
+    const mfaEmail = `key-rotation-mfa-${Date.now()}@example.com`;
+    const mfaUser = await dataSource.getRepository(User).save(
+      dataSource.getRepository(User).create({
+        email: mfaEmail,
+        firstName: 'Key',
+        lastName: 'Rotation',
+        password: null,
+        totpEnabledAt: new Date()
+      })
+    );
+    const pending = { sub: mfaUser.id, purpose: TOKEN_PURPOSE.MFA_PENDING };
+
+    try {
+      expect(
+        await errorKeyOf(
+          mfaService.verifyChallenge(
+            signIssuedAt(pending, minIat - 600),
+            '000000'
+          )
+        )
+      ).toEqual(
+        expect.objectContaining({
+          errorKey: 'errors.auth.mfaInvalidPendingToken'
+        })
+      );
+      expect(
+        await errorKeyOf(
+          mfaService.verifyChallenge(
+            signIssuedAt(pending, Math.floor(Date.now() / 1000)),
+            '000000'
+          )
+        )
+      ).toEqual(
+        expect.objectContaining({ errorKey: 'errors.auth.mfaInvalidCode' })
+      );
+    } finally {
+      await dataSource.getRepository(User).delete({ email: mfaEmail });
+    }
+  }, 30000);
+
+  it('refuses a step-up proof issued before the cut-off', async () => {
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ id: userId });
+    const proof = (iat: number): string =>
+      signIssuedAt(
+        {
+          sub: userId,
+          purpose: TOKEN_PURPOSE.REAUTH_PROOF,
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          jti: randomUUID()
+        },
+        iat
+      );
+
+    expect(
+      await errorKeyOf(
+        authService.assertStepUp(
+          user,
+          undefined,
+          proof(minIat - 600),
+          STEP_UP_OPERATION.MFA_DISABLE
+        )
+      )
+    ).toEqual(
+      expect.objectContaining({ errorKey: 'errors.auth.reauthRequired' })
+    );
+    expect(
+      await errorKeyOf(
+        authService.assertStepUp(
+          user,
+          undefined,
+          proof(Math.floor(Date.now() / 1000)),
+          STEP_UP_OPERATION.MFA_DISABLE
+        )
+      )
+    ).toBe('RESOLVED');
   }, 30000);
 });

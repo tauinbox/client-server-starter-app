@@ -17,6 +17,7 @@ import { RESPONSE_SERIALIZER } from '../../core/interceptors/response-serializer
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
+import { PurposeTokenService } from '../services/purpose-token.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuthService } from '../services/auth.service';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
@@ -156,6 +157,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
       imports: [PassportModule],
       controllers: [OAuthController],
       providers: [
+        PurposeTokenService,
         RESPONSE_SERIALIZER,
         AuthCookies,
         { provide: CACHE_MANAGER, useValue: createMockCache() },

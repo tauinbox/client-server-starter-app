@@ -9,7 +9,6 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
@@ -63,6 +62,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import { readJwtMinIat } from '../jwt-module-options.factory';
+import { PurposeTokenService } from './purpose-token.service';
 import type { SessionClient } from '../utils/session-client';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 
@@ -161,7 +161,7 @@ export class AuthService {
     private auditService: AuditService,
     private metricsService: MetricsService,
     private sessionIssuer: SessionIssuerService,
-    private jwtService: JwtService,
+    private purposeTokens: PurposeTokenService,
     private breachedPasswordService: BreachedPasswordService,
     private mfaService: MfaService,
     private eventEmitter: EventEmitter2,
@@ -1197,28 +1197,25 @@ export class AuthService {
       return false;
     }
 
+    const payload = this.purposeTokens.verify<{
+      sub?: string;
+      operation?: string;
+      jti?: string;
+    }>(proof, TOKEN_PURPOSE.REAUTH_PROOF);
+
+    const isIntact =
+      payload !== null &&
+      payload.sub === user.id &&
+      payload.operation === operation &&
+      !issuedBeforeRevocation(payload.iat, user.tokenRevokedAt);
+
+    // A proof minted before the ledger existed carries no id and cannot be
+    // recorded as spent, so it is refused rather than trusted.
+    if (!isIntact || !payload.jti) {
+      return false;
+    }
+
     try {
-      const payload = this.jwtService.verify<{
-        sub: string;
-        purpose?: string;
-        operation?: string;
-        iat?: number;
-        jti?: string;
-      }>(proof);
-
-      const isIntact =
-        payload.purpose === TOKEN_PURPOSE.REAUTH_PROOF &&
-        payload.sub === user.id &&
-        payload.operation === operation &&
-        typeof payload.iat === 'number' &&
-        !issuedBeforeRevocation(payload.iat, user.tokenRevokedAt);
-
-      // A proof minted before the ledger existed carries no id and cannot be
-      // recorded as spent, so it is refused rather than trusted.
-      if (!isIntact || !payload.jti) {
-        return false;
-      }
-
       return await this.reauthProofLedger.claim(
         payload.jti,
         REAUTH_PROOF_MAX_AGE_SECONDS * 1000
