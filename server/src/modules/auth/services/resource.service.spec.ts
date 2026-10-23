@@ -654,7 +654,6 @@ describe('ResourceService', () => {
       const result = await service.getSubjectMaps();
 
       expect(result.active).toEqual({ users: 'User' });
-      expect(result.active).not.toHaveProperty('legacy');
       expect(result.orphaned).toEqual({ legacy: 'Legacy' });
     });
 

@@ -237,7 +237,9 @@ test.describe('User Detail page', () => {
     await page.goto(`/users/${mockId('user-3')}`);
 
     await expect(
-      page.getByText('Failed to load user details. Please try again.')
+      page
+        .getByRole('main')
+        .getByText('Failed to load user details. Please try again.')
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'User not found' })
