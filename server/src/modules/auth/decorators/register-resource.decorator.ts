@@ -11,6 +11,7 @@ export interface ResourceMetadata {
    * `ResourceService.upsertResource()` auto-normalizes to PascalCase on sync.
    */
   subject: string;
+  /** Written on the first sync only, so an admin's edit survives a restart. */
   displayName: string;
   /**
    * Written on the first sync, and on a later sync only while the stored

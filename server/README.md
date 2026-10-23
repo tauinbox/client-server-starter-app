@@ -341,7 +341,8 @@ increase in 15 minutes.
 
 `ResourceSyncService` reads every `@RegisterResource` at startup. It writes the declared `actions`
 and `conditionalActions` to `resources.action_names` and `resources.conditional_action_names`,
-writes the declared `description` when the stored one is empty (an admin edit survives),
+writes the declared `displayName` only when it creates the row and the declared `description`
+when the stored one is empty (an admin edit survives),
 creates a missing `actions` row for a declared action, and creates a `permissions` row for each
 declared pair only. It never creates an action named `manage` or `all`. The admin narrowing
 `allowed_action_names` survives a sync. A second `@RegisterResource` with a `name` that the sync

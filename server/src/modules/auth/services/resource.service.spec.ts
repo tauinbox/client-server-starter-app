@@ -728,8 +728,8 @@ describe('ResourceService', () => {
       expect(edited.description).toBe('Edited by an admin');
     });
 
-    it('should update existing resource if found by name', async () => {
-      const existing = { ...resource1 };
+    it('updates the existing resource found by name and keeps its display name', async () => {
+      const existing = { ...resource1, displayName: 'Edited by an admin' };
       mockResourceRepo.findOne.mockResolvedValue(existing);
       mockResourceRepo.save.mockImplementation(
         (data: Record<string, unknown>) => Promise.resolve(data)
@@ -745,7 +745,7 @@ describe('ResourceService', () => {
       expect(result).toEqual(
         expect.objectContaining({
           subject: 'UpdatedUser',
-          displayName: 'Updated Users'
+          displayName: 'Edited by an admin'
         })
       );
       expect(mockResourceRepo.findOne).toHaveBeenCalledWith({

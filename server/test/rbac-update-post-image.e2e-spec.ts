@@ -90,8 +90,7 @@ runWithInfra(
         })
         .expect(201);
 
-      // A row of its own: the startup sync of a parallel suite writes the
-      // declared display name back onto a registered resource.
+      // A row of its own, so the grant scope touches no shared resource.
       const resourceRepository = dataSource.getRepository(Resource);
       resource = await resourceRepository.save(
         resourceRepository.create({
