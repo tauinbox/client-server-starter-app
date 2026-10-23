@@ -904,6 +904,19 @@ router.delete(
       return;
     }
 
+    if (
+      !state.rolePermissions.some(
+        (rp) => rp.roleId === id && rp.permissionId === permissionId
+      )
+    ) {
+      res.status(404).json({
+        message: 'The role does not hold this permission',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED
+      });
+      return;
+    }
+
     state.rolePermissions = state.rolePermissions.filter(
       (rp) => !(rp.roleId === id && rp.permissionId === permissionId)
     );
@@ -1056,6 +1069,15 @@ router.delete(
     }
 
     if (!assertGrantScope(req, res, 'lift', roleId, denyRowsOf(roleId))) {
+      return;
+    }
+
+    if (!user.roles.includes(role.name)) {
+      res.status(404).json({
+        message: 'The user does not hold this role',
+        statusCode: 404,
+        errorKey: ErrorKeys.ROLES.ROLE_NOT_ASSIGNED
+      });
       return;
     }
 

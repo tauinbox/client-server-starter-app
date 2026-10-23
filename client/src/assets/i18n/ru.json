@@ -165,7 +165,9 @@
       "conditionBroaderThanCaller": "Нельзя выдать разрешение с условием шире, чем то, которым вы владеете сами",
       "conditionUnresolvable": "Это условие нельзя применить в том виде, в котором оно записано, поэтому оно не ограничит разрешение",
       "superRoleAssignForbidden": "Суперроль нельзя назначить",
-      "superRoleRemoveForbidden": "Суперроль нельзя снять"
+      "superRoleRemoveForbidden": "Суперроль нельзя снять",
+      "roleNotAssigned": "У пользователя нет этой роли",
+      "permissionNotAssigned": "У роли нет этого права"
     },
     "resources": {
       "notFound": "Ресурс не найден",

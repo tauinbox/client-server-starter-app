@@ -383,5 +383,58 @@ describe('role grant error parity with server', () => {
       expect(body.errorKey).toBe('errors.users.notFound');
       expect(getState().users.get(mockId('user-2'))?.roles).toEqual(['user']);
     });
+
+    it('returns 404 ROLES.ROLE_NOT_ASSIGNED for a role the user does not hold, with no side effects', async () => {
+      const token = await loginAsAdmin();
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/assign/${mockId('user-2')}/${mockId('role-editor')}`,
+        {
+          method: 'DELETE',
+          headers: { authorization: `Bearer ${token}` }
+        }
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { message: string; errorKey: string };
+      expect(body.message).toBe('The user does not hold this role');
+      expect(body.errorKey).toBe('errors.roles.roleNotAssigned');
+      const user = getState().users.get(mockId('user-2'));
+      expect(user?.roles).toEqual(['user']);
+      expect(user?.tokenRevokedAt).toBeNull();
+      expect(
+        getState().auditLogs.filter((log) => log.action === 'ROLE_UNASSIGN')
+      ).toHaveLength(0);
+    });
+  });
+
+  describe('DELETE /api/v1/roles/:id/permissions/:permissionId', () => {
+    it('returns 404 ROLES.PERMISSION_NOT_ASSIGNED for a permission the role does not hold, with no audit row', async () => {
+      const token = await loginAsAdmin();
+      const held = editorPermissionIds();
+      const absent = [...getState().permissions.values()]
+        .map((p) => p.id)
+        .find((id) => !held.includes(id));
+      if (!absent) throw new Error('The editor role holds every permission');
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions/${absent}`,
+        {
+          method: 'DELETE',
+          headers: { authorization: `Bearer ${token}` }
+        }
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { message: string; errorKey: string };
+      expect(body.message).toBe('The role does not hold this permission');
+      expect(body.errorKey).toBe('errors.roles.permissionNotAssigned');
+      expect(editorPermissionIds()).toEqual(held);
+      expect(
+        getState().auditLogs.filter(
+          (log) => log.action === 'PERMISSION_UNASSIGN'
+        )
+      ).toHaveLength(0);
+    });
   });
 });

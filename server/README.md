@@ -2529,9 +2529,9 @@ The base URL is `/api/v1`.
 | GET | `/:id/permissions` | `roles:read` | Get the permissions of one role |
 | PUT | `/:id/permissions` | `roles:update` | Replace the full permission set of a role |
 | POST | `/:id/permissions` | `roles:update` | Assign permissions to a role |
-| DELETE | `/:id/permissions/:permissionId` | `roles:update` | Remove a permission from a role |
+| DELETE | `/:id/permissions/:permissionId` | `roles:update` | Remove a permission from a role. It answers 404 when the role does not hold the permission |
 | POST | `/assign/:userId` | `roles:assign` | Assign a role to a user. It answers 404 when the user is unknown or soft-deleted |
-| DELETE | `/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. It answers 404 when the user is unknown or soft-deleted |
+| DELETE | `/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. It answers 404 when the user is unknown or soft-deleted, or does not hold the role |
 
 ### RBAC (`/api/v1/rbac`)
 

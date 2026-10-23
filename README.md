@@ -1622,9 +1622,9 @@ The base URL of the API is `/api/v1`.
 | GET | `/roles/:id/permissions` | `roles:read` | Get the permissions of one role |
 | PUT | `/roles/:id/permissions` | `roles:update` | Replace the full permission set of a role |
 | POST | `/roles/:id/permissions` | `roles:update` | Assign permissions to a role |
-| DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove a permission from a role |
+| DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove a permission from a role. Answers 404 when the role does not hold the permission |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign a role to a user. Answers 404 when the user is unknown or soft-deleted |
-| DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted |
+| DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted, or does not hold the role |
 | GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events` and `user_list_stale`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
 | GET | `/rbac/resources` | `permissions:read` | List each resource, ordered by name. The user permissions page reads the display names from it |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 400 for an action that the code does not check |
@@ -1897,11 +1897,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3034 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 684 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 671 pass and 13 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3036 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 687 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 674 pass and 13 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1594 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 333 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1095 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1097 tests pass |
 
 ## CI/CD
 

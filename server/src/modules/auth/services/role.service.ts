@@ -727,14 +727,27 @@ export class RoleService {
       }
     }
 
+    // The delete is the existence check, so a concurrent removal cannot
+    // pass a separate read and still audit and end the sessions twice.
     await this.writeAudited(
       this.roleRepository.manager,
-      (em) =>
-        em
+      async (em) => {
+        const { affected } = await em
           .createQueryBuilder()
-          .relation(User, 'roles')
-          .of(userId)
-          .remove(roleId),
+          .delete()
+          .from('user_roles')
+          .where('user_id = :userId AND role_id = :roleId', { userId, roleId })
+          .execute();
+        if (!affected) {
+          throw new HttpException(
+            {
+              message: 'The user does not hold this role',
+              errorKey: ErrorKeys.ROLES.ROLE_NOT_ASSIGNED
+            },
+            HttpStatus.NOT_FOUND
+          );
+        }
+      },
       audit
     );
     await this.permissionService.invalidateUserCache(userId);
@@ -857,7 +870,21 @@ export class RoleService {
     }
     await this.writeAudited(
       this.rolePermissionRepository.manager,
-      (em) => em.delete(RolePermission, { roleId, permissionId }),
+      async (em) => {
+        const { affected } = await em.delete(RolePermission, {
+          roleId,
+          permissionId
+        });
+        if (!affected) {
+          throw new HttpException(
+            {
+              message: 'The role does not hold this permission',
+              errorKey: ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED
+            },
+            HttpStatus.NOT_FOUND
+          );
+        }
+      },
       audit
     );
     await this.invalidateUsersWithRole(roleId);

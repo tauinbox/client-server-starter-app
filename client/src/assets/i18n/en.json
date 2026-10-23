@@ -165,7 +165,9 @@
       "conditionBroaderThanCaller": "You cannot grant a permission with a condition broader than the one you hold yourself",
       "conditionUnresolvable": "This condition cannot be applied as written, so it would not restrict the permission",
       "superRoleAssignForbidden": "A super role cannot be assigned",
-      "superRoleRemoveForbidden": "A super role cannot be removed"
+      "superRoleRemoveForbidden": "A super role cannot be removed",
+      "roleNotAssigned": "The user does not hold this role",
+      "permissionNotAssigned": "The role does not hold this permission"
     },
     "resources": {
       "notFound": "Resource not found",

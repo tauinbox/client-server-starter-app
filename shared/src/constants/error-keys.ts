@@ -78,7 +78,9 @@ export const ErrorKeys = {
     CONDITION_BROADER_THAN_CALLER: 'errors.roles.conditionBroaderThanCaller',
     CONDITION_UNRESOLVABLE: 'errors.roles.conditionUnresolvable',
     SUPER_ROLE_ASSIGN_FORBIDDEN: 'errors.roles.superRoleAssignForbidden',
-    SUPER_ROLE_REMOVE_FORBIDDEN: 'errors.roles.superRoleRemoveForbidden'
+    SUPER_ROLE_REMOVE_FORBIDDEN: 'errors.roles.superRoleRemoveForbidden',
+    ROLE_NOT_ASSIGNED: 'errors.roles.roleNotAssigned',
+    PERMISSION_NOT_ASSIGNED: 'errors.roles.permissionNotAssigned'
   },
   RESOURCES: {
     NOT_FOUND: 'errors.resources.notFound',
