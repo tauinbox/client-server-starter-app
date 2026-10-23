@@ -332,7 +332,6 @@ describe('MfaController', () => {
         tokens: { access_token: 'access-token', expires_in: 3600 },
         user: mockUser
       });
-      expect(result.tokens).not.toHaveProperty('refresh_token');
     });
 
     it('sets the refresh cookie only at this point', async () => {

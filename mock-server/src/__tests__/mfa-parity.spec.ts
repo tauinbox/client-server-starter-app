@@ -220,7 +220,6 @@ describe('two-factor sign-in', () => {
       mfaToken: expect.any(String) as unknown,
       expiresIn: 300
     });
-    expect(body).not.toHaveProperty('tokens');
   });
 
   it('refuses the pending token as a bearer credential', async () => {

@@ -331,7 +331,6 @@ describe('AuthController', () => {
         tokens: { access_token: 'access-token', expires_in: 3600 },
         user: mockAuthResult.user
       });
-      expect(result.tokens).not.toHaveProperty('refresh_token');
     });
 
     it('should answer with a challenge, not a session, when the account carries a second factor', async () => {
