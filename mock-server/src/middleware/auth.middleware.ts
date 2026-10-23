@@ -306,7 +306,7 @@ router.post('/verify-email', (req, res) => {
   }
 
   const user = findUserById(issued.userId);
-  if (!user) {
+  if (!user || !user.isActive) {
     res.status(400).json({
       message: 'Invalid or expired verification token',
       errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN

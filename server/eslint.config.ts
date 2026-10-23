@@ -41,6 +41,19 @@ const keylessExceptionSyntax: RestrictedSyntax[] = [
   }
 ];
 
+// These UsersService methods take no ability, because each caller selects the
+// record by a key the server holds: a token hash, a signed token, a refresh
+// row or an event payload. A controller holds a client-chosen id, so it reads
+// a user through findOne(id, ability), which runs the instance check.
+const uncheckedUserLookupSyntax: RestrictedSyntax[] = [
+  {
+    selector:
+      'CallExpression[callee.object.property.name=/^users?Service$/][callee.property.name=/^(findById|findByIdWithDeleted|findByEmail|incrementFailedAttemptsAndLockIfNeeded|upgradePasswordHash|resetLoginAttempts|setEmailVerificationToken|findByEmailVerificationToken|markEmailVerified|setPasswordResetToken|findByPasswordResetToken|clearPendingEmailChange)$/]',
+    message:
+      'This UsersService method takes no ability and runs no instance check. In a controller, use a method that takes an ability, such as findOne(id, ability). If the server, not the client, chose the key, disable this line and give the reason.'
+  }
+];
+
 export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -106,6 +119,18 @@ export default defineConfig(
         'error',
         ...restrictedSyntax,
         ...keylessExceptionSyntax
+      ]
+    }
+  },
+  {
+    basePath: __dirname,
+    files: ['src/**/*.controller.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedSyntax,
+        ...keylessExceptionSyntax,
+        ...uncheckedUserLookupSyntax
       ]
     }
   },

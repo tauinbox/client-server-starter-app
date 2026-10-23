@@ -128,6 +128,20 @@ describe('mailed tokens carry the deadline the server enforces', () => {
     expect(findUserByEmail(email)?.isEmailVerified).toBe(false);
   });
 
+  it('refuses a verification token of a deactivated account like an unknown one', async () => {
+    const token = await issueVerificationToken();
+    findUserByEmail(email)!.isActive = false;
+
+    const res = await postJson('verify-email', { token });
+    expect(res.status).toBe(400);
+    expect(await readErrorBody(res)).toEqual({
+      message: 'Invalid or expired verification token',
+      errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN,
+      statusCode: 400
+    });
+    expect(findUserByEmail(email)?.isEmailVerified).toBe(false);
+  });
+
   it('still accepts a token that is inside its deadline', async () => {
     const token = await issueResetToken();
 
