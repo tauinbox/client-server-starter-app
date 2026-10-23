@@ -336,10 +336,10 @@ export class ResourceService {
     });
 
     // The declared action lists belong to the code and are rewritten on every
-    // sync. allowedActionNames is the admin's narrowing and is kept.
+    // sync. displayName, description and allowedActionNames are admin fields
+    // and are kept.
     if (existing) {
       existing.subject = normalizedSubject;
-      existing.displayName = data.displayName;
       existing.description ??= data.description;
       existing.actionNames = data.actionNames;
       existing.conditionalActionNames = data.conditionalActionNames;
