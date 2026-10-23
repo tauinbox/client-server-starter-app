@@ -132,6 +132,8 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+  /** A load that failed for a reason other than a missing user. */
+  readonly loadFailed = signal(false);
   readonly availableRoles = signal<RoleAdminResponse[]>([]);
   readonly selectedRoleIds = signal<string[]>([]);
   readonly #initialRoleIds = signal<string[]>([]);
@@ -301,6 +303,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   loadUser(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.loadFailed.set(false);
 
     forkJoin({
       user: this.#userService.getById(this.id()),
@@ -367,14 +370,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
             return;
           }
           this.loading.set(false);
-          this.error.set(
-            parseHttpErrorMessage(
-              err,
-              this.#translocoService,
-              'users.edit.errorLoadFailed'
-            )
-          );
-          this.#notify.error(err, 'users.edit.errorLoadFailed');
+          this.loadFailed.set(err.status !== 404);
         }
       });
   }

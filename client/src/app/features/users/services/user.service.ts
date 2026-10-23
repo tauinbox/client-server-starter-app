@@ -27,8 +27,11 @@ export type MfaResetRequest = {
 export class UserService {
   readonly #http = inject(HttpClient);
 
+  /** The detail and edit pages show a failed load in the page itself. */
   getById(id: string): Observable<User> {
-    return this.#http.get<User>(`${USERS_API_V1}/${id}`);
+    return this.#http.get<User>(`${USERS_API_V1}/${id}`, {
+      context: silentContext()
+    });
   }
 
   /** A row refresh after a live event; the list answers a refusal itself. */
@@ -74,8 +77,10 @@ export class UserService {
   }
 
   getPermissions(id: string): Observable<UserEffectivePermissionsResponse> {
+    // The page shows a failed load in its own card.
     return this.#http.get<UserEffectivePermissionsResponse>(
-      `${USERS_API_V1}/${id}/permissions`
+      `${USERS_API_V1}/${id}/permissions`,
+      { context: silentContext() }
     );
   }
 

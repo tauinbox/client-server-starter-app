@@ -233,6 +233,37 @@ test.describe('User Edit page', () => {
     await expect(page.locator('.error-message')).toBeVisible();
   });
 
+  test('offers a retry when the load fails and shows the form after it', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    let failures = 1;
+    await page.route(`**/api/v1/users/${mockId('user-3')}`, (route) => {
+      if (route.request().method() === 'GET' && failures-- > 0) {
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Internal error', statusCode: 500 })
+        });
+      }
+      return route.fallback();
+    });
+    await page.goto(`/users/${mockId('user-3')}/edit`);
+
+    await expect(
+      page.getByText('Failed to load user details. Please try again.')
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'User not found' })
+    ).toBeHidden();
+    await expectNoSnackbar(page);
+
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+
+    await expect(page.getByLabel('Last name')).toHaveValue('Smith');
+  });
+
   test('should show confirmation dialog when changing email', async ({
     _mockServer,
     page

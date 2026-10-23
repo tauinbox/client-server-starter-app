@@ -61,6 +61,14 @@
   }
 }
 
+// The buttons under an empty-state or error card
+@mixin error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-sm;
+  justify-content: center;
+}
+
 // Table container with overflow handling
 @mixin table-container {
   width: 100%;

@@ -20,10 +20,7 @@
   }
 
   .error-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: vars.$spacing-sm;
-    justify-content: center;
+    @include mix.error-actions;
   }
 
   .user-header {
