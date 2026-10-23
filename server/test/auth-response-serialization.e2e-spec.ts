@@ -23,6 +23,7 @@ import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { TokenGeneratorService } from '../src/modules/auth/services/token-generator.service';
+import { PurposeTokenService } from '../src/modules/auth/services/purpose-token.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
@@ -186,6 +187,7 @@ describe('Auth response serialization (e2e)', () => {
           useValue: { assertNotBreached: jest.fn() }
         },
         AuthService,
+        PurposeTokenService,
         {
           // These suites never present a second factor. The mock answers the two
           // members AuthService and AuthController read, so the branch is simply

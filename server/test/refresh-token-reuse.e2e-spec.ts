@@ -23,6 +23,7 @@ import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity'
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { TokenGeneratorService } from '../src/modules/auth/services/token-generator.service';
+import { PurposeTokenService } from '../src/modules/auth/services/purpose-token.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -211,6 +212,7 @@ describe('Refresh token reuse detection (e2e)', () => {
         },
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         AuthService,
+        PurposeTokenService,
         {
           // These suites never present a second factor. The mock answers the two
           // members AuthService and AuthController read, so the branch is simply

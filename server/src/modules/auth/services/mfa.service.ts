@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
+import { PurposeTokenService } from './purpose-token.service';
 import type { Cache } from 'cache-manager';
 import { DataSource, IsNull, Not } from 'typeorm';
 import * as crypto from 'crypto';
@@ -87,6 +88,7 @@ export class MfaService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
+    private readonly purposeTokens: PurposeTokenService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
     private readonly encryption: SecretEncryptionService,
@@ -478,15 +480,13 @@ export class MfaService {
       HttpStatus.UNAUTHORIZED
     );
 
-    let payload: { sub?: string; purpose?: string; iat?: number };
-    try {
-      payload = this.jwtService.verify(mfaToken);
-    } catch {
-      throw invalidTokenError;
-    }
+    const payload = this.purposeTokens.verify<{ sub?: string }>(
+      mfaToken,
+      TOKEN_PURPOSE.MFA_PENDING
+    );
 
     if (
-      payload.purpose !== TOKEN_PURPOSE.MFA_PENDING ||
+      payload === null ||
       typeof payload.sub !== 'string' ||
       payload.sub === ''
     ) {
@@ -504,9 +504,7 @@ export class MfaService {
       !user ||
       !user.isActive ||
       user.totpEnabledAt === null ||
-      (user.tokenRevokedAt &&
-        (typeof payload.iat !== 'number' ||
-          issuedBeforeRevocation(payload.iat, user.tokenRevokedAt)))
+      issuedBeforeRevocation(payload.iat, user.tokenRevokedAt)
     ) {
       throw invalidTokenError;
     }

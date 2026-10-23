@@ -30,6 +30,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
+import { PurposeTokenService } from '../services/purpose-token.service';
 import { GoogleOAuthGuard } from '../guards/google-oauth.guard';
 import { FacebookOAuthGuard } from '../guards/facebook-oauth.guard';
 import { VkOAuthGuard } from '../guards/vk-oauth.guard';
@@ -108,6 +109,7 @@ export class OAuthController {
     private readonly authService: AuthService,
     private readonly cookies: AuthCookies,
     private readonly jwtService: JwtService,
+    private readonly purposeTokens: PurposeTokenService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
     private readonly metricsService: MetricsService,
@@ -393,13 +395,12 @@ export class OAuthController {
 
     let data: OAuthSignInData | MfaRequiredResponseDto;
     try {
-      const payload = this.jwtService.verify<{
-        purpose?: string;
+      const payload = this.purposeTokens.verify<{
         jti?: string;
         data: typeof data;
-      }>(cookie);
-      if (payload.purpose !== TOKEN_PURPOSE.OAUTH_DATA) {
-        throw new Error('Unexpected token purpose');
+      }>(cookie, TOKEN_PURPOSE.OAUTH_DATA);
+      if (!payload) {
+        throw new Error('Invalid OAuth data token');
       }
       // Clearing the cookie only spends the credential in the caller's own
       // browser. A value captured before the exchange stays valid for the rest
@@ -555,22 +556,15 @@ export class OAuthController {
     this.cookies.clear(res, OAUTH_REAUTH_COOKIE);
 
     try {
-      const payload = this.jwtService.verify<{
+      const payload = this.purposeTokens.verify<{
         sub: string;
-        purpose?: string;
         operation?: string;
-        iat?: number;
-      }>(reauthToken);
-      if (payload.purpose !== TOKEN_PURPOSE.OAUTH_REAUTH) {
-        throw new Error('Unexpected token purpose');
+      }>(reauthToken, TOKEN_PURPOSE.OAUTH_REAUTH);
+      if (!payload) {
+        throw new Error('Invalid re-authentication token');
       }
       if (!isStepUpOperation(payload.operation)) {
         throw new Error('Re-authentication token names no known operation');
-      }
-      // The service compares this against the last session revocation, so a
-      // token without one is refused rather than trusted.
-      if (typeof payload.iat !== 'number') {
-        throw new Error('Re-authentication token carries no issue time');
       }
 
       await this.oauthService.assertReauthenticated(
@@ -617,18 +611,12 @@ export class OAuthController {
     this.cookies.clear(res, OAUTH_LINK_COOKIE);
 
     try {
-      const payload = this.jwtService.verify<{
-        sub: string;
-        purpose?: string;
-        iat?: number;
-      }>(linkToken);
-      if (payload.purpose !== TOKEN_PURPOSE.OAUTH_LINK) {
-        throw new Error('Unexpected token purpose');
-      }
-      // The service compares this against the last session revocation, so a
-      // token without one is refused rather than trusted.
-      if (typeof payload.iat !== 'number') {
-        throw new Error('Link token carries no issue time');
+      const payload = this.purposeTokens.verify<{ sub: string }>(
+        linkToken,
+        TOKEN_PURPOSE.OAUTH_LINK
+      );
+      if (!payload) {
+        throw new Error('Invalid link token');
       }
       const userId = payload.sub;
 

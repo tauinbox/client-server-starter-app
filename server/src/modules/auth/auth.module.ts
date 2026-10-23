@@ -16,6 +16,7 @@ import { MfaService } from './services/mfa.service';
 import { CryptoModule } from '../../common/crypto/crypto.module';
 import { OAuthService } from './services/oauth.service';
 import { TokenGeneratorService } from './services/token-generator.service';
+import { PurposeTokenService } from './services/purpose-token.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { OAuthAccount } from './entities/oauth-account.entity';
 import { Role } from './entities/role.entity';
@@ -104,6 +105,7 @@ function conditionalProvider(
     MfaService,
     OAuthService,
     TokenGeneratorService,
+    PurposeTokenService,
     LocalStrategy,
     JwtStrategy,
     RefreshTokenService,

@@ -17,6 +17,7 @@ import { RefreshTokenService } from './refresh-token.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { RoleService } from './role.service';
 import { TokenGeneratorService } from './token-generator.service';
+import { PurposeTokenService } from './purpose-token.service';
 import {
   BCRYPT_SALT_ROUNDS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
@@ -320,6 +321,7 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        PurposeTokenService,
         SessionIssuerService,
         SessionLimitService,
         { provide: EntitlementService, useValue: mockEntitlementService },

@@ -17,6 +17,7 @@ import { OAuthController } from '../src/modules/auth/controllers/oauth.controlle
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { OAuthService } from '../src/modules/auth/services/oauth.service';
 import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.service';
+import { PurposeTokenService } from '../src/modules/auth/services/purpose-token.service';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
 import { UsersService } from '../src/modules/users/services/users.service';
@@ -46,6 +47,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [OAuthController],
       providers: [
+        PurposeTokenService,
         RESPONSE_SERIALIZER,
         AuthCookies,
         {

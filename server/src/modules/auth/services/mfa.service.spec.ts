@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { DataSource, IsNull, Not } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { ScureBase32Plugin, generateSync } from 'otplib';
@@ -13,6 +14,7 @@ import {
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MfaService } from './mfa.service';
+import { PurposeTokenService } from './purpose-token.service';
 import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
@@ -123,6 +125,8 @@ describe('MfaService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MfaService,
+        PurposeTokenService,
+        { provide: ConfigService, useValue: createMockConfigService({}) },
         {
           provide: DataSource,
           useValue: {

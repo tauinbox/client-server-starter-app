@@ -1368,8 +1368,8 @@ must stay open under it, because a fresh sign-in and the password reset are the 
 step-up that offers no password never touches the counter, and neither does the `reauth_proof`
 branch of an account that holds no password.
 
-**Token purpose.** The service signs three token types: access, OAuth link and OAuth data. The three
-use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
+**Token purpose.** The service signs six token types: access, OAuth link, OAuth data, OAuth
+re-authentication, step-up proof and two-factor pending. The six use the same key. Thus each token carries an explicit `purpose` claim, and each consumer accepts only
 its own purpose.
 
 Without that claim, a token from one flow authenticates on another flow. An OAuth-data token carries
@@ -1377,8 +1377,12 @@ no `sub` claim, and a user lookup with no id then resolves to an arbitrary row i
 
 One factory (`jwt-module-options.factory.ts`) pins the issuer, the audience and the algorithm for
 the signing and for the verification. `JwtModule` and `JwtStrategy` both get the key, the algorithm
-and the claims from its `buildJwtVerification`, and both read `JWT_MIN_IAT` through its
-`readJwtMinIat`. Thus the verifiers cannot diverge.
+and the claims from its `buildJwtVerification`. Thus the verifiers cannot diverge.
+
+`JwtStrategy` checks the access token. `PurposeTokenService.verify` checks the other five token
+types: it compares the `purpose` claim, requires an `iat`, and refuses a token issued before
+`JWT_MIN_IAT`. Both read the cut-off through `readJwtMinIat`, so a forced re-login ends every token
+type, not only the sessions.
 
 **GoogleStrategy, FacebookStrategy and VkStrategy** do the OAuth2 login. The module registers each
 one only when its environment variables have a value.
