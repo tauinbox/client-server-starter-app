@@ -2,7 +2,7 @@ import type { Server } from 'http';
 import { ErrorKeys, MIN_PASSWORD_LENGTH } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { resetState } from '../state';
+import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
 import { readErrorBody } from '../utils/error-body';
 
@@ -449,11 +449,20 @@ describe('DELETE /api/v1/roles/:id/permissions/:permissionId', () => {
     expect(body.errorKey).toBe(ErrorKeys.ROLES.NOT_FOUND);
   });
 
-  it('still succeeds for an existing role', async () => {
+  it('still succeeds for a permission that an existing role holds', async () => {
     const token = await login('admin@example.com');
+    // The seed grants the editor role nothing.
+    const [permission] = getState().permissions.values();
+    if (!permission) throw new Error('The seed holds no permission');
+    getState().rolePermissions.push({
+      id: mockId('rp-editor-held'),
+      roleId: mockId('role-editor'),
+      permissionId: permission.id,
+      conditions: null
+    });
 
     const res = await fetch(
-      `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions/${mockId('perm-1')}`,
+      `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions/${permission.id}`,
       { method: 'DELETE', headers: authHeaders(token) }
     );
 

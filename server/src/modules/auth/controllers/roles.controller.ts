@@ -299,6 +299,9 @@ export class RolesController {
   @ApiParam({ name: 'id', description: 'The role ID' })
   @ApiParam({ name: 'permissionId', description: 'The permission ID' })
   @ApiOkResponse({ description: 'Permission removed' })
+  @ApiNotFoundResponse({
+    description: 'Role not found, or the role does not hold the permission'
+  })
   removePermission(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('permissionId', ParseUUIDPipe) permissionId: string,
@@ -355,6 +358,9 @@ export class RolesController {
   @ApiParam({ name: 'userId', description: 'The user ID' })
   @ApiParam({ name: 'roleId', description: 'The role ID' })
   @ApiOkResponse({ description: 'Role removed' })
+  @ApiNotFoundResponse({
+    description: 'User or role not found, or the user does not hold the role'
+  })
   async removeRole(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Param('roleId', ParseUUIDPipe) roleId: string,
