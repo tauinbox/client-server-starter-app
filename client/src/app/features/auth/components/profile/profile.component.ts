@@ -806,8 +806,9 @@ export class ProfileComponent implements OnInit {
 
   /**
    * An account with neither a password nor an authenticator proves itself by
-   * completing a round trip at its provider, which is a full page load. Anything else the user
-   * typed is therefore saved BEFORE leaving, so the redirect never discards it.
+   * completing a round trip at its provider, which is a full page load.
+   * Anything else the user typed is therefore saved BEFORE leaving, so the
+   * redirect never discards it.
    *
    * A first password in the same submit is refused rather than handled: saving
    * it ends the session, which would leave the round trip authenticating a
