@@ -58,7 +58,9 @@ export const errorInterceptor: HttpInterceptorFn = (
       // reactively (RequirePermissionsDirective re-evaluates via effect()),
       // then retry the request once. If the retry also 403s the permission is
       // genuinely revoked — show a snackbar and propagate the retry error.
-      if (error.status === 403 && !isRetry) {
+      // A signed-out 403 (an unverified sign-in) has no permissions to
+      // refresh: the permissions read would 401 and force a logout.
+      if (error.status === 403 && !isRetry && authStore.isAuthenticated()) {
         const permissionsCtx = new HttpContext()
           .set(RBAC_RETRY_CONTEXT, true)
           .set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);

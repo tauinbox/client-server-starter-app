@@ -1,4 +1,6 @@
 import { expect, test } from '../fixtures/base.fixture';
+import { createMockUser } from '../fixtures/mock-data';
+import { mockId } from '../fixtures/ids';
 
 test.describe('Login page', () => {
   test('should display the login form', async ({ _mockServer, page }) => {
@@ -53,5 +55,45 @@ test.describe('Login page', () => {
     await main.getByRole('button', { name: 'Login' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
+  });
+
+  test('should stay on login with no session calls for an unverified user', async ({
+    _mockServer,
+    page
+  }) => {
+    await _mockServer.seedUsers([
+      createMockUser({
+        id: mockId('user-303'),
+        email: 'unverified-login@example.com',
+        firstName: 'Unverified',
+        lastName: 'Login',
+        password: 'Password1',
+        roles: ['user'],
+        isEmailVerified: false
+      })
+    ]);
+    const sessionCalls: string[] = [];
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url());
+      if (
+        pathname === '/api/v1/auth/permissions' ||
+        pathname === '/api/v1/auth/refresh-token'
+      ) {
+        sessionCalls.push(pathname);
+      }
+    });
+
+    await page.goto('/login');
+
+    const main = page.getByRole('main');
+    await page.getByLabel('Email').fill('unverified-login@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
+    await main.getByRole('button', { name: 'Login' }).click();
+
+    await expect(page.getByText(/verify your email/i)).toBeVisible();
+    await expect(page).toHaveURL(/\/login$/);
+    expect(sessionCalls).toEqual([]);
   });
 });
