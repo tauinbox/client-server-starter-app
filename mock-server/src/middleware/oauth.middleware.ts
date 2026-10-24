@@ -8,7 +8,7 @@ import {
   clearReauthProofCookie,
   sendWithRetryAfter,
   stepUpError,
-  stepUpFactorsShapeError
+  stepUpFactorsBodyErrors
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
@@ -50,9 +50,9 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
 
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
 
-  const shapeError = stepUpFactorsShapeError(req.body);
-  if (shapeError) {
-    res.status(400).json(validationError(shapeError));
+  const bodyErrors = stepUpFactorsBodyErrors(req.body);
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
@@ -193,9 +193,9 @@ router.post('/link-init', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
 
-  const shapeError = stepUpFactorsShapeError(req.body);
-  if (shapeError) {
-    res.status(400).json(validationError(shapeError));
+  const bodyErrors = stepUpFactorsBodyErrors(req.body);
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 

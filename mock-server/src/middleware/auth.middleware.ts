@@ -76,8 +76,11 @@ import {
   lockedEnvelope,
   sendWithRetryAfter,
   stepUpError,
-  stepUpFactorsShapeError
+  stepUpFactorsBodyErrors
 } from '../helpers/reauth.helpers';
+
+/** The own fields of `UpdateProfileDto`, beside the step-up factors. */
+const PROFILE_FIELDS = ['firstName', 'lastName', 'password', 'locale'] as const;
 
 function respondLocked(res: Response, lockedUntil: string): void {
   sendWithRetryAfter(
@@ -789,6 +792,12 @@ router.patch(
       req.body;
     const { user } = req as AuthenticatedRequest;
 
+    const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS);
+    if (bodyErrors.length > 0) {
+      res.status(400).json(validationError(bodyErrors));
+      return;
+    }
+
     const localeErr = validateLocale(locale);
     if (localeErr) {
       res.status(400).json(validationError(localeErr));
@@ -801,12 +810,6 @@ router.patch(
     ];
     if (nameErrors.length > 0) {
       res.status(400).json(validationError(nameErrors));
-      return;
-    }
-
-    const shapeError = stepUpFactorsShapeError(req.body);
-    if (shapeError) {
-      res.status(400).json(validationError(shapeError));
       return;
     }
 
@@ -890,6 +893,12 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
   const successMessage =
     'If the new email is available, a confirmation link has been sent to it.';
 
+  const bodyErrors = stepUpFactorsBodyErrors(req.body, ['newEmail']);
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
+    return;
+  }
+
   const newEmailErrors = emailErrors('newEmail', req.body?.newEmail);
   if (newEmailErrors.length > 0) {
     res.status(400).json(validationError(newEmailErrors));
@@ -897,11 +906,6 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
   }
 
   const newEmail = normalizeEmail(req.body.newEmail) ?? '';
-  const shapeError = stepUpFactorsShapeError(req.body);
-  if (shapeError) {
-    res.status(400).json(validationError(shapeError));
-    return;
-  }
 
   const stepUp = stepUpError(
     req,

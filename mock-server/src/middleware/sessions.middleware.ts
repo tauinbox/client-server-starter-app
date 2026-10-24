@@ -7,7 +7,7 @@ import {
   clearReauthProofCookie,
   sendWithRetryAfter,
   stepUpError,
-  stepUpFactorsShapeError
+  stepUpFactorsBodyErrors
 } from '../helpers/reauth.helpers';
 import {
   requireUuid,
@@ -33,9 +33,9 @@ function passesStepUp(req: Request, res: Response): boolean {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
 
-  const shapeError = stepUpFactorsShapeError(req.body);
-  if (shapeError) {
-    res.status(400).json(validationError(shapeError));
+  const bodyErrors = stepUpFactorsBodyErrors(req.body);
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return false;
   }
 

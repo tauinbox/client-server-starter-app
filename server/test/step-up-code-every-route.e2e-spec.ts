@@ -196,6 +196,19 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
     30000
   );
 
+  // The mock refuses the same body with the same message.
+  it('refuses a field the step-up body does not declare', async () => {
+    const refused = await request(http())
+      .post('/api/v1/auth/oauth/link-init')
+      .auth(await token(), { type: 'bearer' })
+      .send({ extra: 1 });
+
+    expect(refused.status).toBe(400);
+    expect((refused.body as { message?: string }).message).toBe(
+      'property extra should not exist'
+    );
+  }, 30000);
+
   // Runs after the first password: ASVS 6.2.3 asks for the current password
   // once the account holds one, and a code does not stand in for it.
   it('refuses a code in place of the current password', async () => {
