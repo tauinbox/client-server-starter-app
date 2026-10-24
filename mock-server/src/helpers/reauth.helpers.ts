@@ -3,6 +3,7 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
+  STEP_UP_OPERATION,
   TOTP_DIGITS,
   TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
@@ -316,7 +317,15 @@ export function stepUpError(
   // browser never sends it to. The server passes no proof there.
   acceptsReauthProof = true
 ): StepUpErrorEnvelope | null {
-  const lock = stepUpCodeError(req, user, code);
+  // ASVS 6.2.3, as on the server: an account that holds a password changes it
+  // only against the current one.
+  const lock = stepUpCodeError(
+    req,
+    user,
+    operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
+      ? undefined
+      : code
+  );
   if (lock !== undefined) {
     return lock;
   }

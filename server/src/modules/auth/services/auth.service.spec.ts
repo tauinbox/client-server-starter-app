@@ -2341,6 +2341,37 @@ describe('AuthService', () => {
       });
     });
 
+    // ASVS 6.2.3: a password changes only against the current one.
+    it('never accepts a code in place of the current password for a password change', async () => {
+      const user = {
+        id: 'user-1',
+        email: 'user@example.com',
+        password: '$2b$12$hash'
+      } as User;
+      mockMfaService.isValidStepUpCode.mockClear();
+      mockMfaService.isValidStepUpCode.mockImplementation(
+        (_user: User, code: string | undefined) =>
+          Promise.resolve(code === '123456')
+      );
+
+      await expect(
+        service.assertStepUp(
+          user,
+          undefined,
+          undefined,
+          STEP_UP_OPERATION.PASSWORD_SET,
+          '123456'
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
+      });
+      expect(mockMfaService.isValidStepUpCode).toHaveBeenCalledWith(
+        user,
+        undefined,
+        undefined
+      );
+    });
+
     it('accepts a valid authenticator code in place of the password', async () => {
       const compare = jest.spyOn(bcrypt, 'compare').mockClear();
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;

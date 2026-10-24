@@ -1120,7 +1120,14 @@ export class AuthService {
     totpCode?: string,
     auditContext?: AuditContext
   ): Promise<StepUpVerdict> {
-    if (await this.mfaService.isValidStepUpCode(user, totpCode, auditContext)) {
+    // ASVS 6.2.3: an account that holds a password changes it only against
+    // the current one. The code stands in for it only on an account that
+    // holds none.
+    const code =
+      operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
+        ? undefined
+        : totpCode;
+    if (await this.mfaService.isValidStepUpCode(user, code, auditContext)) {
       return { factor: null };
     }
 

@@ -90,6 +90,24 @@ const routes: ReadonlyArray<
   ]
 ];
 
+// ASVS 6.2.3: once the account holds a password, a code does not replace it.
+it('refuses a code in place of the current password for a password change', async () => {
+  const token = await oauthOnlyEnrolledToken();
+  const user = getState().users.get(OAUTH_ONLY_ID) as MockUser;
+  user.password = 'Current-Orchard-52';
+
+  const res = await send(token, 'PATCH', '/api/v1/auth/profile', {
+    password: 'Quarry-Bramble-83',
+    code: MOCK_TOTP_CODE
+  });
+
+  expect(res.status).toBe(400);
+  expect(await res.json()).toMatchObject({
+    errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+  });
+  expect(user.password).toBe('Current-Orchard-52');
+});
+
 describe.each(routes)('%s', (_name, method, path, body) => {
   it('refuses an account with no password that sends no factor', async () => {
     const token = await oauthOnlyEnrolledToken();

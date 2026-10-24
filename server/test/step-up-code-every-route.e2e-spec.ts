@@ -195,4 +195,21 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
     },
     30000
   );
+
+  // Runs after the first password: ASVS 6.2.3 asks for the current password
+  // once the account holds one, and a code does not stand in for it.
+  it('refuses a code in place of the current password', async () => {
+    const before = (await row()).password;
+
+    const refused = await request(http())
+      .patch('/api/v1/auth/profile')
+      .auth(await token(), { type: 'bearer' })
+      .send({ password: 'Harbor-Lantern-61', code: await freshCode() });
+
+    expect(refused.status).toBe(400);
+    expect((refused.body as { errorKey?: string }).errorKey).toBe(
+      ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+    );
+    expect((await row()).password).toBe(before);
+  }, 30000);
 });
