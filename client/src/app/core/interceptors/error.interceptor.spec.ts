@@ -32,6 +32,7 @@ describe('errorInterceptor', () => {
   let authStoreMock: {
     setRules: ReturnType<typeof vi.fn>;
     setMfaMandatory: ReturnType<typeof vi.fn>;
+    isAuthenticated: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -41,7 +42,11 @@ describe('errorInterceptor', () => {
       info: vi.fn(),
       warn: vi.fn()
     };
-    authStoreMock = { setRules: vi.fn(), setMfaMandatory: vi.fn() };
+    authStoreMock = {
+      setRules: vi.fn(),
+      setMfaMandatory: vi.fn(),
+      isAuthenticated: vi.fn(() => true)
+    };
 
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModuleWithLangs],
@@ -380,6 +385,24 @@ describe('errorInterceptor', () => {
       expect(notifyMock.error).toHaveBeenCalledTimes(1);
       const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
       expect((arg.error as { message: string }).message).toBe('Forbidden');
+    });
+
+    it('should not fetch permissions for a signed-out 403', () => {
+      authStoreMock.isAuthenticated.mockReturnValue(false);
+      let caughtError: HttpErrorResponse | null = null;
+      http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
+
+      httpMock
+        .expectOne('/api/test')
+        .flush(
+          { message: 'Email not verified' },
+          { status: 403, statusText: 'Forbidden' }
+        );
+
+      httpMock.expectNone(AuthApiEnum.Permissions);
+
+      expect(caughtError!.status).toBe(403);
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
     });
 
     it('should not notify for silent 403 when permissions fetch fails', () => {
