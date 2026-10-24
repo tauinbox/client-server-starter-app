@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpException, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
 import { OAuthService } from './oauth.service';
@@ -894,6 +894,29 @@ describe('OAuthService', () => {
           LINK_TOKEN_IAT
         )
       ).resolves.toBeUndefined();
+    });
+
+    it('should refuse a second identity of a provider the user already linked', async () => {
+      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
+        code: '23505'
+      });
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+
+      await expect(
+        service.linkOAuthToUser(
+          'user-1',
+          'google',
+          'google-456',
+          LINK_TOKEN_IAT
+        )
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED }
+      });
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
     });
 
     it('should recognise the unique violation when TypeORM wraps the driver error', async () => {

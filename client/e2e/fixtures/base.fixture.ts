@@ -89,11 +89,14 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         });
       },
       async seedOAuthAccounts(userId, accounts) {
-        await fetch(`${baseUrl}/__control/oauth-accounts`, {
+        const res = await fetch(`${baseUrl}/__control/oauth-accounts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, accounts })
         });
+        if (!res.ok) {
+          throw new Error(`seedOAuthAccounts failed: ${await res.text()}`);
+        }
       },
       async issueOAuthData(userId) {
         const res = await fetch(`${baseUrl}/__control/oauth-data`, {

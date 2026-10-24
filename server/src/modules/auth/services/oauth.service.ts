@@ -257,7 +257,16 @@ export class OAuthService {
           );
         }
         // Already linked to this user — safe to ignore
-        return;
+        if (existing) return;
+        // The identity is free, so the user already holds another identity of
+        // this provider: the API addresses a linked provider by name only.
+        throw new HttpException(
+          {
+            message: 'A provider account of this kind is already linked',
+            errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED
+          },
+          HttpStatus.CONFLICT
+        );
       }
       throw error;
     }

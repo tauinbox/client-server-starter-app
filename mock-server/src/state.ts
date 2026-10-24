@@ -491,8 +491,13 @@ export function addOAuthAccounts(
   userId: string,
   accounts: OAuthAccount[]
 ): void {
-  const existing = state.oauthAccounts.get(userId) || [];
-  state.oauthAccounts.set(userId, [...existing, ...accounts]);
+  const merged = [...(state.oauthAccounts.get(userId) || []), ...accounts];
+  const providers = new Set(merged.map((a) => a.provider));
+  // The server's unique (user_id, provider) refuses the same state.
+  if (providers.size !== merged.length) {
+    throw new Error(`User ${userId} would hold two accounts of one provider`);
+  }
+  state.oauthAccounts.set(userId, merged);
 }
 
 // Mirrors AUDIT_FIELD_MAX_LENGTH in the server AuditService: the audit columns

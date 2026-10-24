@@ -190,7 +190,12 @@ router.post('/oauth-accounts', (req, res) => {
     return;
   }
 
-  addOAuthAccounts(userId, accounts);
+  try {
+    addOAuthAccounts(userId, accounts);
+  } catch (error) {
+    res.status(400).json({ message: (error as Error).message });
+    return;
+  }
   res.json({
     message: `Added ${accounts.length} OAuth account(s) for user ${userId}`
   });
