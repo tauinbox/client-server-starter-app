@@ -118,6 +118,7 @@
       "invalidOauthData": "Invalid or expired OAuth data",
       "unlinkLastProvider": "This is the only way you can sign in. Connect another provider first, or set a password with the \"Forgot password\" link.",
       "oauthProviderNotLinked": "This provider is not linked to your account.",
+      "oauthProviderAlreadyLinked": "This provider is already linked to your account.",
       "invalidCurrentPassword": "Current password is incorrect",
       "captchaRequired": "Please complete the CAPTCHA challenge to continue.",
       "captchaInvalid": "CAPTCHA verification failed. Please try again.",

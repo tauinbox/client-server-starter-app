@@ -1677,6 +1677,11 @@ authenticate. The loser gets a 400.
 An unlink of a provider that is not linked returns 404 (`errors.auth.oauthProviderNotLinked`) and
 writes no audit row.
 
+An account holds one identity of each provider, because the routes address a provider by its name.
+A link of a second identity of a linked provider gets 409 (`errors.auth.oauthProviderAlreadyLinked`)
+and the callback redirects with `oauth_error=link_failed`. The unique `(user_id, provider)`
+constraint on `oauth_accounts` enforces this for concurrent links too.
+
 **A credential change tells the owner.** An audit row is read by an operator during an investigation.
 A message is read by the owner in minutes, and that is what turns a silent takeover into a reported
 one. Five sites mail the account address: `AuthController.updateProfile` (self-service password
@@ -1976,7 +1981,7 @@ before the row that gave it, and pages then drop or repeat rows silently.
 | Table | Description |
 |-------|-------------|
 | `users` | UUID PK. `email` is unique. The functional unique index `UQ_users_email_lower` on `lower(email)` stops two accounts that differ only by case. The row holds the name and the bcrypt password, which is nullable for a user with OAuth only. It holds `isActive`, `isEmailVerified` and `locale`, the email language, with the default `en`. It holds `failedLoginAttempts` and `lockedUntil`. It holds the verification and reset token fields. `deleted_at TIMESTAMPTZ NULL` is the soft delete. The row has a ManyToMany relation to the roles through `user_roles` |
-| `oauth_accounts` | UUID PK. `provider` and `provider_id` are unique together. The FK to `users` uses CASCADE and has an index |
+| `oauth_accounts` | UUID PK. `provider` and `provider_id` are unique together, and so are `user_id` and `provider`. The FK to `users` uses CASCADE and has an index |
 | `refresh_tokens` | UUID PK. `token` is a unique SHA-256 hash, and `@Exclude` keeps it off the wire. The FK to `users` uses CASCADE. The row also holds `expires_at` and `revoked` |
 | `roles` | UUID PK, unique `name`, description, `isSystem` flag, `isSuper` flag |
 | `resources` | UUID PK, unique `name`, unique `subject`, `displayName`, description, `isSystem` flag. CASL cannot resolve an ambiguous subject, and `check:permissions` enforces both uniqueness rules in CI. The `is_orphaned` boolean becomes true when a person removes the controller. The permissions of such a resource then give nothing, and a deny rule continues to apply until a person restores it. `action_names text[]` and `conditional_action_names text[]` hold what `@RegisterResource` declares, and the startup sync rewrites them. `allowed_action_names text[]` is the admin narrowing of `action_names`, and `null` offers every declared action |

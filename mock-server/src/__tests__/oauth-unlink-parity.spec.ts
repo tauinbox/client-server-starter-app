@@ -77,3 +77,30 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider parity with server', () =
     expect(getState().oauthAccounts.get(userId)).toHaveLength(0);
   });
 });
+
+// The server's unique (user_id, provider) refuses this state, so the mock
+// must not let a test seed it.
+describe('POST /__control/oauth-accounts', () => {
+  it('refuses a second account of a provider the user already holds', async () => {
+    const { userId } = await loginAsAdmin();
+    const before = getState().oauthAccounts.get(userId);
+
+    const res = await fetch(`${baseUrl}/__control/oauth-accounts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        accounts: [
+          {
+            provider: 'google',
+            providerId: 'g-second',
+            createdAt: new Date().toISOString()
+          }
+        ]
+      })
+    });
+
+    expect(res.status).toBe(400);
+    expect(getState().oauthAccounts.get(userId)).toEqual(before);
+  });
+});

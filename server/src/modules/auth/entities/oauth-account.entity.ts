@@ -11,6 +11,7 @@ import { User } from '../../users/entities/user.entity';
 
 @Entity('oauth_accounts')
 @Unique(['provider', 'providerId'])
+@Unique(['userId', 'provider'])
 export class OAuthAccount {
   @PrimaryGeneratedColumn('uuid')
   id: string;
