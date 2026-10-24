@@ -1180,13 +1180,16 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 333 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1594 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 335 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1602 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
-and the password edit. An account created through a provider holds no password, so the profile page
-shows a notice naming that provider in place of the current-password field, and the email change, the
-first password, the two-factor enrolment and a new provider link all leave for the provider and
-resume when the callback returns with `?reauth=ok`.
+and the password edit. An account created through a provider holds no password. When it carries an
+authenticator, the profile form, the providers card and the sessions card ask for a code instead, and
+nothing leaves the app; a new password and a new email in one submit are refused, because one code
+opens one request. Without an authenticator the profile page shows a notice naming that provider in
+place of the current-password field, and the email change, the first password, the two-factor
+enrolment and a new provider link all leave for the provider and resume when the callback returns
+with `?reauth=ok`.
 The email change carries its pending address across the round trip; the first password carries only a
 marker, because a credential must not sit in web storage, so the page asks for the password again on
 return. The enrolment carries a marker too, and the card asks for its secret on the return load. A link

@@ -265,11 +265,16 @@ export class AuthController {
         updateProfileDto.currentPassword,
         reauthProof,
         STEP_UP_OPERATION.PASSWORD_SET,
+        updateProfileDto.code,
         extractAuditContext(req)
       );
     }
 
-    const { currentPassword: _ignored, ...updatePayload } = updateProfileDto;
+    const {
+      currentPassword: _password,
+      code: _code,
+      ...updatePayload
+    } = updateProfileDto;
     const previous =
       updatePayload.firstName !== undefined ||
       updatePayload.lastName !== undefined

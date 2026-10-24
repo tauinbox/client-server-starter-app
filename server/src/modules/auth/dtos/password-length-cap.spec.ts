@@ -4,8 +4,9 @@ import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 import { CreateUserDto } from '../../users/dtos/create-user.dto';
 import { InitiateEmailChangeDto } from './initiate-email-change.dto';
 import { LoginDto } from './login.dto';
-import { MfaSetupDto, MfaStepUpDto } from './mfa.dto';
+import { MfaSetupDto } from './mfa.dto';
 import { ResetPasswordDto } from './reset-password.dto';
+import { StepUpFactorsDto } from './step-up-factors.dto';
 import { UpdateProfileDto } from './update-profile.dto';
 
 // The password is pre-hashed before bcrypt, so the 72 bytes bcrypt reads no
@@ -96,7 +97,7 @@ describe('Password length cap', () => {
       { newEmail: 'new.user@example.com', currentPassword: ASCII_128 }
     ],
     ['MfaSetupDto', MfaSetupDto, { currentPassword: ASCII_128 }],
-    ['MfaStepUpDto', MfaStepUpDto, { currentPassword: ASCII_128 }]
+    ['StepUpFactorsDto', StepUpFactorsDto, { currentPassword: ASCII_128 }]
   ];
 
   describe.each(verifyPaths)(

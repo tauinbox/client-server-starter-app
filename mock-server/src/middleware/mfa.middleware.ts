@@ -22,9 +22,11 @@ import {
   recordFailure,
   sendWithRetryAfter,
   stepUpError,
+  stepUpFactorsBodyErrors,
   type StepUpErrorEnvelope
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
+import { unknownPropertyErrors } from '../utils/validation';
 import { decodeToken } from '../jwt.utils';
 import { findUserById, getState, logAudit } from '../state';
 import {
@@ -118,6 +120,12 @@ router.post('/setup', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword } = req.body;
 
+  // MfaSetupDto takes no code: an account that enrols holds no factor yet.
+  const unknown = unknownPropertyErrors(req.body, ['currentPassword']);
+  if (unknown.length > 0) {
+    res.status(400).json(validationError(unknown));
+    return;
+  }
   if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
     res.status(400).json(validationError('currentPassword is required'));
     return;
@@ -229,18 +237,9 @@ router.post('/disable', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = req.body;
 
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
-    return;
-  }
-  if (code !== undefined && !isValidCodeShape(code)) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `code must be longer than or equal to ${TOTP_DIGITS} characters`
-        )
-      );
+  const bodyErrors = stepUpFactorsBodyErrors(req.body);
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
@@ -290,18 +289,9 @@ router.post('/recovery-codes', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = req.body;
 
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
-    return;
-  }
-  if (code !== undefined && !isValidCodeShape(code)) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `code must be longer than or equal to ${TOTP_DIGITS} characters`
-        )
-      );
+  const bodyErrors = stepUpFactorsBodyErrors(req.body);
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 

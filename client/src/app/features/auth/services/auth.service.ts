@@ -26,7 +26,7 @@ import type {
   AuthResponse,
   LoginCredentials,
   LoginResponse,
-  MfaStepUpRequest,
+  StepUpFactorsRequest,
   MfaRecoveryCodesResponse,
   MfaSetupResponse,
   RegisterRequest,
@@ -241,7 +241,7 @@ export class AuthService {
     );
   }
 
-  disableMfa(request: MfaStepUpRequest): Observable<{ message: string }> {
+  disableMfa(request: StepUpFactorsRequest): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.MfaDisable,
       request,
@@ -258,7 +258,7 @@ export class AuthService {
   /** An empty request relies on the provider proof cookie the page cannot read. */
   revokeSession(
     sessionId: string,
-    request: MfaStepUpRequest
+    request: StepUpFactorsRequest
   ): Observable<{ message: string }> {
     return this.#http.delete<{ message: string }>(
       `${AuthApiEnum.Sessions}/${encodeURIComponent(sessionId)}`,
@@ -267,7 +267,7 @@ export class AuthService {
   }
 
   revokeOtherSessions(
-    request: MfaStepUpRequest
+    request: StepUpFactorsRequest
   ): Observable<{ message: string; count: number }> {
     return this.#http.delete<{ message: string; count: number }>(
       AuthApiEnum.Sessions,
@@ -277,7 +277,7 @@ export class AuthService {
 
   /** Replaces the recovery set and returns the new codes, once. */
   regenerateRecoveryCodes(
-    request: MfaStepUpRequest
+    request: StepUpFactorsRequest
   ): Observable<MfaRecoveryCodesResponse> {
     return this.#http.post<MfaRecoveryCodesResponse>(
       AuthApiEnum.MfaRecoveryCodes,
@@ -472,13 +472,15 @@ export class AuthService {
   /**
    * Starts a provider link. A linked provider is a sign-in credential that no
    * recovery path removes, so the server demands the same fresh proof of
-   * identity the other credential changes demand: a password, or the proof an
-   * account with none earned at its own provider.
+   * identity the other credential changes demand: a password, a code, or the
+   * proof an account with neither earned at its own provider.
    */
-  initOAuthLink(currentPassword?: string): Observable<{ message: string }> {
+  initOAuthLink(
+    stepUp: StepUpFactorsRequest = {}
+  ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.OAuthLinkInit,
-      currentPassword ? { currentPassword } : {},
+      stepUp,
       { context: silentContext() }
     );
   }
@@ -501,20 +503,16 @@ export class AuthService {
   /**
    * Removes a linked provider. The row it deletes is a sign-in credential, so
    * the server demands the same fresh proof of identity the link route
-   * demands: a password, or the proof an account with none earned at its own
-   * provider. A `DELETE` carries the password in its body, which Express
-   * parses and Nest validates like any other body.
+   * demands. A `DELETE` carries the factor in its body, which Express parses
+   * and Nest validates like any other body.
    */
   unlinkOAuthAccount(
     provider: string,
-    currentPassword?: string
+    stepUp: StepUpFactorsRequest = {}
   ): Observable<{ message: string }> {
     return this.#http.delete<{ message: string }>(
       `${AuthApiEnum.OAuthAccounts}/${encodeURIComponent(provider)}`,
-      {
-        body: currentPassword ? { currentPassword } : {},
-        context: silentContext()
-      }
+      { body: stepUp, context: silentContext() }
     );
   }
 
@@ -560,17 +558,16 @@ export class AuthService {
   }
 
   /**
-   * An account created through a provider holds no password and authorizes the
-   * change with the `reauth_proof` cookie instead, so the field is omitted
-   * rather than sent empty - an empty string fails DTO validation.
+   * An account with neither a password nor an authenticator authorizes the
+   * change with the `reauth_proof` cookie, so it sends no factor at all.
    */
   initiateEmailChange(
     newEmail: string,
-    currentPassword?: string
+    stepUp: StepUpFactorsRequest = {}
   ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.InitiateEmailChange,
-      currentPassword ? { newEmail, currentPassword } : { newEmail },
+      { newEmail, ...stepUp },
       { context: silentContext() }
     );
   }

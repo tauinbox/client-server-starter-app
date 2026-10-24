@@ -1664,8 +1664,8 @@ step-up first, and an unlink also has a safety check.
 
 The row an unlink deletes is a sign-in credential that no password reset removes, so the route
 runs `AuthService.assertStepUpForUser` with the operation `oauth_unlink` before it deletes
-anything. The password rides in the body of the `DELETE`; an account created through a provider
-sends none and presents a `reauth_proof` minted for that operation instead. The provider name is
+anything. The password or a code from the authenticator rides in the body of the `DELETE`; an
+account with neither presents a `reauth_proof` minted for that operation instead. The provider name is
 validated first, so a typo costs no factor. The route clears the proof cookie once the provider is
 removed, as every consumer of a proof does.
 
@@ -1843,8 +1843,9 @@ uniqueness again for the race window. It revokes each refresh token, and it noti
 It refuses an account that is not active, with the same body as an unknown token, thus the answer
 reports no account state. This matches the `isActive` gate on `forgotPassword` and `resetPassword`.
 
-The server rejects an account with OAuth only, because it has no password. Such a user must set a
-password first.
+The route demands a step-up with the operation `email_change`. An account that holds a password
+sends it or a code from its authenticator. An account with OAuth only sends a code when it carries
+an authenticator, and presents a `reauth_proof` from a provider round trip when it does not.
 
 The endpoint has a throttle of 3 calls each hour. It is enumeration-safe, because a conflict on a
 taken address gives the same response shape.
@@ -2162,7 +2163,7 @@ These routes currently replace the default limit:
 | `POST /auth/mfa/enable` | 1 min | 5 plus `login-long-window` | It verifies a code from the pending secret |
 | `POST /auth/mfa/disable` | 1 min | 5 plus `login-long-window` | It verifies a password or a code, and it turns the second factor off |
 | `POST /auth/mfa/recovery-codes` | 1 min | 5 plus `login-long-window` | It verifies a password or a code, and it replaces the recovery set |
-| `POST /auth/oauth/link-init` | 1 min | 5 plus `login-long-window`, on a body that carries `currentPassword` | It verifies the step-up secret before it mints the link intent. An account with no password takes a provider round trip instead, and spends none of that budget |
+| `POST /auth/oauth/link-init` | 1 min | 5 plus `login-long-window`, on a body that carries `currentPassword` or `code` | It verifies the step-up secret before it mints the link intent. An account with neither a password nor an authenticator takes a provider round trip instead, and spends none of that budget |
 | `PATCH /auth/profile` | 15 min | `login-long-window` only, on a body that carries `password` | The step-up on the password branch verifies a secret. A name or locale edit keeps the application-wide ceiling |
 | `PATCH /users/:id` | 15 min | `login-long-window` only, on a body that carries `currentPassword` or `code` | A password or email change verifies a step-up secret of the caller. An edit that presents no secret keeps the application-wide ceiling, so an administrator is not limited to five edits a minute |
 | `POST /users/:id/mfa/reset` | 15 min | `login-long-window` only, on every request | Each request carries a step-up secret of the caller, so each refused one counts. The route clears the two-factor enrolment of another user and ends the sessions of that user |
@@ -2503,8 +2504,8 @@ The base URL is `/api/v1`.
 | POST | `/refresh-token` | None | Refresh the access token |
 | POST | `/logout` | Bearer | End the session of this device |
 | GET | `/profile` | Bearer | Get the current user |
-| PATCH | `/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for an account with OAuth only. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
-| POST | `/profile/email/initiate` | Bearer | Step 1 of the self-service email change, with a limit of 3 calls each hour. It requires a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie from a provider round trip for an account that has none. It stores `pendingEmail` and `pendingEmailToken` with an expiry of 1 h. It sends a confirmation link to the new address, and a masked alert with no link to the old address. The response is enumeration-safe |
+| PATCH | `/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one (a code does not replace it, as ASVS 6.2.3 asks), a `code` for an account with OAuth only that carries an authenticator, and a `reauth_proof` cookie minted for `password_set` for an account with OAuth only and no authenticator. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
+| POST | `/profile/email/initiate` | Bearer | Step 1 of the self-service email change, with a limit of 3 calls each hour. It requires a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, a `code` for an account that carries an authenticator, and a `reauth_proof` cookie from a provider round trip for an account that has neither. It stores `pendingEmail` and `pendingEmailToken` with an expiry of 1 h. It sends a confirmation link to the new address, and a masked alert with no link to the old address. The response is enumeration-safe |
 | POST | `/profile/email/confirm` | None | Step 2. It confirms the new address with the token, applies the change atomically, revokes each refresh token, and notifies the old address |
 | GET | `/permissions` | Bearer | Get the resolved permissions of the current user |
 | POST | `/verify-email` | None | Verify an email address with a token |

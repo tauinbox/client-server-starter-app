@@ -2,7 +2,6 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
   IsNotEmpty,
-  IsString,
   MaxLength,
   MinLength,
   ValidateIf
@@ -14,8 +13,10 @@ import {
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
+import { StepUpFactorsDto } from './step-up-factors.dto';
 
-export class UpdateProfileDto {
+/** The step-up factors are read only when the body sets a password. */
+export class UpdateProfileDto extends StepUpFactorsDto {
   @ApiPropertyOptional({
     description: 'The first name of the user',
     example: 'John'
@@ -44,21 +45,6 @@ export class UpdateProfileDto {
   @MinLength(MIN_PASSWORD_LENGTH)
   @MaxLength(MAX_PASSWORD_LENGTH)
   password?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Current password. An account that holds one must supply it to change ' +
-      'the password; the service rejects a missing value. An account created ' +
-      'through a provider holds none and omits this field, and proves itself ' +
-      'instead with a reauth_proof cookie minted for the password_set ' +
-      'operation by a round trip at its provider.',
-    example: 'CurrentPassword123'
-  })
-  @ValidateIf(propertyIsDefined)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(MAX_PASSWORD_LENGTH)
-  currentPassword?: string;
 
   @ApiPropertyOptional({
     description: 'Preferred locale for transactional emails',

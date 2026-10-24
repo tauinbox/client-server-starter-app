@@ -3,6 +3,7 @@ import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
+import { MOCK_TOTP_CODE } from '../constants';
 import type { MockUser, OAuthAccount } from '../types';
 
 let server: Server;
@@ -161,6 +162,21 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
     );
 
     const res = await unlink(token, 'google', {}, proof);
+
+    expect(res.status).toBe(200);
+    expect(getState().oauthAccounts.get(OAUTH_ONLY_ID)).toEqual([
+      account('facebook')
+    ]);
+  });
+
+  it('accepts an authenticator code on an account with no password', async () => {
+    seedOAuthOnlyUser(['google', 'facebook']);
+    const token = await accessToken(OAUTH_ONLY_ID);
+    // Enrolled after the sign-in, which would otherwise answer with a challenge.
+    getState().users.get(OAUTH_ONLY_ID)!.totpEnabledAt =
+      '2025-01-01T00:00:00.000Z';
+
+    const res = await unlink(token, 'google', { code: MOCK_TOTP_CODE });
 
     expect(res.status).toBe(200);
     expect(getState().oauthAccounts.get(OAUTH_ONLY_ID)).toEqual([

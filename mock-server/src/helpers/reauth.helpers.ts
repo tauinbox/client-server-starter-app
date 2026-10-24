@@ -3,6 +3,7 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
+  STEP_UP_OPERATION,
   TOTP_DIGITS,
   TOTP_PERIOD_SECONDS
 } from '@app/shared/constants';
@@ -16,6 +17,7 @@ import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import type { FailedAttemptWindow, MockUser } from '../types';
+import { unknownPropertyErrors } from '../utils/validation';
 
 /**
  * The per-account failure window the server keeps in `FailedAttemptCounter`.
@@ -154,6 +156,34 @@ export function isValidPasswordShape(value: unknown): boolean {
     value.length > 0 &&
     value.length <= MAX_PASSWORD_LENGTH
   );
+}
+
+/**
+ * Mirrors the ValidationPipe on a DTO that carries `StepUpFactorsDto`: a field
+ * outside `fields` and the two factors is refused first, as `whitelist` with
+ * `forbidNonWhitelisted` does. A supplied factor must have the shape of its
+ * field; an absent one reaches the step-up, which is the only place that knows
+ * which factor the account holds.
+ */
+export function stepUpFactorsBodyErrors(
+  body: unknown,
+  fields: readonly string[] = []
+): string[] {
+  const unknown = unknownPropertyErrors(body, [
+    ...fields,
+    'currentPassword',
+    'code'
+  ]);
+  if (unknown.length > 0) return unknown;
+
+  const { currentPassword, code } = (body ?? {}) as Record<string, unknown>;
+  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
+    return ['currentPassword is required'];
+  }
+  if (code !== undefined && !isValidCodeShape(code)) {
+    return [`code must be longer than or equal to ${TOTP_DIGITS} characters`];
+  }
+  return [];
 }
 
 /**
@@ -300,7 +330,15 @@ export function stepUpError(
   // browser never sends it to. The server passes no proof there.
   acceptsReauthProof = true
 ): StepUpErrorEnvelope | null {
-  const lock = stepUpCodeError(req, user, code);
+  // ASVS 6.2.3, as on the server: an account that holds a password changes it
+  // only against the current one.
+  const lock = stepUpCodeError(
+    req,
+    user,
+    operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
+      ? undefined
+      : code
+  );
   if (lock !== undefined) {
     return lock;
   }
@@ -334,14 +372,12 @@ export function stepUpError(
 
 /**
  * The per-account brake on the step-up password, mirroring the counter in
- * `AuthService.stepUpFailure`. The profile routes compare the password
- * themselves rather than through `stepUpError`, so the brake lives here where
- * every one of them can reach it.
+ * `AuthService.stepUpFailure`.
  *
  * A step-up that offers no password never touches the counter, so a route that
  * presents another factor cannot burn the budget of the account.
  */
-export function stepUpPasswordError(
+function stepUpPasswordError(
   req: Request,
   user: MockUser,
   currentPassword: unknown,

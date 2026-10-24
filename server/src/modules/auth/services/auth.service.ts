@@ -797,7 +797,7 @@ export class AuthService {
       dto.currentPassword,
       reauthProof,
       STEP_UP_OPERATION.EMAIL_CHANGE,
-      undefined,
+      dto.code,
       auditContext
     );
 
@@ -1120,7 +1120,14 @@ export class AuthService {
     totpCode?: string,
     auditContext?: AuditContext
   ): Promise<StepUpVerdict> {
-    if (await this.mfaService.isValidStepUpCode(user, totpCode, auditContext)) {
+    // ASVS 6.2.3: an account that holds a password changes it only against
+    // the current one. The code stands in for it only on an account that
+    // holds none.
+    const code =
+      operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
+        ? undefined
+        : totpCode;
+    if (await this.mfaService.isValidStepUpCode(user, code, auditContext)) {
       return { factor: null };
     }
 
@@ -1235,6 +1242,7 @@ export class AuthService {
     currentPassword: string | undefined,
     reauthProof: string | undefined,
     operation: StepUpOperation,
+    totpCode?: string,
     auditContext?: AuditContext
   ): Promise<void> {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
@@ -1244,7 +1252,7 @@ export class AuthService {
       currentPassword,
       reauthProof,
       operation,
-      undefined,
+      totpCode,
       auditContext
     );
   }

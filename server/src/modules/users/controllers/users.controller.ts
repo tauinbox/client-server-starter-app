@@ -59,7 +59,7 @@ import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import { Throttle } from '@nestjs/throttler';
 import { MfaService } from '../../auth/services/mfa.service';
-import { MfaStepUpDto } from '../../auth/dtos/mfa.dto';
+import { StepUpFactorsDto } from '../../auth/dtos/step-up-factors.dto';
 import { maskEmail } from '../../../common/utils/escape-html';
 
 @ApiTags('Users API')
@@ -415,7 +415,7 @@ export class UsersController {
     summary: 'Reset the two-factor enrolment of another user (admin only)'
   })
   @ApiParam({ name: 'id', description: 'The user ID' })
-  @ApiBody({ type: MfaStepUpDto })
+  @ApiBody({ type: StepUpFactorsDto })
   @ApiOkResponse({
     description: 'Two-factor has been reset and every session ended',
     type: AdminUserResponseDto
@@ -425,7 +425,7 @@ export class UsersController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   async resetMfa(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: MfaStepUpDto,
+    @Body() dto: StepUpFactorsDto,
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {

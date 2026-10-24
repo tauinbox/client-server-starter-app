@@ -3,7 +3,7 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { form, required } from '@angular/forms/signals';
 import type { FieldTree } from '@angular/forms/signals';
 import type { UserResponse } from '@app/shared/types';
-import type { MfaStepUpRequest } from '../models/auth.types';
+import type { StepUpFactorsRequest } from '../models/auth.types';
 
 /**
  * The factor an account proves itself with before a sensitive change. `none`
@@ -32,7 +32,7 @@ export type StepUpFactorForm = {
   /** True while the field of the current factor has no value, and always for `none`. */
   invalid: Signal<boolean>;
   /** Exactly one of the two fields, because the server DTO rejects unknown ones. */
-  request(): MfaStepUpRequest;
+  request(): StepUpFactorsRequest;
   /** Clears both values and the touched state, so a reopened prompt shows no stale error. */
   reset(): void;
 };

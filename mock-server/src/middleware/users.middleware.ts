@@ -4,7 +4,6 @@ import {
   ErrorKeys,
   MAX_NAME_LENGTH,
   STEP_UP_OPERATION,
-  TOTP_DIGITS,
   USER_LIST_QUERY
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
@@ -45,10 +44,9 @@ import {
   validateCreateUserDto
 } from '../helpers/user-create.helpers';
 import {
-  isValidCodeShape,
-  isValidPasswordShape,
   sendWithRetryAfter,
-  stepUpError
+  stepUpError,
+  stepUpFactorsBodyErrors
 } from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import { filterByAbility } from '../helpers/ability-filter.helpers';
@@ -90,6 +88,17 @@ function listUsers(req: Request, res: Response): void {
 }
 
 const router = Router();
+
+/** The own fields of `UpdateUserDto`, beside the step-up factors. */
+const UPDATE_USER_FIELDS = [
+  'email',
+  'firstName',
+  'lastName',
+  'password',
+  'locale',
+  'isActive',
+  'unlockAccount'
+] as const;
 
 // POST /api/v1/users
 router.post('/', permissionGuard('create', 'User'), (req, res) => {
@@ -204,6 +213,12 @@ router.patch(
     // The server's global ValidationPipe runs before the handler, so a body that
     // fails UpdateUserDto is a 400 whether or not the addressed row exists. Only
     // checks that need the looked-up row stay below the 404.
+    const bodyErrors = stepUpFactorsBodyErrors(req.body, UPDATE_USER_FIELDS);
+    if (bodyErrors.length > 0) {
+      res.status(400).json(validationError(bodyErrors));
+      return;
+    }
+
     const { firstName, lastName, password, isActive, unlockAccount, locale } =
       req.body;
     // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
@@ -253,26 +268,7 @@ router.patch(
       return;
     }
 
-    // The step-up factors of the caller, validated with the rest of the body
-    // as UpdateUserDto does.
     const { currentPassword, code } = req.body;
-    if (
-      currentPassword !== undefined &&
-      !isValidPasswordShape(currentPassword)
-    ) {
-      res.status(400).json(validationError('currentPassword is required'));
-      return;
-    }
-    if (code !== undefined && !isValidCodeShape(code)) {
-      res
-        .status(400)
-        .json(
-          validationError(
-            `code must be longer than or equal to ${TOTP_DIGITS} characters`
-          )
-        );
-      return;
-    }
 
     if (isActive !== undefined && typeof isActive !== 'boolean') {
       res.status(400).json(validationError('isActive must be a boolean value'));
@@ -594,21 +590,9 @@ router.post(
   (req, res) => {
     const id = req.params['id'] as string;
     const { currentPassword, code } = req.body;
-    if (
-      currentPassword !== undefined &&
-      !isValidPasswordShape(currentPassword)
-    ) {
-      res.status(400).json(validationError('currentPassword is required'));
-      return;
-    }
-    if (code !== undefined && !isValidCodeShape(code)) {
-      res
-        .status(400)
-        .json(
-          validationError(
-            `code must be longer than or equal to ${TOTP_DIGITS} characters`
-          )
-        );
+    const bodyErrors = stepUpFactorsBodyErrors(req.body);
+    if (bodyErrors.length > 0) {
+      res.status(400).json(validationError(bodyErrors));
       return;
     }
 

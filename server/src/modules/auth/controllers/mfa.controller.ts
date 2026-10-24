@@ -32,9 +32,9 @@ import {
   MfaRecoveryDto,
   MfaSetupDto,
   MfaSetupResponseDto,
-  MfaStepUpDto,
   MfaVerifyDto
 } from '../dtos/mfa.dto';
+import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { AuthCookies } from '../utils/auth-cookies';
@@ -122,11 +122,11 @@ export class MfaController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Turn two-factor off' })
-  @ApiBody({ type: MfaStepUpDto })
+  @ApiBody({ type: StepUpFactorsDto })
   @ApiOkResponse({ description: 'Two-factor has been turned off' })
   async disable(
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaStepUpDto,
+    @Body() dto: StepUpFactorsDto,
     @Res({ passthrough: true }) res: Response
   ): Promise<{ message: string }> {
     const user = await this.userService.findOne(
@@ -152,14 +152,14 @@ export class MfaController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Replace the recovery codes with a fresh set' })
-  @ApiBody({ type: MfaStepUpDto })
+  @ApiBody({ type: StepUpFactorsDto })
   @ApiOkResponse({
     description: 'The new codes, readable only in this response',
     type: MfaRecoveryCodesResponseDto
   })
   async regenerateRecoveryCodes(
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaStepUpDto,
+    @Body() dto: StepUpFactorsDto,
     @Res({ passthrough: true }) res: Response
   ): Promise<MfaRecoveryCodesResponseDto> {
     const user = await this.userService.findOne(

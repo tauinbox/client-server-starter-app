@@ -170,7 +170,8 @@ describe('ProfileComponent', () => {
       lastName: 'User',
       currentPassword: '',
       password: 'NewPassword123',
-      confirmPassword: 'NewPassword123'
+      confirmPassword: 'NewPassword123',
+      code: ''
     });
     await fixture.whenStable();
     fixture.detectChanges();
@@ -262,7 +263,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
     });
 
@@ -311,7 +313,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       const errors = component.profileForm.firstName().errors();
@@ -325,7 +328,8 @@ describe('ProfileComponent', () => {
         lastName: '',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       const errors = component.profileForm.lastName().errors();
@@ -339,7 +343,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'CurrentPass1',
         password: 'short',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       const errors = component.profileForm.password().errors();
@@ -353,7 +358,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'CurrentPass1',
         password: 'passwordonly',
-        confirmPassword: 'passwordonly'
+        confirmPassword: 'passwordonly',
+        code: ''
       });
       await fixture.whenStable();
 
@@ -369,7 +375,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'CurrentPass1',
         password: tooLong,
-        confirmPassword: tooLong
+        confirmPassword: tooLong,
+        code: ''
       });
       await fixture.whenStable();
 
@@ -387,7 +394,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       expect(component.profileForm().valid()).toBe(true);
@@ -400,7 +408,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'CurrentPass1',
         password: 'NewPassword123',
-        confirmPassword: 'Different123'
+        confirmPassword: 'Different123',
+        code: ''
       });
       await fixture.whenStable();
       const errors = component.profileForm.confirmPassword().errors();
@@ -414,7 +423,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'CurrentPass1',
         password: 'NewPassword123',
-        confirmPassword: 'NewPassword123'
+        confirmPassword: 'NewPassword123',
+        code: ''
       });
       await fixture.whenStable();
       expect(component.profileForm().valid()).toBe(true);
@@ -427,7 +437,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: 'NewPassword123',
-        confirmPassword: 'NewPassword123'
+        confirmPassword: 'NewPassword123',
+        code: ''
       });
       await fixture.whenStable();
       const errors = component.profileForm.currentPassword().errors();
@@ -444,7 +455,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       const errors = component.profileForm.currentPassword().errors();
@@ -464,7 +476,8 @@ describe('ProfileComponent', () => {
         lastName: mockUser.lastName,
         currentPassword: '',
         password: 'Sunrise-Kettle-19',
-        confirmPassword: 'Sunrise-Kettle-19'
+        confirmPassword: 'Sunrise-Kettle-19',
+        code: ''
       });
     }
 
@@ -556,6 +569,106 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.updateProfile).not.toHaveBeenCalledWith(
         expect.objectContaining({ password: 'Sunrise-Kettle-19' })
       );
+    });
+  });
+
+  // A code is a step-up factor on every route, so an account with no password
+  // and an authenticator needs no provider round trip.
+  describe('an account with no password and an authenticator', () => {
+    const codeUser = { ...mockUser, hasPassword: false, mfaEnabled: true };
+
+    function edit(changes: { email?: string; password?: string }): void {
+      component.profileModel.set({
+        email: changes.email ?? mockUser.email,
+        firstName: mockUser.firstName,
+        lastName: mockUser.lastName,
+        currentPassword: '',
+        password: changes.password ?? '',
+        confirmPassword: changes.password ?? '',
+        code: ''
+      });
+    }
+
+    beforeEach(() => {
+      authServiceMock.getProfile.mockReturnValue(of(codeUser));
+      authServiceMock.getOAuthAccounts.mockReturnValue(
+        of([{ provider: 'google', createdAt: '2025-01-01T00:00:00.000Z' }])
+      );
+      authServiceMock.initiateEmailChange.mockReturnValue(
+        of({ message: 'ok' })
+      );
+      authServiceMock.updateProfile.mockReturnValue(of(codeUser));
+    });
+
+    it('asks for a code, not a password, for an email change', async () => {
+      fixture.detectChanges();
+      edit({ email: 'new@example.com' });
+      await fixture.whenStable();
+
+      expect(component['requiresCode']()).toBe(true);
+      expect(component['requiresCurrentPassword']()).toBe(false);
+      expect(component['reauthNoticeKey']()).toBeNull();
+      expect(
+        component.profileForm
+          .code()
+          .errors()
+          .some((e) => e.kind === 'codeRequired')
+      ).toBe(true);
+    });
+
+    it('sends the code with the email change and starts no round trip', async () => {
+      fixture.detectChanges();
+      edit({ email: 'new@example.com' });
+      component.profileModel.update((m) => ({ ...m, code: ' 123456 ' }));
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(authServiceMock.initiateEmailChange).toHaveBeenCalledWith(
+        'new@example.com',
+        { code: '123456' }
+      );
+      expect(authServiceMock.initOAuthReauth).not.toHaveBeenCalled();
+    });
+
+    it('sends the code with a first password and starts no round trip', async () => {
+      fixture.detectChanges();
+      edit({ password: 'Sunrise-Kettle-19' });
+      component.profileModel.update((m) => ({ ...m, code: '123456' }));
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          password: 'Sunrise-Kettle-19',
+          code: '123456'
+        })
+      );
+      expect(authServiceMock.initOAuthReauth).not.toHaveBeenCalled();
+    });
+
+    // One code is spent by the first request, so it cannot open the second.
+    it('refuses a new password and a new email in one submit', async () => {
+      fixture.detectChanges();
+      edit({ email: 'new@example.com', password: 'Sunrise-Kettle-19' });
+      component.profileModel.update((m) => ({ ...m, code: '123456' }));
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(component['error']()).toBe(
+        'Save your new password first, then change your email.'
+      );
+      expect(authServiceMock.initiateEmailChange).not.toHaveBeenCalled();
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('gives the providers card the code factor', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(providersCard().stepUpFactor()).toBe('code');
     });
   });
 
@@ -729,7 +842,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -752,7 +866,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -773,7 +888,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'CurrentPass1',
         password: 'NewPassword123',
-        confirmPassword: 'NewPassword123'
+        confirmPassword: 'NewPassword123',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -796,7 +912,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -818,7 +935,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'typed-but-unused',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -835,7 +953,8 @@ describe('ProfileComponent', () => {
           lastName: 'User',
           currentPassword: 'CurrentPass1',
           password: 'NewPassword1',
-          confirmPassword: 'NewPassword1'
+          confirmPassword: 'NewPassword1',
+          code: ''
         });
         await fixture.whenStable();
         component.onSubmit();
@@ -894,7 +1013,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -920,7 +1040,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -987,7 +1108,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
       component.onSubmit();
@@ -1119,7 +1241,7 @@ describe('ProfileComponent', () => {
       await fixture.whenStable();
 
       providersCard().disconnectProvider('google');
-      providersCard().stepUpPasswordModel.set({ currentPassword: 'Password1' });
+      providersCard().passwordModel.set({ currentPassword: 'Password1' });
       await fixture.whenStable();
       providersCard()['confirmStepUp']();
 
@@ -1261,7 +1383,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'Password1',
         password: 'NewPassword1',
-        confirmPassword: 'NewPassword1'
+        confirmPassword: 'NewPassword1',
+        code: ''
       });
       await fixture.whenStable();
 
@@ -1283,7 +1406,8 @@ describe('ProfileComponent', () => {
         lastName: 'Person',
         currentPassword: 'Password1',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
 
@@ -1292,7 +1416,7 @@ describe('ProfileComponent', () => {
 
       expect(authServiceMock.initiateEmailChange).toHaveBeenCalledWith(
         'new@example.com',
-        'Password1'
+        { currentPassword: 'Password1' }
       );
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
         firstName: 'Renamed',
@@ -1310,7 +1434,8 @@ describe('ProfileComponent', () => {
         lastName: 'Person',
         currentPassword: 'Password1',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
 
@@ -1337,7 +1462,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'Password1',
         password: 'NewPassword123',
-        confirmPassword: 'NewPassword123'
+        confirmPassword: 'NewPassword123',
+        code: ''
       });
       await fixture.whenStable();
 
@@ -1364,7 +1490,8 @@ describe('ProfileComponent', () => {
         lastName: 'User',
         currentPassword: 'Password1',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
 
@@ -1388,7 +1515,8 @@ describe('ProfileComponent', () => {
         lastName: 'Person',
         currentPassword: 'WrongPassword',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        code: ''
       });
       await fixture.whenStable();
 

@@ -35,7 +35,7 @@ import {
   stepUpFactorOf
 } from '../../utils/step-up-factor-form';
 import type {
-  MfaStepUpRequest,
+  StepUpFactorsRequest,
   SessionRevokeTarget
 } from '../../models/auth.types';
 
@@ -203,7 +203,7 @@ export class ActiveSessionsComponent {
     this.#revoke(target, this.#stepUp.request());
   }
 
-  #revoke(target: SessionRevokeTarget, request: MfaStepUpRequest): void {
+  #revoke(target: SessionRevokeTarget, request: StepUpFactorsRequest): void {
     const request$: Observable<unknown> =
       target.scope === 'one'
         ? this.#authService.revokeSession(target.sessionId, request)
