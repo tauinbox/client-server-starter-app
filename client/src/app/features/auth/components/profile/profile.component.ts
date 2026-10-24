@@ -50,8 +50,10 @@ import {
 } from '@app/shared/constants';
 import type {
   SessionRevokeTarget,
+  StepUpFactorsRequest,
   UpdateProfile
 } from '../../models/auth.types';
+import { stepUpFactorOf } from '../../utils/step-up-factor-form';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Observable } from 'rxjs';
@@ -85,6 +87,7 @@ type ProfileData = {
   firstName: string;
   lastName: string;
   currentPassword: string;
+  code: string;
   password: string;
   confirmPassword: string;
 };
@@ -151,6 +154,7 @@ const INITIAL_PROFILE: ProfileData = {
   firstName: '',
   lastName: '',
   currentPassword: '',
+  code: '',
   password: '',
   confirmPassword: ''
 };
@@ -240,22 +244,27 @@ export class ProfileComponent implements OnInit {
     maxLength(path.password, MAX_PASSWORD_LENGTH, {
       message: 'auth.profile.passwordMaxLength'
     });
+    // Each field is demanded only from the account whose step-up factor it is.
     validate(path.currentPassword, ({ value, valueOf }) => {
-      // An account created through a provider holds no password, so demanding
-      // one here is the defect this field used to carry.
-      if (!this.accountHasPassword()) return null;
-      const password = valueOf(path.password);
-      const emailValue = canonicalEmail(valueOf(path.email));
-      const loaded = canonicalEmail(this.user()?.email);
-      const emailChanged = !!loaded && emailValue !== loaded;
-      if (!password && !emailChanged) return null;
-      if (!value().trim()) {
-        return {
-          kind: 'currentPasswordRequired',
-          message: 'auth.profile.currentPasswordRequired'
-        };
+      if (this.stepUpFactor() !== 'password') return null;
+      if (!this.#isSensitive(valueOf(path.password), valueOf(path.email))) {
+        return null;
       }
-      return null;
+      return value().trim()
+        ? null
+        : {
+            kind: 'currentPasswordRequired',
+            message: 'auth.profile.currentPasswordRequired'
+          };
+    });
+    validate(path.code, ({ value, valueOf }) => {
+      if (this.stepUpFactor() !== 'code') return null;
+      if (!this.#isSensitive(valueOf(path.password), valueOf(path.email))) {
+        return null;
+      }
+      return value().trim()
+        ? null
+        : { kind: 'codeRequired', message: 'auth.profile.codeRequired' };
     });
     validate(path.confirmPassword, ({ value, valueOf }) => {
       const confirm = value();
@@ -276,13 +285,11 @@ export class ProfileComponent implements OnInit {
   );
 
   /**
-   * False only for an account created through a provider. The profile may not
-   * be loaded yet, and the safe default there is the password-bearing shape,
-   * because that one asks for a factor rather than skipping it.
+   * The factor a sensitive change asks for. The profile may not be loaded yet,
+   * and the safe default there is the password, because that one asks for a
+   * factor rather than skipping it.
    */
-  protected readonly accountHasPassword = computed(
-    () => this.user()?.hasPassword !== false
-  );
+  protected readonly stepUpFactor = computed(() => stepUpFactorOf(this.user()));
 
   /** The provider a step-up round trip can run against. */
   protected readonly reauthProvider = computed(() => {
@@ -296,27 +303,29 @@ export class ProfileComponent implements OnInit {
   });
 
   /**
-   * The currentPassword field appears whenever a sensitive change is queued -
-   * either a password update OR an email change. An account that holds no
-   * password proves itself through its provider instead, so the field never
-   * applies to it.
+   * The factor field appears whenever a sensitive change is queued - either a
+   * password update OR an email change. An account with neither a password
+   * nor an authenticator proves itself through its provider instead, so no
+   * field applies to it.
    */
-  protected readonly requiresCurrentPassword = computed(() => {
-    if (!this.accountHasPassword()) return false;
-    const data = this.profileModel();
-    if (data.password) return true;
-    const loaded = canonicalEmail(this.user()?.email);
-    if (!loaded) return false;
-    return canonicalEmail(data.email) !== loaded;
-  });
+  protected readonly requiresCurrentPassword = computed(
+    () =>
+      this.stepUpFactor() === 'password' &&
+      this.#isSensitive(this.profileModel().password, this.profileModel().email)
+  );
+
+  protected readonly requiresCode = computed(
+    () =>
+      this.stepUpFactor() === 'code' &&
+      this.#isSensitive(this.profileModel().password, this.profileModel().email)
+  );
 
   /** True when this submit will leave the app for the provider. */
-  protected readonly emailChangeNeedsReauth = computed(() => {
-    if (this.accountHasPassword()) return false;
-    const loaded = canonicalEmail(this.user()?.email);
-    if (!loaded) return false;
-    return canonicalEmail(this.profileModel().email) !== loaded;
-  });
+  protected readonly emailChangeNeedsReauth = computed(
+    () =>
+      this.stepUpFactor() === 'none' &&
+      this.#isEmailChange(this.profileModel().email)
+  );
 
   /**
    * True from the load that follows a completed round trip until the change it
@@ -346,7 +355,7 @@ export class ProfileComponent implements OnInit {
 
   protected readonly passwordSetNeedsReauth = computed(
     () =>
-      !this.accountHasPassword() &&
+      this.stepUpFactor() === 'none' &&
       this.passwordTyped() &&
       !this.#reauthConfirmed()
   );
@@ -576,6 +585,31 @@ export class ProfileComponent implements OnInit {
     }
   }
 
+  #isEmailChange(email: string): boolean {
+    const loaded = canonicalEmail(this.user()?.email);
+    return !!loaded && canonicalEmail(email) !== loaded;
+  }
+
+  /** A password update or an email change, each of which needs a step-up. */
+  #isSensitive(password: string, email: string): boolean {
+    return !!password || this.#isEmailChange(email);
+  }
+
+  /**
+   * The factor the form holds, as the body of a step-up route. Exactly one
+   * field, because the server DTO rejects an empty one.
+   */
+  #stepUpRequest(values: ProfileData): StepUpFactorsRequest {
+    switch (this.stepUpFactor()) {
+      case 'password':
+        return { currentPassword: values.currentPassword };
+      case 'code':
+        return { code: values.code.trim() };
+      default:
+        return {};
+    }
+  }
+
   /** Unknown providers cannot reach a label key, so the raw name is the last resort. */
   #providerLabel(provider: string): string {
     return isOAuthProvider(provider)
@@ -600,12 +634,10 @@ export class ProfileComponent implements OnInit {
         next: (user) => {
           this.user.set(user);
           this.profileModel.set({
+            ...INITIAL_PROFILE,
             email: user.email,
             firstName: user.firstName,
-            lastName: user.lastName,
-            currentPassword: '',
-            password: '',
-            confirmPassword: ''
+            lastName: user.lastName
           });
           this.loading.set(false);
           this.profileForm().reset();
@@ -672,13 +704,27 @@ export class ProfileComponent implements OnInit {
    * sequence and in this order because they share the current password: the
    * profile update rehashes it and revokes the session, so an initiate sent
    * afterwards would be rejected as a wrong password.
+   *
+   * A code is single use, so it cannot authorise both requests. An account
+   * that steps up with a code saves a new password first, on its own.
    */
   #save(newEmail: string | null): void {
     const values = this.profileModel();
     const updateData = this.#buildProfileUpdate(values, newEmail !== null);
 
-    if (newEmail !== null && !this.accountHasPassword()) {
+    if (newEmail !== null && this.stepUpFactor() === 'none') {
       this.#startReauthForEmailChange(newEmail, updateData);
+      return;
+    }
+
+    if (
+      newEmail !== null &&
+      this.stepUpFactor() === 'code' &&
+      updateData?.password
+    ) {
+      this.error.set(
+        this.#transloco.translate('auth.profile.errorPasswordBeforeEmail')
+      );
       return;
     }
 
@@ -697,7 +743,7 @@ export class ProfileComponent implements OnInit {
     if (newEmail !== null) {
       ops.push(
         this.#authService
-          .initiateEmailChange(newEmail, values.currentPassword)
+          .initiateEmailChange(newEmail, this.#stepUpRequest(values))
           .pipe(
             tap({
               complete: () => {
@@ -759,8 +805,8 @@ export class ProfileComponent implements OnInit {
   }
 
   /**
-   * An account created through a provider proves itself by completing a round
-   * trip at that provider, which is a full page load. Anything else the user
+   * An account with neither a password nor an authenticator proves itself by
+   * completing a round trip at its provider, which is a full page load. Anything else the user
    * typed is therefore saved BEFORE leaving, so the redirect never discards it.
    *
    * A first password in the same submit is refused rather than handled: saving
@@ -877,8 +923,11 @@ export class ProfileComponent implements OnInit {
     };
 
     if (passwordChanged) {
-      updateData.password = values.password;
-      updateData.currentPassword = values.currentPassword;
+      return {
+        ...updateData,
+        password: values.password,
+        ...this.#stepUpRequest(values)
+      };
     }
 
     return updateData;
@@ -920,12 +969,10 @@ export class ProfileComponent implements OnInit {
     if (!current) return;
 
     this.profileModel.set({
+      ...INITIAL_PROFILE,
       email: current.email,
       firstName: current.firstName,
-      lastName: current.lastName,
-      currentPassword: '',
-      password: '',
-      confirmPassword: ''
+      lastName: current.lastName
     });
     this.profileForm().reset();
   }

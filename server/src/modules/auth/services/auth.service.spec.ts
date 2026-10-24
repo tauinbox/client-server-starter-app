@@ -2277,6 +2277,30 @@ describe('AuthService', () => {
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
     });
+
+    it('accepts an authenticator code in place of the provider proof', async () => {
+      const oauthOnlyUser = { ...mockUser, password: null };
+      mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
+      mockMfaService.isValidStepUpCode.mockImplementation(
+        (_user: User, code: string | undefined) =>
+          Promise.resolve(code === '123456')
+      );
+
+      await expect(
+        service.assertStepUpForUser(
+          oauthOnlyUser.id,
+          undefined,
+          undefined,
+          STEP_UP_OPERATION.OAUTH_LINK,
+          '123456'
+        )
+      ).resolves.toBeUndefined();
+      expect(mockMfaService.isValidStepUpCode).toHaveBeenCalledWith(
+        oauthOnlyUser,
+        '123456',
+        undefined
+      );
+    });
   });
 
   describe('assertStepUp', () => {
@@ -2674,6 +2698,28 @@ describe('AuthService', () => {
         })
       );
       expect(result.message).toMatch(/confirmation link/);
+    });
+
+    it('accepts an authenticator code from an account with no password', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        password: null
+      });
+      mockMfaService.isValidStepUpCode.mockImplementation(
+        (_user: User, code: string | undefined) =>
+          Promise.resolve(code === '123456')
+      );
+
+      await service.initiateEmailChange('user-1', {
+        newEmail: 'new@example.com',
+        code: '123456'
+      });
+
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        expect.objectContaining({ pendingEmail: 'new@example.com' })
+      );
     });
 
     it('rejects OAuth-only users (no password)', async () => {

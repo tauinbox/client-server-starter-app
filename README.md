@@ -70,7 +70,8 @@ management and theming.
   has two steps and confirms at the new address.
 
   `POST /api/v1/auth/profile/email/initiate` needs authentication. It has a throttle of 3 calls each
-  hour. It requires the current password and rejects an account that has OAuth only. It stores a
+  hour. It requires a step-up: the current password, a code from the authenticator, or a provider
+  proof for an account that has OAuth only and no authenticator. It stores a
   hashed token on the user row for 1 hour. Then it sends a confirmation link to the new address. It
   also sends an alert with no link to the old address, and it masks the new address there.
 
@@ -217,7 +218,8 @@ management and theming.
   `AppAbility` at bootstrap, before the route activation.
 - The profile page manages the OAuth accounts. A user can link a provider and unlink a provider.
   Each direction is a credential change, so each one asks for a fresh factor first: the current
-  password, or a provider round trip for an account that holds no password.
+  password, a code from the authenticator, or a provider round trip for an account that holds
+  neither.
 - Cron jobs on the server clean up the tokens.
 - **Audit logging.** The server records a security-sensitive operation in the `audit_logs` table.
   Examples are a login, a registration, a password change, user and role management, and an OAuth
@@ -1587,8 +1589,8 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/auth/sessions/:sessionId` | Bearer + step-up | End one other device. An unknown id and an id of another account both answer 404; the own session answers 400 |
 | DELETE | `/auth/sessions` | Bearer + step-up | End every device of the account except the caller |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
-| PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
-| POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires the current password. Rejects an account with OAuth only |
+| PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, a `code` for an account that carries an authenticator, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only and no authenticator. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
+| POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires a step-up: the current password, a code from the authenticator, or a provider proof |
 | POST | `/auth/profile/email/confirm` | None | Confirm an email change with the token from the new address. Applies the change in a transaction and revokes each session |
 | GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
 | GET | `/auth/oauth/:provider/callback` | None | Callback of the OAuth provider |
@@ -2009,7 +2011,9 @@ a second request to the registry for a verdict that gates nothing.
 - A **self-service password change** (`PATCH /auth/profile`) and a **self-service email change**
   (`POST /auth/profile/email/initiate`) both require a fresh proof of identity, with the factor the
   account actually holds. An account with a password supplies `currentPassword`. Thus a stolen token
-  cannot become a permanent account takeover. An account with OAuth only holds no password, so it
+  cannot become a permanent account takeover. An account that carries an authenticator may send a
+  `code` instead, on these two routes and on every other step-up route. An account with OAuth only
+  and no authenticator holds neither, so it
   completes a round trip at its provider through `POST /auth/oauth/reauth-init`, and the callback
   mints a `reauth_proof` cookie the change consumes. The **two-factor enrolment**
   (`POST /auth/mfa/setup`) takes the same trip, under its own operation. Turning the factor off does

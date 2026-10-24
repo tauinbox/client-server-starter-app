@@ -22,6 +22,7 @@ import {
   recordFailure,
   sendWithRetryAfter,
   stepUpError,
+  stepUpFactorsShapeError,
   type StepUpErrorEnvelope
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
@@ -229,18 +230,9 @@ router.post('/disable', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = req.body;
 
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
-    return;
-  }
-  if (code !== undefined && !isValidCodeShape(code)) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `code must be longer than or equal to ${TOTP_DIGITS} characters`
-        )
-      );
+  const shapeError = stepUpFactorsShapeError(req.body);
+  if (shapeError) {
+    res.status(400).json(validationError(shapeError));
     return;
   }
 
@@ -290,18 +282,9 @@ router.post('/recovery-codes', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = req.body;
 
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
-    return;
-  }
-  if (code !== undefined && !isValidCodeShape(code)) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `code must be longer than or equal to ${TOTP_DIGITS} characters`
-        )
-      );
+  const shapeError = stepUpFactorsShapeError(req.body);
+  if (shapeError) {
+    res.status(400).json(validationError(shapeError));
     return;
   }
 

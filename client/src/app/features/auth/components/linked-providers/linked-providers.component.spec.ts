@@ -147,12 +147,29 @@ describe('LinkedProvidersComponent', () => {
 
     it('sends the password with the link request', async () => {
       component.connectProvider('facebook');
-      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
+      component.passwordModel.set({ currentPassword: 'Password1' });
       await fixture.whenStable();
       component['confirmStepUp']();
 
-      expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith('Password1');
+      expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith({
+        currentPassword: 'Password1'
+      });
       expect(component['stepUpPrompt']()).toBeNull();
+    });
+
+    it('asks an account with an authenticator and no password for a code', async () => {
+      fixture.componentRef.setInput('stepUpFactor', 'code');
+      const changes = emitted();
+
+      component.connectProvider('facebook');
+      component.codeModel.set({ code: ' 123456 ' });
+      await fixture.whenStable();
+      component['confirmStepUp']();
+
+      expect(changes).toEqual([]);
+      expect(authServiceMock.initOAuthLink).toHaveBeenCalledWith({
+        code: '123456'
+      });
     });
 
     it('re-enables the controls when the link cannot start', async () => {
@@ -162,7 +179,7 @@ describe('LinkedProvidersComponent', () => {
       );
 
       component.connectProvider('facebook');
-      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
+      component.passwordModel.set({ currentPassword: 'Password1' });
       await fixture.whenStable();
       component['confirmStepUp']();
 
@@ -173,8 +190,8 @@ describe('LinkedProvidersComponent', () => {
       );
     });
 
-    it('asks the page for a round trip on an account with no password', () => {
-      fixture.componentRef.setInput('hasPassword', false);
+    it('asks the page for a round trip on an account with no factor', () => {
+      fixture.componentRef.setInput('stepUpFactor', 'none');
       const changes = emitted();
 
       component.connectProvider('facebook');
@@ -212,13 +229,13 @@ describe('LinkedProvidersComponent', () => {
       component.unlinked.subscribe((provider) => unlinked.push(provider));
 
       component.disconnectProvider('google');
-      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
+      component.passwordModel.set({ currentPassword: 'Password1' });
       await fixture.whenStable();
       component['confirmStepUp']();
 
       expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith(
         'google',
-        'Password1'
+        { currentPassword: 'Password1' }
       );
       expect(component['stepUpPrompt']()).toBeNull();
       expect(component.busy()).toBe(false);
@@ -238,7 +255,7 @@ describe('LinkedProvidersComponent', () => {
       component.unlinked.subscribe((provider) => unlinked.push(provider));
 
       component.disconnectProvider('google');
-      component.stepUpPasswordModel.set({ currentPassword: 'Password1' });
+      component.passwordModel.set({ currentPassword: 'Password1' });
       await fixture.whenStable();
       component['confirmStepUp']();
 
@@ -250,8 +267,22 @@ describe('LinkedProvidersComponent', () => {
       );
     });
 
-    it('asks the page for a round trip on an account with no password', () => {
-      fixture.componentRef.setInput('hasPassword', false);
+    it('sends a code with the unlink request on an account with no password', async () => {
+      fixture.componentRef.setInput('stepUpFactor', 'code');
+
+      component.disconnectProvider('google');
+      component.codeModel.set({ code: '123456' });
+      await fixture.whenStable();
+      component['confirmStepUp']();
+
+      expect(authServiceMock.unlinkOAuthAccount).toHaveBeenCalledWith(
+        'google',
+        { code: '123456' }
+      );
+    });
+
+    it('asks the page for a round trip on an account with no factor', () => {
+      fixture.componentRef.setInput('stepUpFactor', 'none');
       const changes = emitted();
 
       component.disconnectProvider('google');

@@ -157,6 +157,22 @@ export function isValidPasswordShape(value: unknown): boolean {
 }
 
 /**
+ * Mirrors the ValidationPipe on `StepUpFactorsDto`. A supplied factor must have
+ * the shape of its field; an absent one reaches the step-up, which is the only
+ * place that knows which factor the account holds.
+ */
+export function stepUpFactorsShapeError(body: unknown): string | null {
+  const { currentPassword, code } = (body ?? {}) as Record<string, unknown>;
+  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
+    return 'currentPassword is required';
+  }
+  if (code !== undefined && !isValidCodeShape(code)) {
+    return `code must be longer than or equal to ${TOTP_DIGITS} characters`;
+  }
+  return null;
+}
+
+/**
  * Verifies the fixed code and spends it, the way the server verifies a real
  * code and spends it. RFC 6238 section 5.2 forbids a second use of a code that
  * already validated, so an acceptance records its 30-second step and any later
@@ -334,14 +350,12 @@ export function stepUpError(
 
 /**
  * The per-account brake on the step-up password, mirroring the counter in
- * `AuthService.stepUpFailure`. The profile routes compare the password
- * themselves rather than through `stepUpError`, so the brake lives here where
- * every one of them can reach it.
+ * `AuthService.stepUpFailure`.
  *
  * A step-up that offers no password never touches the counter, so a route that
  * presents another factor cannot burn the budget of the account.
  */
-export function stepUpPasswordError(
+function stepUpPasswordError(
   req: Request,
   user: MockUser,
   currentPassword: unknown,

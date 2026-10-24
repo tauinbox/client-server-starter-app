@@ -370,6 +370,7 @@ describe('OAuthController', () => {
         'CurrentPassword123',
         'proof-token',
         STEP_UP_OPERATION.OAUTH_UNLINK,
+        undefined,
         expect.anything()
       );
     });
@@ -496,6 +497,7 @@ describe('OAuthController', () => {
         'CurrentPassword123',
         'proof-token',
         STEP_UP_OPERATION.OAUTH_LINK,
+        undefined,
         expect.anything()
       );
     });

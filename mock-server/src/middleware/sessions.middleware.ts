@@ -1,18 +1,13 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import {
-  ErrorKeys,
-  STEP_UP_OPERATION,
-  TOTP_DIGITS
-} from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import type { ActiveSessionResponse } from '@app/shared/types';
 import { authGuard } from '../helpers/auth.helpers';
 import {
   clearReauthProofCookie,
-  isValidCodeShape,
-  isValidPasswordShape,
   sendWithRetryAfter,
-  stepUpError
+  stepUpError,
+  stepUpFactorsShapeError
 } from '../helpers/reauth.helpers';
 import {
   requireUuid,
@@ -31,25 +26,16 @@ import type { AuthenticatedRequest } from '../types';
 const router = Router();
 
 /**
- * Mirrors the ValidationPipe on `MfaStepUpDto`, then `assertStepUp`. Answers
- * and returns false when the caller did not prove itself.
+ * Mirrors the ValidationPipe on `StepUpFactorsDto`, then `assertStepUp`.
+ * Answers and returns false when the caller did not prove itself.
  */
 function passesStepUp(req: Request, res: Response): boolean {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
 
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
-    return false;
-  }
-  if (code !== undefined && !isValidCodeShape(code)) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `code must be longer than or equal to ${TOTP_DIGITS} characters`
-        )
-      );
+  const shapeError = stepUpFactorsShapeError(req.body);
+  if (shapeError) {
+    res.status(400).json(validationError(shapeError));
     return false;
   }
 

@@ -52,34 +52,6 @@ export class MfaEnableDto {
   code: string;
 }
 
-/**
- * The step-up an operation on a live factor asks for. Turning the factor off
- * and replacing the recovery set both accept the same two factors, so both
- * read this one body.
- */
-export class MfaStepUpDto {
-  @ApiPropertyOptional({
-    description: 'Current password, for an account that holds one',
-    example: 'CurrentPassword123'
-  })
-  @ValidateIf(propertyIsDefined)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(MAX_PASSWORD_LENGTH)
-  currentPassword?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Code from the authenticator app. Accepted in place of the password, ' +
-      'which is the only factor an account created through a provider holds.',
-    example: CODE_EXAMPLE
-  })
-  @ValidateIf(propertyIsDefined)
-  @IsString()
-  @Length(TOTP_DIGITS, TOTP_DIGITS)
-  code?: string;
-}
-
 export class MfaVerifyDto {
   @ApiProperty({
     description: 'The mfaToken the login response returned',

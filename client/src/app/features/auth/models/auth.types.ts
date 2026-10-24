@@ -22,6 +22,7 @@ export type UpdateProfile = {
   lastName?: string;
   password?: string;
   currentPassword?: string;
+  code?: string;
   locale?: string;
 };
 
@@ -48,11 +49,11 @@ export type ResendVerificationRequest = {
 };
 
 /**
- * What the two-factor card sends for an operation on a live factor: turning
- * the factor off, or replacing the recovery set. Both accept the same two
- * factors, and an account created through a provider holds only the code.
+ * The factor a step-up route reads from the body: a password, or a code from
+ * the authenticator. An account created through a provider holds no password,
+ * so it sends a code or proves itself with a provider round trip.
  */
-export type MfaStepUpRequest = {
+export type StepUpFactorsRequest = {
   currentPassword?: string;
   code?: string;
 };

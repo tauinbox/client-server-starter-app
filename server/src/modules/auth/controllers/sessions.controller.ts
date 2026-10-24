@@ -29,7 +29,7 @@ import { RefreshTokenService } from '../services/refresh-token.service';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/audit.service';
 import { JwtAuthRequest } from '../types/auth.request';
-import { MfaStepUpDto } from '../dtos/mfa.dto';
+import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { ActiveSessionResponseDto } from '../dtos/active-session-response.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { AuthCookies } from '../utils/auth-cookies';
@@ -94,13 +94,13 @@ export class SessionsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'End one other session of the current user' })
   @ApiParam({ name: 'sessionId', format: 'uuid' })
-  @ApiBody({ type: MfaStepUpDto, required: false })
+  @ApiBody({ type: StepUpFactorsDto, required: false })
   @ApiOkResponse({ description: 'The session has ended' })
   @ApiNotFoundResponse({ description: 'No such session for this user' })
   async revokeOne(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaStepUpDto,
+    @Body() dto: StepUpFactorsDto,
     @Res({ passthrough: true }) res: Response
   ): Promise<{ message: string }> {
     // Ahead of the step-up: the caller already knows its own session id, and a
@@ -144,11 +144,11 @@ export class SessionsController {
   @ApiOperation({
     summary: 'End every session of the current user except this one'
   })
-  @ApiBody({ type: MfaStepUpDto, required: false })
+  @ApiBody({ type: StepUpFactorsDto, required: false })
   @ApiOkResponse({ description: 'Every other session has ended' })
   async revokeOthers(
     @Request() req: JwtAuthRequest,
-    @Body() dto: MfaStepUpDto,
+    @Body() dto: StepUpFactorsDto,
     @Res({ passthrough: true }) res: Response
   ): Promise<{ message: string; count: number }> {
     await this.assertStepUp(req, dto);
@@ -169,7 +169,7 @@ export class SessionsController {
    */
   private async assertStepUp(
     req: JwtAuthRequest,
-    dto: MfaStepUpDto
+    dto: StepUpFactorsDto
   ): Promise<void> {
     const user = await this.userService.findOne(
       req.user.userId,

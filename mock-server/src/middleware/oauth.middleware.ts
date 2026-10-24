@@ -6,9 +6,9 @@ import { findUserById, getState, logAudit } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import {
   clearReauthProofCookie,
-  isValidPasswordShape,
   sendWithRetryAfter,
-  stepUpError
+  stepUpError,
+  stepUpFactorsShapeError
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
 import {
@@ -48,10 +48,11 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
     return;
   }
 
-  const { currentPassword } = (req.body ?? {}) as { currentPassword?: unknown };
+  const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
 
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
+  const shapeError = stepUpFactorsShapeError(req.body);
+  if (shapeError) {
+    res.status(400).json(validationError(shapeError));
     return;
   }
 
@@ -59,7 +60,7 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
     req,
     user,
     currentPassword,
-    undefined,
+    code,
     STEP_UP_OPERATION.OAUTH_UNLINK
   );
   if (stepUp) {
@@ -190,10 +191,11 @@ router.post('/exchange', (req, res) => {
 // reproduced: a linked provider is a credential no recovery path removes.
 router.post('/link-init', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
-  const { currentPassword } = req.body as { currentPassword?: unknown };
+  const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
 
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
+  const shapeError = stepUpFactorsShapeError(req.body);
+  if (shapeError) {
+    res.status(400).json(validationError(shapeError));
     return;
   }
 
@@ -201,7 +203,7 @@ router.post('/link-init', authGuard, (req, res) => {
     req,
     user,
     currentPassword,
-    undefined,
+    code,
     STEP_UP_OPERATION.OAUTH_LINK
   );
   if (stepUp) {

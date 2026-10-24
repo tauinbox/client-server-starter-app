@@ -785,6 +785,7 @@ describe('AuthController', () => {
         'CurrentPass1',
         undefined,
         STEP_UP_OPERATION.PASSWORD_SET,
+        undefined,
         stepUpAuditContext
       );
       expect(authServiceMock.revokeAllUserSessions).toHaveBeenCalledWith(
@@ -878,6 +879,31 @@ describe('AuthController', () => {
       );
     });
 
+    it('passes the code to the step-up and strips it before userService.update', async () => {
+      const req = mockJwtRequest('user-1') as JwtAuthRequest;
+      const res = mockResponse();
+
+      await controller.updateProfile(
+        req,
+        { password: 'NewPassword1', code: '123456' },
+        res
+      );
+
+      expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
+        'user-1',
+        undefined,
+        undefined,
+        STEP_UP_OPERATION.PASSWORD_SET,
+        '123456',
+        expect.anything()
+      );
+      expect(userServiceMock.update).toHaveBeenCalledWith(
+        'user-1',
+        { password: 'NewPassword1' },
+        SYSTEM_ABILITY
+      );
+    });
+
     it('should propagate INVALID_CURRENT_PASSWORD when the step-up throws', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
       const res = mockResponse();
@@ -911,6 +937,7 @@ describe('AuthController', () => {
         undefined,
         'proof',
         STEP_UP_OPERATION.PASSWORD_SET,
+        undefined,
         stepUpAuditContext
       );
       expect(res.clearCookie).toHaveBeenCalledWith('__Host-reauth_proof', {

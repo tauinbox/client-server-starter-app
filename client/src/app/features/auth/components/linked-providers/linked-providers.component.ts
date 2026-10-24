@@ -20,7 +20,6 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
-import { form, required } from '@angular/forms/signals';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -31,6 +30,11 @@ import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { AuthService } from '../../services/auth.service';
+import {
+  createStepUpFactorForm,
+  type StepUpFactor
+} from '../../utils/step-up-factor-form';
+import type { StepUpFactorsRequest } from '../../models/auth.types';
 import {
   isOAuthProvider,
   OAUTH_PROVIDER_LABEL_KEYS,
@@ -50,7 +54,7 @@ export type ProviderChange = {
   provider: OAuthProvider;
 };
 
-/** Which credential change the open password prompt authorises. */
+/** Which credential change the open step-up prompt authorises. */
 type StepUpPromptMode = 'link' | 'unlink';
 
 @Component({
@@ -83,8 +87,8 @@ export class LinkedProvidersComponent {
   /** The page owns the list, because its email and password flows read it too. */
   readonly accounts = input<LinkedAccount[]>([]);
 
-  /** False only for an account created through a provider. */
-  readonly hasPassword = input(true);
+  /** The factor the prompt asks for; `none` takes the page's provider round trip. */
+  readonly stepUpFactor = input<StepUpFactor>('password');
 
   /** The change a completed round trip was taken for, on the load after it. */
   readonly resumeChange = input<ProviderChange | null>(null);
@@ -114,9 +118,9 @@ export class LinkedProvidersComponent {
   });
 
   /**
-   * The provider whose step-up prompt is waiting for the password, and the
-   * change that prompt authorises. Null when no prompt is open: one prompt at
-   * a time, because one credential change at a time.
+   * The provider whose step-up prompt is waiting for a factor, and the change
+   * that prompt authorises. Null when no prompt is open: one prompt at a time,
+   * because one credential change at a time.
    */
   protected readonly stepUpPrompt = signal<{
     provider: OAuthProvider;
@@ -128,15 +132,18 @@ export class LinkedProvidersComponent {
     return prompt ? this.#providerLabel(prompt.provider) : '';
   });
 
-  readonly stepUpPasswordModel = signal<{ currentPassword: string }>({
-    currentPassword: ''
+  readonly #stepUp = createStepUpFactorForm(this.stepUpFactor, {
+    passwordRequired: 'auth.profile.stepUpPasswordRequired',
+    codeRequired: 'auth.profile.stepUpCodeRequired'
   });
+  readonly passwordModel = this.#stepUp.passwordModel;
+  readonly passwordForm = this.#stepUp.passwordForm;
+  readonly codeModel = this.#stepUp.codeModel;
+  readonly codeForm = this.#stepUp.codeForm;
 
-  readonly stepUpPasswordForm = form(this.stepUpPasswordModel, (path) => {
-    required(path.currentPassword, {
-      message: 'auth.profile.stepUpPasswordRequired'
-    });
-  });
+  protected readonly stepUpBlocked = computed(
+    () => this.#stepUp.invalid() || this.busy()
+  );
 
   /** A resumed round trip sends one request, however often the input emits. */
   #resumed = false;
@@ -164,14 +171,14 @@ export class LinkedProvidersComponent {
   /**
    * A link plants a credential the account owner cannot revoke by changing
    * their password, so it asks for a factor first. An account that holds a
-   * password types it here; an account created through a provider proves
-   * itself at that provider, which is a round trip of its own before the one
+   * password or an authenticator types it here; an account with neither proves
+   * itself at its provider, which is a round trip of its own before the one
    * that does the linking.
    */
   connectProvider(provider: string): void {
     if (!isOAuthProvider(provider)) return;
 
-    if (this.hasPassword()) {
+    if (this.stepUpFactor() !== 'none') {
       this.#openStepUpPrompt(provider, 'link');
       return;
     }
@@ -185,13 +192,13 @@ export class LinkedProvidersComponent {
   /**
    * The row an unlink deletes is a sign-in credential that a password change
    * does not revoke, so removing one costs the factor that adding one costs.
-   * An account that holds a password types it here; an account created through
-   * a provider proves itself at a provider it still holds.
+   * An account with neither a password nor an authenticator proves itself at a
+   * provider it still holds.
    */
   disconnectProvider(provider: string): void {
     if (!isOAuthProvider(provider)) return;
 
-    if (this.hasPassword()) {
+    if (this.stepUpFactor() !== 'none') {
       this.#openStepUpPrompt(provider, 'unlink');
       return;
     }
@@ -202,21 +209,17 @@ export class LinkedProvidersComponent {
     });
   }
 
-  /** The password prompt on the provider controls, answered. */
+  /** The step-up prompt on the provider controls, answered. */
   protected confirmStepUp(): void {
     const prompt = this.stepUpPrompt();
-    if (!prompt || this.stepUpPasswordForm().invalid() || this.busy()) {
-      return;
-    }
-
-    const currentPassword = this.stepUpPasswordModel().currentPassword;
+    if (!prompt || this.stepUpBlocked()) return;
 
     if (prompt.mode === 'link') {
-      this.#startLink(prompt.provider, currentPassword);
+      this.#startLink(prompt.provider, this.#stepUp.request());
       return;
     }
 
-    this.#unlink(prompt.provider, currentPassword);
+    this.#unlink(prompt.provider, this.#stepUp.request());
   }
 
   protected cancelStepUp(): void {
@@ -224,19 +227,19 @@ export class LinkedProvidersComponent {
   }
 
   #openStepUpPrompt(provider: OAuthProvider, mode: StepUpPromptMode): void {
-    this.stepUpPasswordModel.set({ currentPassword: '' });
+    this.#stepUp.reset();
     this.stepUpPrompt.set({ provider, mode });
   }
 
   #closeStepUpPrompt(): void {
     this.stepUpPrompt.set(null);
-    this.stepUpPasswordModel.set({ currentPassword: '' });
+    this.#stepUp.reset();
   }
 
-  #startLink(provider: OAuthProvider, currentPassword?: string): void {
+  #startLink(provider: OAuthProvider, stepUp?: StepUpFactorsRequest): void {
     this.busy.set(true);
     this.#authService
-      .initOAuthLink(currentPassword)
+      .initOAuthLink(stepUp)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -253,10 +256,10 @@ export class LinkedProvidersComponent {
       });
   }
 
-  #unlink(provider: OAuthProvider, currentPassword?: string): void {
+  #unlink(provider: OAuthProvider, stepUp?: StepUpFactorsRequest): void {
     this.busy.set(true);
     this.#authService
-      .unlinkOAuthAccount(provider, currentPassword)
+      .unlinkOAuthAccount(provider, stepUp)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {

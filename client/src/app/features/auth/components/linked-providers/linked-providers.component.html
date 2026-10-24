@@ -47,21 +47,31 @@
               }}
             </p>
 
-            <nxs-form-field
-              [field]="stepUpPasswordForm.currentPassword"
-              label="auth.profile.currentPassword"
-              [type]="stepUpPwdToggle.show() ? 'text' : 'password'"
-              prefixIcon="lock"
-              autocomplete="current-password"
-            >
-              <nxs-password-toggle formFieldSuffix #stepUpPwdToggle />
-            </nxs-form-field>
+            @if (stepUpFactor() === 'code') {
+              <nxs-form-field
+                [field]="codeForm.code"
+                label="auth.profile.code"
+                type="text"
+                prefixIcon="password"
+                autocomplete="one-time-code"
+              />
+            } @else {
+              <nxs-form-field
+                [field]="passwordForm.currentPassword"
+                label="auth.profile.currentPassword"
+                [type]="stepUpPwdToggle.show() ? 'text' : 'password'"
+                prefixIcon="lock"
+                autocomplete="current-password"
+              >
+                <nxs-password-toggle formFieldSuffix #stepUpPwdToggle />
+              </nxs-form-field>
+            }
 
             <div class="oauth-step-up-actions">
               <button
                 matButton="filled"
                 type="button"
-                [disabled]="stepUpPasswordForm().invalid() || busy()"
+                [disabled]="stepUpBlocked()"
                 (click)="confirmStepUp()"
               >
                 @if (busy()) {

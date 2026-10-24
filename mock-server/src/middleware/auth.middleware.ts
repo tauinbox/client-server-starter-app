@@ -65,7 +65,6 @@ import {
   AUTH_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE,
-  REAUTH_PROOF_COOKIE,
   REFRESH_TOKEN_COOKIE
 } from '../constants';
 import {
@@ -74,11 +73,10 @@ import {
 } from '../helpers/refresh-cookie.helpers';
 import {
   clearReauthProofCookie,
-  isValidReauthProof,
   lockedEnvelope,
-  logStepUpFailure,
   sendWithRetryAfter,
-  stepUpPasswordError
+  stepUpError,
+  stepUpFactorsShapeError
 } from '../helpers/reauth.helpers';
 
 function respondLocked(res: Response, lockedUntil: string): void {
@@ -787,7 +785,8 @@ router.patch(
   '/profile',
   permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
   (req, res) => {
-    const { firstName, lastName, password, currentPassword, locale } = req.body;
+    const { firstName, lastName, password, currentPassword, code, locale } =
+      req.body;
     const { user } = req as AuthenticatedRequest;
 
     const localeErr = validateLocale(locale);
@@ -805,6 +804,12 @@ router.patch(
       return;
     }
 
+    const shapeError = stepUpFactorsShapeError(req.body);
+    if (shapeError) {
+      res.status(400).json(validationError(shapeError));
+      return;
+    }
+
     if (password !== undefined) {
       const pwLenErr = passwordLengthError(password);
       if (pwLenErr) {
@@ -812,41 +817,18 @@ router.patch(
         return;
       }
 
-      // A first password binds a credential that outlives the session, so an
-      // account that holds no password proves itself with a provider proof, and
-      // an account that holds one supplies it.
-      if (user.password === null) {
-        const proof = (req.cookies as Record<string, string> | undefined)?.[
-          REAUTH_PROOF_COOKIE
-        ];
-        if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.PASSWORD_SET)) {
-          logStepUpFailure(
-            req,
-            user,
-            STEP_UP_OPERATION.PASSWORD_SET,
-            'reauth_proof',
-            false
-          );
-          res.status(400).json({
-            message:
-              'Confirm it is you with your sign-in provider, then try again',
-            statusCode: 400,
-            errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-          });
-          return;
-        }
-      } else {
-        const stepUp = stepUpPasswordError(
-          req,
-          user,
-          currentPassword,
-          STEP_UP_OPERATION.PASSWORD_SET,
-          false
-        );
-        if (stepUp) {
-          sendWithRetryAfter(res, stepUp);
-          return;
-        }
+      // A first password binds a credential that outlives the session, so it
+      // needs the same fresh proof of identity an email change needs.
+      const stepUp = stepUpError(
+        req,
+        user,
+        currentPassword,
+        code,
+        STEP_UP_OPERATION.PASSWORD_SET
+      );
+      if (stepUp) {
+        sendWithRetryAfter(res, stepUp);
+        return;
       }
 
       // The blocklist verdict comes from UsersService.update on the real server,
@@ -904,7 +886,7 @@ router.patch(
 // POST /api/v1/auth/profile/email/initiate
 router.post('/profile/email/initiate', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
-  const { currentPassword } = req.body;
+  const { currentPassword, code } = req.body;
   const successMessage =
     'If the new email is available, a confirmation link has been sent to it.';
 
@@ -915,49 +897,22 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
   }
 
   const newEmail = normalizeEmail(req.body.newEmail) ?? '';
-  // Supplied values are still checked; an absent one reaches the step-up gate,
-  // which is the only place that knows which factor this account holds.
-  if (
-    currentPassword !== undefined &&
-    (typeof currentPassword !== 'string' ||
-      currentPassword.length === 0 ||
-      currentPassword.length > MAX_PASSWORD_LENGTH)
-  ) {
-    res.status(400).json(validationError('currentPassword is required'));
+  const shapeError = stepUpFactorsShapeError(req.body);
+  if (shapeError) {
+    res.status(400).json(validationError(shapeError));
     return;
   }
 
-  if (user.password === null) {
-    const proof = (req.cookies as Record<string, string> | undefined)?.[
-      REAUTH_PROOF_COOKIE
-    ];
-    if (!isValidReauthProof(proof, user, STEP_UP_OPERATION.EMAIL_CHANGE)) {
-      logStepUpFailure(
-        req,
-        user,
-        STEP_UP_OPERATION.EMAIL_CHANGE,
-        'reauth_proof',
-        false
-      );
-      res.status(400).json({
-        message: 'Confirm it is you with your sign-in provider, then try again',
-        statusCode: 400,
-        errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-      });
-      return;
-    }
-  } else {
-    const stepUp = stepUpPasswordError(
-      req,
-      user,
-      currentPassword,
-      STEP_UP_OPERATION.EMAIL_CHANGE,
-      false
-    );
-    if (stepUp) {
-      sendWithRetryAfter(res, stepUp);
-      return;
-    }
+  const stepUp = stepUpError(
+    req,
+    user,
+    currentPassword,
+    code,
+    STEP_UP_OPERATION.EMAIL_CHANGE
+  );
+  if (stepUp) {
+    sendWithRetryAfter(res, stepUp);
+    return;
   }
 
   if (newEmail === user.email) {

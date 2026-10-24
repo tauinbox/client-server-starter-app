@@ -63,8 +63,7 @@ import { AuthCookies } from '../utils/auth-cookies';
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
-import { OAuthLinkInitDto } from '../dtos/oauth-link-init.dto';
-import { OAuthUnlinkDto } from '../dtos/oauth-unlink.dto';
+import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { AuthService } from '../services/auth.service';
@@ -134,14 +133,14 @@ export class OAuthController {
    * demands the same fresh proof of identity the other credential changes do.
    */
   @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword')
+  @CountFailuresOnlyWhenBody('currentPassword', 'code')
   @Post('link-init')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Initiate OAuth account linking for current user' })
-  @ApiBody({ type: OAuthLinkInitDto })
+  @ApiBody({ type: StepUpFactorsDto })
   async initOAuthLink(
     @Request() req: JwtAuthRequest,
-    @Body() dto: OAuthLinkInitDto,
+    @Body() dto: StepUpFactorsDto,
     @Res({ passthrough: true }) res: Response
   ) {
     const reauthProof = this.cookies.readReauthProof(req);
@@ -151,6 +150,7 @@ export class OAuthController {
       dto.currentPassword,
       reauthProof,
       STEP_UP_OPERATION.OAUTH_LINK,
+      dto.code,
       extractAuditContext(req)
     );
 
@@ -299,7 +299,7 @@ export class OAuthController {
    * proof of identity the link route demands.
    */
   @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword')
+  @CountFailuresOnlyWhenBody('currentPassword', 'code')
   @Delete('/accounts/:provider')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Unlink an OAuth provider from current user' })
@@ -308,11 +308,11 @@ export class OAuthController {
     enum: OAuthProvider,
     description: 'OAuth provider to unlink'
   })
-  @ApiBody({ type: OAuthUnlinkDto, required: false })
+  @ApiBody({ type: StepUpFactorsDto, required: false })
   async unlinkOAuth(
     @Param('provider') provider: string,
     @Request() req: JwtAuthRequest,
-    @Body() dto: OAuthUnlinkDto,
+    @Body() dto: StepUpFactorsDto,
     @Res({ passthrough: true }) res: Response
   ) {
     if (!Object.values(OAuthProvider).includes(provider as OAuthProvider)) {
@@ -334,6 +334,7 @@ export class OAuthController {
       dto.currentPassword,
       reauthProof,
       STEP_UP_OPERATION.OAUTH_UNLINK,
+      dto.code,
       extractAuditContext(req)
     );
 

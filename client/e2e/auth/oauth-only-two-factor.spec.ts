@@ -264,4 +264,57 @@ test.describe('OAuth-only account turns two-factor on', () => {
       card.getByText('Two-factor authentication is off')
     ).toBeVisible();
   });
+
+  // A code is a step-up factor on every route, so the email change asks for
+  // one and never leaves the app for the provider.
+  test('changes the email with a code and no round trip', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: userId,
+      email,
+      roles: ['user']
+    });
+    await seedOAuthOnlyUser(_mockServer, {
+      totpSecret: MOCK_TOTP_SECRET,
+      totpEnabledAt: '2025-02-01T00:00:00.000Z',
+      totpRecoveryCodes: [...MOCK_RECOVERY_CODES]
+    });
+
+    const roundTrips: string[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/auth/oauth/reauth-init')) {
+        roundTrips.push(req.url());
+      }
+    });
+
+    await page.goto('/profile');
+
+    const form = page.locator('form');
+    await form.getByLabel('Email').fill('provider-mfa-new@example.com');
+    await form.getByLabel('Email').blur();
+
+    await expect(form.getByLabel('Current password')).toHaveCount(0);
+    await expect(form.getByText(/confirm it is you/i)).toHaveCount(0);
+    await form.getByLabel('Authentication code').fill(MOCK_TOTP_CODE);
+
+    const initiated = page.waitForResponse(
+      (res) =>
+        res.url().includes('/auth/profile/email/initiate') &&
+        res.request().method() === 'POST',
+      { timeout: 15_000 }
+    );
+    await form.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('button', { name: 'Send link' }).click();
+
+    const response = await initiated;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON()).toEqual({
+      newEmail: 'provider-mfa-new@example.com',
+      code: MOCK_TOTP_CODE
+    });
+    await expect(page.getByText(/Confirmation link sent/)).toBeVisible();
+    expect(roundTrips).toEqual([]);
+  });
 });

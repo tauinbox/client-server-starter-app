@@ -47,9 +47,10 @@ describe('step-up routes', () => {
       expect(ttlOf(handler, LONG_WINDOW)).toBe(LOCKOUT_DURATION_MS);
     });
 
-    it('counts only the requests that carry a password', () => {
+    it('counts only the requests that carry a password or a code', () => {
       expect(reflector.get(FAILURE_COUNTER_BODY_FIELDS, handler)).toEqual([
-        'currentPassword'
+        'currentPassword',
+        'code'
       ]);
     });
   });

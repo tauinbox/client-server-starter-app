@@ -117,6 +117,16 @@
                   </nxs-form-field>
                 }
 
+                @if (requiresCode()) {
+                  <nxs-form-field
+                    [field]="profileForm.code"
+                    label="auth.profile.code"
+                    type="text"
+                    prefixIcon="password"
+                    autocomplete="one-time-code"
+                  />
+                }
+
                 @if (passwordTyped()) {
                   <nxs-form-field
                     [field]="profileForm.confirmPassword"
@@ -172,7 +182,7 @@
         <div class="profile-column">
           <nxs-linked-providers
             [accounts]="oauthAccounts()"
-            [hasPassword]="accountHasPassword()"
+            [stepUpFactor]="stepUpFactor()"
             [resumeChange]="resumeProviderChange()"
             [(busy)]="providersBusy"
             (reauthRequested)="startProviderReauth($event)"
