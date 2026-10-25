@@ -233,7 +233,7 @@ router.patch(
       return;
     }
 
-    const bodyNameErrors = nameErrors(name);
+    const bodyNameErrors = nameErrors(name, 'definedOnly');
     if (bodyNameErrors.length > 0) {
       res.status(400).json(validationError(bodyNameErrors));
       return;

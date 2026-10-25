@@ -1,16 +1,14 @@
 import { randomUUID } from 'crypto';
-import {
-  ErrorKeys,
-  MAX_EMAIL_LENGTH,
-  MAX_NAME_LENGTH
-} from '@app/shared/constants';
+import { ErrorKeys } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
-  isValidEmail,
-  passwordLengthError,
+  emailErrors,
+  nameErrors,
+  newPasswordErrors,
+  stringErrors,
   trimName,
-  validateLocale,
-  validateMaxLength
+  unknownPropertyErrors,
+  validateLocale
 } from '../utils/validation';
 import { findUserByEmail, findUserByPendingEmail } from '../state';
 import { validationError } from './validation-error.helpers';
@@ -47,6 +45,46 @@ interface CreateUserConflict {
   body: ReturnType<typeof validationError> | ConflictEnvelope;
 }
 
+const CREATE_USER_KEYS = ['email', 'name', 'password', 'locale'] as const;
+
+/** The `@MaxLength` of `RegisterDto.captchaToken`. */
+const MAX_CAPTCHA_TOKEN_LENGTH = 2048;
+
+/**
+ * Validates the `CreateUserDto` fields after `leadingErrors`, which hold the
+ * unknown properties and the fields of a subclass: class-validator reports
+ * them first. Every field fails on its own, so one body can carry the errors
+ * of all of them.
+ */
+function createUserDtoResult(
+  body: Record<string, unknown>,
+  leadingErrors: string[]
+): CreateUserDtoResult {
+  const name = trimName(body['name']);
+  const { password, locale } = body;
+  const localeError = validateLocale(locale);
+  const errors = [
+    ...leadingErrors,
+    ...emailErrors('email', body['email']),
+    ...nameErrors(name),
+    ...newPasswordErrors(password),
+    ...(localeError ? [localeError] : [])
+  ];
+  if (errors.length > 0) {
+    return { ok: false, status: 400, body: validationError(errors) };
+  }
+
+  // Each check above rejects a non-string value.
+  const fields: CreateUserFields = {
+    email: String(normalizeEmail(body['email'])),
+    name: String(name),
+    password: String(password),
+    locale: typeof locale === 'string' ? locale : 'en'
+  };
+
+  return { ok: true, fields };
+}
+
 /**
  * The `CreateUserDto` stage. The server runs it in the global pipe, above the
  * ability check, so the admin route places its instance check between this and
@@ -55,48 +93,10 @@ interface CreateUserConflict {
 export function validateCreateUserDto(
   body: Record<string, unknown>
 ): CreateUserDtoResult {
-  const email = normalizeEmail(body['email']) ?? '';
-  const { password, locale } = body;
-  const name = trimName(body['name']);
-
-  if (!email || !name || !password) {
-    return {
-      ok: false,
-      status: 400,
-      body: validationError('All fields are required')
-    };
-  }
-
-  if (!isValidEmail(email)) {
-    return {
-      ok: false,
-      status: 400,
-      body: validationError('email must be an email')
-    };
-  }
-
-  const lengthErr =
-    validateMaxLength(email, MAX_EMAIL_LENGTH, 'email') ||
-    validateMaxLength(name, MAX_NAME_LENGTH, 'name') ||
-    passwordLengthError(password);
-  if (lengthErr) {
-    return { ok: false, status: 400, body: validationError(lengthErr) };
-  }
-
-  const localeErr = validateLocale(locale);
-  if (localeErr) {
-    return { ok: false, status: 400, body: validationError(localeErr) };
-  }
-
-  // Every field above cleared a length check, which rejects non-strings.
-  const fields: CreateUserFields = {
-    email,
-    name: String(name),
-    password: String(password),
-    locale: typeof locale === 'string' ? locale : 'en'
-  };
-
-  return { ok: true, fields };
+  return createUserDtoResult(
+    body,
+    unknownPropertyErrors(body, CREATE_USER_KEYS)
+  );
 }
 
 /**
@@ -128,12 +128,19 @@ export function findCreateUserConflict(
 
 /**
  * Both stages in one call, for `POST /auth/register`. That route is public, so
- * it has no ability check to place between them.
+ * it has no ability check to place between them. Its `RegisterDto` adds
+ * `captchaToken` to the `CreateUserDto` fields.
  */
 export function validateCreateUserBody(
   body: Record<string, unknown>
 ): CreateUserResult {
-  const validated = validateCreateUserDto(body);
+  const validated = createUserDtoResult(body, [
+    ...unknownPropertyErrors(body, [...CREATE_USER_KEYS, 'captchaToken']),
+    ...stringErrors('captchaToken', body['captchaToken'], {
+      max: MAX_CAPTCHA_TOKEN_LENGTH,
+      optional: 'nullable'
+    })
+  ]);
   if (!validated.ok) return validated;
 
   const conflict = findCreateUserConflict(validated.fields);
