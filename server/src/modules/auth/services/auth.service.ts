@@ -255,6 +255,7 @@ export class AuthService {
 
     // Check email verification
     if (!user.isEmailVerified) {
+      this.metricsService.recordAuthEvent('login_failure');
       throw new HttpException(
         {
           message: 'Please verify your email address before logging in',
@@ -1373,6 +1374,7 @@ export class AuthService {
       targetType: 'User',
       details
     });
+    this.metricsService.recordAuthEvent('login_failure');
     return lockedException(
       'Account is temporarily locked due to too many failed login attempts',
       ErrorKeys.AUTH.ACCOUNT_LOCKED,
