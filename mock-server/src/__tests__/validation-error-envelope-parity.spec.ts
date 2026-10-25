@@ -60,8 +60,7 @@ describe('validation-error envelope parity with server', () => {
     it('auth: register with a malformed email', async () => {
       const { status, body } = await send('POST', '/api/v1/auth/register', {
         email: 'not-an-email',
-        firstName: 'A',
-        lastName: 'B',
+        name: 'A B',
         password: 'Password1'
       });
 

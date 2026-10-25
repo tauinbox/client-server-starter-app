@@ -551,8 +551,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '123',
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -600,8 +599,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '123',
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -636,8 +634,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.VK,
         providerId: '123',
         email: '',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: false
       };
 
@@ -661,8 +658,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.VK,
         providerId: '123',
         email: '',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: false
       };
 
@@ -685,8 +681,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '999',
         email: 'taken@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -707,8 +702,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '123',
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -724,8 +718,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '123',
         email: 'provider-claim@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -809,8 +802,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '456',
         email: 'different@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -849,8 +841,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '456',
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -878,8 +869,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '456',
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -904,8 +894,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '456',
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -928,8 +917,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '123',
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         emailVerified: true
       };
 
@@ -956,8 +944,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: 'stranger-456',
         email: 'stranger@example.com',
-        firstName: 'Stranger',
-        lastName: 'Person',
+        name: 'Stranger Person',
         emailVerified: true
       };
 
@@ -992,8 +979,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: 'stranger-456',
         email: 'stranger@example.com',
-        firstName: 'Stranger',
-        lastName: 'Person',
+        name: 'Stranger Person',
         emailVerified: true
       };
 
@@ -1311,8 +1297,7 @@ describe('OAuthController', () => {
         provider: OAuthProvider.GOOGLE,
         providerId: '789',
         email: 'fb@example.com',
-        firstName: 'Face',
-        lastName: 'Book',
+        name: 'Face Book',
         emailVerified: true
       };
 

@@ -128,8 +128,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `plan-change-race-${stamp}@example.com`,
-        firstName: 'Plan',
-        lastName: 'Race',
+        name: 'Plan Race',
         password: 'hashed'
       })
     );

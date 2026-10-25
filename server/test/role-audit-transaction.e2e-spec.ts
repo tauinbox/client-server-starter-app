@@ -85,7 +85,7 @@ runWithInfra(
       authService = app.get(AuthService);
       roleService = app.get(RoleService);
 
-      const names = { firstName: 'Role', lastName: 'Tx' };
+      const names = { name: 'Role Tx' };
       const admin = await usersService.create(
         { email: adminEmail, password, ...names },
         SYSTEM_ABILITY

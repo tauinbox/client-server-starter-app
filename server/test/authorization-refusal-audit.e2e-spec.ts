@@ -75,8 +75,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       const saved = await userRepository.save(
         userRepository.create({
           email: emails[key],
-          firstName: 'Refusal',
-          lastName: key,
+          name: `Refusal ${key}`,
           isEmailVerified: true,
           password: null
         })
@@ -196,7 +195,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
 
   it('writes the instance check refusal', async () => {
     const res = await send('patch', `/users/${ids.victim}`, `${tag}-instance`, {
-      firstName: 'Changed'
+      name: 'Changed'
     });
     expect(res.status).toBe(403);
     expect((res.body as { errorKey: string }).errorKey).toBe(
@@ -210,7 +209,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
 
   it('writes the super-target refusal', async () => {
     const res = await send('patch', `/users/${ids.super}`, `${tag}-target`, {
-      firstName: 'Changed'
+      name: 'Changed'
     });
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN

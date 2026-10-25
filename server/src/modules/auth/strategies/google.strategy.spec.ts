@@ -102,4 +102,32 @@ describe('GoogleStrategy.validate', () => {
     expect(profile.emailVerified).toBe(false);
     expect(profile.email).toBe('');
   });
+
+  it('takes the display name that Google sends', () => {
+    strategy.validate(
+      'access',
+      'refresh',
+      {
+        id: 'google-6',
+        displayName: 'María José García',
+        name: { givenName: 'María', familyName: 'García' }
+      },
+      done
+    );
+
+    const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
+    expect(profile.name).toBe('María José García');
+  });
+
+  it('keeps a given name when Google sends no family name', () => {
+    strategy.validate(
+      'access',
+      'refresh',
+      { id: 'google-7', name: { givenName: 'Madonna' } },
+      done
+    );
+
+    const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
+    expect(profile.name).toBe('Madonna');
+  });
 });

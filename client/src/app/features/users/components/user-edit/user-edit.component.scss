@@ -11,21 +11,6 @@
     margin-top: vars.$spacing-md;
   }
 
-  .form-name-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: vars.$spacing-md; // NxsFormFieldComponent host margin owns row rhythm
-    align-items: start;
-
-    mat-form-field {
-      width: 100%;
-    }
-
-    @media (max-width: vars.$breakpoint-xs) {
-      grid-template-columns: 1fr;
-    }
-  }
-
   .full-width {
     display: block;
     width: 100%;

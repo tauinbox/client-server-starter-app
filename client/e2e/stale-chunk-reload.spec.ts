@@ -22,8 +22,7 @@ test.describe('a page loaded before a deploy', () => {
       createMockUser({
         id: '901',
         email: EMAIL,
-        firstName: 'Stale',
-        lastName: 'Chunk',
+        name: 'Stale Chunk',
         password: PASSWORD,
         roles: ['user'],
         isActive: true,

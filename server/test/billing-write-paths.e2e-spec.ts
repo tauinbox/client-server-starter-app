@@ -126,8 +126,7 @@ runWithInfra('billing write paths (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `billing-write-paths-${stamp}@example.com`,
-        firstName: 'Write',
-        lastName: 'Paths',
+        name: 'Write Paths',
         password: 'hashed'
       })
     );

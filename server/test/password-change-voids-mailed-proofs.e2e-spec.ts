@@ -49,8 +49,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     return repository.save(
       repository.create({
         email,
-        firstName: 'Voids',
-        lastName: 'Proofs',
+        name: 'Voids Proofs',
         isEmailVerified: true,
         ...overrides
       })
@@ -147,16 +146,12 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
       pendingEmailExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
     });
 
-    await usersService.update(
-      user.id,
-      { firstName: 'Renamed' },
-      SYSTEM_ABILITY
-    );
+    await usersService.update(user.id, { name: 'Renamed' }, SYSTEM_ABILITY);
 
     const afterChange = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
-    expect(afterChange.firstName).toBe('Renamed');
+    expect(afterChange.name).toBe('Renamed');
     expect(afterChange.passwordResetToken).not.toBeNull();
     expect(afterChange.pendingEmailToken).not.toBeNull();
     expect(

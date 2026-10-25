@@ -198,8 +198,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `renewal-race-${stamp}@example.com`,
-        firstName: 'Renewal',
-        lastName: 'Race',
+        name: 'Renewal Race',
         password: 'hashed'
       })
     );

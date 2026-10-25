@@ -127,7 +127,7 @@ describe('compileAbilityRules', () => {
           grant('users', 'update'),
           grant('users', 'update', {
             effect: 'deny',
-            fieldMatch: { lastname: ['Typo'] }
+            fieldMatch: { Name: ['Typo'] }
           })
         ],
         maps
@@ -298,20 +298,20 @@ describe('compileAbilityRules', () => {
   it('should apply safe custom conditions as MongoQuery', () => {
     const ability = abilityOf([
       grant('users', 'read', {
-        custom: '{"lastName":{"$in":["active","pending"]}}'
+        custom: '{"name":{"$in":["active","pending"]}}'
       })
     ]);
 
     expect(
       ability.can('read', {
         __caslSubjectType__: 'User',
-        lastName: 'active'
+        name: 'active'
       } as never)
     ).toBe(true);
     expect(
       ability.can('read', {
         __caslSubjectType__: 'User',
-        lastName: 'deleted'
+        name: 'deleted'
       } as never)
     ).toBe(false);
   });
@@ -329,7 +329,7 @@ describe('compileAbilityRules', () => {
   it('should skip custom conditions containing nested $where', () => {
     const ability = abilityOf([
       grant('users', 'read', {
-        custom: '{"$or":[{"lastName":"active"},{"$where":"hack"}]}'
+        custom: '{"$or":[{"name":"active"},{"$where":"hack"}]}'
       })
     ]);
 
@@ -392,7 +392,7 @@ describe('compileAbilityRules', () => {
       grant('users', 'update', {
         ownership: { userField: 'email' },
         custom:
-          '{"$or":[{"lastName":"active"},{"profile":{"constructor":{"x":1}}}]}'
+          '{"$or":[{"name":"active"},{"profile":{"constructor":{"x":1}}}]}'
       })
     ]);
 
@@ -401,7 +401,7 @@ describe('compileAbilityRules', () => {
       ability.can('update', {
         __caslSubjectType__: 'User',
         email: 'user-1',
-        lastName: 'active'
+        name: 'active'
       } as never)
     ).toBe(false);
     expect(logger.warn).toHaveBeenCalledWith(
@@ -440,7 +440,7 @@ describe('compileAbilityRules', () => {
         grant('users', 'update'),
         grant('users', 'update', {
           effect: 'deny',
-          custom: '{"lastName":{"$in":["archived"]}}'
+          custom: '{"name":{"$in":["archived"]}}'
         })
       ]);
 
@@ -448,19 +448,19 @@ describe('compileAbilityRules', () => {
       // allow because the conditional deny cannot decide without a record.
       expect(ability.can('update', 'User')).toBe(true);
 
-      // Instance with non-matching lastName -> only the allow applies.
+      // Instance with non-matching name -> only the allow applies.
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          lastName: 'active'
+          name: 'active'
         } as never)
       ).toBe(true);
 
-      // Instance with matching lastName -> deny rule blocks.
+      // Instance with matching name -> deny rule blocks.
       expect(
         ability.can('update', {
           __caslSubjectType__: 'User',
-          lastName: 'archived'
+          name: 'archived'
         } as never)
       ).toBe(false);
     });
@@ -475,7 +475,7 @@ describe('compileAbilityRules', () => {
         ),
         grant('users', 'update', {
           effect: 'deny',
-          fieldMatch: { lastName: ['locked'] }
+          fieldMatch: { name: ['locked'] }
         })
       ]);
 
@@ -484,7 +484,7 @@ describe('compileAbilityRules', () => {
         ability.can('update', {
           __caslSubjectType__: 'User',
           email: 'user-1',
-          lastName: 'active'
+          name: 'active'
         } as never)
       ).toBe(true);
 
@@ -493,7 +493,7 @@ describe('compileAbilityRules', () => {
         ability.can('update', {
           __caslSubjectType__: 'User',
           email: 'user-1',
-          lastName: 'locked'
+          name: 'locked'
         } as never)
       ).toBe(false);
 
@@ -502,7 +502,7 @@ describe('compileAbilityRules', () => {
         ability.can('update', {
           __caslSubjectType__: 'User',
           email: 'user-2',
-          lastName: 'active'
+          name: 'active'
         } as never)
       ).toBe(false);
     });
@@ -545,7 +545,7 @@ describe('compileAbilityRules', () => {
         grant('users', 'update'),
         grant('users', 'update', {
           effect: 'deny',
-          fieldMatch: { lastName: [] }
+          fieldMatch: { name: [] }
         })
       ]);
 
@@ -585,7 +585,7 @@ describe('compileAbilityRules', () => {
         grant(
           'users',
           'update',
-          { ownership: { userField: 'email' }, fieldMatch: { lastName: [] } },
+          { ownership: { userField: 'email' }, fieldMatch: { name: [] } },
           'users:update:own'
         )
       ]);
@@ -652,19 +652,19 @@ describe('dedupPermissions', () => {
       {
         resource: 'users',
         action: 'update',
-        conditions: { effect: 'deny', fieldMatch: { lastName: ['a'] } }
+        conditions: { effect: 'deny', fieldMatch: { name: ['a'] } }
       },
       {
         resource: 'users',
         action: 'update',
-        conditions: { effect: 'deny', fieldMatch: { lastName: ['b'] } }
+        conditions: { effect: 'deny', fieldMatch: { name: ['b'] } }
       },
       { resource: 'users', action: 'update', conditions: null }
     ]);
 
     expect(result.map((p) => p.conditions)).toEqual([
-      { effect: 'deny', fieldMatch: { lastName: ['a'] } },
-      { effect: 'deny', fieldMatch: { lastName: ['b'] } },
+      { effect: 'deny', fieldMatch: { name: ['a'] } },
+      { effect: 'deny', fieldMatch: { name: ['b'] } },
       null
     ]);
   });

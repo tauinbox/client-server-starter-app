@@ -89,21 +89,17 @@ describe('condition shape parity with server', () => {
     it.each([
       [
         'a partially malformed fieldMatch (forgot array brackets)',
-        { fieldMatch: { lastName: ['active'], email: 'sales' } },
+        { fieldMatch: { name: ['active'], email: 'sales' } },
         'fieldMatch.email'
       ],
       [
         'an empty fieldMatch array value',
-        { fieldMatch: { lastName: [] } },
+        { fieldMatch: { name: [] } },
         'non-empty array'
       ],
       ['a non-object fieldMatch', { fieldMatch: 5 }, 'fieldMatch'],
       ['an empty ownership object', { ownership: {} }, 'userField'],
-      [
-        'a non-string userAttr value',
-        { userAttr: { firstName: 123 } },
-        'userAttr'
-      ],
+      ['a non-string userAttr value', { userAttr: { name: 123 } }, 'userAttr'],
       [
         'an unknown top-level condition key',
         { unknownBranch: {} },
@@ -116,14 +112,14 @@ describe('condition shape parity with server', () => {
       ],
       [
         'a "$"-prefixed fieldMatch key',
-        { fieldMatch: { lastName: ['active'], $where: ['x'] } },
+        { fieldMatch: { name: ['active'], $where: ['x'] } },
         '$where'
       ],
       ['a "$"-prefixed userAttr key', { userAttr: { $expr: 'id' } }, '$expr'],
       ['a non-string custom', { custom: 5 }, 'JSON string'],
       [
         'a custom $in list holding a non-scalar element',
-        { custom: '{"lastName":{"$in":["active",{"nested":"x"}]}}' },
+        { custom: '{"name":{"$in":["active",{"nested":"x"}]}}' },
         'must be an array of'
       ]
     ])('rejects %s with 400 and no write', async (_label, conditions, part) => {
@@ -140,9 +136,9 @@ describe('condition shape parity with server', () => {
         {
           effect: 'deny',
           ownership: { userField: 'email' },
-          fieldMatch: { lastName: ['active'] },
-          userAttr: { firstName: 'id' },
-          custom: '{"lastName":{"$in":["active"]}}'
+          fieldMatch: { name: ['active'] },
+          userAttr: { name: 'id' },
+          custom: '{"name":{"$in":["active"]}}'
         },
         updateUserPermissionId()
       );
@@ -166,14 +162,14 @@ describe('condition shape parity with server', () => {
           },
           body: JSON.stringify({
             permissionIds: [mockId('perm-1')],
-            conditions: { fieldMatch: { lastName: 'active' } }
+            conditions: { fieldMatch: { name: 'active' } }
           })
         }
       );
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors: string[] };
-      expect(body.errors.join(' ')).toContain('fieldMatch.lastName');
+      expect(body.errors.join(' ')).toContain('fieldMatch.name');
       expect(editorRolePermissions()).toEqual([]);
     });
   });
@@ -210,15 +206,15 @@ describe('condition shape parity with server', () => {
     }
 
     it('vetoes a permission whose stored condition is partially malformed', () => {
-      grantToEditor({ fieldMatch: { lastName: ['active'], email: 'sales' } });
+      grantToEditor({ fieldMatch: { name: ['active'], email: 'sales' } });
 
       expect(editorUserRules().granted).toBe(false);
     });
 
     it('vetoes a permission whose custom key collides with ownership.userField', () => {
       grantToEditor({
-        ownership: { userField: 'firstName' },
-        custom: '{"firstName":{"$ne":null}}'
+        ownership: { userField: 'name' },
+        custom: '{"name":{"$ne":null}}'
       });
 
       expect(editorUserRules().granted).toBe(false);
@@ -226,8 +222,8 @@ describe('condition shape parity with server', () => {
 
     it('vetoes a permission whose fieldMatch key collides with ownership.userField', () => {
       grantToEditor({
-        ownership: { userField: 'firstName' },
-        fieldMatch: { firstName: ['a', 'b'] }
+        ownership: { userField: 'name' },
+        fieldMatch: { name: ['a', 'b'] }
       });
 
       expect(editorUserRules().granted).toBe(false);
@@ -247,20 +243,20 @@ describe('condition shape parity with server', () => {
 
     it('vetoes a permission whose stored custom $in list holds a non-scalar element', () => {
       grantToEditor({
-        custom: '{"lastName":{"$in":["active",{"nested":"x"}]}}'
+        custom: '{"name":{"$in":["active",{"nested":"x"}]}}'
       });
 
       expect(editorUserRules().granted).toBe(false);
     });
 
     it('grants the permission when the stored condition is valid (control)', () => {
-      grantToEditor({ fieldMatch: { lastName: ['active'] } });
+      grantToEditor({ fieldMatch: { name: ['active'] } });
 
       expect(editorUserRules().granted).toBe(true);
     });
 
     it('grants the permission when the stored custom uses an allowed operator (control)', () => {
-      grantToEditor({ custom: '{"lastName":{"$in":["active"]}}' });
+      grantToEditor({ custom: '{"name":{"$in":["active"]}}' });
 
       expect(editorUserRules().granted).toBe(true);
     });

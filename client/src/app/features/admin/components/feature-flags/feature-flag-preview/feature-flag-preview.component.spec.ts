@@ -212,8 +212,7 @@ describe('FeatureFlagPreviewComponent', () => {
       const bob: User = {
         id: 'u-bob',
         email: 'bob@example.com',
-        firstName: 'Bob',
-        lastName: 'Marley',
+        name: 'Bob Marley',
         isActive: true,
         roles: [],
         isEmailVerified: true,

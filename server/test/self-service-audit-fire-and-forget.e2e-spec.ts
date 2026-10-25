@@ -75,8 +75,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
         {
           email: ownerEmail,
           password,
-          firstName: 'Self',
-          lastName: 'Service'
+          name: 'Self Service'
         },
         SYSTEM_ABILITY
       )
@@ -129,8 +128,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
       .send({
         email: registeredEmail,
         password,
-        firstName: 'New',
-        lastName: 'Account'
+        name: 'New Account'
       })
       .expect(201);
     await settle();

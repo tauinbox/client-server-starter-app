@@ -42,7 +42,7 @@ async function login(email: string): Promise<string> {
 const routes: ReadonlyArray<
   [method: string, path: () => string, body: object]
 > = [
-  ['PATCH', () => '/api/v1/auth/profile', { firstName: 'Jane' }],
+  ['PATCH', () => '/api/v1/auth/profile', { name: 'Jane' }],
   [
     'POST',
     () => '/api/v1/auth/profile/email/initiate',
@@ -58,7 +58,7 @@ const routes: ReadonlyArray<
   [
     'PATCH',
     () => `/api/v1/users/${userId('user@example.com')}`,
-    { firstName: 'Jane' }
+    { name: 'Jane' }
   ]
 ];
 

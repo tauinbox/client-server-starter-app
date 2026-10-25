@@ -316,11 +316,11 @@ describe('applyAbilityToUserQuery', () => {
     applyAbilityToUserQuery(
       qb,
       ability({
-        rules: [{ conditions: { firstName: { [op]: 'M' } } }]
+        rules: [{ conditions: { name: { [op]: 'M' } } }]
       }),
       'search'
     );
-    expect(calls[0].sql).toContain(`user.firstName ${sqlOp} :abFilter_0`);
+    expect(calls[0].sql).toContain(`user.name ${sqlOp} :abFilter_0`);
     expect(calls[0].params).toMatchObject({ abFilter_0: 'M' });
   });
 

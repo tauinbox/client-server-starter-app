@@ -46,8 +46,7 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
     provider: 'vk',
     providerId: `vk-${crypto.randomBytes(6).toString('hex')}`,
     email,
-    firstName: 'Provider',
-    lastName: 'Signup',
+    name: 'Provider Signup',
     emailVerified: false
   });
 
@@ -81,8 +80,7 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
     const owner = await repository.save(
       repository.create({
         email: uniqueEmail('owner'),
-        firstName: 'Pending',
-        lastName: 'Owner',
+        name: 'Pending Owner',
         isEmailVerified: true,
         pendingEmail,
         pendingEmailToken: hashToken(rawToken),

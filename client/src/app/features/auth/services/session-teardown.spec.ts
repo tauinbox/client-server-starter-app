@@ -35,8 +35,7 @@ const ENTITLEMENTS_URL = '/api/v1/billing/entitlements';
 const cachedUser: UserResponse = {
   id: '1',
   email: 'previous@example.com',
-  firstName: 'Previous',
-  lastName: 'User',
+  name: 'Previous User',
   isActive: true,
   roles: [],
   isEmailVerified: true,

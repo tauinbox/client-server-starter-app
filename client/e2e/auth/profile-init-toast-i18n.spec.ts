@@ -25,8 +25,7 @@ test.describe('Profile init notifications wait for their translations', () => {
       createMockUser({
         id: userId,
         email,
-        firstName: 'Pat',
-        lastName: 'Provider',
+        name: 'Pat Provider',
         password: null,
         isActive: true,
         roles: ['user'],

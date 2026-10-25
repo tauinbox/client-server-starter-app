@@ -11,7 +11,6 @@ import { createMockUser } from '../fixtures/mock-data';
 import type { MockUser } from '../fixtures/mock-data';
 
 const baseUser = {
-  lastName: 'Restorable',
   password: 'Password1',
   roles: ['user'],
   isActive: false,
@@ -28,7 +27,7 @@ const deletedUser: MockUser = createMockUser({
   ...baseUser,
   id: mockId('user-900'),
   email: 'deleted.restorable@example.com',
-  firstName: 'Deleted',
+  name: 'Deleted Restorable',
   deletedAt: '2025-02-01T00:00:00.000Z'
 });
 
@@ -36,7 +35,7 @@ const liveUser: MockUser = createMockUser({
   ...baseUser,
   id: mockId('user-901'),
   email: 'live.restorable@example.com',
-  firstName: 'Live',
+  name: 'Live Restorable',
   deletedAt: null
 });
 

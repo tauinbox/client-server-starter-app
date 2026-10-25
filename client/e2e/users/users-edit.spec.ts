@@ -21,8 +21,7 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
-    await expect(page.getByLabel('First name')).toHaveValue('Admin');
-    await expect(page.getByLabel('Last name')).toHaveValue('User');
+    await expect(page.getByLabel('Full name')).toHaveValue('Admin User');
   });
 
   test('should show status checkbox when logged in as admin', async ({
@@ -67,7 +66,7 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${selfId}/edit`);
 
     // The form must render, or a not-found page would pass the check below.
-    await expect(page.getByLabel('First name')).toHaveValue('John');
+    await expect(page.getByLabel('Full name')).toHaveValue('John Doe');
     await expect(
       page.getByRole('button', { name: 'Delete', exact: true })
     ).toBeHidden();
@@ -83,7 +82,7 @@ test.describe('User Edit page', () => {
     await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.goto(`/users/${selfId}/edit`);
 
-    await expect(page.getByLabel('First name')).toHaveValue('John');
+    await expect(page.getByLabel('Full name')).toHaveValue('John Doe');
     await expect(page.getByLabel('Active')).toBeHidden();
     await expect(page.getByRole('textbox', { name: 'Email' })).toBeHidden();
     await expect(page.getByLabel('New password')).toBeHidden();
@@ -94,8 +93,8 @@ test.describe('User Edit page', () => {
       })
     ).toHaveAttribute('href', '/profile');
 
-    await page.getByLabel('First name').fill('Renamed');
-    await page.getByLabel('First name').blur();
+    await page.getByLabel('Full name').fill('Renamed');
+    await page.getByLabel('Full name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
@@ -115,13 +114,13 @@ test.describe('User Edit page', () => {
     await loginViaUi(page, _mockServer.url, {
       id: ownId,
       email: 'owner@example.com',
-      firstName: 'Olivia',
+      name: 'Olivia',
       roles: ['self-editor']
     });
 
     await page.goto(`/users/${ownId}/edit`);
 
-    await expect(page.getByLabel('First name')).toHaveValue('Olivia');
+    await expect(page.getByLabel('Full name')).toHaveValue('Olivia');
     await expect(page).toHaveURL(new RegExp(`/users/${ownId}/edit$`));
   });
 
@@ -134,7 +133,7 @@ test.describe('User Edit page', () => {
     await seedUserRole(_mockServer, 'smith-editor', {
       search: null,
       read: null,
-      update: { fieldMatch: { lastName: ['Smith'] } }
+      update: { fieldMatch: { name: ['John Smith'] } }
     });
     await loginViaUi(page, _mockServer.url, {
       id: mockId('user-scoped'),
@@ -143,7 +142,7 @@ test.describe('User Edit page', () => {
     });
 
     await page.goto(`/users/${mockId('user-3')}/edit`);
-    await expect(page.getByLabel('Last name')).toHaveValue('Smith');
+    await expect(page.getByLabel('Full name')).toHaveValue('John Smith');
     // The editor holds no read:Role, so the form must not ask for the catalog.
     await expectNoSnackbar(page);
 
@@ -178,27 +177,22 @@ test.describe('User Edit page', () => {
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await page.getByLabel('Email').clear();
-    await page.getByLabel('First name').click();
+    await page.getByLabel('Full name').click();
 
     await expect(page.getByText('Email is required')).toBeVisible();
 
-    await page.getByLabel('First name').clear();
-    await page.getByLabel('Last name').click();
-
-    await expect(page.getByText('First name is required')).toBeVisible();
-
-    await page.getByLabel('Last name').clear();
+    await page.getByLabel('Full name').fill('   ');
     await page.getByLabel('Email').click();
 
-    await expect(page.getByText('Last name is required')).toBeVisible();
+    await expect(page.getByText('Full name is required')).toBeVisible();
   });
 
   test('should update user successfully', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
-    await page.getByLabel('First name').fill('Updated');
-    await page.getByLabel('First name').blur();
+    await page.getByLabel('Full name').fill('Updated');
+    await page.getByLabel('Full name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('User updated successfully')).toBeVisible();
@@ -226,8 +220,8 @@ test.describe('User Edit page', () => {
     });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
-    await page.getByLabel('First name').fill('Updated');
-    await page.getByLabel('First name').blur();
+    await page.getByLabel('Full name').fill('Updated');
+    await page.getByLabel('Full name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
@@ -261,7 +255,7 @@ test.describe('User Edit page', () => {
 
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
 
-    await expect(page.getByLabel('Last name')).toHaveValue('Smith');
+    await expect(page.getByLabel('Full name')).toHaveValue('John Smith');
   });
 
   test('should show confirmation dialog when changing email', async ({

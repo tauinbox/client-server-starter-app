@@ -69,8 +69,7 @@ describe('the local common-password check mirrors the server verdict', () => {
   it('refuses a listed password on register with the server envelope', async () => {
     const res = await send('POST', 'auth/register', {
       email: 'common-register@example.com',
-      firstName: 'Common',
-      lastName: 'Register',
+      name: 'Common Register',
       password: COMMON_PASSWORD
     });
 
@@ -82,8 +81,7 @@ describe('the local common-password check mirrors the server verdict', () => {
   it('refuses a password that contains the first name sent with it', async () => {
     const res = await send('POST', 'auth/register', {
       email: 'k.ivanova@example.com',
-      firstName: 'Katerina',
-      lastName: 'Ivanova',
+      name: 'Katerina Ivanova',
       password: 'Katerina-Sunrise-19'
     });
 
@@ -95,8 +93,7 @@ describe('the local common-password check mirrors the server verdict', () => {
     // 'Password1' is in both; the server runs the local check first.
     const res = await send('POST', 'auth/register', {
       email: 'both-lists@example.com',
-      firstName: 'Both',
-      lastName: 'Lists',
+      name: 'Both Lists',
       password: 'Password1'
     });
 
@@ -131,7 +128,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       'PATCH',
       'auth/profile',
       {
-        firstName: 'Anastasia',
+        name: 'Anastasia',
         password: 'Anastasia-Sunrise-19',
         currentPassword: 'Password1'
       },
@@ -140,7 +137,7 @@ describe('the local common-password check mirrors the server verdict', () => {
 
     expect(res.status).toBe(400);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
-    expect(findUserByEmail('user@example.com')?.firstName).toBe('Regular');
+    expect(findUserByEmail('user@example.com')?.name).toBe('Regular User');
   });
 
   it('refuses a listed password on the admin create', async () => {
@@ -151,8 +148,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       'users',
       {
         email: 'common-create@example.com',
-        firstName: 'Common',
-        lastName: 'Create',
+        name: 'Common Create',
         password: COMMON_PASSWORD
       },
       token

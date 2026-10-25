@@ -49,7 +49,7 @@ async function getUsers(
 }
 
 describe('User list/search filter-param validation parity with server', () => {
-  it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
+  it.each(['q', 'email', 'name', 'role'])(
     'rejects an array-valued %s on GET /users/search/cursor with 400',
     async (field) => {
       const token = await loginAsAdmin();
@@ -99,7 +99,7 @@ describe('User list/search filter-param validation parity with server', () => {
     expect(res.status).toBe(400);
   });
 
-  it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
+  it.each(['q', 'email', 'name', 'role'])(
     'rejects an over-long %s on GET /users/search/cursor with 400',
     async (field) => {
       const token = await loginAsAdmin();

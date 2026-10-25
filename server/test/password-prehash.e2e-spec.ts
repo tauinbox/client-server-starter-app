@@ -56,8 +56,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
     const user = await usersService.create(
       {
         email: nextEmail(label),
-        firstName: 'Prehash',
-        lastName: 'Check',
+        name: 'Prehash Check',
         password
       },
       SYSTEM_ABILITY
@@ -129,8 +128,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
     const legacy = await repository.save(
       repository.create({
         email: nextEmail('legacy'),
-        firstName: 'Prehash',
-        lastName: 'Legacy',
+        name: 'Prehash Legacy',
         password: await bcrypt.hash(password, BCRYPT_SALT_ROUNDS),
         isEmailVerified: true
       })
@@ -167,8 +165,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
     const legacy = await repository.save(
       repository.create({
         email: nextEmail('legacy-wrong'),
-        firstName: 'Prehash',
-        lastName: 'Legacy',
+        name: 'Prehash Legacy',
         password: await bcrypt.hash('Quartz-Meadow-77', BCRYPT_SALT_ROUNDS),
         isEmailVerified: true
       })

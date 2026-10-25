@@ -9,8 +9,8 @@ let nextId = 1000;
 
 export function createMockUser(options: MockUserOptions = {}): MockUser {
   const id = options.id ?? mockId(`user-${nextId++}`);
-  const firstName = options.firstName ?? faker.person.firstName();
-  const lastName = options.lastName ?? faker.person.lastName();
+  const firstName = faker.person.firstName();
+  const lastName = faker.person.lastName();
   const now = faker.date.past({ years: 1 }).toISOString();
 
   return {
@@ -20,8 +20,7 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
       faker.internet
         .email({ firstName, lastName, provider: 'example.com' })
         .toLowerCase(),
-    firstName,
-    lastName,
+    name: options.name ?? `${firstName} ${lastName}`,
     // `??` would turn an explicit null into the default, and null is exactly
     // what an account created through a provider holds.
     password: 'password' in options ? (options.password ?? null) : 'Password1',

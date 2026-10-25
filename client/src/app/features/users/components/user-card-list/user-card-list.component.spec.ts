@@ -34,8 +34,7 @@ const adminRole: RoleAdminResponse = {
 const mockUser: User = {
   id: 'test-user-id',
   email: 'test@example.com',
-  firstName: 'Test',
-  lastName: 'User',
+  name: 'Test User',
   roles: [userRole],
   isActive: true,
   isEmailVerified: true,
@@ -52,8 +51,7 @@ const adminUser: User = {
   ...mockUser,
   id: 'admin-user-id',
   email: 'admin@example.com',
-  firstName: 'Admin',
-  lastName: 'Person',
+  name: 'Admin Person',
   roles: [adminRole]
 };
 

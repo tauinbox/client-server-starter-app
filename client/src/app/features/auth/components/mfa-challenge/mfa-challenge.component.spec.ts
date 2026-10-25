@@ -23,8 +23,7 @@ const mockAuthResponse: AuthResponse = {
   user: {
     id: '1',
     email: 'test@example.com',
-    firstName: 'Test',
-    lastName: 'User',
+    name: 'Test User',
     isActive: true,
     roles: [mockUserRole],
     isEmailVerified: true,

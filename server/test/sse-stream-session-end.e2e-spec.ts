@@ -84,8 +84,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
     const user = await repository.save(
       repository.create({
         email,
-        firstName: 'Stream',
-        lastName: 'Session',
+        name: 'Stream Session',
         isEmailVerified: true,
         password: null
       })

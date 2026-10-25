@@ -29,8 +29,7 @@ function createUser(overrides: Partial<User> = {}): User {
   return Object.assign(new User(), {
     id: 'user-1',
     email: 'user@example.com',
-    firstName: 'Jane',
-    lastName: 'Doe',
+    name: 'Jane Doe',
     password: '$2b$10$hashed',
     isActive: true,
     isEmailVerified: true,

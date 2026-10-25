@@ -19,8 +19,7 @@ import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloc
 const user: UserResponse = {
   id: '1',
   email: 'returning@example.com',
-  firstName: 'Returning',
-  lastName: 'Tab',
+  name: 'Returning Tab',
   isActive: true,
   roles: [],
   isEmailVerified: true,

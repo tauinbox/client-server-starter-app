@@ -25,7 +25,7 @@
           <div class="profile-hero">
             <div class="avatar">{{ initials() }}</div>
             <div class="profile-info">
-              <h2 class="profile-name">{{ u.firstName }} {{ u.lastName }}</h2>
+              <h2 class="profile-name">{{ u.name }}</h2>
               <p class="profile-email">{{ u.email }}</p>
               <div class="profile-badges">
                 @if (u.isActive) {
@@ -63,21 +63,12 @@
 
             <mat-card-content>
               <form (submit)="$event.preventDefault(); onSubmit()">
-                <div class="form-name-row">
-                  <nxs-form-field
-                    [field]="profileForm.firstName"
-                    label="auth.profile.firstName"
-                    prefixIcon="person"
-                    autocomplete="given-name"
-                  />
-
-                  <nxs-form-field
-                    [field]="profileForm.lastName"
-                    label="auth.profile.lastName"
-                    prefixIcon="person"
-                    autocomplete="family-name"
-                  />
-                </div>
+                <nxs-form-field
+                  [field]="profileForm.name"
+                  label="auth.profile.name"
+                  prefixIcon="person"
+                  autocomplete="name"
+                />
 
                 <nxs-form-field
                   [field]="profileForm.email"

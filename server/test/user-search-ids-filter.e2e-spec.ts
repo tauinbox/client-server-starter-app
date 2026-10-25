@@ -64,7 +64,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
     for (const email of [adminEmail, ...emails]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Ids', lastName: 'Filter' })
+        .send({ email, password, name: 'Ids Filter' })
         .expect(201);
     }
     for (const email of emails) {

@@ -127,8 +127,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `unclaimed-${stamp}@example.com`,
-        firstName: 'Unclaimed',
-        lastName: 'Payment',
+        name: 'Unclaimed Payment',
         password: 'hashed'
       })
     );

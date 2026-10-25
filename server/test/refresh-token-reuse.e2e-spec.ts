@@ -165,8 +165,7 @@ describe('Refresh token reuse detection (e2e)', () => {
   const userRecord: User = {
     id: 'user-1',
     email: 'alice@example.com',
-    firstName: 'Alice',
-    lastName: 'Doe',
+    name: 'Alice Doe',
     password: 'hash',
     isActive: true,
     isEmailVerified: true,

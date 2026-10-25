@@ -34,8 +34,7 @@ describe('SessionIssuerService', () => {
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     password: '$2b$10$hashedpassword',
     passwordHashVersion: 2,
     hasPassword: true,

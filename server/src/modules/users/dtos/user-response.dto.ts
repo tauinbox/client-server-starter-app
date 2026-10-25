@@ -14,11 +14,8 @@ export class UserResponseDto {
   @ApiProperty({ example: 'user@example.com' })
   email: string;
 
-  @ApiProperty({ example: 'John' })
-  firstName: string;
-
-  @ApiProperty({ example: 'Doe' })
-  lastName: string;
+  @ApiProperty({ example: 'John Doe' })
+  name: string;
 
   @ApiProperty({ example: true })
   isActive: boolean;

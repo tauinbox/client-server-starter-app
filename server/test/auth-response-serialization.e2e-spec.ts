@@ -51,8 +51,7 @@ import { SignInCompletionService } from '../src/modules/auth/services/sign-in-co
 const PUBLIC_USER_FIELDS = [
   'id',
   'email',
-  'firstName',
-  'lastName',
+  'name',
   'isActive',
   'roles',
   'isEmailVerified',
@@ -105,8 +104,7 @@ function createUserEntity(): User {
   return Object.assign(new User(), {
     id: 'user-1',
     email: 'user@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     password: '$2b$10$hashedpassword',
     isActive: true,
     roles: [role],
@@ -138,8 +136,7 @@ const oauthProfile: OAuthUserProfile = {
   provider: 'google',
   providerId: 'google-123',
   email: 'user@example.com',
-  firstName: 'John',
-  lastName: 'Doe',
+  name: 'John Doe',
   emailVerified: true
 };
 

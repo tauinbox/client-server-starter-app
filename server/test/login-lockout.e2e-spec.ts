@@ -34,8 +34,7 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
     const user = await dataSource.getRepository(User).save(
       dataSource.getRepository(User).create({
         email,
-        firstName: 'Lockout',
-        lastName: 'Probe',
+        name: 'Lockout Probe',
         password: null
       })
     );

@@ -212,7 +212,7 @@ describe('RolePermissionsDialogComponent', () => {
       fixture.detectChanges();
 
       expect(host.querySelector('.condition-editor')?.textContent).toContain(
-        'id, email, firstName, lastName, isActive, locale'
+        'id, email, name, isActive, locale'
       );
     });
 

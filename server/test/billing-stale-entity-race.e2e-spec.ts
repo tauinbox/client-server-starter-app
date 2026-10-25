@@ -138,8 +138,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `stale-race-${stamp}@example.com`,
-        firstName: 'Stale',
-        lastName: 'Race',
+        name: 'Stale Race',
         password: 'hashed'
       })
     );

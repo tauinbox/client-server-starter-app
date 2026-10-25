@@ -46,8 +46,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const user = await dataSource.getRepository(User).save(
       dataSource.getRepository(User).create({
         email,
-        firstName: 'Lost',
-        lastName: 'Response',
+        name: 'Lost Response',
         password: null
       })
     );

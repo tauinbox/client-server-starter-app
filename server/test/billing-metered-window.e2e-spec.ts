@@ -237,8 +237,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `metered-window-${stamp}@example.com`,
-        firstName: 'Metered',
-        lastName: 'Window',
+        name: 'Metered Window',
         password: 'hashed'
       })
     );

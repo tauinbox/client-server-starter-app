@@ -71,8 +71,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `refund-race-${stamp}@example.com`,
-        firstName: 'Refund',
-        lastName: 'Race',
+        name: 'Refund Race',
         password: 'hashed'
       })
     );

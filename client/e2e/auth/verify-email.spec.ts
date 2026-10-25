@@ -11,8 +11,7 @@ test.describe('Email verification', () => {
     await page.goto('/register');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('verify-test@example.com');
-    await page.getByLabel('First name').fill('Verify');
-    await page.getByLabel('Last name').fill('Test');
+    await page.getByLabel('Full name').fill('Verify Test');
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -46,8 +45,7 @@ test.describe('Email verification', () => {
       createMockUser({
         id: mockId('user-300'),
         email: 'unverified@example.com',
-        firstName: 'Unverified',
-        lastName: 'User',
+        name: 'Unverified User',
         password: 'Password1',
         isActive: true,
         roles: ['user'],
@@ -85,8 +83,7 @@ test.describe('Email verification', () => {
       createMockUser({
         id: mockId('user-301'),
         email: 'resend@example.com',
-        firstName: 'Resend',
-        lastName: 'User',
+        name: 'Resend User',
         password: 'Password1',
         isActive: true,
         roles: ['user'],
@@ -138,8 +135,7 @@ test.describe('Email verification', () => {
     await page.goto('/register');
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('expired-verify@example.com');
-    await page.getByLabel('First name').fill('Expired');
-    await page.getByLabel('Last name').fill('Verify');
+    await page.getByLabel('Full name').fill('Expired Verify');
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -169,8 +165,7 @@ test.describe('Email verification', () => {
       createMockUser({
         id: mockId('user-302'),
         email: 'verifythenlogin@example.com',
-        firstName: 'Verify',
-        lastName: 'Login',
+        name: 'Verify Login',
         password: 'Password1',
         isActive: true,
         roles: ['user'],

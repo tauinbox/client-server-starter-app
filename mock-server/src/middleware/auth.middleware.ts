@@ -9,7 +9,6 @@ import {
   LOCKOUT_DURATION_MS,
   MAX_EMAIL_LENGTH,
   MAX_FAILED_ATTEMPTS,
-  MAX_NAME_LENGTH,
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   RESET_TOKEN_EXPIRY_MS,
@@ -20,7 +19,9 @@ import isLength from 'validator/lib/isLength';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   emailErrors,
+  nameErrors,
   passwordLengthError,
+  trimName,
   validateLocale,
   validateMaxLength
 } from '../utils/validation';
@@ -80,7 +81,7 @@ import {
 } from '../helpers/reauth.helpers';
 
 /** The own fields of `UpdateProfileDto`, beside the step-up factors. */
-const PROFILE_FIELDS = ['firstName', 'lastName', 'password', 'locale'] as const;
+const PROFILE_FIELDS = ['name', 'password', 'locale'] as const;
 
 function respondLocked(res: Response, lockedUntil: string): void {
   sendWithRetryAfter(
@@ -769,22 +770,6 @@ router.get('/permissions', authGuard, (req, res) => {
   });
 });
 
-/**
- * Mirrors `@ValidateIf(propertyIsDefined) @IsNotEmpty()
- * @MaxLength(MAX_NAME_LENGTH)` on `UpdateProfileDto`. An omitted field is skipped, an explicit null is not.
- * Decorators apply bottom-up, so MaxLength is reported before IsNotEmpty.
- */
-function profileNameErrors(field: string, value: unknown): string[] {
-  if (value === undefined) return [];
-  const errors: string[] = [];
-  const tooLong = validateMaxLength(value, MAX_NAME_LENGTH, field);
-  if (tooLong) errors.push(tooLong);
-  if (value === '' || value === null) {
-    errors.push(`${field} should not be empty`);
-  }
-  return errors;
-}
-
 // PATCH /api/v1/auth/profile
 // The server route carries `@SkipMfaEnrolmentGate()`: an account that owes an
 // enrolment may still set the password that the enrolment step-up needs.
@@ -792,8 +777,8 @@ router.patch(
   '/profile',
   permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
   (req, res) => {
-    const { firstName, lastName, password, currentPassword, code, locale } =
-      req.body;
+    const { password, currentPassword, code, locale } = req.body;
+    const name = trimName(req.body['name']);
     const { user } = req as AuthenticatedRequest;
 
     const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS);
@@ -808,12 +793,9 @@ router.patch(
       return;
     }
 
-    const nameErrors = [
-      ...profileNameErrors('firstName', firstName),
-      ...profileNameErrors('lastName', lastName)
-    ];
-    if (nameErrors.length > 0) {
-      res.status(400).json(validationError(nameErrors));
+    const bodyNameErrors = nameErrors(name);
+    if (bodyNameErrors.length > 0) {
+      res.status(400).json(validationError(bodyNameErrors));
       return;
     }
 
@@ -843,8 +825,7 @@ router.patch(
       // the profile unchanged.
       const passwordRefusal = newPasswordRefusal(password, {
         email: user.email,
-        firstName: firstName ?? user.firstName,
-        lastName: lastName ?? user.lastName
+        name: typeof name === 'string' ? name : user.name
       });
       if (passwordRefusal) {
         res.status(400).json(passwordRefusal);
@@ -853,8 +834,7 @@ router.patch(
     }
 
     const previous = { ...user };
-    if (firstName !== undefined) user.firstName = firstName;
-    if (lastName !== undefined) user.lastName = lastName;
+    if (typeof name === 'string') user.name = name;
     if (locale !== undefined) user.locale = locale as string;
     if (password !== undefined) {
       user.password = password;
@@ -879,10 +859,7 @@ router.patch(
       clearOAuthIntentCookies(res);
     }
     user.updatedAt = new Date().toISOString();
-    if (
-      previous.firstName !== user.firstName ||
-      previous.lastName !== user.lastName
-    ) {
+    if (previous.name !== user.name) {
       pushUserCrudEvent('updated', user.id, previous);
     }
 

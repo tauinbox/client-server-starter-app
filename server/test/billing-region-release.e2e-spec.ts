@@ -133,8 +133,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `region-release-${stamp}@example.com`,
-        firstName: 'Region',
-        lastName: 'Release',
+        name: 'Region Release',
         password: 'hashed'
       })
     );

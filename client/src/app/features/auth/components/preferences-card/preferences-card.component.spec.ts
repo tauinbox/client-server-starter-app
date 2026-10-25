@@ -24,8 +24,7 @@ function buildUser(overrides: Partial<UserResponse> = {}): UserResponse {
   return {
     id: '1',
     email: 'test@example.com',
-    firstName: 'Test',
-    lastName: 'User',
+    name: 'Test User',
     isActive: true,
     roles: [mockRole],
     isEmailVerified: true,

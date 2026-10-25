@@ -133,8 +133,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
             provider: OAuthProvider.GOOGLE,
             providerId: 'google-id-of-the-signer',
             email: 'signer@example.com',
-            firstName: 'Signer',
-            lastName: 'Person',
+            name: 'Signer Person',
             emailVerified: true
           });
         }

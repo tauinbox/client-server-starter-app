@@ -123,8 +123,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `MFA_REQUIRED_FOR_ADMINS` | `false` | Set to `true` to make two-factor authentication mandatory for every account that holds a super role. Such an account signs in and reaches its profile as before, but no route behind an authorization check answers it until the enrolment is complete. The requirement stays off while `MFA_ENCRYPTION_KEY` is empty, because enrolment is unavailable in that state |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server makes the account at startup when it does not exist. It skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
-| `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |
-| `ADMIN_LAST_NAME` | `User` | Last name of the initial administrator |
+| `ADMIN_NAME` | `Admin` | Full name of the initial administrator |
 | `SMTP_HOST` | - | SMTP server host. When it is empty, the server writes each email to the console |
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_SECURE` | - | The value `true` forces implicit TLS. When it is empty, the server uses STARTTLS on port 587 and implicit TLS on port 465. TLS is always necessary |
@@ -2473,8 +2472,8 @@ node dist/server/src/seed-admin.js   # Create admin user if ADMIN_EMAIL set
 exec node dist/server/src/main       # Start NestJS
 ```
 
-The administrator seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
-`ADMIN_FIRST_NAME` and `ADMIN_LAST_NAME` from the environment. It is idempotent: it skips the work
+The administrator seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSWORD` and
+`ADMIN_NAME` from the environment. It is idempotent: it skips the work
 when the user exists, and when `ADMIN_EMAIL` has no value.
 
 **The seeder must never exit non-zero, and `seed-admin.spec.ts` pins that.** The entrypoint runs it
@@ -2700,7 +2699,7 @@ name as the gate. Thus a later reader can go from the code to the configuration 
 |--------|------|------|-------------|
 | POST | `/` | `users:create` | Create a user |
 | GET | `/cursor` | `users:search` | List the users with cursor (keyset) pagination. `includeDeleted=true` adds the soft-deleted rows |
-| GET | `/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids), `isActive`, `isEmailVerified`, `mfaEnabled`, `hasPassword` and `isLocked` (`lockedUntil` later than now). `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. The boolean filters accept `true` or `false` only, and each other value is a 400 |
+| GET | `/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email and name), `email`, `name`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids), `isActive`, `isEmailVerified`, `mfaEnabled`, `hasPassword` and `isLocked` (`lockedUntil` later than now). `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. The boolean filters accept `true` or `false` only, and each other value is a 400 |
 | GET | `/:id` | `users:read` | Get a user by ID |
 | GET | `/:id/permissions` | `users:read` | Get the effective permissions of a user: the roles, the resolved permissions and the packed CASL rules |
 | PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. `isActive` and `unlockAccount` on the caller's own record answer 400 `errors.users.moderationSelf`, before the step-up. `password` and a changed `email` on the caller's own record answer 400 `errors.users.credentialSelf`, before the step-up; the profile flows change them. A password change, a real email move and a deactivation each revoke each session of the target. A real email move also writes a second audit row, `USER_EMAIL_CHANGE_COMPLETE` with `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row records field names only. The server mails the previous address that the account moved, with the new address masked, because this path recovers an account whose old address an attacker can hold. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and a real email move or a deactivation clears the same five fields |

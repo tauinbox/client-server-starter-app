@@ -32,8 +32,7 @@ function generateUsers(): MockUser[] {
     {
       id: mockId('user-1'),
       email: 'admin@example.com',
-      firstName: 'Admin',
-      lastName: 'User',
+      name: 'Admin User',
       password: 'Password1',
       isActive: true,
       roles: ['admin'],
@@ -56,8 +55,7 @@ function generateUsers(): MockUser[] {
     {
       id: mockId('user-2'),
       email: 'user@example.com',
-      firstName: 'Regular',
-      lastName: 'User',
+      name: 'Regular User',
       password: 'Password1',
       isActive: true,
       roles: ['user'],
@@ -80,8 +78,7 @@ function generateUsers(): MockUser[] {
     {
       id: mockId('user-3'),
       email: 'john@example.com',
-      firstName: 'John',
-      lastName: 'Smith',
+      name: 'John Smith',
       password: 'Password1',
       isActive: true,
       roles: ['user'],
@@ -104,8 +101,7 @@ function generateUsers(): MockUser[] {
     {
       id: mockId('user-4'),
       email: 'jane@example.com',
-      firstName: 'Jane',
-      lastName: 'Doe',
+      name: 'Jane Doe',
       password: 'Password1',
       isActive: false,
       roles: ['user'],
@@ -128,8 +124,7 @@ function generateUsers(): MockUser[] {
     {
       id: mockId('user-5'),
       email: 'bob@example.com',
-      firstName: 'Bob',
-      lastName: 'Wilson',
+      name: 'Bob Wilson',
       password: 'Password1',
       isActive: true,
       roles: ['user'],

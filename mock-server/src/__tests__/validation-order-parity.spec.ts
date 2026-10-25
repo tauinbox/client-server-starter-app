@@ -69,7 +69,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({
-        firstName: 'Changed',
+        name: 'Changed',
         email: 'changed@example.com',
         password: INVALID_PASSWORD
       })
@@ -83,11 +83,11 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
       headers: authHeaders(token)
     });
     const user = (await after.json()) as {
-      firstName: string;
+      name: string;
       email: string;
       isEmailVerified: boolean;
     };
-    expect(user.firstName).toBe('John');
+    expect(user.name).toBe('John Smith');
     expect(user.email).toBe('john@example.com');
     expect(user.isEmailVerified).toBe(true);
   });
@@ -101,7 +101,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({
-        firstName: 'Changed',
+        name: 'Changed',
         locale: 'ru',
         password: INVALID_PASSWORD,
         currentPassword: 'Password1'
@@ -116,10 +116,10 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
       headers: authHeaders(token)
     });
     const profile = (await after.json()) as {
-      firstName: string;
+      name: string;
       locale: string;
     };
-    expect(profile.firstName).toBe('Regular');
+    expect(profile.name).toBe('Regular User');
     expect(profile.locale).toBe('en');
   });
 
@@ -153,7 +153,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({
-        firstName: 'Changed',
+        name: 'Changed',
         password: BREACHED_PASSWORD,
         currentPassword: 'Password1'
       })
@@ -170,8 +170,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
     const after = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       headers: authHeaders(token)
     });
-    const user = (await after.json()) as { firstName: string };
-    expect(user.firstName).toBe('John');
+    const user = (await after.json()) as { name: string };
+    expect(user.name).toBe('John Smith');
   });
 
   it('refuses a listed password on the profile update and leaves it untouched', async () => {
@@ -181,7 +181,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({
-        firstName: 'Changed',
+        name: 'Changed',
         password: BREACHED_PASSWORD,
         currentPassword: 'Password1'
       })
@@ -194,8 +194,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
     const after = await fetch(`${baseUrl}/api/v1/auth/profile`, {
       headers: authHeaders(token)
     });
-    const profile = (await after.json()) as { firstName: string };
-    expect(profile.firstName).toBe('Regular');
+    const profile = (await after.json()) as { name: string };
+    expect(profile.name).toBe('Regular User');
   });
 
   it('reports a wrong currentPassword before the blocklist verdict', async () => {
@@ -221,8 +221,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         email: 'admin@example.com',
-        firstName: 'Taken',
-        lastName: 'Address',
+        name: 'Taken Address',
         password: BREACHED_PASSWORD
       })
     });
@@ -255,8 +254,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         email: 'seeded-clean@example.com',
-        firstName: 'Clean',
-        lastName: 'Value',
+        name: 'Clean Value',
         password
       })
     });
@@ -269,8 +267,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         email: 'seeded-breached@example.com',
-        firstName: 'Seeded',
-        lastName: 'Value',
+        name: 'Seeded Value',
         password
       })
     });
@@ -286,8 +283,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         email: 'lowercase-only@example.com',
-        firstName: 'Lower',
-        lastName: 'Case',
+        name: 'Lower Case',
         password: 'kettlesunrise'
       })
     });
@@ -320,7 +316,7 @@ describe('body validation precedes the entity lookup', () => {
       path: `/api/v1/users/${UNKNOWN}`,
       malformed: { password: INVALID_PASSWORD },
       malformedMessage: PASSWORD_LENGTH_ERROR,
-      wellFormed: { firstName: 'Valid' },
+      wellFormed: { name: 'Valid' },
       notFoundKey: ErrorKeys.USERS.NOT_FOUND
     },
     {
@@ -426,12 +422,12 @@ describe('body validation precedes the entity lookup', () => {
     const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
       method: 'PATCH',
       headers: authHeaders(token),
-      body: JSON.stringify({ firstName: 'Renamed' })
+      body: JSON.stringify({ name: 'Renamed' })
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { firstName: string };
-    expect(body.firstName).toBe('Renamed');
+    const body = (await res.json()) as { name: string };
+    expect(body.name).toBe('Renamed');
   });
 });
 

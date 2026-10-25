@@ -38,8 +38,7 @@ function createAuthResponse(): AuthResponse {
     user: {
       id: '1',
       email: 'idle@example.com',
-      firstName: 'Idle',
-      lastName: 'User',
+      name: 'Idle User',
       isActive: true,
       roles: [],
       isEmailVerified: true,

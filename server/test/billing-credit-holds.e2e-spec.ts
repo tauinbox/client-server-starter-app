@@ -130,8 +130,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `credit-holds-${stamp}@example.com`,
-        firstName: 'Credit',
-        lastName: 'Holds',
+        name: 'Credit Holds',
         password: 'hashed'
       })
     );

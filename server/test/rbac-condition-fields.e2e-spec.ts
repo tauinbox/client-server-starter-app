@@ -92,8 +92,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
       users[key] = await userRepository.save(
         userRepository.create({
           email: emails[key],
-          firstName: 'Cond',
-          lastName: key === 'target' ? 'Typo' : 'Actor',
+          name: key === 'target' ? 'Typo' : 'Cond Actor',
           isEmailVerified: true,
           password: null
         })
@@ -150,7 +149,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
   });
 
   it('turns a stored deny on a misspelt field into a blanket deny', async () => {
-    await storeRows([{ effect: 'deny', fieldMatch: { lastname: ['Typo'] } }]);
+    await storeRows([{ effect: 'deny', fieldMatch: { Name: ['Typo'] } }]);
     const allowRole = await roleService.create(
       { name: `${tag}-allow` },
       SYSTEM_ABILITY
@@ -169,9 +168,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
     try {
       expect(await canReadTarget()).toBe(false);
 
-      await storeRows([
-        { effect: 'deny', fieldMatch: { lastName: ['Other'] } }
-      ]);
+      await storeRows([{ effect: 'deny', fieldMatch: { name: ['Other'] } }]);
       expect(await canReadTarget()).toBe(true);
     } finally {
       await dataSource.getRepository(Role).delete({ id: allowRole.id });

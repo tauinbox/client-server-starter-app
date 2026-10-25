@@ -85,8 +85,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     const user = await repo.save(
       repo.create({
         email: nextEmail('owner'),
-        firstName: 'Proof',
-        lastName: 'Owner',
+        name: 'Proof Owner',
         password: null,
         isEmailVerified: false,
         ...fields
@@ -220,8 +219,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
       provider: 'google',
       providerId,
       email: user.email,
-      firstName: 'Proof',
-      lastName: 'Owner',
+      name: 'Proof Owner',
       emailVerified: true
     });
 

@@ -55,8 +55,7 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
     const user = await dataSource.getRepository(User).save(
       dataSource.getRepository(User).create({
         email,
-        firstName: 'Rotation',
-        lastName: 'Race',
+        name: 'Rotation Race',
         password: null
       })
     );

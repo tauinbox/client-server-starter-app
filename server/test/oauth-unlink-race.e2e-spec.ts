@@ -32,8 +32,8 @@ runWithInfra('OAuth unlink concurrency (e2e)', () => {
   async function seedPasswordlessUser(providers: string[]): Promise<string> {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const [{ id }] = await ds.query<Array<{ id: string }>>(
-      `INSERT INTO users (email, "firstName", "lastName", password)
-       VALUES ($1, 'Race', 'Unlink', NULL) RETURNING id`,
+      `INSERT INTO users (email, "name", password)
+       VALUES ($1, 'Race Unlink', NULL) RETURNING id`,
       [`oauth-race-${stamp}@example.com`]
     );
     userId = id;

@@ -3,8 +3,7 @@
 // cannot carry.
 export const ALLOWED_USER_SORT_COLUMNS = [
   'email',
-  'firstName',
-  'lastName',
+  'name',
   'isActive',
   'createdAt'
 ] as const;

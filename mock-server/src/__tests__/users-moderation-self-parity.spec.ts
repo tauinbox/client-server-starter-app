@@ -85,10 +85,10 @@ describe('PATCH /api/v1/users/:id moderation of the own record', () => {
     const token = await login('user@example.com');
     const owner = findUserByEmail('user@example.com')!;
 
-    const res = await patchUser(token, owner.id, { firstName: 'Renamed' });
+    const res = await patchUser(token, owner.id, { name: 'Renamed' });
 
     expect(res.status).toBe(200);
-    expect(owner.firstName).toBe('Renamed');
+    expect(owner.name).toBe('Renamed');
   });
 
   it('refuses an administrator on the own record too', async () => {

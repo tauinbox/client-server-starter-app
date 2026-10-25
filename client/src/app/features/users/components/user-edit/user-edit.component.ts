@@ -64,21 +64,20 @@ import {
 } from '@app/shared/constants';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { requiredNotBlank } from '@shared/forms/required-not-blank';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import type { MfaResetDialogData } from '../mfa-reset-dialog/mfa-reset-dialog.component';
 import { MfaResetDialogComponent } from '../mfa-reset-dialog/mfa-reset-dialog.component';
 
 type UserFormData = {
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   password: string;
 };
 
 const INITIAL_USER_FORM: UserFormData = {
   email: '',
-  firstName: '',
-  lastName: '',
+  name: '',
   password: ''
 };
 
@@ -148,8 +147,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   readonly userForm = form(this.userModel, (path) => {
     required(path.email, { message: 'users.edit.emailRequired' });
     email(path.email, { message: 'users.edit.emailInvalid' });
-    required(path.firstName, { message: 'users.edit.firstNameRequired' });
-    required(path.lastName, { message: 'users.edit.lastNameRequired' });
+    requiredNotBlank(path.name, { message: 'users.edit.nameRequired' });
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'users.edit.passwordMinLength'
     });
@@ -163,8 +161,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
     const initial = this.#initialFormData();
     return (
       current.email !== initial.email ||
-      current.firstName !== initial.firstName ||
-      current.lastName !== initial.lastName ||
+      current.name !== initial.name ||
       current.password !== initial.password
     );
   });
@@ -345,8 +342,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
           const formData: UserFormData = {
             email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
+            name: user.name,
             password: ''
           };
           this.userModel.set(formData);
@@ -399,8 +395,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
         message: this.#translocoService.translate(
           'users.edit.confirmEmailChangeMessage',
           {
-            firstName: u.firstName,
-            lastName: u.lastName,
+            name: u.name,
             newEmail
           }
         ),
@@ -482,12 +477,8 @@ export class UserEditComponent implements OnInit, OnDestroy {
   }
 
   #prepareUpdateData(): UpdateUser {
-    const { email: emailVal, firstName, lastName, password } = this.userModel();
-    const updateData: UpdateUser = {
-      email: emailVal,
-      firstName,
-      lastName
-    };
+    const { email: emailVal, name, password } = this.userModel();
+    const updateData: UpdateUser = { email: emailVal, name };
 
     if (password?.trim()) {
       updateData.password = password;
@@ -542,7 +533,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
         ),
         message: this.#translocoService.translate(
           'users.edit.confirmRevokeSessionsMessage',
-          { firstName: u.firstName, lastName: u.lastName }
+          { name: u.name }
         ),
         confirmButton: this.#translocoService.translate(
           'users.edit.confirmRevokeSessionsButton'
@@ -609,8 +600,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
         message: this.#translocoService.translate(
           'users.edit.confirmDeleteMessage',
           {
-            firstName: this.user()!.firstName,
-            lastName: this.user()!.lastName
+            name: this.user()!.name
           }
         ),
         confirmButton: this.#translocoService.translate('common.delete'),

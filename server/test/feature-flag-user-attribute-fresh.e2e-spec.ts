@@ -43,8 +43,7 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
     const user = await userRepository.save(
       userRepository.create({
         email: `holder@${domainA}`,
-        firstName: 'Flag',
-        lastName: 'Holder',
+        name: 'Flag Holder',
         isEmailVerified: true,
         password: null
       })

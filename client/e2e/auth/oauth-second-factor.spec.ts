@@ -30,8 +30,7 @@ async function arriveAtCallback(
     createMockUser({
       id: USER_ID,
       email: 'oauth-factor@example.com',
-      firstName: 'Oauth',
-      lastName: 'Factor',
+      name: 'Oauth Factor',
       password: null,
       roles: ['user'],
       isEmailVerified: true,

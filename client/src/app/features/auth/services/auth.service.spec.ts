@@ -51,8 +51,7 @@ function createMockAuthResponse(): AuthResponse {
     user: {
       id: '1',
       email: 'test@example.com',
-      firstName: 'Test',
-      lastName: 'User',
+      name: 'Test User',
       isActive: true,
       roles: [mockUserRole],
       isEmailVerified: true,
@@ -364,8 +363,7 @@ describe('AuthService', () => {
     it('should POST registration data without captchaToken when not provided', async () => {
       const registerData = {
         email: 'new@example.com',
-        firstName: 'New',
-        lastName: 'User',
+        name: 'New User',
         password: 'password123'
       };
       const mockUser = createMockAuthResponse().user;
@@ -385,8 +383,7 @@ describe('AuthService', () => {
     it('should include captchaToken in body when provided', async () => {
       const registerData = {
         email: 'new@example.com',
-        firstName: 'New',
-        lastName: 'User',
+        name: 'New User',
         password: 'password123'
       };
       const mockUser = createMockAuthResponse().user;
@@ -791,7 +788,7 @@ describe('AuthService', () => {
       [
         'updateProfile',
         AuthApiEnum.Profile,
-        () => service.updateProfile({ firstName: 'A' })
+        () => service.updateProfile({ name: 'A' })
       ],
       [
         'exchangeOAuthData',

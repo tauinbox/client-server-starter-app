@@ -32,8 +32,7 @@ function createMockUser(): UserResponse {
   return {
     id: '1',
     email: 'test@example.com',
-    firstName: 'Test',
-    lastName: 'User',
+    name: 'Test User',
     isActive: true,
     roles: [mockUserRole],
     isEmailVerified: true,
@@ -194,7 +193,7 @@ describe('AuthStore', () => {
       store.saveAuthResponse(createMockAuthResponse());
       storageMock.setItem.mockClear();
 
-      const updatedUser = { ...createMockUser(), firstName: 'Updated' };
+      const updatedUser = { ...createMockUser(), name: 'Updated' };
       store.updateCurrentUser(updatedUser);
 
       expect(store.user()).toEqual(updatedUser);

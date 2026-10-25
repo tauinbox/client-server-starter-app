@@ -78,8 +78,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
       .send({
         email: adminEmail,
         password,
-        firstName: 'Rule',
-        lastName: 'Shape'
+        name: 'Rule Shape'
       })
       .expect(201);
     const superRole = await dataSource

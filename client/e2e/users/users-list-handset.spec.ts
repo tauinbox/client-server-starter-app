@@ -59,8 +59,7 @@ test.describe('User List page — handset layout', () => {
     const knownUser = {
       id: mockId('user-1'),
       email: 'admin@example.com',
-      firstName: 'Admin',
-      lastName: 'User',
+      name: 'Admin User',
       isActive: true,
       roles: ['admin'],
       isEmailVerified: true,
@@ -116,8 +115,7 @@ test.describe('User List page — handset layout', () => {
       {
         id: mockId('user-10'),
         email: 'claire.kerluke-shields@example.com',
-        firstName: 'Claire',
-        lastName: 'Kerluke-Shields-Williamson',
+        name: 'Claire Kerluke-Shields-Williamson',
         isActive: true,
         roles: ['user'],
         isEmailVerified: true,
@@ -129,8 +127,7 @@ test.describe('User List page — handset layout', () => {
       {
         id: mockId('user-11'),
         email: 'angel.runolfsdottir.with.a.really.long.address@example.com',
-        firstName: 'Angel',
-        lastName: 'Runolfsdottir-Hermiston',
+        name: 'Angel Runolfsdottir-Hermiston',
         isActive: true,
         roles: ['user'],
         isEmailVerified: true,
@@ -200,8 +197,7 @@ test.describe('User List page — handset layout', () => {
     const knownUser = {
       id: mockId('user-3'),
       email: 'john@example.com',
-      firstName: 'John',
-      lastName: 'Smith',
+      name: 'John Smith',
       isActive: true,
       roles: ['user'],
       isEmailVerified: true,
@@ -233,7 +229,7 @@ test.describe('User List page — handset layout', () => {
 
     await card.locator('button.user-card-menu-trigger').click();
     // The delete menu item's accessible name comes from its aria-label,
-    // which resolves to "Delete <firstName> <lastName>".
+    // which resolves to "Delete <name>".
     await page
       .getByRole('menu')
       .getByRole('menuitem', { name: 'Delete John Smith' })

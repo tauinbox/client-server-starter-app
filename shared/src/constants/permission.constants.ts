@@ -27,7 +27,7 @@ export const CASL_RESERVED_SUBJECT_NAMES: readonly string[] = ['all'];
  * `<>` and `NOT IN` drop NULL rows that the in-memory check keeps.
  */
 export const ABILITY_FILTER_FIELDS = {
-  User: ['id', 'email', 'firstName', 'lastName', 'isActive'],
+  User: ['id', 'email', 'name', 'isActive'],
   FeatureFlag: ['id', 'key', 'enabled', 'public']
 } as const satisfies Record<string, readonly string[]>;
 

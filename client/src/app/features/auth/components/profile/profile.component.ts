@@ -67,6 +67,7 @@ import {
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { requiredNotBlank } from '@shared/forms/required-not-blank';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import {
   isAdminRole,
@@ -84,8 +85,7 @@ import {
 
 type ProfileData = {
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   currentPassword: string;
   code: string;
   password: string;
@@ -151,8 +151,7 @@ function isPendingReauth(value: unknown): value is PendingReauth {
 
 const INITIAL_PROFILE: ProfileData = {
   email: '',
-  firstName: '',
-  lastName: '',
+  name: '',
   currentPassword: '',
   code: '',
   password: '',
@@ -217,7 +216,13 @@ export class ProfileComponent implements OnInit {
   readonly initials = computed(() => {
     const u = this.user();
     if (!u) return '';
-    return `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase();
+    return u.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word.charAt(0))
+      .join('')
+      .toUpperCase();
   });
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
@@ -232,12 +237,7 @@ export class ProfileComponent implements OnInit {
   readonly profileForm = form(this.profileModel, (path) => {
     required(path.email, { message: 'auth.profile.emailRequired' });
     emailValidator(path.email, { message: 'auth.profile.emailInvalid' });
-    required(path.firstName, {
-      message: 'auth.profile.firstNameRequired'
-    });
-    required(path.lastName, {
-      message: 'auth.profile.lastNameRequired'
-    });
+    requiredNotBlank(path.name, { message: 'auth.profile.nameRequired' });
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.profile.passwordMinLength'
     });
@@ -636,8 +636,7 @@ export class ProfileComponent implements OnInit {
           this.profileModel.set({
             ...INITIAL_PROFILE,
             email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName
+            name: user.name
           });
           this.loading.set(false);
           this.profileForm().reset();
@@ -867,15 +866,13 @@ export class ProfileComponent implements OnInit {
   #startReauthForPasswordSet(): void {
     const values = this.profileModel();
     const u = this.user();
-    const nameChanged =
-      !u || values.firstName !== u.firstName || values.lastName !== u.lastName;
+    const nameChanged = !u || values.name !== u.name;
 
     const trip$ = this.#reauthTrip(
       { operation: STEP_UP_OPERATION.PASSWORD_SET },
       nameChanged
         ? this.#saveBeforeLeaving({
-            firstName: values.firstName,
-            lastName: values.lastName
+            name: values.name
           })
         : EMPTY
     );
@@ -913,14 +910,12 @@ export class ProfileComponent implements OnInit {
   ): UpdateProfile | null {
     const u = this.user();
     const passwordChanged = !!values.password.trim();
-    const nameChanged =
-      !u || values.firstName !== u.firstName || values.lastName !== u.lastName;
+    const nameChanged = !u || values.name !== u.name;
 
     if (emailChanging && !nameChanged && !passwordChanged) return null;
 
     const updateData: UpdateProfile = {
-      firstName: values.firstName,
-      lastName: values.lastName
+      name: values.name
     };
 
     if (passwordChanged) {
@@ -972,8 +967,7 @@ export class ProfileComponent implements OnInit {
     this.profileModel.set({
       ...INITIAL_PROFILE,
       email: current.email,
-      firstName: current.firstName,
-      lastName: current.lastName
+      name: current.name
     });
     this.profileForm().reset();
   }

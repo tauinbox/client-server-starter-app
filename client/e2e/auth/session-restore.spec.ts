@@ -4,6 +4,7 @@ import {
   createValidJwt,
   defaultUser,
   expect,
+  loginViaUi,
   test
 } from '../fixtures/base.fixture';
 
@@ -75,6 +76,33 @@ test.describe('Session restoration with expired access token', () => {
 
     // Verify the refresh-token request was actually made
     expect(refreshTokenCalled).toBe(true);
+  });
+
+  // A tab that was open across the release of the single name field holds a
+  // user of the old shape. The store refuses it, so the reload is an
+  // anonymous bootstrap: the user signs in once more, and nothing breaks.
+  test('asks for a new sign-in when the stored user has the old name fields', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url);
+    await page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('auth_user') ?? '{}') as {
+        name?: string;
+      };
+      const { name: _name, ...rest } = stored;
+      localStorage.setItem(
+        'auth_user',
+        JSON.stringify({ ...rest, firstName: 'John', lastName: 'Doe' })
+      );
+    });
+
+    await page.reload();
+
+    await expect(page).toHaveURL(/.*\/login/);
+    await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
+
+    await loginViaUi(page, _mockServer.url);
   });
 
   test('should redirect to login when refresh token is also invalid', async ({

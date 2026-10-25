@@ -78,7 +78,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     for (const email of [adminEmail, ownerEmail, otherEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Step', lastName: 'Up' })
+        .send({ email, password, name: 'Step Up' })
         .expect(201);
     }
 
@@ -253,7 +253,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     for (const body of [
       { password: newPassword, currentPassword: password },
       { email: movedEmail },
-      { email: movedEmail, firstName: 'Moved' }
+      { email: movedEmail, name: 'Moved' }
     ]) {
       const refused = await patch(token, id, body);
       expect(refused.status).toBe(400);
@@ -266,7 +266,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       .getRepository(User)
       .findOneOrFail({ where: { id } });
     expect(row.email).toBe(ownerEmail);
-    expect(row.firstName).not.toBe('Moved');
+    expect(row.name).not.toBe('Moved');
     expect(await holdsPassword(id, password)).toBe(true);
     expect(await stepUpFailures(ownerEmail)).toBe(failuresBefore);
   }, 30000);
@@ -275,12 +275,13 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const id = await userId(ownerEmail);
     const token = await tokenFor(ownerEmail);
 
-    await patch(token, id, { firstName: 'Renamed' }).expect(200);
-    await patch(token, id, { email: ownerEmail, lastName: 'Kept' }).expect(200);
+    await patch(token, id, { name: 'Renamed' }).expect(200);
+    expect((await usersService.findOne(id, SYSTEM_ABILITY)).name).toBe(
+      'Renamed'
+    );
 
-    const row = await usersService.findOne(id, SYSTEM_ABILITY);
-    expect(row.firstName).toBe('Renamed');
-    expect(row.lastName).toBe('Kept');
+    await patch(token, id, { email: ownerEmail, name: 'Kept' }).expect(200);
+    expect((await usersService.findOne(id, SYSTEM_ABILITY)).name).toBe('Kept');
   }, 30000);
 
   it('answers 403 for another record before it reads a factor', async () => {

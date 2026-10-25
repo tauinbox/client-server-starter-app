@@ -82,8 +82,7 @@ describe('SSE user_crud_events scoping', () => {
       },
       body: JSON.stringify({
         email: 'sse-created@example.com',
-        firstName: 'Sse',
-        lastName: 'Created',
+        name: 'Sse Created',
         password: 'Sunrise-Kettle-19'
       })
     });
@@ -129,7 +128,7 @@ describe('SSE user_crud_events scoping', () => {
           authorization: `Bearer ${adminToken}`,
           'content-type': 'application/json'
         },
-        body: JSON.stringify({ firstName: 'Changed' })
+        body: JSON.stringify({ name: 'Changed' })
       });
     expect((await patch(other.id)).status).toBe(200);
     expect((await patch(viewer.id)).status).toBe(200);
@@ -177,8 +176,7 @@ describe('SSE user_crud_events scoping', () => {
       },
       body: JSON.stringify({
         email: 'sse-leaves@example.com',
-        firstName: 'Sse',
-        lastName: 'Leaves',
+        name: 'Sse Leaves',
         password: 'Sunrise-Kettle-19'
       })
     });

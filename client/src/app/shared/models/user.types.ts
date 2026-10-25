@@ -15,14 +15,11 @@ export type User = AdminUserResponse;
 /** The search, the filters and the `params` of the shared user list. */
 export type UserSearch = UserListFilters;
 
-export type CreateUser = Pick<User, 'email' | 'firstName' | 'lastName'> & {
+export type CreateUser = Pick<User, 'email' | 'name'> & {
   password: string;
 };
 
-export type UpdateUser = Pick<
-  Partial<User>,
-  'email' | 'firstName' | 'lastName' | 'isActive'
-> & {
+export type UpdateUser = Pick<Partial<User>, 'email' | 'name' | 'isActive'> & {
   password?: string;
   unlockAccount?: boolean;
   /** Step-up factor of the caller, sent with a password or email change. */

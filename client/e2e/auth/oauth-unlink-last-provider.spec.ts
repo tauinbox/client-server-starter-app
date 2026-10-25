@@ -27,8 +27,7 @@ test.describe('OAuth — unlink last provider safety', () => {
       createMockUser({
         id: userId,
         email,
-        firstName: 'John',
-        lastName: 'Doe',
+        name: 'John Doe',
         // Null, not empty: this is what an account created through a
         // provider actually holds, and the guard reads it that way.
         password: null,

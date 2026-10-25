@@ -9,8 +9,7 @@ test.describe('Register page', () => {
 
     const main = page.getByRole('main');
     await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('First name')).toBeVisible();
-    await expect(page.getByLabel('Last name')).toBeVisible();
+    await expect(page.getByLabel('Full name')).toBeVisible();
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
     await expect(main.getByRole('button', { name: 'Register' })).toBeVisible();
   });
@@ -33,8 +32,7 @@ test.describe('Register page', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('not-an-email');
-    await page.getByLabel('First name').fill('John');
-    await page.getByLabel('Last name').fill('Doe');
+    await page.getByLabel('Full name').fill('John Doe');
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -50,8 +48,7 @@ test.describe('Register page', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
-    await page.getByLabel('First name').fill('John');
-    await page.getByLabel('Last name').fill('Doe');
+    await page.getByLabel('Full name').fill('John Doe');
     await page.getByLabel('Password', { exact: true }).fill('short');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
@@ -66,10 +63,8 @@ test.describe('Register page', () => {
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByLabel('First name').fill('John');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Doe');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('John Doe');
+    await page.getByLabel('Full name').blur();
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -85,16 +80,28 @@ test.describe('Register page', () => {
 
     // Touch fields by focusing and blurring
     await page.getByLabel('Email').click();
-    await page.getByLabel('First name').click();
-    await page.getByLabel('Last name').click();
+    await page.getByLabel('Full name').click();
     await page.getByLabel('Password', { exact: true }).click();
     // Blur last field
     await page.getByLabel('Email').click();
 
     await expect(page.getByText('Email is required')).toBeVisible();
-    await expect(page.getByText('First name is required')).toBeVisible();
-    await expect(page.getByText('Last name is required')).toBeVisible();
+    await expect(page.getByText('Full name is required')).toBeVisible();
     await expect(page.getByText('Password is required')).toBeVisible();
+  });
+
+  test('should refuse a name of spaces only', async ({ _mockServer, page }) => {
+    await page.goto('/register');
+
+    const main = page.getByRole('main');
+    await page.getByLabel('Email').fill('test@example.com');
+    await page.getByLabel('Full name').fill('   ');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
+
+    await expect(page.getByText('Full name is required')).toBeVisible();
+    await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
 
   test('should show email validation error for invalid email', async ({
@@ -104,7 +111,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     await page.getByLabel('Email').fill('invalid-email');
-    await page.getByLabel('First name').click();
+    await page.getByLabel('Full name').click();
 
     await expect(
       page.getByText('Please enter a valid email address')
@@ -133,8 +140,7 @@ test.describe('Register page', () => {
 
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('newuser@example.com');
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('Last name').fill('Smith');
+    await page.getByLabel('Full name').fill('Jane Smith');
     await page.getByLabel('Password', { exact: true }).fill('passwordonly');
 
     await expect(page.getByText(/Longer is stronger/i)).toBeVisible();
@@ -170,10 +176,8 @@ test.describe('Register page', () => {
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('newuser@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Smith');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('Jane Smith');
+    await page.getByLabel('Full name').blur();
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -195,10 +199,8 @@ test.describe('Register page', () => {
     // admin@example.com exists in seed data
     await page.getByLabel('Email').fill('admin@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByLabel('First name').fill('John');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Doe');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('John Doe');
+    await page.getByLabel('Full name').blur();
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -229,10 +231,8 @@ test.describe('Register page', () => {
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByLabel('First name').fill('John');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Doe');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('John Doe');
+    await page.getByLabel('Full name').blur();
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
@@ -282,10 +282,8 @@ test.describe('Register page', () => {
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('breached@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Smith');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('Jane Smith');
+    await page.getByLabel('Full name').blur();
     await page.getByLabel('Password', { exact: true }).fill(breached);
     await main.getByRole('button', { name: 'Register' }).click();
 
@@ -306,10 +304,8 @@ test.describe('Register page', () => {
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('common@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Smith');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('Jane Smith');
+    await page.getByLabel('Full name').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 

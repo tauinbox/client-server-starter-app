@@ -38,8 +38,7 @@ function buildSeedUser(): User {
   const u = new User();
   u.id = 'user-1';
   u.email = 'before@example.com';
-  u.firstName = 'Before';
-  u.lastName = 'User';
+  u.name = 'Before User';
   u.password = '$2b$10$hash';
   u.isActive = true;
   u.isEmailVerified = true;
@@ -177,7 +176,7 @@ describe('UsersService.update — email change side effects', () => {
       'user-1',
       {
         email: 'before@example.com',
-        firstName: 'Updated'
+        name: 'Updated'
       },
       SYSTEM_ABILITY
     );
@@ -442,7 +441,7 @@ describe('Admin email change - session revocation through the real event bus', (
   it('writes no email-change row when the submitted email is unchanged', async () => {
     await controller.update(
       'user-1',
-      { email: 'before@example.com', firstName: 'Updated' },
+      { email: 'before@example.com', name: 'Updated' },
       adminRequest,
       ability
     );
@@ -458,7 +457,7 @@ describe('Admin email change - session revocation through the real event bus', (
   it('leaves sessions alone when the submitted email is unchanged', async () => {
     await controller.update(
       'user-1',
-      { email: 'before@example.com', firstName: 'Updated' },
+      { email: 'before@example.com', name: 'Updated' },
       adminRequest,
       ability
     );

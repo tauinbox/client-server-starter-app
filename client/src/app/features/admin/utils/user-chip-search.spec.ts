@@ -20,8 +20,7 @@ function makeUser(overrides: Partial<User> = {}): User {
   return {
     id: 'u-1',
     email: 'ada@example.com',
-    firstName: 'Ada',
-    lastName: 'Lovelace',
+    name: 'Ada Lovelace',
     isActive: true,
     roles: [],
     isEmailVerified: true,
@@ -60,7 +59,7 @@ describe('userToChip', () => {
   });
 
   it('falls back to the email when the user has no name', () => {
-    const chip = userToChip(makeUser({ firstName: '', lastName: '' }));
+    const chip = userToChip(makeUser({ name: '' }));
     expect(chip.label).toBe('ada@example.com');
   });
 });

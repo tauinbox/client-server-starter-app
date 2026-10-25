@@ -10,8 +10,7 @@ const TARGET_EMAIL = 'john@example.com';
 const enrolledTarget = createMockUser({
   id: TARGET_ID,
   email: TARGET_EMAIL,
-  firstName: 'John',
-  lastName: 'Smith',
+  name: 'John Smith',
   password: PASSWORD,
   roles: ['user'],
   isActive: true,

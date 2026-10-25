@@ -68,7 +68,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     for (const email of [adminEmail, targetEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Audit', lastName: 'Fields' })
+        .send({ email, password, name: 'Audit Fields' })
         .expect(201);
     }
     const superRole = await dataSource
@@ -207,21 +207,20 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     ).toEqual(['description']);
   });
 
-  it('user: a resubmit logs [] and a name edit logs ["firstName"]', async () => {
+  it('user: a resubmit logs [] and a name edit logs ["name"]', async () => {
     const id = await userId(targetEmail);
     const form = {
       email: targetEmail,
-      firstName: 'Audit',
-      lastName: 'Fields',
+      name: 'Audit Fields',
       isActive: true
     };
 
     await patch(`users/${id}`, form);
     expect(await lastChangedFields(AuditAction.USER_UPDATE, id)).toEqual([]);
 
-    await patch(`users/${id}`, { ...form, firstName: 'Renamed' });
+    await patch(`users/${id}`, { ...form, name: 'Renamed' });
     expect(await lastChangedFields(AuditAction.USER_UPDATE, id)).toEqual([
-      'firstName'
+      'name'
     ]);
   });
 });

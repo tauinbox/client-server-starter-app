@@ -12,28 +12,23 @@ import {
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
+import { Transform } from 'class-transformer';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 import { StepUpFactorsDto } from './step-up-factors.dto';
 
 /** The step-up factors are read only when the body sets a password. */
 export class UpdateProfileDto extends StepUpFactorsDto {
   @ApiPropertyOptional({
-    description: 'The first name of the user',
-    example: 'John'
+    description: 'The full name of the user, in the order the user writes it',
+    example: 'John Doe'
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value
+  )
   @ValidateIf(propertyIsDefined)
   @IsNotEmpty()
   @MaxLength(MAX_NAME_LENGTH)
-  firstName?: string;
-
-  @ApiPropertyOptional({
-    description: 'The last name of the user',
-    example: 'Doe'
-  })
-  @ValidateIf(propertyIsDefined)
-  @IsNotEmpty()
-  @MaxLength(MAX_NAME_LENGTH)
-  lastName?: string;
+  name?: string;
 
   @ApiPropertyOptional({
     description:

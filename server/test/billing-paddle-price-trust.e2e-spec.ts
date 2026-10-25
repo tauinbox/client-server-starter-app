@@ -127,8 +127,7 @@ runWithInfra(
       const user = await ds.getRepository(User).save(
         ds.getRepository(User).create({
           email: `price-trust-${stamp}@example.com`,
-          firstName: 'Price',
-          lastName: 'Trust',
+          name: 'Price Trust',
           password: 'hashed'
         })
       );

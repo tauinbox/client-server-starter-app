@@ -23,8 +23,7 @@ const mockUserRole: RoleAdminResponse = {
 const mockUser: User = {
   id: 'user-1',
   email: 'test@example.com',
-  firstName: 'Test',
-  lastName: 'User',
+  name: 'Test User',
   roles: [mockUserRole],
   isActive: true,
   isEmailVerified: true,
@@ -186,8 +185,8 @@ describe('UsersStore', () => {
   });
 
   describe('applyUserEvent', () => {
-    const alice: User = { ...mockUser, id: 'alice', firstName: 'Alice' };
-    const bob: User = { ...mockUser, id: 'bob', firstName: 'Bob' };
+    const alice: User = { ...mockUser, id: 'alice', name: 'Alice' };
+    const bob: User = { ...mockUser, id: 'bob', name: 'Bob' };
     const event = (
       action: 'created' | 'updated' | 'deleted' | 'restored',
       userId: string
@@ -215,13 +214,13 @@ describe('UsersStore', () => {
 
     it('updates a loaded row in place and keeps the other pages and the cursor', () => {
       userServiceMock.getListRow.mockReturnValue(
-        of({ ...bob, firstName: 'Robert' })
+        of({ ...bob, name: 'Robert' })
       );
 
       store.applyUserEvent(event('updated', 'bob'));
 
       expect(userServiceMock.getListRow).toHaveBeenCalledWith('bob');
-      expect(store.entities().map((user) => user.firstName)).toEqual([
+      expect(store.entities().map((user) => user.name)).toEqual([
         'Alice',
         'Robert'
       ]);
@@ -303,10 +302,10 @@ describe('UsersStore', () => {
 
       store.applyUserEvent(event('updated', 'alice'));
       store.applyUserEvent(event('updated', 'alice'));
-      second.next({ ...alice, firstName: 'New' });
-      first.next({ ...alice, firstName: 'Old' });
+      second.next({ ...alice, name: 'New' });
+      first.next({ ...alice, name: 'Old' });
 
-      expect(store.entityMap()['alice']?.firstName).toBe('New');
+      expect(store.entityMap()['alice']?.name).toBe('New');
     });
 
     it('does not bring back a row that a reload dropped while the read ran', async () => {
@@ -317,7 +316,7 @@ describe('UsersStore', () => {
       store.applyUserEvent(event('updated', 'alice'));
       store.load();
       await settled();
-      read.next({ ...alice, firstName: 'Late' });
+      read.next({ ...alice, name: 'Late' });
 
       expect(store.entities().map((user) => user.id)).toEqual(['bob']);
     });

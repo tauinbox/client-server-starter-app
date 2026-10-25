@@ -21,8 +21,7 @@ const RECONNECT_DELAY_MS = 5_000;
 const user: UserResponse = {
   id: '1',
   email: 'stream@example.com',
-  firstName: 'Stream',
-  lastName: 'Tab',
+  name: 'Stream Tab',
   isActive: true,
   roles: [],
   isEmailVerified: true,

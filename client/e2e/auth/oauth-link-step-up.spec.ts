@@ -28,8 +28,7 @@ test.describe('Linking a provider demands a step-up', () => {
       createMockUser({
         id: providerUserId,
         email: providerEmail,
-        firstName: 'Sam',
-        lastName: 'Provider',
+        name: 'Sam Provider',
         password: null,
         isActive: true,
         roles: ['user'],

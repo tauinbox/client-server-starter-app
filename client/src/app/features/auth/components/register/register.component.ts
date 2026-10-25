@@ -20,6 +20,7 @@ import {
   required
 } from '@angular/forms/signals';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { requiredNotBlank } from '@shared/forms/required-not-blank';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
@@ -40,8 +41,7 @@ import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
 type RegisterData = {
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   password: string;
 };
 
@@ -81,16 +81,14 @@ export class RegisterComponent {
 
   readonly registerModel = signal<RegisterData>({
     email: '',
-    firstName: '',
-    lastName: '',
+    name: '',
     password: ''
   });
 
   readonly registerForm = form(this.registerModel, (path) => {
     required(path.email, { message: 'auth.register.emailRequired' });
     emailValidator(path.email, { message: 'auth.register.emailInvalid' });
-    required(path.firstName, { message: 'auth.register.firstNameRequired' });
-    required(path.lastName, { message: 'auth.register.lastNameRequired' });
+    requiredNotBlank(path.name, { message: 'auth.register.nameRequired' });
     required(path.password, { message: 'auth.register.passwordRequired' });
     minLength(path.password, MIN_PASSWORD_LENGTH, {
       message: 'auth.register.passwordMinLength'

@@ -22,8 +22,7 @@ test.describe('OAuth-only account changes its email', () => {
       createMockUser({
         id: userId,
         email,
-        firstName: 'Pat',
-        lastName: 'Provider',
+        name: 'Pat Provider',
         password: null,
         isActive: true,
         roles: ['user'],

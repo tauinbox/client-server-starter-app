@@ -22,13 +22,7 @@ import { DataSource } from 'typeorm';
 
 dotenv.config();
 
-const SUPPORTED_USER_FIELDS = new Set([
-  'id',
-  'email',
-  'firstName',
-  'lastName',
-  'isActive'
-]);
+const SUPPORTED_USER_FIELDS = new Set(['id', 'email', 'name', 'isActive']);
 
 const SUPPORTED_COMPARISON_OPS = new Set([
   '$eq',
@@ -251,7 +245,7 @@ async function main(): Promise<void> {
   console.error(
     'These rules were being mistranslated by the pre-fix translator (silently over-sharing).\n' +
       'Either rewrite them using only supported operators ($eq/$ne/$in/$nin/$gt/$gte/$lt/$lte/$and/$or/$nor/$not)\n' +
-      'against the user fields { id, email, firstName, lastName, isActive }, or accept that\n' +
+      'against the user fields { id, email, name, isActive }, or accept that\n' +
       'they will become deny-all under the fix.'
   );
   process.exit(1);

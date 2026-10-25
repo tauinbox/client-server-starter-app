@@ -41,7 +41,7 @@ test.describe('A refused request shows one error message', () => {
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Current password').fill('WrongPass1');
     await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
-    await page.getByLabel('First name').click();
+    await page.getByLabel('Full name').click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.locator('.error-message')).toHaveText(

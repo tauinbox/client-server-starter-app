@@ -54,7 +54,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     return build();
   };
 
-  const patch = (dto: { isActive?: boolean; firstName?: string }) =>
+  const patch = (dto: { isActive?: boolean; name?: string }) =>
     usersController.update(
       userId,
       dto,
@@ -109,8 +109,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     const user = await repository.save(
       repository.create({
         email,
-        firstName: 'Deactivation',
-        lastName: 'Sessions',
+        name: 'Deactivation Sessions',
         isEmailVerified: true,
         password: null
       })
@@ -173,7 +172,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
   it('keeps the session when the update does not deactivate', async () => {
     const raw = await seedSession();
 
-    await patch({ firstName: 'Renamed' });
+    await patch({ name: 'Renamed' });
     await patch({ isActive: true });
 
     expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(

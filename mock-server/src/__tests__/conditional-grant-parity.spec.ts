@@ -224,7 +224,7 @@ describe('conditional update checks the record after the write', () => {
 
   beforeEach(() => {
     grant([
-      ['users', 'update', { fieldMatch: { lastName: ['Smith'] } }],
+      ['users', 'update', { fieldMatch: { name: ['John Smith'] } }],
       ['roles', 'update', { fieldMatch: { name: ['scoped'] } }],
       [
         'permissions',
@@ -236,9 +236,9 @@ describe('conditional update checks the record after the write', () => {
 
   it('refuses a user write that leaves the condition', async () => {
     const path = `/users/${johnId()}`;
-    expect((await call('PATCH', path, { lastName: 'Moved' })).status).toBe(403);
-    expect(getState().users.get(johnId())?.lastName).toBe('Smith');
-    expect((await call('PATCH', path, { firstName: 'Jon' })).status).toBe(200);
+    expect((await call('PATCH', path, { name: 'Moved' })).status).toBe(403);
+    expect(getState().users.get(johnId())?.name).toBe('John Smith');
+    expect((await call('PATCH', path, { locale: 'ru' })).status).toBe(200);
   });
 
   it('refuses a role write that leaves the condition', async () => {

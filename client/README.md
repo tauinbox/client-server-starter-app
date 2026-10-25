@@ -1169,8 +1169,8 @@ axe rule `aria-progressbar-name` requires a name for it. Use `[attr.aria-label]=
 - a conditional `update:User` grant decides on the loaded record, not on the id in the URL
   (`users/users-edit.spec.ts`). An ownership grant admits the owner of the record on
   `/users/<own-id>/edit`, and the seeded `user` role, which cannot read another record, goes to
-  `/forbidden`. A `fieldMatch` grant on `lastName` opens the form of a Smith record and sends a
-  Doe record back to its detail page with the notice "You cannot edit this user"
+  `/forbidden`. A `fieldMatch` grant on `name` opens the form of the John Smith record and sends
+  the Jane Doe record back to its detail page with the notice "You cannot edit this user"
 - an administrator resets the two-factor enrolment of an enrolled user from the edit page, with
   the administrator's own password in the dialog, and that user then signs in with the password
   alone; a wrong password leaves the factor on (`users/users-mfa-reset.spec.ts`)

@@ -21,8 +21,7 @@ test.describe('OAuth-only account sets its first password', () => {
       createMockUser({
         id: userId,
         email,
-        firstName: 'Robin',
-        lastName: 'Provider',
+        name: 'Robin Provider',
         password: null,
         isActive: true,
         roles: ['user'],

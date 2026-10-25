@@ -46,8 +46,7 @@ describe('SearchUsersCursorQueryDto filters', () => {
       validate({
         q: 'ann',
         email: 'ann@example.com',
-        firstName: 'Ann',
-        lastName: 'Lee',
+        name: 'Ann Lee',
         role: 'admin',
         isActive: 'true',
         includeDeleted: 'false'
@@ -55,15 +54,14 @@ describe('SearchUsersCursorQueryDto filters', () => {
     ).resolves.toMatchObject({
       q: 'ann',
       email: 'ann@example.com',
-      firstName: 'Ann',
-      lastName: 'Lee',
+      name: 'Ann Lee',
       role: 'admin',
       isActive: true,
       includeDeleted: false
     });
   });
 
-  it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
+  it.each(['q', 'email', 'name', 'role'])(
     'rejects a %s longer than the cap',
     async (field) => {
       const message = await expectMessage({
@@ -76,7 +74,7 @@ describe('SearchUsersCursorQueryDto filters', () => {
     }
   );
 
-  it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
+  it.each(['q', 'email', 'name', 'role'])(
     'accepts a %s exactly at the cap',
     async (field) => {
       await expect(
@@ -205,7 +203,7 @@ describe('SearchUsersCursorQueryDto filters', () => {
     ]);
   });
 
-  it.each(['q', 'email', 'firstName', 'lastName', 'role'])(
+  it.each(['q', 'email', 'name', 'role'])(
     'rejects an array-valued %s',
     async (field) => {
       const message = await expectMessage({ [field]: ['a', 'b'] });

@@ -143,8 +143,7 @@ describe('AuthService', () => {
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     password: '$2b$10$hashedpassword',
     passwordHashVersion: 2,
     hasPassword: true,
@@ -912,8 +911,7 @@ describe('AuthService', () => {
     const registerDto = {
       email: 'new@example.com',
       password: 'Password1',
-      firstName: 'Jane',
-      lastName: 'Doe'
+      name: 'Jane Doe'
     };
 
     const savedUser = { ...mockUser, ...registerDto, id: 'new-user-1' };
@@ -988,8 +986,7 @@ describe('AuthService', () => {
         'kettlesunrise',
         expect.objectContaining({
           email: registerDto.email,
-          firstName: registerDto.firstName,
-          lastName: registerDto.lastName
+          name: registerDto.name
         })
       );
     });

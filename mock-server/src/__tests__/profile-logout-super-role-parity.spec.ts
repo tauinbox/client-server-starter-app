@@ -87,44 +87,38 @@ const SESSION_BOUND_COOKIES = [
 ];
 
 describe('PATCH /auth/profile', () => {
-  it('rejects an empty first name', async () => {
+  it.each(['', '   '])('rejects the name %j', async (name) => {
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'PATCH', '/auth/profile', { firstName: '' });
+    const res = await send(token, 'PATCH', '/auth/profile', { name });
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
-    expect(body.errors).toEqual(['firstName should not be empty']);
+    expect(body.errors).toEqual(['name should not be empty']);
   });
 
-  it('reports both name fields, and both rules for an explicit null', async () => {
+  it('reports both rules for an explicit null', async () => {
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'PATCH', '/auth/profile', {
-      firstName: null,
-      lastName: ''
-    });
+    const res = await send(token, 'PATCH', '/auth/profile', { name: null });
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
     expect(body.errors).toEqual([
-      'firstName must be shorter than or equal to 255 characters',
-      'firstName should not be empty',
-      'lastName should not be empty'
+      'name must be shorter than or equal to 255 characters',
+      'name should not be empty'
     ]);
   });
 
-  it('keeps an accepted name edit working', async () => {
+  it('keeps an accepted name edit working, trimmed', async () => {
     const token = await login(USER_EMAIL);
 
     const res = await send(token, 'PATCH', '/auth/profile', {
-      firstName: 'Renamed'
+      name: '  Renamed  '
     });
 
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { firstName: string }).firstName).toBe(
-      'Renamed'
-    );
+    expect(((await res.json()) as { name: string }).name).toBe('Renamed');
   });
 
   it('refuses a caller without update:Profile', async () => {
@@ -142,7 +136,7 @@ describe('PATCH /auth/profile', () => {
     const token = await login(USER_EMAIL);
 
     const res = await send(token, 'PATCH', '/auth/profile', {
-      firstName: 'Renamed'
+      name: 'Renamed'
     });
 
     expect(res.status).toBe(403);

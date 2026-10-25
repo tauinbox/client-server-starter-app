@@ -76,8 +76,7 @@ runWithInfra(
         .send({
           email: actorEmail,
           password,
-          firstName: 'Post',
-          lastName: 'Actor'
+          name: 'Post Actor'
         })
         .expect(201);
       await request(http())
@@ -85,8 +84,7 @@ runWithInfra(
         .send({
           email: targetEmail,
           password,
-          firstName: 'Post',
-          lastName: 'Alpha'
+          name: 'Alpha'
         })
         .expect(201);
 
@@ -123,7 +121,7 @@ runWithInfra(
         [
           {
             permissionId: permissionId('User'),
-            conditions: { fieldMatch: { lastName: ['Alpha'] } }
+            conditions: { fieldMatch: { name: ['Alpha'] } }
           },
           {
             permissionId: permissionId('Role'),
@@ -197,25 +195,22 @@ runWithInfra(
       it('refuses a write that moves the user out of the scope', async () => {
         const id = await userId(targetEmail);
 
-        const res = await patch(`users/${id}`, { lastName: 'Beta' });
+        const res = await patch(`users/${id}`, { name: 'Beta' });
 
         expect(res.status).toBe(403);
         const row = await dataSource
           .getRepository(User)
           .findOneOrFail({ where: { id } });
-        expect(row.lastName).toBe('Alpha');
+        expect(row.name).toBe('Alpha');
       }, 30000);
 
       it('allows a write that keeps the user in the scope', async () => {
         const id = await userId(targetEmail);
 
-        const res = await patch(`users/${id}`, {
-          firstName: 'Renamed',
-          lastName: 'Alpha'
-        });
+        const res = await patch(`users/${id}`, { name: 'Alpha', locale: 'ru' });
 
         expect(res.status).toBe(200);
-        expect((res.body as { firstName: string }).firstName).toBe('Renamed');
+        expect((res.body as { locale: string }).locale).toBe('ru');
       }, 30000);
     });
 

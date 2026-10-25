@@ -16,7 +16,7 @@
 
   @if (authStore.isAuthenticated()) {
     <button matButton="text" [matMenuTriggerFor]="menu">
-      {{ authStore.user()?.firstName }} {{ authStore.user()?.lastName }}
+      {{ authStore.user()?.name }}
       <mat-icon aria-hidden="true">expand_more</mat-icon>
     </button>
     <mat-menu #menu="matMenu">

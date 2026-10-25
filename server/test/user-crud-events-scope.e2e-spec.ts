@@ -100,8 +100,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       users[key] = await repository.save(
         repository.create({
           email: emails[key],
-          firstName: 'Crud',
-          lastName: key,
+          name: `Crud ${key}`,
           isEmailVerified: true,
           password: null
         })
@@ -281,7 +280,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
 
     await usersController.update(
       other,
-      { firstName: 'Changed' },
+      { name: 'Changed' },
       adminRequest(),
       superAbility()
     );
@@ -289,7 +288,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     await usersController.restore(other, adminRequest(), superAbility());
     await usersController.update(
       own,
-      { firstName: 'Own' },
+      { name: 'Own' },
       adminRequest(),
       superAbility()
     );
@@ -321,7 +320,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     );
     await usersController.update(
       other,
-      { firstName: 'Inactive' },
+      { name: 'Inactive' },
       adminRequest(),
       superAbility()
     );
@@ -358,7 +357,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
 
     await usersController.update(
       users.scoped.id,
-      { firstName: 'Again' },
+      { name: 'Again' },
       adminRequest(),
       superAbility()
     );

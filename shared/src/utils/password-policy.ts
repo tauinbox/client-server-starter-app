@@ -7,8 +7,7 @@ import { COMMON_PASSWORDS } from '../data/common-passwords';
 /** The caller's own fields that a password must not contain. */
 export interface PasswordContext {
   email?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
+  name?: string | null;
 }
 
 export type LocalPasswordRefusal = 'common' | 'context';
@@ -28,8 +27,7 @@ function contextWords(context: PasswordContext): string[] {
   return [
     ...PASSWORD_PRODUCT_WORDS,
     ...wordsOf(localPart),
-    ...wordsOf(context.firstName),
-    ...wordsOf(context.lastName)
+    ...wordsOf(context.name)
   ].filter((word) => word.length >= MIN_PASSWORD_CONTEXT_WORD_LENGTH);
 }
 

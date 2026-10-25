@@ -43,21 +43,12 @@
             </div>
           }
 
-          <div class="form-name-row">
-            <nxs-form-field
-              [field]="userForm.firstName"
-              label="users.edit.firstName"
-              prefixIcon="person"
-              autocomplete="off"
-            />
-
-            <nxs-form-field
-              [field]="userForm.lastName"
-              label="users.edit.lastName"
-              prefixIcon="person"
-              autocomplete="off"
-            />
-          </div>
+          <nxs-form-field
+            [field]="userForm.name"
+            label="users.edit.name"
+            prefixIcon="person"
+            autocomplete="off"
+          />
 
           @if (canChangeCredentials()) {
             <nxs-form-field

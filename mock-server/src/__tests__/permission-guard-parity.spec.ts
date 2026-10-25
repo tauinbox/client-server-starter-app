@@ -136,7 +136,7 @@ describe('permission-based route authorization', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ firstName: 'Renamed' })
+        body: JSON.stringify({ name: 'Renamed' })
       });
       expect(patch.status).toBe(403);
       expect(await readMessage(patch)).toBe('Insufficient permissions');
@@ -282,8 +282,7 @@ describe('permission-based route authorization', () => {
 
       const allowed = await send(token, 'POST', '/api/v1/users', {
         email: 'allowed@example.com',
-        firstName: 'Ada',
-        lastName: 'Lovelace',
+        name: 'Ada Lovelace',
         password: UNBREACHED_PASSWORD,
         locale: 'ru'
       });
@@ -292,8 +291,7 @@ describe('permission-based route authorization', () => {
       await expectRefused(
         await send(token, 'POST', '/api/v1/users', {
           email: 'refused@example.com',
-          firstName: 'Ada',
-          lastName: 'Lovelace',
+          name: 'Ada Lovelace',
           password: UNBREACHED_PASSWORD,
           locale: 'en'
         })
@@ -310,7 +308,7 @@ describe('permission-based route authorization', () => {
 
       const res = await send(token, 'POST', '/api/v1/users', {
         email: 'refused@example.com',
-        firstName: 'Ada',
+        name: '   ',
         password: UNBREACHED_PASSWORD,
         locale: 'en'
       });
@@ -329,8 +327,7 @@ describe('permission-based route authorization', () => {
       await expectRefused(
         await send(token, 'POST', '/api/v1/users', {
           email: 'refused@example.com',
-          firstName: 'Ada',
-          lastName: 'Lovelace',
+          name: 'Ada Lovelace',
           password: 'Password1',
           locale: 'en'
         })
@@ -349,13 +346,13 @@ describe('permission-based route authorization', () => {
         token,
         'PATCH',
         `/api/v1/users/${REGULAR_ID}`,
-        { firstName: 'Renamed' }
+        { name: 'Renamed' }
       );
       expect(allowed.status).toBe(200);
 
       await expectRefused(
         await send(token, 'PATCH', `/api/v1/users/${ADMIN_ID}`, {
-          firstName: 'Renamed'
+          name: 'Renamed'
         })
       );
     });

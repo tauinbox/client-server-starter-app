@@ -146,7 +146,7 @@ describe('a password change voids the mailed proofs', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${accessToken}`
       },
-      body: JSON.stringify({ firstName: 'Renamed' })
+      body: JSON.stringify({ name: 'Renamed' })
     });
     expect(res.status).toBe(200);
 

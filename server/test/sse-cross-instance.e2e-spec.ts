@@ -74,8 +74,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
       repository.save(
         repository.create({
           email,
-          firstName: 'Cross',
-          lastName: 'Instance',
+          name: 'Cross Instance',
           isEmailVerified: true,
           password: null
         })

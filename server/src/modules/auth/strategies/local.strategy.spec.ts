@@ -12,8 +12,7 @@ describe('LocalStrategy', () => {
   const mockUser: Partial<UserResponseDto> = {
     id: 'user-1',
     email: 'test@example.com',
-    firstName: 'Test',
-    lastName: 'User'
+    name: 'Test User'
   };
 
   beforeEach(async () => {

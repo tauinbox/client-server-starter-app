@@ -228,7 +228,7 @@ export class UserListComponent implements OnInit {
         ),
         message: this.#translocoService.translate(
           'users.list.confirmDeleteMessage',
-          { firstName: user.firstName, lastName: user.lastName }
+          { name: user.name }
         ),
         confirmButton: this.#translocoService.translate('common.delete'),
         cancelButton: this.#translocoService.translate('common.cancel')
@@ -249,7 +249,7 @@ export class UserListComponent implements OnInit {
         ),
         message: this.#translocoService.translate(
           'users.list.confirmRestoreMessage',
-          { firstName: user.firstName, lastName: user.lastName }
+          { name: user.name }
         ),
         confirmButton: this.#translocoService.translate(
           'users.list.actionRestore'

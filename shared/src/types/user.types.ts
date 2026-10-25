@@ -3,8 +3,7 @@ import { RoleResponse, RoleAdminResponse } from './role.types';
 export type UserResponse = {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   isActive: boolean;
   roles: RoleResponse[];
   isEmailVerified: boolean;

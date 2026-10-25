@@ -145,21 +145,20 @@ describe('audit changedFields parity', () => {
     ]);
   });
 
-  it('user: a resubmit logs [] and a name edit logs ["firstName"]', async () => {
+  it('user: a resubmit logs [] and a name edit logs ["name"]', async () => {
     const id = mockId('user-3');
     const user = getState().users.get(id)!;
     const form = {
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      name: user.name,
       isActive: user.isActive
     };
 
     await send('PATCH', `users/${id}`, form, 200);
     expect(lastChangedFields('USER_UPDATE', id)).toEqual([]);
 
-    await send('PATCH', `users/${id}`, { ...form, firstName: 'Renamed' }, 200);
-    expect(lastChangedFields('USER_UPDATE', id)).toEqual(['firstName']);
+    await send('PATCH', `users/${id}`, { ...form, name: 'Renamed' }, 200);
+    expect(lastChangedFields('USER_UPDATE', id)).toEqual(['name']);
   });
 
   it('user: unlockAccount is listed only for a locked account', async () => {

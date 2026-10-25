@@ -8,6 +8,7 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { CookieStateStore } from '../utils/cookie-state-store';
+import { oauthProfileName } from '../utils/oauth-profile-name';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -34,6 +35,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     profile: {
       id: string;
       emails?: { value: string; verified?: boolean }[];
+      displayName?: string;
       name?: { givenName?: string; familyName?: string };
     },
     done: VerifyCallback
@@ -43,8 +45,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       provider: OAuthProvider.GOOGLE,
       providerId: profile.id,
       email: normalizeEmail(primaryEmail?.value) ?? '',
-      firstName: profile.name?.givenName || '',
-      lastName: profile.name?.familyName || '',
+      name: oauthProfileName(profile),
       emailVerified: primaryEmail?.verified === true
     };
 

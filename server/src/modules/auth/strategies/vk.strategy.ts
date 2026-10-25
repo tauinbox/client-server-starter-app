@@ -9,6 +9,7 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { CookieStateStore } from '../utils/cookie-state-store';
+import { oauthProfileName } from '../utils/oauth-profile-name';
 
 /**
  * passport-vkontakte hands its options to passport-oauth2, but its published
@@ -56,8 +57,9 @@ export class VkStrategy extends PassportStrategy(Strategy, 'vkontakte') {
       provider: OAuthProvider.VK,
       providerId: String(profile.id),
       email: normalizeEmail(params.email) ?? '',
-      firstName: profile.name?.givenName || '',
-      lastName: profile.name?.familyName || '',
+      // Not the displayName: passport-vkontakte builds it as
+      // `first_name + ' ' + last_name`, which reads "undefined" for a missing part.
+      name: oauthProfileName({ name: profile.name }),
       // VK OAuth does not expose an email-verification flag.
       emailVerified: false
     };

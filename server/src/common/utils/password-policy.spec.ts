@@ -7,8 +7,7 @@ import {
 
 const CONTEXT = {
   email: 'john.smith@example.com',
-  firstName: 'Martina',
-  lastName: 'Rossi'
+  name: 'Martina Rossi'
 };
 
 describe('localPasswordRefusal', () => {
@@ -44,7 +43,7 @@ describe('localPasswordRefusal', () => {
       expect(localPasswordRefusal('Kettle-John-19', CONTEXT)).toBe('context');
     });
 
-    it('refuses the first and the last name, case-insensitively', () => {
+    it('refuses each word of the name, case-insensitively', () => {
       expect(localPasswordRefusal('Kettle-MARTINA-19', CONTEXT)).toBe(
         'context'
       );
@@ -53,13 +52,13 @@ describe('localPasswordRefusal', () => {
 
     it('refuses a Cyrillic name', () => {
       expect(
-        localPasswordRefusal('Чайник-Мартина-19', { firstName: 'Мартина' })
+        localPasswordRefusal('Чайник-Мартина-19', { name: 'Мартина' })
       ).toBe('context');
     });
 
     it('ignores a context word shorter than four characters', () => {
       expect(
-        localPasswordRefusal('Kettle-Ann-Sunrise', { firstName: 'Ann' })
+        localPasswordRefusal('Kettle-Ann-Sunrise', { name: 'Ann' })
       ).toBeNull();
     });
 
@@ -80,8 +79,7 @@ describe('localPasswordRefusal', () => {
     expect(
       localPasswordRefusal('Sunrise-Kettle-19', {
         email: null,
-        firstName: null,
-        lastName: null
+        name: null
       })
     ).toBeNull();
   });

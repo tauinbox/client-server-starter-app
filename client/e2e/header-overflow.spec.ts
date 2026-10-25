@@ -56,8 +56,7 @@ test.describe('Header — handset overflow regression (BKL-032)', () => {
       // element on the authenticated header. Pre-fix, "Admin User" alone
       // pushed scrollWidth to 336 at 320×568.
       await loginViaUi(page, _mockServer.url, {
-        firstName: 'Александр',
-        lastName: 'Тупавов'
+        name: 'Александр Тупавов'
       });
       await expect(page.locator('mat-toolbar')).toBeVisible();
 

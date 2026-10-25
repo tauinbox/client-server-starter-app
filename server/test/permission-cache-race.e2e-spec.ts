@@ -107,8 +107,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     holder = await userRepository.save(
       userRepository.create({
         email,
-        firstName: 'Cache',
-        lastName: 'Race',
+        name: 'Cache Race',
         isEmailVerified: true,
         password: null
       })

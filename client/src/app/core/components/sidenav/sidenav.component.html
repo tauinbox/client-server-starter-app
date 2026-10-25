@@ -37,10 +37,7 @@
       >
         <mat-icon aria-hidden="true">account_circle</mat-icon>
         @if (sidenavState.isWide()) {
-          <span
-            >{{ authStore.user()?.firstName }}
-            {{ authStore.user()?.lastName }}</span
-          >
+          <span>{{ authStore.user()?.name }}</span>
         }
       </a>
     </div>

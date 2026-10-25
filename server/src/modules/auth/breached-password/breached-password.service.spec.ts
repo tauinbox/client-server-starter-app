@@ -189,8 +189,7 @@ describe('BreachedPasswordService', () => {
       await expect(
         service.assertNotBreached('Sunrise-Martina-19', {
           email: 'm.rossi@example.com',
-          firstName: 'Martina',
-          lastName: 'Rossi'
+          name: 'Martina Rossi'
         })
       ).rejects.toMatchObject({
         status: 400,
@@ -204,8 +203,7 @@ describe('BreachedPasswordService', () => {
 
       await service.assertNotBreached('Sunrise-Kettle-19', {
         email: 'm.rossi@example.com',
-        firstName: 'Martina',
-        lastName: 'Rossi'
+        name: 'Martina Rossi'
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
