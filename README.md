@@ -1505,14 +1505,18 @@ configuration.
 
 **How `scripts/sync-prod-env.sh` operates.** The deploy workflow exports the managed keys as
 environment variables, from `${{ secrets.* }}`. Then it runs the script from the checkout root on the
-VPS. For each managed key the script calls an `upsert KEY VALUE FILE` helper. That helper does three
+VPS. For each managed key the script calls an `upsert KEY VALUE FILE` helper. That helper does four
 things:
 
 1. **It skips an empty value.** If the secret is unset or empty, the key on disk stays exactly as it
    is. For that reason it is safe to add a new managed key before its secret exists.
 2. **It replaces the line or appends it.** It removes an existing `KEY=` line and writes a new
    `KEY=value` line. Thus there is never a duplicate line, and the value updates in place.
-3. **It writes atomically.** It builds a temporary file and moves it over the target. Thus a crash in
+3. **It escapes each `$` as `$$`.** Docker Compose interpolates both `server/.env` (an `env_file`)
+   and the root `.env`, so an unescaped `$` starts a variable reference and the container gets the
+   value cut at that point. Compose reads `$$` back as one `$`. `--self-test` checks this rule, and
+   the `Server – Checks` CI job runs it.
+4. **It writes atomically.** It builds a temporary file and moves it over the target. Thus a crash in
    the middle of a write cannot leave a half-written env file.
 
 The script targets `server/.env` for each managed key. It also mirrors `DB_PASSWORD` into the root
