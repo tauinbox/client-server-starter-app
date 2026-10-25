@@ -75,8 +75,8 @@ runWithInfra('One linked identity per provider (e2e)', () => {
   beforeEach(async () => {
     stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const [{ id }] = await ds.query<Array<{ id: string }>>(
-      `INSERT INTO users (email, "firstName", "lastName", password)
-       VALUES ($1, 'Link', 'Twice', 'hashed') RETURNING id`,
+      `INSERT INTO users (email, "name", password)
+       VALUES ($1, 'Link Twice', 'hashed') RETURNING id`,
       [`oauth-one-per-provider-${stamp}@example.com`]
     );
     userId = id;

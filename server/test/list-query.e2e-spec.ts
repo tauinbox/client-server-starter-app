@@ -98,7 +98,7 @@ runWithInfra('List search and filters (e2e)', () => {
   async function register(email: string): Promise<void> {
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password, firstName: 'List', lastName: 'Query' })
+      .send({ email, password, name: 'List Query' })
       .expect(201);
   }
 

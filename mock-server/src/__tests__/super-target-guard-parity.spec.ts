@@ -153,20 +153,20 @@ describe('user writes on a super target parity', () => {
     const token = await login('admin@example.com');
     const target = findUserByEmail('admin@example.com')!;
 
-    const res = await call(token, 'PATCH', target.id, { firstName: 'Renamed' });
+    const res = await call(token, 'PATCH', target.id, { name: 'Renamed' });
 
     expect(res.status).toBe(200);
-    expect(target.firstName).toBe('Renamed');
+    expect(target.name).toBe('Renamed');
   });
 
   it('lets the delegated role change an ordinary account', async () => {
     const token = await login('user@example.com');
     const target = findUserByEmail('user@example.com')!;
 
-    const res = await call(token, 'PATCH', target.id, { firstName: 'Renamed' });
+    const res = await call(token, 'PATCH', target.id, { name: 'Renamed' });
 
     expect(res.status).toBe(200);
-    expect(target.firstName).toBe('Renamed');
+    expect(target.name).toBe('Renamed');
   });
 
   it('refuses a role assignment on a super account by a delegated role', async () => {

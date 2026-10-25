@@ -44,8 +44,7 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
     provider: 'google',
     providerId,
     email: `oauth-mfa-${providerId}@example.com`,
-    firstName: 'Oauth',
-    lastName: 'Factor',
+    name: 'Oauth Factor',
     emailVerified: true
   });
 
@@ -121,8 +120,8 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     providerId = `google-${stamp}`;
     const [{ id }] = await ds.query<Array<{ id: string }>>(
-      `INSERT INTO users (email, "firstName", "lastName", password, is_email_verified)
-       VALUES ($1, 'Oauth', 'Factor', NULL, true) RETURNING id`,
+      `INSERT INTO users (email, "name", password, is_email_verified)
+       VALUES ($1, 'Oauth Factor', NULL, true) RETURNING id`,
       [`oauth-mfa-${stamp}@example.com`]
     );
     userId = id;

@@ -41,8 +41,7 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
 
   const VALID_USER = {
     email: 'user@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     password: 'Password123'
   };
 
@@ -88,12 +87,9 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
   });
 
   describe('UpdateProfileDto', () => {
-    it.each(['firstName', 'lastName', 'locale'])(
-      'rejects a null %s',
-      async (field) => {
-        await expectRejected(UpdateProfileDto, { [field]: null });
-      }
-    );
+    it.each(['name', 'locale'])('rejects a null %s', async (field) => {
+      await expectRejected(UpdateProfileDto, { [field]: null });
+    });
 
     // A null password passed validation, then skipped the controller's
     // verifyCurrentPassword branch: the column was nulled with a 200 and no
@@ -108,8 +104,8 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
 
     it('still accepts a partial update', async () => {
       await expect(
-        validate(UpdateProfileDto, { firstName: 'Jane' })
-      ).resolves.toEqual({ firstName: 'Jane' });
+        validate(UpdateProfileDto, { name: 'Jane' })
+      ).resolves.toEqual({ name: 'Jane' });
     });
   });
 
@@ -128,8 +124,7 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
   describe('UpdateUserDto', () => {
     it.each([
       'email',
-      'firstName',
-      'lastName',
+      'name',
       'password',
       'locale',
       'isActive',
@@ -151,13 +146,7 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
       ) as string[] | undefined;
 
       expect(metadata).toEqual(
-        expect.arrayContaining([
-          ':email',
-          ':firstName',
-          ':lastName',
-          ':password',
-          ':locale'
-        ])
+        expect.arrayContaining([':email', ':name', ':password', ':locale'])
       );
     });
   });

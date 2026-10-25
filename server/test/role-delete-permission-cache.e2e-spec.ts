@@ -48,8 +48,7 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
     holder = await userRepository.save(
       userRepository.create({
         email,
-        firstName: 'Role',
-        lastName: 'Holder',
+        name: 'Role Holder',
         isEmailVerified: true,
         password: null
       })

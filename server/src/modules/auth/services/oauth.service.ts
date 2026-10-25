@@ -152,8 +152,7 @@ export class OAuthService {
           try {
             newUser = await manager.save(User, {
               email,
-              firstName: profile.firstName,
-              lastName: profile.lastName,
+              name: profile.name || email.split('@')[0],
               password: null,
               isEmailVerified,
               emailVerificationToken: verification?.hashedToken ?? null,

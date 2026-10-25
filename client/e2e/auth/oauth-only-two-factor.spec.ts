@@ -26,8 +26,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
       createMockUser({
         id: userId,
         email,
-        firstName: 'Sam',
-        lastName: 'Provider',
+        name: 'Sam Provider',
         password: null,
         isActive: true,
         roles: ['user'],

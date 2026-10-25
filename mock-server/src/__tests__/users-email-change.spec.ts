@@ -148,7 +148,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${adminToken}`
       },
-      body: JSON.stringify({ email: 'john@example.com', firstName: 'Johnny' })
+      body: JSON.stringify({ email: 'john@example.com', name: 'Johnny' })
     });
     expect(res.status).toBe(200);
 
@@ -167,7 +167,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ email: 'john@example.com', firstName: 'Johnny' })
+      body: JSON.stringify({ email: 'john@example.com', name: 'Johnny' })
     });
 
     expect(res.status).toBe(200);
@@ -217,7 +217,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ email: 'john@example.com', firstName: 'Johnny' })
+      body: JSON.stringify({ email: 'john@example.com', name: 'Johnny' })
     });
     expect(res.status).toBe(200);
 

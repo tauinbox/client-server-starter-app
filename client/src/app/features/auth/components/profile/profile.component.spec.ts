@@ -34,8 +34,7 @@ const mockUserRole: RoleResponse = {
 const mockUser: UserResponse = {
   id: '1',
   email: 'test@example.com',
-  firstName: 'Test',
-  lastName: 'User',
+  name: 'Test User',
   isActive: true,
   roles: [mockUserRole],
   isEmailVerified: true,
@@ -166,8 +165,7 @@ describe('ProfileComponent', () => {
     fixture.detectChanges();
     component.profileModel.set({
       email: 'test@example.com',
-      firstName: 'Test',
-      lastName: 'User',
+      name: 'Test User',
       currentPassword: '',
       password: 'NewPassword123',
       confirmPassword: 'NewPassword123',
@@ -259,8 +257,7 @@ describe('ProfileComponent', () => {
       expect(component['loading']()).toBe(false);
       expect(component.profileModel()).toEqual({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -301,46 +298,43 @@ describe('ProfileComponent', () => {
     });
   });
 
+  describe('initials', () => {
+    it.each([
+      ['Madonna', 'M'],
+      ['jane doe', 'JD'],
+      ['María José García', 'MJ']
+    ])('takes the first two words of %j', (name, initials) => {
+      component['user'].set({ ...mockUser, name });
+      expect(component.initials()).toBe(initials);
+    });
+  });
+
   describe('form validation', () => {
     beforeEach(() => {
       fixture.detectChanges();
     });
 
-    it('should require firstName', async () => {
+    it.each(['', '   '])('should refuse the name %j', async (name) => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: '',
-        lastName: 'User',
+        name,
         currentPassword: '',
         password: '',
         confirmPassword: '',
         code: ''
       });
       await fixture.whenStable();
-      const errors = component.profileForm.firstName().errors();
-      expect(errors.some((e) => e.kind === 'required')).toBe(true);
-    });
-
-    it('should require lastName', async () => {
-      component.profileModel.set({
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: '',
-        currentPassword: '',
-        password: '',
-        confirmPassword: '',
-        code: ''
-      });
-      await fixture.whenStable();
-      const errors = component.profileForm.lastName().errors();
-      expect(errors.some((e) => e.kind === 'required')).toBe(true);
+      const errors = component.profileForm.name().errors();
+      expect(errors.map((e) => [e.kind, e.message])).toContainEqual([
+        'required',
+        'auth.profile.nameRequired'
+      ]);
     });
 
     it('should validate password minLength when provided', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'CurrentPass1',
         password: 'short',
         confirmPassword: '',
@@ -354,8 +348,7 @@ describe('ProfileComponent', () => {
     it('accepts a password made only of lower-case letters', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'CurrentPass1',
         password: 'passwordonly',
         confirmPassword: 'passwordonly',
@@ -371,8 +364,7 @@ describe('ProfileComponent', () => {
       const tooLong = `Aa1${'x'.repeat(126)}`;
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'CurrentPass1',
         password: tooLong,
         confirmPassword: tooLong,
@@ -390,8 +382,7 @@ describe('ProfileComponent', () => {
     it('should allow empty password (optional)', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -404,8 +395,7 @@ describe('ProfileComponent', () => {
     it('should have passwordMismatch when passwords differ', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'CurrentPass1',
         password: 'NewPassword123',
         confirmPassword: 'Different123',
@@ -419,8 +409,7 @@ describe('ProfileComponent', () => {
     it('should be valid when passwords match and current password is provided', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'CurrentPass1',
         password: 'NewPassword123',
         confirmPassword: 'NewPassword123',
@@ -433,8 +422,7 @@ describe('ProfileComponent', () => {
     it('should require currentPassword when new password is entered', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: '',
         password: 'NewPassword123',
         confirmPassword: 'NewPassword123',
@@ -451,8 +439,7 @@ describe('ProfileComponent', () => {
     it('should NOT require currentPassword when password is blank', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -472,8 +459,7 @@ describe('ProfileComponent', () => {
     function typePassword(): void {
       component.profileModel.set({
         email: mockUser.email,
-        firstName: mockUser.firstName,
-        lastName: mockUser.lastName,
+        name: mockUser.name,
         currentPassword: '',
         password: 'Sunrise-Kettle-19',
         confirmPassword: 'Sunrise-Kettle-19',
@@ -580,8 +566,7 @@ describe('ProfileComponent', () => {
     function edit(changes: { email?: string; password?: string }): void {
       component.profileModel.set({
         email: changes.email ?? mockUser.email,
-        firstName: mockUser.firstName,
-        lastName: mockUser.lastName,
+        name: mockUser.name,
         currentPassword: '',
         password: changes.password ?? '',
         confirmPassword: changes.password ?? '',
@@ -838,8 +823,7 @@ describe('ProfileComponent', () => {
     it('should not submit when form is invalid', async () => {
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: '',
-        lastName: 'User',
+        name: '',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -857,13 +841,12 @@ describe('ProfileComponent', () => {
     });
 
     it('should submit without password when password is empty', async () => {
-      const updatedUser = { ...mockUser, firstName: 'Updated' };
+      const updatedUser = { ...mockUser, name: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -873,19 +856,17 @@ describe('ProfileComponent', () => {
       component.onSubmit();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
-        firstName: 'Updated',
-        lastName: 'User'
+        name: 'Updated User'
       });
     });
 
     it('should include password and currentPassword when password is provided', async () => {
-      const updatedUser = { ...mockUser, firstName: 'Updated' };
+      const updatedUser = { ...mockUser, name: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         currentPassword: 'CurrentPass1',
         password: 'NewPassword123',
         confirmPassword: 'NewPassword123',
@@ -895,21 +876,19 @@ describe('ProfileComponent', () => {
       component.onSubmit();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         password: 'NewPassword123',
         currentPassword: 'CurrentPass1'
       });
     });
 
     it('should show snackbar and update user on success', async () => {
-      const updatedUser = { ...mockUser, firstName: 'Updated' };
+      const updatedUser = { ...mockUser, name: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -926,13 +905,12 @@ describe('ProfileComponent', () => {
     });
 
     it('clears the password fields after a save without a password', async () => {
-      const updatedUser = { ...mockUser, firstName: 'Updated' };
+      const updatedUser = { ...mockUser, name: 'Updated' };
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         currentPassword: 'typed-but-unused',
         password: '',
         confirmPassword: '',
@@ -949,8 +927,7 @@ describe('ProfileComponent', () => {
       async function submitPasswordChange(): Promise<void> {
         component.profileModel.set({
           email: 'test@example.com',
-          firstName: 'Test',
-          lastName: 'User',
+          name: 'Test User',
           currentPassword: 'CurrentPass1',
           password: 'NewPassword1',
           confirmPassword: 'NewPassword1',
@@ -1009,8 +986,7 @@ describe('ProfileComponent', () => {
 
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -1036,8 +1012,7 @@ describe('ProfileComponent', () => {
 
       component.profileModel.set({
         email: 'test@example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -1099,13 +1074,12 @@ describe('ProfileComponent', () => {
 
     it('saves personal fields directly instead of starting an email change', async () => {
       authServiceMock.updateProfile.mockReturnValue(
-        of({ ...mockUser, email: 'User@Example.com', firstName: 'Updated' })
+        of({ ...mockUser, email: 'User@Example.com', name: 'Updated' })
       );
 
       component.profileModel.set({
         email: 'User@Example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         currentPassword: '',
         password: '',
         confirmPassword: '',
@@ -1115,8 +1089,7 @@ describe('ProfileComponent', () => {
       component.onSubmit();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
-        firstName: 'Updated',
-        lastName: 'User'
+        name: 'Updated User'
       });
     });
   });
@@ -1344,8 +1317,7 @@ describe('ProfileComponent', () => {
   describe('submitting an email change alongside other edits', () => {
     const renamedUser: UserResponse = {
       ...mockUser,
-      firstName: 'Renamed',
-      lastName: 'Person'
+      name: 'Renamed Person'
     };
 
     beforeEach(() => {
@@ -1379,8 +1351,7 @@ describe('ProfileComponent', () => {
         .mockResolvedValue(true);
       component.profileModel.set({
         email: 'new@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'Password1',
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1',
@@ -1402,8 +1373,7 @@ describe('ProfileComponent', () => {
     it('persists the name typed alongside the new email', async () => {
       component.profileModel.set({
         email: 'new@example.com',
-        firstName: 'Renamed',
-        lastName: 'Person',
+        name: 'Renamed Person',
         currentPassword: 'Password1',
         password: '',
         confirmPassword: '',
@@ -1419,8 +1389,7 @@ describe('ProfileComponent', () => {
         { currentPassword: 'Password1' }
       );
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
-        firstName: 'Renamed',
-        lastName: 'Person'
+        name: 'Renamed Person'
       });
       expect(notifyMock.success).toHaveBeenCalledWith(
         'auth.profile.emailChangeInitiatedWithProfile'
@@ -1430,8 +1399,7 @@ describe('ProfileComponent', () => {
     it('leaves the persisted name on screen and the email unchanged', async () => {
       component.profileModel.set({
         email: 'new@example.com',
-        firstName: 'Renamed',
-        lastName: 'Person',
+        name: 'Renamed Person',
         currentPassword: 'Password1',
         password: '',
         confirmPassword: '',
@@ -1444,13 +1412,8 @@ describe('ProfileComponent', () => {
 
       // Nothing may be left on screen that only looks saved: the fields must
       // match the record the server returned.
-      expect(component['user']()?.firstName).toBe('Renamed');
-      expect(component.profileModel().firstName).toBe(
-        component['user']()?.firstName
-      );
-      expect(component.profileModel().lastName).toBe(
-        component['user']()?.lastName
-      );
+      expect(component['user']()?.name).toBe('Renamed Person');
+      expect(component.profileModel().name).toBe(component['user']()?.name);
       // The address only changes once the link in the new inbox is clicked.
       expect(component.profileModel().email).toBe('test@example.com');
     });
@@ -1458,8 +1421,7 @@ describe('ProfileComponent', () => {
     it('sends the password change too, and initiates the email first', async () => {
       component.profileModel.set({
         email: 'new@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'Password1',
         password: 'NewPassword123',
         confirmPassword: 'NewPassword123',
@@ -1471,8 +1433,7 @@ describe('ProfileComponent', () => {
       await fixture.whenStable();
 
       expect(authServiceMock.updateProfile).toHaveBeenCalledWith({
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'NewPassword123',
         currentPassword: 'Password1'
       });
@@ -1486,8 +1447,7 @@ describe('ProfileComponent', () => {
     it('sends no profile update when only the email changed', async () => {
       component.profileModel.set({
         email: 'new@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         currentPassword: 'Password1',
         password: '',
         confirmPassword: '',
@@ -1511,8 +1471,7 @@ describe('ProfileComponent', () => {
 
       component.profileModel.set({
         email: 'new@example.com',
-        firstName: 'Renamed',
-        lastName: 'Person',
+        name: 'Renamed Person',
         currentPassword: 'WrongPassword',
         password: '',
         confirmPassword: '',
@@ -1532,7 +1491,7 @@ describe('ProfileComponent', () => {
     it('sends nothing and keeps Save available when the dialog is cancelled', async () => {
       adaptiveDialogMock.openConfirm.mockReturnValue(of(false));
 
-      await typeInto('input[autocomplete="given-name"]', 'Renamed');
+      await typeInto('input[autocomplete="name"]', 'Renamed');
       await typeInto('input[autocomplete="email"]', 'new@example.com');
       await typeInto('input[autocomplete="current-password"]', 'Password1');
 

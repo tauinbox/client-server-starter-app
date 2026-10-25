@@ -138,8 +138,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
             provider: OAuthProvider.GOOGLE,
             providerId: PROVIDER_ID,
             email: 'signer@example.com',
-            firstName: 'Signer',
-            lastName: 'Person',
+            name: 'Signer Person',
             emailVerified: true
           });
         }

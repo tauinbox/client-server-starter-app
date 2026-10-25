@@ -45,8 +45,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     const user = await repository.save(
       repository.create({
         email,
-        firstName: 'Lockout',
-        lastName: 'Recovery',
+        name: 'Lockout Recovery',
         password: await bcrypt.hash(password, BCRYPT_SALT_ROUNDS),
         isEmailVerified: true
       })

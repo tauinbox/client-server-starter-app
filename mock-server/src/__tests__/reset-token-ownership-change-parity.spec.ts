@@ -150,7 +150,7 @@ describe('a reset link dies with an ownership change', () => {
     const userId = findUserByEmail(USER_EMAIL)!.id;
 
     const res = await adminRequest('PATCH', userId, adminToken, {
-      firstName: 'Renamed'
+      name: 'Renamed'
     });
     expect(res.status).toBe(200);
 

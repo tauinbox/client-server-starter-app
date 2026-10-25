@@ -69,7 +69,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     for (const email of [ownerEmail, moderatorEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Mod', lastName: 'Self' })
+        .send({ email, password, name: 'Mod Self' })
         .expect(201);
     }
 
@@ -201,10 +201,10 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     const id = await userId(ownerEmail);
 
     await patch(await tokenFor(ownerEmail), id, {
-      firstName: 'Renamed'
+      name: 'Renamed'
     }).expect(200);
 
-    expect((await row(id)).firstName).toBe('Renamed');
+    expect((await row(id)).name).toBe('Renamed');
   }, 30000);
 
   it('lets an unconditional update:User holder deactivate another account', async () => {

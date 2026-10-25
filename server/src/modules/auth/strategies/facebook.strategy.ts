@@ -8,6 +8,7 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { CookieStateStore } from '../utils/cookie-state-store';
+import { oauthProfileName } from '../utils/oauth-profile-name';
 
 @Injectable()
 export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
@@ -35,6 +36,7 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
     profile: {
       id: string;
       emails?: { value: string }[];
+      displayName?: string;
       name?: { givenName?: string; familyName?: string };
     },
     done: (error: Error | null, user?: OAuthUserProfile) => void
@@ -43,8 +45,7 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
       provider: OAuthProvider.FACEBOOK,
       providerId: profile.id,
       email: normalizeEmail(profile.emails?.[0]?.value) ?? '',
-      firstName: profile.name?.givenName || '',
-      lastName: profile.name?.familyName || '',
+      name: oauthProfileName(profile),
       // Facebook exposes no per-email verification flag: its account-level
       // `verified` says the account passed Facebook's identity check, not that
       // the person owns this mailbox.

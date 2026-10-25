@@ -58,7 +58,7 @@ runWithInfra('POST /auth/mfa/recovery code format (e2e)', () => {
 
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password, firstName: 'Mfa', lastName: 'Recovery' })
+      .send({ email, password, name: 'Mfa Recovery' })
       .expect(201);
 
     // The recovery route never reads the secret, so a stored enrolment is enough.

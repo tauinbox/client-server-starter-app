@@ -12,8 +12,7 @@ const seededUsers = Array.from({ length: SEEDED }, (_, index) => {
   return createMockUser({
     id: mockId(`live-${n}`),
     email: `live-${n}@example.com`,
-    firstName: `Live${n}`,
-    lastName: 'Member',
+    name: `Live${n} Member`,
     createdAt: `2030-01-01T00:00:${n}.000Z`,
     updatedAt: `2030-01-01T00:00:${n}.000Z`
   });
@@ -85,7 +84,7 @@ test.describe('User list - live changes', () => {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ firstName: 'Renamed' })
+        body: JSON.stringify({ name: 'Renamed Member' })
       }
     );
     expect(patch.status).toBe(200);
@@ -112,8 +111,7 @@ test.describe('User list - live changes', () => {
       body: JSON.stringify({
         email: 'newcomer@example.com',
         password: 'Tq7-vRw2-Lp9z',
-        firstName: 'Newcomer',
-        lastName: 'Person'
+        name: 'Newcomer Person'
       })
     });
     expect(register.status).toBe(201);
@@ -152,8 +150,7 @@ test.describe('User list - live changes', () => {
       body: JSON.stringify({
         email: 'gap-newcomer@example.com',
         password: 'Tq7-vRw2-Lp9z',
-        firstName: 'Gap',
-        lastName: 'Newcomer'
+        name: 'Gap Newcomer'
       })
     });
     expect(register.status).toBe(201);

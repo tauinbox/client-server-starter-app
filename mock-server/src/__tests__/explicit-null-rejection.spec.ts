@@ -118,7 +118,7 @@ describe('explicit null parity with server DTOs', () => {
   });
 
   describe('PATCH /users/:id', () => {
-    it.each(['email', 'firstName', 'lastName', 'password', 'locale'])(
+    it.each(['email', 'name', 'password', 'locale'])(
       'rejects a null %s',
       async (field) => {
         await expectValidation400('PATCH', `/users/${mockId('user-3')}`, {
@@ -129,13 +129,13 @@ describe('explicit null parity with server DTOs', () => {
 
     it('leaves the target untouched after a rejected null', async () => {
       const before = getState().users.get(mockId('user-3'));
-      const firstName = before?.firstName;
+      const name = before?.name;
 
       await expectValidation400('PATCH', `/users/${mockId('user-3')}`, {
-        firstName: null
+        name: null
       });
 
-      expect(getState().users.get(mockId('user-3'))?.firstName).toBe(firstName);
+      expect(getState().users.get(mockId('user-3'))?.name).toBe(name);
     });
 
     it('applies a locale the server DTO also accepts', async () => {
@@ -155,12 +155,9 @@ describe('explicit null parity with server DTOs', () => {
   });
 
   describe('PATCH /auth/profile', () => {
-    it.each(['firstName', 'lastName', 'locale'])(
-      'rejects a null %s',
-      async (field) => {
-        await expectValidation400('PATCH', '/auth/profile', { [field]: null });
-      }
-    );
+    it.each(['name', 'locale'])('rejects a null %s', async (field) => {
+      await expectValidation400('PATCH', '/auth/profile', { [field]: null });
+    });
 
     it('rejects a null password instead of wiping the credential', async () => {
       const token = await loginAsAdmin();

@@ -120,7 +120,7 @@ describe('Profile mass-assignment protection (e2e)', () => {
   });
 
   it.each([
-    ['isActive', { firstName: 'x', isActive: true }],
+    ['isActive', { name: 'x', isActive: true }],
     ['roles', { roles: ['admin'] }],
     ['failedLoginAttempts', { failedLoginAttempts: 0 }]
   ])(
@@ -140,17 +140,17 @@ describe('Profile mass-assignment protection (e2e)', () => {
   );
 
   it('accepts a whitelisted payload (200) and dispatches the update', async () => {
-    usersService.update.mockResolvedValue({ id: 'user-1', firstName: 'x' });
+    usersService.update.mockResolvedValue({ id: 'user-1', name: 'x' });
 
     const res = await request(server)
       .patch('/api/v1/auth/profile')
-      .send({ firstName: 'x' })
+      .send({ name: 'x' })
       .expect(200);
 
-    expect(res.body).toEqual({ id: 'user-1', firstName: 'x' });
+    expect(res.body).toEqual({ id: 'user-1', name: 'x' });
     expect(usersService.update).toHaveBeenCalledWith(
       'user-1',
-      { firstName: 'x' },
+      { name: 'x' },
       SYSTEM_ABILITY
     );
   });

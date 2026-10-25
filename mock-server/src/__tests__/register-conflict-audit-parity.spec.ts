@@ -38,8 +38,7 @@ function register(body: Record<string, unknown>): Promise<Response> {
 const validBody = {
   email: 'taken@example.com',
   password: 'Sunrise-Kettle-19',
-  firstName: 'Conflict',
-  lastName: 'Probe'
+  name: 'Conflict Probe'
 };
 
 describe('register conflict audit parity', () => {

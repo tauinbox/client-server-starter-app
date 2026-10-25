@@ -127,8 +127,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `trial-once-${stamp}@example.com`,
-        firstName: 'Trial',
-        lastName: 'Once',
+        name: 'Trial Once',
         password: 'hashed'
       })
     );

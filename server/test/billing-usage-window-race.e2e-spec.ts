@@ -161,8 +161,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `window-race-${stamp}@example.com`,
-        firstName: 'Window',
-        lastName: 'Race',
+        name: 'Window Race',
         password: 'hashed'
       })
     );

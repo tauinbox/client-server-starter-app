@@ -1169,8 +1169,8 @@ axe rule `aria-progressbar-name` requires a name for it. Use `[attr.aria-label]=
 - a conditional `update:User` grant decides on the loaded record, not on the id in the URL
   (`users/users-edit.spec.ts`). An ownership grant admits the owner of the record on
   `/users/<own-id>/edit`, and the seeded `user` role, which cannot read another record, goes to
-  `/forbidden`. A `fieldMatch` grant on `lastName` opens the form of a Smith record and sends a
-  Doe record back to its detail page with the notice "You cannot edit this user"
+  `/forbidden`. A `fieldMatch` grant on `name` opens the form of the John Smith record and sends
+  the Jane Doe record back to its detail page with the notice "You cannot edit this user"
 - an administrator resets the two-factor enrolment of an enrolled user from the edit page, with
   the administrator's own password in the dialog, and that user then signs in with the password
   alone; a wrong password leaves the factor on (`users/users-mfa-reset.spec.ts`)
@@ -1180,7 +1180,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 335 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 337 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1605 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an

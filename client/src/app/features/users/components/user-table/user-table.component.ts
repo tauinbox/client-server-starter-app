@@ -36,7 +36,7 @@ import type { User, UserSortColumn } from '../../models/user.types';
 
 export const COLUMN_TO_SORT_MAP: Record<string, UserSortColumn> = {
   email: 'email',
-  name: 'firstName',
+  name: 'name',
   status: 'isActive',
   createdAt: 'createdAt'
 };

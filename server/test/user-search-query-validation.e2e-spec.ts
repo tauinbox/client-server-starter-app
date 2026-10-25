@@ -1,5 +1,5 @@
-// Regression guard: the user-search filter params (q/email/firstName/
-// lastName/role) once lacked @IsString(), so a duplicated query param
+// Regression guard: the user-search filter params (q/email/name/
+// name/role) once lacked @IsString(), so a duplicated query param
 // (?q=a&q=b, parsed as an array) passed validation and crashed the
 // service with a 500. Pipe options mirror main.ts.
 
@@ -32,7 +32,7 @@ const EMPTY_PAGE = {
   meta: { nextCursor: null, hasMore: false, limit: 20 }
 };
 
-const FILTER_FIELDS = ['q', 'email', 'firstName', 'lastName', 'role'] as const;
+const FILTER_FIELDS = ['q', 'email', 'name', 'role'] as const;
 
 describe('User search query DTO validation (e2e)', () => {
   let app: INestApplication;

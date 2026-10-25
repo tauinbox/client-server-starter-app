@@ -48,8 +48,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     return repository.save(
       repository.create({
         email,
-        firstName: 'Reset',
-        lastName: 'Verifies',
+        name: 'Reset Verifies',
         password: null,
         isEmailVerified: false,
         ...overrides

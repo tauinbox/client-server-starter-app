@@ -55,8 +55,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
     const user = await repository.save(
       repository.create({
         email: newEmail(label),
-        firstName: 'Reset',
-        lastName: 'Owner',
+        name: 'Reset Owner',
         isEmailVerified: true,
         passwordResetToken: hashToken(rawToken),
         passwordResetExpiresAt: new Date(Date.now() + 30 * 60 * 1000),

@@ -74,7 +74,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     for (const email of [supportEmail, ownerEmail, superEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Session', lastName: 'Revoke' })
+        .send({ email, password, name: 'Session Revoke' })
         .expect(201);
     }
 

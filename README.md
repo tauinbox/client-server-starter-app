@@ -537,7 +537,7 @@ Security: the parser skips a prototype-pollution key silently. Those keys are `_
 > **SQL translation on the server (`apply-ability.util.ts`).** The translator makes an SQL `WHERE`
 > fragment from the CASL conditions for the user listing. It supports exactly the operators above,
 > that is `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$nor` and `$not`.
-> It supports them against the user fields `id`, `email`, `firstName`, `lastName` and `isActive`.
+> It supports them against the user fields `id`, `email`, `name` and `isActive`.
 >
 > The input validation rejects each other operator at the start. Thus the accepted set and the
 > translatable set are identical, and a drift-guard test enforces this.
@@ -717,7 +717,7 @@ the same permission both apply.
   (has a password or provider only), plus Include deleted. Each filter applies at once (the search
   after 350 ms of idle time), with no Search button. Empty filters load all users. Filled
   filters start a search through `GET /users/search/cursor`. The `q` value matches with an OR across
-  the id, the email, the first name and the last name. The `role` filter narrows the list to the users
+  the id, the email and the name. The `role` filter narrows the list to the users
   that have a role with that exact name.
 - **Infinite scroll** with column sorting. The page loads 20 users at a time through the cursor
   endpoints. The shared `nxsInfiniteScroll` sentinel requests the next page while the user scrolls. It
@@ -1142,8 +1142,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `MFA_REQUIRED_FOR_ADMINS` | `false` | Set to `true` to make two-factor authentication mandatory for every account that holds a super role. Such an account signs in and reaches its profile as before, but no route behind an authorization check answers it until the enrolment is complete. The requirement stays off while `MFA_ENCRYPTION_KEY` is empty, because enrolment is unavailable in that state |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server seeds the account at startup, and it skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
-| `ADMIN_FIRST_NAME` | `Admin` | First name of the initial administrator |
-| `ADMIN_LAST_NAME` | `User` | Last name of the initial administrator |
+| `ADMIN_NAME` | `Admin` | Full name of the initial administrator |
 | `TURNSTILE_SITE_KEY` | - | Public site key of Cloudflare Turnstile. The CAPTCHA on `/register`, `/forgot-password` and `/resend-verification` stays disabled while one of the two keys is empty. Get a true pair at `dash.cloudflare.com`, then Turnstile, then Add site. It is free. The test keys (`1x00000000000000000000AA` and `1x0000000000000000000000000000000AA`) operate for local development and for CI. They are public and give no protection in production. Refer to [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
 | `TURNSTILE_SECRET_KEY` | - | Secret key of Cloudflare Turnstile for the `siteverify` calls on the server. Use it with `TURNSTILE_SITE_KEY` |
 | `PADDLE_API_KEY` | - | Paddle server API key. Use it with `PADDLE_WEBHOOK_SECRET`. The two values are necessary before Paddle counts as configured |
@@ -1368,8 +1367,7 @@ administrator account at the first startup:
 ```
 ADMIN_EMAIL=admin@yourdomain.com
 ADMIN_PASSWORD=YourSecurePass1
-ADMIN_FIRST_NAME=Admin
-ADMIN_LAST_NAME=User
+ADMIN_NAME=Admin
 ```
 
 The administrator seeder is idempotent. It skips the creation when the user already exists. It does
@@ -1610,7 +1608,7 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
 | GET | `/users/cursor` | `users:search` | List the users with cursor (keyset) pagination. `includeDeleted=true` adds the soft-deleted rows |
-| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email, firstName and lastName), `email`, `firstName`, `lastName`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids), `isActive`, `isEmailVerified`, `mfaEnabled`, `hasPassword` and `isLocked` (`lockedUntil` later than now). `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
+| GET | `/users/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email and name), `email`, `name`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids), `isActive`, `isEmailVerified`, `mfaEnabled`, `hasPassword` and `isLocked` (`lockedUntil` later than now). `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. A boolean filter accepts `true` or `false` only, and each other value is a 400 |
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
@@ -1903,11 +1901,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3051 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3076 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 698 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 685 pass and 13 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1605 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 335 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1123 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1608 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 337 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1124 tests pass |
 
 ## CI/CD
 

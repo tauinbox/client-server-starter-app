@@ -1,6 +1,7 @@
 import {
   UUID_PATTERN,
   MAX_EMAIL_LENGTH,
+  MAX_NAME_LENGTH,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
@@ -182,6 +183,27 @@ export function emailErrors(
   const tooLong = validateMaxLength(transformed, MAX_EMAIL_LENGTH, field);
   if (tooLong) errors.push(tooLong);
   if (!isValidEmail(transformed)) errors.push(`${field} must be an email`);
+  return errors;
+}
+
+/** The `@Transform(trim)` of the `name` field of the user DTOs. */
+export function trimName(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
+/**
+ * Mirrors `@IsNotEmpty() @MaxLength(MAX_NAME_LENGTH)` on a `name` that
+ * `trimName` returned. An omitted field is skipped, an explicit null is not.
+ * Decorators apply bottom-up, so MaxLength is reported before IsNotEmpty.
+ */
+export function nameErrors(value: unknown): string[] {
+  if (value === undefined) return [];
+  const errors: string[] = [];
+  const tooLong = validateMaxLength(value, MAX_NAME_LENGTH, 'name');
+  if (tooLong) errors.push(tooLong);
+  if (value === '' || value === null) {
+    errors.push('name should not be empty');
+  }
   return errors;
 }
 

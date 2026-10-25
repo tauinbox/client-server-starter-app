@@ -45,7 +45,7 @@ runWithInfra('Refresh for a deleted account (e2e)', () => {
 
     await request(app.getHttpServer() as Server)
       .post('/api/v1/auth/register')
-      .send({ email, password, firstName: 'Refresh', lastName: 'Deleted' })
+      .send({ email, password, name: 'Refresh Deleted' })
       .expect(201);
 
     await dataSource

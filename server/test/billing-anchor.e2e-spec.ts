@@ -30,9 +30,9 @@ runWithInfra('subscription billing anchor (e2e)', () => {
     stamp: number
   ): Promise<string> {
     const [{ id: userId }] = (await runner.query(
-      `INSERT INTO users (email, "firstName", "lastName")
-       VALUES ($1, $2, $3) RETURNING id`,
-      [`anchor-${stamp}@example.com`, 'An', 'Chor']
+      `INSERT INTO users (email, "name")
+       VALUES ($1, $2) RETURNING id`,
+      [`anchor-${stamp}@example.com`, 'An Chor']
     )) as Array<{ id: string }>;
     const [{ id: customerId }] = (await runner.query(
       `INSERT INTO billing_customers (user_id, provider, country, currency)

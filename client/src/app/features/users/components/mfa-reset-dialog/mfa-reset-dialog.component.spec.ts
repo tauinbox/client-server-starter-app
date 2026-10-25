@@ -17,8 +17,7 @@ import type { User } from '../../models/user.types';
 const enrolledUser: User = {
   id: 'user-9',
   email: 'owner@example.com',
-  firstName: 'Olga',
-  lastName: 'Owner',
+  name: 'Olga Owner',
   roles: [],
   isActive: true,
   isEmailVerified: true,

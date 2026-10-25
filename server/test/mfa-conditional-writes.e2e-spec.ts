@@ -58,8 +58,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
     return repository.save(
       repository.create({
         email,
-        firstName: 'Mfa',
-        lastName: 'Writes',
+        name: 'Mfa Writes',
         password: null,
         isEmailVerified: true,
         totpSecret: enrolled

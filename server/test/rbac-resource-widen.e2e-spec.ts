@@ -137,8 +137,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     actor = await userRepository.save(
       userRepository.create({
         email: actorEmail,
-        firstName: 'Widen',
-        lastName: 'Actor',
+        name: 'Widen Actor',
         isEmailVerified: true,
         password: null
       })

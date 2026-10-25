@@ -43,8 +43,7 @@ test.describe('User Detail page', () => {
       createMockUser({
         id: mockId('user-50'),
         email: 'target@example.com',
-        firstName: 'Target',
-        lastName: 'User',
+        name: 'Target User',
         password: 'Password1',
         isActive: true,
         roles: ['user'],
@@ -71,8 +70,7 @@ test.describe('User Detail page', () => {
       createMockUser({
         id: mockId('user-50'),
         email: 'target@example.com',
-        firstName: 'Target',
-        lastName: 'User',
+        name: 'Target User',
         password: 'Password1',
         isActive: false,
         roles: ['user'],
@@ -197,7 +195,7 @@ test.describe('User Detail page', () => {
     page
   }) => {
     await seedUserRole(_mockServer, 'smith-reader', {
-      read: { fieldMatch: { lastName: ['Smith'] } }
+      read: { fieldMatch: { name: ['John Smith'] } }
     });
     await loginViaUi(page, _mockServer.url, {
       id: mockId('user-scoped'),

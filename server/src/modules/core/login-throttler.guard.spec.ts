@@ -51,13 +51,13 @@ class ProbeController {
   })
   @CountFailuresOnlyWhenBody('password')
   @Post('profile')
-  profile(@Body() body: { password?: string; firstName?: string }): {
+  profile(@Body() body: { password?: string; name?: string }): {
     ok: boolean;
   } {
     if (body.password) {
       throw new UnauthorizedException();
     }
-    if (body.firstName === 'bad') {
+    if (body.name === 'bad') {
       throw new BadRequestException();
     }
     return { ok: true };
@@ -119,7 +119,7 @@ describe('LoginThrottlerGuard', () => {
   it('never spends the failure budget on a refused request that carries no secret', async () => {
     const statuses: number[] = [];
     for (let i = 0; i < MAX_FAILED_ATTEMPTS + 2; i++) {
-      statuses.push(await profile({ firstName: 'bad' }));
+      statuses.push(await profile({ name: 'bad' }));
     }
 
     expect(statuses).toEqual([400, 400, 400, 400, 400, 400, 400]);
@@ -136,7 +136,7 @@ describe('LoginThrottlerGuard', () => {
 
   it('keeps the secret budget intact after refused requests that carry none', async () => {
     for (let i = 0; i < MAX_FAILED_ATTEMPTS + 2; i++) {
-      await profile({ firstName: 'bad' });
+      await profile({ name: 'bad' });
     }
 
     const statuses: number[] = [];

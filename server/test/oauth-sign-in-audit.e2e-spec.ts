@@ -49,8 +49,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
       provider: 'google',
       providerId: `google-${stamp}`,
       email,
-      firstName: 'Oauth',
-      lastName: 'Audit',
+      name: 'Oauth Audit',
       emailVerified: true
     };
   };
@@ -107,8 +106,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     const user = await dataSource.getRepository(User).save(
       dataSource.getRepository(User).create({
         email: profile.email,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
+        name: profile.name,
         password: null,
         isEmailVerified: true,
         ...fields

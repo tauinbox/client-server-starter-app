@@ -264,8 +264,7 @@ describe('FeatureFlagRuleRowComponent', () => {
         pageOf(
           criteria.ids.map((id) => ({
             id,
-            firstName: 'Alice',
-            lastName: 'Adams',
+            name: 'Alice Adams',
             email: `alice+${id}@example.com`
           }))
         )
@@ -315,8 +314,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       pageOf([
         {
           id: 'uuid-known',
-          firstName: 'Carol',
-          lastName: 'Clark',
+          name: 'Carol Clark',
           email: 'carol@example.com'
         }
       ])
@@ -837,8 +835,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       const bob: User = {
         id: '22222222-2222-2222-2222-222222222222',
         email: 'bob@example.com',
-        firstName: 'Bob',
-        lastName: 'Marley',
+        name: 'Bob Marley',
         isActive: true,
         roles: [],
         isEmailVerified: true,

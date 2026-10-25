@@ -65,8 +65,7 @@ test.describe('Login page', () => {
       createMockUser({
         id: mockId('user-303'),
         email: 'unverified-login@example.com',
-        firstName: 'Unverified',
-        lastName: 'Login',
+        name: 'Unverified Login',
         password: 'Password1',
         roles: ['user'],
         isEmailVerified: false

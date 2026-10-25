@@ -62,9 +62,9 @@ runWithInfra('schema hardening constraints (e2e)', () => {
 
       for (const suffix of ['a', 'b']) {
         const [{ id: userId }] = (await runner.query(
-          `INSERT INTO users (email, "firstName", "lastName")
-           VALUES ($1, $2, $3) RETURNING id`,
-          [`uq-usage-${suffix}-${stamp}@example.com`, 'Uq', 'Usage']
+          `INSERT INTO users (email, "name")
+           VALUES ($1, $2) RETURNING id`,
+          [`uq-usage-${suffix}-${stamp}@example.com`, 'Uq Usage']
         )) as Array<{ id: string }>;
 
         const [{ id: customerId }] = (await runner.query(
@@ -110,9 +110,9 @@ runWithInfra('schema hardening constraints (e2e)', () => {
     await runner.startTransaction();
     try {
       const [{ id: userId }] = (await runner.query(
-        `INSERT INTO users (email, "firstName", "lastName")
-         VALUES ($1, $2, $3) RETURNING id`,
-        [`uq-token-${Date.now()}@example.com`, 'Uq', 'Token']
+        `INSERT INTO users (email, "name")
+         VALUES ($1, $2) RETURNING id`,
+        [`uq-token-${Date.now()}@example.com`, 'Uq Token']
       )) as Array<{ id: string }>;
 
       const token = `uq-token-${Date.now()}`;
@@ -135,12 +135,12 @@ runWithInfra('schema hardening constraints (e2e)', () => {
     await runner.startTransaction();
     try {
       const address = `uq-case-${Date.now()}@example.com`;
-      const insert = `INSERT INTO users (email, "firstName", "lastName")
-         VALUES ($1, $2, $3)`;
-      await runner.query(insert, [address, 'Uq', 'Case']);
+      const insert = `INSERT INTO users (email, "name")
+         VALUES ($1, $2)`;
+      await runner.query(insert, [address, 'Uq Case']);
 
       await expect(
-        runner.query(insert, [address.toUpperCase(), 'Uq', 'Case'])
+        runner.query(insert, [address.toUpperCase(), 'Uq Case'])
       ).rejects.toThrow(/UQ_users_email_lower/);
     } finally {
       await runner.rollbackTransaction();
@@ -154,9 +154,9 @@ runWithInfra('schema hardening constraints (e2e)', () => {
     await runner.startTransaction();
     try {
       const [{ id: userId }] = (await runner.query(
-        `INSERT INTO users (email, "firstName", "lastName")
-         VALUES ($1, $2, $3) RETURNING id`,
-        [`uq-default-${Date.now()}@example.com`, 'Uq', 'Default']
+        `INSERT INTO users (email, "name")
+         VALUES ($1, $2) RETURNING id`,
+        [`uq-default-${Date.now()}@example.com`, 'Uq Default']
       )) as Array<{ id: string }>;
 
       const [{ id: customerId }] = (await runner.query(

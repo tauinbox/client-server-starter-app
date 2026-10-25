@@ -35,7 +35,7 @@ test.describe('Profile password change', () => {
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Current password').fill('WrongPass1');
     await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
-    await page.getByLabel('First name').click(); // blur
+    await page.getByLabel('Full name').click(); // blur
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
@@ -58,7 +58,7 @@ test.describe('Profile password change', () => {
     const otherTab = await page.context().newPage();
     await routeApiToMockServer(otherTab, _mockServer.url);
     await otherTab.goto('/profile');
-    await expect(otherTab.getByLabel('First name')).toBeVisible();
+    await expect(otherTab.getByLabel('Full name')).toBeVisible();
 
     // Current password field only appears once the user starts typing a new password.
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');

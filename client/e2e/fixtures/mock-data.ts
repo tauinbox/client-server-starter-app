@@ -14,8 +14,7 @@ export type { MockUser };
 export const defaultUser: MockUser = createMockUser({
   id: mockId('user-1'),
   email: 'test@example.com',
-  firstName: 'John',
-  lastName: 'Doe',
+  name: 'John Doe',
   password: 'Password1',
   isActive: true,
   roles: ['user'],
@@ -37,8 +36,7 @@ export const mockUsersList: MockUser[] = [
   createMockUser({
     id: mockId('user-1'),
     email: 'admin@example.com',
-    firstName: 'Admin',
-    lastName: 'User',
+    name: 'Admin User',
     password: 'Password1',
     roles: ['admin'],
     isActive: true,
@@ -53,8 +51,7 @@ export const mockUsersList: MockUser[] = [
   createMockUser({
     id: mockId('user-2'),
     email: 'john@example.com',
-    firstName: 'John',
-    lastName: 'Smith',
+    name: 'John Smith',
     password: 'Password1',
     roles: ['user'],
     isActive: true,
@@ -69,8 +66,7 @@ export const mockUsersList: MockUser[] = [
   createMockUser({
     id: mockId('user-3'),
     email: 'jane@example.com',
-    firstName: 'Jane',
-    lastName: 'Doe',
+    name: 'Jane Doe',
     password: 'Password1',
     roles: ['user'],
     isActive: false,

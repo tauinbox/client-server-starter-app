@@ -38,8 +38,7 @@ const mockAdminRole: RoleAdminResponse = {
 const mockUser: User = {
   id: 'test-user-id',
   email: 'test@example.com',
-  firstName: 'Test',
-  lastName: 'User',
+  name: 'Test User',
   roles: [mockUserRole],
   isActive: true,
   isEmailVerified: true,
@@ -56,8 +55,7 @@ const otherUser: User = {
   ...mockUser,
   id: 'other-user-id',
   email: 'other@example.com',
-  firstName: 'Other',
-  lastName: 'Person'
+  name: 'Other Person'
 };
 
 describe('UserTableComponent', () => {
@@ -127,8 +125,8 @@ describe('UserTableComponent', () => {
       expect(COLUMN_TO_SORT_MAP['email']).toBe('email');
     });
 
-    it('should map name column to firstName sort key', () => {
-      expect(COLUMN_TO_SORT_MAP['name']).toBe('firstName');
+    it('should map name column to name sort key', () => {
+      expect(COLUMN_TO_SORT_MAP['name']).toBe('name');
     });
 
     it('should map status column to isActive sort key', () => {
@@ -142,7 +140,7 @@ describe('UserTableComponent', () => {
     it('maps each sort key back to its column', () => {
       expect(SORT_TO_COLUMN_MAP).toEqual({
         email: 'email',
-        firstName: 'name',
+        name: 'name',
         isActive: 'status',
         createdAt: 'createdAt'
       });

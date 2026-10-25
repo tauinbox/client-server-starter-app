@@ -56,8 +56,7 @@ describe('UsersService', () => {
   const mockUser: User = {
     id: 'user-1',
     email: 'test@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     password: '$2b$10$hashedpassword',
     passwordHashVersion: 2,
     hasPassword: true,
@@ -166,8 +165,7 @@ describe('UsersService', () => {
     const createUserDto = {
       email: 'new@example.com',
       password: 'Password1',
-      firstName: 'Jane',
-      lastName: 'Doe'
+      name: 'Jane Doe'
     };
 
     it('should create a user with hashed password', async () => {
@@ -309,7 +307,7 @@ describe('UsersService', () => {
         {
           action: 'create',
           subject: 'User',
-          conditions: { lastName: { $in: ['Smith'] } }
+          conditions: { name: { $in: ['Smith'] } }
         }
       ]);
 
@@ -384,7 +382,7 @@ describe('UsersService', () => {
         {
           action: 'read',
           subject: 'User',
-          conditions: { lastName: { $in: ['Smith'] } }
+          conditions: { name: { $in: ['Smith'] } }
         }
       ]);
 
@@ -407,7 +405,7 @@ describe('UsersService', () => {
         {
           action: 'read',
           subject: 'User',
-          conditions: { lastName: { $in: ['Doe'] } }
+          conditions: { name: { $in: ['John Doe'] } }
         }
       ]);
 
@@ -507,7 +505,7 @@ describe('UsersService', () => {
       );
     });
 
-    it('applies unified q filter as OR across email/firstName/lastName/id', async () => {
+    it('applies unified q filter as OR across email/name/id', async () => {
       mockQueryBuilder.getMany.mockResolvedValue([]);
 
       await service.findCursorPaginated(
@@ -556,8 +554,7 @@ describe('UsersService', () => {
       const params = { listSearch: expectedPattern };
       expect(subCalls).toEqual([
         { sql: 'user.email ILIKE :listSearch', params },
-        { sql: 'user.firstName ILIKE :listSearch', params },
-        { sql: 'user.lastName ILIKE :listSearch', params },
+        { sql: 'user.name ILIKE :listSearch', params },
         { sql: 'CAST(user.id AS text) ILIKE :listSearch', params }
       ]);
     });
@@ -581,7 +578,7 @@ describe('UsersService', () => {
 
   describe('update', () => {
     it('should update user fields', async () => {
-      const updateDto = { firstName: 'Updated' };
+      const updateDto = { name: 'Updated' };
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue({ ...mockUser, ...updateDto });
 
@@ -589,7 +586,7 @@ describe('UsersService', () => {
 
       expect(mockRepository.merge).toHaveBeenCalledWith(mockUser, updateDto);
       expect(mockRepository.save).toHaveBeenCalledWith(mockUser);
-      expect(result.firstName).toBe('Updated');
+      expect(result.name).toBe('Updated');
     });
 
     it('should hash password when updating password', async () => {
@@ -652,7 +649,7 @@ describe('UsersService', () => {
       });
       mockRepository.save.mockResolvedValue(mockUser);
 
-      await service.update('user-1', { firstName: 'Updated' }, SYSTEM_ABILITY);
+      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY);
 
       expect(mockRepository.merge).toHaveBeenCalledWith(
         expect.anything(),
@@ -692,7 +689,7 @@ describe('UsersService', () => {
 
       await service.update(
         'user-1',
-        { password: 'Copper-Meadow-83', firstName: 'Martina' },
+        { password: 'Copper-Meadow-83', name: 'Martina' },
         SYSTEM_ABILITY
       );
 
@@ -700,8 +697,7 @@ describe('UsersService', () => {
         mockBreachedPasswordService.assertNotBreached
       ).toHaveBeenCalledWith('Copper-Meadow-83', {
         email: mockUser.email,
-        firstName: 'Martina',
-        lastName: mockUser.lastName
+        name: 'Martina'
       });
     });
 
@@ -709,7 +705,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue(mockUser);
 
-      await service.update('user-1', { firstName: 'Updated' }, SYSTEM_ABILITY);
+      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY);
 
       expect(
         mockBreachedPasswordService.assertNotBreached
@@ -720,7 +716,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(
-        service.update('nonexistent', { firstName: 'Updated' }, SYSTEM_ABILITY)
+        service.update('nonexistent', { name: 'Updated' }, SYSTEM_ABILITY)
       ).rejects.toThrow(HttpException);
     });
 
@@ -824,7 +820,7 @@ describe('UsersService', () => {
       mockRepository.save.mockRejectedValue(new Error('connection lost'));
 
       await expect(
-        service.update('user-1', { firstName: 'Updated' }, SYSTEM_ABILITY)
+        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY)
       ).rejects.toThrow('connection lost');
     });
 
@@ -835,7 +831,7 @@ describe('UsersService', () => {
       const ability: AppAbility = { can: canSpy };
 
       await expect(
-        service.update('user-1', { firstName: 'Updated' }, ability)
+        service.update('user-1', { name: 'Updated' }, ability)
       ).rejects.toThrow(ForbiddenException);
       expect(canSpy).toHaveBeenCalledWith('update', mockUser);
     });
@@ -846,7 +842,7 @@ describe('UsersService', () => {
       const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
       await expect(
-        service.update('user-1', { firstName: 'Updated' }, ability, 'actor-1')
+        service.update('user-1', { name: 'Updated' }, ability, 'actor-1')
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -863,7 +859,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue({
         ...mockUser,
-        firstName: 'Updated'
+        name: 'Updated'
       });
       const canSpy = jest.fn().mockReturnValue(true);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
@@ -871,28 +867,28 @@ describe('UsersService', () => {
 
       const result = await service.update(
         'user-1',
-        { firstName: 'Updated' },
+        { name: 'Updated' },
         ability
       );
 
       expect(canSpy).toHaveBeenCalledWith('update', mockUser);
-      expect(result.firstName).toBe('Updated');
+      expect(result.name).toBe('Updated');
     });
 
     it('should skip ability check when ability is not provided', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       mockRepository.save.mockResolvedValue({
         ...mockUser,
-        firstName: 'Updated'
+        name: 'Updated'
       });
 
       const result = await service.update(
         'user-1',
-        { firstName: 'Updated' },
+        { name: 'Updated' },
         SYSTEM_ABILITY
       );
 
-      expect(result.firstName).toBe('Updated');
+      expect(result.name).toBe('Updated');
     });
 
     describe('email change', () => {
@@ -1479,7 +1475,7 @@ describe('UsersService', () => {
       // @ts-expect-error ability is required
       void (() => service.findCursorPaginated({ ...query, cursor: undefined }));
       // @ts-expect-error ability is required
-      void (() => service.update('user-1', { firstName: 'x' }));
+      void (() => service.update('user-1', { name: 'x' }));
       // @ts-expect-error ability is required
       void (() => service.remove('user-1'));
       // @ts-expect-error ability is required
@@ -1591,7 +1587,7 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(superUser);
 
       await expect(
-        service.update('super-1', { firstName: 'Kept' }, superActor, 'actor-1')
+        service.update('super-1', { name: 'Kept' }, superActor, 'actor-1')
       ).resolves.toBeDefined();
       expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });
@@ -1603,7 +1599,7 @@ describe('UsersService', () => {
       });
 
       await expect(
-        service.update('user-1', { firstName: 'Kept' }, delegated, 'actor-1')
+        service.update('user-1', { name: 'Kept' }, delegated, 'actor-1')
       ).rejects.toThrow('assertNotSuperTarget needs the roles of the target');
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
@@ -1616,7 +1612,7 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(mockUser);
 
       await expect(
-        service.update('user-1', { firstName: 'Kept' }, delegated, 'actor-1')
+        service.update('user-1', { name: 'Kept' }, delegated, 'actor-1')
       ).resolves.toBeDefined();
       expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });

@@ -142,8 +142,7 @@ test.describe('User List page', () => {
     const knownUser = {
       id: mockId('user-1'),
       email: 'admin@example.com',
-      firstName: 'Admin',
-      lastName: 'User',
+      name: 'Admin User',
       isActive: true,
       roles: ['admin'],
       isEmailVerified: true,
@@ -189,8 +188,7 @@ test.describe('User List page', () => {
     const knownUser = {
       id: mockId('user-1'),
       email: 'admin@example.com',
-      firstName: 'Admin',
-      lastName: 'User',
+      name: 'Admin User',
       isActive: true,
       roles: ['admin'],
       isEmailVerified: true,
@@ -236,8 +234,7 @@ test.describe('User List page', () => {
     const knownUser = {
       id: mockId('user-3'),
       email: 'john@example.com',
-      firstName: 'John',
-      lastName: 'Smith',
+      name: 'John Smith',
       isActive: true,
       roles: ['user'],
       isEmailVerified: true,

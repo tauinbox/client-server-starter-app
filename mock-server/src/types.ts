@@ -16,8 +16,7 @@ export type {
 export interface MockUser {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   /** Null for an account created through a provider, which holds no password. */
   password: string | null;
   isActive: boolean;

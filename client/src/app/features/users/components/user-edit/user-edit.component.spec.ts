@@ -35,8 +35,7 @@ const mockUserRole: RoleAdminResponse = {
 const mockUser: User = {
   id: 'user-1',
   email: 'test@example.com',
-  firstName: 'Test',
-  lastName: 'User',
+  name: 'Test User',
   roles: [mockUserRole],
   isActive: true,
   isEmailVerified: true,
@@ -175,8 +174,7 @@ describe('UserEditComponent', () => {
       expect(component['loading']()).toBe(false);
       expect(component.userModel()).toEqual({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
     });
@@ -264,8 +262,7 @@ describe('UserEditComponent', () => {
     it('should require email', async () => {
       component.userModel.set({
         email: '',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       await fixture.whenStable();
@@ -276,8 +273,7 @@ describe('UserEditComponent', () => {
     it('should validate email format', async () => {
       component.userModel.set({
         email: 'not-an-email',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       await fixture.whenStable();
@@ -285,35 +281,24 @@ describe('UserEditComponent', () => {
       expect(errors.some((e) => e.kind === 'email')).toBe(true);
     });
 
-    it('should require firstName', async () => {
+    it.each(['', '   '])('should refuse the name %j', async (name) => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: '',
-        lastName: 'User',
+        name,
         password: ''
       });
       await fixture.whenStable();
-      const errors = component.userForm.firstName().errors();
-      expect(errors.some((e) => e.kind === 'required')).toBe(true);
-    });
-
-    it('should require lastName', async () => {
-      component.userModel.set({
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: '',
-        password: ''
-      });
-      await fixture.whenStable();
-      const errors = component.userForm.lastName().errors();
-      expect(errors.some((e) => e.kind === 'required')).toBe(true);
+      const errors = component.userForm.name().errors();
+      expect(errors.map((e) => [e.kind, e.message])).toContainEqual([
+        'required',
+        'users.edit.nameRequired'
+      ]);
     });
 
     it('should accept empty password (optional field)', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       await fixture.whenStable();
@@ -323,8 +308,7 @@ describe('UserEditComponent', () => {
     it('should validate password minLength of 8', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'short'
       });
       await fixture.whenStable();
@@ -335,8 +319,7 @@ describe('UserEditComponent', () => {
     it('names the minLength rule instead of the generic unknown message', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'short'
       });
       await fixture.whenStable();
@@ -350,8 +333,7 @@ describe('UserEditComponent', () => {
     it('accepts a password made only of lower-case letters', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'passwordonly'
       });
       await fixture.whenStable();
@@ -363,8 +345,7 @@ describe('UserEditComponent', () => {
     it('rejects a password longer than the server ceiling', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: `Aa1${'x'.repeat(126)}`
       });
       await fixture.whenStable();
@@ -379,8 +360,7 @@ describe('UserEditComponent', () => {
     it('keeps an empty password valid, since it means "unchanged"', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       await fixture.whenStable();
@@ -391,8 +371,7 @@ describe('UserEditComponent', () => {
     it('should accept password of 8+ characters', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'ValidPassword1'
       });
       await fixture.whenStable();
@@ -412,8 +391,7 @@ describe('UserEditComponent', () => {
     it('should be true when form is valid and dirty', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -423,8 +401,7 @@ describe('UserEditComponent', () => {
     it('should be false when form is invalid', async () => {
       component.userModel.set({
         email: '',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       await fixture.whenStable();
@@ -434,8 +411,7 @@ describe('UserEditComponent', () => {
     it('should be false when saving is in progress', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -620,8 +596,7 @@ describe('UserEditComponent', () => {
       // Make form dirty by changing a value
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       await fixture.whenStable();
@@ -630,8 +605,7 @@ describe('UserEditComponent', () => {
     it('should not submit when form is invalid', async () => {
       component.userModel.set({
         email: '',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       await fixture.whenStable();
@@ -642,8 +616,7 @@ describe('UserEditComponent', () => {
     it('should call updateUser with form values (no password)', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -651,8 +624,7 @@ describe('UserEditComponent', () => {
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         isActive: true
       });
     });
@@ -660,8 +632,7 @@ describe('UserEditComponent', () => {
     it('should include password when provided', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: 'newPassword1'
       });
       component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
@@ -681,8 +652,7 @@ describe('UserEditComponent', () => {
       permittedSignal.set(false);
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -690,8 +660,7 @@ describe('UserEditComponent', () => {
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User'
+        name: 'Changed User'
       });
     });
 
@@ -699,8 +668,7 @@ describe('UserEditComponent', () => {
       const navigateSpy = vi.spyOn(router, 'navigate');
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -714,13 +682,12 @@ describe('UserEditComponent', () => {
 
     it('should call updateCurrentUser when editing own account', async () => {
       currentUserSignal.set({ id: 'user-1' });
-      const updatedUser = { ...mockUser, firstName: 'Updated' };
+      const updatedUser = { ...mockUser, name: 'Updated' };
       usersStoreMock.updateUser.mockReturnValue(of(updatedUser));
 
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Updated',
-        lastName: 'User',
+        name: 'Updated User',
         password: ''
       });
       await fixture.whenStable();
@@ -733,8 +700,7 @@ describe('UserEditComponent', () => {
       currentUserSignal.set({ id: 'admin-id' });
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -746,8 +712,7 @@ describe('UserEditComponent', () => {
     it('should reset password field after successful update', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: 'OldPassword1'
       });
       component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
@@ -767,8 +732,7 @@ describe('UserEditComponent', () => {
 
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -786,8 +750,7 @@ describe('UserEditComponent', () => {
 
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -1029,8 +992,7 @@ describe('UserEditComponent', () => {
       fixture.detectChanges();
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();
@@ -1039,8 +1001,7 @@ describe('UserEditComponent', () => {
 
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User'
+        name: 'Changed User'
       });
     });
   });
@@ -1077,7 +1038,7 @@ describe('UserEditComponent', () => {
     it('saves a name edit of the own record with the stored address and no factor', async () => {
       currentUserSignal.set({ id: 'user-1' });
       fixture.detectChanges();
-      component.userModel.update((m) => ({ ...m, firstName: 'Changed' }));
+      component.userModel.update((m) => ({ ...m, name: 'Changed User' }));
       await fixture.whenStable();
 
       component.onSubmit();
@@ -1085,8 +1046,7 @@ describe('UserEditComponent', () => {
       expect(dialogMock.open).not.toHaveBeenCalled();
       expect(usersStoreMock.updateUser).toHaveBeenCalledWith('user-1', {
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User'
+        name: 'Changed User'
       });
     });
   });
@@ -1179,8 +1139,7 @@ describe('UserEditComponent', () => {
     function changePassword(): void {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'NewPassword1'
       });
     }
@@ -1193,8 +1152,7 @@ describe('UserEditComponent', () => {
     it('asks for nothing while neither the email nor the password changes', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Renamed',
-        lastName: 'User',
+        name: 'Renamed User',
         password: ''
       });
       await fixture.whenStable();
@@ -1288,8 +1246,7 @@ describe('UserEditComponent', () => {
 
       component.userModel.set({
         email: 'new@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
@@ -1310,8 +1267,7 @@ describe('UserEditComponent', () => {
 
       component.userModel.set({
         email: 'new@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
@@ -1329,8 +1285,7 @@ describe('UserEditComponent', () => {
 
       component.userModel.set({
         email: 'new@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: ''
       });
       component.stepUpPasswordModel.set({ currentPassword: 'AdminPass1' });
@@ -1346,8 +1301,7 @@ describe('UserEditComponent', () => {
     it('should not open dialog when only non-email fields changed', async () => {
       component.userModel.set({
         email: 'test@example.com',
-        firstName: 'Changed',
-        lastName: 'User',
+        name: 'Changed User',
         password: ''
       });
       await fixture.whenStable();

@@ -77,7 +77,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
     ]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Super', lastName: 'Target' })
+        .send({ email, password, name: 'Super Target' })
         .expect(201);
     }
 
@@ -253,9 +253,9 @@ runWithInfra('User writes on a super target (e2e)', () => {
     await request(http())
       .patch(`/api/v1/users/${await userId(superEmail)}`)
       .auth(token, { type: 'bearer' })
-      .send({ firstName: 'Renamed' })
+      .send({ name: 'Renamed' })
       .expect(200);
-    expect((await row(superEmail)).firstName).toBe('Renamed');
+    expect((await row(superEmail)).name).toBe('Renamed');
   }, 30000);
 
   it('lets the delegated role change an ordinary account', async () => {
@@ -264,9 +264,9 @@ runWithInfra('User writes on a super target (e2e)', () => {
     await request(http())
       .patch(`/api/v1/users/${await userId(plainEmail)}`)
       .auth(token, { type: 'bearer' })
-      .send({ firstName: 'Renamed' })
+      .send({ name: 'Renamed' })
       .expect(200);
-    expect((await row(plainEmail)).firstName).toBe('Renamed');
+    expect((await row(plainEmail)).name).toBe('Renamed');
   }, 30000);
   it('refuses a role assignment on a super account by a delegated role', async () => {
     const token = await tokenFor(supportEmail);

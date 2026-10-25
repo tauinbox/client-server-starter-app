@@ -83,8 +83,7 @@ test.describe('CAPTCHA soft-trigger', () => {
       createMockUser({
         id: mockId('user-401'),
         email: 'resend-captcha@example.com',
-        firstName: 'Resend',
-        lastName: 'Captcha',
+        name: 'Resend Captcha',
         password: 'Password1',
         isActive: true,
         roles: ['user'],

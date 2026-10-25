@@ -103,11 +103,11 @@ test.describe('Keyboard navigation', () => {
     // Wait for form to load
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
 
-    // Focus First name, change it, then tab through remaining fields
-    const firstNameInput = page.getByLabel('First name');
-    await firstNameInput.focus();
-    await expect(firstNameInput).toBeFocused();
-    await firstNameInput.fill('Updated');
+    // Focus the name, change it, then tab through remaining fields
+    const nameInput = page.getByLabel('Full name');
+    await nameInput.focus();
+    await expect(nameInput).toBeFocused();
+    await nameInput.fill('Updated');
 
     // Tab forward to reach the Save button
     const saveButton = page.getByRole('button', { name: 'Save', exact: true });

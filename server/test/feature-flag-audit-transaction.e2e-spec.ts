@@ -66,7 +66,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
 
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email: adminEmail, password, firstName: 'Flag', lastName: 'Tx' })
+      .send({ email: adminEmail, password, name: 'Flag Tx' })
       .expect(201);
     const superRole = await dataSource
       .getRepository(Role)

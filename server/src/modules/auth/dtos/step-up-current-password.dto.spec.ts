@@ -47,8 +47,7 @@ describe('step-up DTOs accept an absent currentPassword', () => {
   describe('UpdateProfileDto', () => {
     it('passes a password change that supplies no currentPassword', async () => {
       const result = await validate(UpdateProfileDto, {
-        firstName: 'John',
-        lastName: 'Doe',
+        name: 'John Doe',
         password: 'Password123'
       });
 

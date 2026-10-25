@@ -63,8 +63,7 @@ describe('RegisterComponent', () => {
     it('accepts 64 Cyrillic characters, which are 128 bytes', async () => {
       component.registerModel.set({
         email: 'user@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'Пароль1' + 'я'.repeat(57)
       });
       await fixture.whenStable();
@@ -75,8 +74,7 @@ describe('RegisterComponent', () => {
     it('rejects 129 characters on the length cap', async () => {
       component.registerModel.set({
         email: 'user@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'A1' + 'a'.repeat(127)
       });
       await fixture.whenStable();
@@ -101,8 +99,7 @@ describe('RegisterComponent', () => {
     it('should validate email format', async () => {
       component.registerModel.set({
         email: 'invalid',
-        firstName: '',
-        lastName: '',
+        name: '',
         password: ''
       });
       await fixture.whenStable();
@@ -111,22 +108,26 @@ describe('RegisterComponent', () => {
 
       component.registerModel.set({
         email: 'test@example.com',
-        firstName: '',
-        lastName: '',
+        name: '',
         password: ''
       });
       await fixture.whenStable();
       expect(component.registerForm.email().valid()).toBe(true);
     });
 
-    it('should require firstName', () => {
-      const errors = component.registerForm.firstName().errors();
+    it('should require name', () => {
+      const errors = component.registerForm.name().errors();
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
-    it('should require lastName', () => {
-      const errors = component.registerForm.lastName().errors();
-      expect(errors.some((e) => e.kind === 'required')).toBe(true);
+    it('should refuse a name of spaces only', async () => {
+      component.registerModel.update((m) => ({ ...m, name: '   ' }));
+      await fixture.whenStable();
+      const errors = component.registerForm.name().errors();
+      expect(errors.map((e) => [e.kind, e.message])).toContainEqual([
+        'required',
+        'auth.register.nameRequired'
+      ]);
     });
 
     it('should require password', () => {
@@ -137,8 +138,7 @@ describe('RegisterComponent', () => {
     it('should enforce password minLength of 8', async () => {
       component.registerModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'short'
       });
       await fixture.whenStable();
@@ -147,8 +147,7 @@ describe('RegisterComponent', () => {
 
       component.registerModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'LongPassword1'
       });
       await fixture.whenStable();
@@ -158,8 +157,7 @@ describe('RegisterComponent', () => {
     it('accepts a password made only of lower-case letters', async () => {
       component.registerModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'passwordonly'
       });
       await fixture.whenStable();
@@ -171,8 +169,7 @@ describe('RegisterComponent', () => {
     it('rejects a password longer than the server ceiling', async () => {
       component.registerModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: `Aa1${'x'.repeat(126)}`
       });
       await fixture.whenStable();
@@ -187,8 +184,7 @@ describe('RegisterComponent', () => {
     it('should be valid with correct values', async () => {
       component.registerModel.set({
         email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
+        name: 'Test User',
         password: 'Password123'
       });
       await fixture.whenStable();
@@ -199,8 +195,7 @@ describe('RegisterComponent', () => {
   describe('onSubmit', () => {
     const validForm = {
       email: 'test@example.com',
-      firstName: 'Test',
-      lastName: 'User',
+      name: 'Test User',
       password: 'Password123'
     };
 
@@ -321,8 +316,7 @@ describe('RegisterComponent', () => {
   describe('captcha soft-trigger', () => {
     const validForm = {
       email: 'test@example.com',
-      firstName: 'Test',
-      lastName: 'User',
+      name: 'Test User',
       password: 'Password123'
     };
 

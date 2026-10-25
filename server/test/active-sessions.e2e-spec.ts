@@ -69,7 +69,7 @@ runWithInfra('Active sessions (e2e)', () => {
     for (const email of [ownerEmail, otherEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Session', lastName: 'Owner' })
+        .send({ email, password, name: 'Session Owner' })
         .expect(201);
     }
   }, 60000);

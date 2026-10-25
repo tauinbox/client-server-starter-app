@@ -31,8 +31,8 @@ runWithInfra('keyset pagination sort-column precision (e2e)', () => {
     await ds.initialize();
 
     await ds.query(
-      `INSERT INTO users (email, "firstName", "lastName", created_at)
-       SELECT $1 || i || '@example.com', 'Keyset', 'Precision',
+      `INSERT INTO users (email, "name", created_at)
+       SELECT $1 || i || '@example.com', 'Keyset Precision',
               TIMESTAMPTZ '2026-01-01 00:00:00+00' + (i * INTERVAL '100 microseconds')
          FROM generate_series(0, $2::int - 1) AS i`,
       [emailPrefix, ROW_COUNT]

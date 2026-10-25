@@ -49,8 +49,7 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
     const user = await repository.save(
       repository.create({
         email,
-        firstName: 'Stream',
-        lastName: 'Guard',
+        name: 'Stream Guard',
         isEmailVerified: true,
         password: null
       })

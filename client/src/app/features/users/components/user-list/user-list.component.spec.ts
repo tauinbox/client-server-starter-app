@@ -32,8 +32,7 @@ const mockUserRole: RoleAdminResponse = {
 const mockUser: User = {
   id: 'user-1',
   email: 'test@example.com',
-  firstName: 'Test',
-  lastName: 'User',
+  name: 'Test User',
   roles: [mockUserRole],
   isActive: true,
   isEmailVerified: true,
@@ -260,11 +259,11 @@ describe('UserListComponent', () => {
       });
     });
 
-    it('maps the name column to firstName', () => {
+    it('maps the name column to name', () => {
       component.sortData({ active: 'name', direction: 'desc' });
 
       expect(lastNavigation().queryParams).toMatchObject({
-        'users.sortBy': 'firstName',
+        'users.sortBy': 'name',
         'users.sortOrder': null
       });
     });
@@ -281,7 +280,7 @@ describe('UserListComponent', () => {
     it('marks the sorted column in the table, and none for the default sort', () => {
       expect(component.sort()).toEqual({ active: '', direction: '' });
 
-      usersStoreMock.sortBy.set('firstName');
+      usersStoreMock.sortBy.set('name');
       usersStoreMock.sortOrder.set('asc');
 
       expect(component.sort()).toEqual({ active: 'name', direction: 'asc' });

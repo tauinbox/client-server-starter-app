@@ -39,7 +39,7 @@ export const USER_SEARCH_LIMIT = 10;
 export function userToChip(user: User): ChipOption {
   return {
     value: user.id,
-    label: `${user.firstName} ${user.lastName}`.trim() || user.email,
+    label: user.name || user.email,
     sub: user.email
   };
 }

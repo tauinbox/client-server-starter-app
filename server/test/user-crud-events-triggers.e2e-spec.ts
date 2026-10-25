@@ -76,8 +76,7 @@ runWithInfra(
       return repository.save(
         repository.create({
           email,
-          firstName: 'Crud',
-          lastName: 'Trigger',
+          name: 'Crud Trigger',
           isEmailVerified: true,
           password: null,
           ...extra
@@ -238,15 +237,13 @@ runWithInfra(
       await authService.register({
         email: emails.registered,
         password: 'Sunrise-Kettle-19',
-        firstName: 'Self',
-        lastName: 'Registered'
+        name: 'Self Registered'
       });
       await app.get(OAuthService).loginWithOAuth({
         provider: 'vk',
         providerId: `vk-${randomBytes(6).toString('hex')}`,
         email: emails.provider,
-        firstName: 'Provider',
-        lastName: 'Signup',
+        name: 'Provider Signup',
         emailVerified: true
       });
 
@@ -303,7 +300,7 @@ runWithInfra(
       );
       await authController.updateProfile(
         requestOf(target.id),
-        { lastName: 'Renamed' },
+        { name: 'Renamed' },
         res
       );
 

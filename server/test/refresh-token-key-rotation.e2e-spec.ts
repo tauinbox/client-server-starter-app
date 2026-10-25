@@ -57,8 +57,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     const user = await dataSource.getRepository(User).save(
       dataSource.getRepository(User).create({
         email,
-        firstName: 'Key',
-        lastName: 'Rotation',
+        name: 'Key Rotation',
         password: null
       })
     );
@@ -146,8 +145,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     const mfaUser = await dataSource.getRepository(User).save(
       dataSource.getRepository(User).create({
         email: mfaEmail,
-        firstName: 'Key',
-        lastName: 'Rotation',
+        name: 'Key Rotation',
         password: null,
         totpEnabledAt: new Date()
       })

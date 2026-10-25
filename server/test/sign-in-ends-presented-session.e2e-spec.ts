@@ -84,7 +84,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
     for (const email of [ownerEmail, otherEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, firstName: 'Relogin', lastName: 'Owner' })
+        .send({ email, password, name: 'Relogin Owner' })
         .expect(201);
     }
     await dataSource
@@ -188,15 +188,13 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
       provider: 'google',
       providerId: `google-${stamp}`,
       email: oauthEmail,
-      firstName: 'Relogin',
-      lastName: 'Provider',
+      name: 'Relogin Provider',
       emailVerified: true
     };
     const user = await dataSource.getRepository(User).save(
       dataSource.getRepository(User).create({
         email: oauthEmail,
-        firstName: 'Relogin',
-        lastName: 'Provider',
+        name: 'Relogin Provider',
         password: null,
         isEmailVerified: true
       })

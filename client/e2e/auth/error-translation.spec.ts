@@ -131,10 +131,8 @@ test.describe('Error translation: register component errors', () => {
     const main = page.getByRole('main');
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
-    await page.getByLabel('First name').fill('John');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Doe');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('John Doe');
+    await page.getByLabel('Full name').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
     await main.getByRole('button', { name: 'Register' }).click();
 

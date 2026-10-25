@@ -69,8 +69,7 @@ async function claimAsPendingEmail(): Promise<void> {
 
 const createBody = {
   email: CLAIMED_EMAIL,
-  firstName: 'Pending',
-  lastName: 'Claim',
+  name: 'Pending Claim',
   password: 'Sunrise-Kettle-19'
 };
 

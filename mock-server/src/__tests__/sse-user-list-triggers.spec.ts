@@ -126,8 +126,7 @@ describe('SSE user list events outside the admin user routes', () => {
       await call('POST', '/auth/register', null, {
         email: 'sse-registered@example.com',
         password: 'Sunrise-Kettle-19',
-        firstName: 'Self',
-        lastName: 'Registered'
+        name: 'Self Registered'
       })
     ).toBe(201);
 
@@ -170,7 +169,7 @@ describe('SSE user list events outside the admin user routes', () => {
       await call('PATCH', '/auth/profile', userToken, { locale: 'ru' })
     ).toBe(200);
     expect(
-      await call('PATCH', '/auth/profile', userToken, { lastName: 'Renamed' })
+      await call('PATCH', '/auth/profile', userToken, { name: 'Renamed' })
     ).toBe(200);
 
     await wait(100);

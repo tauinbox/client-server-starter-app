@@ -21,11 +21,10 @@ import { ALLOWED_USER_SORT_COLUMNS } from './user.constants';
 export const MAX_LIST_FILTER_LENGTH = 255;
 
 export const USER_LIST_QUERY = {
-  search: ['email', 'firstName', 'lastName', 'id'],
+  search: ['email', 'name', 'id'],
   filters: {
     email: { kind: 'contains' },
-    firstName: { kind: 'contains' },
-    lastName: { kind: 'contains' },
+    name: { kind: 'contains' },
     ids: { kind: 'uuidList', field: 'id' },
     isActive: { kind: 'boolean' },
     isEmailVerified: { kind: 'boolean' },

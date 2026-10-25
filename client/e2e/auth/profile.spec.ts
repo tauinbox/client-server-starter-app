@@ -59,8 +59,7 @@ test.describe('Profile page', () => {
           body: JSON.stringify({
             id: mockId('user-100'),
             email: 'testlogin@example.com',
-            firstName: 'John',
-            lastName: 'Doe',
+            name: 'John Doe',
             isActive: false,
             roles: ['user'],
             isEmailVerified: true,
@@ -85,8 +84,7 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await expect(page.getByLabel('First name')).toHaveValue('John');
-    await expect(page.getByLabel('Last name')).toHaveValue('Doe');
+    await expect(page.getByLabel('Full name')).toHaveValue('John Doe');
     await expect(page.getByLabel('New password (optional)')).toHaveValue('');
   });
 
@@ -107,39 +105,28 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
+    await page.getByLabel('Full name').fill('Jane');
+    await page.getByLabel('Full name').blur();
 
     await expect(
       page.getByRole('button', { name: 'Save', exact: true })
     ).toBeEnabled();
   });
 
-  test('should disable submit button when first name is empty', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url);
+  for (const value of ['', '   ']) {
+    test(`should disable submit button when the name is ${JSON.stringify(value)}`, async ({
+      _mockServer,
+      page
+    }) => {
+      await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('First name').clear();
+      await page.getByLabel('Full name').fill(value);
 
-    await expect(
-      page.getByRole('button', { name: 'Save', exact: true })
-    ).toBeDisabled();
-  });
-
-  test('should disable submit button when last name is empty', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url);
-
-    await page.getByLabel('Last name').clear();
-
-    await expect(
-      page.getByRole('button', { name: 'Save', exact: true })
-    ).toBeDisabled();
-  });
+      await expect(
+        page.getByRole('button', { name: 'Save', exact: true })
+      ).toBeDisabled();
+    });
+  }
 
   test('should disable submit button with short password', async ({
     _mockServer,
@@ -191,7 +178,7 @@ test.describe('Profile page', () => {
 
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Confirm new password').fill('different1');
-    await page.getByLabel('First name').click();
+    await page.getByLabel('Full name').click();
 
     await expect(page.getByText(/passwords do not match/i)).toBeVisible();
     await expect(
@@ -202,10 +189,8 @@ test.describe('Profile page', () => {
   test('should update profile successfully', async ({ _mockServer, page }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Smith');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('Jane Smith');
+    await page.getByLabel('Full name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('Profile updated successfully')).toBeVisible();
@@ -217,10 +202,8 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
-    await page.getByLabel('Last name').fill('Smith');
-    await page.getByLabel('Last name').blur();
+    await page.getByLabel('Full name').fill('Jane Smith');
+    await page.getByLabel('Full name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(
@@ -234,8 +217,8 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
+    await page.getByLabel('Full name').fill('Jane');
+    await page.getByLabel('Full name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('Profile updated successfully')).toBeVisible();
@@ -250,8 +233,8 @@ test.describe('Profile page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
+    await page.getByLabel('Full name').fill('Jane Roe');
+    await page.getByLabel('Full name').blur();
     await page.getByLabel('Email').fill('changed@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Current password').fill('Password1');
@@ -262,7 +245,7 @@ test.describe('Profile page', () => {
       page.getByText(/Profile updated\. Confirmation link sent/)
     ).toBeVisible();
     // The name reached the server; the address waits for the emailed link.
-    await expect(page.getByRole('heading', { name: 'Jane Doe' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Jane Roe' })).toBeVisible();
     await expect(page.getByLabel('Email')).toHaveValue('testlogin@example.com');
   });
 
@@ -283,36 +266,26 @@ test.describe('Profile page', () => {
       return route.fallback();
     });
 
-    await page.getByLabel('First name').fill('Jane');
-    await page.getByLabel('First name').blur();
+    await page.getByLabel('Full name').fill('Jane');
+    await page.getByLabel('Full name').blur();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
   });
 
-  test('should show validation error for empty first name', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url);
+  for (const value of ['', '   ']) {
+    test(`should show validation error for the name ${JSON.stringify(value)}`, async ({
+      _mockServer,
+      page
+    }) => {
+      await loginViaUi(page, _mockServer.url);
 
-    await page.getByLabel('First name').clear();
-    await page.getByLabel('Last name').click();
+      await page.getByLabel('Full name').fill(value);
+      await page.getByLabel('Email').click();
 
-    await expect(page.getByText('First name is required')).toBeVisible();
-  });
-
-  test('should show validation error for empty last name', async ({
-    _mockServer,
-    page
-  }) => {
-    await loginViaUi(page, _mockServer.url);
-
-    await page.getByLabel('Last name').clear();
-    await page.getByLabel('First name').click();
-
-    await expect(page.getByText('Last name is required')).toBeVisible();
-  });
+      await expect(page.getByText('Full name is required')).toBeVisible();
+    });
+  }
 
   test('should show password validation error', async ({
     _mockServer,
@@ -321,7 +294,7 @@ test.describe('Profile page', () => {
     await loginViaUi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('short');
-    await page.getByLabel('First name').click();
+    await page.getByLabel('Full name').click();
 
     await expect(
       page.getByText('Password must be at least 8 characters')

@@ -89,7 +89,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
     ['a changed email', { email: 'moved@example.com' }],
     [
       'a changed email beside a name',
-      { email: 'moved@example.com', firstName: 'Moved' }
+      { email: 'moved@example.com', name: 'Moved' }
     ]
   ])(
     'refuses %s on the own record before it reads a factor',
@@ -105,7 +105,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
         ErrorKeys.USERS.CREDENTIAL_SELF
       );
       expect(self.email).toBe('user@example.com');
-      expect(self.firstName).not.toBe('Moved');
+      expect(self.name).not.toBe('Moved');
       expect(self.password).toBe(SEED_PASSWORD);
       expect(stepUpFailures('user@example.com')).toHaveLength(before);
     }
@@ -128,13 +128,11 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
     const token = await login('user@example.com');
     const self = findUserByEmail('user@example.com')!;
 
-    expect((await patch(token, self.id, { firstName: 'Renamed' })).status).toBe(
-      200
-    );
+    expect((await patch(token, self.id, { name: 'Renamed' })).status).toBe(200);
     expect(
       (await patch(token, self.id, { email: 'user@example.com' })).status
     ).toBe(200);
-    expect(self.firstName).toBe('Renamed');
+    expect(self.name).toBe('Renamed');
   });
 
   it('answers 403 for another record before it reads a factor', async () => {

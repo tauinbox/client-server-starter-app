@@ -47,8 +47,7 @@ runWithInfra(
       provider: 'google',
       providerId: `google-${stamp}`,
       email: `oauth-exchange-${stamp}@example.com`,
-      firstName: 'Exchange',
-      lastName: 'Owner',
+      name: 'Exchange Owner',
       emailVerified: true
     };
 
@@ -93,8 +92,7 @@ runWithInfra(
       user = await dataSource.getRepository(User).save(
         dataSource.getRepository(User).create({
           email: profile.email,
-          firstName: profile.firstName,
-          lastName: profile.lastName,
+          name: profile.name,
           password: null,
           isEmailVerified: true
         })

@@ -49,8 +49,7 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
     const user = await repository.save(
       repository.create({
         email,
-        firstName: 'Stream',
-        lastName: 'Cap',
+        name: 'Stream Cap',
         isEmailVerified: true,
         password: null
       })

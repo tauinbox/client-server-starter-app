@@ -63,8 +63,7 @@ runWithInfra(
       user = await users.save(
         users.create({
           email: `refund-push-${stamp}@example.com`,
-          firstName: 'Refund',
-          lastName: 'Push',
+          name: 'Refund Push',
           isEmailVerified: true,
           password: null
         })

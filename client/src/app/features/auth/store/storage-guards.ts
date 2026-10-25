@@ -14,8 +14,7 @@ export function isPersistedUser(value: unknown): value is UserResponse {
     isRecord(value) &&
     typeof value['id'] === 'string' &&
     typeof value['email'] === 'string' &&
-    typeof value['firstName'] === 'string' &&
-    typeof value['lastName'] === 'string' &&
+    typeof value['name'] === 'string' &&
     Array.isArray(value['roles'])
   );
 }

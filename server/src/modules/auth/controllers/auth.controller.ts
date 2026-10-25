@@ -276,8 +276,7 @@ export class AuthController {
       ...updatePayload
     } = updateProfileDto;
     const previous =
-      updatePayload.firstName !== undefined ||
-      updatePayload.lastName !== undefined
+      updatePayload.name !== undefined
         ? await this.userService.findOne(req.user.userId, SYSTEM_ABILITY)
         : undefined;
     // Self-service route: the target is pinned to the authenticated caller and
@@ -288,11 +287,7 @@ export class AuthController {
       updatePayload,
       SYSTEM_ABILITY
     );
-    if (
-      previous &&
-      (previous.firstName !== updatedUser.firstName ||
-        previous.lastName !== updatedUser.lastName)
-    ) {
+    if (previous && previous.name !== updatedUser.name) {
       this.eventEmitter.emit(
         UserUpdatedEvent.name,
         new UserUpdatedEvent(req.user.userId, previous)

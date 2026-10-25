@@ -23,8 +23,7 @@ function lockedUser(): User {
   return Object.assign(new User(), {
     id: '00000000-0000-4000-8000-000000000001',
     email: 'serializer@example.com',
-    firstName: 'Serial',
-    lastName: 'Izer',
+    name: 'Serial Izer',
     password: '$2b$12$secret-hash',
     failedLoginAttempts: 3,
     lockedUntil: new Date('2030-01-01T00:00:00.000Z')

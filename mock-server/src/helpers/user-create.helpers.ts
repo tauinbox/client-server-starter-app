@@ -8,6 +8,7 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import {
   isValidEmail,
   passwordLengthError,
+  trimName,
   validateLocale,
   validateMaxLength
 } from '../utils/validation';
@@ -18,8 +19,7 @@ import type { MockUser } from '../types';
 
 export interface CreateUserFields {
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   password: string;
   locale: string;
 }
@@ -56,9 +56,10 @@ export function validateCreateUserDto(
   body: Record<string, unknown>
 ): CreateUserDtoResult {
   const email = normalizeEmail(body['email']) ?? '';
-  const { firstName, lastName, password, locale } = body;
+  const { password, locale } = body;
+  const name = trimName(body['name']);
 
-  if (!email || !firstName || !lastName || !password) {
+  if (!email || !name || !password) {
     return {
       ok: false,
       status: 400,
@@ -76,8 +77,7 @@ export function validateCreateUserDto(
 
   const lengthErr =
     validateMaxLength(email, MAX_EMAIL_LENGTH, 'email') ||
-    validateMaxLength(firstName, MAX_NAME_LENGTH, 'firstName') ||
-    validateMaxLength(lastName, MAX_NAME_LENGTH, 'lastName') ||
+    validateMaxLength(name, MAX_NAME_LENGTH, 'name') ||
     passwordLengthError(password);
   if (lengthErr) {
     return { ok: false, status: 400, body: validationError(lengthErr) };
@@ -91,8 +91,7 @@ export function validateCreateUserDto(
   // Every field above cleared a length check, which rejects non-strings.
   const fields: CreateUserFields = {
     email,
-    firstName: String(firstName),
-    lastName: String(lastName),
+    name: String(name),
     password: String(password),
     locale: typeof locale === 'string' ? locale : 'en'
   };
@@ -157,8 +156,7 @@ export function buildMockUser(
   return {
     id: randomUUID(),
     email: fields.email,
-    firstName: fields.firstName,
-    lastName: fields.lastName,
+    name: fields.name,
     password: fields.password, // Stored as plaintext - mock only. Real server uses bcrypt.
     isActive: true,
     roles: ['user'],

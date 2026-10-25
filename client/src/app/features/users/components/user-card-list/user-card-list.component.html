@@ -7,7 +7,7 @@
         </div>
         <div class="user-card-titles">
           <mat-card-title>
-            {{ user.firstName }} {{ user.lastName }}
+            {{ user.name }}
           </mat-card-title>
           <mat-card-subtitle class="user-card-email">
             {{ user.email }}
@@ -19,13 +19,7 @@
           [matMenuTriggerFor]="actionsMenu"
           [matMenuTriggerData]="{ user: user }"
           [matTooltip]="t('users.table.columnActions')"
-          [attr.aria-label]="
-            t('users.table.columnActions') +
-            ': ' +
-            user.firstName +
-            ' ' +
-            user.lastName
-          "
+          [attr.aria-label]="t('users.table.columnActions') + ': ' + user.name"
         >
           <mat-icon>more_vert</mat-icon>
         </button>
@@ -88,8 +82,7 @@
             (click)="restoreUser.emit(user)"
             [attr.aria-label]="
               t('users.table.actionRestoreAria', {
-                firstName: user.firstName,
-                lastName: user.lastName
+                name: user.name
               })
             "
           >
@@ -103,8 +96,7 @@
           [routerLink]="['/admin/users', user.id]"
           [attr.aria-label]="
             t('users.table.actionViewDetailsAria', {
-              firstName: user.firstName,
-              lastName: user.lastName
+              name: user.name
             })
           "
         >
@@ -123,8 +115,7 @@
             [routerLink]="['/admin/users', user.id, 'edit']"
             [attr.aria-label]="
               t('users.table.actionEditAria', {
-                firstName: user.firstName,
-                lastName: user.lastName
+                name: user.name
               })
             "
           >
@@ -145,8 +136,7 @@
             (click)="deleteUser.emit(user)"
             [attr.aria-label]="
               t('users.table.actionDeleteAria', {
-                firstName: user.firstName,
-                lastName: user.lastName
+                name: user.name
               })
             "
           >

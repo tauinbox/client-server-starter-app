@@ -59,7 +59,7 @@ test.describe('Sign-out on a role change', () => {
     await loginViaUiKeepSse(page, _mockServer.url, { id: userId });
     await page.goto('/profile');
     // The address bar shows /profile before the router commits it.
-    await expect(page.getByLabel('First name')).toBeVisible();
+    await expect(page.getByLabel('Full name')).toBeVisible();
 
     await assignEditorRole(_mockServer.url, userId);
 

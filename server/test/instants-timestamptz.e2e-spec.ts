@@ -130,9 +130,9 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
       await runner.query("SET LOCAL TIME ZONE 'America/Los_Angeles'");
 
       const [{ id: userId }] = (await runner.query(
-        `INSERT INTO users (email, "firstName", "lastName")
-         VALUES ($1, $2, $3) RETURNING id`,
-        [`tsz-${Date.now()}@example.com`, 'Ts', 'Z']
+        `INSERT INTO users (email, "name")
+         VALUES ($1, $2) RETURNING id`,
+        [`tsz-${Date.now()}@example.com`, 'Ts Z']
       )) as Array<{ id: string }>;
 
       const instant = new Date('2026-07-01T05:30:00.000Z');

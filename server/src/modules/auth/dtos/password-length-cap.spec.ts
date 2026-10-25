@@ -57,8 +57,7 @@ describe('Password length cap', () => {
       CreateUserDto,
       {
         email: 'new.user@example.com',
-        firstName: 'New',
-        lastName: 'User'
+        name: 'New User'
       }
     ]
   ];

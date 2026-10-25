@@ -71,8 +71,7 @@ function mockLocalAuthRequest(
   const user: UserResponseDto = {
     id,
     email,
-    firstName: 'Admin',
-    lastName: 'User',
+    name: 'Admin User',
     isActive: true,
     roles: [mockAdminRole],
     isEmailVerified: true,
@@ -165,8 +164,7 @@ describe('AuthController', () => {
     user: {
       id: 'user-1',
       email: 'admin@example.com',
-      firstName: 'Admin',
-      lastName: 'User',
+      name: 'Admin User',
       isActive: true,
       roles: [mockAdminRole],
       isEmailVerified: true,
@@ -302,8 +300,7 @@ describe('AuthController', () => {
       const dto = {
         email: 'new@example.com',
         password: 'Password1',
-        firstName: 'New',
-        lastName: 'User'
+        name: 'New User'
       };
       const req = mockExpressRequest() as ExpressRequest;
 
@@ -713,7 +710,7 @@ describe('AuthController', () => {
     it('should update user profile and return updated user without logout when no password change', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
       const res = mockResponse();
-      const dto = { firstName: 'Updated' };
+      const dto = { name: 'Updated' };
 
       const result = await controller.updateProfile(req, dto, res);
 
@@ -731,14 +728,14 @@ describe('AuthController', () => {
 
     it('announces a name change with the record before the write', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
-      const previous = { id: 'user-1', firstName: 'Old', lastName: 'Name' };
+      const previous = { id: 'user-1', name: 'Old Name' };
       userServiceMock.findOne.mockResolvedValueOnce(previous);
       userServiceMock.update.mockResolvedValueOnce({
         ...previous,
-        firstName: 'New'
+        name: 'New'
       });
 
-      await controller.updateProfile(req, { firstName: 'New' }, mockResponse());
+      await controller.updateProfile(req, { name: 'New' }, mockResponse());
 
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         UserUpdatedEvent.name,
@@ -748,13 +745,13 @@ describe('AuthController', () => {
 
     it('announces nothing when the name does not change', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
-      const previous = { id: 'user-1', firstName: 'Same', lastName: 'Name' };
+      const previous = { id: 'user-1', name: 'Same Name' };
       userServiceMock.findOne.mockResolvedValueOnce(previous);
       userServiceMock.update.mockResolvedValueOnce(previous);
 
       await controller.updateProfile(
         req,
-        { firstName: 'Same', locale: 'ru' },
+        { name: 'Same', locale: 'ru' },
         mockResponse()
       );
 
@@ -837,7 +834,7 @@ describe('AuthController', () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
       const res = mockResponse();
 
-      await controller.updateProfile(req, { firstName: 'Updated' }, res);
+      await controller.updateProfile(req, { name: 'Updated' }, res);
 
       expect(
         mailServiceMock.sendPasswordChangedNotification

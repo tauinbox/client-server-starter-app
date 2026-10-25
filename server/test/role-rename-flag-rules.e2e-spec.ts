@@ -67,8 +67,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     holder = await userRepository.save(
       userRepository.create({
         email,
-        firstName: 'Flag',
-        lastName: 'Holder',
+        name: 'Flag Holder',
         isEmailVerified: true,
         password: null
       })

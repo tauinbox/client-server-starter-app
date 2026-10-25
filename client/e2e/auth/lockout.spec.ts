@@ -43,8 +43,7 @@ test.describe('Account lockout', () => {
       createMockUser({
         id: mockId('user-200'),
         email: 'locked@example.com',
-        firstName: 'Locked',
-        lastName: 'User',
+        name: 'Locked User',
         password: 'Password1',
         isActive: true,
         roles: ['user'],
@@ -82,8 +81,7 @@ test.describe('Account lockout', () => {
       createMockUser({
         id: mockId('user-201'),
         email: 'lockeduser@example.com',
-        firstName: 'Locked',
-        lastName: 'Account',
+        name: 'Locked Account',
         password: 'Password1',
         isActive: true,
         roles: ['user'],

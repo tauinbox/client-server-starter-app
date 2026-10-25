@@ -75,8 +75,7 @@ describe('OAuthService', () => {
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     password: '$2b$10$hashedpassword',
     isActive: true,
     isEmailVerified: true,
@@ -182,8 +181,7 @@ describe('OAuthService', () => {
       provider: 'google',
       providerId: 'google-123',
       email: 'oauth@example.com',
-      firstName: 'OAuth',
-      lastName: 'User',
+      name: 'OAuth User',
       emailVerified: true
     };
 
@@ -191,8 +189,7 @@ describe('OAuthService', () => {
       ...mockUser,
       id: 'oauth-user-1',
       email: 'oauth@example.com',
-      firstName: 'OAuth',
-      lastName: 'User',
+      name: 'OAuth User',
       password: null,
       isEmailVerified: true
     };
@@ -582,6 +579,26 @@ describe('OAuthService', () => {
       );
     });
 
+    it('names a new account after the email local part when the provider sends no name', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        null
+      );
+      mockManager.save.mockResolvedValueOnce(oauthUser).mockResolvedValueOnce({
+        id: 'oauth-account-1',
+        userId: 'oauth-user-1',
+        provider: 'google',
+        providerId: 'google-123'
+      });
+      mockUsersService.findOne.mockResolvedValue(oauthUser);
+
+      await service.loginWithOAuth({ ...oauthProfile, name: '' });
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        User,
+        expect.objectContaining({ name: 'oauth' })
+      );
+    });
+
     it('should create new verified user when provider asserts emailVerified=true', async () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
@@ -603,8 +620,7 @@ describe('OAuthService', () => {
         expect.anything(),
         expect.objectContaining({
           email: 'oauth@example.com',
-          firstName: 'OAuth',
-          lastName: 'User',
+          name: 'OAuth User',
           password: null,
           isEmailVerified: true,
           emailVerificationToken: null,

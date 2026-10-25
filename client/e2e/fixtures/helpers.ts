@@ -151,8 +151,7 @@ export async function loginViaUi(
   const user = {
     id: overrides.id ?? '100',
     email,
-    firstName: overrides.firstName ?? 'John',
-    lastName: overrides.lastName ?? 'Doe',
+    name: overrides.name ?? 'John Doe',
     password,
     isActive: overrides.isActive ?? true,
     roles: overrides.roles ?? ['user'],
@@ -185,10 +184,7 @@ export async function loginViaUi(
     await page.goto('/profile');
   }
   await expect(
-    page.getByRole('heading', {
-      level: 2,
-      name: `${user.firstName} ${user.lastName}`
-    })
+    page.getByRole('heading', { level: 2, name: user.name })
   ).toBeVisible();
 }
 
@@ -228,8 +224,7 @@ export async function loginViaUiKeepSse(
   const user = {
     id: overrides.id ?? '100',
     email,
-    firstName: overrides.firstName ?? 'John',
-    lastName: overrides.lastName ?? 'Doe',
+    name: overrides.name ?? 'John Doe',
     password,
     isActive: overrides.isActive ?? true,
     roles: overrides.roles ?? ['user'],

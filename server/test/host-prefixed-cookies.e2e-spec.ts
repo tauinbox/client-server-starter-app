@@ -66,8 +66,7 @@ const oauthProfile: OAuthUserProfile = {
   provider: 'google',
   providerId: 'google-123',
   email: 'user@example.com',
-  firstName: 'John',
-  lastName: 'Doe',
+  name: 'John Doe',
   emailVerified: true
 };
 
@@ -75,8 +74,7 @@ function createUserEntity(): User {
   return Object.assign(new User(), {
     id: 'user-1',
     email: 'user@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     isActive: true,
     roles: [],
     isEmailVerified: true,

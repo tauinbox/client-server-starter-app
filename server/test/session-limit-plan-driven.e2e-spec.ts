@@ -102,8 +102,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
   const userRecord: User = {
     id: USER_ID,
     email: 'alice@example.com',
-    firstName: 'Alice',
-    lastName: 'Doe',
+    name: 'Alice Doe',
     isActive: true,
     isEmailVerified: true,
     roles: [

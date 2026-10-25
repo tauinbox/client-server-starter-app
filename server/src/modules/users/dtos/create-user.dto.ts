@@ -29,20 +29,15 @@ export class CreateUserDto {
   email: string;
 
   @ApiProperty({
-    description: 'The first name of the user',
-    example: 'John'
+    description: 'The full name of the user, in the order the user writes it',
+    example: 'John Doe'
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value
+  )
   @IsNotEmpty()
   @MaxLength(MAX_NAME_LENGTH)
-  firstName: string;
-
-  @ApiProperty({
-    description: 'The last name of the user',
-    example: 'Doe'
-  })
-  @IsNotEmpty()
-  @MaxLength(MAX_NAME_LENGTH)
-  lastName: string;
+  name: string;
 
   @ApiProperty({
     description:

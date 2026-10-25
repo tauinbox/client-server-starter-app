@@ -126,8 +126,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       users[key] = await userRepository.save(
         userRepository.create({
           email: emails[key],
-          firstName: 'Deny',
-          lastName: key,
+          name: `Deny ${key}`,
           isEmailVerified: true,
           password: null
         })

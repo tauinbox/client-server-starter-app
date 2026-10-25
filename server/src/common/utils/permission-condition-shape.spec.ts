@@ -106,7 +106,7 @@ describe('permission condition shape key validation', () => {
 
   describe('findConditionFieldError', () => {
     it.each([
-      ['a misspelt fieldMatch key', { fieldMatch: { lastname: ['Typo'] } }],
+      ['a misspelt fieldMatch key', { fieldMatch: { Name: ['Typo'] } }],
       ['an excluded column', { fieldMatch: { password: ['x'] } }],
       ['an ownership field', { ownership: { userField: 'createdBy' } }],
       ['a userAttr key', { userAttr: { ownerId: 'id' } }],
@@ -124,8 +124,8 @@ describe('permission condition shape key validation', () => {
         findConditionFieldError('User', {
           effect: 'deny',
           ownership: { userField: 'id' },
-          fieldMatch: { lastName: ['Alpha'], isActive: [true] },
-          custom: '{"$and":[{"email":{"$nin":["a@x.io"]}},{"firstName":"A"}]}'
+          fieldMatch: { name: ['Alpha'], isActive: [true] },
+          custom: '{"$and":[{"email":{"$nin":["a@x.io"]}},{"name":"A"}]}'
         })
       ).toBeNull();
     });

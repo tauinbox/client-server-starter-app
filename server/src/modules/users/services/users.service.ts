@@ -37,14 +37,12 @@ import { applyAbilityToUserQuery } from '../../../common/utils/apply-ability.uti
 const USER_LIST_COLUMNS: ListColumns<typeof USER_LIST_QUERY> = {
   search: {
     email: 'user.email',
-    firstName: 'user.firstName',
-    lastName: 'user.lastName',
+    name: 'user.name',
     id: 'CAST(user.id AS text)'
   },
   filters: {
     email: 'user.email',
-    firstName: 'user.firstName',
-    lastName: 'user.lastName',
+    name: 'user.name',
     ids: 'user.id',
     isActive: 'user.isActive',
     isEmailVerified: 'user.isEmailVerified',
@@ -54,8 +52,7 @@ const USER_LIST_COLUMNS: ListColumns<typeof USER_LIST_QUERY> = {
   },
   sort: {
     email: 'user.email',
-    firstName: 'user.firstName',
-    lastName: 'user.lastName',
+    name: 'user.name',
     isActive: 'user.isActive',
     createdAt: 'user.createdAt'
   },
@@ -341,12 +338,11 @@ export class UsersService {
     if (rest.password) {
       // After the ability check, which decides whether this caller may write to
       // the record at all, and before the hash.
-      // The names and email checked are the ones the record has after this
+      // The name and email checked are the ones the record has after this
       // write, so a rename in the same body is covered.
       await this.breachedPasswordService.assertNotBreached(rest.password, {
         email: rest.email ?? user.email,
-        firstName: rest.firstName ?? user.firstName,
-        lastName: rest.lastName ?? user.lastName
+        name: rest.name ?? user.name
       });
       const { hash, version } = await hashPassword(rest.password);
       changes.password = hash;

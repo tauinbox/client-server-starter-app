@@ -78,8 +78,7 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
     return repository.save(
       repository.create({
         email,
-        firstName: 'Burst',
-        lastName: 'Probe',
+        name: 'Burst Probe',
         password: await bcrypt.hash(PASSWORD, 4),
         isEmailVerified: true,
         totpSecret: app

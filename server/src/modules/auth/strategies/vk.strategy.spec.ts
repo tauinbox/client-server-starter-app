@@ -51,4 +51,20 @@ describe('VkStrategy.validate', () => {
     const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
     expect(profile.email).toBe('john@mail.ru');
   });
+
+  // passport-vkontakte builds displayName as `first_name + ' ' + last_name`.
+  it('takes the name parts, not the built display name', () => {
+    const strategy = makeStrategy();
+    const done = jest.fn();
+    const vkProfile = {
+      id: '12345',
+      displayName: 'Ivan undefined',
+      name: { givenName: 'Ivan' }
+    };
+
+    strategy.validate('access', 'refresh', {}, vkProfile, done);
+
+    const profile = (done.mock.calls[0] as [unknown, OAuthUserProfile])[1];
+    expect(profile.name).toBe('Ivan');
+  });
 });

@@ -18,8 +18,7 @@ export type LoginCredentials = {
 export type RegisterRequest = CreateUser;
 
 export type UpdateProfile = {
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   password?: string;
   currentPassword?: string;
   code?: string;

@@ -89,7 +89,7 @@ describe('a deactivation ends the sessions', () => {
     const user = await signIn(USER_EMAIL);
     const admin = await signIn(ADMIN_EMAIL);
 
-    await patchUser(admin, { firstName: 'Renamed' });
+    await patchUser(admin, { name: 'Renamed' });
     await patchUser(admin, { isActive: true });
 
     expect((await refresh(user)).status).toBe(200);

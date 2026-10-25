@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
   ErrorKeys,
-  MAX_NAME_LENGTH,
   STEP_UP_OPERATION,
   USER_LIST_QUERY
 } from '@app/shared/constants';
@@ -11,9 +10,10 @@ import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
   emailErrors,
+  nameErrors,
   passwordLengthError,
-  validateLocale,
-  validateMaxLength
+  trimName,
+  validateLocale
 } from '../utils/validation';
 import {
   listPage,
@@ -92,8 +92,7 @@ const router = Router();
 /** The own fields of `UpdateUserDto`, beside the step-up factors. */
 const UPDATE_USER_FIELDS = [
   'email',
-  'firstName',
-  'lastName',
+  'name',
   'password',
   'locale',
   'isActive',
@@ -219,8 +218,8 @@ router.patch(
       return;
     }
 
-    const { firstName, lastName, password, isActive, unlockAccount, locale } =
-      req.body;
+    const { password, isActive, unlockAccount, locale } = req.body;
+    const name = trimName(req.body['name']);
     // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
     // uses PartialType(..., { skipNullProperties: false }).
     const email =
@@ -234,24 +233,10 @@ router.patch(
       return;
     }
 
-    if (firstName !== undefined) {
-      const fnMaxErr = validateMaxLength(
-        firstName,
-        MAX_NAME_LENGTH,
-        'firstName'
-      );
-      if (fnMaxErr) {
-        res.status(400).json(validationError(fnMaxErr));
-        return;
-      }
-    }
-
-    if (lastName !== undefined) {
-      const lnMaxErr = validateMaxLength(lastName, MAX_NAME_LENGTH, 'lastName');
-      if (lnMaxErr) {
-        res.status(400).json(validationError(lnMaxErr));
-        return;
-      }
+    const bodyNameErrors = nameErrors(name);
+    if (bodyNameErrors.length > 0) {
+      res.status(400).json(validationError(bodyNameErrors));
+      return;
     }
 
     if (password !== undefined) {
@@ -329,7 +314,7 @@ router.patch(
         req,
         res,
         'update',
-        withChanges(user, { email, firstName, lastName, locale, isActive })
+        withChanges(user, { email, name, locale, isActive })
       )
     ) {
       return;
@@ -364,8 +349,7 @@ router.patch(
         ? null
         : newPasswordRefusal(password, {
             email: email ?? user.email,
-            firstName: firstName ?? user.firstName,
-            lastName: lastName ?? user.lastName
+            name: typeof name === 'string' ? name : user.name
           });
     if (passwordRefusal) {
       res.status(400).json(passwordRefusal);
@@ -374,8 +358,7 @@ router.patch(
 
     const changed = changedFields(user, {
       email,
-      firstName,
-      lastName,
+      name,
       locale,
       isActive
     });
@@ -413,8 +396,7 @@ router.patch(
       }
       user.email = email;
     }
-    if (firstName !== undefined) user.firstName = firstName;
-    if (lastName !== undefined) user.lastName = lastName;
+    if (typeof name === 'string') user.name = name;
     if (locale !== undefined) user.locale = locale as string;
     if (password !== undefined) {
       user.password = password;

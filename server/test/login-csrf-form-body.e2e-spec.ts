@@ -52,7 +52,7 @@ runWithInfra('Login CSRF through a form body (e2e)', () => {
 
     await request(app.getHttpServer() as Server)
       .post('/api/v1/auth/register')
-      .send({ email, password, firstName: 'Login', lastName: 'Csrf' })
+      .send({ email, password, name: 'Login Csrf' })
       .expect(201);
     await dataSource
       .getRepository(User)

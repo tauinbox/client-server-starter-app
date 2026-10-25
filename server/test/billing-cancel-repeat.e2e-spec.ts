@@ -131,8 +131,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
         email: `cancel-repeat-${stamp}@example.com`,
-        firstName: 'Cancel',
-        lastName: 'Repeat',
+        name: 'Cancel Repeat',
         password: 'hashed'
       })
     );

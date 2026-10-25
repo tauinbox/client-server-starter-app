@@ -101,7 +101,7 @@ runWithInfra('Email delivery (e2e)', () => {
 
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password, firstName: 'Del', lastName: 'Ivery' })
+      .send({ email, password, name: 'Del Ivery' })
       .expect(201);
 
     // Login is blocked until the address is verified.
@@ -144,7 +144,7 @@ runWithInfra('Email delivery (e2e)', () => {
 
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password, firstName: 'Del', lastName: 'Ivery' })
+      .send({ email, password, name: 'Del Ivery' })
       .expect(201);
 
     const verificationHtml = await waitForEmailHtml(email);

@@ -124,7 +124,7 @@ describe('audit row of an authorization refusal parity', () => {
     const victim = findUserByEmail('admin@example.com')!;
 
     const res = await call('PATCH', `/users/${victim.id}`, {
-      firstName: 'Changed'
+      name: 'Changed'
     });
     expect(res.errorKey).toBe(ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS);
     expect(lastRow()).toMatchObject({

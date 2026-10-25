@@ -73,7 +73,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
     usersService = app.get(UsersService);
     authService = app.get(AuthService);
 
-    const names = { firstName: 'Users', lastName: 'Tx' };
+    const names = { name: 'Users Tx' };
     const admin = await usersService.create(
       { email: adminEmail, password, ...names },
       SYSTEM_ABILITY
@@ -167,8 +167,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
       .send({
         email: createdEmail,
         password,
-        firstName: 'New',
-        lastName: 'User'
+        name: 'New User'
       })
       .expect(500);
 
