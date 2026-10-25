@@ -112,6 +112,23 @@ describe('RoleFormDialogComponent', () => {
     expect(save?.disabled).toBe(false);
   });
 
+  it('refuses a name of spaces only and sends nothing', async () => {
+    const fixture = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.roleModel.set({ name: '   ', description: '' });
+    await fixture.whenStable();
+
+    cmp.submit();
+
+    expect(
+      cmp.roleForm
+        .name()
+        .errors()
+        .map((e) => e.kind)
+    ).toEqual(['required']);
+    expect(storeMock.createRole).not.toHaveBeenCalled();
+  });
+
   it('sends nothing when the form is unchanged', async () => {
     const fixture = await setup({ role });
 

@@ -11,8 +11,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import {
   form,
   maxLength,
-  readonly as readonlyField,
-  required
+  readonly as readonlyField
 } from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import {
@@ -25,6 +24,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { RoleAdminResponse } from '@app/shared/types';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { requiredNotBlank } from '@shared/forms/required-not-blank';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { RolesStore } from '../../../store/roles.store';
 
@@ -72,7 +72,7 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
   });
 
   readonly roleForm = form(this.roleModel, (path) => {
-    required(path.name);
+    requiredNotBlank(path.name);
     maxLength(path.name, 50);
     maxLength(path.description, 255);
     if (this.isSystemRole) {

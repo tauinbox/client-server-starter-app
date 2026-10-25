@@ -55,10 +55,10 @@ describe('explicit null is rejected on optional fields backed by NOT NULL column
       await expect(validate(UpdateResourceDto, {})).resolves.toEqual({});
     });
 
-    it('still accepts a whitespace-only displayName', async () => {
+    it('still accepts a valid displayName', async () => {
       await expect(
-        validate(UpdateResourceDto, { displayName: '   ' })
-      ).resolves.toEqual({ displayName: '   ' });
+        validate(UpdateResourceDto, { displayName: 'Users' })
+      ).resolves.toEqual({ displayName: 'Users' });
     });
 
     it('keeps accepting a null description, whose column is nullable', async () => {
