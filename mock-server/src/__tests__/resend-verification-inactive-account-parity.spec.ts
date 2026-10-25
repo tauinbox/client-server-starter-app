@@ -69,3 +69,37 @@ describe('resend-verification against a deactivated account', () => {
     expect(getState().emailVerificationTokens.size).toBe(1);
   });
 });
+
+describe('resend-verification audit row', () => {
+  function resendRows() {
+    return getState().auditLogs.filter(
+      (row) => row.action === 'EMAIL_VERIFICATION_RESEND'
+    );
+  }
+
+  it('audits a resend for an unverified active account', async () => {
+    makeUnverified(true);
+    const user = findUserByEmail(email)!;
+
+    await postJson('resend-verification', { email });
+
+    expect(resendRows()).toEqual([
+      expect.objectContaining({
+        actorEmail: email,
+        targetId: user.id,
+        targetType: 'User'
+      })
+    ]);
+  });
+
+  it('writes no row for an unknown, verified or deactivated address', async () => {
+    await postJson('resend-verification', {
+      email: 'no-such-address@example.com'
+    });
+    await postJson('resend-verification', { email });
+    makeUnverified(false);
+    await postJson('resend-verification', { email });
+
+    expect(resendRows()).toEqual([]);
+  });
+});

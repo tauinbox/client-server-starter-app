@@ -425,7 +425,10 @@ export class AuthService {
     return { message: 'Email verified successfully' };
   }
 
-  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+  async resendVerificationEmail(
+    email: string,
+    auditContext?: AuditContext
+  ): Promise<{ message: string }> {
     const user = await this.usersService.findByEmail(email);
 
     // Always return success to prevent email enumeration. A deactivated account
@@ -444,6 +447,14 @@ export class AuthService {
       hashedToken,
       expiresAt
     );
+
+    this.auditService.logFireAndForget({
+      action: AuditAction.EMAIL_VERIFICATION_RESEND,
+      actorEmail: email,
+      targetId: user.id,
+      targetType: 'User',
+      context: auditContext
+    });
 
     this.mailService
       .sendEmailVerification(user.email, rawToken, user.locale)

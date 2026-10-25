@@ -1178,6 +1178,38 @@ describe('AuthService', () => {
       expect(result.message).toBeDefined();
     });
 
+    it('audits a resend for an unverified active account', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false
+      });
+      const context = { ip: '10.0.0.1', requestId: 'req-1' };
+
+      await service.resendVerificationEmail('test@example.com', context);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.EMAIL_VERIFICATION_RESEND,
+        actorEmail: 'test@example.com',
+        targetId: 'user-1',
+        targetType: 'User',
+        context
+      });
+    });
+
+    it.each([
+      ['an unknown address', null],
+      ['a verified account', { isEmailVerified: true }],
+      ['a deactivated account', { isEmailVerified: false, isActive: false }]
+    ])('writes no audit row for %s', async (_label, overrides) => {
+      mockUsersService.findByEmail.mockResolvedValue(
+        overrides && { ...mockUser, ...overrides }
+      );
+
+      await service.resendVerificationEmail('test@example.com');
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
     it('should return success even when user not found (prevent enumeration)', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
