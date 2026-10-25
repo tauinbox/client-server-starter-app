@@ -703,7 +703,7 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      await this.refreshTokenService.revokeToken(tokenDoc.id);
+      await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
       throw this.refreshRefusal(
         'user_deactivated',
         { actorId: user.id, actorEmail: user.email },

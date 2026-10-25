@@ -668,10 +668,7 @@ router.post('/refresh-token', (req, res) => {
   }
 
   if (!user.isActive) {
-    // The server revokes the row and keeps it, so a later replay of the same
-    // token still reaches the reuse detector.
-    state.refreshTokens.delete(cookieToken);
-    state.revokedRefreshTokens.set(cookieToken, user.id);
+    endSessionOfToken(cookieToken);
     logAudit('TOKEN_REFRESH_FAILURE', {
       actorId: user.id,
       actorEmail: user.email,

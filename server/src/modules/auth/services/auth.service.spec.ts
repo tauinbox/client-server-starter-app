@@ -93,7 +93,6 @@ describe('AuthService', () => {
     findLostResponseSuccessor: jest.Mock;
     deleteByUserId: jest.Mock;
     deleteBySessionId: jest.Mock;
-    revokeToken: jest.Mock;
     pruneOldestTokens: jest.Mock;
     rotatedDevice: jest.Mock;
   };
@@ -260,7 +259,6 @@ describe('AuthService', () => {
       findLostResponseSuccessor: jest.fn().mockResolvedValue(null),
       deleteByUserId: jest.fn().mockResolvedValue(undefined),
       deleteBySessionId: jest.fn().mockResolvedValue(1),
-      revokeToken: jest.fn().mockResolvedValue(undefined),
       pruneOldestTokens: jest.fn().mockResolvedValue(undefined),
       rotatedDevice: jest.fn((previous: RefreshToken, ip: string | null) =>
         Promise.resolve({
@@ -1883,7 +1881,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('should revoke token and throw when user is deactivated', async () => {
+    it('ends the session and throws when user is deactivated', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
       mockUsersService.findById.mockResolvedValue(inactiveUser);
@@ -1898,8 +1896,8 @@ describe('AuthService', () => {
         }
       });
 
-      expect(mockRefreshTokenService.revokeToken).toHaveBeenCalledWith(
-        'token-1'
+      expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+        'session-1'
       );
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
         action: AuditAction.TOKEN_REFRESH_FAILURE,
@@ -1935,7 +1933,6 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
         'session-1'
       );
-      expect(mockRefreshTokenService.revokeToken).not.toHaveBeenCalled();
     });
 
     it('refuses a refresh past the absolute session lifetime and ends the session', async () => {

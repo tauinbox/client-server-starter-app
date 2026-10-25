@@ -241,10 +241,6 @@ export class RefreshTokenService {
       .execute();
   }
 
-  async revokeToken(id: string): Promise<void> {
-    await this.repository.update(id, { revoked: true });
-  }
-
   async removeExpiredTokens(): Promise<number> {
     const result = await this.repository
       .createQueryBuilder()

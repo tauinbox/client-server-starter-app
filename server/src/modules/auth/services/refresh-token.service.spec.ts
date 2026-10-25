@@ -13,7 +13,6 @@ describe('RefreshTokenService', () => {
     find: jest.Mock;
     findOne: jest.Mock;
     delete: jest.Mock;
-    update: jest.Mock;
     count: jest.Mock;
     exists: jest.Mock;
     createQueryBuilder: jest.Mock;
@@ -41,7 +40,6 @@ describe('RefreshTokenService', () => {
       findOne: jest.fn(),
       delete: jest.fn(),
       exists: jest.fn(),
-      update: jest.fn(),
       count: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder)
     };
@@ -300,18 +298,6 @@ describe('RefreshTokenService', () => {
 
       expect(mockRepository.delete).toHaveBeenCalledWith({
         userId: 'user-1'
-      });
-    });
-  });
-
-  describe('revokeToken', () => {
-    it('should mark a token as revoked', async () => {
-      mockRepository.update.mockResolvedValue({ affected: 1 });
-
-      await service.revokeToken('token-1');
-
-      expect(mockRepository.update).toHaveBeenCalledWith('token-1', {
-        revoked: true
       });
     });
   });

@@ -128,7 +128,7 @@ describe('refresh-token failure parity', () => {
     expect(rows[0].details).toEqual({ reason: 'user_not_found' });
   });
 
-  it('keeps a refused deactivated token for the reuse detector', async () => {
+  it('ends the session at the deactivated refusal, so a replay is not read as reuse', async () => {
     const phone = await signIn();
     const desktop = await signIn();
     setActive(phone.userId, false);
@@ -142,18 +142,10 @@ describe('refresh-token failure parity', () => {
       statusCode: 401,
       errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
     });
-    expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
+    expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
 
-    // The replay revoked every session of the account, so the other device is
-    // dead even after the account comes back.
     setActive(phone.userId, true);
-    const other = await refresh(desktop);
-    expect(other.status).toBe(401);
-    expect(await readErrorBody(other)).toEqual({
-      message: 'Invalid refresh token',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-    });
+    expect((await refresh(desktop)).status).toBe(200);
   });
 
   it('leaves the other device alone when the token is not replayed', async () => {
