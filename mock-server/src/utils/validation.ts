@@ -193,16 +193,33 @@ export function trimName(value: unknown): unknown {
 
 /**
  * Mirrors `@IsNotEmpty() @MaxLength(MAX_NAME_LENGTH)` on a `name` that
- * `trimName` returned. An omitted field is skipped, an explicit null is not.
- * Decorators apply bottom-up, so MaxLength is reported before IsNotEmpty.
+ * `trimName` returned. Decorators apply bottom-up, so MaxLength is reported
+ * before IsNotEmpty.
  */
-export function nameErrors(value: unknown): string[] {
-  if (value === undefined) return [];
+export function nameErrors(value: unknown, optional?: OptionalMode): string[] {
+  if (isSkipped(value, optional)) return [];
   const errors: string[] = [];
   const tooLong = validateMaxLength(value, MAX_NAME_LENGTH, 'name');
   if (tooLong) errors.push(tooLong);
-  if (value === '' || value === null) {
+  if (value === '' || value === null || value === undefined) {
     errors.push('name should not be empty');
+  }
+  return errors;
+}
+
+/**
+ * Mirrors `@IsNotEmpty() @MinLength(MIN_PASSWORD_LENGTH)
+ * @MaxLength(MAX_PASSWORD_LENGTH)` of `CreateUserDto.password`, reported
+ * MaxLength, MinLength, IsNotEmpty. The field has no `@IsString()`, so a number
+ * fails the two caps only.
+ */
+export function newPasswordErrors(value: unknown): string[] {
+  const errors = [
+    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password'),
+    validateMinLength(value, MIN_PASSWORD_LENGTH, 'password')
+  ].filter((error): error is string => error !== null);
+  if (value === '' || value === null || value === undefined) {
+    errors.push('password should not be empty');
   }
   return errors;
 }
