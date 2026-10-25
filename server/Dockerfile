@@ -1,12 +1,12 @@
 # Stage 1: install production dependencies
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS deps
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS deps
 RUN apk upgrade --no-cache && apk add --no-cache python3 make g++
 WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
 
 # Stage 2: build
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS builder
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS builder
 RUN apk upgrade --no-cache && apk add --no-cache python3 make g++
 WORKDIR /app
 COPY server/package*.json ./server/
@@ -19,7 +19,7 @@ RUN cd server && npm run build
 # A release appears early in each month, so the previous month is the fallback.
 # A failed download leaves the directory empty: the server then shows no
 # session location, and a third-party outage cannot block a deploy.
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS geoip
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS geoip
 WORKDIR /geoip
 RUN set -o pipefail; \
     this_month=$(date -u +%Y-%m); \
@@ -34,7 +34,7 @@ RUN set -o pipefail; \
     echo "WARNING: GeoIP database not downloaded; session locations are disabled"
 
 # Stage 4: runtime
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS runner
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runner
 RUN apk upgrade --no-cache && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/bin/npm \
