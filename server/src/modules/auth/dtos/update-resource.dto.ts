@@ -1,12 +1,14 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   ValidateIf
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class UpdateResourceDto {
@@ -14,7 +16,11 @@ export class UpdateResourceDto {
     description: 'Human-readable display name',
     example: 'Users'
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value
+  )
   @ValidateIf(propertyIsDefined)
+  @IsNotEmpty()
   @IsString()
   @MaxLength(100)
   displayName?: string;

@@ -54,18 +54,28 @@ async function send(
 // ValidationPipe against CreateActionDto / UpdateActionDto / UpdateResourceDto.
 describe('rbac validation parity with server', () => {
   describe('PATCH /rbac/resources/:id', () => {
-    it('accepts a whitespace-only displayName', async () => {
+    it.each([[''], ['  ']])('rejects displayName %j', async (displayName) => {
       const res = await send(
         'PATCH',
         `/rbac/resources/${mockId('res-users')}`,
-        {
-          displayName: '  '
-        }
+        { displayName }
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { errors?: string[] };
+      expect(body.errors).toEqual(['displayName should not be empty']);
+    });
+
+    it('stores a trimmed displayName', async () => {
+      const res = await send(
+        'PATCH',
+        `/rbac/resources/${mockId('res-users')}`,
+        { displayName: '  Members  ' }
       );
 
       expect(res.status).toBe(200);
       const resource = (await res.json()) as { displayName: string };
-      expect(resource.displayName).toBe('  ');
+      expect(resource.displayName).toBe('Members');
     });
 
     it('rejects a non-string displayName', async () => {

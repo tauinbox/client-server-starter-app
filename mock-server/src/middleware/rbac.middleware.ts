@@ -27,6 +27,7 @@ import {
 import {
   stringArrayErrors,
   stringErrors,
+  trimmedStringErrors,
   unknownPropertyErrors
 } from '../utils/validation';
 
@@ -137,7 +138,8 @@ router.patch(
     const id = req.params['id'] as string;
     const state = getState();
 
-    const { displayName, description, allowedActionNames } = req.body;
+    const { description, allowedActionNames } = req.body;
+    const rawDisplayName: unknown = req.body.displayName;
 
     // The server's global pipe runs before the handler, so a malformed body is a
     // 400 whether or not the resource exists, and it reports every violation at
@@ -148,8 +150,9 @@ router.patch(
         'description',
         'allowedActionNames'
       ]),
-      ...stringErrors('displayName', displayName, {
+      ...trimmedStringErrors('displayName', rawDisplayName, {
         max: 100,
+        notEmpty: true,
         optional: 'definedOnly'
       }),
       ...stringErrors('description', description, {
@@ -167,6 +170,9 @@ router.patch(
       res.status(400).json(validationError(errors));
       return;
     }
+
+    const displayName =
+      typeof rawDisplayName === 'string' ? rawDisplayName.trim() : undefined;
 
     const resource = state.resources.get(id);
 
