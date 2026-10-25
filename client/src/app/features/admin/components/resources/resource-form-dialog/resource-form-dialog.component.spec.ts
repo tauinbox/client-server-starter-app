@@ -135,10 +135,10 @@ describe('ResourceFormDialogComponent', () => {
     expect(saveBtn?.disabled).toBe(true);
   });
 
-  it('reports one required error for an empty displayName', () => {
+  it('reports one required error for an empty displayName', async () => {
     createComponent();
     component.resourceModel.set({ displayName: '', description: '' });
-    TestBed.tick();
+    await fixture.whenStable();
 
     expect(
       component.resourceForm
@@ -148,13 +148,13 @@ describe('ResourceFormDialogComponent', () => {
     ).toEqual(['required']);
   });
 
-  it('refuses a displayName of spaces only and sends nothing', () => {
+  it('refuses a displayName of spaces only and sends nothing', async () => {
     createComponent();
     component.resourceModel.set({
       displayName: '   ',
       description: 'User management'
     });
-    TestBed.tick();
+    await fixture.whenStable();
     fixture.detectChanges();
     const saveBtn = fixture.nativeElement.querySelector(
       'button[matButton="filled"]'
