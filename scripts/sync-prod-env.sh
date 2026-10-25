@@ -27,15 +27,34 @@ SERVER_ENV="${SERVER_ENV:-server/.env}"
 ROOT_ENV="${ROOT_ENV:-.env}"
 
 # upsert KEY VALUE FILE — replace or append `KEY=VALUE`; no-op when VALUE empty.
+# Compose interpolates both files (`env_file:` and the project `.env`), so a
+# `$` in a secret starts a variable reference and the value is cut there.
+# `$$` is the escape that compose reads back as one `$`.
 upsert() {
   local key="$1" val="$2" file="$3"
   [ -z "$val" ] && return 0
+  val="${val//\$/\$\$}"
   touch "$file"
   local tmp="${file}.tmp.$$"
   grep -v "^${key}=" "$file" > "$tmp" 2>/dev/null || true
   printf '%s=%s\n' "$key" "$val" >> "$tmp"
   mv "$tmp" "$file"
 }
+
+if [ "${1:-}" = "--self-test" ]; then
+  dir="$(mktemp -d)"
+  trap 'rm -rf "$dir"' EXIT
+  upsert KEY 'old' "$dir/env"
+  upsert KEY 'a$b$$c' "$dir/env"
+  upsert EMPTY '' "$dir/env"
+  expected='KEY=a$$b$$$$c'
+  if [ "$(cat "$dir/env")" != "$expected" ]; then
+    echo "sync-prod-env: self-test FAILED, got: $(cat "$dir/env")" >&2
+    exit 1
+  fi
+  echo "sync-prod-env: self-test OK"
+  exit 0
+fi
 
 # --- managed secret keys (server/.env) ---
 upsert JWT_PRIVATE_KEY        "${JWT_PRIVATE_KEY:-}"        "$SERVER_ENV"

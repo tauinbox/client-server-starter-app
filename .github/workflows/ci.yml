@@ -58,6 +58,8 @@ jobs:
       # that has stopped detecting anything fails loudly instead of passing.
       - run: node ../scripts/check-imports.mjs --self-test
       - run: npm run check:imports
+      # The deploy writes the production secrets with this script.
+      - run: bash ../scripts/sync-prod-env.sh --self-test
 
   server-tests:
     name: Server – Tests & Build
