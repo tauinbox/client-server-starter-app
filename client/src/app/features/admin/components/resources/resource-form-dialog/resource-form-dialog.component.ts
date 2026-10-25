@@ -8,7 +8,7 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { form, maxLength, required } from '@angular/forms/signals';
+import { form, maxLength } from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -30,6 +30,7 @@ import { ResourcesStore } from '../../../store/resources.store';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { NotifyService } from '@core/services/notify.service';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
+import { requiredNotBlank } from '@shared/forms/required-not-blank';
 
 export type ResourceFormDialogData = {
   resource: ResourceResponse;
@@ -75,7 +76,7 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   });
 
   readonly resourceForm = form(this.resourceModel, (path) => {
-    required(path.displayName);
+    requiredNotBlank(path.displayName);
     maxLength(path.displayName, 100);
   });
 

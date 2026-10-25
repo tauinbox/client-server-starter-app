@@ -135,6 +135,43 @@ describe('ResourceFormDialogComponent', () => {
     expect(saveBtn?.disabled).toBe(true);
   });
 
+  it('reports one required error for an empty displayName', () => {
+    createComponent();
+    component.resourceModel.set({ displayName: '', description: '' });
+    TestBed.tick();
+
+    expect(
+      component.resourceForm
+        .displayName()
+        .errors()
+        .map((e) => e.kind)
+    ).toEqual(['required']);
+  });
+
+  it('refuses a displayName of spaces only and sends nothing', () => {
+    createComponent();
+    component.resourceModel.set({
+      displayName: '   ',
+      description: 'User management'
+    });
+    TestBed.tick();
+    fixture.detectChanges();
+    const saveBtn = fixture.nativeElement.querySelector(
+      'button[matButton="filled"]'
+    );
+
+    component.submit();
+
+    expect(saveBtn?.disabled).toBe(true);
+    expect(
+      component.resourceForm
+        .displayName()
+        .errors()
+        .map((e) => e.kind)
+    ).toEqual(['required']);
+    expect(resourcesStoreMock.updateResource).not.toHaveBeenCalled();
+  });
+
   it('disables Save button when displayName exceeds 100 chars (maxlength)', () => {
     createComponent();
     component.resourceModel.set({
