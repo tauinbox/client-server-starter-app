@@ -2332,7 +2332,7 @@ These are the counters and the histograms:
 |--------|------|--------|-------------|
 | `http_requests_total` | counter | `method`, `route`, `status_code` | Each HTTP request that reaches the app |
 | `http_request_duration_seconds` | histogram | `method`, `route`, `status_code` | The latency of each route, in seconds |
-| `auth_events_total` | counter | `event`, one of `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | The authentication events. Every refused refresh records `token_refresh_failure`, except a reuse, which records `token_reuse_detected` |
+| `auth_events_total` | counter | `event`, one of `login_success`, `login_failure`, `token_refresh_success`, `token_refresh_failure`, `token_reuse_detected`, `logout`, `register` | The authentication events. Every refused sign-in records `login_failure`: a wrong password, a locked account, an unverified address and a refused provider sign-in. Every refused refresh records `token_refresh_failure`, except a reuse, which records `token_reuse_detected` |
 | `rbac_permission_denied_total` | counter | `action`, `subject`, `level`, one of `guard` or `instance` | The RBAC and ABAC denials. `level=guard` is a rejection from the `@Authorize` decorator. `level=instance` is an `ability.can(action, entity)` rejection after the server loaded the record |
 | `sse_connections_active` | gauge | - | The SSE notification streams that are open now |
 | `mail_queue_jobs` | gauge | `state`, one of `waiting`, `active`, `completed`, `failed`, `delayed` | The depth of the BullMQ mail queue, by job state. The metric stays absent when no queue is configured, that is when `REDIS_URL` is empty and `MailService` sends the mail in the process |

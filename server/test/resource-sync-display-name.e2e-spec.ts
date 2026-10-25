@@ -81,13 +81,14 @@ runWithInfra('Startup sync of an edited resource (e2e)', () => {
     );
     await sync.onApplicationBootstrap();
 
+    // No isOrphaned check: the app of a parallel suite syncs the same database
+    // without this controller, and a sync never clears the flag.
     const synced = await resources.findOneByOrFail({ name });
     expect(synced).toEqual(
       expect.objectContaining({
         displayName: 'Edited name',
         description: 'Edited description',
-        actionNames: ['read'],
-        isOrphaned: false
+        actionNames: ['read']
       })
     );
   });

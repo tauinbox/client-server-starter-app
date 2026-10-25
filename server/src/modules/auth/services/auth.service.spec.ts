@@ -578,6 +578,10 @@ describe('AuthService', () => {
       }
       expect(compareSpy).not.toHaveBeenCalled();
       expect(mockUsersService.resetLoginAttempts).not.toHaveBeenCalled();
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+        'login_failure'
+      );
     });
 
     // A read-then-check lets every request of a concurrent burst be checked
@@ -619,6 +623,10 @@ describe('AuthService', () => {
       expect(
         mockUsersService.incrementFailedAttemptsAndLockIfNeeded
       ).not.toHaveBeenCalled();
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+        'login_failure'
+      );
     });
 
     // Regression: an elapsed lockout used to leave failedLoginAttempts at the
@@ -688,6 +696,10 @@ describe('AuthService', () => {
       expect(
         mockUsersService.incrementFailedAttemptsAndLockIfNeeded
       ).toHaveBeenCalledWith('user-1', expect.any(Number), expect.any(Number));
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+        'login_failure'
+      );
     });
 
     it('should throw 403 when email is not verified', async () => {
@@ -707,6 +719,10 @@ describe('AuthService', () => {
           ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
         );
       }
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
+        'login_failure'
+      );
     });
 
     it('should reset failed attempts on successful login', async () => {
