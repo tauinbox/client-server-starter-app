@@ -1628,6 +1628,11 @@ answers 401 with `errors.auth.sessionInvalidated`, and `deleteBySessionId` remov
 second presentation of the same cookie is therefore an unknown token, and it does not purge the
 sessions that the user started after the key rotation.
 
+The refusal of a deactivated account (401, `errors.auth.userDeactivated`) also removes the session
+with `deleteBySessionId`. A deactivation deletes the refresh tokens, so this branch sees a row only
+when that revocation failed. A replay is then an unknown token, and it does not purge the other
+sessions of the account.
+
 The column is real and not derived. `MIN(created_at)` of a session looks sufficient, because a
 rotation revokes an ancestor instead of deleting it, but `removeExpiredTokens` deletes each row,
 revoked or not, once it is past its own expiry. The oldest row of a long session is therefore gone well

@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
@@ -29,6 +30,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
   let authService: AuthService;
   let refreshTokenService: RefreshTokenService;
   let usersController: UsersController;
+  let logFireAndForget: jest.SpyInstance;
   const email = `deactivation-sessions-${Date.now()}@example.com`;
   let userId: string;
 
@@ -99,7 +101,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     usersController = app.get(UsersController);
 
     jest.spyOn(app.get(AuditService), 'log').mockResolvedValue(undefined);
-    jest
+    logFireAndForget = jest
       .spyOn(app.get(AuditService), 'logFireAndForget')
       .mockImplementation(() => undefined);
 
@@ -117,6 +119,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
   }, 60000);
 
   beforeEach(async () => {
+    logFireAndForget.mockClear();
     await dataSource.getRepository(RefreshToken).delete({ userId });
     await dataSource.getRepository(User).update(userId, { isActive: true });
   });
@@ -139,6 +142,31 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     // Pre-fix the kept row minted a new access token here.
     expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
       ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    );
+  }, 30000);
+
+  // A failed revocation listener leaves the rows of a deactivated account.
+  it('ends the session at the deactivated refusal, so a replay is not read as reuse', async () => {
+    const raw = await seedSession();
+    const other = await seedSession();
+    await dataSource.getRepository(User).update(userId, { isActive: false });
+
+    expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
+      ErrorKeys.AUTH.USER_DEACTIVATED
+    );
+    expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
+      ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    );
+
+    const reuseRows = logFireAndForget.mock.calls.filter(
+      ([entry]: [{ action: AuditAction }]) =>
+        entry.action === AuditAction.TOKEN_REUSE_DETECTED
+    );
+    expect(reuseRows).toHaveLength(0);
+
+    await dataSource.getRepository(User).update(userId, { isActive: true });
+    expect(await errorKeyOf(authService.refreshTokens(other, null))).toBe(
+      'RESOLVED'
     );
   }, 30000);
 
