@@ -1026,13 +1026,15 @@ describe('AuthController', () => {
   // ── resendVerification ────────────────────────────────────────────
 
   describe('resendVerification', () => {
-    it('should delegate to authService.resendVerificationEmail', async () => {
+    it('should delegate to authService.resendVerificationEmail with email and audit context', async () => {
       const dto = { email: 'resend@example.com' };
+      const req = mockExpressRequest() as ExpressRequest;
 
-      const result = await controller.resendVerification(dto);
+      const result = await controller.resendVerification(dto, req);
 
       expect(authServiceMock.resendVerificationEmail).toHaveBeenCalledWith(
-        'resend@example.com'
+        'resend@example.com',
+        expect.objectContaining({ ip: '127.0.0.1' })
       );
       expect(result).toEqual({ message: 'sent' });
     });

@@ -380,6 +380,13 @@ router.post('/resend-verification', (req, res) => {
     expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS).toISOString()
   });
 
+  logAudit('EMAIL_VERIFICATION_RESEND', {
+    actorEmail: email,
+    targetId: user.id,
+    targetType: 'User',
+    ip: req.ip
+  });
+
   const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
   console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
 

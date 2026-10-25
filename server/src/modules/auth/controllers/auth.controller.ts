@@ -415,8 +415,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Resend email verification link' })
   @ApiBody({ type: ResendVerificationDto })
   @ApiOkResponse({ description: 'Verification email sent if account exists' })
-  resendVerification(@Body() dto: ResendVerificationDto) {
-    return this.authService.resendVerificationEmail(dto.email);
+  resendVerification(
+    @Body() dto: ResendVerificationDto,
+    @Request() req: ExpressRequest
+  ) {
+    return this.authService.resendVerificationEmail(
+      dto.email,
+      extractAuditContext(req)
+    );
   }
 
   @Public()
