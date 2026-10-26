@@ -57,6 +57,40 @@ test.describe('Login page', () => {
     await expect(page.locator('.error-message')).toBeVisible();
   });
 
+  // The mock has no rate limit, so the throttle answer of the server is
+  // played back here with the body it sends: no errorKey.
+  test('names a throttled sign-in instead of blaming the credentials', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.route('**/api/v1/auth/login', (route) =>
+      route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          statusCode: 429,
+          message: 'ThrottlerException: Too Many Requests',
+          error: 'Too Many Requests',
+          path: '/api/v1/auth/login'
+        })
+      })
+    );
+    await page.goto('/login');
+
+    const main = page.getByRole('main');
+    await page.getByLabel('Email').fill('user@example.com');
+    await page.getByLabel('Email').blur();
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Lantern-Orchard-47');
+    await page.getByLabel('Password', { exact: true }).blur();
+    await main.getByRole('button', { name: 'Login' }).click();
+
+    await expect(page.locator('.error-message')).toHaveText(
+      'Too many requests. Please slow down and try again.'
+    );
+  });
+
   test('should stay on login with no session calls for an unverified user', async ({
     _mockServer,
     page

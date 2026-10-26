@@ -1,6 +1,5 @@
 {
   "common": {
-    "add": "Добавить",
     "cancel": "Отмена",
     "confirm": "Подтвердить",
     "yes": "Да",
@@ -10,16 +9,11 @@
     "edit": "Редактировать",
     "delete": "Удалить",
     "search": "Поиск",
-    "clear": "Очистить",
     "all": "Все",
     "noFilterResults": "По этим фильтрам ничего не найдено.",
     "loading": "Загрузка...",
     "active": "Активен",
     "inactive": "Неактивен",
-    "name": "Название",
-    "description": "Описание",
-    "created": "Создан",
-    "actions": "Действия",
     "back": "Назад",
     "retry": "Повторить",
     "skipToContent": "Перейти к основному содержимому",
@@ -43,9 +37,7 @@
     "switchToDark": "Переключить на тёмную тему"
   },
   "language": {
-    "switchLanguage": "Сменить язык",
-    "en": "English",
-    "ru": "Русский"
+    "switchLanguage": "Сменить язык"
   },
   "pageNotFound": {
     "code": "404",

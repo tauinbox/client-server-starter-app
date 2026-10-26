@@ -753,9 +753,10 @@ in the cache emits at once, so the wait costs nothing on the ordinary load.
 `e2e/auth/profile-init-toast-i18n.spec.ts` holds that behaviour: it delays the scope file and asserts
 that the key never reaches the screen.
 
-The `HttpErrorResponse` overload uses the same parse sequence as `errorInterceptor`. It uses the
-translated `errorKey` first. If no translation exists, it uses the server `message`. If that is
-absent, it uses the translated `fallbackKey`. If that is also absent, it shows the status code.
+The `HttpErrorResponse` overload goes through `parseHttpErrorMessage`. It uses the translated
+`errorKey` first. A 429 then gets `errors.general.tooManyRequests`, because the throttle sends no key
+and the fallback of a form would name another cause. A validation list gets the generic translated
+text. Then come the translated `fallbackKey`, the single-string server `message`, and the status code.
 
 **The app never shows a server `errorKey` outside this funnel.** An `errorKey` is a translation key
 only when a translation for it exists. A direct translation puts a raw dot-path on the screen the
@@ -1026,9 +1027,12 @@ message key is `success<Result>` (`successCancelled`). The key goes in the secti
 shows it; a message that a store shows goes in a `store` section (`billing.store.errorLoadFailed`).
 A feature file has no `errors` group, because the root `errors.*` group holds the server error keys.
 `check:i18n-keys` (`scripts/check-i18n-keys.mjs`, part of `npm run lint`) checks these names. It also
-checks that each single-quoted key in a non-spec `.ts` or `.html` file is in `en.json` and `ru.json`
-of its scope, and that the two files of a scope hold the same keys. A dynamic key is a literal prefix
-that ends with `.` or `_`.
+checks that each single-quoted key in a non-spec `.ts` or `.html` file, and each key in a static
+template attribute (`label="auth.login.email"`), is in `en.json` and `ru.json` of its scope, and that
+the two files of a scope hold the same keys. A dynamic key is a literal prefix that ends with `.` or
+`_`. Every key of `en.json` must be read by the code: a literal names it or a literal prefix covers it.
+The root `errors` group is exempt, because the server sends those keys. A group whose keys the code
+builds from data goes into `DYNAMIC_GROUPS` with the file that builds them (`billing.catalog`).
 
 ## Testing
 
@@ -1180,8 +1184,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 341 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1614 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 342 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1616 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

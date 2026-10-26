@@ -12,6 +12,8 @@ type ServerErrorBody = {
  *
  * Resolution order:
  * 1. `errorKey` when it maps to an actual translation entry;
+ * 1a. a 429: the throttle sends no key, and the fallback of a form would
+ *    name another cause, for example wrong credentials;
  * 2. a validation payload - either an `errors` string array, which is how
  *    `GlobalExceptionFilter` forwards ValidationPipe failures, or a `message`
  *    string array, the raw ValidationPipe shape. Both carry raw English
@@ -40,6 +42,10 @@ export function parseHttpErrorMessage(
     if (translated !== body.errorKey) {
       return translated;
     }
+  }
+
+  if (error.status === 429) {
+    return transloco.translate('errors.general.tooManyRequests');
   }
 
   if (Array.isArray(body?.errors) || Array.isArray(body?.message)) {
