@@ -275,6 +275,30 @@ describe('RoleService', () => {
       ).rejects.toThrow(HttpException);
     });
 
+    it('should answer nameExists when the unique index refuses a name that a concurrent request took', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(null);
+      mockRoleRepo.save.mockRejectedValueOnce({ code: '23505' });
+      const audit = jest.fn();
+
+      await expect(
+        service.create({ name: 'viewer' }, SYSTEM_ABILITY, 'a', audit)
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.ROLES.NAME_EXISTS }
+      });
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+
+    it('should pass on a save error that is not a unique violation', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(null);
+      const failure = new Error('db down');
+      mockRoleRepo.save.mockRejectedValueOnce(failure);
+
+      await expect(
+        service.create({ name: 'viewer' }, SYSTEM_ABILITY)
+      ).rejects.toBe(failure);
+    });
+
     it('should always create role with isSuper false regardless of input', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
       await service.create({ name: 'viewer' }, SYSTEM_ABILITY);
@@ -352,6 +376,32 @@ describe('RoleService', () => {
         service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
       ).rejects.toThrow('db down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+
+    it('should answer nameExists when the unique index refuses a rename that a concurrent request took', async () => {
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockRoleRepo.findOne.mockResolvedValueOnce(null);
+      mockRoleRepo.save.mockRejectedValueOnce({ code: '23505' });
+
+      await expect(
+        service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { errorKey: ErrorKeys.ROLES.NAME_EXISTS }
+      });
+      expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+
+    it('should not map a unique violation of a rename listener to nameExists', async () => {
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockRoleRepo.findOne.mockResolvedValueOnce(null);
+      const failure = { code: '23505' };
+      mockEventEmitter.emitAsync.mockRejectedValueOnce(failure);
+
+      await expect(
+        service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
+      ).rejects.toBe(failure);
     });
 
     it('should not emit or invalidate when the name stays the same', async () => {
