@@ -449,8 +449,8 @@ src/app/
 | `/billing/settings` | BillingSettingsComponent | billingAvailableGuard + authGuard |
 | `/billing/success` | CheckoutReturnComponent | billingAvailableGuard + authGuard |
 | `/billing/cancel` | CheckoutReturnComponent | billingAvailableGuard + authGuard |
-| `/verify-email` | VerifyEmailComponent | - |
-| `/confirm-email-change` | ConfirmEmailChangeComponent | - |
+| `/verify-email` | MailedTokenComponent (`data.action: verifyEmail`) | - |
+| `/confirm-email-change` | MailedTokenComponent (`data.action: confirmEmailChange`) | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
@@ -1180,8 +1180,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 337 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1605 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 341 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1614 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

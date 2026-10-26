@@ -132,6 +132,20 @@ test.describe('OAuth-only account changes its email', () => {
     };
     // The address does not change until the link is confirmed.
     expect(state.users.find((u) => u.id === userId)?.email).toBe(email);
+
+    const tokens = await _mockServer.getTokens();
+    const confirmToken = Object.keys(tokens.pendingEmailTokens)[0];
+    expect(confirmToken).toBeTruthy();
+
+    await page.goto(`/confirm-email-change?token=${confirmToken}`);
+
+    await expect(page.getByText('Email updated')).toBeVisible();
+    const confirmed = (await _mockServer.getState()) as {
+      users: { id: string; email: string }[];
+    };
+    expect(confirmed.users.find((u) => u.id === userId)?.email).toBe(
+      'new-address@example.com'
+    );
   });
 
   test('refuses the change when no proof was minted', async ({

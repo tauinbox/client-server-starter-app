@@ -70,16 +70,18 @@ export const routes: Routes = [
   },
   {
     path: AppRouteSegmentEnum.VerifyEmail,
+    data: { action: 'verifyEmail' },
     loadComponent: () =>
-      import('./features/auth/components/verify-email/verify-email.component').then(
-        (c) => c.VerifyEmailComponent
+      import('./features/auth/components/mailed-token/mailed-token.component').then(
+        (c) => c.MailedTokenComponent
       )
   },
   {
     path: AppRouteSegmentEnum.ConfirmEmailChange,
+    data: { action: 'confirmEmailChange' },
     loadComponent: () =>
-      import('./features/auth/components/confirm-email-change/confirm-email-change.component').then(
-        (c) => c.ConfirmEmailChangeComponent
+      import('./features/auth/components/mailed-token/mailed-token.component').then(
+        (c) => c.MailedTokenComponent
       )
   },
   {
