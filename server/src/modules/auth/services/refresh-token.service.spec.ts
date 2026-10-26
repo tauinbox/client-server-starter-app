@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { createMockConfigService } from '../../../common/testing/config-service.mock';
 import { RefreshTokenService } from './refresh-token.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
@@ -55,7 +57,11 @@ describe('RefreshTokenService', () => {
           provide: getRepositoryToken(RefreshToken),
           useValue: mockRepository
         },
-        { provide: GeoIpService, useValue: mockGeoIp }
+        { provide: GeoIpService, useValue: mockGeoIp },
+        {
+          provide: ConfigService,
+          useValue: createMockConfigService({ JWT_REFRESH_EXPIRATION: '7200' })
+        }
       ]
     }).compile();
 
@@ -64,6 +70,49 @@ describe('RefreshTokenService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('refuses to start without JWT_REFRESH_EXPIRATION', async () => {
+    await expect(
+      Test.createTestingModule({
+        providers: [
+          RefreshTokenService,
+          {
+            provide: getRepositoryToken(RefreshToken),
+            useValue: mockRepository
+          },
+          { provide: GeoIpService, useValue: mockGeoIp },
+          { provide: ConfigService, useValue: createMockConfigService({}) }
+        ]
+      }).compile()
+    ).rejects.toThrow('Configuration key "JWT_REFRESH_EXPIRATION"');
+  });
+
+  describe('buildRow', () => {
+    it('stores the hash of the token and expires one lifetime from now', () => {
+      const fields = {
+        userId: 'user-1',
+        sessionId: 'session-1',
+        sessionStartedAt: new Date('2026-01-01T00:00:00Z'),
+        userAgent: 'UA',
+        ipAddress: '203.0.113.7',
+        countryCode: 'DE',
+        city: 'Berlin'
+      };
+
+      const before = Date.now();
+      const row = service.buildRow(fields, 'raw-token');
+      const after = Date.now();
+
+      expect(row).toEqual({
+        ...fields,
+        token: hashToken('raw-token'),
+        expiresAt: expect.any(Date) as Date
+      });
+      const expiresAt = (row.expiresAt as Date).getTime();
+      expect(expiresAt).toBeGreaterThanOrEqual(before + 7200 * 1000);
+      expect(expiresAt).toBeLessThanOrEqual(after + 7200 * 1000);
+    });
   });
 
   describe('hasLiveSession', () => {
@@ -123,7 +172,6 @@ describe('RefreshTokenService', () => {
       const result = await service.createRefreshToken(
         'user-1',
         'raw-token',
-        3600,
         'session-1',
         { userAgent: null, ipAddress: null }
       );
@@ -152,7 +200,7 @@ describe('RefreshTokenService', () => {
       );
       mockGeoIp.lookup.mockResolvedValue({ countryCode: 'DE', city: 'Berlin' });
 
-      await service.createRefreshToken('user-1', 'token', 3600, 'session-1', {
+      await service.createRefreshToken('user-1', 'token', 'session-1', {
         userAgent: 'UA',
         ipAddress: '203.0.113.7'
       });
@@ -177,7 +225,7 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken('user-1', 'token', 3600, 'session-1', {
+      await service.createRefreshToken('user-1', 'token', 'session-1', {
         userAgent: null,
         ipAddress: null
       });
@@ -192,7 +240,7 @@ describe('RefreshTokenService', () => {
       expect(sessionStartedAt.getTime()).toBeLessThanOrEqual(after);
     });
 
-    it('should set expiration based on expiresIn seconds', async () => {
+    it('expires the row one configured lifetime after issue', async () => {
       mockRepository.create.mockImplementation(
         (data: Partial<RefreshToken>) => data
       );
@@ -201,7 +249,7 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken('user-1', 'token', 7200, 'session-1', {
+      await service.createRefreshToken('user-1', 'token', 'session-1', {
         userAgent: null,
         ipAddress: null
       });

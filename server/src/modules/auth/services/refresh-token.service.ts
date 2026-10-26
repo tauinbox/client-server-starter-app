@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../entities/refresh-token.entity';
@@ -12,6 +13,13 @@ export type SessionDevice = Pick<
   'userAgent' | 'ipAddress' | 'countryCode' | 'city'
 >;
 
+/** The fields of a refresh row that the caller supplies. */
+export type RefreshRowFields = Pick<
+  RefreshToken,
+  'userId' | 'sessionId' | 'sessionStartedAt'
+> &
+  SessionDevice;
+
 /** The unused successor that a lost rotation response left behind. */
 export interface LostResponseSuccessor {
   /** Time since the rotation that issued the successor. */
@@ -22,31 +30,53 @@ export interface LostResponseSuccessor {
 
 @Injectable()
 export class RefreshTokenService {
+  /** `JWT_REFRESH_EXPIRATION`: the lifetime of one refresh row. */
+  readonly lifetimeSeconds: number;
+
   constructor(
     @InjectRepository(RefreshToken)
     private repository: Repository<RefreshToken>,
-    private readonly geoIp: GeoIpService
-  ) {}
+    private readonly geoIp: GeoIpService,
+    configService: ConfigService
+  ) {
+    this.lifetimeSeconds = Number(
+      configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION')
+    );
+  }
+
+  /**
+   * The row that stores `token`, at sign-in and at rotation alike. Only the
+   * hash is stored, and the row expires one lifetime from now.
+   */
+  buildRow(fields: RefreshRowFields, token: string): Partial<RefreshToken> {
+    return {
+      ...fields,
+      token: hashToken(token),
+      expiresAt: new Date(Date.now() + this.lifetimeSeconds * 1000)
+    };
+  }
 
   async createRefreshToken(
     userId: string,
     token: string,
-    expiresIn: number,
     sessionId: string,
     client: SessionClient
   ): Promise<RefreshToken> {
     const location = await this.geoIp.lookup(client.ipAddress);
-    const refreshToken = this.repository.create({
-      userId,
-      sessionId,
-      sessionStartedAt: new Date(),
-      userAgent: client.userAgent,
-      ipAddress: client.ipAddress,
-      countryCode: location.countryCode,
-      city: location.city,
-      token: hashToken(token),
-      expiresAt: new Date(Date.now() + expiresIn * 1000)
-    });
+    const refreshToken = this.repository.create(
+      this.buildRow(
+        {
+          userId,
+          sessionId,
+          sessionStartedAt: new Date(),
+          userAgent: client.userAgent,
+          ipAddress: client.ipAddress,
+          countryCode: location.countryCode,
+          city: location.city
+        },
+        token
+      )
+    );
 
     return this.repository.save(refreshToken);
   }
