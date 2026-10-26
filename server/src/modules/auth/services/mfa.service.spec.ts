@@ -946,24 +946,32 @@ describe('MfaService', () => {
 
       await expect(
         service.isValidStepUpCode(user, generateSync({ secret }))
-      ).resolves.toBe(true);
+      ).resolves.toBe('accepted');
     });
 
-    it('rejects a code on an account that carries no factor', async () => {
+    it('treats a code on an account that carries no factor as not offered', async () => {
       const { secret } = await enrol();
 
       await expect(
         service.isValidStepUpCode(buildUser(), generateSync({ secret }))
-      ).resolves.toBe(false);
+      ).resolves.toBe('not_offered');
     });
 
-    it('rejects a missing code', async () => {
+    it('reports a missing code as not offered', async () => {
       await expect(
         service.isValidStepUpCode(
           buildUser({ totpSecret: 'v1.a.b.c', totpEnabledAt: new Date() }),
           undefined
         )
-      ).resolves.toBe(false);
+      ).resolves.toBe('not_offered');
+    });
+
+    it('refuses a wrong code from an enrolled account', async () => {
+      const { user } = await enrolled();
+
+      await expect(service.isValidStepUpCode(user, '000000')).resolves.toBe(
+        'refused'
+      );
     });
 
     it('rejects rather than throws when the stored secret will not decrypt', async () => {
@@ -974,7 +982,7 @@ describe('MfaService', () => {
       repository.findOne.mockResolvedValue(broken);
 
       await expect(service.isValidStepUpCode(broken, '123456')).resolves.toBe(
-        false
+        'refused'
       );
     });
 
@@ -984,17 +992,21 @@ describe('MfaService', () => {
       const { user, secret } = await enrolled();
       const code = generateSync({ secret });
 
-      await expect(service.isValidStepUpCode(user, code)).resolves.toBe(true);
+      await expect(service.isValidStepUpCode(user, code)).resolves.toBe(
+        'accepted'
+      );
       persistLedger(user);
 
-      await expect(service.isValidStepUpCode(user, code)).resolves.toBe(false);
+      await expect(service.isValidStepUpCode(user, code)).resolves.toBe(
+        'refused'
+      );
     });
 
     describe('per-account brake', () => {
       async function guessWrong(user: User, times: number): Promise<void> {
         for (let i = 0; i < times; i += 1) {
           await expect(service.isValidStepUpCode(user, '000000')).resolves.toBe(
-            false
+            'refused'
           );
         }
       }
@@ -1060,14 +1072,14 @@ describe('MfaService', () => {
         for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
           await expect(
             service.isValidStepUpCode(user, undefined)
-          ).resolves.toBe(false);
+          ).resolves.toBe('not_offered');
         }
 
         // An ordinary password step-up reaches this method as well, so it must
         // not burn the budget of an account that never offered a code.
         await expect(
           service.isValidStepUpCode(user, generateSync({ secret }))
-        ).resolves.toBe(true);
+        ).resolves.toBe('accepted');
       });
 
       it('closes the window on a correct code', async () => {
@@ -1076,13 +1088,13 @@ describe('MfaService', () => {
         await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
         await expect(
           service.isValidStepUpCode(user, generateSync({ secret }))
-        ).resolves.toBe(true);
+        ).resolves.toBe('accepted');
         persistLedger(user);
 
         // The window is closed, so the next wrong code is a first strike again
         // and refuses the factor rather than barring the account.
         await expect(service.isValidStepUpCode(user, '000000')).resolves.toBe(
-          false
+          'refused'
         );
       });
 
@@ -1153,11 +1165,11 @@ describe('MfaService', () => {
 
       await expect(
         service.isValidStepUpCode(enabled, generateSync({ secret }))
-      ).resolves.toBe(true);
+      ).resolves.toBe('accepted');
       persistLedger(enabled);
 
       await expect(service.isValidStepUpCode(enabled, previous)).resolves.toBe(
-        false
+        'refused'
       );
     });
 
@@ -1177,7 +1189,7 @@ describe('MfaService', () => {
           enabled,
           generateSync({ secret, epoch: nowSeconds - TOTP_PERIOD_SECONDS })
         )
-      ).resolves.toBe(true);
+      ).resolves.toBe('accepted');
 
       expect(lastUpdate().totpLastUsedStep).toBe(
         Math.floor((nowSeconds - TOTP_PERIOD_SECONDS) / TOTP_PERIOD_SECONDS)
@@ -1195,7 +1207,7 @@ describe('MfaService', () => {
 
       await expect(
         service.isValidStepUpCode(enabled, generateSync({ secret }))
-      ).resolves.toBe(true);
+      ).resolves.toBe('accepted');
       persistLedger(enabled);
 
       await expect(
@@ -1203,7 +1215,7 @@ describe('MfaService', () => {
           enabled,
           generateSync({ secret, epoch: nowSeconds + TOTP_PERIOD_SECONDS })
         )
-      ).resolves.toBe(true);
+      ).resolves.toBe('accepted');
     });
   });
 });

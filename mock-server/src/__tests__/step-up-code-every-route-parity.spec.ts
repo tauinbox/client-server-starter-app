@@ -1,5 +1,5 @@
 import type { Server } from 'http';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -12,6 +12,7 @@ let server: Server;
 let baseUrl: string;
 
 const OAUTH_ONLY_ID = '921';
+const WRONG_CODE = '000000';
 
 beforeAll(async () => {
   resetState();
@@ -108,6 +109,33 @@ it('refuses a code in place of the current password for a password change', asyn
   expect(user.password).toBe('Current-Orchard-52');
 });
 
+it('names the code, not the password, when only a wrong code is offered', async () => {
+  const token = await oauthOnlyEnrolledToken();
+  const user = getState().users.get(OAUTH_ONLY_ID) as MockUser;
+  user.password = 'Current-Orchard-52';
+
+  const res = await send(token, 'POST', '/api/v1/auth/mfa/disable', {
+    code: WRONG_CODE
+  });
+
+  expect(res.status).toBe(400);
+  expect(await res.json()).toMatchObject({
+    errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
+  });
+  expect(user.totpEnabledAt).not.toBeNull();
+  expect(
+    getState()
+      .auditLogs.filter((row) => row.action === 'STEP_UP_FAILURE')
+      .map((row) => row.details)
+  ).toEqual([
+    {
+      operation: STEP_UP_OPERATION.MFA_DISABLE,
+      factor: 'code',
+      codeOffered: true
+    }
+  ]);
+});
+
 describe.each(routes)('%s', (_name, method, path, body) => {
   it('refuses an account with no password that sends no factor', async () => {
     const token = await oauthOnlyEnrolledToken();
@@ -117,6 +145,17 @@ describe.each(routes)('%s', (_name, method, path, body) => {
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+    });
+  });
+
+  it('names the code when a wrong code is the only factor', async () => {
+    const token = await oauthOnlyEnrolledToken();
+
+    const res = await send(token, method, path, { ...body, code: WRONG_CODE });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
     });
   });
 

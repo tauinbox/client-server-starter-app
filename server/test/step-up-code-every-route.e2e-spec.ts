@@ -27,6 +27,7 @@ import { withPrivateThrottlerStorage } from './private-throttler';
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 const SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+const WRONG_CODE = '000000';
 
 runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
   let app: INestApplication;
@@ -185,6 +186,16 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         ErrorKeys.AUTH.REAUTH_REQUIRED
       );
 
+      // The refusal names the factor the caller offered, not the provider.
+      const wrongCode = await request(http())
+        [method](path)
+        .auth(bearer, { type: 'bearer' })
+        .send({ ...body, code: WRONG_CODE });
+      expect(wrongCode.status).toBe(400);
+      expect((wrongCode.body as { errorKey?: string }).errorKey).toBe(
+        ErrorKeys.AUTH.MFA_INVALID_CODE
+      );
+
       const accepted = await request(http())
         [method](path)
         .auth(bearer, { type: 'bearer' })
@@ -223,5 +234,19 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     );
     expect((await row()).password).toBe(before);
+  }, 30000);
+
+  // Runs after the first password, so the account now holds one.
+  it('names the code, not the password, when only a wrong code is offered', async () => {
+    const refused = await request(http())
+      .post('/api/v1/auth/mfa/disable')
+      .auth(await token(), { type: 'bearer' })
+      .send({ code: WRONG_CODE });
+
+    expect(refused.status).toBe(400);
+    expect((refused.body as { errorKey?: string }).errorKey).toBe(
+      ErrorKeys.AUTH.MFA_INVALID_CODE
+    );
+    expect((await row()).totpEnabledAt).not.toBeNull();
   }, 30000);
 });

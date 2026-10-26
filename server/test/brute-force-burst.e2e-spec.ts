@@ -137,7 +137,9 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
     const audit = jest.spyOn(auditService, 'log');
 
     await burst(async () => {
-      if (!(await mfaService.isValidStepUpCode(user, WRONG_CODE))) {
+      if (
+        (await mfaService.isValidStepUpCode(user, WRONG_CODE)) !== 'accepted'
+      ) {
         throw new Error('refused');
       }
     });
