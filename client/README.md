@@ -449,8 +449,8 @@ src/app/
 | `/billing/settings` | BillingSettingsComponent | billingAvailableGuard + authGuard |
 | `/billing/success` | CheckoutReturnComponent | billingAvailableGuard + authGuard |
 | `/billing/cancel` | CheckoutReturnComponent | billingAvailableGuard + authGuard |
-| `/verify-email` | VerifyEmailComponent | - |
-| `/confirm-email-change` | ConfirmEmailChangeComponent | - |
+| `/verify-email` | MailedTokenComponent (`data.action: verifyEmail`) | - |
+| `/confirm-email-change` | MailedTokenComponent (`data.action: confirmEmailChange`) | - |
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |

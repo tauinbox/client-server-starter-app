@@ -22,6 +22,7 @@ export type StateSnapshot = { readonly [K in keyof State]: unknown };
 export type TokensSnapshot = {
   emailVerificationTokens: Record<string, string>;
   passwordResetTokens: Record<string, string>;
+  pendingEmailTokens: Record<string, string>;
 };
 
 // Single source of truth for the __control API contract.

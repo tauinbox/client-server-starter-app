@@ -76,10 +76,12 @@ describe('ResetPasswordComponent', () => {
       expect(component['error']()).toBeNull();
     });
 
-    it('should set invalidToken and error when no token provided', () => {
+    it('should show the invalid-link message when no token provided', () => {
       createComponent(undefined);
       expect(component['invalidToken']()).toBe(true);
-      expect(component['error']()).toBe('No reset token provided.');
+      expect(fixture.nativeElement.textContent).toContain(
+        'No reset token provided.'
+      );
     });
   });
 

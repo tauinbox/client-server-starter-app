@@ -1,7 +1,7 @@
-<div class="verify-email-container" *transloco="let t; scope: 'auth'">
+<div class="mailed-token-container" *transloco="let t; scope: 'auth'">
   <mat-card>
     <mat-card-header>
-      <mat-card-title>{{ t('auth.verifyEmail.title') }}</mat-card-title>
+      <mat-card-title>{{ t(keyPrefix() + 'title') }}</mat-card-title>
     </mat-card-header>
 
     <mat-card-content>
@@ -11,24 +11,24 @@
             [attr.aria-label]="t('common.loading')"
             diameter="48"
           ></mat-spinner>
-          <p>{{ t('auth.verifyEmail.verifying') }}</p>
+          <p>{{ t(keyPrefix() + 'verifying') }}</p>
         </div>
       } @else if (success()) {
         <div class="status-container success">
           <mat-icon>check_circle</mat-icon>
-          <h3>{{ t('auth.verifyEmail.successTitle') }}</h3>
-          <p>{{ t('auth.verifyEmail.successMessage') }}</p>
+          <h3>{{ t(keyPrefix() + 'successTitle') }}</h3>
+          <p>{{ t(keyPrefix() + 'successMessage') }}</p>
           <button matButton="filled" routerLink="/login">
-            {{ t('auth.verifyEmail.goToLogin') }}
+            {{ t(keyPrefix() + 'goToLogin') }}
           </button>
         </div>
       } @else {
         <div class="status-container error">
           <mat-icon>error_outline</mat-icon>
-          <h3>{{ t('auth.verifyEmail.failedTitle') }}</h3>
+          <h3>{{ t(keyPrefix() + 'failedTitle') }}</h3>
           <p>{{ error() }}</p>
           <button matButton="filled" routerLink="/login">
-            {{ t('auth.verifyEmail.goToLogin') }}
+            {{ t(keyPrefix() + 'goToLogin') }}
           </button>
         </div>
       }

@@ -3,7 +3,7 @@
 @use 'abstracts/mixins' as mix;
 
 :host {
-  .confirm-email-change-container {
+  .mailed-token-container {
     mat-card {
       width: 100%;
     }

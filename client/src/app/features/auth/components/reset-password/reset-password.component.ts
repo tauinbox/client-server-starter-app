@@ -111,9 +111,6 @@ export class ResetPasswordComponent implements OnInit {
 
     if (!this.#token) {
       this.invalidToken.set(true);
-      this.error.set(
-        this.#translocoService.translate('auth.resetPassword.errorNoToken')
-      );
     }
   }
 
