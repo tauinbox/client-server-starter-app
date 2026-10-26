@@ -121,3 +121,25 @@ export function validateMongoQueryKeys(
 
   return null;
 }
+
+/**
+ * Checks the `custom` branch of a permission condition: a JSON string that
+ * holds a safe MongoQuery object.
+ *
+ * @returns Error message string, or `null` if safe.
+ */
+export function findCustomQueryError(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return 'custom must be a JSON string';
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return 'custom must be valid JSON';
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return 'custom must be a JSON object';
+  }
+  return validateMongoQueryKeys(parsed, '');
+}

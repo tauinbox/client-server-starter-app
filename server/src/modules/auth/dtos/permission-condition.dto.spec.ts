@@ -189,4 +189,51 @@ describe('PermissionConditionDto shape validation', () => {
       ).resolves.toBeDefined();
     });
   });
+
+  // ValidateNested validates each entry of an array, so without IsObject an
+  // array passed and was stored as the condition: a deny in it had no
+  // `effect` at the top and compiled as an unconditional allow.
+  describe('an array in place of an object', () => {
+    async function messagesOf(
+      metatype: typeof AssignPermissionsDto | typeof SetPermissionsDto,
+      body: unknown
+    ): Promise<string[]> {
+      const error = await pipe.transform(body, { type: 'body', metatype }).then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(error).toBeInstanceOf(BadRequestException);
+      return (
+        (error as BadRequestException).getResponse() as { message: string[] }
+      ).message;
+    }
+
+    it.each<[unknown[]]>([[[]], [[{ effect: 'deny' }]]])(
+      'rejects the POST conditions %j',
+      async (conditions) => {
+        expect(
+          await messagesOf(AssignPermissionsDto, {
+            permissionIds: [PERM_ID],
+            conditions
+          })
+        ).toEqual(['conditions must be an object']);
+      }
+    );
+
+    it('rejects an item conditions that is an array', async () => {
+      expect(
+        await messagesOf(SetPermissionsDto, {
+          items: [{ permissionId: PERM_ID, conditions: [{ effect: 'deny' }] }]
+        })
+      ).toEqual(['items.0.conditions must be an object']);
+    });
+
+    it('rejects an item that is an array', async () => {
+      expect(
+        await messagesOf(SetPermissionsDto, {
+          items: [[{ permissionId: PERM_ID }]]
+        })
+      ).toEqual(['each value in items must be an object']);
+    });
+  });
 });

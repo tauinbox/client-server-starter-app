@@ -3,6 +3,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -27,6 +28,7 @@ export class AssignPermissionsDto {
     description: 'Optional conditions for the permissions'
   })
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => PermissionConditionDto)
   conditions?: PermissionConditionDto;
@@ -41,6 +43,7 @@ export class PermissionItemDto {
     description: 'Optional conditions for this permission'
   })
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => PermissionConditionDto)
   conditions?: PermissionConditionDto | null;
@@ -53,6 +56,7 @@ export class SetPermissionsDto {
   })
   @IsArray()
   @ArrayMaxSize(500)
+  @IsObject({ each: true })
   @ValidateNested({ each: true })
   @Type(() => PermissionItemDto)
   items: PermissionItemDto[];

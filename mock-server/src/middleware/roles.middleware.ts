@@ -12,7 +12,7 @@ import {
 } from '../helpers/list-query.helpers';
 
 import type { PermissionCondition } from '@app/shared/types';
-import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
+import { findCustomQueryError } from '@app/shared/utils/mongo-query-safety';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import {
@@ -50,7 +50,14 @@ import {
   requireUuid,
   validationError
 } from '../helpers/validation-error.helpers';
-import { unknownPropertyErrors, validateMaxLength } from '../utils/validation';
+import {
+  isUuidV4,
+  nestedErrors,
+  objectErrors,
+  oneOfErrors,
+  unknownPropertyErrors,
+  validateMaxLength
+} from '../utils/validation';
 
 const router = Router();
 
@@ -73,76 +80,134 @@ function normalizeRoleName(value: unknown): RoleName {
   return maxErr ? { ok: false, error: maxErr } : { ok: true, name };
 }
 
-function validateCustomCondition(custom: string | undefined): string | null {
-  if (!custom) return null;
-  try {
-    const parsed = JSON.parse(custom);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
-      return 'custom must be a JSON object';
-    return validateMongoQueryKeys(parsed);
-  } catch {
-    return 'custom must be valid JSON';
-  }
-}
-
-const CONDITION_KEYS = new Set([
+const CONDITION_KEYS = [
   'effect',
   'ownership',
   'fieldMatch',
   'userAttr',
   'custom'
-]);
+];
+const ASSIGN_PERMISSIONS_KEYS = ['permissionIds', 'conditions'];
+const PERMISSION_ITEM_KEYS = ['permissionId', 'conditions'];
+const SET_PERMISSIONS_KEYS = ['items'];
+const MAX_PERMISSION_ITEMS = 500;
 
-// Mirrors the server's PermissionConditionDto validation (ValidationPipe
-// whitelist + per-branch shape checks) so a payload the real server rejects
-// with 400 cannot pass the mock and turn an e2e run false-green.
-function findConditionShapeError(conditions: unknown): string | null {
-  if (conditions === undefined || conditions === null) return null;
-  if (typeof conditions !== 'object' || Array.isArray(conditions)) {
-    return 'conditions must be an object';
-  }
+// Mirrors `@IsOptional() @IsObject() @Is<Branch>Shape()`, reported bottom-up.
+function conditionBranchErrors(
+  field: string,
+  value: unknown,
+  findShapeError: (value: unknown) => string | null
+): string[] {
+  if (value === undefined || value === null) return [];
+  const shapeError = findShapeError(value);
+  return [...(shapeError ? [shapeError] : []), ...objectErrors(field, value)];
+}
 
-  const cond = conditions as Record<string, unknown>;
-  for (const key of Object.keys(cond)) {
-    if (!CONDITION_KEYS.has(key)) {
-      return `property conditions.${key} should not exist`;
-    }
-  }
+// Mirrors `@IsOptional() @IsString() @IsSafeMongoQuery()`, reported bottom-up.
+function customConditionErrors(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  const queryError = findCustomQueryError(value);
+  return [
+    ...(queryError ? [queryError] : []),
+    ...(typeof value === 'string' ? [] : ['custom must be a string'])
+  ];
+}
 
-  if (
-    cond['effect'] != null &&
-    cond['effect'] !== 'allow' &&
-    cond['effect'] !== 'deny'
-  ) {
-    return 'effect must be one of the following values: allow, deny';
-  }
+// Mirrors PermissionConditionDto, so a payload the real server rejects with
+// 400 cannot pass the mock and turn an e2e run false-green.
+function conditionObjectErrors(path: string, value: object): string[] {
+  const cond = value as Record<string, unknown>;
+  return [
+    ...unknownPropertyErrors(cond, CONDITION_KEYS),
+    ...oneOfErrors('effect', cond['effect'], ['allow', 'deny'], 'nullable'),
+    ...conditionBranchErrors(
+      'ownership',
+      cond['ownership'],
+      findOwnershipShapeError
+    ),
+    ...conditionBranchErrors(
+      'fieldMatch',
+      cond['fieldMatch'],
+      findFieldMatchShapeError
+    ),
+    ...conditionBranchErrors(
+      'userAttr',
+      cond['userAttr'],
+      findUserAttrShapeError
+    ),
+    ...customConditionErrors(cond['custom'])
+  ].map((message) => `${path}.${message}`);
+}
 
-  if (cond['ownership'] != null) {
-    const error = findOwnershipShapeError(cond['ownership']);
-    if (error) return error;
-  }
+// Mirrors `@IsOptional() @IsObject() @ValidateNested()
+// @Type(() => PermissionConditionDto)`.
+function conditionsErrors(parentPath: string, value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  return nestedErrors(
+    parentPath,
+    'conditions',
+    value,
+    objectErrors('conditions', value),
+    conditionObjectErrors
+  );
+}
 
-  if (cond['fieldMatch'] != null) {
-    const error = findFieldMatchShapeError(cond['fieldMatch']);
-    if (error) return error;
-  }
+// Mirrors AssignPermissionsDto. `permissionIds` carries `@IsArray()
+// @ArrayNotEmpty() @ArrayMaxSize(500) @IsUUID('4', { each: true })`, reported
+// bottom-up.
+function assignPermissionsErrors(body: Record<string, unknown>): string[] {
+  const ids = body['permissionIds'];
+  const isArray = Array.isArray(ids);
+  return [
+    ...unknownPropertyErrors(body, ASSIGN_PERMISSIONS_KEYS),
+    ...((isArray ? ids : [ids]).some((id) => !isUuidV4(id))
+      ? ['each value in permissionIds must be a UUID']
+      : []),
+    ...(!isArray || ids.length > MAX_PERMISSION_ITEMS
+      ? [
+          `permissionIds must contain no more than ${MAX_PERMISSION_ITEMS} elements`
+        ]
+      : []),
+    ...(!isArray || ids.length === 0
+      ? ['permissionIds should not be empty']
+      : []),
+    ...(isArray ? [] : ['permissionIds must be an array']),
+    ...conditionsErrors('', body['conditions'])
+  ];
+}
 
-  if (cond['userAttr'] != null) {
-    const error = findUserAttrShapeError(cond['userAttr']);
-    if (error) return error;
-  }
+// Mirrors PermissionItemDto.
+function permissionItemErrors(path: string, value: object): string[] {
+  const item = value as Record<string, unknown>;
+  return [
+    ...[
+      ...unknownPropertyErrors(item, PERMISSION_ITEM_KEYS),
+      ...(isUuidV4(item['permissionId']) ? [] : ['permissionId must be a UUID'])
+    ].map((message) => `${path}.${message}`),
+    ...conditionsErrors(path, item['conditions'])
+  ];
+}
 
-  if (cond['custom'] != null) {
-    if (typeof cond['custom'] !== 'string') {
-      return 'custom must be a JSON string';
-    }
-    const error = validateCustomCondition(cond['custom']);
-    if (error) {
-      return `conditions.custom contains disallowed operator or is invalid: ${error}`;
-    }
-  }
-
-  return null;
+// Mirrors SetPermissionsDto. `items` carries `@IsArray() @ArrayMaxSize(500)
+// @IsObject({ each: true }) @ValidateNested({ each: true })`.
+function setPermissionsErrors(body: Record<string, unknown>): string[] {
+  const items = body['items'];
+  const isArray = Array.isArray(items);
+  const isPlainObject = (value: unknown): boolean =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+  const own = [
+    ...((isArray ? items : [items]).some((item) => !isPlainObject(item))
+      ? ['each value in items must be an object']
+      : []),
+    ...(!isArray || items.length > MAX_PERMISSION_ITEMS
+      ? [`items must contain no more than ${MAX_PERMISSION_ITEMS} elements`]
+      : []),
+    ...(isArray ? [] : ['items must be an array'])
+  ];
+  return [
+    ...unknownPropertyErrors(body, SET_PERMISSIONS_KEYS),
+    ...nestedErrors('', 'items', items, own, permissionItemErrors, true)
+  ];
 }
 
 // Mirrors RoleService.assertGrantsApplicable, in the same order: a grant that
@@ -612,29 +677,14 @@ router.put(
     // SetPermissionsDto is validated by the server's global pipe before the
     // handler runs, so its shape checks precede the role lookup. Everything that
     // needs the role or the permission registry stays below the 404.
+    const errors = setPermissionsErrors(req.body);
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
     const { items } = req.body as {
-      items?: { permissionId: string; conditions?: unknown }[];
+      items: { permissionId: string; conditions?: unknown }[];
     };
-    if (!Array.isArray(items)) {
-      res.status(400).json(validationError('items must be an array'));
-      return;
-    }
-
-    if (items.length > 500) {
-      res
-        .status(400)
-        .json(validationError('items must contain no more than 500 elements'));
-      return;
-    }
-
-    // Validate condition shapes (mirrors the server's DTO validation)
-    for (const item of items) {
-      const error = findConditionShapeError(item.conditions);
-      if (error) {
-        res.status(400).json(validationError(error));
-        return;
-      }
-    }
 
     const role = state.roles.get(id);
 
@@ -743,36 +793,12 @@ router.post(
     // AssignPermissionsDto is validated by the server's global pipe before the
     // handler runs, so its shape checks precede the role lookup. Everything that
     // needs the role or the permission registry stays below the 404.
+    const errors = assignPermissionsErrors(req.body);
+    if (errors.length > 0) {
+      res.status(400).json(validationError(errors));
+      return;
+    }
     const { permissionIds, conditions } = req.body;
-    if (!Array.isArray(permissionIds)) {
-      res.status(400).json(validationError('permissionIds must be an array'));
-      return;
-    }
-
-    if (permissionIds.length === 0) {
-      res
-        .status(400)
-        .json(validationError('permissionIds should not be empty'));
-      return;
-    }
-
-    if (permissionIds.length > 500) {
-      res
-        .status(400)
-        .json(
-          validationError(
-            'permissionIds must contain no more than 500 elements'
-          )
-        );
-      return;
-    }
-
-    // Validate condition shape (mirrors the server's DTO validation)
-    const conditionError = findConditionShapeError(conditions);
-    if (conditionError) {
-      res.status(400).json(validationError(conditionError));
-      return;
-    }
 
     const role = state.roles.get(id);
 

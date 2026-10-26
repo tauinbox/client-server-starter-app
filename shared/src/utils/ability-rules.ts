@@ -11,6 +11,7 @@ import {
   findConditionFieldError,
   findConditionSupportError
 } from './permission-condition-shape';
+import { isDenyCondition } from './grant-scope';
 import { resolveConditions, type ResolverLogger } from './resolve-conditions';
 
 export interface AbilityLogger extends ResolverLogger {
@@ -47,7 +48,7 @@ export function dedupPermissions(
 ): ResolvedPermission[] {
   const permissionMap = new Map<string, ResolvedPermission>();
   for (const { resource, action, conditions } of grants) {
-    const effect = conditions?.effect === 'deny' ? 'deny' : 'allow';
+    const effect = isDenyCondition(conditions) ? 'deny' : 'allow';
     const key = `${effect}:${resource}:${action}:${JSON.stringify(conditions ?? null)}`;
     if (!permissionMap.has(key)) {
       permissionMap.set(key, {
@@ -88,13 +89,13 @@ export function compileAbilityRules<
   // direct rules (can) to override them. Partition so allows are registered
   // first, denies last.
   const ordered = [
-    ...permissions.filter((p) => p.conditions?.effect !== 'deny'),
-    ...permissions.filter((p) => p.conditions?.effect === 'deny')
+    ...permissions.filter((p) => !isDenyCondition(p.conditions)),
+    ...permissions.filter((p) => isDenyCondition(p.conditions))
   ];
 
   for (const p of ordered) {
     const action = p.action;
-    const isDeny = p.conditions?.effect === 'deny';
+    const isDeny = isDenyCondition(p.conditions);
 
     // Fail closed in both directions, as the condition veto below does: an
     // allow needs a live resource, while a deny must outlive its resource

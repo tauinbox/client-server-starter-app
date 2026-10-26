@@ -9,6 +9,7 @@ import { buildAbility } from '../casl/build-ability';
 import { resolveConditions } from '@app/shared/utils/resolve-conditions';
 import { assertCanGrantPermissions } from './can-grant.util';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
+import { isDenyCondition } from '@app/shared/utils/grant-scope';
 import {
   findConditionFieldError,
   findConditionSupportError
@@ -216,7 +217,7 @@ export function analyzeGrants(input: {
 
   const inert: GrantRow[] = [];
   for (const g of grants) {
-    const isDeny = g.conditions?.effect === 'deny';
+    const isDeny = isDenyCondition(g.conditions);
     if (
       (!isDeny &&
         !subjectMaps.grantableActions[g.resource_name]?.includes(

@@ -1452,6 +1452,9 @@ These inputs cause a veto:
 - A `fieldMatch`, `userAttr` or `custom` key that collides with the protected `ownership.userField`
   key. Such a key replaces the owner-scoping predicate with a broader one.
 - A restriction branch that resolves to an empty query.
+- A condition that is not an object. `@IsObject()` refuses one on a write, but a row written before
+  that check can hold an array. `isDenyCondition` treats such an array as a deny when any entry is a
+  deny, so the row registers as an unconditional `cannot()`.
 
 The runtime check runs the same `validateMongoQueryKeys()` allow-list that the DTO applies on a
 write. Thus CASL cannot honor a stored condition that the SQL list-filter translator drops.

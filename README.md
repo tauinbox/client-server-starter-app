@@ -350,6 +350,10 @@ management and theming.
   `ownership.userField` that is empty or not a string, a prototype-pollution key, or a `$`-prefixed
   key or attribute name.
 
+  A condition that is not an object vetoes the permission too. The permission-write routes refuse
+  one with a 400, but a row written before that check can hold an array. A deny in any entry of such
+  an array makes the whole row a deny.
+
   The system never registers a partial resolution. A drop of the malformed part alone widens the
   intended restriction silently.
 
@@ -1901,11 +1905,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3076 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 698 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 685 pass and 13 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3084 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 700 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 687 pass and 13 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1608 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 337 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1178 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1221 tests pass |
 
 ## CI/CD
 
