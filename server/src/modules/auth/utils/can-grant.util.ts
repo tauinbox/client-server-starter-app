@@ -23,32 +23,30 @@ function scopeOf(ability: AppAbility): GrantScopeAbility {
   };
 }
 
-function grantDenied(refusal: GrantRefusal): HttpException {
+export function grantDenied(refusal: GrantRefusal): HttpException {
   const { status, message, errorKey, details } = refusal;
   return new HttpException({ message, errorKey, details }, status);
 }
 
 /**
- * Throws the 403 of `findGrantRefusal`: the caller can grant only what it
+ * The refusal of `findGrantRefusal`: the caller can grant only what it
  * holds, and a conditional holder only a condition at least as narrow.
  */
-export function assertCanGrantPermissions(
+export function grantRefusalOf(
   ability: AppAbility,
   items: GrantScopeItem[],
   ctx: GrantCheckContext
-): void {
-  const refusal = findGrantRefusal(scopeOf(ability), items, ctx);
-  if (refusal) throw grantDenied(refusal);
+): GrantRefusal | null {
+  return findGrantRefusal(scopeOf(ability), items, ctx);
 }
 
 /**
- * Throws the 403 of `findLiftRefusal`: only a caller holding the pair without
+ * The refusal of `findLiftRefusal`: only a caller holding the pair without
  * restriction can remove a deny row.
  */
-export function assertCanLiftDenies(
+export function liftRefusalOf(
   ability: AppAbility,
   items: GrantScopeItem[]
-): void {
-  const refusal = findLiftRefusal(scopeOf(ability), items);
-  if (refusal) throw grantDenied(refusal);
+): GrantRefusal | null {
+  return findLiftRefusal(scopeOf(ability), items);
 }

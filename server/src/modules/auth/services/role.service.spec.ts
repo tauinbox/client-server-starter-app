@@ -1267,7 +1267,7 @@ describe('RoleService', () => {
 
   // ── RBAC-SEC-1: grant-escalation block ────────────────────────────
 
-  describe('assertCanGrantPermissions (via service)', () => {
+  describe('grantRefusalOf (via service)', () => {
     const permCreateRole = {
       id: 'perm-create-role',
       action: { name: 'create' },

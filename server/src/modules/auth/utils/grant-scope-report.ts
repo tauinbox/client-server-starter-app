@@ -1,4 +1,4 @@
-import { HttpException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import type {
   PermissionCondition,
   ResolvedPermission,
@@ -7,7 +7,7 @@ import type {
 import type { AppAbility } from '../casl/app-ability';
 import { buildAbility } from '../casl/build-ability';
 import { resolveConditions } from '@app/shared/utils/resolve-conditions';
-import { assertCanGrantPermissions } from './can-grant.util';
+import { grantRefusalOf } from './can-grant.util';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import { isDenyCondition } from '@app/shared/utils/grant-scope';
 import {
@@ -19,13 +19,13 @@ import {
  * Analysis behind `npm run check:grant-scope`: which stored grants the
  * grant-scope rule would reject if they were written today.
  *
- * `assertCanGrantPermissions` applies to writes only - rows already in
+ * The grant-scope rule applies to writes only - rows already in
  * `role_permissions` are deliberately not re-validated, because retro-validating
  * live grants would silently strip permissions in production. This module is the
  * read-only diagnostic that fills that gap. It decides nothing and changes
  * nothing; the script that calls it only reads and prints.
  *
- * The verdicts come from the real `assertCanGrantPermissions`, and the author's
+ * The verdicts come from the real `grantRefusalOf`, and the author's
  * ability from the same `buildAbility` the application uses, so neither can
  * drift from the enforcement.
  */
@@ -121,38 +121,25 @@ export function verdictFor(
   actorId: string,
   row: GrantRow
 ): Verdict {
-  try {
-    assertCanGrantPermissions(
-      ability,
-      [
-        {
-          permissionId: row.permission_id,
-          actionName: row.action_name,
-          subject: row.resource_subject,
-          bodyConditions: row.conditions
-        }
-      ],
-      { actorId, logger: silent }
-    );
-    return { rejected: false };
-  } catch (err) {
-    if (!(err instanceof HttpException)) throw err;
-    const body = err.getResponse();
-    const parsed =
-      typeof body === 'object' && body !== null
-        ? (body as {
-            errorKey?: string;
-            message?: string;
-            details?: { reason?: string };
-          })
-        : {};
-    return {
-      rejected: true,
-      errorKey: parsed.errorKey,
-      reason: parsed.details?.reason,
-      message: parsed.message
-    };
-  }
+  const refusal = grantRefusalOf(
+    ability,
+    [
+      {
+        permissionId: row.permission_id,
+        actionName: row.action_name,
+        subject: row.resource_subject,
+        bodyConditions: row.conditions
+      }
+    ],
+    { actorId, logger: silent }
+  );
+  if (!refusal) return { rejected: false };
+  return {
+    rejected: true,
+    errorKey: refusal.errorKey,
+    reason: refusal.details.reason,
+    message: refusal.message
+  };
 }
 
 /**

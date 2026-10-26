@@ -2,7 +2,7 @@
  * The unit and service specs never prove the escalation is blocked at the
  * route. The real `RoleService` runs here - only the repositories are mocked -
  * so a request travels controller -> assertGrantAllowed ->
- * assertCanGrantPermissions as it does in production, against an ability built
+ * grantRefusalOf as it does in production, against an ability built
  * through the production condition resolver.
  */
 

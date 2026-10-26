@@ -67,7 +67,7 @@ grant removes permissions in production silently.
 This report closes that gap. It lists two groups. The first group holds each grant whose stored
 condition the resolver vetoes, which is inert today. The second group holds each grant that its
 author, from the `PERMISSION_ASSIGN` audit trail, could not authorize today. The report runs those
-grants through the true `assertCanGrantPermissions` function. It builds the ability of each author
+grants through the true `grantRefusalOf` function. It builds the ability of each author
 with `buildAbility` (`src/modules/auth/casl/build-ability.ts`), the same function that
 `CaslAbilityFactory` calls.
 
@@ -1522,7 +1522,7 @@ takes the actor for this purpose. Each denial also increases
 `rbac_permission_denied_total{level="instance"}`.
 
 **A delegated grant can narrow the condition of the caller, and never widen it.**
-`assertCanGrantPermissions` requires the caller to hold the granted pair of action and subject. When
+`grantRefusalOf` requires the caller to hold the granted pair of action and subject. When
 each matching allow rule of the caller is conditional, the granted condition must **contain** one of
 them.
 

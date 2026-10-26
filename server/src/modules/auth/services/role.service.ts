@@ -29,11 +29,13 @@ import { withChanges } from '@app/shared/utils/changed-fields';
 import {
   isDenyCondition,
   sameConditions,
+  type GrantRefusal,
   type GrantScopeItem
 } from '@app/shared/utils/grant-scope';
 import {
-  assertCanGrantPermissions,
-  assertCanLiftDenies
+  grantDenied,
+  grantRefusalOf,
+  liftRefusalOf
 } from '../utils/can-grant.util';
 import {
   findConditionActionError,
@@ -108,15 +110,11 @@ export class RoleService {
     // clean 400 for every caller instead of an opaque FK-violation 409.
     const resolved = await this.resolveGrantItems(items);
     if (ability.can('manage', 'all')) return;
-    try {
-      assertCanGrantPermissions(ability, resolved, {
-        actorId: context.actorId,
-        logger: this.logger
-      });
-    } catch (err) {
-      this.recordGrantRefusal(err, ability, context);
-      throw err;
-    }
+    const refusal = grantRefusalOf(ability, resolved, {
+      actorId: context.actorId,
+      logger: this.logger
+    });
+    if (refusal) this.refuseGrant(refusal, ability, context);
   }
 
   /**
@@ -133,12 +131,8 @@ export class RoleService {
     const denies = rows.filter((row) => isDenyCondition(row.conditions));
     if (denies.length === 0) return;
     const resolved = await this.resolveGrantItems(denies);
-    try {
-      assertCanLiftDenies(ability, resolved);
-    } catch (err) {
-      this.recordGrantRefusal(err, ability, context);
-      throw err;
-    }
+    const refusal = liftRefusalOf(ability, resolved);
+    if (refusal) this.refuseGrant(refusal, ability, context);
   }
 
   private isScopeChecked(ability: AbilityOrSystem): ability is AppAbility {
@@ -152,28 +146,12 @@ export class RoleService {
     return rows.filter((row) => isDenyCondition(row.conditions));
   }
 
-  /** Rethrows a 403 through `refuseAccess`; any other error is left alone. */
-  private recordGrantRefusal(
-    err: unknown,
+  private refuseGrant(
+    refusal: GrantRefusal,
     ability: AppAbility,
     context: { actorId?: string; roleId: string }
-  ): void {
-    if (!(err instanceof HttpException) || err.getStatus() !== 403) return;
-    const body = err.getResponse();
-    const details =
-      typeof body === 'object' && body !== null
-        ? ((body as { details?: Record<string, unknown> }).details ?? {
-            body
-          })
-        : { message: String(body) };
-    const rawAction =
-      typeof details === 'object' && 'action' in details
-        ? (details as { action?: unknown }).action
-        : undefined;
-    const rawSubject =
-      typeof details === 'object' && 'subject' in details
-        ? (details as { subject?: unknown }).subject
-        : undefined;
+  ): never {
+    const { details } = refusal;
     refuseAccess(
       this.auditService,
       this.metricsService,
@@ -185,14 +163,9 @@ export class RoleService {
         details,
         context: auditContextOf(ability),
         level: 'instance',
-        denied: [
-          {
-            action: typeof rawAction === 'string' ? rawAction : 'grant',
-            subject: typeof rawSubject === 'string' ? rawSubject : 'Permission'
-          }
-        ]
+        denied: [{ action: details.action, subject: details.subject }]
       },
-      err
+      grantDenied(refusal)
     );
   }
 

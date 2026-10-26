@@ -14,13 +14,32 @@ import {
   type GrantScopeItem
 } from '@app/shared/utils/grant-scope';
 import {
-  assertCanGrantPermissions,
-  assertCanLiftDenies
+  grantDenied,
+  grantRefusalOf,
+  liftRefusalOf,
+  type GrantCheckContext
 } from './can-grant.util';
 
 const CALLER_ID = 'caller-id';
 
-describe('assertCanGrantPermissions', () => {
+function assertCanGrantPermissions(
+  ability: AppAbility,
+  items: GrantScopeItem[],
+  ctx: GrantCheckContext
+): void {
+  const refusal = grantRefusalOf(ability, items, ctx);
+  if (refusal) throw grantDenied(refusal);
+}
+
+function assertCanLiftDenies(
+  ability: AppAbility,
+  items: GrantScopeItem[]
+): void {
+  const refusal = liftRefusalOf(ability, items);
+  if (refusal) throw grantDenied(refusal);
+}
+
+describe('grantRefusalOf', () => {
   let logger: Logger;
 
   beforeEach(() => {
@@ -383,7 +402,7 @@ function denyItem(
   };
 }
 
-describe('assertCanLiftDenies', () => {
+describe('liftRefusalOf', () => {
   function abilityWith(
     define: (
       can: AbilityBuilder<AppAbility>['can'],
