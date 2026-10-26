@@ -22,6 +22,7 @@ import { MailService } from '../../mail/mail.service';
 import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { User } from '../entities/user.entity';
+import { addressTakenWhere, emailExistsConflict } from '../utils/email-taken';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import type { CursorPaginatedResponseDto } from '../../../common/dtos';
@@ -110,20 +111,10 @@ export class UsersService {
       createUserDto
     );
 
-    // Reject if address is held by another user as primary email OR as a
-    // pending email-change request — both are reservations on the address.
     const existingUser = await this.userRepository.findOne({
-      where: [{ email }, { pendingEmail: email }]
+      where: addressTakenWhere(email)
     });
-    if (existingUser) {
-      throw new HttpException(
-        {
-          message: 'User with this email already exists',
-          errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-        },
-        HttpStatus.CONFLICT
-      );
-    }
+    if (existingUser) throw emailExistsConflict();
 
     const { hash, version } = await hashPassword(password);
 
@@ -154,24 +145,10 @@ export class UsersService {
     }
   }
 
-  /**
-   * The address checks above are not atomic with their write: a concurrent
-   * request can claim the same address in between. The unique indexes on
-   * email and pending_email reject the loser, and this keeps its response
-   * identical to the pre-check's 409 instead of the generic unique-violation
-   * shape the exception filter would produce. Every unique index on users
-   * covers an address, so any violation here is an address collision.
-   */
+  // Every unique index on users covers an address, so any violation here is an
+  // address collision.
   private emailConflictOrOriginal(error: unknown): unknown {
-    if (!isUniqueViolation(error)) return error;
-
-    return new HttpException(
-      {
-        message: 'User with this email already exists',
-        errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-      },
-      HttpStatus.CONFLICT
-    );
+    return isUniqueViolation(error) ? emailExistsConflict() : error;
   }
 
   async findCursorPaginated(
@@ -377,19 +354,11 @@ export class UsersService {
 
     let pendingVerificationRawToken: string | null = null;
     if (rest.email !== undefined && rest.email !== user.email) {
-      // Reject if another user holds this address as primary email OR as a
-      // pending email-change request in flight.
       const conflicting = await this.userRepository.findOne({
-        where: [{ email: rest.email }, { pendingEmail: rest.email }]
+        where: addressTakenWhere(rest.email)
       });
       if (conflicting && conflicting.id !== user.id) {
-        throw new HttpException(
-          {
-            message: 'User with this email already exists',
-            errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-          },
-          HttpStatus.CONFLICT
-        );
+        throw emailExistsConflict();
       }
       const issued = issueMailedToken(VERIFICATION_TOKEN_EXPIRY_MS);
       pendingVerificationRawToken = issued.rawToken;

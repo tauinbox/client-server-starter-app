@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
 import { UserCreatedEvent } from '../../users/events/user-created.event';
+import { addressTakenWhere } from '../../users/utils/email-taken';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
@@ -140,7 +141,7 @@ export class OAuthService {
           // An address another account is changing to is reserved as well,
           // matching register; otherwise that owner's confirmation fails.
           const existing = await manager.findOne(User, {
-            where: [{ email }, { pendingEmail: email }]
+            where: addressTakenWhere(email)
           });
           if (existing) {
             throw new OAuthAuthenticationFailedException(

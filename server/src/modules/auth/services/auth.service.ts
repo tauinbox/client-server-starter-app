@@ -16,6 +16,11 @@ import { RegisterDto } from '../dtos/register.dto';
 import { User } from '../../users/entities/user.entity';
 import { UserCreatedEvent } from '../../users/events/user-created.event';
 import { UserUpdatedEvent } from '../../users/events/user-updated.event';
+import {
+  addressTakenWhere,
+  emailExistsConflict,
+  isEmailExistsConflict
+} from '../../users/utils/email-taken';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { LocalAuthRequest } from '../types/auth.request';
 import { RefreshTokenService } from './refresh-token.service';
@@ -77,34 +82,6 @@ type ConfirmEmailChangeOutcome =
     }
   | { kind: 'expired'; userId: string }
   | { kind: 'conflict'; userId: string };
-
-/**
- * The address checks in this file are not atomic with their writes: a
- * concurrent request can claim the same address in between. The unique indexes
- * on email and pending_email reject the loser, and translating that violation
- * here keeps its response identical to the pre-check's instead of the generic
- * unique-violation shape the exception filter would produce.
- */
-function emailExistsConflict(): HttpException {
-  return new HttpException(
-    {
-      message: 'User with this email already exists',
-      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-    },
-    HttpStatus.CONFLICT
-  );
-}
-
-function isEmailExistsConflict(error: unknown): boolean {
-  if (!(error instanceof HttpException)) return false;
-  const response = error.getResponse();
-  return (
-    typeof response === 'object' &&
-    response !== null &&
-    'errorKey' in response &&
-    response.errorKey === ErrorKeys.USERS.EMAIL_EXISTS
-  );
-}
 
 const INVALID_REFRESH_TOKEN_BODY = {
   message: 'Invalid refresh token',
@@ -305,13 +282,8 @@ export class AuthService {
     let user: User;
     try {
       user = await withTransaction(this.dataSource, async (manager) => {
-        // Also reject if another user holds this address as a pending email
-        // change — otherwise two accounts could claim the same address in flight.
         const existing = await manager.findOne(User, {
-          where: [
-            { email: registerDto.email },
-            { pendingEmail: registerDto.email }
-          ]
+          where: addressTakenWhere(registerDto.email)
         });
         if (existing) {
           throw emailExistsConflict();
