@@ -621,7 +621,7 @@ describe('turning the factor off', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(400);
-    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
+    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
   });
 
   it('accepts the password', async () => {

@@ -66,6 +66,12 @@ const CHALLENGE_FAILURE_KEY_PREFIX = 'mfa:challenge-failures:';
  */
 const STEP_UP_FAILURE_KEY_PREFIX = 'mfa:step-up-failures:';
 
+/**
+ * What the code of one step-up proved. A refused code is not the same as no
+ * code: the refusal must name the factor the caller offered.
+ */
+export type StepUpCodeVerdict = 'accepted' | 'refused' | 'not_offered';
+
 @Injectable()
 export class MfaService {
   private readonly logger = new Logger(MfaService.name);
@@ -483,12 +489,12 @@ export class MfaService {
     user: User,
     code: string | undefined,
     context?: AuditContext
-  ): Promise<boolean> {
+  ): Promise<StepUpCodeVerdict> {
     // Every step-up runs through here, including the ones that carry no code
     // at all. Counting those would let an ordinary password step-up burn the
     // budget of an account that never offered a code.
     if (user.totpEnabledAt === null || !code) {
-      return false;
+      return 'not_offered';
     }
 
     // Reserve before checking, for the reason given in verifyChallenge.
@@ -508,11 +514,11 @@ export class MfaService {
       }
       // The caller may still hold a password, so a wrong code is a refusal of
       // this factor rather than of the whole step-up.
-      return false;
+      return 'refused';
     }
 
     await this.#stepUpFailures.clear(user.id);
-    return true;
+    return 'accepted';
   }
 
   private async userFromPendingToken(mfaToken: string): Promise<User> {

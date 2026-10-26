@@ -7,6 +7,7 @@ import {
   MOCK_TOTP_SECRET
 } from '../../../mock-server/src/constants';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
+import type { UserResponse } from '@app/shared/types';
 import type { MockUser } from '../fixtures/mock-data';
 import type { Page } from '@playwright/test';
 
@@ -262,6 +263,38 @@ test.describe('OAuth-only account turns two-factor on', () => {
     await expect(
       card.getByText('Two-factor authentication is off')
     ).toBeVisible();
+  });
+
+  // The refusal names the factor the user typed. Before, a wrong code told this
+  // account to confirm with its provider, which it had not tried.
+  test('names the code when a wrong code turns nothing off', async ({
+    _mockServer,
+    page
+  }) => {
+    await loginViaUi(page, _mockServer.url, {
+      id: userId,
+      email,
+      roles: ['user']
+    });
+    await seedOAuthOnlyUser(_mockServer, {
+      totpSecret: MOCK_TOTP_SECRET,
+      totpEnabledAt: '2025-02-01T00:00:00.000Z',
+      totpRecoveryCodes: [...MOCK_RECOVERY_CODES]
+    });
+
+    await page.goto('/profile');
+
+    const card = page.locator('nxs-two-factor');
+    await card.getByRole('button', { name: 'Turn off' }).click();
+    await page.getByLabel('Authentication code').fill('000000');
+    await card.getByRole('button', { name: 'Turn off' }).click();
+
+    await expect(page.locator('mat-snack-bar-container')).toContainText(
+      'That verification code is incorrect.'
+    );
+    const state = await _mockServer.getState();
+    const user = (state.users as UserResponse[]).find((u) => u.id === userId);
+    expect(user?.mfaEnabled).toBe(true);
   });
 
   // A code is a step-up factor on every route, so the email change asks for

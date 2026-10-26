@@ -157,7 +157,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
         {
           provide: MfaService,
           useValue: {
-            isValidStepUpCode: jest.fn().mockResolvedValue(false),
+            isValidStepUpCode: jest.fn().mockResolvedValue('not_offered'),
             issuePendingToken: jest
               .fn()
               .mockReturnValue({ mfaToken: 'mfa', expiresIn: 300 })

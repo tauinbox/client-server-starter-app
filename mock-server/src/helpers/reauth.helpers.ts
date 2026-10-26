@@ -133,7 +133,7 @@ export function logStepUpFailure(
   req: Request,
   user: MockUser,
   operation: StepUpOperation,
-  factor: 'password' | 'reauth_proof',
+  factor: 'password' | 'reauth_proof' | 'code',
   codeOffered: boolean
 ): void {
   logAudit('STEP_UP_FAILURE', {
@@ -223,8 +223,9 @@ export interface StepUpErrorEnvelope {
 /**
  * The per-account brake on the step-up code, mirroring
  * `MfaService.isValidStepUpCode`. It answers `null` when the code proved the
- * caller, an envelope when the account is barred, and `undefined` when the
- * step-up must fall through to the password or the provider proof.
+ * caller and an envelope when the account is barred. It answers `'refused'`
+ * for a wrong code and `undefined` for no code; both fall through to the
+ * password or the provider proof.
  *
  * A step-up that offers no code never touches the counter, so an ordinary
  * password step-up cannot burn the budget of the account.
@@ -233,7 +234,7 @@ function stepUpCodeError(
   req: Request,
   user: MockUser,
   code: unknown
-): StepUpErrorEnvelope | null | undefined {
+): StepUpErrorEnvelope | null | 'refused' | undefined {
   if (!user.totpEnabledAt || !code) {
     return undefined;
   }
@@ -256,7 +257,7 @@ function stepUpCodeError(
     });
     return count >= MAX_FAILED_ATTEMPTS
       ? stepUpLockedEnvelope(remainingMs)
-      : undefined;
+      : 'refused';
   }
 
   clearFailures(windows, user.id);
@@ -309,6 +310,15 @@ function stepUpPasswordLockedEnvelope(
   );
 }
 
+/** A 400, not the 401 of the sign-in challenge, as the server answers. */
+function invalidStepUpCodeEnvelope(): StepUpErrorEnvelope {
+  return {
+    message: 'Verification code is incorrect',
+    statusCode: 400,
+    errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
+  };
+}
+
 function invalidCurrentPasswordEnvelope(): StepUpErrorEnvelope {
   return {
     message: 'Current password is incorrect',
@@ -335,16 +345,17 @@ export function stepUpError(
 ): StepUpErrorEnvelope | null {
   // ASVS 6.2.3, as on the server: an account that holds a password changes it
   // only against the current one.
-  const lock = stepUpCodeError(
+  const codeVerdict = stepUpCodeError(
     req,
     user,
     operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
       ? undefined
       : code
   );
-  if (lock !== undefined) {
-    return lock;
+  if (codeVerdict !== undefined && codeVerdict !== 'refused') {
+    return codeVerdict;
   }
+  const codeRefused = codeVerdict === 'refused';
 
   if (user.password === null) {
     const proof = acceptsReauthProof
@@ -356,6 +367,10 @@ export function stepUpError(
       return null;
     }
 
+    if (codeRefused) {
+      logStepUpFailure(req, user, operation, 'code', true);
+      return invalidStepUpCodeEnvelope();
+    }
     logStepUpFailure(req, user, operation, 'reauth_proof', code !== undefined);
     return {
       message: 'Confirm it is you with your sign-in provider, then try again',
@@ -369,7 +384,8 @@ export function stepUpError(
     user,
     currentPassword,
     operation,
-    code !== undefined
+    code !== undefined,
+    codeRefused
   );
 }
 
@@ -385,9 +401,14 @@ function stepUpPasswordError(
   user: MockUser,
   currentPassword: unknown,
   operation: StepUpOperation,
-  codeOffered: boolean
+  codeOffered: boolean,
+  codeRefused: boolean
 ): StepUpErrorEnvelope | null {
   if (!currentPassword) {
+    if (codeRefused) {
+      logStepUpFailure(req, user, operation, 'code', codeOffered);
+      return invalidStepUpCodeEnvelope();
+    }
     logStepUpFailure(req, user, operation, 'password', codeOffered);
     return invalidCurrentPasswordEnvelope();
   }

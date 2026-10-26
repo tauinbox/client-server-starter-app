@@ -114,10 +114,32 @@ const STEP_UP_PASSWORD_FAILURE_KEY_PREFIX = 'step-up:password-failures:';
 /** The outcome of one step-up, and the brake that attempt may have tripped. */
 interface StepUpVerdict {
   /** The factor that refused the caller, or null when the caller proved itself. */
-  factor: 'password' | 'reauth_proof' | null;
+  factor: 'password' | 'reauth_proof' | 'code' | null;
   /** How long the account stays barred, set only when this attempt barred it. */
   lockedMs?: number;
 }
+
+/**
+ * The 400 answer for each factor that can refuse a step-up. Not a 401: on a
+ * session route the client takes a 401 as an expired session and refreshes.
+ */
+const STEP_UP_REFUSALS: Record<
+  NonNullable<StepUpVerdict['factor']>,
+  { message: string; errorKey: string }
+> = {
+  reauth_proof: {
+    message: 'Confirm it is you with your sign-in provider, then try again',
+    errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+  },
+  password: {
+    message: 'Current password is incorrect',
+    errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+  },
+  code: {
+    message: 'Verification code is incorrect',
+    errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
+  }
+};
 
 @Injectable()
 export class AuthService {
@@ -1071,22 +1093,7 @@ export class AuthService {
       throw this.stepUpPasswordLockedException(lockedMs);
     }
 
-    throw factor === 'reauth_proof'
-      ? new HttpException(
-          {
-            message:
-              'Confirm it is you with your sign-in provider, then try again',
-            errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-          },
-          HttpStatus.BAD_REQUEST
-        )
-      : new HttpException(
-          {
-            message: 'Current password is incorrect',
-            errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-          },
-          HttpStatus.BAD_REQUEST
-        );
+    throw new HttpException(STEP_UP_REFUSALS[factor], HttpStatus.BAD_REQUEST);
   }
 
   /**
@@ -1110,21 +1117,32 @@ export class AuthService {
       operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
         ? undefined
         : totpCode;
-    if (await this.mfaService.isValidStepUpCode(user, code, auditContext)) {
+    const codeVerdict = await this.mfaService.isValidStepUpCode(
+      user,
+      code,
+      auditContext
+    );
+    if (codeVerdict === 'accepted') {
       return { factor: null };
     }
+    // A wrong code still falls through to the other factor. When that factor
+    // also fails without a password check, the refusal names the code that
+    // the caller typed, not a factor the caller never offered.
+    const refusal = (factor: 'password' | 'reauth_proof'): StepUpVerdict => ({
+      factor: codeVerdict === 'refused' ? 'code' : factor
+    });
 
     if (user.password === null) {
       return (await this.isValidReauthProof(user, reauthProof, operation))
         ? { factor: null }
-        : { factor: 'reauth_proof' };
+        : refusal('reauth_proof');
     }
 
     // Every step-up runs through here, including the ones that carry no
     // password at all. Counting those would let a route that presents another
     // factor burn the budget of an account that never offered a password.
     if (!currentPassword) {
-      return { factor: 'password' };
+      return refusal('password');
     }
 
     // The attempt takes its slot before the password is checked, so a
