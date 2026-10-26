@@ -7,6 +7,7 @@ import {
   TOKEN_PURPOSE,
   TOTP_ISSUER
 } from '@app/shared/constants';
+import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { authGuard } from '../helpers/auth.helpers';
 import {
@@ -15,7 +16,6 @@ import {
   consumeTotpCode,
   currentPasswordErrors,
   lockedEnvelope,
-  normalize,
   readFailures,
   recordFailure,
   sendWithRetryAfter,
@@ -414,9 +414,9 @@ router.post('/recovery', (req, res) => {
     return;
   }
 
-  const target = normalize(recoveryCode);
+  const target = normalizeOtpCode(recoveryCode);
   const remaining = (user.totpRecoveryCodes ?? []).filter(
-    (stored) => normalize(stored) !== target
+    (stored) => normalizeOtpCode(stored) !== target
   );
 
   if (remaining.length === (user.totpRecoveryCodes ?? []).length) {

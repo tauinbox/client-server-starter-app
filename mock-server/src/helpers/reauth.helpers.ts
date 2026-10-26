@@ -15,6 +15,7 @@ import {
 } from '../constants';
 import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
+import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import type { FailedAttemptWindow, MockUser } from '../types';
 import {
@@ -145,11 +146,6 @@ export function logStepUpFailure(
   });
 }
 
-/** Normalises a code the way the server does before it compares anything. */
-export function normalize(value: string): string {
-  return value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase();
-}
-
 /** Mirrors `@IsString() @Length(TOTP_DIGITS, TOTP_DIGITS)` on a `code`. */
 export function totpCodeErrors(
   value: unknown,
@@ -203,7 +199,7 @@ export function stepUpFactorsBodyErrors(
  * acceptance happens in. The property is the same: one code, one use.
  */
 export function consumeTotpCode(user: MockUser, code: unknown): boolean {
-  if (typeof code !== 'string' || normalize(code) !== MOCK_TOTP_CODE) {
+  if (typeof code !== 'string' || normalizeOtpCode(code) !== MOCK_TOTP_CODE) {
     return false;
   }
 
