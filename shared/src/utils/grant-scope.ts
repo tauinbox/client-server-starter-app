@@ -136,10 +136,23 @@ function grantIsContained(
   );
 }
 
+function holdsDeny(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(holdsDeny);
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { effect?: unknown }).effect === 'deny'
+  );
+}
+
+/**
+ * A row stored before the write-time `@IsObject()` check can hold an array.
+ * A deny in any of its entries makes the row a deny, so the row fails closed.
+ */
 export function isDenyCondition(
   conditions: PermissionCondition | null | undefined
 ): boolean {
-  return conditions?.effect === 'deny';
+  return holdsDeny(conditions);
 }
 
 /**

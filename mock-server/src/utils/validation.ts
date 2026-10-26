@@ -8,6 +8,7 @@ import {
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import isEmail from 'validator/lib/isEmail';
+import isUUID from 'validator/lib/isUUID';
 
 /**
  * Mirrors `@IsEmail()`, which is `typeof value === 'string' && isEmail(value)`
@@ -406,6 +407,53 @@ export function uuidErrors(
   return typeof value === 'string' && UUID_PATTERN.test(value)
     ? []
     : [`${field} must be a UUID`];
+}
+
+/** Mirrors `@IsUUID('4')`. */
+export function isUuidV4(value: unknown): boolean {
+  return typeof value === 'string' && isUUID(value, 4);
+}
+
+/**
+ * Mirrors `@ValidateNested()` on one property (`each` for
+ * `{ each: true }`) and how the ValidationPipe flattens its errors. `own` holds
+ * the messages of the other decorators of the property, in report order;
+ * `validate` returns the messages of one nested object, each with its path.
+ *
+ * A leaf message gets the path of its parent, so an array entry that is not an
+ * object reports no index. On the top level (`parentPath` is empty) a property
+ * with nested errors loses its own messages; below the top level they follow
+ * the nested ones.
+ */
+export function nestedErrors(
+  parentPath: string,
+  field: string,
+  value: unknown,
+  own: string[],
+  validate: (path: string, value: object) => string[],
+  each = false
+): string[] {
+  const path = parentPath ? `${parentPath}.${field}` : field;
+  const nestedMessage = `${each ? 'each value in ' : ''}nested property ${field} must be either object or array`;
+  const entryErrors = (entryPath: string, entries: unknown[]): string[] =>
+    entries.flatMap((entry, i) => {
+      if (Array.isArray(entry)) return entryErrors(`${entryPath}.${i}`, entry);
+      if (typeof entry === 'object' && entry !== null) {
+        return validate(`${entryPath}.${i}`, entry);
+      }
+      return [`${entryPath}.${nestedMessage}`];
+    });
+
+  const isObject = typeof value === 'object' && value !== null;
+  const children = Array.isArray(value)
+    ? entryErrors(path, value)
+    : isObject
+      ? validate(path, value)
+      : [];
+  const ownMessages =
+    value === undefined || isObject ? own : [...own, nestedMessage];
+  if (!parentPath) return children.length > 0 ? children : ownMessages;
+  return [...children, ...ownMessages.map((m) => `${parentPath}.${m}`)];
 }
 
 /**

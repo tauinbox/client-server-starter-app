@@ -77,13 +77,13 @@ describe('role grant error parity with server', () => {
             'content-type': 'application/json',
             authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ permissionIds: ['perm-nope'] })
+          body: JSON.stringify({ permissionIds: [mockId('perm-nope')] })
         }
       );
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string; errorKey: string };
-      expect(body.message).toBe('Permission perm-nope not found');
+      expect(body.message).toBe(`Permission ${mockId('perm-nope')} not found`);
       expect(body.errorKey).toBe('errors.general.resourceNotFound');
       expect(editorPermissionIds()).toEqual([]);
     });
@@ -142,7 +142,7 @@ describe('role grant error parity with server', () => {
           body: JSON.stringify({
             items: [
               { permissionId: mockId('perm-2') },
-              { permissionId: 'perm-nope' }
+              { permissionId: mockId('perm-nope') }
             ]
           })
         }
@@ -150,7 +150,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string; errorKey: string };
-      expect(body.message).toBe('Permission perm-nope not found');
+      expect(body.message).toBe(`Permission ${mockId('perm-nope')} not found`);
       expect(body.errorKey).toBe('errors.general.resourceNotFound');
       expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
     });

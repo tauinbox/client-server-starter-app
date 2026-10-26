@@ -4,7 +4,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface
 } from 'class-validator';
-import { validateMongoQueryKeys } from '@app/shared/utils/mongo-query-safety';
+import { findCustomQueryError } from '@app/shared/utils/mongo-query-safety';
 
 @ValidatorConstraint({ name: 'isSafeMongoQuery', async: false })
 export class IsSafeMongoQueryConstraint implements ValidatorConstraintInterface {
@@ -15,29 +15,7 @@ export class IsSafeMongoQueryConstraint implements ValidatorConstraintInterface 
       return true;
     }
 
-    if (typeof value !== 'string') {
-      this.lastError = 'custom must be a JSON string';
-      return false;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      this.lastError = 'custom must be valid JSON';
-      return false;
-    }
-
-    if (
-      parsed === null ||
-      typeof parsed !== 'object' ||
-      Array.isArray(parsed)
-    ) {
-      this.lastError = 'custom must be a JSON object';
-      return false;
-    }
-
-    const error = validateMongoQueryKeys(parsed, '');
+    const error = findCustomQueryError(value);
     if (error) {
       this.lastError = error;
       return false;

@@ -58,6 +58,12 @@ export function resolveConditions(
     return { query, skipPermission: true };
   };
 
+  // A row stored before the write-time `@IsObject()` check can hold an array,
+  // whose entries are not one condition.
+  if (typeof conditions !== 'object' || Array.isArray(conditions)) {
+    return veto('conditions must be an object');
+  }
+
   let ownershipField: string | undefined;
   if (ownership !== undefined && ownership !== null) {
     const shapeError = findOwnershipShapeError(ownership);

@@ -628,6 +628,40 @@ describe('compileAbilityRules', () => {
       ).toBe(false);
     });
   });
+
+  // A row stored before the write-time IsObject check can hold an array.
+  describe('a condition stored as an array', () => {
+    const storedArray = (entries: unknown[]): ResolvedPermission => {
+      const permission = grant('users', 'update');
+      // @ts-expect-error -- a stored row can hold what the type forbids
+      permission.conditions = entries;
+      return permission;
+    };
+    const otherUser = { __caslSubjectType__: 'User', id: 'user-2' } as never;
+
+    it.each<[string, unknown[]]>([
+      ['an empty array', []],
+      ['a restriction in an array', [{ fieldMatch: { email: ['x'] } }]]
+    ])('should grant nothing for %s', (_label, entries) => {
+      const ability = abilityOf([storedArray(entries)]);
+
+      expect(ability.can('update', 'User')).toBe(false);
+      expect(ability.can('update', otherUser)).toBe(false);
+    });
+
+    it.each<[string, unknown[]]>([
+      ['a deny in an array', [{ effect: 'deny' }]],
+      ['a deny in a nested array', [[{ effect: 'deny', custom: '{}' }]]]
+    ])('should widen %s into a blanket deny', (_label, entries) => {
+      const ability = abilityOf([
+        grant('users', 'update'),
+        storedArray(entries)
+      ]);
+
+      expect(ability.can('update', 'User')).toBe(false);
+      expect(ability.can('update', otherUser)).toBe(false);
+    });
+  });
 });
 
 describe('dedupPermissions', () => {

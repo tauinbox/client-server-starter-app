@@ -53,6 +53,7 @@ import {
 } from '../helpers/validation-error.helpers';
 import {
   booleanErrors,
+  nestedErrors,
   objectErrors,
   oneOfErrors,
   stringArrayErrors,
@@ -186,13 +187,7 @@ function isString(value: unknown): value is string {
 }
 
 const RULE_KEYS = ['effect', 'payload'] as const;
-const NESTED_RULES_MESSAGE =
-  'each value in nested property rules must be either object or array';
 
-// The ValidationPipe flattens a nested error from its leaves: a leaf message
-// gets the path of its parent, and a parent with child errors loses its own
-// messages. So a primitive entry reports no index, and a too-long array with a
-// bad entry reports only the entry.
 function ruleObjectErrors(path: string, rule: object): string[] {
   const r = rule as Record<string, unknown>;
   return [
@@ -202,38 +197,22 @@ function ruleObjectErrors(path: string, rule: object): string[] {
   ].map((message) => `${path}.${message}`);
 }
 
-function ruleEntryErrors(path: string, entries: unknown[]): string[] {
-  return entries.flatMap((entry, i) => {
-    if (Array.isArray(entry)) return ruleEntryErrors(`${path}.${i}`, entry);
-    if (typeof entry === 'object' && entry !== null) {
-      return ruleObjectErrors(`${path}.${i}`, entry);
-    }
-    return [`${path}.${NESTED_RULES_MESSAGE}`];
-  });
-}
-
 // Mirrors `@IsArray() @ArrayMaxSize @ValidateNested({ each: true })
 // @Type(() => FeatureFlagRuleDto)`. A plain object is validated as one rule.
 function rulesErrors(value: unknown, optional: OptionalMode): string[] {
   if (value === undefined || (optional === 'nullable' && value === null)) {
     return [];
   }
-  const isObject = typeof value === 'object' && value !== null;
-  const children = Array.isArray(value)
-    ? ruleEntryErrors('rules', value)
-    : isObject
-      ? ruleObjectErrors('rules', value)
-      : [];
-  if (children.length > 0) return children;
-  const errors: string[] = [];
-  if (!Array.isArray(value) || value.length > FEATURE_FLAG_RULES_MAX_ITEMS) {
-    errors.push(
-      `rules must contain no more than ${FEATURE_FLAG_RULES_MAX_ITEMS} elements`
-    );
-  }
-  if (!Array.isArray(value)) errors.push('rules must be an array');
-  if (!isObject) errors.push(NESTED_RULES_MESSAGE);
-  return errors;
+  const isArray = Array.isArray(value);
+  const own = [
+    ...(!isArray || value.length > FEATURE_FLAG_RULES_MAX_ITEMS
+      ? [
+          `rules must contain no more than ${FEATURE_FLAG_RULES_MAX_ITEMS} elements`
+        ]
+      : []),
+    ...(isArray ? [] : ['rules must be an array'])
+  ];
+  return nestedErrors('', 'rules', value, own, ruleObjectErrors, true);
 }
 
 // The fields that CreateFeatureFlagDto and UpdateFeatureFlagDto share, in
