@@ -12,6 +12,9 @@
  *    success is success<Result>, and a feature file has no "errors" group at
  *    any depth. The root "errors" group holds the server error keys and is
  *    exempt from the names; the root "forms.errors" group is shared.
+ * 4. Every key of en.json is read by the code: a literal names it, or a
+ *    literal dynamic prefix covers it. The root "errors" group is exempt (the
+ *    server sends those keys), and so is each group in DYNAMIC_GROUPS.
  *
  * Exit code 1 if violations found.
  */
@@ -25,6 +28,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const srcDir = resolve(__dirname, '..', 'src');
 
 const LITERAL = /'([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_-]+)*\.?)'/g;
+// A component input that translates its value takes the key as a static
+// attribute: `label="auth.login.email"`.
+const ATTRIBUTE = /="([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_-]+)+)"/g;
+
+/**
+ * Groups whose keys the code builds from data, so no literal names them. Each
+ * entry names the place that builds the key.
+ */
+const DYNAMIC_GROUPS = [
+  // billing/utils/catalog-text.ts: the plan or product key from the database
+  'billing.catalog.'
+];
+
+const isComment = (line) => /^\s*(\/\/|\/?\*)/.test(line);
 const FEATURE_I18N = /^app\/features\/([^/]+)\/i18n\/(en|ru)\.json$/;
 const ROOT_I18N = /^assets\/i18n\/(en|ru)\.json$/;
 
@@ -154,11 +171,36 @@ const resolveKey = (literal) => {
     .map(({ file }) => file);
 };
 
+// Full keys and dynamic prefixes the code reads, as "<scope>|<path>".
+const usedKeys = new Set();
+const usedPrefixes = [];
+
+/** The scope and the path of a literal, or null when it names no scope. */
+const scopeOf = (literal) => {
+  const first = literal.split('.')[0];
+  if (scopes.has(first) && first !== '') {
+    return { scope: first, path: literal.slice(first.length + 1) };
+  }
+  return rootGroups.has(first) ? { scope: '', path: literal } : null;
+};
+
+const recordUse = (literal) => {
+  const owner = scopeOf(literal);
+  if (!owner) return;
+  const id = `${owner.scope}|${owner.path}`;
+  if (literal.endsWith('.') || literal.endsWith('_')) usedPrefixes.push(id);
+  else usedKeys.add(id);
+};
+
 for (const file of files) {
   if (!/\.(ts|html)$/.test(file) || file.endsWith('.spec.ts')) continue;
   const lines = readFileSync(resolve(srcDir, file), 'utf-8').split('\n');
   lines.forEach((line, index) => {
-    for (const [, literal] of line.matchAll(LITERAL)) {
+    const literals = [...line.matchAll(LITERAL)].map((m) => m[1]);
+    if (file.endsWith('.html')) {
+      literals.push(...[...line.matchAll(ATTRIBUTE)].map((m) => m[1]));
+    }
+    for (const literal of literals) {
       if (!literal.includes('.')) continue;
       const missingIn = resolveKey(literal);
       if (missingIn && missingIn.length > 0) {
@@ -166,8 +208,23 @@ for (const file of files) {
           `  ${file}:${index + 1}  '${literal}' not in ${missingIn.join(', ')}`
         );
       }
+      if (!isComment(line)) recordUse(literal);
     }
   });
+}
+
+// 4. every key is read
+for (const [scope, { en }] of scopes) {
+  if (!en) continue;
+  for (const path of leafPaths(en.json)) {
+    const full = scope ? `${scope}.${path}` : path;
+    if (!scope && path.startsWith('errors.')) continue;
+    if (DYNAMIC_GROUPS.some((group) => full.startsWith(group))) continue;
+    const id = `${scope}|${path}`;
+    if (usedKeys.has(id)) continue;
+    if (usedPrefixes.some((prefix) => id.startsWith(prefix))) continue;
+    violations.push(`  ${en.file}  ${path}: no code reads this key`);
+  }
 }
 
 if (violations.length > 0) {

@@ -57,7 +57,6 @@
     "name": "Full name",
     "nameRequired": "Full name is required",
     "newPassword": "New password (optional)",
-    "passwordPlaceholder": "Leave blank to keep current password",
     "passwordMinLength": "Password must be at least 8 characters",
     "passwordMaxLength": "Password must be no more than 128 characters",
     "roles": "Roles",
@@ -127,12 +126,10 @@
   },
   "store": {
     "errorLoadFailed": "Failed to load users. Please try again.",
-    "errorLoadMoreFailed": "Failed to load more users. Please try again.",
     "errorLoadDetailsFailed": "Failed to load user details. Please try again."
   },
   "permissions": {
     "title": "Effective permissions",
-    "subtitle": "{{ name }}",
     "backAriaLabel": "Back to user",
     "viewButton": "View permissions",
     "rolesSection": "Roles",

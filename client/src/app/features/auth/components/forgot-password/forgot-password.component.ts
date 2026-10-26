@@ -117,7 +117,11 @@ export class ForgotPasswordComponent {
             return;
           }
           this.error.set(
-            this.#translocoService.translate('auth.forgotPassword.errorFailed')
+            parseHttpErrorMessage(
+              err,
+              this.#translocoService,
+              'auth.forgotPassword.errorFailed'
+            )
           );
         }
       });

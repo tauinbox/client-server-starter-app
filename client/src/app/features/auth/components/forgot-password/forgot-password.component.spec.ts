@@ -129,6 +129,29 @@ describe('ForgotPasswordComponent', () => {
       expect(component['success']()).toBe(false);
     });
 
+    it('names a throttled request instead of a generic failure', async () => {
+      authServiceMock.forgotPassword.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              error: {
+                statusCode: 429,
+                message: 'ThrottlerException: Too Many Requests'
+              },
+              status: 429
+            })
+        )
+      );
+      component.forgotPasswordModel.set({ email: 'user@example.com' });
+      await fixture.whenStable();
+
+      component.onSubmit();
+
+      expect(component['error']()).toBe(
+        'Too many requests. Please slow down and try again.'
+      );
+    });
+
     it('should clear previous error before submitting', async () => {
       component['error'].set('Previous error');
       authServiceMock.forgotPassword.mockReturnValue(

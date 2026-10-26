@@ -1,6 +1,5 @@
 {
   "common": {
-    "add": "Add",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "yes": "Yes",
@@ -10,16 +9,11 @@
     "edit": "Edit",
     "delete": "Delete",
     "search": "Search",
-    "clear": "Clear",
     "all": "All",
     "noFilterResults": "Nothing matches these filters.",
     "loading": "Loading...",
     "active": "Active",
     "inactive": "Inactive",
-    "name": "Name",
-    "description": "Description",
-    "created": "Created",
-    "actions": "Actions",
     "back": "Back",
     "retry": "Retry",
     "skipToContent": "Skip to main content",
@@ -43,9 +37,7 @@
     "switchToDark": "Switch to dark theme"
   },
   "language": {
-    "switchLanguage": "Switch language",
-    "en": "English",
-    "ru": "Русский"
+    "switchLanguage": "Switch language"
   },
   "pageNotFound": {
     "code": "404",

@@ -65,6 +65,26 @@ describe('parseHttpErrorMessage', () => {
     ).toBe('Failed to link OAuth account. Please try again.');
   });
 
+  // The body the server sends for a throttled request: no errorKey.
+  it('names a throttled request rather than the fallback of the form', () => {
+    const error = new HttpErrorResponse({
+      error: {
+        statusCode: 429,
+        message: 'ThrottlerException: Too Many Requests',
+        error: 'Too Many Requests'
+      },
+      status: 429
+    });
+
+    expect(
+      parseHttpErrorMessage(
+        error,
+        transloco,
+        'auth.login.errorCredentialsInvalid'
+      )
+    ).toBe('Too many requests. Please slow down and try again.');
+  });
+
   it('passes a single-string server message through when no fallback is given', () => {
     const error = new HttpErrorResponse({
       error: { message: 'Something specific went wrong' },
