@@ -1034,27 +1034,6 @@ describe('RoleService', () => {
     });
   });
 
-  describe('findRolesForUser', () => {
-    it('should query roles for a user via createQueryBuilder', async () => {
-      const roles = [systemRole];
-      mockRoleRepoQB.getMany.mockResolvedValue(roles);
-
-      const result = await service.findRolesForUser('user-1');
-
-      expect(mockRoleRepo.createQueryBuilder).toHaveBeenCalledWith('role');
-      expect(mockRoleRepoQB.innerJoin).toHaveBeenCalledWith(
-        'user_roles',
-        'ur',
-        'ur.role_id = role.id'
-      );
-      expect(mockRoleRepoQB.where).toHaveBeenCalledWith(
-        'ur.user_id = :userId',
-        { userId: 'user-1' }
-      );
-      expect(result).toEqual(roles);
-    });
-  });
-
   describe('getPermissionsForRole', () => {
     it('should return permissions for a role', async () => {
       const perms = [{ id: 'rp-1', roleId: 'role-2', permissionId: 'perm-1' }];

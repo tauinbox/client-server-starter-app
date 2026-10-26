@@ -30,23 +30,6 @@ export type CustomJwtPayload = JwtPayload & {
   email: string;
 };
 
-export type ForgotPasswordRequest = {
-  email: string;
-};
-
-export type ResetPasswordRequest = {
-  token: string;
-  password: string;
-};
-
-export type VerifyEmailRequest = {
-  token: string;
-};
-
-export type ResendVerificationRequest = {
-  email: string;
-};
-
 /**
  * The factor a step-up route reads from the body: a password, or a code from
  * the authenticator. An account created through a provider holds no password,

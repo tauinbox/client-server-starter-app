@@ -548,16 +548,6 @@ describe('AuthService', () => {
     });
   });
 
-  describe('hasPersistedUser', () => {
-    it('should delegate to authStore.hasPersistedUser', () => {
-      authStoreMock.hasPersistedUser.mockReturnValue(true);
-      expect(service.hasPersistedUser()).toBe(true);
-
-      authStoreMock.hasPersistedUser.mockReturnValue(false);
-      expect(service.hasPersistedUser()).toBe(false);
-    });
-  });
-
   describe('session_invalidated push', () => {
     it('signs out and keeps the current URL as the return URL', () => {
       const router = TestBed.inject(Router);

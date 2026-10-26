@@ -753,14 +753,6 @@ export class RoleService {
     await this.permissionService.invalidateUserCache(userId);
   }
 
-  async findRolesForUser(userId: string): Promise<Role[]> {
-    return this.roleRepository
-      .createQueryBuilder('role')
-      .innerJoin('user_roles', 'ur', 'ur.role_id = role.id')
-      .where('ur.user_id = :userId', { userId })
-      .getMany();
-  }
-
   async getPermissionsForRole(
     roleId: string,
     ability: AbilityOrSystem,
