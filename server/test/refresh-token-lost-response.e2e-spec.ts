@@ -69,7 +69,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
   async function seedSession(): Promise<{ raw: string; sessionId: string }> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const sessionId = randomUUID();
-    await refreshTokenService.createRefreshToken(userId, raw, 3600, sessionId, {
+    await refreshTokenService.createRefreshToken(userId, raw, sessionId, {
       userAgent: null,
       ipAddress: null
     });

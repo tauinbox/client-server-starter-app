@@ -707,11 +707,6 @@ export class AuthService {
       tokenDoc.sessionId
     );
 
-    const expiresIn = parseInt(
-      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
-      10
-    );
-    const expiresAt = new Date(Date.now() + expiresIn * 1000);
     // Outside the transaction: a location lookup may load the GeoIP file.
     const device = await this.refreshTokenService.rotatedDevice(
       tokenDoc,
@@ -737,16 +732,20 @@ export class AuthService {
         });
       }
 
-      await manager.save(RefreshToken, {
-        userId: user.id,
-        sessionId: tokenDoc.sessionId,
-        // Carried over, never re-stamped: re-stamping here restores the sliding
-        // expiry the absolute cap above exists to end.
-        sessionStartedAt: tokenDoc.sessionStartedAt,
-        ...device,
-        token: hashToken(tokens.refresh_token),
-        expiresAt
-      });
+      await manager.save(
+        RefreshToken,
+        this.refreshTokenService.buildRow(
+          {
+            userId: user.id,
+            sessionId: tokenDoc.sessionId,
+            // Carried over, never re-stamped: re-stamping here restores the
+            // sliding expiry the absolute cap above exists to end.
+            sessionStartedAt: tokenDoc.sessionStartedAt,
+            ...device
+          },
+          tokens.refresh_token
+        )
+      );
     });
 
     this.metricsService.recordAuthEvent('token_refresh_success');

@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 import { RefreshTokenService } from './refresh-token.service';
@@ -16,7 +15,6 @@ describe('SessionIssuerService', () => {
     pruneOldestTokens: jest.Mock;
   };
   let mockTokenGenerator: { generateTokens: jest.Mock };
-  let mockConfigService: { getOrThrow: jest.Mock };
   let mockEntitlementService: { limitFor: jest.Mock };
 
   const mockUserRole = {
@@ -87,19 +85,6 @@ describe('SessionIssuerService', () => {
       })
     };
 
-    mockConfigService = {
-      getOrThrow: jest.fn().mockImplementation((key: string) => {
-        const config: Record<string, string> = {
-          JWT_REFRESH_EXPIRATION: '604800'
-        };
-        const value = config[key];
-        if (value === undefined) {
-          throw new Error(`Configuration key "${key}" does not exist`);
-        }
-        return value;
-      })
-    };
-
     // Free tier by default: no plan-specific allowance, so pruning falls back
     // to the constant. Individual tests raise it.
     mockEntitlementService = {
@@ -111,7 +96,6 @@ describe('SessionIssuerService', () => {
         SessionIssuerService,
         SessionLimitService,
         { provide: EntitlementService, useValue: mockEntitlementService },
-        { provide: ConfigService, useValue: mockConfigService },
         { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         { provide: TokenGeneratorService, useValue: mockTokenGenerator }
       ]
@@ -175,7 +159,6 @@ describe('SessionIssuerService', () => {
     expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
       'user-1',
       'mock-refresh-token',
-      604800,
       expect.any(String),
       { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
     );
@@ -191,11 +174,11 @@ describe('SessionIssuerService', () => {
       string
     ];
     const storedCall = mockRefreshTokenService.createRefreshToken.mock
-      .calls[0] as [string, string, number, string];
+      .calls[0] as [string, string, string];
 
     // A mismatch would leave the access token naming a session that never
     // existed, so JwtStrategy would refuse the caller on its first request.
-    expect(signedCall[2]).toBe(storedCall[3]);
+    expect(signedCall[2]).toBe(storedCall[2]);
   });
 
   it('mints a distinct session id per sign-in, so one sign-out cannot end another device', async () => {

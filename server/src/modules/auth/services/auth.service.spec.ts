@@ -95,6 +95,7 @@ describe('AuthService', () => {
     deleteBySessionId: jest.Mock;
     pruneOldestTokens: jest.Mock;
     rotatedDevice: jest.Mock;
+    buildRow: jest.Mock;
   };
   let mockMailService: {
     sendPasswordChangedNotification: jest.Mock;
@@ -266,7 +267,12 @@ describe('AuthService', () => {
           countryCode: previous.countryCode,
           city: previous.city
         })
-      )
+      ),
+      buildRow: jest.fn((fields: Partial<RefreshToken>, token: string) => ({
+        ...fields,
+        token: hashToken(token),
+        expiresAt: new Date(Date.now() + 604800 * 1000)
+      }))
     };
 
     mockMailService = {
@@ -830,7 +836,6 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
         'user-1',
         expect.any(String),
-        604800,
         expect.any(String),
         { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
       );
@@ -881,18 +886,6 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
         'user-1',
         MAX_CONCURRENT_SESSIONS
-      );
-    });
-
-    it('should throw when config values are missing', async () => {
-      mockConfigService.getOrThrow.mockImplementation((key: string) => {
-        throw new Error(`Configuration key "${key}" does not exist`);
-      });
-
-      await expect(
-        service.login(mockUser, { userAgent: null, ipAddress: null })
-      ).rejects.toThrow(
-        'Configuration key "JWT_REFRESH_EXPIRATION" does not exist'
       );
     });
 
@@ -1656,7 +1649,14 @@ describe('AuthService', () => {
       // strand the access token every other tab of this device still holds.
       expect(mockManager.save).toHaveBeenCalledWith(
         RefreshToken,
-        expect.objectContaining({ sessionId: 'session-1' })
+        expect.objectContaining({
+          sessionId: 'session-1',
+          token: hashToken('mock-refresh-token')
+        })
+      );
+      expect(mockRefreshTokenService.buildRow).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', sessionId: 'session-1' }),
+        'mock-refresh-token'
       );
       expect(mockTokenGenerator.generateTokens).toHaveBeenCalledWith(
         'user-1',

@@ -91,13 +91,10 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
 
   async function seedSession(): Promise<string> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    await refreshTokenService.createRefreshToken(
-      userId,
-      raw,
-      3600,
-      randomUUID(),
-      { userAgent: null, ipAddress: null }
-    );
+    await refreshTokenService.createRefreshToken(userId, raw, randomUUID(), {
+      userAgent: null,
+      ipAddress: null
+    });
     return raw;
   }
 

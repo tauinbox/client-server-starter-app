@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { User } from '../../users/entities/user.entity';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
@@ -21,7 +20,6 @@ import { TokenGeneratorService } from './token-generator.service';
 @Injectable()
 export class SessionIssuerService {
   constructor(
-    private readonly configService: ConfigService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly sessionLimitService: SessionLimitService,
     private readonly tokenGenerator: TokenGeneratorService
@@ -51,14 +49,9 @@ export class SessionIssuerService {
       sessionId
     );
 
-    const expiresIn = parseInt(
-      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
-      10
-    );
     await this.refreshTokenService.createRefreshToken(
       user.id,
       tokens.refresh_token,
-      expiresIn,
       sessionId,
       client
     );
