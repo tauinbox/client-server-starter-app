@@ -66,6 +66,26 @@ function permissionIdFor(resourceId: string, actionId: string): string {
 
 describe('role grant error parity with server', () => {
   describe('POST /api/v1/roles/:id/permissions', () => {
+    it('returns 201 with an empty body on success', async () => {
+      const token = await loginAsAdmin();
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ permissionIds: [mockId('perm-1')] })
+        }
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.text()).toBe('');
+      expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
+    });
+
     it('returns 400 RESOURCE_NOT_FOUND for an unknown permission id', async () => {
       const token = await loginAsAdmin();
 
