@@ -109,6 +109,7 @@ describe('OAuthController', () => {
   let oauthServiceMock: {
     loginWithOAuth: jest.Mock;
     linkOAuthToUser: jest.Mock;
+    assertReauthenticated: jest.Mock;
   };
   let oauthAccountServiceMock: {
     findByUserId: jest.Mock;
@@ -142,7 +143,8 @@ describe('OAuthController', () => {
 
     oauthServiceMock = {
       loginWithOAuth: jest.fn(),
-      linkOAuthToUser: jest.fn().mockResolvedValue(undefined)
+      linkOAuthToUser: jest.fn().mockResolvedValue(undefined),
+      assertReauthenticated: jest.fn().mockResolvedValue(undefined)
     };
 
     oauthAccountServiceMock = {
@@ -907,6 +909,139 @@ describe('OAuthController', () => {
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/profile?oauth_error=link_failed'
       );
+      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('should audit a link that the service refuses', async () => {
+      oauthServiceMock.linkOAuthToUser.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Already linked',
+            errorKey: ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
+          },
+          HttpStatus.CONFLICT
+        )
+      );
+
+      const res = mockResponse();
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '456',
+        email: 'other@example.com',
+        name: 'Other User',
+        emailVerified: true
+      };
+
+      await controller.googleCallback(
+        mockExpressRequest(profile, linkCookie('valid-link-token')),
+        res
+      );
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/profile?oauth_error=link_failed'
+      );
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.OAUTH_LINK_FAILURE,
+        actorId: 'user-1',
+        targetId: 'user-1',
+        targetType: 'User',
+        details: {
+          provider: OAuthProvider.GOOGLE,
+          reason: ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
+        },
+        context: { ip: '127.0.0.1', requestId: undefined }
+      });
+    });
+
+    describe('re-authentication', () => {
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '789',
+        email: 'other@example.com',
+        name: 'Other User',
+        emailVerified: true
+      };
+
+      function reauthCookie(token: string) {
+        return { '__Host-oauth_reauth': bindIntent(token, FLOW_STATE) };
+      }
+
+      beforeEach(() => {
+        jwtServiceMock.verify.mockReturnValue({
+          sub: 'user-1',
+          purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+          operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+          iat: LINK_TOKEN_IAT
+        });
+      });
+
+      it('should audit a re-authentication that the service refuses', async () => {
+        oauthServiceMock.assertReauthenticated.mockRejectedValue(
+          new HttpException(
+            {
+              message: 'Re-authentication required',
+              errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+            },
+            HttpStatus.FORBIDDEN
+          )
+        );
+        const res = mockResponse();
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, reauthCookie('reauth-token')),
+          res
+        );
+
+        expect(res.redirect).toHaveBeenCalledWith(
+          'http://localhost:4200/profile?oauth_error=reauth_failed'
+        );
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+          action: AuditAction.STEP_UP_FAILURE,
+          actorId: 'user-1',
+          targetId: 'user-1',
+          targetType: 'User',
+          details: {
+            operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+            factor: 'reauth_proof',
+            provider: OAuthProvider.GOOGLE,
+            reason: ErrorKeys.AUTH.REAUTH_REQUIRED
+          },
+          context: { ip: '127.0.0.1', requestId: undefined }
+        });
+      });
+
+      it('should write no audit row when the intent does not verify', async () => {
+        jwtServiceMock.verify.mockImplementation(() => {
+          throw new Error('invalid token');
+        });
+        const res = mockResponse();
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, reauthCookie('bad-token')),
+          res
+        );
+
+        expect(res.redirect).toHaveBeenCalledWith(
+          'http://localhost:4200/profile?oauth_error=reauth_failed'
+        );
+        expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
+      });
+
+      it('should write no audit row when the re-authentication succeeds', async () => {
+        const res = mockResponse();
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, reauthCookie('reauth-token')),
+          res
+        );
+
+        expect(res.redirect).toHaveBeenCalledWith(
+          'http://localhost:4200/profile?reauth=ok'
+        );
+        expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
+      });
     });
 
     it('should use loginWithOAuth when no link cookie present', async () => {
