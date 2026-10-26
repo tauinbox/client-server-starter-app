@@ -1,7 +1,7 @@
 /**
  * Read-only report on existing permission grants versus the grant-scope rule.
  *
- * `assertCanGrantPermissions` requires a granted condition to CONTAIN the
+ * `grantRefusalOf` requires a granted condition to CONTAIN the
  * granting caller's own condition. That rule is applied to writes only - rows
  * already in `role_permissions` are deliberately not re-validated, because
  * retro-validating live grants would silently strip permissions in production.
@@ -23,7 +23,7 @@
  *      rule would reject it on rewrite. Actor-independent, no inference.
  *   B. Grants their author could not re-authorize today - attributed through
  *      the most recent PERMISSION_ASSIGN audit row and re-run through the real
- *      `assertCanGrantPermissions` against the author's current ability.
+ *      `grantRefusalOf` against the author's current ability.
  *   C. Attributed grants the check accepts today - a count, so the row
  *      arithmetic can be reconciled.
  *   D. Unattributed grants - no PERMISSION_ASSIGN row, so they were seeded or
