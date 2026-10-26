@@ -9,9 +9,11 @@ import {
  * minutes. The long window is the same one the login route uses, and it
  * refunds itself on success, so only failures accumulate.
  *
- * Every route that verifies a secret carries this, the enrolment, the step-up
- * and the provider-link ones included. `ThrottlerGuard.generateKey` hashes the
- * handler name into the storage key, so each route keeps a counter of its own.
+ * The two-factor, provider-link, provider-unlink and session-revocation routes
+ * carry this. Three routes that verify a secret set their own limits: the
+ * login, the profile update (the long window only) and the email-change
+ * initiation (3 per hour). `ThrottlerGuard.generateKey` hashes the handler name
+ * into the storage key, so each route keeps a counter of its own.
  */
 export const CHALLENGE_THROTTLE = {
   default: { ttl: 60000, limit: 5 },
