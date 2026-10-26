@@ -498,10 +498,6 @@ export class RoleService {
     await this.invalidateHolders(holderIds);
   }
 
-  /**
-   * Runs `write` and the audit row of the change in one transaction, so a
-   * failed row rolls the write back.
-   */
   private nameExists(): HttpException {
     return new HttpException(
       {
@@ -522,6 +518,10 @@ export class RoleService {
     }
   }
 
+  /**
+   * Runs `write` and the audit row of the change in one transaction, so a
+   * failed row rolls the write back.
+   */
   private writeAudited<T>(
     manager: EntityManager,
     write: (em: EntityManager) => Promise<T>,
