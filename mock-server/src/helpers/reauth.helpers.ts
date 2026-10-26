@@ -17,7 +17,12 @@ import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import type { FailedAttemptWindow, MockUser } from '../types';
-import { unknownPropertyErrors } from '../utils/validation';
+import {
+  fixedLengthStringErrors,
+  stringErrors,
+  unknownPropertyErrors
+} from '../utils/validation';
+import type { OptionalMode } from '../utils/validation';
 
 /**
  * The per-account failure window the server keeps in `FailedAttemptCounter`.
@@ -145,45 +150,47 @@ export function normalize(value: string): string {
   return value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase();
 }
 
-/** Mirrors `@Length(TOTP_DIGITS, TOTP_DIGITS)` on the step-up `code`. */
-export function isValidCodeShape(value: unknown): value is string {
-  return typeof value === 'string' && value.length === TOTP_DIGITS;
+/** Mirrors `@IsString() @Length(TOTP_DIGITS, TOTP_DIGITS)` on a `code`. */
+export function totpCodeErrors(
+  value: unknown,
+  optional?: OptionalMode
+): string[] {
+  return fixedLengthStringErrors('code', value, TOTP_DIGITS, optional);
 }
 
-export function isValidPasswordShape(value: unknown): boolean {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= MAX_PASSWORD_LENGTH
-  );
+/**
+ * Mirrors `@ValidateIf(propertyIsDefined) @IsString() @IsNotEmpty()
+ * @MaxLength(MAX_PASSWORD_LENGTH)` on a `currentPassword`.
+ */
+export function currentPasswordErrors(value: unknown): string[] {
+  return stringErrors('currentPassword', value, {
+    max: MAX_PASSWORD_LENGTH,
+    notEmpty: true,
+    isStringOnTop: true,
+    optional: 'definedOnly'
+  });
 }
 
 /**
  * Mirrors the ValidationPipe on a DTO that carries `StepUpFactorsDto`: a field
- * outside `fields` and the two factors is refused first, as `whitelist` with
- * `forbidNonWhitelisted` does. A supplied factor must have the shape of its
- * field; an absent one reaches the step-up, which is the only place that knows
- * which factor the account holds.
+ * outside `fields` and the two factors is reported first, as `whitelist` with
+ * `forbidNonWhitelisted` does, then `fieldErrors` of the DTO's own fields, then
+ * the factors. A supplied factor must have the shape of its field; an absent
+ * one reaches the step-up, which is the only place that knows which factor the
+ * account holds.
  */
 export function stepUpFactorsBodyErrors(
   body: unknown,
-  fields: readonly string[] = []
+  fields: readonly string[] = [],
+  fieldErrors: readonly string[] = []
 ): string[] {
-  const unknown = unknownPropertyErrors(body, [
-    ...fields,
-    'currentPassword',
-    'code'
-  ]);
-  if (unknown.length > 0) return unknown;
-
   const { currentPassword, code } = (body ?? {}) as Record<string, unknown>;
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    return ['currentPassword is required'];
-  }
-  if (code !== undefined && !isValidCodeShape(code)) {
-    return [`code must be longer than or equal to ${TOTP_DIGITS} characters`];
-  }
-  return [];
+  return [
+    ...unknownPropertyErrors(body, [...fields, 'currentPassword', 'code']),
+    ...fieldErrors,
+    ...currentPasswordErrors(currentPassword),
+    ...totpCodeErrors(code, 'definedOnly')
+  ];
 }
 
 /**

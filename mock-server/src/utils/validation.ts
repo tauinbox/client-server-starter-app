@@ -75,18 +75,6 @@ export function validateMinLength(
 }
 
 /**
- * The length rules every field that SETS a password carries: the
- * `@MinLength` / `@MaxLength` pair, then the bcrypt byte cap. A field that
- * only VERIFIES a password keeps MAX_PASSWORD_LENGTH and does not come here.
- */
-export function passwordLengthError(value: unknown): string | null {
-  return (
-    validateMinLength(value, MIN_PASSWORD_LENGTH, 'password') ??
-    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password')
-  );
-}
-
-/**
  * Mirrors `whitelist` + `forbidNonWhitelisted`. class-validator whitelists
  * before it validates, so a caller must report these ahead of its field errors.
  */
@@ -127,13 +115,19 @@ interface StringRules {
    * alone. It sits at the top of the decorator list, so it is reported last.
    */
   notEmpty?: boolean;
+  /**
+   * The DTO lists `@IsString()` above `@IsNotEmpty()`, so IsString is
+   * reported last.
+   */
+  isStringOnTop?: boolean;
   optional?: OptionalMode;
 }
 
 /**
  * Mirrors `@IsNotEmpty() @IsString() @MinLength(min) @MaxLength(max)`.
  * Decorators apply bottom-up, so a value failing several of them is reported
- * MaxLength, MinLength, IsString, IsNotEmpty.
+ * MaxLength, MinLength, IsString, IsNotEmpty, or MaxLength, MinLength,
+ * IsNotEmpty, IsString with `isStringOnTop`.
  */
 export function stringErrors(
   field: string,
@@ -149,13 +143,57 @@ export function stringErrors(
     const tooShort = validateMinLength(value, rules.min, field);
     if (tooShort) errors.push(tooShort);
   }
+  const notString =
+    typeof value !== 'string' ? [`${field} must be a string`] : [];
+  const empty =
+    rules.notEmpty && (value === '' || value === null || value === undefined)
+      ? [`${field} should not be empty`]
+      : [];
+  return rules.isStringOnTop
+    ? [...errors, ...empty, ...notString]
+    : [...errors, ...notString, ...empty];
+}
+
+/**
+ * Mirrors `@IsString() @Length(length, length)`, reported Length, IsString.
+ * class-validator picks the Length message from the raw value: a falsy or
+ * shorter one is "longer than", a longer one is "shorter than", and a value
+ * with no `length` (a number) gets both bounds in one message.
+ */
+export function fixedLengthStringErrors(
+  field: string,
+  value: unknown,
+  length: number,
+  optional?: OptionalMode
+): string[] {
+  if (isSkipped(value, optional)) return [];
+  if (typeof value === 'string' && value.length === length) return [];
+
+  const size = (value as { length?: unknown } | null | undefined)?.length;
+  const errors = [
+    !value || (typeof size === 'number' && size < length)
+      ? `${field} must be longer than or equal to ${length} characters`
+      : typeof size === 'number' && size > length
+        ? `${field} must be shorter than or equal to ${length} characters`
+        : `${field} must be longer than or equal to ${length} and shorter than or equal to ${length} characters`
+  ];
   if (typeof value !== 'string') errors.push(`${field} must be a string`);
-  if (
-    rules.notEmpty &&
-    (value === '' || value === null || value === undefined)
-  ) {
-    errors.push(`${field} should not be empty`);
+  return errors;
+}
+
+/**
+ * Mirrors `@IsString() @Matches(pattern)`, reported Matches, IsString.
+ */
+export function matchesErrors(
+  field: string,
+  value: unknown,
+  pattern: RegExp
+): string[] {
+  const errors: string[] = [];
+  if (typeof value !== 'string' || !pattern.test(value)) {
+    errors.push(`${field} must match ${pattern} regular expression`);
   }
+  if (typeof value !== 'string') errors.push(`${field} must be a string`);
   return errors;
 }
 
@@ -208,16 +246,34 @@ export function nameErrors(value: unknown, optional?: OptionalMode): string[] {
 }
 
 /**
+ * Mirrors `@MinLength(MIN_PASSWORD_LENGTH) @MaxLength(MAX_PASSWORD_LENGTH)`,
+ * the length rules of every field that SETS a password, reported MaxLength,
+ * MinLength. A field that only VERIFIES a password keeps MAX_PASSWORD_LENGTH
+ * and does not come here.
+ */
+export function passwordLengthErrors(
+  value: unknown,
+  optional?: OptionalMode
+): string[] {
+  if (isSkipped(value, optional)) return [];
+  return [
+    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password'),
+    validateMinLength(value, MIN_PASSWORD_LENGTH, 'password')
+  ].filter((error): error is string => error !== null);
+}
+
+/**
  * Mirrors `@IsNotEmpty() @MinLength(MIN_PASSWORD_LENGTH)
  * @MaxLength(MAX_PASSWORD_LENGTH)` of `CreateUserDto.password`, reported
  * MaxLength, MinLength, IsNotEmpty. The field has no `@IsString()`, so a number
  * fails the two caps only.
  */
-export function newPasswordErrors(value: unknown): string[] {
-  const errors = [
-    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password'),
-    validateMinLength(value, MIN_PASSWORD_LENGTH, 'password')
-  ].filter((error): error is string => error !== null);
+export function newPasswordErrors(
+  value: unknown,
+  optional?: OptionalMode
+): string[] {
+  if (isSkipped(value, optional)) return [];
+  const errors = passwordLengthErrors(value);
   if (value === '' || value === null || value === undefined) {
     errors.push('password should not be empty');
   }

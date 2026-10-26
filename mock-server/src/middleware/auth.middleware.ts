@@ -11,8 +11,10 @@ import {
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
+  MIN_PASSWORD_LENGTH,
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
+  SUPPORTED_LOCALES,
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import isLength from 'validator/lib/isLength';
@@ -20,10 +22,11 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import {
   emailErrors,
   nameErrors,
-  passwordLengthError,
+  oneOfErrors,
+  passwordLengthErrors,
+  stringErrors,
   trimName,
-  validateLocale,
-  validateMaxLength
+  unknownPropertyErrors
 } from '../utils/validation';
 import {
   generateMfaPendingToken,
@@ -82,6 +85,15 @@ import {
 
 /** The own fields of `UpdateProfileDto`, beside the step-up factors. */
 const PROFILE_FIELDS = ['name', 'password', 'locale'] as const;
+
+/** Mirrors `@IsString() @IsNotEmpty() @MaxLength(512)` on a mailed `token`. */
+function mailedTokenErrors(value: unknown): string[] {
+  return stringErrors('token', value, {
+    max: 512,
+    notEmpty: true,
+    isStringOnTop: true
+  });
+}
 
 function respondLocked(res: Response, lockedUntil: string): void {
   sendWithRetryAfter(
@@ -285,14 +297,12 @@ router.post('/login', (req, res) => {
 router.post('/verify-email', (req, res) => {
   const { token } = req.body;
 
-  if (!token) {
-    res.status(400).json(validationError('Token is required'));
-    return;
-  }
-
-  const tokenLenError = validateMaxLength(token, 512, 'token');
-  if (tokenLenError) {
-    res.status(400).json(validationError(tokenLenError));
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['token']),
+    ...mailedTokenErrors(token)
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
@@ -461,20 +471,18 @@ router.post('/forgot-password', (req, res) => {
 router.post('/reset-password', (req, res) => {
   const { token, password } = req.body;
 
-  if (!token || !password) {
-    res.status(400).json(validationError('Token and password are required'));
-    return;
-  }
-
-  const tokenLenError = validateMaxLength(token, 512, 'token');
-  if (tokenLenError) {
-    res.status(400).json(validationError(tokenLenError));
-    return;
-  }
-
-  const pwLenErr = passwordLengthError(password);
-  if (pwLenErr) {
-    res.status(400).json(validationError(pwLenErr));
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['token', 'password']),
+    ...mailedTokenErrors(token),
+    ...stringErrors('password', password, {
+      min: MIN_PASSWORD_LENGTH,
+      max: MAX_PASSWORD_LENGTH,
+      notEmpty: true,
+      isStringOnTop: true
+    })
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
@@ -781,31 +789,17 @@ router.patch(
     const name = trimName(req.body['name']);
     const { user } = req as AuthenticatedRequest;
 
-    const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS);
+    const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS, [
+      ...nameErrors(name, 'definedOnly'),
+      ...passwordLengthErrors(password, 'definedOnly'),
+      ...oneOfErrors('locale', locale, SUPPORTED_LOCALES, 'definedOnly')
+    ]);
     if (bodyErrors.length > 0) {
       res.status(400).json(validationError(bodyErrors));
       return;
     }
 
-    const localeErr = validateLocale(locale);
-    if (localeErr) {
-      res.status(400).json(validationError(localeErr));
-      return;
-    }
-
-    const bodyNameErrors = nameErrors(name, 'definedOnly');
-    if (bodyNameErrors.length > 0) {
-      res.status(400).json(validationError(bodyNameErrors));
-      return;
-    }
-
     if (password !== undefined) {
-      const pwLenErr = passwordLengthError(password);
-      if (pwLenErr) {
-        res.status(400).json(validationError(pwLenErr));
-        return;
-      }
-
       // A first password binds a credential that outlives the session, so it
       // needs the same fresh proof of identity an email change needs.
       const stepUp = stepUpError(
@@ -874,15 +868,13 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
   const successMessage =
     'If the new email is available, a confirmation link has been sent to it.';
 
-  const bodyErrors = stepUpFactorsBodyErrors(req.body, ['newEmail']);
+  const bodyErrors = stepUpFactorsBodyErrors(
+    req.body,
+    ['newEmail'],
+    emailErrors('newEmail', req.body?.newEmail)
+  );
   if (bodyErrors.length > 0) {
     res.status(400).json(validationError(bodyErrors));
-    return;
-  }
-
-  const newEmailErrors = emailErrors('newEmail', req.body?.newEmail);
-  if (newEmailErrors.length > 0) {
-    res.status(400).json(validationError(newEmailErrors));
     return;
   }
 
@@ -969,14 +961,12 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
 router.post('/profile/email/confirm', (req, res) => {
   const { token } = req.body;
 
-  if (!token || typeof token !== 'string') {
-    res.status(400).json(validationError('Token is required'));
-    return;
-  }
-
-  const tokenLenError = validateMaxLength(token, 512, 'token');
-  if (tokenLenError) {
-    res.status(400).json(validationError(tokenLenError));
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['token']),
+    ...mailedTokenErrors(token)
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 

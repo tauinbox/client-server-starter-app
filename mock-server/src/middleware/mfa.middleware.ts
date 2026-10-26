@@ -5,7 +5,6 @@ import {
   MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE,
-  TOTP_DIGITS,
   TOTP_ISSUER
 } from '@app/shared/constants';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
@@ -14,8 +13,7 @@ import {
   clearFailures,
   clearReauthProofCookie,
   consumeTotpCode,
-  isValidCodeShape,
-  isValidPasswordShape,
+  currentPasswordErrors,
   lockedEnvelope,
   normalize,
   readFailures,
@@ -23,10 +21,15 @@ import {
   sendWithRetryAfter,
   stepUpError,
   stepUpFactorsBodyErrors,
+  totpCodeErrors,
   type StepUpErrorEnvelope
 } from '../helpers/reauth.helpers';
 import { validationError } from '../helpers/validation-error.helpers';
-import { unknownPropertyErrors } from '../utils/validation';
+import {
+  matchesErrors,
+  stringErrors,
+  unknownPropertyErrors
+} from '../utils/validation';
 import { decodeToken } from '../jwt.utils';
 import { findUserById, getState, logAudit } from '../state';
 import {
@@ -51,6 +54,15 @@ const invalidPendingTokenEnvelope = {
   statusCode: 401,
   errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN
 };
+
+/** Mirrors `@IsString() @IsNotEmpty() @MaxLength(4096)` on `mfaToken`. */
+function mfaTokenErrors(value: unknown): string[] {
+  return stringErrors('mfaToken', value, {
+    max: 4096,
+    notEmpty: true,
+    isStringOnTop: true
+  });
+}
 
 /**
  * The route throttles are keyed by client address, so they bound one caller and
@@ -121,13 +133,12 @@ router.post('/setup', authGuard, (req, res) => {
   const { currentPassword } = req.body;
 
   // MfaSetupDto takes no code: an account that enrols holds no factor yet.
-  const unknown = unknownPropertyErrors(req.body, ['currentPassword']);
-  if (unknown.length > 0) {
-    res.status(400).json(validationError(unknown));
-    return;
-  }
-  if (currentPassword !== undefined && !isValidPasswordShape(currentPassword)) {
-    res.status(400).json(validationError('currentPassword is required'));
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['currentPassword']),
+    ...currentPasswordErrors(currentPassword)
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
@@ -174,14 +185,12 @@ router.post('/enable', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { code } = req.body;
 
-  if (!isValidCodeShape(code)) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `code must be longer than or equal to ${TOTP_DIGITS} characters`
-        )
-      );
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['code']),
+    ...totpCodeErrors(code)
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
@@ -337,18 +346,13 @@ router.post('/recovery-codes', authGuard, (req, res) => {
 router.post('/verify', (req, res) => {
   const { mfaToken, code } = req.body;
 
-  if (typeof mfaToken !== 'string' || mfaToken.length === 0) {
-    res.status(400).json(validationError('mfaToken should not be empty'));
-    return;
-  }
-  if (!isValidCodeShape(code)) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `code must be longer than or equal to ${TOTP_DIGITS} characters`
-        )
-      );
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['mfaToken', 'code']),
+    ...mfaTokenErrors(mfaToken),
+    ...totpCodeErrors(code)
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
@@ -394,21 +398,13 @@ const RECOVERY_CODE_PATTERN =
 router.post('/recovery', (req, res) => {
   const { mfaToken, recoveryCode } = req.body;
 
-  if (typeof mfaToken !== 'string' || mfaToken.length === 0) {
-    res.status(400).json(validationError('mfaToken should not be empty'));
-    return;
-  }
-  if (
-    typeof recoveryCode !== 'string' ||
-    !RECOVERY_CODE_PATTERN.test(recoveryCode)
-  ) {
-    res
-      .status(400)
-      .json(
-        validationError(
-          `recoveryCode must match ${RECOVERY_CODE_PATTERN} regular expression`
-        )
-      );
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['mfaToken', 'recoveryCode']),
+    ...mfaTokenErrors(mfaToken),
+    ...matchesErrors('recoveryCode', recoveryCode, RECOVERY_CODE_PATTERN)
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
