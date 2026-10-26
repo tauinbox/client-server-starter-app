@@ -88,6 +88,20 @@ function invalidOAuthData(): HttpException {
   );
 }
 
+/** The `reason` of an audit row for a refused provider callback. */
+function oauthFailureReason(error: unknown): string {
+  if (error instanceof OAuthAuthenticationFailedException) {
+    return error.oauthError;
+  }
+  if (error instanceof HttpException) {
+    return (
+      (error.getResponse() as { errorKey?: string })?.errorKey ??
+      'unexpected_error'
+    );
+  }
+  return 'unexpected_error';
+}
+
 @ApiTags('OAuth API')
 @Controller({
   path: 'auth/oauth',
@@ -462,7 +476,7 @@ export class OAuthController {
         : null;
 
       if (reauthToken) {
-        return this.handleOAuthReauth(reauthToken, profile, res);
+        return this.handleOAuthReauth(reauthToken, profile, req, res);
       }
 
       const linkIntent = this.cookies.read(req, OAUTH_LINK_COOKIE);
@@ -525,16 +539,13 @@ export class OAuthController {
     error: unknown,
     req: ExpressRequest
   ): void {
-    let reason = 'unexpected_error';
-    if (error instanceof OAuthAuthenticationFailedException) {
-      reason = error.oauthError;
-    } else if (error instanceof HttpException) {
-      reason =
-        (error.getResponse() as { errorKey?: string })?.errorKey ?? reason;
-    }
     this.auditService.logFireAndForget({
       action: AuditAction.USER_LOGIN_FAILURE,
-      details: { method: 'oauth', provider: profile.provider, reason },
+      details: {
+        method: 'oauth',
+        provider: profile.provider,
+        reason: oauthFailureReason(error)
+      },
       context: extractAuditContext(req)
     });
     this.metricsService.recordAuthEvent('login_failure');
@@ -552,12 +563,14 @@ export class OAuthController {
   private async handleOAuthReauth(
     reauthToken: string,
     profile: OAuthUserProfile,
+    req: ExpressRequest,
     res: Response
   ): Promise<void> {
     this.cookies.clear(res, OAUTH_REAUTH_COOKIE);
 
+    let payload: { sub: string; operation?: string; iat: number } | null = null;
     try {
-      const payload = this.purposeTokens.verify<{
+      payload = this.purposeTokens.verify<{
         sub: string;
         operation?: string;
       }>(reauthToken, TOKEN_PURPOSE.OAUTH_REAUTH);
@@ -596,6 +609,23 @@ export class OAuthController {
 
       res.redirect(`${this.clientUrl}/profile?reauth=ok`);
     } catch (error) {
+      // An intent that does not verify names no account, so only the log
+      // records it, as a refused provider round trip does.
+      if (payload) {
+        this.auditService.logFireAndForget({
+          action: AuditAction.STEP_UP_FAILURE,
+          actorId: payload.sub,
+          targetId: payload.sub,
+          targetType: 'User',
+          details: {
+            operation: payload.operation,
+            factor: 'reauth_proof',
+            provider: profile.provider,
+            reason: oauthFailureReason(error)
+          },
+          context: extractAuditContext(req)
+        });
+      }
       this.logger.error('OAuth re-authentication error', error);
       res.redirect(
         `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.REAUTH_FAILED}`
@@ -611,6 +641,7 @@ export class OAuthController {
   ): Promise<void> {
     this.cookies.clear(res, OAUTH_LINK_COOKIE);
 
+    let userId: string | null = null;
     try {
       const payload = this.purposeTokens.verify<{ sub: string }>(
         linkToken,
@@ -619,7 +650,7 @@ export class OAuthController {
       if (!payload) {
         throw new Error('Invalid link token');
       }
-      const userId = payload.sub;
+      userId = payload.sub;
 
       await this.oauthService.linkOAuthToUser(
         userId,
@@ -633,6 +664,19 @@ export class OAuthController {
         `${this.clientUrl}/profile?oauth_linked=${profile.provider}`
       );
     } catch (error) {
+      if (userId) {
+        this.auditService.logFireAndForget({
+          action: AuditAction.OAUTH_LINK_FAILURE,
+          actorId: userId,
+          targetId: userId,
+          targetType: 'User',
+          details: {
+            provider: profile.provider,
+            reason: oauthFailureReason(error)
+          },
+          context: extractAuditContext(req)
+        });
+      }
       this.logger.error('OAuth link error', error);
       res.redirect(
         `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.LINK_FAILED}`
