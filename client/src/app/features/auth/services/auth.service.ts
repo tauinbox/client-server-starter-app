@@ -408,10 +408,6 @@ export class AuthService {
       .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
   }
 
-  hasPersistedUser(): boolean {
-    return this.#authStore.hasPersistedUser();
-  }
-
   refreshTokens(): Observable<TokensResponse | null> {
     return this.#tokenService.refreshTokens();
   }
