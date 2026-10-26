@@ -46,6 +46,7 @@ import { AuditService } from '../../audit/audit.service';
 import type { AuditLogParams } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-target.util';
 import { refuseAccess } from '../../../common/utils/refuse-access.util';
 import { auditContextOf } from '../casl/ability-context';
@@ -399,18 +400,10 @@ export class RoleService {
     const existing = await this.roleRepository.findOne({
       where: { name: data.name }
     });
-    if (existing) {
-      throw new HttpException(
-        {
-          message: 'Role with this name already exists',
-          errorKey: ErrorKeys.ROLES.NAME_EXISTS
-        },
-        HttpStatus.BAD_REQUEST
-      );
-    }
+    if (existing) throw this.nameExists();
     const role = this.roleRepository.create({ ...data, isSuper: false });
     return this.roleRepository.manager.transaction(async (em) => {
-      const saved = await em.save(Role, role);
+      const saved = await this.saveRole(em, role);
       if (audit) await this.auditService.log(audit(saved), em);
       return saved;
     });
@@ -443,15 +436,7 @@ export class RoleService {
       const existing = await this.roleRepository.findOne({
         where: { name: data.name }
       });
-      if (existing && existing.id !== id) {
-        throw new HttpException(
-          {
-            message: 'Role with this name already exists',
-            errorKey: ErrorKeys.ROLES.NAME_EXISTS
-          },
-          HttpStatus.BAD_REQUEST
-        );
-      }
+      if (existing && existing.id !== id) throw this.nameExists();
     }
     const oldName = role.name;
     const auditRow = audit?.({ ...role });
@@ -459,13 +444,13 @@ export class RoleService {
     if (role.name === oldName) {
       return this.writeAudited(
         this.roleRepository.manager,
-        (em) => em.save(Role, role),
+        (em) => this.saveRole(em, role),
         auditRow
       );
     }
 
     const saved = await this.writeWithRoleEvent(
-      (em) => em.save(Role, role),
+      (em) => this.saveRole(em, role),
       RoleRenamedEvent.name,
       (em, committed) =>
         new RoleRenamedEvent(oldName, role.name, em, committed),
@@ -517,6 +502,26 @@ export class RoleService {
    * Runs `write` and the audit row of the change in one transaction, so a
    * failed row rolls the write back.
    */
+  private nameExists(): HttpException {
+    return new HttpException(
+      {
+        message: 'Role with this name already exists',
+        errorKey: ErrorKeys.ROLES.NAME_EXISTS
+      },
+      HttpStatus.BAD_REQUEST
+    );
+  }
+
+  // The read check of the name runs before the transaction, so a concurrent
+  // request can take the name between them; the unique index then refuses it.
+  private async saveRole(em: EntityManager, role: Role): Promise<Role> {
+    try {
+      return await em.save(Role, role);
+    } catch (error) {
+      throw isUniqueViolation(error) ? this.nameExists() : error;
+    }
+  }
+
   private writeAudited<T>(
     manager: EntityManager,
     write: (em: EntityManager) => Promise<T>,
