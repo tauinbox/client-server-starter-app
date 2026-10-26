@@ -856,9 +856,11 @@ describe('MfaService', () => {
     it('accepts the code however the user retypes it', async () => {
       repository.findOne.mockResolvedValue(enabledWithCode());
 
-      await expect(
-        service.consumeRecoveryCode('token', 'abcdefgh ijklmnop')
-      ).resolves.toBeDefined();
+      await service.consumeRecoveryCode('token', 'abcd-efgh ijkl-mnop');
+
+      expect(repository.update).toHaveBeenCalledWith('user-1', {
+        totpRecoveryCodes: ['other-hash']
+      });
     });
 
     // The two-group form is what every enrolment before the entropy rise got,

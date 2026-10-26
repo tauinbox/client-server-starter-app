@@ -36,6 +36,7 @@ import type {
   MfaSetupResponse
 } from '@app/shared/types';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { User } from '../../users/entities/user.entity';
 import { AuditContext, AuditService } from '../../audit/audit.service';
@@ -187,7 +188,7 @@ export class MfaService {
           {
             totpEnabledAt: new Date(),
             totpRecoveryCodes: recoveryCodes.map((code) =>
-              hashToken(normalize(code))
+              hashToken(normalizeOtpCode(code))
             )
           }
         );
@@ -239,7 +240,7 @@ export class MfaService {
       { id: user.id, totpEnabledAt: Not(IsNull()) },
       {
         totpRecoveryCodes: recoveryCodes.map((code) =>
-          hashToken(normalize(code))
+          hashToken(normalizeOtpCode(code))
         )
       }
     );
@@ -423,7 +424,7 @@ export class MfaService {
     context?: AuditContext
   ): Promise<User> {
     const user = await this.userFromPendingToken(mfaToken);
-    const digest = hashToken(normalize(recoveryCode));
+    const digest = hashToken(normalizeOtpCode(recoveryCode));
 
     // Read and write under one lock. A plain read-then-write lets two requests
     // presenting the same code both see it unspent, which is the one property
@@ -581,7 +582,7 @@ export class MfaService {
       return false;
     }
 
-    const token = normalize(code);
+    const token = normalizeOtpCode(code);
 
     return withTransaction(this.dataSource, async (manager) => {
       // The locked row carries the secret as well as the floor. Verifying
@@ -744,12 +745,4 @@ export class MfaService {
       HttpStatus.UNAUTHORIZED
     );
   }
-}
-
-/**
- * Users read codes off a screen and type them back with spaces, dashes and
- * whatever case the app showed. Only the characters carry meaning.
- */
-function normalize(value: string): string {
-  return value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase();
 }
