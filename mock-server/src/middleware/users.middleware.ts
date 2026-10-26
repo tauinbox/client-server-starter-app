@@ -3,17 +3,19 @@ import type { Request, Response } from 'express';
 import {
   ErrorKeys,
   STEP_UP_OPERATION,
+  SUPPORTED_LOCALES,
   USER_LIST_QUERY
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { newPasswordRefusal } from '../helpers/breached-password.helpers';
 import {
+  booleanErrors,
   emailErrors,
   nameErrors,
-  passwordLengthError,
-  trimName,
-  validateLocale
+  newPasswordErrors,
+  oneOfErrors,
+  trimName
 } from '../utils/validation';
 import {
   listPage,
@@ -212,60 +214,31 @@ router.patch(
     // The server's global ValidationPipe runs before the handler, so a body that
     // fails UpdateUserDto is a 400 whether or not the addressed row exists. Only
     // checks that need the looked-up row stay below the 404.
-    const bodyErrors = stepUpFactorsBodyErrors(req.body, UPDATE_USER_FIELDS);
+    const { password, isActive, unlockAccount, locale, currentPassword, code } =
+      req.body;
+    const name = trimName(req.body['name']);
+
+    // UpdateUserDto declares its own fields ahead of the inherited
+    // CreateUserDto fields, so the server reports them first.
+    const bodyErrors = stepUpFactorsBodyErrors(req.body, UPDATE_USER_FIELDS, [
+      ...booleanErrors('isActive', isActive, 'definedOnly'),
+      ...booleanErrors('unlockAccount', unlockAccount, 'definedOnly'),
+      ...emailErrors('email', req.body.email, 'definedOnly'),
+      ...nameErrors(name, 'definedOnly'),
+      ...newPasswordErrors(password, 'definedOnly'),
+      ...oneOfErrors('locale', locale, SUPPORTED_LOCALES, 'definedOnly')
+    ]);
     if (bodyErrors.length > 0) {
       res.status(400).json(validationError(bodyErrors));
       return;
     }
 
-    const { password, isActive, unlockAccount, locale } = req.body;
-    const name = trimName(req.body['name']);
     // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
     // uses PartialType(..., { skipNullProperties: false }).
     const email =
       req.body.email === undefined
         ? undefined
         : (normalizeEmail(req.body.email) ?? req.body.email);
-
-    const bodyEmailErrors = emailErrors('email', req.body.email, 'definedOnly');
-    if (bodyEmailErrors.length > 0) {
-      res.status(400).json(validationError(bodyEmailErrors));
-      return;
-    }
-
-    const bodyNameErrors = nameErrors(name, 'definedOnly');
-    if (bodyNameErrors.length > 0) {
-      res.status(400).json(validationError(bodyNameErrors));
-      return;
-    }
-
-    if (password !== undefined) {
-      const pwLenErr = passwordLengthError(password);
-      if (pwLenErr) {
-        res.status(400).json(validationError(pwLenErr));
-        return;
-      }
-    }
-
-    const localeErr = validateLocale(locale);
-    if (localeErr) {
-      res.status(400).json(validationError(localeErr));
-      return;
-    }
-
-    const { currentPassword, code } = req.body;
-
-    if (isActive !== undefined && typeof isActive !== 'boolean') {
-      res.status(400).json(validationError('isActive must be a boolean value'));
-      return;
-    }
-
-    if (unlockAccount !== undefined && typeof unlockAccount !== 'boolean') {
-      res
-        .status(400)
-        .json(validationError('unlockAccount must be a boolean value'));
-      return;
-    }
 
     // Mirrors UsersController.update: a moderation field on the caller's own
     // record is refused before the lookup and the step-up.

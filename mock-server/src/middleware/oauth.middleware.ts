@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { completeSignIn } from '../helpers/sign-in.helpers';
-import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
-import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
+import {
+  ErrorKeys,
+  STEP_UP_OPERATION,
+  STEP_UP_OPERATIONS
+} from '@app/shared/constants';
+import { oneOfErrors, unknownPropertyErrors } from '../utils/validation';
 import { findUserById, getState, logAudit } from '../state';
 import { authGuard } from '../helpers/auth.helpers';
 import {
@@ -224,10 +228,12 @@ router.post('/link-init', authGuard, (req, res) => {
 router.post('/reauth-init', authGuard, (req, res) => {
   const { operation } = req.body as { operation?: unknown };
 
-  if (!isStepUpOperation(operation)) {
-    res
-      .status(400)
-      .json(validationError('operation must be a known step-up operation'));
+  const bodyErrors = [
+    ...unknownPropertyErrors(req.body, ['operation']),
+    ...oneOfErrors('operation', operation, STEP_UP_OPERATIONS)
+  ];
+  if (bodyErrors.length > 0) {
+    res.status(400).json(validationError(bodyErrors));
     return;
   }
 
