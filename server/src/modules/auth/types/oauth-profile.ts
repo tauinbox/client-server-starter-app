@@ -5,7 +5,7 @@ export interface OAuthUserProfile {
   /** Empty when the provider sends no name. */
   name: string;
   // Whether the OAuth provider asserts the email address is verified.
-  // Google: profile.emails[i].verified. Facebook: profile._json.verified.
-  // VK: provider does not expose this — always false.
+  // Google: profile.emails[i].verified. Facebook and VK: always false, because
+  // neither provider asserts that the person owns the mailbox.
   emailVerified: boolean;
 }

@@ -888,7 +888,7 @@ router.post(
       ip: req.ip
     });
 
-    res.send();
+    res.status(201).send();
   }
 );
 

@@ -1723,7 +1723,8 @@ one, the service throws `OAuthAuthenticationFailedException(no_email)` before an
 redirects to `/login?oauth_error=no_email`.
 
 A new user that OAuth makes takes the `email_verified` flag of the provider. Google gives
-`profile.emails[0].verified`. Facebook gives `profile._json.verified`. VK always gives `false`.
+`profile.emails[0].verified`. Facebook and VK always give `false`: the account-level `verified` flag of
+Facebook does not show that the person owns the mailbox.
 
 **An OAuth callback failure redirects, and does not answer 401.** Passport rejects a callback inside
 the guard. Three examples are a denied consent screen, a missing or expired state cookie, and a

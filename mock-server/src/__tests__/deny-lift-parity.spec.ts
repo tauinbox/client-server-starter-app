@@ -255,7 +255,7 @@ describe('deny lift parity with server', () => {
         { permissionIds: [updateUserId()], conditions: DENY_CEO }
       );
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(201);
     });
   });
 

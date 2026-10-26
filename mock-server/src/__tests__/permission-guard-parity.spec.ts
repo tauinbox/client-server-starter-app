@@ -492,7 +492,7 @@ describe('permission-based route authorization', () => {
             { permissionIds: [granted] }
           )
         ).status
-      ).toBe(200);
+      ).toBe(201);
       await expectRefused(
         await send(
           token,

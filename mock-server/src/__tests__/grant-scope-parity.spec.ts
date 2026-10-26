@@ -215,7 +215,7 @@ describe('grant scope parity with server', () => {
       conditions
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(targetRowCount()).toBe(1);
   });
 
@@ -233,7 +233,7 @@ describe('grant scope parity with server', () => {
         conditions: deny
       });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(201);
       expect(targetRowCount()).toBe(1);
     });
 
