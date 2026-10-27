@@ -11,7 +11,6 @@ import {
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
-  MIN_PASSWORD_LENGTH,
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
   SUPPORTED_LOCALES,
@@ -22,8 +21,8 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import {
   emailErrors,
   nameErrors,
+  newPasswordErrors,
   oneOfErrors,
-  passwordLengthErrors,
   stringErrors,
   trimName,
   unknownPropertyErrors
@@ -475,12 +474,7 @@ router.post('/reset-password', (req, res) => {
   const bodyErrors = [
     ...unknownPropertyErrors(req.body, ['token', 'password']),
     ...mailedTokenErrors(token),
-    ...stringErrors('password', password, {
-      min: MIN_PASSWORD_LENGTH,
-      max: MAX_PASSWORD_LENGTH,
-      notEmpty: true,
-      isStringOnTop: true
-    })
+    ...newPasswordErrors(password)
   ];
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
@@ -792,7 +786,7 @@ router.patch(
 
     const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS, [
       ...nameErrors(name, 'definedOnly'),
-      ...passwordLengthErrors(password, 'definedOnly'),
+      ...newPasswordErrors(password, 'definedOnly'),
       ...oneOfErrors('locale', locale, SUPPORTED_LOCALES, 'definedOnly')
     ]);
     if (bodyErrors.length > 0) {

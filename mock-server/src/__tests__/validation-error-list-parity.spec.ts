@@ -100,7 +100,8 @@ const PASSWORD_TOO_SHORT =
   'password must be longer than or equal to 8 characters';
 const PASSWORD_NOT_STRING = [
   'password must be shorter than or equal to 128 characters',
-  PASSWORD_TOO_SHORT
+  PASSWORD_TOO_SHORT,
+  'password must be a string'
 ];
 const LOCALE_INVALID = 'locale must be one of the following values: en, ru';
 const RECOVERY_CODE_MISMATCH =
@@ -153,9 +154,7 @@ const cases: [string, string, string, Caller, unknown, string[]][] = [
       'email must be an email',
       'name must be shorter than or equal to 255 characters',
       'name should not be empty',
-      'password must be shorter than or equal to 128 characters',
-      PASSWORD_TOO_SHORT,
-      'password should not be empty',
+      ...PASSWORD_MISSING,
       LOCALE_INVALID
     ]
   ],
@@ -217,7 +216,7 @@ const cases: [string, string, string, Caller, unknown, string[]][] = [
     [
       'name must be shorter than or equal to 255 characters',
       'name should not be empty',
-      ...PASSWORD_NOT_STRING,
+      ...PASSWORD_MISSING,
       LOCALE_INVALID
     ]
   ],

@@ -2844,7 +2844,9 @@ The import covers:
   `SystemRole`.
 
   The password DTOs read these length constants, thus `@MinLength` and `@MaxLength` cannot drift
-  away from the client form rules. Every password field, one that sets a password and one that
+  away from the client form rules. Every field that sets a password uses one decorator,
+  `IsNewPassword()` (`src/common/validators/is-new-password.ts`), so every route gives the same 400
+  list for the same value. Every password field, one that sets a password and one that
   verifies it, caps at `MAX_PASSWORD_LENGTH`, which is 128 characters. The byte count does not
   matter: `src/common/utils/password-hash.ts` pre-hashes the value with HMAC-SHA-256 before bcrypt,
   so bcrypt always reads a 44-character input. `users.password_hash_version` records the format; a

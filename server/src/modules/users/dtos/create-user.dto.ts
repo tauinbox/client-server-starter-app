@@ -3,7 +3,6 @@ import {
   IsIn,
   IsNotEmpty,
   MaxLength,
-  MinLength,
   ValidateIf
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -12,10 +11,10 @@ import { normalizeEmail } from '@app/shared/utils/email';
 import {
   MAX_EMAIL_LENGTH,
   MAX_NAME_LENGTH,
-  MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
+import { IsNewPassword } from '../../../common/validators/is-new-password';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 
 export class CreateUserDto {
@@ -45,9 +44,7 @@ export class CreateUserDto {
     example: 'Sunrise-Kettle-19',
     minLength: MIN_PASSWORD_LENGTH
   })
-  @IsNotEmpty()
-  @MinLength(MIN_PASSWORD_LENGTH)
-  @MaxLength(MAX_PASSWORD_LENGTH)
+  @IsNewPassword()
   password: string;
 
   @ApiPropertyOptional({

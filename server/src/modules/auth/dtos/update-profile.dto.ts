@@ -1,18 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsIn,
-  IsNotEmpty,
-  MaxLength,
-  MinLength,
-  ValidateIf
-} from 'class-validator';
+import { IsIn, IsNotEmpty, MaxLength, ValidateIf } from 'class-validator';
 import {
   MAX_NAME_LENGTH,
-  MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   SUPPORTED_LOCALES
 } from '@app/shared/constants';
 import { Transform } from 'class-transformer';
+import { IsNewPassword } from '../../../common/validators/is-new-password';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
 import { StepUpFactorsDto } from './step-up-factors.dto';
 
@@ -37,8 +31,7 @@ export class UpdateProfileDto extends StepUpFactorsDto {
     minLength: MIN_PASSWORD_LENGTH
   })
   @ValidateIf(propertyIsDefined)
-  @MinLength(MIN_PASSWORD_LENGTH)
-  @MaxLength(MAX_PASSWORD_LENGTH)
+  @IsNewPassword()
   password?: string;
 
   @ApiPropertyOptional({

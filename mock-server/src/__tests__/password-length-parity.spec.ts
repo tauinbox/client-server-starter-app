@@ -3,7 +3,7 @@ import { ErrorKeys, MAX_PASSWORD_LENGTH } from '@app/shared/constants';
 import { createApp } from '../app';
 import { resetState } from '../state';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { passwordLengthErrors } from '../utils/validation';
+import { newPasswordErrors } from '../utils/validation';
 
 // Mirrors the server: the password is pre-hashed before bcrypt, so every
 // path caps at MAX_PASSWORD_LENGTH characters whatever their byte count.
@@ -30,18 +30,18 @@ beforeEach(() => {
   resetState();
 });
 
-describe('passwordLengthErrors', () => {
+describe('newPasswordErrors', () => {
   it('accepts 64 Cyrillic characters', () => {
     expect(CYRILLIC_64).toHaveLength(64);
-    expect(passwordLengthErrors(CYRILLIC_64)).toEqual([]);
+    expect(newPasswordErrors(CYRILLIC_64)).toEqual([]);
   });
 
   it(`accepts ${MAX_PASSWORD_LENGTH} characters`, () => {
-    expect(passwordLengthErrors(ASCII_128)).toEqual([]);
+    expect(newPasswordErrors(ASCII_128)).toEqual([]);
   });
 
   it(`rejects ${MAX_PASSWORD_LENGTH + 1} characters`, () => {
-    expect(passwordLengthErrors(ASCII_128 + 'a')).toEqual([
+    expect(newPasswordErrors(ASCII_128 + 'a')).toEqual([
       `password must be shorter than or equal to ${MAX_PASSWORD_LENGTH} characters`
     ]);
   });
