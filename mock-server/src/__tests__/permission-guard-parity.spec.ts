@@ -588,6 +588,11 @@ describe('permission-based route authorization', () => {
         )
       );
 
+      // Orphaned, and offering no action, so the restore wakes no grant
+      // and the widen check of a non-super caller passes.
+      const usersResource = getState().resources.get(USERS_RESOURCE_ID)!;
+      usersResource.isOrphaned = true;
+      usersResource.allowedActionNames = [];
       expect(
         (
           await send(

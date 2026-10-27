@@ -142,11 +142,16 @@ describe('permissions_updated after a resource write', () => {
     ).toBe(1);
   });
 
-  it('is not sent for the restore of a resource that is not orphaned', async () => {
+  it('is not sent for the refused restore of a resource that is not orphaned', async () => {
     expect(
-      await pushesAfter((token) =>
-        call('POST', `/rbac/resources/${USERS_RESOURCE_ID}/restore`, token)
-      )
+      await pushesAfter(async (token) => {
+        const status = await call(
+          'POST',
+          `/rbac/resources/${USERS_RESOURCE_ID}/restore`,
+          token
+        );
+        return status === 409 ? 200 : 500;
+      })
     ).toBe(0);
   });
 });

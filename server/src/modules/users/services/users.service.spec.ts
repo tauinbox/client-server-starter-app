@@ -6,7 +6,7 @@ import {
   PasswordHashVersion,
   prehashPassword
 } from '../../../common/utils/password-hash';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull, Not } from 'typeorm';
 import { BCRYPT_SALT_ROUNDS, ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { UsersService } from './users.service';
@@ -88,7 +88,7 @@ describe('UsersService', () => {
       create: jest.fn(),
       save: jest.fn(),
       softRemove: jest.fn().mockResolvedValue(undefined),
-      restore: jest.fn().mockResolvedValue(undefined),
+      restore: jest.fn().mockResolvedValue({ affected: 1 }),
       merge: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
       increment: jest.fn().mockResolvedValue(undefined),
@@ -102,13 +102,13 @@ describe('UsersService', () => {
         (
           run: (manager: {
             save: jest.Mock;
-            restore: (entity: unknown, id: string) => Promise<unknown>;
+            restore: (entity: unknown, criteria: unknown) => Promise<unknown>;
           }) => Promise<unknown>
         ) =>
           run({
             save: mockRepository.save,
-            restore: (_entity, id) =>
-              mockRepository.restore(id) as Promise<unknown>
+            restore: (_entity, criteria) =>
+              mockRepository.restore(criteria) as Promise<unknown>
           })
       )
     };
@@ -1135,7 +1135,10 @@ describe('UsersService', () => {
         relations: { roles: true },
         withDeleted: true
       });
-      expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
+      expect(mockRepository.restore).toHaveBeenCalledWith({
+        id: 'user-1',
+        deletedAt: Not(IsNull())
+      });
       // `isActive` is gated by the `update` action, which this endpoint does
       // not require, so restoring must never write it.
       expect(mockRepository.update).not.toHaveBeenCalled();
@@ -1153,9 +1156,37 @@ describe('UsersService', () => {
 
       const result = await service.restore('user-1', SYSTEM_ABILITY);
 
-      expect(mockRepository.restore).toHaveBeenCalledWith('user-1');
+      expect(mockRepository.restore).toHaveBeenCalledTimes(1);
       expect(result.isActive).toBe(true);
       expect(result.deletedAt).toBeNull();
+    });
+
+    it('refuses a user that is not deleted, before any effect', async () => {
+      mockRepository.findOne.mockResolvedValueOnce(mockUser);
+      const audit = jest.fn().mockReturnValue([]);
+
+      await expect(
+        service.restore('user-1', SYSTEM_ABILITY, undefined, audit)
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: 'errors.users.notDeleted' }
+      });
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(audit).not.toHaveBeenCalled();
+    });
+
+    it('refuses the loser of two concurrent restores and writes no audit row', async () => {
+      mockRepository.findOne.mockResolvedValueOnce(deletedUser);
+      mockRepository.restore.mockResolvedValueOnce({ affected: 0 });
+      const audit = jest.fn().mockReturnValue([]);
+
+      await expect(
+        service.restore('user-1', SYSTEM_ABILITY, undefined, audit)
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: 'errors.users.notDeleted' }
+      });
+      expect(audit).not.toHaveBeenCalled();
     });
 
     it('should throw HttpException when user does not exist', async () => {

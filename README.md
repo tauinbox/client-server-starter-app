@@ -732,7 +732,8 @@ the same permission both apply.
 - **Restore** a soft-deleted user with `POST /users/:id/restore`. The restore clears `deleted_at`
   only. An account that a person deactivated before the delete comes back deactivated. Reactivation
   stays a `PATCH /users/:id { "isActive": true }` operation. Thus `users:delete` alone cannot enable a
-  disabled account through a delete and restore sequence.
+  disabled account through a delete and restore sequence. A restore of a user that is not deleted
+  answers 409 `errors.users.notDeleted` and writes no audit row.
 - An **"Include deleted users"** checkbox is in the filter form of the list. It sends
   `includeDeleted=true` on the list and on the search. A deleted row shows a "Deleted" status chip and
   offers restore as its only action, because the detail endpoint and the edit endpoint exclude a
@@ -1905,11 +1906,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3098 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 701 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 688 pass and 13 skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3103 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 706 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 693 pass and 13 skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1616 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 343 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1226 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1229 tests pass |
 
 ## CI/CD
 

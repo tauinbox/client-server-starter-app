@@ -516,6 +516,15 @@ router.post(
       return;
     }
 
+    if (!targetUser.deletedAt) {
+      res.status(409).json({
+        message: `User with ID ${id} is not deleted, so there is nothing to restore`,
+        statusCode: 409,
+        errorKey: ErrorKeys.USERS.NOT_DELETED
+      });
+      return;
+    }
+
     // Restore lifts the soft-delete only - `isActive` is a separate
     // administrative state changed through PATCH /users/:id.
     targetUser.deletedAt = null;

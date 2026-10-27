@@ -1,7 +1,9 @@
 import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource, In } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
@@ -248,5 +250,66 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
     const restored = await resourceService.restore(resource.id, superAbility);
     expect(restored.isOrphaned).toBe(false);
+  });
+
+  // The `users` resource is registered by every suite, so no parallel startup
+  // sync orphans it, and these cases do not change it.
+  describe('a restore of a resource that is not orphaned', () => {
+    const notOrphaned = `409 ${ErrorKeys.RESOURCES.NOT_ORPHANED}`;
+    const restoreRows = (): number =>
+      jest
+        .mocked(app.get(AuditService).log)
+        .mock.calls.filter(
+          ([row]) => row.action === AuditAction.RESOURCE_RESTORE
+        ).length;
+    const usersResource = (): Promise<Resource> =>
+      dataSource.getRepository(Resource).findOneByOrFail({ name: 'users' });
+    const audit = (id: string) => ({
+      action: AuditAction.RESOURCE_RESTORE,
+      targetId: id,
+      targetType: 'Resource'
+    });
+
+    it('is refused with no audit row', async () => {
+      const users = await usersResource();
+      const before = restoreRows();
+
+      expect(
+        await outcome(
+          resourceService.restore(
+            users.id,
+            superAbility,
+            undefined,
+            audit(users.id)
+          )
+        )
+      ).toBe(notOrphaned);
+      expect(restoreRows()).toBe(before);
+    });
+
+    it('is refused after a stale read, as the loser of two concurrent restores is', async () => {
+      const users = await usersResource();
+      expect(users.isOrphaned).toBe(false);
+      jest
+        .spyOn(
+          app.get<Repository<Resource>>(getRepositoryToken(Resource)),
+          'findOne'
+        )
+        .mockResolvedValueOnce({ ...users, isOrphaned: true });
+      const before = restoreRows();
+
+      expect(
+        await outcome(
+          resourceService.restore(
+            users.id,
+            SYSTEM_ABILITY,
+            undefined,
+            audit(users.id)
+          )
+        )
+      ).toBe(notOrphaned);
+      expect(restoreRows()).toBe(before);
+      expect((await usersResource()).isOrphaned).toBe(false);
+    });
   });
 });
