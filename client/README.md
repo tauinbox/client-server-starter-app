@@ -579,7 +579,9 @@ refresh, the `catch` block in `restoreSession` (the bootstrap initializer), and 
 password change. They run the same routine through the public `clearSession()` delegate. The
 profile path cannot call `logout()`: the server already revoked every session, so
 `POST /auth/logout` would get a 401. It opens `/login?password_changed=1` (or `=email-pending`
-when the same submit started an email change), and the login page shows a banner that says why. A call to `AuthStore.clearSession()` clears only the token and the
+when the same submit started an email change), and the login page shows a banner that says why.
+`ResetPasswordComponent` opens `/login?password_changed=1` after a successful reset for the same
+reason. A call to `AuthStore.clearSession()` clears only the token and the
 persisted user.
 
 **The server sign-out is per device.** `POST /auth/logout` ends the session that the

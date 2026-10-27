@@ -1,7 +1,7 @@
 /**
- * A password change on the profile revokes every session on the server, so the
- * profile page hands the user to `/login` with this marker instead of a
- * snackbar that would vanish with the page.
+ * A password change on the profile and a password reset revoke every session
+ * on the server, so both pages hand the user to `/login` with this marker
+ * instead of a snackbar that would vanish with the page.
  */
 export const PASSWORD_CHANGED_PARAM = 'password_changed';
 
