@@ -1,9 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
-import {
-  MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH
-} from '@app/shared/constants';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { MIN_PASSWORD_LENGTH } from '@app/shared/constants';
+import { IsNewPassword } from '../../../common/validators/is-new-password';
 
 export class ResetPasswordDto {
   @ApiProperty({
@@ -19,9 +17,6 @@ export class ResetPasswordDto {
       'New password. Rejected when it appears in a public breach corpus.',
     minLength: MIN_PASSWORD_LENGTH
   })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(MIN_PASSWORD_LENGTH)
-  @MaxLength(MAX_PASSWORD_LENGTH)
+  @IsNewPassword()
   password: string;
 }

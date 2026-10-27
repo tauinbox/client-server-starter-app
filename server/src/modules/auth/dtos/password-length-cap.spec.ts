@@ -1,7 +1,11 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import type { Type } from '@nestjs/common';
-import { MAX_PASSWORD_LENGTH } from '@app/shared/constants';
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH
+} from '@app/shared/constants';
 import { CreateUserDto } from '../../users/dtos/create-user.dto';
+import { UpdateUserDto } from '../../users/dtos/update-user.dto';
 import { InitiateEmailChangeDto } from './initiate-email-change.dto';
 import { LoginDto } from './login.dto';
 import { MfaSetupDto } from './mfa.dto';
@@ -84,6 +88,40 @@ describe('Password length cap', () => {
       );
     });
   });
+
+  async function messagesOf(
+    metatype: Type<unknown>,
+    payload: unknown
+  ): Promise<string[]> {
+    const error = await validate(metatype, payload).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(BadRequestException);
+    return (
+      (error as BadRequestException).getResponse() as { message: string[] }
+    ).message;
+  }
+
+  const TOO_LONG = `password must be shorter than or equal to ${MAX_PASSWORD_LENGTH} characters`;
+  const TOO_SHORT = `password must be longer than or equal to ${MIN_PASSWORD_LENGTH} characters`;
+  const EMPTY = 'password should not be empty';
+  const NOT_STRING = 'password must be a string';
+
+  describe.each([...setPaths, ['UpdateUserDto', UpdateUserDto, {}] as const])(
+    '%s gives one list of violations',
+    (_name, metatype, base) => {
+      it.each([
+        ['a number', 12345678, [TOO_LONG, TOO_SHORT, NOT_STRING]],
+        ['an empty string', '', [TOO_SHORT, EMPTY]],
+        ['a null', null, [TOO_LONG, TOO_SHORT, EMPTY, NOT_STRING]]
+      ])('for %s', async (_case, password, expected) => {
+        expect(await messagesOf(metatype, { ...base, password })).toEqual(
+          expected
+        );
+      });
+    }
+  );
 
   const verifyPaths: ReadonlyArray<
     [name: string, metatype: Type<unknown>, payload: Record<string, unknown>]

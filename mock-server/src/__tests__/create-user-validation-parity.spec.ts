@@ -75,7 +75,8 @@ const NAME_MISSING = [
 const PASSWORD_MISSING = [
   'password must be shorter than or equal to 128 characters',
   'password must be longer than or equal to 8 characters',
-  'password should not be empty'
+  'password should not be empty',
+  'password must be a string'
 ];
 
 const CASES: [string, Record<string, unknown>, string[]][] = [
@@ -114,7 +115,8 @@ const CASES: [string, Record<string, unknown>, string[]][] = [
       ...EMAIL_MISSING,
       'name must be shorter than or equal to 255 characters',
       'password must be shorter than or equal to 128 characters',
-      'password must be longer than or equal to 8 characters'
+      'password must be longer than or equal to 8 characters',
+      'password must be a string'
     ]
   ],
   [

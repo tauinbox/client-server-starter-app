@@ -247,38 +247,21 @@ export function nameErrors(value: unknown, optional?: OptionalMode): string[] {
 }
 
 /**
- * Mirrors `@MinLength(MIN_PASSWORD_LENGTH) @MaxLength(MAX_PASSWORD_LENGTH)`,
- * the length rules of every field that SETS a password, reported MaxLength,
- * MinLength. A field that only VERIFIES a password keeps MAX_PASSWORD_LENGTH
- * and does not come here.
- */
-export function passwordLengthErrors(
-  value: unknown,
-  optional?: OptionalMode
-): string[] {
-  if (isSkipped(value, optional)) return [];
-  return [
-    validateMaxLength(value, MAX_PASSWORD_LENGTH, 'password'),
-    validateMinLength(value, MIN_PASSWORD_LENGTH, 'password')
-  ].filter((error): error is string => error !== null);
-}
-
-/**
- * Mirrors `@IsNotEmpty() @MinLength(MIN_PASSWORD_LENGTH)
- * @MaxLength(MAX_PASSWORD_LENGTH)` of `CreateUserDto.password`, reported
- * MaxLength, MinLength, IsNotEmpty. The field has no `@IsString()`, so a number
- * fails the two caps only.
+ * Mirrors `@IsNewPassword()`, the rules of every field that SETS a password,
+ * reported MaxLength, MinLength, IsNotEmpty, IsString. A field that only
+ * VERIFIES a password keeps MAX_PASSWORD_LENGTH and does not come here.
  */
 export function newPasswordErrors(
   value: unknown,
   optional?: OptionalMode
 ): string[] {
-  if (isSkipped(value, optional)) return [];
-  const errors = passwordLengthErrors(value);
-  if (value === '' || value === null || value === undefined) {
-    errors.push('password should not be empty');
-  }
-  return errors;
+  return stringErrors('password', value, {
+    min: MIN_PASSWORD_LENGTH,
+    max: MAX_PASSWORD_LENGTH,
+    notEmpty: true,
+    isStringOnTop: true,
+    optional
+  });
 }
 
 /**
