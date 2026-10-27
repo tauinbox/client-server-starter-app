@@ -63,7 +63,8 @@ export const ErrorKeys = {
     MFA_RESET_SELF: 'errors.users.mfaResetSelf',
     SESSION_REVOKE_SELF: 'errors.users.sessionRevokeSelf',
     MODERATION_SELF: 'errors.users.moderationSelf',
-    CREDENTIAL_SELF: 'errors.users.credentialSelf'
+    CREDENTIAL_SELF: 'errors.users.credentialSelf',
+    NOT_DELETED: 'errors.users.notDeleted'
   },
   ROLES: {
     NOT_FOUND: 'errors.roles.notFound',
@@ -86,6 +87,7 @@ export const ErrorKeys = {
   RESOURCES: {
     NOT_FOUND: 'errors.resources.notFound',
     CANNOT_RESTORE: 'errors.resources.cannotRestore',
+    NOT_ORPHANED: 'errors.resources.notOrphaned',
     SUBJECT_RESERVED: 'errors.resources.subjectReserved',
     ACTION_NOT_DECLARED: 'errors.resources.actionNotDeclared',
     CANNOT_WIDEN: 'errors.resources.cannotWiden'

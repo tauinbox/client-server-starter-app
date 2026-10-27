@@ -606,6 +606,7 @@ export class UsersController {
   }
 
   @Post(':id/restore')
+  @HttpCode(HttpStatus.OK)
   @Authorize(['delete', 'User'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Restore a soft-deleted user (admin only)' })

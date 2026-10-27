@@ -291,14 +291,25 @@ export class ResourceService {
         HttpStatus.BAD_REQUEST
       );
     }
-    const woken = resource.isOrphaned ? grantableActionNames(resource) : [];
+    if (!resource.isOrphaned) throw notOrphaned(resource);
+    const woken = grantableActionNames(resource);
     this.assertCanWiden(ability, resource, woken, actorId);
+    // Keyed on the orphaned state, so of two concurrent restores one writes
+    // and audits and the other is refused.
+    await this.resourceRepository.manager.transaction(async (em) => {
+      const { affected } = await em.update(
+        Resource,
+        { id: resource.id, isOrphaned: true },
+        { isOrphaned: false }
+      );
+      if (affected === 0) throw notOrphaned(resource);
+      if (audit) await this.auditService.log(audit, em);
+    });
     resource.isOrphaned = false;
-    const saved = await this.saveAudited(resource, audit);
     await this.invalidateSubjectMapCache();
     if (woken.length > 0) this.#emitActionsChanged();
-    saved.isRegistered = true;
-    return saved;
+    resource.isRegistered = true;
+    return resource;
   }
 
   #emitActionsChanged(): void {
@@ -359,4 +370,14 @@ export class ResourceService {
   async invalidateSubjectMapCache(): Promise<void> {
     await this.#subjectMapVersion.bump();
   }
+}
+
+function notOrphaned(resource: Resource): HttpException {
+  return new HttpException(
+    {
+      message: `Resource "${resource.name}" is not orphaned, so there is nothing to restore`,
+      errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED
+    },
+    HttpStatus.CONFLICT
+  );
 }

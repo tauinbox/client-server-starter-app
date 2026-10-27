@@ -41,7 +41,7 @@ describe('ResourceService', () => {
     save: jest.Mock;
     manager: { transaction: jest.Mock };
   };
-  let mockEm: { save: jest.Mock };
+  let mockEm: { save: jest.Mock; update: jest.Mock };
   let mockAudit: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mockCacheManager: {
     get: jest.Mock;
@@ -136,7 +136,8 @@ describe('ResourceService', () => {
     // The transactional save goes through the repository mock, so the
     // assertions on `save` below cover both paths.
     mockEm = {
-      save: jest.fn((data: unknown): unknown => mockResourceRepo.save(data))
+      save: jest.fn((data: unknown): unknown => mockResourceRepo.save(data)),
+      update: jest.fn().mockResolvedValue({ affected: 1 })
     };
     mockAudit = {
       log: jest.fn().mockResolvedValue(undefined),
@@ -477,15 +478,23 @@ describe('ResourceService', () => {
     });
 
     it('emits nothing after a restore that wakes no grant', async () => {
-      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-      await service.restore('res-1', superAbility);
       mockResourceRepo.findOne.mockResolvedValue({
         ...orphanedResource,
         allowedActionNames: []
       });
       await service.restore('res-3', superAbility);
 
-      expect(mockResourceRepo.save).toHaveBeenCalledTimes(2);
+      expect(mockEm.update).toHaveBeenCalledTimes(1);
+      expect(emitted()).toHaveLength(0);
+    });
+
+    it('emits nothing after a restore that a concurrent restore won', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
+      mockEm.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(service.restore('res-3', superAbility)).rejects.toThrow(
+        HttpException
+      );
       expect(emitted()).toHaveLength(0);
     });
   });
@@ -925,31 +934,28 @@ describe('ResourceService', () => {
   });
 
   describe('restore', () => {
-    it('should set isOrphaned to false and save', async () => {
-      const orphaned = { ...orphanedResource };
-      mockResourceRepo.findOne.mockResolvedValue(orphaned);
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
+    it('clears isOrphaned only on a row that is still orphaned', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
 
       const result = await service.restore('res-3', superAbility);
 
       expect(result).toMatchObject({ isOrphaned: false });
-      expect(mockResourceRepo.save).toHaveBeenCalled();
+      expect(mockEm.update).toHaveBeenCalledWith(
+        Resource,
+        { id: 'res-3', isOrphaned: true },
+        { isOrphaned: false }
+      );
     });
 
     it('should set isRegistered to true on returned resource', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
 
       const result = await service.restore('res-3', superAbility);
 
       expect(result.isRegistered).toBe(true);
     });
 
-    it('writes the audit row in the transaction of the save', async () => {
+    it('writes the audit row in the transaction of the write', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
       const audit = {
         action: AuditAction.RESOURCE_RESTORE,
@@ -959,17 +965,50 @@ describe('ResourceService', () => {
 
       await service.restore('res-3', superAbility, undefined, audit);
 
-      expect(mockEm.save).toHaveBeenCalledWith(
-        expect.objectContaining({ isOrphaned: false })
-      );
+      expect(mockEm.update).toHaveBeenCalledTimes(1);
       expect(mockAudit.log).toHaveBeenCalledWith(audit, mockEm);
+    });
+
+    it('refuses a resource that is not orphaned, before any effect', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      const audit = {
+        action: AuditAction.RESOURCE_RESTORE,
+        targetId: 'res-1',
+        targetType: 'Resource'
+      };
+
+      await expect(
+        service.restore('res-1', superAbility, undefined, audit)
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: 'errors.resources.notOrphaned' }
+      });
+      expect(mockResourceRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(mockAudit.log).not.toHaveBeenCalled();
+      expect(mockCacheManager.set).not.toHaveBeenCalled();
+    });
+
+    it('refuses the loser of two concurrent restores and writes no audit row', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
+      mockEm.update.mockResolvedValueOnce({ affected: 0 });
+      const audit = {
+        action: AuditAction.RESOURCE_RESTORE,
+        targetId: 'res-3',
+        targetType: 'Resource'
+      };
+
+      await expect(
+        service.restore('res-3', superAbility, undefined, audit)
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: 'errors.resources.notOrphaned' }
+      });
+      expect(mockAudit.log).not.toHaveBeenCalled();
+      expect(mockCacheManager.set).not.toHaveBeenCalled();
     });
 
     it('should invalidate subject map cache after restore', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
 
       await service.restore('res-3', superAbility);
 
@@ -991,7 +1030,7 @@ describe('ResourceService', () => {
       await expect(service.restore('res-3', superAbility)).rejects.toThrow(
         HttpException
       );
-      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+      expect(mockEm.update).not.toHaveBeenCalled();
     });
   });
 
@@ -1020,15 +1059,13 @@ describe('ResourceService', () => {
     });
 
     it('lets a non-super caller restore what wakes no grant', async () => {
-      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-      await service.restore('res-1', delegatedAbility);
       mockResourceRepo.findOne.mockResolvedValue({
         ...orphanedResource,
         allowedActionNames: []
       });
       await service.restore('res-3', delegatedAbility);
 
-      expect(mockResourceRepo.save).toHaveBeenCalledTimes(2);
+      expect(mockEm.update).toHaveBeenCalledTimes(1);
     });
   });
 

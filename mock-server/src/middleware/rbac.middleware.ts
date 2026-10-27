@@ -105,7 +105,16 @@ router.post(
       return;
     }
 
-    const woken = resource.isOrphaned ? grantableActionNames(resource) : [];
+    if (!resource.isOrphaned) {
+      res.status(409).json({
+        message: `Resource "${resource.name}" is not orphaned, so there is nothing to restore`,
+        statusCode: 409,
+        errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED
+      });
+      return;
+    }
+
+    const woken = grantableActionNames(resource);
     if (!assertCanWiden(req, res, resource, woken)) {
       return;
     }

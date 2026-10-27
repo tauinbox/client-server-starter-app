@@ -7,6 +7,7 @@ import {
   inject,
   signal
 } from '@angular/core';
+import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, merge, of } from 'rxjs';
 import { MatButton } from '@angular/material/button';
@@ -272,8 +273,8 @@ export class UserListComponent implements OnInit {
         next: () => {
           this.#notify.success('users.list.successRestored');
         },
-        error: () => {
-          this.#notify.error('users.list.errorRestoreFailed');
+        error: (err: HttpErrorResponse) => {
+          this.#notify.error(err, 'users.list.errorRestoreFailed');
         }
       });
   }

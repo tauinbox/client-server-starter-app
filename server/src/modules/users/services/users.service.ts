@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
@@ -594,10 +594,27 @@ export class UsersService {
     // state gated by the `update` action, so reactivating here would let a
     // principal holding just `delete` re-enable a deactivated account by
     // deleting and restoring it.
+    if (!user.deletedAt) throw notDeleted(id);
+    // Keyed on the deleted state, so of two concurrent restores one writes
+    // and audits and the other is refused.
     await withTransaction(this.dataSource, async (manager) => {
-      await manager.restore(User, id);
+      const { affected } = await manager.restore(User, {
+        id,
+        deletedAt: Not(IsNull())
+      });
+      if (affected === 0) throw notDeleted(id);
       await this.writeAudit(manager, audit, user);
     });
     return this.loadUser(id);
   }
+}
+
+function notDeleted(id: string): HttpException {
+  return new HttpException(
+    {
+      message: `User with ID ${id} is not deleted, so there is nothing to restore`,
+      errorKey: ErrorKeys.USERS.NOT_DELETED
+    },
+    HttpStatus.CONFLICT
+  );
 }

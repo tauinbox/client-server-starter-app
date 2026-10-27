@@ -7,7 +7,9 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
-import { DataSource } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   applyBodyParsers,
@@ -277,5 +279,58 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
         AuditAction.PASSWORD_CHANGE
       ])
     );
+  });
+
+  describe('restore with a working audit', () => {
+    beforeEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    function restoreRows(id: string): Promise<number> {
+      return dataSource
+        .getRepository(AuditLog)
+        .countBy({ targetId: id, action: AuditAction.USER_RESTORE });
+    }
+
+    function restoreOf(id: string) {
+      return request(http())
+        .post(`/api/v1/users/${id}/restore`)
+        .auth(token, { type: 'bearer' });
+    }
+
+    it('answers 409 for a user that is not deleted and writes no row', async () => {
+      const res = await restoreOf(targetId).expect(409);
+
+      expect((res.body as { errorKey?: string }).errorKey).toBe(
+        ErrorKeys.USERS.NOT_DELETED
+      );
+      expect(await restoreRows(targetId)).toBe(0);
+    });
+
+    it('answers 200 with one row, then 409 for the same user with no second row', async () => {
+      await restoreOf(deletedId).expect(200);
+      expect((await stored(deletedId)).deletedAt).toBeNull();
+      expect(await restoreRows(deletedId)).toBe(1);
+
+      await restoreOf(deletedId).expect(409);
+      expect(await restoreRows(deletedId)).toBe(1);
+    });
+
+    it('refuses a restore after a stale read, as the loser of two concurrent restores is', async () => {
+      const live = await stored(targetId);
+      jest
+        .spyOn(app.get<Repository<User>>(getRepositoryToken(User)), 'findOne')
+        .mockResolvedValueOnce({ ...live, deletedAt: new Date() } as User);
+      const audit = jest.fn().mockReturnValue([]);
+
+      await expect(
+        usersService.restore(targetId, SYSTEM_ABILITY, undefined, audit)
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { errorKey: ErrorKeys.USERS.NOT_DELETED }
+      });
+      expect(audit).not.toHaveBeenCalled();
+      expect((await stored(targetId)).deletedAt).toBeNull();
+    });
   });
 });

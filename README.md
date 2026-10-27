@@ -732,7 +732,8 @@ the same permission both apply.
 - **Restore** a soft-deleted user with `POST /users/:id/restore`. The restore clears `deleted_at`
   only. An account that a person deactivated before the delete comes back deactivated. Reactivation
   stays a `PATCH /users/:id { "isActive": true }` operation. Thus `users:delete` alone cannot enable a
-  disabled account through a delete and restore sequence.
+  disabled account through a delete and restore sequence. A restore of a user that is not deleted
+  answers 409 `errors.users.notDeleted` and writes no audit row.
 - An **"Include deleted users"** checkbox is in the filter form of the list. It sends
   `includeDeleted=true` on the list and on the search. A deleted row shows a "Deleted" status chip and
   offers restore as its only action, because the detail endpoint and the edit endpoint exclude a

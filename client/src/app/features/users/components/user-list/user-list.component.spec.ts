@@ -1,5 +1,6 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { config, of, Subject, throwError } from 'rxjs';
@@ -433,10 +434,12 @@ describe('UserListComponent', () => {
       expect(usersStoreMock.restoreUser).not.toHaveBeenCalled();
     });
 
-    it('should show an error snackbar when restore fails', () => {
-      usersStoreMock.restoreUser.mockReturnValue(
-        throwError(() => new Error('Network error'))
-      );
+    it('passes the server error of a failed restore to the snackbar', () => {
+      const failure = new HttpErrorResponse({
+        status: 409,
+        error: { errorKey: 'errors.users.notDeleted' }
+      });
+      usersStoreMock.restoreUser.mockReturnValue(throwError(() => failure));
       dialogMock.open.mockReturnValue({
         afterClosed: vi.fn().mockReturnValue(of(true))
       });
@@ -444,6 +447,7 @@ describe('UserListComponent', () => {
       component.confirmRestore(deletedUser);
 
       expect(notifyMock.error).toHaveBeenCalledWith(
+        failure,
         'users.list.errorRestoreFailed'
       );
     });

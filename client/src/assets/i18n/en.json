@@ -142,7 +142,8 @@
       "mfaResetSelf": "Turn off your own two-factor authentication from your profile",
       "sessionRevokeSelf": "End your own sessions from your profile",
       "moderationSelf": "You cannot deactivate or unlock your own account. Ask another administrator.",
-      "credentialSelf": "Change your own email and password on your profile page"
+      "credentialSelf": "Change your own email and password on your profile page",
+      "notDeleted": "This user is not deleted, so there is nothing to restore"
     },
     "roles": {
       "notFound": "Role not found",
@@ -165,6 +166,7 @@
     "resources": {
       "notFound": "Resource not found",
       "cannotRestore": "Cannot restore resource: its controller is not registered. Restore the controller code first.",
+      "notOrphaned": "This resource is not orphaned, so there is nothing to restore",
       "subjectReserved": "Resource subject is reserved and cannot be used",
       "actionNotDeclared": "Only the actions that the code checks for this resource can be offered",
       "cannotWiden": "Only a super administrator can offer an action again or restore a resource"
