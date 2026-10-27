@@ -129,7 +129,7 @@
         }
 
         @case ('disable') {
-          @if (accountHasPassword()) {
+          @if (stepUpFactor() === 'password') {
             <p class="two-factor-note">{{ t('auth.twoFactor.disableHint') }}</p>
 
             <nxs-form-field
@@ -181,7 +181,7 @@
         }
 
         @case ('regenerate') {
-          @if (accountHasPassword()) {
+          @if (stepUpFactor() === 'password') {
             <p class="two-factor-note">
               {{ t('auth.twoFactor.regenerateHint') }}
             </p>
