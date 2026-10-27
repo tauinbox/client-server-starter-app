@@ -685,6 +685,7 @@ export class AuthService {
     // account whose session is not yet revoked arrives here.
     const user = await this.usersService.findById(tokenDoc.userId);
     if (!user) {
+      await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
       throw this.refreshRefusal(
         'user_not_found',
         { actorId: tokenDoc.userId },
