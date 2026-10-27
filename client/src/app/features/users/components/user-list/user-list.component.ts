@@ -287,8 +287,8 @@ export class UserListComponent implements OnInit {
         next: () => {
           this.#notify.success('users.list.successDeleted');
         },
-        error: () => {
-          this.#notify.error('users.list.errorDeleteFailed');
+        error: (err: HttpErrorResponse) => {
+          this.#notify.error(err, 'users.list.errorDeleteFailed');
         }
       });
   }

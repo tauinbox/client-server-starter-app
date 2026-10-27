@@ -387,10 +387,12 @@ describe('UserListComponent', () => {
       expect(usersStoreMock.deleteUser).not.toHaveBeenCalled();
     });
 
-    it('should show error snackbar when delete fails', () => {
-      usersStoreMock.deleteUser.mockReturnValue(
-        throwError(() => new Error('Network error'))
-      );
+    it('passes the server error of a failed delete to the snackbar', () => {
+      const failure = new HttpErrorResponse({
+        status: 403,
+        error: { errorKey: 'errors.users.superTargetForbidden' }
+      });
+      usersStoreMock.deleteUser.mockReturnValue(throwError(() => failure));
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
@@ -399,6 +401,7 @@ describe('UserListComponent', () => {
       component.confirmDelete(mockUser);
 
       expect(notifyMock.error).toHaveBeenCalledWith(
+        failure,
         'users.list.errorDeleteFailed'
       );
     });
