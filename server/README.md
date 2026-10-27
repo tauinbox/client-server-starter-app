@@ -396,8 +396,9 @@ because a billing outage must never become a login outage.
 registers with `suppressErrors:false`, and the caller emits it with `emitAsync`. Thus a failed
 revocation fails the request of the caller.
 
-`UserRoleChangedListener` does the revocation
-and the permission-cache invalidation after a role change. It uses the same two halves as
+`UserRoleChangedListener` does the revocation after a role change.
+`RoleService.assignRoleToUser` and `removeRoleFromUser` drop the permission cache themselves, so a
+caller that emits no event gets the drop too. The listener uses the same two halves as
 `SessionRevocationListener`: it registers with `suppressErrors:false`, and `RolesController` emits
 `UserRoleChangedEvent` with `emitAsync` and awaits it. Thus a failed revocation fails the role
 change. The other handlers of that event keep the default suppression.

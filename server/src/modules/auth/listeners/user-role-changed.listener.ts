@@ -2,14 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { UserRoleChangedEvent } from '../events/user-role-changed.event';
 import { AuthService } from '../services/auth.service';
-import { PermissionService } from '../services/permission.service';
 
 @Injectable()
 export class UserRoleChangedListener {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly permissionService: PermissionService
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   // suppressErrors: false is what makes the awaited emit in the controller
   // meaningful - the loader swallows and merely logs listener errors by
@@ -17,9 +13,6 @@ export class UserRoleChangedListener {
   // the caller still gets a 200.
   @OnEvent(UserRoleChangedEvent.name, { suppressErrors: false })
   async handleUserRoleChanged(event: UserRoleChangedEvent): Promise<void> {
-    await Promise.all([
-      this.authService.revokeAllUserSessions(event.userId),
-      this.permissionService.invalidateUserCache(event.userId)
-    ]);
+    await this.authService.revokeAllUserSessions(event.userId);
   }
 }
