@@ -249,7 +249,7 @@ describe('FeatureFlagResolverService', () => {
         'gated'
       )
     ).toBe(false);
-    expect([...cacheStore.keys()]).toEqual(['featureflags:all']);
+    expect(flagRepo.find).toHaveBeenCalledTimes(1);
   });
 
   it('records a feature_flags_all miss then hit across two evaluations', async () => {
@@ -487,8 +487,10 @@ describe('FeatureFlagResolverService', () => {
     ]);
     await inFlight;
 
-    // The superseded load must not write pre-invalidation rows into the cache.
-    expect(cacheStore.has('featureflags:all')).toBe(false);
+    // The superseded load must not write pre-invalidation rows under the
+    // version that readers now use.
+    const version = String(cacheStore.get('featureflags:version'));
+    expect(cacheStore.has(`featureflags:all:v${version}`)).toBe(false);
 
     // The next evaluation starts a fresh DB load instead of joining the
     // detached stale one.

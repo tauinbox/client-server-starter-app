@@ -507,11 +507,13 @@ describe('Feature flags end-to-end', () => {
       { userId: 'u-1', email: null, createdAt: null, roles: [] },
       {} as Parameters<typeof resolver.evaluateForUser>[1]
     );
-    expect(cache.store.has('featureflags:all')).toBe(true);
+    const flagsKey = (): string =>
+      `featureflags:all:v${String(cache.store.get('featureflags:version'))}`;
+    expect(cache.store.has(flagsKey())).toBe(true);
 
     await listener.handleFeatureFlagChanged();
 
-    expect(cache.store.has('featureflags:all')).toBe(false);
+    expect(cache.store.has(flagsKey())).toBe(false);
     // The broadcast is coalesced: nothing is pushed until the window elapses.
     expect(notifications.pushToAll).not.toHaveBeenCalled();
     await new Promise((resolve) =>
