@@ -136,6 +136,9 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
       SYSTEM_ABILITY,
       flagAuditActor()
     );
+    // The admin controller announces a new flag and the service does not, so a
+    // flag set cached by another suite would not hold this flag.
+    await resolver.invalidateAll();
     const versionBefore = (await flagService.findOne(flag.id, SYSTEM_ABILITY))
       .version;
     expect(await holderSees(key)).toBe(true);

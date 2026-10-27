@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
@@ -22,6 +22,7 @@ import { PermissionService } from '../../auth/services/permission.service';
 import { UsersService } from '../../users/services/users.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
+import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 
 export interface ResolverUser {
   userId: string;
@@ -49,11 +50,18 @@ interface CachedFlag {
 
 const ALL_FLAGS_KEY = 'featureflags:all';
 const ALL_FLAGS_TTL_MS = 300_000;
+const VERSION_KEY = 'featureflags:version';
+const VERSION_COUNTER_KEY = 'featureflags:version:counter';
 
 @Injectable()
 export class FeatureFlagResolverService {
-  #loadAllInFlight: Promise<CachedFlag[]> | null = null;
-  #loadAllGeneration = 0;
+  readonly #logger = new Logger(FeatureFlagResolverService.name);
+
+  // Versioned key: a load in another instance that read the rows before an
+  // invalidation writes under the old version, which no reader reads again.
+  readonly #version: CacheVersionCounter;
+  #loadAllInFlight: { version: number; load: Promise<CachedFlag[]> } | null =
+    null;
 
   constructor(
     @InjectRepository(FeatureFlag)
@@ -66,7 +74,14 @@ export class FeatureFlagResolverService {
     private readonly permissionService: PermissionService,
     private readonly usersService: UsersService,
     private readonly metrics: MetricsService
-  ) {}
+  ) {
+    this.#version = new CacheVersionCounter(
+      cacheManager,
+      VERSION_COUNTER_KEY,
+      VERSION_KEY,
+      this.#logger
+    );
+  }
 
   /**
    * Assembles the evaluation context for a user id: looks up the user record
@@ -174,16 +189,13 @@ export class FeatureFlagResolverService {
   }
 
   async invalidateAll(): Promise<void> {
-    // A load that started before this invalidation holds pre-change rows: bump
-    // the generation so its cache write is skipped, and detach the in-flight
-    // promise so the next miss starts a fresh DB load.
-    this.#loadAllGeneration++;
-    this.#loadAllInFlight = null;
-    await this.cacheManager.del(ALL_FLAGS_KEY);
+    await this.#version.bump();
   }
 
   private async loadAllFlags(): Promise<CachedFlag[]> {
-    const cached = await this.cacheManager.get<CachedFlag[]>(ALL_FLAGS_KEY);
+    const version = await this.#version.read();
+    const cacheKey = `${ALL_FLAGS_KEY}:v${version}`;
+    const cached = await this.cacheManager.get<CachedFlag[]>(cacheKey);
     this.metrics.recordCacheAccess(
       'feature_flags_all',
       cached ? 'hit' : 'miss'
@@ -192,23 +204,21 @@ export class FeatureFlagResolverService {
 
     // Single-flight: the flag-change broadcast triggers a synchronized refetch
     // from every connected client, so concurrent misses must share one DB load
-    // instead of stampeding the flags table.
-    if (!this.#loadAllInFlight) {
-      const load = this.#loadAllFlagsFromDb().finally(() => {
-        if (this.#loadAllInFlight === load) this.#loadAllInFlight = null;
+    // instead of stampeding the flags table. A load of an older version holds
+    // pre-change rows, so a miss of a newer version does not join it.
+    if (this.#loadAllInFlight?.version !== version) {
+      const load = this.#loadAllFlagsFromDb(cacheKey).finally(() => {
+        if (this.#loadAllInFlight?.load === load) this.#loadAllInFlight = null;
       });
-      this.#loadAllInFlight = load;
+      this.#loadAllInFlight = { version, load };
     }
-    return this.#loadAllInFlight;
+    return this.#loadAllInFlight.load;
   }
 
-  async #loadAllFlagsFromDb(): Promise<CachedFlag[]> {
-    const generation = this.#loadAllGeneration;
+  async #loadAllFlagsFromDb(cacheKey: string): Promise<CachedFlag[]> {
     const flags = await this.flagRepo.find({ order: { key: 'ASC' } });
     if (flags.length === 0) {
-      if (generation === this.#loadAllGeneration) {
-        await this.cacheManager.set(ALL_FLAGS_KEY, [], ALL_FLAGS_TTL_MS);
-      }
+      await this.cacheManager.set(cacheKey, [], ALL_FLAGS_TTL_MS);
       return [];
     }
     const rules = await this.ruleRepo.find({
@@ -231,9 +241,7 @@ export class FeatureFlagResolverService {
         payload: r.payload
       }))
     }));
-    if (generation === this.#loadAllGeneration) {
-      await this.cacheManager.set(ALL_FLAGS_KEY, projected, ALL_FLAGS_TTL_MS);
-    }
+    await this.cacheManager.set(cacheKey, projected, ALL_FLAGS_TTL_MS);
     return projected;
   }
 

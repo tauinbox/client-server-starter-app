@@ -2577,10 +2577,11 @@ The base URL is `/api/v1`.
 | DELETE | `/admin/feature-flags/:id` | `delete:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
 | POST | `/admin/feature-flags/:id/preview` | `read:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 422. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
 
-**Caching.** `featureflags:all` holds the full set of flags and rules, with a TTL of 300 s. A reload
-is single-flight: two concurrent misses share one load from the database. A load that an
-invalidation overlaps skips its cache write, through a generation guard. Thus the cache never holds a
-row from before the change.
+**Caching.** `featureflags:all:v<n>` holds the full set of flags and rules, with a TTL of 300 s.
+`<n>` is a version counter (`CacheVersionCounter`, Redis `INCR`), and an invalidation increments
+it. A reload reads the version before the database, so a load that an invalidation overlaps, in
+this instance or in another one, writes under the old version, which no reader reads again. A
+reload is single-flight per version: two concurrent misses share one load from the database.
 
 The system does not cache an evaluated result. Each check evaluates the cached flag list against the
 user as the database holds it now. Thus a change of email or roles applies on the next check. An
