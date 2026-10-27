@@ -195,7 +195,7 @@ describe('ResetPasswordComponent', () => {
       );
     });
 
-    it('should navigate to /login on success', async () => {
+    it('should navigate to /login with the password-changed marker on success', async () => {
       authServiceMock.resetPassword.mockReturnValue(of(void 0));
       const navigateSpy = vi.spyOn(router, 'navigate');
       component.resetPasswordModel.set({
@@ -206,7 +206,10 @@ describe('ResetPasswordComponent', () => {
 
       component.onSubmit();
 
-      expect(navigateSpy).toHaveBeenCalledWith(['/login']);
+      expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
+        queryParams: { password_changed: '1' },
+        replaceUrl: true
+      });
     });
 
     it('should set error from server on failure', async () => {

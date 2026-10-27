@@ -83,8 +83,12 @@ test.describe('Password reset', () => {
     await page.getByLabel('Confirm password').fill('Quartz-Meadow-77');
     await page.getByRole('button', { name: /reset password/i }).click();
 
-    // Should redirect to login
-    await expect(page).toHaveURL(/.*\/login$/);
+    await expect(page).toHaveURL(/\/login\?password_changed=1$/);
+    await expect(
+      page.getByText(
+        'Your password was changed and every session was ended. Sign in with the new password.'
+      )
+    ).toBeVisible();
 
     // Login with the new password
     const main = page.getByRole('main');

@@ -27,6 +27,10 @@ import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
+import {
+  PASSWORD_CHANGED,
+  PASSWORD_CHANGED_PARAM
+} from '../../constants/password-changed.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
@@ -126,7 +130,10 @@ export class ResetPasswordComponent implements OnInit {
       .subscribe({
         next: () => {
           this.loading.set(false);
-          void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`]);
+          void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
+            queryParams: { [PASSWORD_CHANGED_PARAM]: PASSWORD_CHANGED.Done },
+            replaceUrl: true
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
