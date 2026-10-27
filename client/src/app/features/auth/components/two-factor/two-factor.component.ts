@@ -26,7 +26,10 @@ import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-fie
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthService } from '../../services/auth.service';
-import { createStepUpFactorForm } from '../../utils/step-up-factor-form';
+import {
+  createStepUpFactorForm,
+  stepUpFactorOf
+} from '../../utils/step-up-factor-form';
 
 /**
  * The enrolment is a strict sequence, and each step needs the answer of the
@@ -99,18 +102,13 @@ export class TwoFactorComponent {
     () => this.user()?.hasPassword !== false
   );
 
-  /**
-   * An account with no password proves itself with a code from the
-   * authenticator it enrolled, which is the only factor it holds. Turning the
-   * factor off and replacing the recovery set ask for the same proof.
-   */
-  readonly #stepUp = createStepUpFactorForm(
-    computed(() => (this.accountHasPassword() ? 'password' : 'code')),
-    {
-      passwordRequired: 'auth.twoFactor.passwordRequired',
-      codeRequired: 'auth.twoFactor.codeRequired'
-    }
-  );
+  /** Turning the factor off and replacing the recovery set ask for the same proof. */
+  protected readonly stepUpFactor = computed(() => stepUpFactorOf(this.user()));
+
+  readonly #stepUp = createStepUpFactorForm(this.stepUpFactor, {
+    passwordRequired: 'auth.twoFactor.passwordRequired',
+    codeRequired: 'auth.twoFactor.codeRequired'
+  });
   readonly passwordModel = this.#stepUp.passwordModel;
   readonly passwordForm = this.#stepUp.passwordForm;
   readonly codeModel = this.#stepUp.codeModel;
