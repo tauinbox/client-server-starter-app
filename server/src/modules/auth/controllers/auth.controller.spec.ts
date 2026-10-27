@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { HttpException, Logger, UnauthorizedException } from '@nestjs/common';
+import { HttpException, Logger } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Request as ExpressRequest, Response } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -472,12 +474,13 @@ describe('AuthController', () => {
   // ── refreshToken ──────────────────────────────────────────────────
 
   describe('refreshToken', () => {
-    it('should throw UnauthorizedException when no refresh cookie', async () => {
+    it('refuses with REFRESH_TOKEN_REQUIRED when no refresh cookie', async () => {
       const req = mockExpressRequest({}) as ExpressRequest;
       const res = mockResponse();
 
-      await expect(controller.refreshToken(req, res)).rejects.toThrow(
-        UnauthorizedException
+      await expectApiRejection(
+        controller.refreshToken(req, res),
+        ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED
       );
     });
 
@@ -510,8 +513,9 @@ describe('AuthController', () => {
       }) as ExpressRequest;
       const res = mockResponse();
 
-      await expect(controller.refreshToken(req, res)).rejects.toThrow(
-        UnauthorizedException
+      await expectApiRejection(
+        controller.refreshToken(req, res),
+        ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED
       );
       expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
       expect(res.cookie).not.toHaveBeenCalled();

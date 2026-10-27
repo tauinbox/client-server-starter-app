@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { INestApplication, ServiceUnavailableException } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
+import { expectApiRejection } from '../src/common/testing/api-error.expect';
 import { Test } from '@nestjs/testing';
 import { DataSource, Repository } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -68,8 +70,9 @@ runWithInfra('Billing provider kill switch evaluation (e2e)', () => {
   it('refuses checkout when the enabled flag targets another environment', async () => {
     await setKillSwitch(['e2e-no-such-environment']);
 
-    await expect(billing.resolveProvider(customer)).rejects.toThrow(
-      ServiceUnavailableException
+    await expectApiRejection(
+      billing.resolveProvider(customer),
+      ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
     );
     await expect(
       billing.isProviderAvailable('paddle', customer.userId)

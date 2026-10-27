@@ -4,7 +4,7 @@
 // AttributeRegistryService + FeatureFlagChangedListener against in-memory
 // repository stand-ins. Exercises the full happy path (create flag → add
 // percentage rule → evaluate per user) plus the load-bearing edge cases:
-// optimistic-lock 409, deny-overrides, public vs anonymous filtering, SSE
+// optimistic-lock 412, deny-overrides, public vs anonymous filtering, SSE
 // broadcast on change, and the @RequireFeature guard's 404-on-disabled
 // anti-enumeration response.
 
@@ -55,6 +55,13 @@ import type { FlagAuditActor } from '../src/modules/feature-flags/services/featu
 import { AuditService } from '../src/modules/audit/audit.service';
 import { createMockConfigService } from '../src/common/testing/config-service.mock';
 import { flagAuditActor } from './flag-audit-actor';
+import type { IfMatchCondition } from '@app/shared/utils/if-match';
+
+/** The If-Match condition of one strong version tag. */
+const version = (v: number): IfMatchCondition => ({
+  any: false,
+  versions: [v]
+});
 
 // Saves a full rule set through the update path at the current version.
 async function setRules(
@@ -64,7 +71,13 @@ async function setRules(
   actor: FlagAuditActor
 ): Promise<FeatureFlag> {
   const current = await service.findOne(id, SYSTEM_ABILITY);
-  return service.update(id, { rules }, current.version, SYSTEM_ABILITY, actor);
+  return service.update(
+    id,
+    { rules },
+    version(current.version),
+    SYSTEM_ABILITY,
+    actor
+  );
 }
 
 // ── In-memory repository stand-ins ─────────────────────────────────────────
@@ -458,7 +471,7 @@ describe('Feature flags end-to-end', () => {
     expect('risky-feature' in banned.flags).toBe(false);
   });
 
-  it('PATCH /:id rejects a stale version with HTTP 409', async () => {
+  it('PATCH /:id rejects a stale version with HTTP 412', async () => {
     const flag = await flagService.create(
       { key: 'v-lock', enabled: false },
       SYSTEM_ABILITY,
@@ -470,22 +483,22 @@ describe('Feature flags end-to-end', () => {
     const next = await flagService.update(
       flag.id,
       { enabled: true },
-      1,
+      version(1),
       SYSTEM_ABILITY,
       flagAuditActor('actor-2')
     );
     expect(next.version).toBe(2);
 
-    // Stale PATCH at v1 → 409.
+    // A stale PATCH at v1 answers 412 (RFC 9110 13.1.1).
     await expect(
       flagService.update(
         flag.id,
         { enabled: false },
-        1,
+        version(1),
         SYSTEM_ABILITY,
         flagAuditActor('actor-3')
       )
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({ status: 412 });
   });
 
   it('a flag change invalidates cache and broadcasts SSE', async () => {
@@ -637,7 +650,7 @@ describe('Feature flags end-to-end', () => {
         flagAuditActor('actor-1')
       )
     ).rejects.toMatchObject({
-      status: 400,
+      status: 422,
       message: 'attribute rule with field=createdAt does not support op=eq'
     });
   });
@@ -671,7 +684,7 @@ describe('Feature flags end-to-end', () => {
         [{ effect: 'include', payload }],
         flagAuditActor('actor-1')
       )
-    ).rejects.toMatchObject({ status: 400, message });
+    ).rejects.toMatchObject({ status: 422, message });
     await expect(
       flagService.findOne(flag.id, SYSTEM_ABILITY)
     ).resolves.toMatchObject({

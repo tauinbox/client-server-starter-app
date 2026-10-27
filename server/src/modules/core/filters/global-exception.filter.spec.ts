@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
+import { ERROR_STATUS, ErrorKeys, httpStatusText } from '@app/shared/constants';
+import { ApiError } from '../../../common/errors/api-error';
 import { GlobalExceptionFilter } from './global-exception.filter';
 import { ErrorResponse } from './error-response.interface';
 
@@ -199,13 +201,60 @@ describe('GlobalExceptionFilter', () => {
     expect(mockHttpAdapter.setHeader).not.toHaveBeenCalled();
   });
 
-  it('should name every status the codebase throws', () => {
+  it.each([...new Set(Object.values(ERROR_STATUS))].filter((s) => s !== 500))(
+    'names the status %d of the error key table, not the fallback',
+    (status) => {
+      expect(httpStatusText(status)).not.toBe(httpStatusText(500));
+    }
+  );
+
+  // --- WWW-Authenticate (RFC 9110 15.5.2) ---
+
+  it('sends a Bearer challenge with every 401', () => {
+    filter.catch(new UnauthorizedException(), mockHost);
+
+    expect(mockHttpAdapter.setHeader).toHaveBeenCalledWith(
+      expect.anything(),
+      'WWW-Authenticate',
+      'Bearer'
+    );
+  });
+
+  it('names a refused token in the challenge (RFC 6750 3.1)', () => {
     filter.catch(
-      new HttpException({ message: 'Password required' }, 428),
+      new ApiError(ErrorKeys.AUTH.TOKEN_REVOKED, 'Token has been revoked'),
       mockHost
     );
 
-    expect(getResponseBody().error).toBe('Precondition Required');
+    expect(mockHttpAdapter.setHeader).toHaveBeenCalledWith(
+      expect.anything(),
+      'WWW-Authenticate',
+      'Bearer error="invalid_token"'
+    );
+  });
+
+  it('sends no challenge with a status other than 401', () => {
+    filter.catch(new ForbiddenException(), mockHost);
+
+    expect(mockHttpAdapter.setHeader).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'WWW-Authenticate',
+      expect.anything()
+    );
+  });
+
+  it('answers an ApiError with the status of its key', () => {
+    filter.catch(
+      new ApiError(ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT, 'stale'),
+      mockHost
+    );
+
+    expect(getResponseStatus()).toBe(412);
+    expect(getResponseBody()).toMatchObject({
+      statusCode: 412,
+      error: 'Precondition Failed',
+      errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+    });
   });
 
   // --- Validation errors ---
@@ -260,7 +309,7 @@ describe('GlobalExceptionFilter', () => {
 
     filter.catch(error, mockHost);
 
-    expect(getResponseStatus()).toBe(400);
+    expect(getResponseStatus()).toBe(422);
     const body = getResponseBody();
     expect(body.message).toBe('A required field is missing');
   });
@@ -323,7 +372,7 @@ describe('GlobalExceptionFilter', () => {
     expect(getResponseBody()).toMatchObject({
       statusCode: 413,
       message: 'request entity too large',
-      error: 'Payload Too Large'
+      error: 'Content Too Large'
     });
     expect(getResponseBody().errorKey).toBeUndefined();
     expect(loggerErrorSpy).not.toHaveBeenCalled();

@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  HttpException,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -36,6 +35,7 @@ import { AuthCookies } from '../utils/auth-cookies';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
+import { ApiError } from '../../../common/errors/api-error';
 
 /**
  * The signed-in devices of the caller. The list is bounded by the plan
@@ -106,12 +106,9 @@ export class SessionsController {
     // Ahead of the step-up: the caller already knows its own session id, and a
     // request refused anyway must not spend a single-use provider proof.
     if (sessionId === req.user.sessionId) {
-      throw new HttpException(
-        {
-          message: 'Use sign out to end the session of this device',
-          errorKey: ErrorKeys.AUTH.SESSION_IS_CURRENT
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.SESSION_IS_CURRENT,
+        'Use sign out to end the session of this device'
       );
     }
 
@@ -122,13 +119,7 @@ export class SessionsController {
       sessionId
     );
     if (!ended) {
-      throw new HttpException(
-        {
-          message: 'Session not found',
-          errorKey: ErrorKeys.AUTH.SESSION_NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
-      );
+      throw new ApiError(ErrorKeys.AUTH.SESSION_NOT_FOUND, 'Session not found');
     }
 
     this.cookies.clearReauthProof(res);

@@ -216,9 +216,9 @@ describe('jwtInterceptor', () => {
     expect(tokenServiceMock.refreshTokens).not.toHaveBeenCalled();
   });
 
-  // A wrong enrolment code answers 401. A refresh there replays the same wrong
-  // code, which costs the user a second attempt of the account budget.
-  it('should pass 401 through for the two-factor enrolment URL', () => {
+  // A wrong enrolment code answers 422, not 401, so it never replays the code
+  // through a refresh and never spends a second attempt of the account budget.
+  it('should pass a wrong enrolment code through without a refresh', () => {
     authStoreMock.getAccessToken.mockReturnValue('my-access-token');
     let caughtError: HttpErrorResponse | null = null;
 
@@ -233,6 +233,28 @@ describe('jwtInterceptor', () => {
     );
     req.flush(
       { message: 'Verification code is incorrect' },
+      { status: 422, statusText: 'Unprocessable Content' }
+    );
+
+    expect(caughtError!.status).toBe(422);
+    expect(tokenServiceMock.refreshTokens).not.toHaveBeenCalled();
+    expect(tokenServiceMock.forceLogout).not.toHaveBeenCalled();
+  });
+
+  // The handoff cookie is the only credential of the exchange: a 401 there says
+  // the cookie is missing or spent, and a refresh would replay it.
+  it('should send no token to the OAuth exchange and pass its 401 through', () => {
+    authStoreMock.getAccessToken.mockReturnValue('my-access-token');
+    let caughtError: HttpErrorResponse | null = null;
+
+    http.post('/api/v1/auth/oauth/exchange', {}).subscribe({
+      error: (err) => (caughtError = err)
+    });
+
+    const req = httpMock.expectOne('/api/v1/auth/oauth/exchange');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush(
+      { message: 'Missing OAuth data' },
       { status: 401, statusText: 'Unauthorized' }
     );
 

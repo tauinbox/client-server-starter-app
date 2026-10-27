@@ -119,7 +119,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
 | `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth callback redirects |
-| `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 503 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
+| `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 501 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
 | `MFA_REQUIRED_FOR_ADMINS` | `false` | Set to `true` to make two-factor authentication mandatory for every account that holds a super role. Such an account signs in and reaches its profile as before, but no route behind an authorization check answers it until the enrolment is complete. The requirement stays off while `MFA_ENCRYPTION_KEY` is empty, because enrolment is unavailable in that state |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server makes the account at startup when it does not exist. It skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
@@ -232,7 +232,7 @@ stays unspent. A proof that carries no `jti` cannot be recorded, thus it is refu
 `property-is-defined.ts` supplies the `@ValidateIf` condition. That condition replaces
 `@IsOptional()` on an optional field whose consumer reads the value instead of a default. Three
 examples of such a consumer are a NOT NULL column, a bounds check and a provider call. Thus an
-explicit `null` is a 400 and the server does not pass it on. A DTO that `PartialType` builds passes
+explicit `null` is a 422 and the server does not pass it on. A DTO that `PartialType` builds passes
 `{ skipNullProperties: false }` for the same reason.
 
 `common/upload/` holds `createDiskStorageOptions()`. That is a reusable factory for a multer disk
@@ -362,7 +362,7 @@ sets the refresh cookie and removes the refresh token from the body. The OAuth c
 session. It signs only `{ userId, provider }` (or the second-factor challenge) into the `oauth_data`
 cookie, because the provider redirect carries no refresh cookie and cannot end the session that the
 browser replaces. The exchange loads the account again and refuses a deactivated or deleted account
-with the same 400 `INVALID_OAUTH_DATA` that a bad cookie gets.
+with the same 401 `INVALID_OAUTH_DATA` that a bad cookie gets.
 
 `SessionIssuerService.issueSession(user, client)` is the single place where a sign-in becomes a session. It
 generates the tokens, persists the refresh token, and then prunes the sessions to the resolved
@@ -497,8 +497,8 @@ registers no middleware.
 `entities/` holds `FeatureFlag` and `FeatureFlagRule` with a cascade, plus their entity-contract
 files.
 
-`services/feature-flag.service.ts` holds the CRUD operations. A PATCH with `If-Match` gives a 409 on
-an optimistic-lock conflict. The key check sits above the version comparison, because the version
+`services/feature-flag.service.ts` holds the CRUD operations. A PATCH with `If-Match` gives a 412 on
+an optimistic-lock conflict (RFC 9110 §13.1.1); the controller sends the `ETag` of the version. The key check sits above the version comparison, because the version
 goes into the `UPDATE ... WHERE` clause. Thus a request that is stale and duplicate-keyed gives
 `errors.featureFlags.keyExists`. `create` and `update` accept an optional `rules` array. When it is
 present, the flag row and the full rule set are written in one transaction, so a failed rule write
@@ -560,7 +560,7 @@ cache and calls `pushToAll` over SSE, through a coalescing window of 500 ms. It 
 flags.
 
 `utils/validate-rule-payload.util.ts` wraps the shared `parseFeatureFlagRulePayload`
-(`shared/src/utils/feature-flag-rule-payload.ts`) and throws its message as a 400. That function
+(`shared/src/utils/feature-flag-rule-payload.ts`) and throws its message as a 422. That function
 validates the payload of each rule type separately, and the mock server calls it too, so both reject
 with the same text. It rejects a custom attribute key that the registry does not hold. The value check itself is the shared
 `attributeValueError`, which the mock server and the admin rule editor also call, thus the client
@@ -597,11 +597,11 @@ The module imports `EntitlementsModule` and re-exports it. Thus an importer cont
 `BillingService`, `BillingConfigService`, `EntitlementsModule`, `UsageService` and `CreditService`.
 
 **Geo-router (`billing.service.ts`).** `resolveProvider()` computes
-`providerOverride ?? geoDefault(country)`. It answers 503 when the provider is disabled or not
-configured. "Disabled" is the full evaluation of the kill-switch flag for the user of the customer
+`providerOverride ?? geoDefault(country)`. It answers 501 `PROVIDER_NOT_CONFIGURED` when the provider
+is not configured, and 503 `PROVIDER_UNAVAILABLE` when it is disabled. "Disabled" is the full evaluation of the kill-switch flag for the user of the customer
 (`FeatureFlagResolverService.isEnabledForUserId`), so the environments and the rules of the flag
 apply. The file also holds the `geoDefaultFor()`, `effectiveProviderId()` and
-`getProviderById()` helpers. `getProviderById()` answers 503 for a provider that is not registered,
+`getProviderById()` helpers. `getProviderById()` answers 500 for a provider that is not registered,
 so a refund or a cancel cannot skip the provider call.
 
 **Controllers.** `BillingPlansController` holds the `@Public()` route `GET /api/v1/billing/plans`. It
@@ -682,7 +682,8 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
 - It reads and sets the region, with the guard against a cross-provider migration.
 - It lists the one-time catalog (`listProducts`) and does a purchase. The purchase calls
   `resolveProvider` and then `createOneTimePayment`. On Paddle, an `sku` or a `credits` product with
-  no `paddlePriceId` gets a 503, because the webhook finds the product by the paid catalog price. The
+  no `paddlePriceId` gets a 500 `PRODUCT_NOT_CONFIGURED`, because the webhook finds the product by
+  the paid catalog price. The
   service answers `{ provider, url|null, sessionRef }` to the client.
 - It starts a payment-method update. The dispatch uses the provider of the subscription, as the
   cancel does. It returns the hosted session, and the return URL is the billing settings page.
@@ -743,7 +744,7 @@ The refund runs as three steps in two short transactions: reserve, call, settle.
 no pool connection is held across the HTTP call to the provider.
 
 The first transaction commits the amount of the leg onto `refunded_minor` under a `FOR UPDATE` lock.
-Thus a concurrent leg prices against the reservation and gets a 400 before any money moves.
+Thus a concurrent leg prices against the reservation and gets a 422 before any money moves.
 
 Then the service calls the provider outside any transaction. The idempotency key is
 `refund-{id}-{cumulativeAfter}`, that is the cumulative total after the leg. A failure releases the
@@ -765,7 +766,7 @@ proration leg shares them. `lockInvoice` is the single site that takes the `FOR 
 invoice. `remainingRefundable` is the single expression of the bound
 `0 <= refunded_minor <= amount_minor`. `releaseRefund` is the single compensating release, with its
 clamp at zero. The policy stays at the call site: the proration caps silently, and this route rejects
-with a 400.
+with a 422.
 
 **`UsageService`** does the idempotent metering ingest.
 
@@ -778,7 +779,7 @@ a guard for a unique-violation race. A key that another customer reuses is a dis
 replay.
 
 A record is an observation, thus the current plan of the customer does not gate the write. The
-service refuses, with a 400, only a record that no rating can charge correctly:
+service refuses, with a 422, only a record that no rating can charge correctly:
 
 - A meter that no plan in the catalog declares. Such a meter is a typo of the producer.
 - An `occurredAt` before the open metered window (`usageIngestStart`: `meteredWindowStart`, or
@@ -791,7 +792,7 @@ A replay of a known key answers before these checks.
 The checks and the insert run in one transaction that reads the subscription `FOR SHARE`. A close
 that moves the window waits for that lock. The renewal and `billClosingUsagePeriod` rate before they
 move the window, so they first write `usage_sealed_until` (the end of the window) in a committed
-write. Thus a record is rated by the close, or it gets the 400. It is never stored in a window that
+write. Thus a record is rated by the close, or it gets the 422. It is never stored in a window that
 was already rated.
 
 The service stores a meter that another plan prices. It counts that record on
@@ -898,9 +899,10 @@ No API edits these fields, and the seeders create rows but do not update them. T
 writes them with SQL, for example
 `UPDATE plans SET prices = jsonb_set(prices, '{paddle,providerPriceId}', '"pri_..."') WHERE key = 'pro';`.
 Without a price id, Paddle checkout, plan change, plan-change preview and the purchase of that
-product answer 503. A `custom` product needs no price id. The mock seed carries placeholder
+product answer 500 (`PLAN_NOT_CONFIGURED`, `PRODUCT_NOT_CONFIGURED`). A `custom` product needs no
+price id. The mock seed carries placeholder
 `providerPriceId` values on its plans and `paddlePriceId` values on its products, so that the mock
-checkout, plan change and purchase flows work. The mock answers the same 503 when an id is missing.
+checkout, plan change and purchase flows work. The mock answers the same 500 when an id is missing.
 
 **Paddle also needs these settings before a buyer can pay.** Do them in the Paddle dashboard of
 each environment:
@@ -1222,7 +1224,7 @@ Request -> Global Middleware (Compression, CookieParser, CORS)
         -> Module Middleware
         -> Guards (JwtAuthGuard, RolesGuard)
         -> Interceptors (global ClassSerializer with @SerializeOptions, custom)
-        -> Pipes (ValidationPipe, custom)
+        -> Pipes (ApiValidationPipe: body 422, query and path 400; custom)
         -> Controller Handler
         -> Interceptors (response phase)
         -> Response
@@ -1243,7 +1245,7 @@ goes through the shared `normalizeEmail` function (`shared/src/utils/email.ts`).
 not a string becomes an empty string. The strategy also applies the two caps that `LoginDto` declares:
 an address over `MAX_EMAIL_LENGTH` (255) and a password over `MAX_PASSWORD_LENGTH` (128) become an empty string
 too. It counts length with the `maxLength` function of `class-validator`, which `@MaxLength` uses.
-Thus a login answers 401 and never 400, and the lookup and the audit row never get an over-long value.
+Thus a login answers 401 and never 422, and the lookup and the audit row never get an over-long value.
 
 **Email canonicalization.** `normalizeEmail` trims the address and makes it lowercase. The DTO
 `@Transform` decorators apply it. `LocalStrategy` applies it. The three OAuth strategies apply it. It
@@ -1465,7 +1467,7 @@ unconditionally.
 
 `PermissionConditionDto` enforces the same shape rules at the input, through the custom validators in
 `common/validators/permission-condition-shape.validator.ts`. Thus the server rejects a partly
-malformed condition with a 400 at authoring time.
+malformed condition with a 422 at authoring time.
 
 **Instance-level enforcement.** The service behind each single-entity endpoint loads the target
 record and runs `assertCan(ability, action, subject(<Subject>, entity))` BEFORE it returns or changes
@@ -1488,7 +1490,7 @@ checks above (or, for `search`, the SQL filter of `applyAbilityToQuery`). The li
 `Permission`: `update`; `Profile` and `Billing`: none. `read:Role` is not in the list, because
 `GET /roles` and `GET /roles/cursor` return every role. `RoleService.assignRoleToUser` and
 `removeRoleFromUser` check `assign` on the role after `update` on the target user, so a role can be
-limited to assigning some roles. `RoleService.assertGrantsApplicable` answers 400
+limited to assigning some roles. `RoleService.assertGrantsApplicable` answers 422
 `errors.roles.conditionNotSupported` for a restriction on any other action, and
 `errors.roles.actionNotGrantable` for an allow on an action that the resource does not offer.
 `buildAbility` fails closed on a stored row that breaks either rule: the allow registers nothing,
@@ -1558,7 +1560,7 @@ caller under a deny on a pair also cannot grant an allow on it: the answer is 40
 id of the acting user. A record that does not exist yet can never carry that id. Thus either branch
 on a `create` permission denies each create instead of a restriction.
 
-`RoleService.assertConditionsApplicable` rejects such a grant with a 400
+`RoleService.assertConditionsApplicable` rejects such a grant with a 422
 (`errors.roles.conditionNotApplicable`) on `PUT /roles/:id/permissions` and
 `POST /roles/:id/permissions`, for each caller and for a super role. The check is a validity rule and
 not an authorization rule, thus it runs before the can-grant check that a super role bypasses.
@@ -1679,7 +1681,7 @@ removed, as every consumer of a proof does.
 The check and the delete run in one transaction that holds a `FOR UPDATE` lock on the user row
 (`OAuthAccountService.unlinkProvider`). Thus two concurrent unlink requests cannot both see "one
 other provider remains". Without the lock, they leave an account with no password and no way to
-authenticate. The loser gets a 400.
+authenticate. The loser gets a 409.
 
 An unlink of a provider that is not linked returns 404 (`errors.auth.oauthProviderNotLinked`) and
 writes no audit row.
@@ -1864,7 +1866,7 @@ administrator email change, on a deactivation (`isActive` set to false), on a so
 The same writes also clear `passwordResetToken` and `passwordResetExpiresAt`, and so does the
 self-service confirmation. Thus a reset link mailed to the previous address, or before a deactivation
 or a delete, does not take the account. `resetPassword` keys its write on the token hash, thus a
-concurrent password change that clears the token wins, and the reset answers 400.
+concurrent password change that clears the token wins, and the reset answers 422.
 
 A partial unique index on `LOWER(pending_email)`, plus the dual-email checks in `register`,
 `users.create`, `users.update` and the OAuth sign-up, keep the set of `{email}` and `{pendingEmail}` globally unique
@@ -2245,7 +2247,7 @@ when an IP comes near the rate limit.
    the `Turnstile siteverify request failed` message fills the log.
 
    Each verification attempt is abandoned after 2.5 s, thus an unresponsive Cloudflare costs a fast
-   400 and does not hold a request handler open. The gate stays fail closed through an outage: the
+   422 and does not hold a request handler open. The gate stays fail closed through an outage: the
    two routes refuse every caller whose rate-limit budget is nearly spent, until you do this step.
 
    Clear the two `TURNSTILE_*` GitHub secrets, that is set an empty value, and start a deploy. The
@@ -2553,8 +2555,8 @@ The base URL is `/api/v1`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/resources` | `permissions:read` | List each resource, ordered by name |
-| PATCH | `/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. An action that the code does not check answers 400 `errors.resources.actionNotDeclared` |
-| POST | `/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. It answers 400 when no `@RegisterResource` controller exists |
+| PATCH | `/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. An action that the code does not check answers 422 `errors.resources.actionNotDeclared` |
+| POST | `/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. It answers 409 `errors.resources.cannotRestore` when no `@RegisterResource` controller exists |
 
 ### Notifications (`/api/v1/notifications`)
 
@@ -2570,9 +2572,9 @@ The base URL is `/api/v1`.
 | GET | `/admin/feature-flags/cursor` | `search:FeatureFlag` | List the flags with their rules, cursor paginated. Filters: `q` (key or description), `enabled`, `public`, `environment` (one of `APP_ENVIRONMENTS`; a flag with no environments applies in every one) |
 | GET | `/admin/feature-flags/:id` | `read:FeatureFlag` | Get a flag by ID |
 | POST | `/admin/feature-flags` | `create:FeatureFlag` | Create a flag. An optional `rules` array is written in the same transaction. The audit action is `FEATURE_FLAG_CREATE` |
-| PATCH | `/admin/feature-flags/:id` | `update:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 400. An optional `rules` array replaces the full rule set in the same transaction as the flag fields, with one version increase; without `rules` the stored rules stay. It **requires the `If-Match: <version>` header**. A mismatch gives HTTP 409 with `errorKey: errors.featureFlags.versionConflict` and writes no rule. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired`. A value that is not a positive integer of at most 2147483647 (for example `1abc`) gives HTTP 400 |
+| PATCH | `/admin/feature-flags/:id` | `update:FeatureFlag` | Update a flag. The key is immutable: a body with `key` gives HTTP 422. An optional `rules` array replaces the full rule set in the same transaction as the flag fields, with one version increase; without `rules` the stored rules stay. It **requires the `If-Match: "<version>"` header** (RFC 9110 grammar: `*`, a list, weak tags; GET, POST and PATCH send the `ETag`). A mismatch gives HTTP 412 with `errorKey: errors.featureFlags.versionConflict` and writes no rule. A missing header gives HTTP 428 with `errors.featureFlags.ifMatchRequired`. A value outside the grammar (for example a bare `1` or `1abc`) gives HTTP 400 `errors.featureFlags.ifMatchInvalid` |
 | DELETE | `/admin/feature-flags/:id` | `delete:FeatureFlag` | Delete a flag with a cascade. The audit action is `FEATURE_FLAG_DELETE` |
-| POST | `/admin/feature-flags/:id/preview` | `read:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 400. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
+| POST | `/admin/feature-flags/:id/preview` | `read:FeatureFlag` | Evaluate the flag against a synthetic context and write nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag. A supplied rule set goes through the validator of the `rules` field of a save, thus it gets the same 422. The `reason` field is one of `disabled`, `env-mismatch`, `excluded`, `included-by-rule`, `no-rules-default-on` and `not-included`. `excluded` says that an exclude rule matched. `not-included` says that include rules exist and that no rule matched |
 
 **Caching.** `featureflags:all` holds the full set of flags and rules, with a TTL of 300 s. A reload
 is single-flight: two concurrent misses share one load from the database. A load that an
@@ -2706,7 +2708,7 @@ name as the gate. Thus a later reader can go from the code to the configuration 
 | GET | `/search/cursor` | `users:search` | Search the users with cursor pagination. The filters are `q` (a substring across the id, email and name), `email`, `name`, `role` (an exact role name), `ids` (a comma-separated list of at most 100 user ids), `isActive`, `isEmailVerified`, `mfaEnabled`, `hasPassword` and `isLocked` (`lockedUntil` later than now). `includeDeleted=true` adds the soft-deleted rows. A string filter has a cap of 255 characters. The boolean filters accept `true` or `false` only, and each other value is a 400 |
 | GET | `/:id` | `users:read` | Get a user by ID |
 | GET | `/:id/permissions` | `users:read` | Get the effective permissions of a user: the roles, the resolved permissions and the packed CASL rules |
-| PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. `isActive` and `unlockAccount` on the caller's own record answer 400 `errors.users.moderationSelf`, before the step-up. `password` and a changed `email` on the caller's own record answer 400 `errors.users.credentialSelf`, before the step-up; the profile flows change them. A password change, a real email move and a deactivation each revoke each session of the target. A real email move also writes a second audit row, `USER_EMAIL_CHANGE_COMPLETE` with `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row records field names only. The server mails the previous address that the account moved, with the new address masked, because this path recovers an account whose old address an attacker can hold. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and a real email move or a deactivation clears the same five fields |
+| PATCH | `/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. `isActive` and `unlockAccount` on the caller's own record answer 403 `errors.users.moderationSelf`, before the step-up. `password` and a changed `email` on the caller's own record answer 403 `errors.users.credentialSelf`, before the step-up; the profile flows change them. A password change, a real email move and a deactivation each revoke each session of the target. A real email move also writes a second audit row, `USER_EMAIL_CHANGE_COMPLETE` with `details: { oldEmail, newEmail, source: 'admin' }`, because the `USER_UPDATE` row records field names only. The server mails the previous address that the account moved, with the new address masked, because this path recovers an account whose old address an attacker can hold. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and a real email move or a deactivation clears the same five fields |
 | DELETE | `/:id` | `users:delete` | Soft-delete a user. It sets `deleted_at` and revokes each active session |
 | POST | `/:id/restore` | `users:delete` | Restore a soft-deleted user. It clears `deleted_at` and sets `isActive=true` |
 

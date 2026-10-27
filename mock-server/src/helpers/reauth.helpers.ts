@@ -1,5 +1,7 @@
 import {
+  ERROR_STATUS,
   ErrorKeys,
+  type ErrorKey,
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   MAX_PASSWORD_LENGTH,
@@ -70,12 +72,12 @@ export function clearFailures(
  */
 export function sendWithRetryAfter(
   res: Response,
-  body: { statusCode: number; retryAfter?: number }
+  body: StepUpErrorEnvelope
 ): void {
   if (body.retryAfter !== undefined) {
     res.setHeader('Retry-After', String(Math.max(0, body.retryAfter)));
   }
-  res.status(body.statusCode).json(body);
+  res.status(ERROR_STATUS[body.errorKey]).json(body);
 }
 
 /**
@@ -212,10 +214,10 @@ export function consumeTotpCode(user: MockUser, code: unknown): boolean {
   return true;
 }
 
+/** A refusal body; its status is the status of its key. */
 export interface StepUpErrorEnvelope {
   message: string;
-  statusCode: number;
-  errorKey: string;
+  errorKey: ErrorKey;
   lockedUntil?: string;
   retryAfter?: number;
 }
@@ -264,15 +266,14 @@ function stepUpCodeError(
   return null;
 }
 
-/** The 423 answer of every per-account brake, as the server `lockedException`. */
+/** The answer of every per-account brake, as the server `lockedException`. */
 export function lockedEnvelope(
   message: string,
-  errorKey: string,
+  errorKey: ErrorKey,
   lockedUntil: Date
 ): StepUpErrorEnvelope {
   return {
     message,
-    statusCode: 423,
     errorKey,
     lockedUntil: lockedUntil.toISOString(),
     retryAfter: Math.max(
@@ -310,19 +311,17 @@ function stepUpPasswordLockedEnvelope(
   );
 }
 
-/** A 400, not the 401 of the sign-in challenge, as the server answers. */
+/** Not the key of the sign-in challenge, as the server answers. */
 function invalidStepUpCodeEnvelope(): StepUpErrorEnvelope {
   return {
     message: 'Verification code is incorrect',
-    statusCode: 400,
-    errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
+    errorKey: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE
   };
 }
 
 function invalidCurrentPasswordEnvelope(): StepUpErrorEnvelope {
   return {
     message: 'Current password is incorrect',
-    statusCode: 400,
     errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
   };
 }
@@ -374,7 +373,6 @@ export function stepUpError(
     logStepUpFailure(req, user, operation, 'reauth_proof', code !== undefined);
     return {
       message: 'Confirm it is you with your sign-in provider, then try again',
-      statusCode: 400,
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     };
   }

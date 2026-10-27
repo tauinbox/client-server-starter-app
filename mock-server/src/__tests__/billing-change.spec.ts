@@ -404,9 +404,9 @@ describe('POST /billing/subscription/change/preview', () => {
 
 describe('a plan with no Paddle price id (server parity)', () => {
   const NO_PRICE_BODY = {
-    statusCode: 503,
+    statusCode: 500,
     message: 'Plan "business" has no Paddle price configured',
-    errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
+    errorKey: ErrorKeys.BILLING.PLAN_NOT_CONFIGURED
   };
 
   function removePaddlePriceId(planKey: string): void {
@@ -415,16 +415,16 @@ describe('a plan with no Paddle price id (server parity)', () => {
     delete plan.prices.paddle.providerPriceId;
   }
 
-  it('answers 503 on a Paddle checkout', async () => {
+  it('answers 500 on a Paddle checkout', async () => {
     const token = await login('user@example.com');
     removePaddlePriceId('business');
 
     const res = await post(token, 'checkout', { planKey: 'business' });
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(500);
     expect(await readErrorBody(res)).toEqual(NO_PRICE_BODY);
   });
 
-  it('answers 503 on a Paddle change and preview, with nothing changed', async () => {
+  it('answers 500 on a Paddle change and preview, with nothing changed', async () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     removePaddlePriceId('business');
@@ -432,7 +432,7 @@ describe('a plan with no Paddle price id (server parity)', () => {
 
     for (const path of ['subscription/change', 'subscription/change/preview']) {
       const res = await post(token, path, { planKey: 'business' });
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(500);
       expect(await readErrorBody(res)).toEqual(NO_PRICE_BODY);
     }
     expect(getState().billingSubscriptions.get(subId)?.planKey).toBe('pro');
@@ -464,11 +464,11 @@ describe('POST /billing/payment-method', () => {
 
     const res = await post(token, 'payment-method', {});
 
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(500);
     expect(await readErrorBody(res)).toEqual({
       message: 'The current plan is missing from the catalog',
       errorKey: ErrorKeys.BILLING.CURRENT_PLAN_MISSING,
-      statusCode: 503
+      statusCode: 500
     });
     expect(getState().billingPaymentMethods.size).toBe(methodsBefore);
   });

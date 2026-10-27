@@ -161,7 +161,7 @@ describe('billing request-body validation parity with server', () => {
   ];
 
   describe('forbidNonWhitelisted: a property no DTO declares', () => {
-    it.each(routes)('$name rejects it with 400', async (route) => {
+    it.each(routes)('$name rejects it with 422', async (route) => {
       const token = await login(
         route.admin ? 'admin@example.com' : 'user@example.com'
       );
@@ -173,10 +173,10 @@ describe('billing request-body validation parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(['property sneaky should not exist']);
       expect(body.message).toBe('property sneaky should not exist');
-      expect(body.error).toBe('Bad Request');
+      expect(body.error).toBe('Unprocessable Content');
     });
   });
 
@@ -296,7 +296,7 @@ describe('billing request-body validation parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(testCase.errors);
       expect(body.message).toBe(testCase.errors.join('. '));
     });
@@ -312,7 +312,7 @@ describe('billing request-body validation parity with server', () => {
       token
     );
 
-    expect(status).toBe(400);
+    expect(status).toBe(422);
     expect(body.errors).toEqual([
       'property foo should not exist',
       'property bar should not exist',
@@ -334,7 +334,7 @@ describe('billing request-body validation parity with server', () => {
         token
       );
 
-      expect(status).toBe(404);
+      expect(status).toBe(422);
     });
 
     it('trims before measuring, as the DTO @Transform does', async () => {
@@ -347,7 +347,7 @@ describe('billing request-body validation parity with server', () => {
         token
       );
 
-      expect(status).toBe(404);
+      expect(status).toBe(422);
     });
 
     it('opens a purchase session with a 128-char description', async () => {

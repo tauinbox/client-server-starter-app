@@ -61,7 +61,7 @@ function setup(token: string, currentPassword?: string): Promise<Response> {
 async function guessWrong(token: string, times: number): Promise<void> {
   for (let i = 0; i < times; i += 1) {
     const res = await setup(token, WRONG_PASSWORD);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   }
 }
 
@@ -147,7 +147,7 @@ describe('the step-up password carries a per-account brake', () => {
 
     for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
       const res = await setup(token);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(await res.json()).toMatchObject({
         errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
       });

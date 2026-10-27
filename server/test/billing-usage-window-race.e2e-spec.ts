@@ -3,7 +3,7 @@
 // record sees the closed window and is refused.
 
 import { Test } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { expectApiError } from '../src/common/testing/api-error.expect';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntitySubscriberInterface } from 'typeorm';
@@ -425,10 +425,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
     p.charge.release();
     await scan;
 
-    expect(refused).toBeInstanceOf(BadRequestException);
-    expect((refused as BadRequestException).getResponse()).toMatchObject({
-      errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
-    });
+    expectApiError(refused, ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW);
     expect(p.amounts).toEqual([WITHOUT_LATE_MINOR]);
     expect(await lateRowStored()).toBe(false);
   }, 30000);

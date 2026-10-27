@@ -1,0 +1,192 @@
+import { ErrorKeys } from './error-keys';
+
+type ValuesOf<T> = T[keyof T];
+
+/** Every value of `ErrorKeys`, for example `'errors.auth.invalidCredentials'`. */
+export type ErrorKey = ValuesOf<{
+  [Group in keyof typeof ErrorKeys]: ValuesOf<(typeof ErrorKeys)[Group]>;
+}>;
+
+/**
+ * The statuses that an error key can have, each with its meaning in RFC 9110
+ * (428: RFC 6585, 423: RFC 4918). 402 is not here: RFC 9110 reserves it.
+ * - 400: malformed syntax (bad JSON, a bad query parameter or header).
+ * - 401: no valid credentials. The response carries `WWW-Authenticate`.
+ * - 403: the request is understood and refused.
+ * - 404: the target resource (the URL) does not exist.
+ * - 409: the current state of the target resource refuses the request.
+ * - 412: an `If-Match` condition is false.
+ * - 422: well-formed content that fails a check, or names a missing record.
+ * - 423: the account is locked for a time.
+ * - 428: a required `If-Match` header is missing.
+ * - 500: an unexpected condition (a code or data defect).
+ * - 501: this server is not configured for the feature.
+ * - 502: a payment provider sent a bad or failed answer.
+ * - 503: an operator closed the feature for a time.
+ * - 504: a payment provider did not answer in time.
+ */
+export type ErrorStatus =
+  | 400
+  | 401
+  | 403
+  | 404
+  | 409
+  | 412
+  | 422
+  | 423
+  | 428
+  | 500
+  | 501
+  | 502
+  | 503
+  | 504;
+
+/** The one HTTP status of each error key. A key with no status does not compile. */
+export const ERROR_STATUS: Readonly<Record<ErrorKey, ErrorStatus>> = {
+  [ErrorKeys.AUTH.INVALID_CREDENTIALS]: 401,
+  [ErrorKeys.AUTH.ACCOUNT_LOCKED]: 423,
+  [ErrorKeys.AUTH.EMAIL_NOT_VERIFIED]: 403,
+  [ErrorKeys.AUTH.USER_DEACTIVATED]: 401,
+  [ErrorKeys.AUTH.USER_NOT_FOUND]: 401,
+  [ErrorKeys.AUTH.OAUTH_ALREADY_LINKED]: 409,
+  [ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED]: 401,
+  [ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN]: 422,
+  [ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED]: 422,
+  [ErrorKeys.AUTH.INVALID_RESET_TOKEN]: 422,
+  [ErrorKeys.AUTH.RESET_TOKEN_EXPIRED]: 422,
+  [ErrorKeys.AUTH.INVALID_REFRESH_TOKEN]: 401,
+  [ErrorKeys.AUTH.SESSION_INVALIDATED]: 401,
+  [ErrorKeys.AUTH.SESSION_EXPIRED]: 401,
+  [ErrorKeys.AUTH.TOKEN_REVOKED]: 401,
+  [ErrorKeys.AUTH.TOKEN_INVALIDATED_ROTATION]: 401,
+  [ErrorKeys.AUTH.INVALID_TOKEN]: 401,
+  [ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER]: 404,
+  [ErrorKeys.AUTH.MISSING_OAUTH_DATA]: 401,
+  [ErrorKeys.AUTH.INVALID_OAUTH_DATA]: 401,
+  [ErrorKeys.AUTH.UNLINK_LAST_PROVIDER]: 409,
+  [ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED]: 404,
+  [ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED]: 409,
+  [ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD]: 403,
+  [ErrorKeys.AUTH.CAPTCHA_REQUIRED]: 422,
+  [ErrorKeys.AUTH.CAPTCHA_INVALID]: 422,
+  [ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE]: 500,
+  [ErrorKeys.AUTH.SAME_EMAIL]: 409,
+  [ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED]: 422,
+  [ErrorKeys.AUTH.REAUTH_REQUIRED]: 403,
+  [ErrorKeys.AUTH.PASSWORD_BREACHED]: 422,
+  [ErrorKeys.AUTH.PASSWORD_TOO_COMMON]: 422,
+  [ErrorKeys.AUTH.MFA_UNAVAILABLE]: 501,
+  [ErrorKeys.AUTH.MFA_ALREADY_ENABLED]: 409,
+  [ErrorKeys.AUTH.MFA_NOT_ENABLED]: 409,
+  [ErrorKeys.AUTH.MFA_SETUP_REQUIRED]: 409,
+  [ErrorKeys.AUTH.MFA_INVALID_CODE]: 401,
+  [ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE]: 403,
+  [ErrorKeys.AUTH.MFA_ENROLMENT_INVALID_CODE]: 422,
+  [ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE]: 401,
+  [ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN]: 401,
+  [ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED]: 403,
+  [ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED]: 423,
+  [ErrorKeys.AUTH.MFA_STEP_UP_LOCKED]: 423,
+  [ErrorKeys.AUTH.STEP_UP_LOCKED]: 423,
+  [ErrorKeys.AUTH.SESSION_NOT_FOUND]: 404,
+  [ErrorKeys.AUTH.SESSION_IS_CURRENT]: 403,
+  [ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED]: 401,
+
+  [ErrorKeys.USERS.NOT_FOUND]: 404,
+  [ErrorKeys.USERS.EMAIL_EXISTS]: 409,
+  [ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN]: 403,
+  [ErrorKeys.USERS.MFA_RESET_SELF]: 403,
+  [ErrorKeys.USERS.SESSION_REVOKE_SELF]: 403,
+  [ErrorKeys.USERS.MODERATION_SELF]: 403,
+  [ErrorKeys.USERS.CREDENTIAL_SELF]: 403,
+  [ErrorKeys.USERS.NOT_DELETED]: 409,
+
+  [ErrorKeys.ROLES.NOT_FOUND]: 404,
+  [ErrorKeys.ROLES.NAME_EXISTS]: 409,
+  [ErrorKeys.ROLES.UNKNOWN_PERMISSION]: 422,
+  [ErrorKeys.ROLES.UNKNOWN_ROLE]: 422,
+  [ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM]: 403,
+  [ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM]: 403,
+  [ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION]: 403,
+  [ErrorKeys.ROLES.CANNOT_LIFT_DENY]: 403,
+  [ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE]: 422,
+  [ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED]: 422,
+  [ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN]: 422,
+  [ErrorKeys.ROLES.ACTION_NOT_GRANTABLE]: 422,
+  [ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER]: 403,
+  [ErrorKeys.ROLES.CONDITION_UNRESOLVABLE]: 403,
+  [ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN]: 403,
+  [ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN]: 403,
+  [ErrorKeys.ROLES.ROLE_NOT_ASSIGNED]: 404,
+  [ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED]: 404,
+
+  [ErrorKeys.RESOURCES.NOT_FOUND]: 404,
+  [ErrorKeys.RESOURCES.CANNOT_RESTORE]: 409,
+  [ErrorKeys.RESOURCES.NOT_ORPHANED]: 409,
+  [ErrorKeys.RESOURCES.SUBJECT_RESERVED]: 422,
+  [ErrorKeys.RESOURCES.ACTION_NOT_DECLARED]: 422,
+  [ErrorKeys.RESOURCES.CANNOT_WIDEN]: 403,
+
+  [ErrorKeys.FEATURE_FLAGS.NOT_FOUND]: 404,
+  [ErrorKeys.FEATURE_FLAGS.KEY_EXISTS]: 409,
+  [ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT]: 412,
+  [ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED]: 428,
+  [ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID]: 400,
+  [ErrorKeys.FEATURE_FLAGS.INVALID_RULE]: 422,
+
+  [ErrorKeys.BILLING.REGION_UNAVAILABLE]: 403,
+  [ErrorKeys.BILLING.REGION_CHANGE_BLOCKED]: 409,
+  [ErrorKeys.BILLING.PROVIDER_UNAVAILABLE]: 503,
+  [ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED]: 501,
+  [ErrorKeys.BILLING.ALREADY_SUBSCRIBED]: 409,
+  [ErrorKeys.BILLING.PLAN_NOT_FOUND]: 422,
+  [ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER]: 409,
+  [ErrorKeys.BILLING.PLAN_NOT_CONFIGURED]: 500,
+  [ErrorKeys.BILLING.SAME_PLAN]: 409,
+  [ErrorKeys.BILLING.CURRENT_PLAN_MISSING]: 500,
+  [ErrorKeys.BILLING.PRODUCT_NOT_FOUND]: 422,
+  [ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER]: 409,
+  [ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED]: 500,
+  [ErrorKeys.BILLING.AMOUNT_REQUIRED]: 422,
+  [ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE]: 422,
+  [ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION]: 404,
+  [ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED]: 409,
+  [ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE]: 409,
+  [ErrorKeys.BILLING.SUBSCRIPTION_BUSY]: 409,
+  [ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED]: 409,
+  [ErrorKeys.BILLING.CANCELLATION_SCHEDULED]: 409,
+  [ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED]: 409,
+  [ErrorKeys.BILLING.RENEWAL_IN_PROGRESS]: 409,
+  [ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT]: 409,
+  [ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT]: 409,
+  [ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED]: 409,
+  [ErrorKeys.BILLING.ENTITLEMENT_REQUIRED]: 403,
+  [ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND]: 404,
+  [ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE]: 409,
+  [ErrorKeys.BILLING.SUBSCRIPTION_NOT_FOUND]: 404,
+  [ErrorKeys.BILLING.INVOICE_NOT_FOUND]: 404,
+  [ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE]: 409,
+  [ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE]: 422,
+  [ErrorKeys.BILLING.CREDITS_BLOCKED]: 409,
+  [ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION]: 409,
+  [ErrorKeys.BILLING.METER_NOT_DECLARED]: 422,
+  [ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW]: 422,
+  [ErrorKeys.BILLING.USAGE_IN_FUTURE]: 422,
+  [ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED]: 502,
+  [ErrorKeys.BILLING.PROVIDER_REFUND_FAILED]: 502,
+  [ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN]: 502,
+  [ErrorKeys.BILLING.PROVIDER_TIMEOUT]: 504,
+  [ErrorKeys.BILLING.PROVIDER_ERROR]: 502,
+  [ErrorKeys.BILLING.PAYMENT_DECLINED]: 409,
+  [ErrorKeys.BILLING.PAYMENT_METHOD_MISSING]: 409,
+
+  [ErrorKeys.DB.UNIQUE_VIOLATION]: 409,
+  [ErrorKeys.DB.FOREIGN_KEY_VIOLATION]: 409,
+  [ErrorKeys.DB.NOT_NULL_VIOLATION]: 422,
+  [ErrorKeys.DB.INVALID_INPUT]: 400,
+
+  [ErrorKeys.GENERAL.RESOURCE_NOT_FOUND]: 404,
+  [ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR]: 500,
+  [ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS]: 403,
+  [ErrorKeys.GENERAL.INVALID_CURSOR]: 400
+};

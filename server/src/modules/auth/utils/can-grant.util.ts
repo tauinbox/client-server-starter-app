@@ -1,4 +1,4 @@
-import { HttpException, type Logger } from '@nestjs/common';
+import type { Logger } from '@nestjs/common';
 import {
   findGrantRefusal,
   findLiftRefusal,
@@ -6,6 +6,7 @@ import {
   type GrantScopeAbility,
   type GrantScopeItem
 } from '@app/shared/utils/grant-scope';
+import { ApiError } from '../../../common/errors/api-error';
 import type { AppAbility, Subjects } from '../casl/app-ability';
 
 export interface GrantCheckContext {
@@ -23,9 +24,9 @@ function scopeOf(ability: AppAbility): GrantScopeAbility {
   };
 }
 
-export function grantDenied(refusal: GrantRefusal): HttpException {
-  const { status, message, errorKey, details } = refusal;
-  return new HttpException({ message, errorKey, details }, status);
+export function grantDenied(refusal: GrantRefusal): ApiError {
+  const { message, errorKey, details } = refusal;
+  return new ApiError(errorKey, message, { details });
 }
 
 /**

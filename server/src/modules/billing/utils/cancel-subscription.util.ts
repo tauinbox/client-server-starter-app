@@ -1,4 +1,3 @@
-import { ConflictException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, type Repository } from 'typeorm';
 import {
@@ -14,12 +13,13 @@ import { SubscriptionCanceledEvent } from '../events/billing.events';
 import type { RenewalService } from '../renewals/renewal.service';
 import type { CreditService } from '../services/credit.service';
 import { cancelFields } from './cancel-fields.util';
+import { ApiError } from '../../../common/errors/api-error';
 
-function alreadyCanceled(): ConflictException {
-  return new ConflictException({
-    message: 'This subscription is already canceled.',
-    errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED
-  });
+function alreadyCanceled(): ApiError {
+  return new ApiError(
+    ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED,
+    'This subscription is already canceled.'
+  );
 }
 
 /**
@@ -31,7 +31,7 @@ function alreadyCanceled(): ConflictException {
 function cancelRefusal(
   subscription: Subscription,
   mode: CancelMode
-): ConflictException | null {
+): ApiError | null {
   if (!isOpenStatus(subscription.status)) {
     return alreadyCanceled();
   }
@@ -39,16 +39,16 @@ function cancelRefusal(
     return null;
   }
   if (subscription.status === 'incomplete') {
-    return new ConflictException({
-      message: 'This subscription has no paid period to end.',
-      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
-    });
+    return new ApiError(
+      ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED,
+      'This subscription has no paid period to end.'
+    );
   }
   if (subscription.cancelAtPeriodEnd) {
-    return new ConflictException({
-      message: 'A cancellation is already scheduled for the end of the period.',
-      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
-    });
+    return new ApiError(
+      ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED,
+      'A cancellation is already scheduled for the end of the period.'
+    );
   }
   return null;
 }

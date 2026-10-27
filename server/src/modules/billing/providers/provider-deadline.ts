@@ -1,5 +1,6 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
+import { ApiError } from '../../../common/errors/api-error';
 import type { BillingProviderId, CancelMode } from '@app/shared/types';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
@@ -31,21 +32,40 @@ export const DEFAULT_BILLING_PROVIDER_TIMEOUT_MS = 20_000;
 export const MAX_BILLING_PROVIDER_TIMEOUT_MS = 120_000;
 
 /**
- * Raised when a provider call outlives its deadline. It answers 503 with
- * `PROVIDER_STATE_UNCERTAIN`: the deadline does not cancel the provider's
- * request, so money may have moved.
+ * Raised when a provider call outlives its deadline. The deadline does not
+ * cancel the provider's request, so money may have moved.
  */
-export class ProviderTimeoutError extends ServiceUnavailableException {
+export class ProviderTimeoutError extends ApiError {
   constructor(
     readonly provider: BillingProviderId,
     readonly method: string,
     readonly timeoutMs: number
   ) {
-    super({
-      message: `${provider}.${method} did not respond within ${timeoutMs}ms`,
-      errorKey: ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
-    });
+    super(
+      ErrorKeys.BILLING.PROVIDER_TIMEOUT,
+      `${provider}.${method} did not respond within ${timeoutMs}ms`
+    );
     this.name = 'ProviderTimeoutError';
+  }
+}
+
+/**
+ * Raised when a provider call fails with an error that is not an HTTP answer
+ * of ours: a dropped socket, or an error answer of the provider API.
+ */
+export class ProviderError extends ApiError {
+  constructor(
+    readonly provider: BillingProviderId,
+    readonly method: string,
+    cause: unknown
+  ) {
+    super(
+      ErrorKeys.BILLING.PROVIDER_ERROR,
+      `${provider}.${method} failed`,
+      {},
+      { cause }
+    );
+    this.name = 'ProviderError';
   }
 }
 
@@ -70,7 +90,7 @@ export class ProviderTimeoutError extends ServiceUnavailableException {
 export class DeadlineBoundProvider implements PaymentProvider {
   constructor(
     private readonly inner: PaymentProvider,
-    private readonly timeoutMs: number
+    private readonly timeoutMs: number | null
   ) {}
 
   get id(): BillingProviderId {
@@ -218,18 +238,25 @@ export class DeadlineBoundProvider implements PaymentProvider {
   private async bound<T>(method: string, call: () => Promise<T>): Promise<T> {
     let timer: NodeJS.Timeout | undefined;
     try {
-      return await Promise.race([
-        call(),
-        new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(
-                new ProviderTimeoutError(this.inner.id, method, this.timeoutMs)
-              ),
-            this.timeoutMs
-          );
-        })
-      ]);
+      const calls: Promise<T>[] = [call()];
+      if (this.timeoutMs !== null) {
+        const timeoutMs = this.timeoutMs;
+        calls.push(
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(
+              () =>
+                reject(
+                  new ProviderTimeoutError(this.inner.id, method, timeoutMs)
+                ),
+              timeoutMs
+            );
+          })
+        );
+      }
+      return await Promise.race(calls);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new ProviderError(this.inner.id, method, error);
     } finally {
       clearTimeout(timer);
     }
@@ -238,15 +265,15 @@ export class DeadlineBoundProvider implements PaymentProvider {
 
 /**
  * Wraps `provider` so each call rejects with `ProviderTimeoutError` after
- * `timeoutMs`. A non-positive or non-finite deadline disables the bound and
- * returns the provider untouched.
+ * `timeoutMs`, and with `ProviderError` when the provider throws anything that
+ * is not an HTTP exception. A non-positive or non-finite deadline disables the
+ * deadline only.
  */
 export function withProviderDeadline(
   provider: PaymentProvider,
   timeoutMs: number
 ): PaymentProvider {
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    return provider;
-  }
-  return new DeadlineBoundProvider(provider, timeoutMs);
+  const deadline =
+    Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null;
+  return new DeadlineBoundProvider(provider, deadline);
 }

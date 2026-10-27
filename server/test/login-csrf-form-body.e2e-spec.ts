@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -37,13 +34,7 @@ runWithInfra('Login CSRF through a form body (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -96,7 +87,7 @@ runWithInfra('Login CSRF through a form body (e2e)', () => {
 
   it('does not parse a form-encoded body on the two-factor routes', async () => {
     // Well-formed fields, so a parsed body would reach the service and get
-    // its 401: only an unparsed body fails validation with 400.
+    // its 401: only an unparsed body fails validation with 422.
     const bodies = {
       verify: { mfaToken: 'not-a-token', code: '123456' },
       recovery: { mfaToken: 'not-a-token', recoveryCode: 'ABCDEFGH-IJKLMNOP' }
@@ -107,7 +98,7 @@ runWithInfra('Login CSRF through a form body (e2e)', () => {
         .type('form')
         .send(body);
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(refreshCookieOf(res)).toBeUndefined();
     }
   }, 30000);

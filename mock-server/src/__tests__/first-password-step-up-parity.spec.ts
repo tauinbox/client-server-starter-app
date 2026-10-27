@@ -99,9 +99,9 @@ describe('PATCH /api/v1/auth/profile demands a step-up for a first password', ()
 
     const res = await patchProfile(token, { password: NEW_PASSWORD });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
-      statusCode: 400,
+      statusCode: 403,
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });
     expect(getState().users.get(OAUTH_ONLY_ID)?.password).toBeNull();
@@ -141,7 +141,7 @@ describe('PATCH /api/v1/auth/profile demands a step-up for a first password', ()
       proof as string
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });
@@ -178,7 +178,7 @@ describe('PATCH /api/v1/auth/profile demands a step-up for a first password', ()
 
     const res = await patchProfile(token, { password: NEW_PASSWORD });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     });
@@ -200,7 +200,7 @@ describe('POST /__control/reauth-proof binds the proof to one operation', () => 
 });
 
 describe('POST /api/v1/auth/oauth/reauth-init validates the operation', () => {
-  it('400s on an unknown operation', async () => {
+  it('422s on an unknown operation', async () => {
     seedOAuthOnlyUser();
     const token = await accessToken(OAUTH_ONLY_ID);
 
@@ -213,7 +213,7 @@ describe('POST /api/v1/auth/oauth/reauth-init validates the operation', () => {
       body: JSON.stringify({ operation: 'delete_account' })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it('accepts a known operation', async () => {

@@ -103,11 +103,11 @@ describe('mailed tokens carry the deadline the server enforces', () => {
       token,
       password: newPassword
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual({
       message: 'Password reset token has expired. Please request a new one.',
       errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
-      statusCode: 400
+      statusCode: 422
     });
 
     const login = await postJson('login', { email, password: newPassword });
@@ -119,11 +119,11 @@ describe('mailed tokens carry the deadline the server enforces', () => {
     ageToken(getState().emailVerificationTokens, token);
 
     const res = await postJson('verify-email', { token });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual({
       message: 'Verification token has expired. Please request a new one.',
       errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED,
-      statusCode: 400
+      statusCode: 422
     });
     expect(findUserByEmail(email)?.isEmailVerified).toBe(false);
   });
@@ -133,11 +133,11 @@ describe('mailed tokens carry the deadline the server enforces', () => {
     findUserByEmail(email)!.isActive = false;
 
     const res = await postJson('verify-email', { token });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual({
       message: 'Invalid or expired verification token',
       errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN,
-      statusCode: 400
+      statusCode: 422
     });
     expect(findUserByEmail(email)?.isEmailVerified).toBe(false);
   });
@@ -170,11 +170,11 @@ describe('POST /__control/expire-token', () => {
       token,
       password: newPassword
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual({
       message: 'Password reset token has expired. Please request a new one.',
       errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
-      statusCode: 400
+      statusCode: 422
     });
   });
 
@@ -183,11 +183,11 @@ describe('POST /__control/expire-token', () => {
     expect((await expireToken(token)).status).toBe(200);
 
     const res = await postJson('verify-email', { token });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual({
       message: 'Verification token has expired. Please request a new one.',
       errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED,
-      statusCode: 400
+      statusCode: 422
     });
   });
 

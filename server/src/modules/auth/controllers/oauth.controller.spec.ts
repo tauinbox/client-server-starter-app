@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request as ExpressRequest, Response } from 'express';
 import { OAuthController } from './oauth.controller';
+import { ApiError } from '../../../common/errors/api-error';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
@@ -335,12 +336,9 @@ describe('OAuthController', () => {
 
     it('should not write an audit row when the unlink is rejected', async () => {
       oauthAccountServiceMock.unlinkProvider.mockRejectedValue(
-        new HttpException(
-          {
-            message: 'No linked google account found',
-            errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED
-          },
-          HttpStatus.NOT_FOUND
+        new ApiError(
+          ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED,
+          'No linked google account found'
         )
       );
 
@@ -415,12 +413,9 @@ describe('OAuthController', () => {
 
     it('removes nothing when the step-up refuses the caller', async () => {
       authServiceMock.assertStepUpForUser.mockRejectedValue(
-        new HttpException(
-          {
-            message: 'Current password is incorrect',
-            errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-          },
-          HttpStatus.BAD_REQUEST
+        new ApiError(
+          ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD,
+          'Current password is incorrect'
         )
       );
 
@@ -508,12 +503,9 @@ describe('OAuthController', () => {
       const res = mockResponse();
       const req = mockJwtRequest('user-1');
       authServiceMock.assertStepUpForUser.mockRejectedValue(
-        new HttpException(
-          {
-            message: 'Current password is incorrect',
-            errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-          },
-          HttpStatus.BAD_REQUEST
+        new ApiError(
+          ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD,
+          'Current password is incorrect'
         )
       );
 
@@ -762,12 +754,9 @@ describe('OAuthController', () => {
         ],
         [
           'a deactivated account',
-          new HttpException(
-            {
-              message: 'User account is deactivated',
-              errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
-            },
-            HttpStatus.UNAUTHORIZED
+          new ApiError(
+            ErrorKeys.AUTH.USER_DEACTIVATED,
+            'User account is deactivated'
           ),
           ErrorKeys.AUTH.USER_DEACTIVATED
         ],
@@ -914,13 +903,7 @@ describe('OAuthController', () => {
 
     it('should audit a link that the service refuses', async () => {
       oauthServiceMock.linkOAuthToUser.mockRejectedValue(
-        new HttpException(
-          {
-            message: 'Already linked',
-            errorKey: ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
-          },
-          HttpStatus.CONFLICT
-        )
+        new ApiError(ErrorKeys.AUTH.OAUTH_ALREADY_LINKED, 'Already linked')
       );
 
       const res = mockResponse();
@@ -978,12 +961,9 @@ describe('OAuthController', () => {
 
       it('should audit a re-authentication that the service refuses', async () => {
         oauthServiceMock.assertReauthenticated.mockRejectedValue(
-          new HttpException(
-            {
-              message: 'Re-authentication required',
-              errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-            },
-            HttpStatus.FORBIDDEN
+          new ApiError(
+            ErrorKeys.AUTH.REAUTH_REQUIRED,
+            'Re-authentication required'
           )
         );
         const res = mockResponse();
@@ -1230,7 +1210,7 @@ describe('OAuthController', () => {
             res
           )
         ).rejects.toMatchObject({
-          status: HttpStatus.BAD_REQUEST,
+          status: HttpStatus.UNAUTHORIZED,
           response: { errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA }
         });
         expect(authServiceMock.login).not.toHaveBeenCalled();

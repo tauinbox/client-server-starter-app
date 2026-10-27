@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -51,13 +48,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -167,7 +158,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
       isActive: false
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect((res.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.USERS.MODERATION_SELF
     );
@@ -184,7 +175,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
 
     const res = await patch(token, id, { unlockAccount: true });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect((res.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.USERS.MODERATION_SELF
     );

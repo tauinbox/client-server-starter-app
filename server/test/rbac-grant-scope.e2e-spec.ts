@@ -11,9 +11,9 @@ import {
   ExecutionContext,
   INestApplication,
   Injectable,
-  Module,
-  ValidationPipe
+  Module
 } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -222,13 +222,7 @@ describe('Grant scope over the HTTP path', () => {
 
     app = moduleRef.createNestApplication();
     // Mirrors the production pipe in main.ts so DTO rejections are identical.
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     await app.init();
   });
 

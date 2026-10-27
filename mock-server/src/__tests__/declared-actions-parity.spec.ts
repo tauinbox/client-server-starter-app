@@ -72,7 +72,7 @@ describe('declared action lists parity with server', () => {
     );
 
     expect(res).toEqual({
-      status: 400,
+      status: 422,
       errorKey: ErrorKeys.RESOURCES.ACTION_NOT_DECLARED
     });
   });
@@ -88,7 +88,7 @@ describe('declared action lists parity with server', () => {
     });
 
     expect(res).toEqual({
-      status: 400,
+      status: 422,
       errorKey: ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED
     });
   });
@@ -104,7 +104,7 @@ describe('declared action lists parity with server', () => {
     });
 
     expect(res).toEqual({
-      status: 400,
+      status: 422,
       errorKey: ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN
     });
   });
@@ -143,7 +143,7 @@ describe('declared action lists parity with server', () => {
     });
 
     expect(res).toEqual({
-      status: 400,
+      status: 422,
       errorKey: ErrorKeys.ROLES.ACTION_NOT_GRANTABLE
     });
   });

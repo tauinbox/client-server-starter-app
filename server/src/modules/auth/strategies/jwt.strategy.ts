@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +13,7 @@ import {
   issuedBeforeMinIat,
   readJwtMinIat
 } from '../jwt-module-options.factory';
+import { ApiError } from '../../../common/errors/api-error';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -42,24 +43,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // minted for another flow (OAuth link/data) would otherwise be accepted
     // here. Requiring the access purpose keeps those flows non-interchangeable.
     if (payload.purpose !== TOKEN_PURPOSE.ACCESS) {
-      throw new HttpException(
-        {
-          message: 'Token is not an access token',
-          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.INVALID_TOKEN,
+        'Token is not an access token'
       );
     }
 
     // Fail closed: a missing subject would leave the lookup below unconstrained,
     // which resolves to an arbitrary user instead of failing
     if (typeof payload.sub !== 'string' || payload.sub === '') {
-      throw new HttpException(
-        {
-          message: 'Token is missing a valid subject claim',
-          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.INVALID_TOKEN,
+        'Token is missing a valid subject claim'
       );
     }
 
@@ -67,24 +62,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Fail closed: without a trusted issue time the key-rotation and
     // token-revocation checks below cannot be enforced
     if (typeof iat !== 'number' || !Number.isFinite(iat)) {
-      throw new HttpException(
-        {
-          message: 'Token is missing a valid issued-at claim',
-          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.INVALID_TOKEN,
+        'Token is missing a valid issued-at claim'
       );
     }
 
     // SRV-12: global key rotation — reject tokens issued before the rotation timestamp
     if (issuedBeforeMinIat(iat, this.minIat)) {
-      throw new HttpException(
-        {
-          message:
-            'Token invalidated due to key rotation. Please log in again.',
-          errorKey: ErrorKeys.AUTH.TOKEN_INVALIDATED_ROTATION
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.TOKEN_INVALIDATED_ROTATION,
+        'Token invalidated due to key rotation. Please log in again.'
       );
     }
 
@@ -95,21 +83,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user) {
-      throw new HttpException(
-        {
-          message: 'User not found',
-          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND
-        },
-        HttpStatus.UNAUTHORIZED
-      );
+      throw new ApiError(ErrorKeys.AUTH.USER_NOT_FOUND, 'User not found');
     }
     if (issuedBeforeRevocation(iat, user.tokenRevokedAt)) {
-      throw new HttpException(
-        {
-          message: 'Token has been revoked',
-          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.TOKEN_REVOKED,
+        'Token has been revoked'
       );
     }
 
@@ -119,12 +98,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // through the refresh cookie.
     const sessionId = payload.sid;
     if (typeof sessionId !== 'string' || sessionId === '') {
-      throw new HttpException(
-        {
-          message: 'Token is missing a valid session claim',
-          errorKey: ErrorKeys.AUTH.INVALID_TOKEN
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.INVALID_TOKEN,
+        'Token is missing a valid session claim'
       );
     }
 
@@ -132,13 +108,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // device spends to kill that device's access token at once, rather than
     // stamping a revocation that ends every other device too.
     if (!(await this.refreshTokenService.hasLiveSession(sessionId))) {
-      throw new HttpException(
-        {
-          message: 'Session has ended',
-          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
-        },
-        HttpStatus.UNAUTHORIZED
-      );
+      throw new ApiError(ErrorKeys.AUTH.TOKEN_REVOKED, 'Session has ended');
     }
 
     return {

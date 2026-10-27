@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { versionEtag } from '@app/shared/utils/if-match';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -44,7 +45,7 @@ async function send<T>(
     'content-type': 'application/json',
     authorization: `Bearer ${token}`
   };
-  if (ifMatch !== undefined) headers['if-match'] = String(ifMatch);
+  if (ifMatch !== undefined) headers['if-match'] = versionEtag(ifMatch);
   const res = await fetch(`${baseUrl}/api/v1/${path}`, {
     method,
     headers,

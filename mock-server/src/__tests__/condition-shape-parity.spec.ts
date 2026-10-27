@@ -48,7 +48,7 @@ function editorRolePermissions(): unknown[] {
 }
 
 // Mirrors the server's PermissionConditionDto shape validation: a partially
-// malformed condition must be rejected with 400, and a stored malformed
+// malformed condition must be rejected with 422, and a stored malformed
 // condition must veto the permission during rule packing (fail closed)
 // instead of silently widening the grant.
 describe('condition shape parity with server', () => {
@@ -122,10 +122,10 @@ describe('condition shape parity with server', () => {
         { custom: '{"name":{"$in":["active",{"nested":"x"}]}}' },
         'must be an array of'
       ]
-    ])('rejects %s with 400 and no write', async (_label, conditions, part) => {
+    ])('rejects %s with 422 and no write', async (_label, conditions, part) => {
       const res = await putConditions(conditions);
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
       expect(body.errors.join(' ')).toContain(part);
       expect(editorRolePermissions()).toEqual([]);
@@ -149,7 +149,7 @@ describe('condition shape parity with server', () => {
   });
 
   describe('POST /api/v1/roles/:id/permissions', () => {
-    it('rejects a malformed conditions object with 400 and no write', async () => {
+    it('rejects a malformed conditions object with 422 and no write', async () => {
       const token = await loginAsAdmin();
 
       const res = await fetch(
@@ -167,7 +167,7 @@ describe('condition shape parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
       expect(body.errors.join(' ')).toContain('fieldMatch.name');
       expect(editorRolePermissions()).toEqual([]);

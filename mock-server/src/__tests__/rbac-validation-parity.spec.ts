@@ -61,7 +61,7 @@ describe('rbac validation parity with server', () => {
         { displayName }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual(['displayName should not be empty']);
     });
@@ -87,7 +87,7 @@ describe('rbac validation parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual([
         'displayName must be shorter than or equal to 100 characters',
@@ -105,7 +105,7 @@ describe('rbac validation parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual([
         'description must be shorter than or equal to 500 characters'
@@ -127,7 +127,7 @@ describe('rbac validation parity with server', () => {
         { bogus: 1, other: 2, displayName: 'ok' }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual([
         'property bogus should not exist',
@@ -147,7 +147,7 @@ describe('rbac validation parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual([
         'property bogus should not exist',
@@ -168,7 +168,7 @@ describe('rbac validation parity with server', () => {
         { allowedActionNames: [1, 'x'.repeat(51)] }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual([
         'each value in allowedActionNames must be shorter than or equal to 50 characters',
@@ -183,7 +183,7 @@ describe('rbac validation parity with server', () => {
         { allowedActionNames: ['read', 'x'.repeat(51)], displayName: 5 }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
       expect(body.errors).toEqual([
         'displayName must be shorter than or equal to 100 characters',

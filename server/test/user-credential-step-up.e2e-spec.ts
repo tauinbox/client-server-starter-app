@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -60,13 +57,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -193,7 +184,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const token = await tokenFor(adminEmail);
 
     const refused = await patch(token, id, { password: newPassword });
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     );
@@ -219,7 +210,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       password: newPassword,
       currentPassword: 'Wrong-Password-00'
     });
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     );
@@ -234,7 +225,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       .findOneOrFail({ where: { id } });
 
     const refused = await patch(token, id, { email: movedEmail });
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
 
     const row = await dataSource
       .getRepository(User)
@@ -256,7 +247,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       { email: movedEmail, name: 'Moved' }
     ]) {
       const refused = await patch(token, id, body);
-      expect(refused.status).toBe(400);
+      expect(refused.status).toBe(403);
       expect((refused.body as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.USERS.CREDENTIAL_SELF
       );

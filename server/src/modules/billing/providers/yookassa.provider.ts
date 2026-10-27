@@ -3,8 +3,7 @@ import {
   Inject,
   Injectable,
   Logger,
-  NotImplementedException,
-  ServiceUnavailableException
+  NotImplementedException
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -24,6 +23,7 @@ import type { Customer } from '../entities/customer.entity';
 import { PaymentMethod } from '../entities/payment-method.entity';
 import type { Plan } from '../entities/plan.entity';
 import { YOOKASSA_CLIENT } from './yookassa.client';
+import { ApiError } from '../../../common/errors/api-error';
 import {
   ChargeDeclinedError,
   MANAGES_LIFECYCLE,
@@ -138,10 +138,10 @@ function confirmationSession(payment: {
 }): CheckoutSession {
   const url = payment.confirmation?.confirmation_url;
   if (!url) {
-    throw new ServiceUnavailableException({
-      message: 'YooKassa did not return a confirmation URL',
-      errorKey: ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED
-    });
+    throw new ApiError(
+      ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED,
+      'YooKassa did not return a confirmation URL'
+    );
   }
   return { url, sessionRef: payment.id };
 }
@@ -205,10 +205,10 @@ export class YooKassaProvider implements PaymentProvider {
 
   private requireClient(): YooCheckout {
     if (!this.yoo) {
-      throw new ServiceUnavailableException({
-        message: 'YooKassa is not configured',
-        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED,
+        'YooKassa is not configured'
+      );
     }
     return this.yoo;
   }
@@ -248,10 +248,10 @@ export class YooKassaProvider implements PaymentProvider {
     const yoo = this.requireClient();
     const price = plan.prices.yookassa;
     if (!price) {
-      throw new ServiceUnavailableException({
-        message: `Plan "${plan.key}" has no YooKassa price configured`,
-        errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PLAN_NOT_CONFIGURED,
+        `Plan "${plan.key}" has no YooKassa price configured`
+      );
     }
 
     const metadata = {
@@ -427,10 +427,10 @@ export class YooKassaProvider implements PaymentProvider {
     const yoo = this.requireClient();
     const payment = await yoo.getPayment(providerInvoiceRef);
     if (offSessionChargeKeyFrom(payment.metadata) !== chargeKey) {
-      throw new ServiceUnavailableException({
-        message: `YooKassa payment "${providerInvoiceRef}" does not carry charge key "${chargeKey}"`,
-        errorKey: ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN,
+        `YooKassa payment "${providerInvoiceRef}" does not carry charge key "${chargeKey}"`
+      );
     }
     if (payment.status === 'canceled') {
       return null;
@@ -485,10 +485,10 @@ export class YooKassaProvider implements PaymentProvider {
       }
       cursor = list.next_cursor;
     }
-    throw new ServiceUnavailableException({
-      message: `YooKassa payment scan for charge key "${chargeKey}" exceeded ${OFF_SESSION_SCAN_MAX_PAGES} pages without a definitive answer`,
-      errorKey: ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
-    });
+    throw new ApiError(
+      ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN,
+      `YooKassa payment scan for charge key "${chargeKey}" exceeded ${OFF_SESSION_SCAN_MAX_PAGES} pages without a definitive answer`
+    );
   }
 
   cancel(_providerSubscriptionId: string, _mode: CancelMode): Promise<void> {
@@ -576,10 +576,10 @@ export class YooKassaProvider implements PaymentProvider {
       }
       cursor = list.next_cursor;
     }
-    throw new ServiceUnavailableException({
-      message: `YooKassa refund scan for payment "${paymentId}" exceeded ${maxPages} pages without a definitive answer`,
-      errorKey: ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
-    });
+    throw new ApiError(
+      ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN,
+      `YooKassa refund scan for payment "${paymentId}" exceeded ${maxPages} pages without a definitive answer`
+    );
   }
 
   async verifyAndParseWebhook(
@@ -745,10 +745,10 @@ export class YooKassaProvider implements PaymentProvider {
   private async resolveSavedMethodRef(customer: Customer): Promise<string> {
     const methodId = customer.defaultPaymentMethodId;
     if (!methodId) {
-      throw new ServiceUnavailableException({
-        message: `Customer "${customer.id}" has no saved YooKassa payment method`,
-        errorKey: ErrorKeys.BILLING.PAYMENT_METHOD_MISSING
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PAYMENT_METHOD_MISSING,
+        `Customer "${customer.id}" has no saved YooKassa payment method`
+      );
     }
     // Scoped to the owner (and this provider) so a mis-pointed default can never
     // charge another customer's card token - it fails loudly instead.
@@ -756,10 +756,10 @@ export class YooKassaProvider implements PaymentProvider {
       where: { id: methodId, customerId: customer.id, provider: this.id }
     });
     if (!method) {
-      throw new ServiceUnavailableException({
-        message: `Saved payment method "${methodId}" was not found`,
-        errorKey: ErrorKeys.BILLING.PAYMENT_METHOD_MISSING
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PAYMENT_METHOD_MISSING,
+        `Saved payment method "${methodId}" was not found`
+      );
     }
     return method.providerMethodRef;
   }

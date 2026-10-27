@@ -93,6 +93,7 @@ export {
 } from './environment.constants';
 
 export { ErrorKeys } from './error-keys';
+export { ERROR_STATUS, type ErrorKey, type ErrorStatus } from './error-status';
 
 export { httpStatusText } from './http-status.constants';
 

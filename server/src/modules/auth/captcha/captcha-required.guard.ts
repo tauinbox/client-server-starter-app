@@ -1,13 +1,7 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  InternalServerErrorException
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ErrorKeys } from '@app/shared/constants';
+import { ApiError } from '../../../common/errors/api-error';
 import { CaptchaService } from './captcha.service';
 
 /**
@@ -42,10 +36,10 @@ export class CaptchaRequiredGuard implements CanActivate {
       // Missing or unparseable header means the gate has no rate-limit
       // signal: the APP_GUARD ThrottlerGuard should have set it, so this is
       // configuration drift. Fail closed rather than silently skip captcha.
-      throw new InternalServerErrorException({
-        message: 'Captcha gate cannot evaluate rate-limit state',
-        errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
-      });
+      throw new ApiError(
+        ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE,
+        'Captcha gate cannot evaluate rate-limit state'
+      );
     }
 
     if (remaining > CAPTCHA_THRESHOLD) {
@@ -57,23 +51,17 @@ export class CaptchaRequiredGuard implements CanActivate {
       typeof body?.captchaToken === 'string' ? body.captchaToken.trim() : '';
 
     if (!token) {
-      throw new HttpException(
-        {
-          message: 'Captcha verification is required',
-          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.CAPTCHA_REQUIRED,
+        'Captcha verification is required'
       );
     }
 
     const verified = await this.captchaService.verify(token, req.ip);
     if (!verified) {
-      throw new HttpException(
-        {
-          message: 'Captcha verification failed',
-          errorKey: ErrorKeys.AUTH.CAPTCHA_INVALID
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.CAPTCHA_INVALID,
+        'Captcha verification failed'
       );
     }
 

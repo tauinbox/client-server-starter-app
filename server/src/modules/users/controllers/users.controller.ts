@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  HttpException,
   HttpStatus,
   Logger,
   Param,
@@ -18,6 +17,7 @@ import {
 import { packRules } from '@casl/ability/extra';
 import { UsersService } from '../services/users.service';
 import { MailService } from '../../mail/mail.service';
+import { ApiError } from '../../../common/errors/api-error';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { SearchUsersCursorQueryDto } from '../dtos/search-users-cursor-query.dto';
@@ -252,13 +252,9 @@ export class UsersController {
       id === req.user.userId &&
       (changes.isActive !== undefined || changes.unlockAccount !== undefined)
     ) {
-      throw new HttpException(
-        {
-          message:
-            'You cannot deactivate or unlock your own account. Ask another administrator.',
-          errorKey: ErrorKeys.USERS.MODERATION_SELF
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.USERS.MODERATION_SELF,
+        'You cannot deactivate or unlock your own account. Ask another administrator.'
       );
     }
 
@@ -279,12 +275,9 @@ export class UsersController {
         id === req.user.userId &&
         (changes.password !== undefined || changes.email !== target.email)
       ) {
-        throw new HttpException(
-          {
-            message: 'Change your own email and password on your profile page',
-            errorKey: ErrorKeys.USERS.CREDENTIAL_SELF
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.USERS.CREDENTIAL_SELF,
+          'Change your own email and password on your profile page'
         );
       }
       if (changes.password !== undefined || changes.email !== target.email) {
@@ -430,13 +423,9 @@ export class UsersController {
     @CurrentAbility() ability: AppAbility
   ) {
     if (id === req.user.userId) {
-      throw new HttpException(
-        {
-          message:
-            'Turn off your own two-factor authentication from your profile',
-          errorKey: ErrorKeys.USERS.MFA_RESET_SELF
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.USERS.MFA_RESET_SELF,
+        'Turn off your own two-factor authentication from your profile'
       );
     }
 
@@ -450,12 +439,9 @@ export class UsersController {
       req.user.userId
     );
     if (!target.mfaEnabled) {
-      throw new HttpException(
-        {
-          message: 'Two-factor authentication is not enabled',
-          errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.MFA_NOT_ENABLED,
+        'Two-factor authentication is not enabled'
       );
     }
     await this.assertCredentialStepUp(
@@ -503,12 +489,9 @@ export class UsersController {
     @CurrentAbility() ability: AppAbility
   ): Promise<{ message: string }> {
     if (id === req.user.userId) {
-      throw new HttpException(
-        {
-          message: 'End your own sessions from your profile',
-          errorKey: ErrorKeys.USERS.SESSION_REVOKE_SELF
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.USERS.SESSION_REVOKE_SELF,
+        'End your own sessions from your profile'
       );
     }
 

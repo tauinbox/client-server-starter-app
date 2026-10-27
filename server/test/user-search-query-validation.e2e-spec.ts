@@ -4,11 +4,8 @@
 // service with a 500. Pipe options mirror main.ts.
 
 import { Test } from '@nestjs/testing';
-import {
-  ValidationPipe,
-  VersioningType,
-  type INestApplication
-} from '@nestjs/common';
+import { VersioningType, type INestApplication } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
@@ -73,13 +70,7 @@ describe('User search query DTO validation (e2e)', () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.use((req: Request, _res: Response, next: NextFunction) => {
       (
         req as Request & {

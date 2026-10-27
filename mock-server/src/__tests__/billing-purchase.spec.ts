@@ -100,16 +100,16 @@ describe('GET /billing/products', () => {
 });
 
 describe('POST /billing/purchase', () => {
-  it('rejects an unknown product with 404', async () => {
+  it('rejects an unknown product with 422', async () => {
     const token = await login();
     const res = await postPurchase(token, { productKey: 'nope' });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(422);
   });
 
-  it('rejects a missing custom amount with 400', async () => {
+  it('rejects a missing custom amount with 422', async () => {
     const token = await login();
     const res = await postPurchase(token, { productKey: 'donation' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
     expect(body.message).toBe(
       'amountMinor is required for a custom-amount product'
@@ -124,14 +124,14 @@ describe('POST /billing/purchase', () => {
         productKey: 'donation',
         amountMinor
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe('amountMinor must be between 100 and 50000');
     }
   );
 
   it('treats a zero lower bound as configured, not as missing bounds', async () => {
-    // Mirrors the server: `!minAmountMinor` answered 503 for a legitimate 0
+    // Mirrors the server: `!minAmountMinor` answered a configuration error for a legitimate 0
     // lower bound, so no donation to such a product could ever be started.
     const donation = [...getState().billingProducts.values()].find(
       (p) => p.key === 'donation'
@@ -164,7 +164,7 @@ describe('POST /billing/purchase', () => {
   });
 
   it.each(['report-pack', 'credits-500'])(
-    'rejects a Paddle %s price with no catalog price id with 503',
+    'rejects a Paddle %s price with no catalog price id with 500',
     async (productKey) => {
       const product = [...getState().billingProducts.values()].find(
         (p) => p.key === productKey
@@ -174,7 +174,7 @@ describe('POST /billing/purchase', () => {
       const token = await login();
       const res = await postPurchase(token, { productKey });
 
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(500);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(
         `Product "${productKey}" has no Paddle price configured`
@@ -467,11 +467,11 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     expect(first.status).toBe(200);
     expect(((await first.json()) as InvoiceResponse).status).toBe('paid');
 
-    // Only `amountMinor - half` remains; asking for more than that is a 400.
+    // Only `amountMinor - half` remains; asking for more than that is a 422.
     const over = await refund(adminToken, invoice.id, {
       amountMinor: invoice.amountMinor - half + 1
     });
-    expect(over.status).toBe(400);
+    expect(over.status).toBe(422);
     // Credits stay intact — the rejected leg had no side effects.
     const balance = (await (await getCredits(token)).json()) as {
       balanceUnits: number;

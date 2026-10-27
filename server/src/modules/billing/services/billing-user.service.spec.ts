@@ -1,13 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-  ServiceUnavailableException
-} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ApiError } from '../../../common/errors/api-error';
 import { In } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import {
@@ -225,7 +220,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.purchase('user-1', { productKey: 'nope' }),
-        NotFoundException,
         ErrorKeys.BILLING.PRODUCT_NOT_FOUND
       );
     });
@@ -235,7 +229,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.purchase('user-1', { productKey: 'report-pack' }),
-        NotFoundException,
         ErrorKeys.BILLING.PRODUCT_NOT_FOUND
       );
     });
@@ -249,7 +242,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.purchase('user-1', { productKey: 'report-pack' }),
-        ConflictException,
         ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER
       );
     });
@@ -261,7 +253,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.purchase('user-1', { productKey: 'report-pack' }),
-        ServiceUnavailableException,
         ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
       );
     });
@@ -289,7 +280,6 @@ describe('BillingUserService', () => {
 
           await expectRefusal(
             ctx.service.purchase('user-1', { productKey: 'report-pack' }),
-            ServiceUnavailableException,
             ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
           );
           expect(paddle.createOneTimePayment).not.toHaveBeenCalled();
@@ -329,7 +319,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.purchase('user-1', { productKey: 'donation' }),
-        BadRequestException,
         ErrorKeys.BILLING.AMOUNT_REQUIRED
       );
     });
@@ -344,7 +333,6 @@ describe('BillingUserService', () => {
             productKey: 'donation',
             amountMinor
           }),
-          BadRequestException,
           ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE
         );
         expect(yoo.createOneTimePayment).not.toHaveBeenCalled();
@@ -387,7 +375,6 @@ describe('BillingUserService', () => {
           productKey: 'donation',
           amountMinor: 500
         }),
-        ServiceUnavailableException,
         ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
       );
     });
@@ -610,7 +597,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.checkout('user-1', 'ghost'),
-        NotFoundException,
         ErrorKeys.BILLING.PLAN_NOT_FOUND
       );
     });
@@ -628,7 +614,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.checkout('user-1', 'pro'),
-        ConflictException,
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(ctx.billing.resolveProvider).not.toHaveBeenCalled();
@@ -682,7 +667,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.checkout('user-1', 'pro'),
-        ConflictException,
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
@@ -705,7 +689,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.checkout('user-1', 'pro'),
-        ConflictException,
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
     });
@@ -751,7 +734,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.checkout('user-1', 'pro'),
-        ConflictException,
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(paddle.startCheckout).not.toHaveBeenCalled();
@@ -896,7 +878,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.cancelSubscription('user-1', 'immediate'),
-        ConflictException,
         ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED
       );
       expect(ctx.emit).not.toHaveBeenCalled();
@@ -909,7 +890,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.cancelSubscription('user-1'),
-        NotFoundException,
         ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
       );
     });
@@ -1002,7 +982,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.startPaymentMethodUpdate('user-1'),
-        ServiceUnavailableException,
         ErrorKeys.BILLING.CURRENT_PLAN_MISSING
       );
       expect(yoo.updatePaymentMethod).not.toHaveBeenCalled();
@@ -1015,7 +994,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.startPaymentMethodUpdate('user-1'),
-        NotFoundException,
         ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
       );
     });
@@ -1034,7 +1012,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.startPaymentMethodUpdate('user-1'),
-        ConflictException,
         ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED
       );
       expect(paddle.updatePaymentMethod).not.toHaveBeenCalled();
@@ -1050,14 +1027,11 @@ describe('BillingUserService', () => {
         status: 'active'
       });
       ctx.billing.getProviderById.mockImplementation(() => {
-        throw new ServiceUnavailableException({
-          errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-        });
+        throw new ApiError(ErrorKeys.BILLING.PROVIDER_UNAVAILABLE, 'closed');
       });
 
       await expectRefusal(
         ctx.service.startPaymentMethodUpdate('user-1'),
-        ServiceUnavailableException,
         ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
       );
     });
@@ -1338,7 +1312,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.setRegion('user-1', 'ru'),
-        ConflictException,
         ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
       );
       expect(ctx.customers.update).not.toHaveBeenCalled();
@@ -1390,7 +1363,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.setRegion('user-1', 'world'),
-        ConflictException,
         ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
       );
       expect(ctx.customers.update).not.toHaveBeenCalled();
@@ -1413,7 +1385,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.setRegion('user-1', 'ru'),
-        ConflictException,
         ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
       );
       expect(ctx.subscriptions.update).not.toHaveBeenCalled();
@@ -1432,12 +1403,10 @@ describe('BillingUserService', () => {
         (id: BillingProviderId) => Promise.resolve(id === 'yookassa')
       );
 
-      const refusal = ctx.service.setRegion('user-1', 'world');
-
-      await expect(refusal).rejects.toThrow(ConflictException);
-      await expect(refusal).rejects.toMatchObject({
-        response: { errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE }
-      });
+      await expectRefusal(
+        ctx.service.setRegion('user-1', 'world'),
+        ErrorKeys.BILLING.REGION_UNAVAILABLE
+      );
       expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith(
         'paddle',
         'user-1'
@@ -1456,8 +1425,9 @@ describe('BillingUserService', () => {
       });
       ctx.billing.isProviderAvailable.mockResolvedValue(false);
 
-      await expect(ctx.service.setRegion('user-1', 'auto')).rejects.toThrow(
-        ConflictException
+      await expectRefusal(
+        ctx.service.setRegion('user-1', 'auto'),
+        ErrorKeys.BILLING.REGION_UNAVAILABLE
       );
       expect(ctx.billing.isProviderAvailable).toHaveBeenCalledWith(
         'yookassa',
@@ -1523,7 +1493,6 @@ describe('BillingUserService', () => {
 
       await expectRefusal(
         ctx.service.setRegion('user-1', 'ru'),
-        NotFoundException,
         ErrorKeys.USERS.NOT_FOUND
       );
       expect(ctx.customers.save).not.toHaveBeenCalled();

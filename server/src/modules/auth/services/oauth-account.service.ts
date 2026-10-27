@@ -1,7 +1,8 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
+import { ApiError } from '../../../common/errors/api-error';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -56,24 +57,18 @@ export class OAuthAccountService {
       });
 
       if (!user) {
-        throw new HttpException(
-          {
-            message: `User with ID ${userId} not found`,
-            errorKey: ErrorKeys.USERS.NOT_FOUND
-          },
-          HttpStatus.NOT_FOUND
+        throw new ApiError(
+          ErrorKeys.USERS.NOT_FOUND,
+          `User with ID ${userId} not found`
         );
       }
 
       const accounts = await manager.find(OAuthAccount, { where: { userId } });
 
       if (!accounts.some((a) => a.provider === provider)) {
-        throw new HttpException(
-          {
-            message: `No linked ${provider} account found`,
-            errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED
-          },
-          HttpStatus.NOT_FOUND
+        throw new ApiError(
+          ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED,
+          `No linked ${provider} account found`
         );
       }
 
@@ -83,13 +78,9 @@ export class OAuthAccountService {
       ).length;
 
       if (!hasPassword && otherOAuthCount === 0) {
-        throw new HttpException(
-          {
-            message:
-              'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.',
-            errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.AUTH.UNLINK_LAST_PROVIDER,
+          'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.'
         );
       }
 

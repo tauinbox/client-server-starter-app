@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  ServiceUnavailableException
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { BillingProviderId } from '@app/shared/types';
 import { BILLING_PROVIDER_FLAGS, ErrorKeys } from '@app/shared/constants';
 import { geoDefault } from '@app/shared/utils/billing-rules';
@@ -13,6 +9,7 @@ import {
   type PaymentProvider
 } from './providers/payment-provider.interface';
 import { BillingConfigService } from './config/billing-config.service';
+import { ApiError } from '../../common/errors/api-error';
 
 /** Admin kill-switch flag per provider (seeded disabled by default). */
 const PROVIDER_ENABLED_FLAG: Record<BillingProviderId, string> =
@@ -33,21 +30,25 @@ export class BillingService {
    * Selects the effective provider for a customer: a manual override wins over
    * the geo default. The effective provider must be both enabled (the admin
    * kill-switch flag, fully evaluated for the customer's user) and configured
-   * (env credentials present), else billing is unavailable for that geo — a `503`, the server-side enforcement behind the
-   * UI availability gating.
+   * (env credentials present), else billing is unavailable for that geo. This
+   * is the server-side enforcement behind the UI availability gating.
    */
   async resolveProvider(
     customer: Pick<Customer, 'providerOverride' | 'country' | 'userId'>
   ): Promise<PaymentProvider> {
     const effective = customer.providerOverride ?? geoDefault(customer.country);
 
-    const enabled = await this.isProviderEnabled(effective, customer.userId);
-    const configured = this.billingConfig.isConfigured(effective);
-    if (!enabled || !configured) {
-      throw new ServiceUnavailableException({
-        message: `Billing provider "${effective}" is not available`,
-        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-      });
+    if (!this.billingConfig.isConfigured(effective)) {
+      throw new ApiError(
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED,
+        `Billing provider "${effective}" is not configured`
+      );
+    }
+    if (!(await this.isProviderEnabled(effective, customer.userId))) {
+      throw new ApiError(
+        ErrorKeys.BILLING.PROVIDER_UNAVAILABLE,
+        `Billing provider "${effective}" is not available`
+      );
     }
 
     return this.getProviderById(effective);
@@ -86,17 +87,17 @@ export class BillingService {
 
   /**
    * The registered provider instance for `id`, with no enabled/configured
-   * check: an existing subscription or invoice keeps its provider. Throws a
-   * `503` for an unregistered id, so no caller can skip the provider call and
-   * still record the result locally.
+   * check: an existing subscription or invoice keeps its provider. Throws for
+   * an unregistered id, so no caller can skip the provider call and still
+   * record the result locally.
    */
   getProviderById(id: BillingProviderId): PaymentProvider {
     const provider = this.providers.find((p) => p.id === id);
     if (!provider) {
-      throw new ServiceUnavailableException({
-        message: `Billing provider "${id}" is not registered`,
-        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-      });
+      throw new ApiError(
+        ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
+        `Billing provider "${id}" is not registered`
+      );
     }
     return provider;
   }

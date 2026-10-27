@@ -61,7 +61,7 @@ describe('PATCH /api/v1/users/:id moderation of the own record', () => {
 
     const res = await patchUser(token, owner.id, { isActive: false });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await errorKeyOf(res)).toBe(ErrorKeys.USERS.MODERATION_SELF);
     expect(owner.isActive).toBe(true);
   });
@@ -75,7 +75,7 @@ describe('PATCH /api/v1/users/:id moderation of the own record', () => {
 
     const res = await patchUser(token, owner.id, { unlockAccount: true });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await errorKeyOf(res)).toBe(ErrorKeys.USERS.MODERATION_SELF);
     expect(owner.failedLoginAttempts).toBe(5);
     expect(owner.lockedUntil).toBe(lockedUntil);
@@ -97,7 +97,7 @@ describe('PATCH /api/v1/users/:id moderation of the own record', () => {
 
     const res = await patchUser(token, admin.id, { isActive: false });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await errorKeyOf(res)).toBe(ErrorKeys.USERS.MODERATION_SELF);
     expect(admin.isActive).toBe(true);
   });

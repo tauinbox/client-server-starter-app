@@ -74,7 +74,7 @@ async function expectProofsDead(email: string, resetToken: string) {
     token: resetToken,
     password: 'Amber-Signal-42'
   });
-  expect(reset.status).toBe(400);
+  expect(reset.status).toBe(422);
   expect(await reset.json()).toMatchObject({
     errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
   });
@@ -83,7 +83,7 @@ async function expectProofsDead(email: string, resetToken: string) {
   const confirm = await postAuth('profile/email/confirm', {
     token: PENDING_TOKEN
   });
-  expect(confirm.status).toBe(400);
+  expect(confirm.status).toBe(422);
   expect(await confirm.json()).toMatchObject({
     errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
   });

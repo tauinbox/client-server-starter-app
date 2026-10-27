@@ -111,7 +111,7 @@ describe('POST /api/v1/users/:id/sessions/revoke parity', () => {
       findUserByEmail('admin@example.com')!.id
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await errorKeyOf(res)).toBe(ErrorKeys.USERS.SESSION_REVOKE_SELF);
     expect((await profile(admin)).status).toBe(200);
   });

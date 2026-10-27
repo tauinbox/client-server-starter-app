@@ -75,7 +75,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
   }
 
   const notEnabled = {
-    status: 400,
+    status: 409,
     response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
   };
 

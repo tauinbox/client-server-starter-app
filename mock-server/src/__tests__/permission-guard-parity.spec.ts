@@ -192,7 +192,7 @@ describe('permission-based route authorization', () => {
         body: JSON.stringify({ name: '   ' })
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
   });
 
@@ -298,7 +298,7 @@ describe('permission-based route authorization', () => {
       );
     });
 
-    it('answers 400 on POST /users for a body that fails the DTO, even when the condition refuses', async () => {
+    it('answers 422 on POST /users for a body that fails the DTO, even when the condition refuses', async () => {
       const token = await delegate([
         {
           permissionId: permissionId('res-users', 'act-create'),
@@ -313,7 +313,7 @@ describe('permission-based route authorization', () => {
         locale: 'en'
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('answers 403 on POST /users above the blocklist, which the server checks below the ability', async () => {

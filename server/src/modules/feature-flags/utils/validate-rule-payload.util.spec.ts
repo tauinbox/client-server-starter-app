@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { expectApiError } from '../../../common/testing/api-error.expect';
 import {
   ErrorKeys,
   FEATURE_FLAG_ATTRIBUTE_FIELD_OPS,
@@ -152,7 +152,10 @@ describe('validateRulePayload attribute value', () => {
   }
 
   function expectRejected(op: string, value: unknown): void {
-    expect(() => validate(op, value)).toThrow(BadRequestException);
+    expectApiError(
+      thrownBy(() => validate(op, value)),
+      ErrorKeys.FEATURE_FLAGS.INVALID_RULE
+    );
   }
 
   describe('eq', () => {
@@ -347,12 +350,15 @@ describe('validateRulePayload attribute value', () => {
   it.each(['session', null, 1])(
     'rejects percentage bucketBy=%p',
     (bucketBy) => {
-      expect(() =>
-        validateRulePayload(
-          { type: 'percentage', percent: 25, bucketBy },
-          knownCustomKeys
-        )
-      ).toThrow(BadRequestException);
+      expectApiError(
+        thrownBy(() =>
+          validateRulePayload(
+            { type: 'percentage', percent: 25, bucketBy },
+            knownCustomKeys
+          )
+        ),
+        ErrorKeys.FEATURE_FLAGS.INVALID_RULE
+      );
     }
   );
 });

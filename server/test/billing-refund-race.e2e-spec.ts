@@ -5,7 +5,8 @@
 
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { BadRequestException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
+import { expectApiError } from '../src/common/testing/api-error.expect';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
@@ -192,7 +193,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
 
     // 60000 + 50000 exceeds the 99000 invoice: the second leg used to price
     // itself against a zero base and move real money anyway.
-    expect(secondLeg).toBeInstanceOf(BadRequestException);
+    expectApiError(secondLeg, ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE);
     expect(refund).toHaveBeenCalledTimes(1);
     const row = await reload(invoice.id);
     expect(row?.refundedMinor.toNumber()).toBe(60000);

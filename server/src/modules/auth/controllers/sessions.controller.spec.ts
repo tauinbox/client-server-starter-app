@@ -191,7 +191,7 @@ describe('SessionsController', () => {
           mockResponse()
         )
       ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
+        status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.SESSION_IS_CURRENT }
       });
 

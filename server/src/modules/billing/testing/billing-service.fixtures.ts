@@ -1,16 +1,17 @@
-import type { HttpException, Type } from '@nestjs/common';
+import { ERROR_STATUS, type ErrorKey } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
+import { ApiError } from '../../../common/errors/api-error';
 import type { Plan } from '../entities/plan.entity';
 
-/** A refusal answers its status class and the key that the client translates. */
+/** A refusal answers the key that the client translates, with its status. */
 export async function expectRefusal(
   action: Promise<unknown>,
-  type: Type<HttpException>,
-  errorKey: string
+  errorKey: ErrorKey
 ): Promise<void> {
   const error: unknown = await action.catch((caught: unknown) => caught);
-  expect(error).toBeInstanceOf(type);
-  expect(error).toMatchObject({ response: { errorKey } });
+  expect(error).toBeInstanceOf(ApiError);
+  expect((error as ApiError).errorKey).toBe(errorKey);
+  expect((error as ApiError).getStatus()).toBe(ERROR_STATUS[errorKey]);
 }
 
 export type QueryBuilderMock = {

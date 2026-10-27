@@ -18,6 +18,7 @@ import {
 } from '../state';
 import type { AuthenticatedRequest } from '../types';
 import { logRefusal } from './auth.helpers';
+import { sendError } from './error-envelope.helpers';
 
 type ScopeItem = {
   permissionId: string;
@@ -90,11 +91,7 @@ export function assertGrantScope(
     // of the response body.
     details: refused.details
   });
-  res.status(refused.status).json({
-    message: refused.message,
-    statusCode: refused.status,
-    errorKey: refused.errorKey
-  });
+  sendError(res, refused.errorKey, refused.message);
   return false;
 }
 
@@ -122,11 +119,11 @@ export function assertCanWiden(
       reason: 'resource-widen'
     }
   });
-  res.status(403).json({
-    message: `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`,
-    statusCode: 403,
-    errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN
-  });
+  sendError(
+    res,
+    ErrorKeys.RESOURCES.CANNOT_WIDEN,
+    `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`
+  );
   return false;
 }
 

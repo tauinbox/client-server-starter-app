@@ -1,10 +1,14 @@
-import { ServiceUnavailableException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
+import { expectApiError } from '../../../common/testing/api-error.expect';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
-import type { PaymentProvider } from './payment-provider.interface';
+import {
+  ChargeDeclinedError,
+  type PaymentProvider
+} from './payment-provider.interface';
 import {
   DeadlineBoundProvider,
+  ProviderError,
   ProviderTimeoutError,
   withProviderDeadline
 } from './provider-deadline';
@@ -50,17 +54,18 @@ describe('withProviderDeadline', () => {
     );
   });
 
-  it('answers 503 with the uncertain-state key, since money may have moved', () => {
+  it('answers a gateway timeout, since the provider did not answer in time', () => {
     const error = new ProviderTimeoutError(
       'yookassa',
       'chargeOffSession',
       TIMEOUT_MS
     );
 
-    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    expectApiError(error, ErrorKeys.BILLING.PROVIDER_TIMEOUT);
+    expect(error.getStatus()).toBe(504);
     expect(error.getResponse()).toEqual({
       message: `yookassa.chargeOffSession did not respond within ${TIMEOUT_MS}ms`,
-      errorKey: ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+      errorKey: ErrorKeys.BILLING.PROVIDER_TIMEOUT
     });
     expect(error.message).toBe(
       `yookassa.chargeOffSession did not respond within ${TIMEOUT_MS}ms`
@@ -120,27 +125,45 @@ describe('withProviderDeadline', () => {
     );
   });
 
-  it('propagates the underlying failure instead of masking it as a timeout', async () => {
+  it('answers a provider failure as a bad gateway that keeps the cause', async () => {
     const inner = providerStub();
-    const failure = new Error('card declined');
+    const failure = new Error('socket hang up');
     inner.chargeOffSession.mockRejectedValue(failure);
+    const provider = withProviderDeadline(inner, TIMEOUT_MS);
+
+    const error: unknown = await provider
+      .chargeOffSession(customer, 1000, 'RUB', [])
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ProviderError);
+    expectApiError(error, ErrorKeys.BILLING.PROVIDER_ERROR);
+    expect((error as ProviderError).getStatus()).toBe(502);
+    expect((error as ProviderError).cause).toBe(failure);
+  });
+
+  it('passes an HTTP answer of ours through, so a decline stays a decline', async () => {
+    const inner = providerStub();
+    const declined = new ChargeDeclinedError();
+    inner.chargeOffSession.mockRejectedValue(declined);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
     await expect(
       provider.chargeOffSession(customer, 1000, 'RUB', [])
-    ).rejects.toBe(failure);
+    ).rejects.toBe(declined);
   });
 
-  it('propagates a synchronous throw as a rejection', async () => {
+  it('answers a synchronous throw as a bad gateway too', async () => {
     const inner = providerStub();
     inner.cancel.mockImplementation(() => {
       throw new Error('not configured');
     });
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
-    await expect(provider.cancel('sub-1', 'immediate')).rejects.toThrow(
-      'not configured'
-    );
+    const error: unknown = await provider
+      .cancel('sub-1', 'immediate')
+      .catch((caught: unknown) => caught);
+
+    expectApiError(error, ErrorKeys.BILLING.PROVIDER_ERROR);
   });
 
   it('clears the deadline timer once the call settles', async () => {
@@ -166,14 +189,24 @@ describe('withProviderDeadline', () => {
     expect(provider.managesLifecycle).toBe(false);
   });
 
-  it('returns the provider untouched when the deadline is disabled', () => {
-    const inner = providerStub();
+  it.each([0, -1, Number.NaN])(
+    'keeps the error mapping but sets no timer for the disabled deadline %p',
+    async (timeoutMs) => {
+      jest.useFakeTimers();
+      try {
+        const inner = providerStub();
+        inner.cancel.mockRejectedValue(new Error('socket hang up'));
+        const provider = withProviderDeadline(inner, timeoutMs);
+        expect(provider).toBeInstanceOf(DeadlineBoundProvider);
 
-    expect(withProviderDeadline(inner, 0)).toBe(inner);
-    expect(withProviderDeadline(inner, -1)).toBe(inner);
-    expect(withProviderDeadline(inner, Number.NaN)).toBe(inner);
-    expect(withProviderDeadline(inner, TIMEOUT_MS)).toBeInstanceOf(
-      DeadlineBoundProvider
-    );
-  });
+        const pending = provider
+          .cancel('sub-1', 'immediate')
+          .catch((caught: unknown) => caught);
+        expect(jest.getTimerCount()).toBe(0);
+        expectApiError(await pending, ErrorKeys.BILLING.PROVIDER_ERROR);
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+  );
 });

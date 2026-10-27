@@ -14,7 +14,8 @@ import {
   stepUpError,
   stepUpFactorsBodyErrors
 } from '../helpers/reauth.helpers';
-import { validationError } from '../helpers/validation-error.helpers';
+import { sendValidationError } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 import {
   AUTH_COOKIE_PATH,
   OAUTH_DATA_COOKIE,
@@ -44,11 +45,11 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const provider = req.params['provider'] as string;
   if (!OAUTH_PROVIDERS.includes(provider)) {
-    res.status(400).json({
-      message: `Invalid OAuth provider: ${provider}`,
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER,
+      `Invalid OAuth provider: ${provider}`
+    );
     return;
   }
 
@@ -56,7 +57,7 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
 
   const bodyErrors = stepUpFactorsBodyErrors(req.body);
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -76,23 +77,22 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
   const accounts = state.oauthAccounts.get(user.id) || [];
 
   if (!accounts.some((a) => a.provider === provider)) {
-    res.status(404).json({
-      message: `No linked ${provider} account found`,
-      statusCode: 404,
-      errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED,
+      `No linked ${provider} account found`
+    );
     return;
   }
 
   const otherOAuth = accounts.filter((a) => a.provider !== provider).length;
 
   if (!user.password && otherOAuth === 0) {
-    res.status(400).json({
-      message:
-        'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.UNLINK_LAST_PROVIDER,
+      'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.'
+    );
     return;
   }
 
@@ -149,11 +149,7 @@ router.post('/exchange', (req, res) => {
   res.clearCookie(OAUTH_DATA_COOKIE, { path: AUTH_COOKIE_PATH });
 
   if (!cookie) {
-    res.status(400).json({
-      message: 'Missing OAuth data',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.MISSING_OAUTH_DATA
-    });
+    sendError(res, ErrorKeys.AUTH.MISSING_OAUTH_DATA, 'Missing OAuth data');
     return;
   }
 
@@ -166,11 +162,11 @@ router.post('/exchange', (req, res) => {
   // A deactivated account gets the refusal a bad cookie gets, as on the
   // server, so the exchange tells nothing about the account.
   if (!pending || pending.expiresAt < Date.now() || !user?.isActive) {
-    res.status(400).json({
-      message: 'Invalid or expired OAuth data',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_OAUTH_DATA,
+      'Invalid or expired OAuth data'
+    );
     return;
   }
 
@@ -199,7 +195,7 @@ router.post('/link-init', authGuard, (req, res) => {
 
   const bodyErrors = stepUpFactorsBodyErrors(req.body);
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -233,7 +229,7 @@ router.post('/reauth-init', authGuard, (req, res) => {
     ...oneOfErrors('operation', operation, STEP_UP_OPERATIONS)
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 

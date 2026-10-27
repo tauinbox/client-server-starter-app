@@ -58,13 +58,13 @@ async function send(
  * the application's own ValidationPipe options over ForgotPasswordDto and
  * ResendVerificationDto returned:
  *
- *   {}              -> 400 ["email must be shorter than or equal to 255 characters",
+ *   {}              -> 422["email must be shorter than or equal to 255 characters",
  *                           "email must be an email"]
- *   {email: null}   -> 400 (the same two)
- *   {email: 123}    -> 400 (the same two)
- *   {email: ''}     -> 400 ["email must be an email"]
- *   {email: '   '}  -> 400 ["email must be an email"]
- *   {email: 'nope'} -> 400 ["email must be an email"]
+ *   {email: null}   -> 422(the same two)
+ *   {email: 123}    -> 422(the same two)
+ *   {email: ''}     -> 422["email must be an email"]
+ *   {email: '   '}  -> 422["email must be an email"]
+ *   {email: 'nope'} -> 422["email must be an email"]
  *
  * The mock used to answer the enumeration-safe 200 for the first three shapes
  * on /resend-verification and /forgot-password, so a client that sent no
@@ -84,7 +84,7 @@ describe('email field validation parity with the server DTOs', () => {
     it('rejects an absent address with both validator messages', async () => {
       const { status, body } = await send('POST', path, {});
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(TWO_MESSAGES);
       expect(body.message).toBe(TWO_MESSAGES.join('. '));
     });
@@ -92,35 +92,35 @@ describe('email field validation parity with the server DTOs', () => {
     it('rejects a null address with both validator messages', async () => {
       const { status, body } = await send('POST', path, { email: null });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(TWO_MESSAGES);
     });
 
     it('rejects a non-string address with both validator messages', async () => {
       const { status, body } = await send('POST', path, { email: 123 });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(TWO_MESSAGES);
     });
 
     it('rejects an empty address with the email message alone', async () => {
       const { status, body } = await send('POST', path, { email: '' });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(ONE_MESSAGE);
     });
 
     it('rejects a whitespace-only address with the email message alone', async () => {
       const { status, body } = await send('POST', path, { email: '   ' });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(ONE_MESSAGE);
     });
 
     it('rejects a malformed address with the email message alone', async () => {
       const { status, body } = await send('POST', path, { email: 'nope' });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(ONE_MESSAGE);
     });
 
@@ -145,7 +145,7 @@ describe('email field validation parity with the server DTOs', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual([
         'newEmail must be shorter than or equal to 255 characters',
         'newEmail must be an email'
@@ -161,7 +161,7 @@ describe('email field validation parity with the server DTOs', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(['newEmail must be an email']);
     });
   });
@@ -177,7 +177,7 @@ describe('email field validation parity with the server DTOs', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(TWO_MESSAGES);
     });
 
@@ -191,7 +191,7 @@ describe('email field validation parity with the server DTOs', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(ONE_MESSAGE);
     });
   });

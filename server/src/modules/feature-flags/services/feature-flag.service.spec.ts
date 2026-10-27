@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { HttpException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
+import type { IfMatchCondition } from '@app/shared/utils/if-match';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuditService } from '../../audit/audit.service';
 import { FeatureFlagService } from './feature-flag.service';
@@ -34,6 +34,12 @@ function createQueryBuilder(affected: number): QueryBuilderMock {
   };
   return qb;
 }
+
+/** The If-Match condition of one strong version tag. */
+const version = (v: number): IfMatchCondition => ({
+  any: false,
+  versions: [v]
+});
 
 describe('FeatureFlagService', () => {
   let service: FeatureFlagService;
@@ -282,7 +288,10 @@ describe('FeatureFlagService', () => {
           SYSTEM_ABILITY,
           actor
         )
-      ).rejects.toBeInstanceOf(HttpException);
+      ).rejects.toMatchObject({
+        status: 422,
+        response: { errorKey: ErrorKeys.FEATURE_FLAGS.INVALID_RULE }
+      });
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
@@ -328,14 +337,53 @@ describe('FeatureFlagService', () => {
       flagRepo.findOne.mockResolvedValue({ ...sampleFlag });
     });
 
-    it('returns 409 before the write when the stored flag is not at the expected version', async () => {
+    it('returns 412 before the write when the stored flag is not at the expected version', async () => {
       await expect(
-        service.update('flag-1', { enabled: true }, 2, SYSTEM_ABILITY, actor)
+        service.update(
+          'flag-1',
+          { enabled: true },
+          version(2),
+          SYSTEM_ABILITY,
+          actor
+        )
       ).rejects.toMatchObject({
-        status: 409,
+        status: 412,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT }
       });
       expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('returns 412 for a condition that names no version, such as a weak tag', async () => {
+      await expect(
+        service.update(
+          'flag-1',
+          { enabled: true },
+          { any: false, versions: [] },
+          SYSTEM_ABILITY,
+          actor
+        )
+      ).rejects.toMatchObject({ status: 412 });
+    });
+
+    it('writes under If-Match * against the version it read', async () => {
+      flagRepo.findOne
+        .mockResolvedValueOnce({ ...sampleFlag })
+        .mockResolvedValueOnce({ ...sampleFlag, enabled: true, version: 2 });
+      const qb = createQueryBuilder(1);
+      mockTransaction({ createQueryBuilder: jest.fn().mockReturnValue(qb) });
+
+      await service.update(
+        'flag-1',
+        { enabled: true },
+        { any: true },
+        SYSTEM_ABILITY,
+        actor
+      );
+
+      expect(qb.where).toHaveBeenCalledWith(
+        'id = :id AND version = :expected',
+        { id: 'flag-1', expected: sampleFlag.version }
+      );
     });
 
     it('reports a bad rule payload before a version mismatch, as the mock does', async () => {
@@ -343,11 +391,11 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { rules: [percentRule(150)] },
-          2,
+          version(2),
           SYSTEM_ABILITY,
           actor
         )
-      ).rejects.toMatchObject({ status: 400 });
+      ).rejects.toMatchObject({ status: 422 });
     });
 
     it('returns 409 when the version-checked write matches no row (affected = 0)', async () => {
@@ -358,12 +406,12 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { enabled: true, rules: [percentRule(25)] },
-          1,
+          version(1),
           SYSTEM_ABILITY,
           actor
         )
       ).rejects.toMatchObject({
-        status: 409,
+        status: 412,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT }
       });
       expect(flagRepo.findOne).toHaveBeenCalledTimes(1);
@@ -383,7 +431,7 @@ describe('FeatureFlagService', () => {
       const result = await service.update(
         'flag-1',
         { enabled: true },
-        1,
+        version(1),
         SYSTEM_ABILITY,
         actor
       );
@@ -411,7 +459,13 @@ describe('FeatureFlagService', () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(qb)
       });
-      await service.update('flag-1', { rules: [] }, 1, SYSTEM_ABILITY, actor);
+      await service.update(
+        'flag-1',
+        { rules: [] },
+        version(1),
+        SYSTEM_ABILITY,
+        actor
+      );
       expect(qb.execute).toHaveBeenCalledTimes(1);
       expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
         flagId: 'flag-1'
@@ -427,7 +481,7 @@ describe('FeatureFlagService', () => {
       await service.update(
         'flag-1',
         { enabled: true, rules: [percentRule(25)] },
-        1,
+        version(1),
         SYSTEM_ABILITY,
         actor
       );
@@ -447,7 +501,13 @@ describe('FeatureFlagService', () => {
       auditService.log.mockRejectedValueOnce(new Error('audit down'));
 
       await expect(
-        service.update('flag-1', { enabled: true }, 1, SYSTEM_ABILITY, actor)
+        service.update(
+          'flag-1',
+          { enabled: true },
+          version(1),
+          SYSTEM_ABILITY,
+          actor
+        )
       ).rejects.toThrow('audit down');
     });
 
@@ -456,11 +516,14 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { rules: [percentRule(150)] },
-          1,
+          version(1),
           SYSTEM_ABILITY,
           actor
         )
-      ).rejects.toBeInstanceOf(HttpException);
+      ).rejects.toMatchObject({
+        status: 422,
+        response: { errorKey: ErrorKeys.FEATURE_FLAGS.INVALID_RULE }
+      });
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
@@ -541,7 +604,13 @@ describe('FeatureFlagService', () => {
       flagRepo.findOne.mockResolvedValue({ ...inScope });
 
       await expect(
-        service.update('flag-1', { environments: [] }, 1, scoped, actor)
+        service.update(
+          'flag-1',
+          { environments: [] },
+          version(1),
+          scoped,
+          actor
+        )
       ).rejects.toMatchObject(refused);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
@@ -672,7 +741,7 @@ describe('FeatureFlagService', () => {
         error = e;
       }
       expect(error).toMatchObject({
-        status: 400,
+        status: 422,
         response: {
           message: 'user rule requires userIds: an array of up to 100 UUIDs'
         }

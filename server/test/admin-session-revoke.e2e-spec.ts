@@ -1,9 +1,9 @@
 import {
   HttpException,
   INestApplication,
-  ValidationPipe,
   VersioningType
 } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -56,13 +56,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -217,7 +211,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const support = await sessionFor(supportEmail);
 
     const refused = await revoke(support.access, await userId(supportEmail));
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.USERS.SESSION_REVOKE_SELF
     );

@@ -2,11 +2,8 @@
 // and out of every rollout of the flag. Pipe options mirror main.ts.
 
 import { Test } from '@nestjs/testing';
-import {
-  ValidationPipe,
-  VersioningType,
-  type INestApplication
-} from '@nestjs/common';
+import { VersioningType, type INestApplication } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
@@ -62,13 +59,7 @@ describe('Feature flag key is immutable after create (e2e)', () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.use((req: Request, _res: Response, next: NextFunction) => {
       const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
       can('update', 'FeatureFlag');
@@ -83,12 +74,12 @@ describe('Feature flag key is immutable after create (e2e)', () => {
     await app.close();
   });
 
-  it('rejects a PATCH that carries a key (400) and writes nothing', async () => {
+  it('rejects a PATCH that carries a key (422) and writes nothing', async () => {
     const res = await request(server)
       .patch(`/api/v1/admin/feature-flags/${FLAG_ID}`)
-      .set('If-Match', '1')
+      .set('If-Match', '"1"')
       .send({ key: 'renamed-flag', enabled: true })
-      .expect(400);
+      .expect(422);
 
     expect((res.body as { message: string[] }).message).toEqual([
       'property key should not exist'
@@ -106,14 +97,14 @@ describe('Feature flag key is immutable after create (e2e)', () => {
 
     await request(server)
       .patch(`/api/v1/admin/feature-flags/${FLAG_ID}`)
-      .set('If-Match', '1')
+      .set('If-Match', '"1"')
       .send({ enabled: true })
       .expect(200);
 
     expect(flagService.update).toHaveBeenCalledWith(
       FLAG_ID,
       { enabled: true },
-      1,
+      { any: false, versions: [1] },
       expect.anything(),
       expect.objectContaining({ actorId: 'admin-1' })
     );

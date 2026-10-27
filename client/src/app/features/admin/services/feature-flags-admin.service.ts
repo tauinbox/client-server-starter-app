@@ -13,6 +13,7 @@ import type {
 } from '@app/shared/types';
 
 import type { CursorPaginatedResponse } from '@app/shared/types';
+import { versionEtag } from '@app/shared/utils/if-match';
 import { silentContext } from '@core/context-tokens/error-notifications';
 import {
   cursorParams,
@@ -109,7 +110,7 @@ export class FeatureFlagsAdminService {
       `${ADMIN_API_V1}/${id}`,
       data,
       {
-        headers: new HttpHeaders({ 'If-Match': String(expectedVersion) }),
+        headers: new HttpHeaders({ 'If-Match': versionEtag(expectedVersion) }),
         context: silentContext()
       }
     );

@@ -1,10 +1,7 @@
 import { Test } from '@nestjs/testing';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException
-} from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { ErrorKeys } from '@app/shared/constants';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { FindOneOptions } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -301,11 +298,12 @@ describe('UsageService', () => {
     });
   });
 
-  it('throws NotFound when the customer has no active subscription', async () => {
+  it('refuses with 409 when the customer has no active subscription', async () => {
     subscriptions.findOne.mockResolvedValue(null);
 
-    await expect(service.record(INPUT)).rejects.toBeInstanceOf(
-      NotFoundException
+    await expectApiRejection(
+      service.record(INPUT),
+      ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION
     );
     expect(usageRecords.save).not.toHaveBeenCalled();
   });
@@ -316,9 +314,10 @@ describe('UsageService', () => {
     // declaring that meter comes back.
     plans.find.mockResolvedValue([makePlan()]);
 
-    await expect(
-      service.record({ ...INPUT, meterKey: 'api_call' })
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expectApiRejection(
+      service.record({ ...INPUT, meterKey: 'api_call' }),
+      ErrorKeys.BILLING.METER_NOT_DECLARED
+    );
     expect(usageRecords.save).not.toHaveBeenCalled();
     expect(metrics.recordUnratedUsage).not.toHaveBeenCalled();
   });
@@ -367,8 +366,9 @@ describe('UsageService', () => {
     credits.isBlocked.mockResolvedValue(true);
     subscriptions.findOne.mockResolvedValue(makeSubscription());
 
-    await expect(service.record(INPUT)).rejects.toBeInstanceOf(
-      ConflictException
+    await expectApiRejection(
+      service.record(INPUT),
+      ErrorKeys.BILLING.CREDITS_BLOCKED
     );
     expect(usageRecords.save).not.toHaveBeenCalled();
   });
@@ -400,7 +400,7 @@ describe('UsageService', () => {
           occurredAt: new Date(PERIOD_START.getTime() - 1).toISOString()
         })
       ).rejects.toMatchObject({
-        status: 400,
+        status: 422,
         response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
       });
       expect(usageRecords.save).not.toHaveBeenCalled();
@@ -445,7 +445,7 @@ describe('UsageService', () => {
           occurredAt: new Date(usageSealedUntil.getTime() - 1).toISOString()
         })
       ).rejects.toMatchObject({
-        status: 400,
+        status: 422,
         response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
       });
       await service.record({
@@ -477,7 +477,7 @@ describe('UsageService', () => {
           occurredAt: new Date(NOW + 5 * 60_000 + 1).toISOString()
         })
       ).rejects.toMatchObject({
-        status: 400,
+        status: 422,
         response: { errorKey: 'errors.billing.usageInFuture' }
       });
       expect(usageRecords.save).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
@@ -29,6 +29,7 @@ import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import type { MfaRequiredResponse } from '@app/shared/types';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
+import { ApiError } from '../../../common/errors/api-error';
 
 @Injectable()
 export class OAuthService {
@@ -91,12 +92,9 @@ export class OAuthService {
         SYSTEM_ABILITY
       );
       if (!user.isActive) {
-        throw new HttpException(
-          {
-            message: 'User account is deactivated',
-            errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
-          },
-          HttpStatus.UNAUTHORIZED
+        throw new ApiError(
+          ErrorKeys.AUTH.USER_DEACTIVATED,
+          'User account is deactivated'
         );
       }
       // Verifying unconditionally would void the mail sent at creation for
@@ -248,24 +246,18 @@ export class OAuthService {
             providerId
           );
         if (existing && existing.userId !== userId) {
-          throw new HttpException(
-            {
-              message: 'This OAuth account is already linked to another user',
-              errorKey: ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
-            },
-            HttpStatus.CONFLICT
+          throw new ApiError(
+            ErrorKeys.AUTH.OAUTH_ALREADY_LINKED,
+            'This OAuth account is already linked to another user'
           );
         }
         // Already linked to this user — safe to ignore
         if (existing) return;
         // The identity is free, so the user already holds another identity of
         // this provider: the API addresses a linked provider by name only.
-        throw new HttpException(
-          {
-            message: 'A provider account of this kind is already linked',
-            errorKey: ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED
-          },
-          HttpStatus.CONFLICT
+        throw new ApiError(
+          ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED,
+          'A provider account of this kind is already linked'
         );
       }
       throw error;
@@ -292,12 +284,9 @@ export class OAuthService {
       providerId
     );
     if (!account || account.userId !== userId) {
-      throw new HttpException(
-        {
-          message: 'The provider identity does not belong to this account',
-          errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.REAUTH_REQUIRED,
+        'The provider identity does not belong to this account'
       );
     }
   }
@@ -356,21 +345,15 @@ export class OAuthService {
   ): Promise<User> {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
     if (!user.isActive) {
-      throw new HttpException(
-        {
-          message: 'User account not found or deactivated',
-          errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED,
+        'User account not found or deactivated'
       );
     }
     if (issuedBeforeRevocation(intentIssuedAt, user.tokenRevokedAt)) {
-      throw new HttpException(
-        {
-          message: 'Token has been revoked',
-          errorKey: ErrorKeys.AUTH.TOKEN_REVOKED
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.TOKEN_REVOKED,
+        'Token has been revoked'
       );
     }
     return user;

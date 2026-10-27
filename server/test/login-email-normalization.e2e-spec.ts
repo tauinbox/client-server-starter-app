@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
@@ -32,13 +29,7 @@ runWithInfra('Login email normalization (e2e)', () => {
     ).compile();
 
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();

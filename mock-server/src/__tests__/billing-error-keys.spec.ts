@@ -83,7 +83,7 @@ const REFUSALS: Refusal[] = [
     name: 'checkout of an unknown plan',
     path: '/billing/checkout',
     body: { planKey: 'ghost' },
-    status: 404,
+    status: 422,
     errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND
   },
   {
@@ -98,7 +98,7 @@ const REFUSALS: Refusal[] = [
     name: 'purchase of an unknown product',
     path: '/billing/purchase',
     body: { productKey: 'ghost' },
-    status: 404,
+    status: 422,
     errorKey: ErrorKeys.BILLING.PRODUCT_NOT_FOUND
   },
   {
@@ -120,21 +120,21 @@ const REFUSALS: Refusal[] = [
     },
     path: '/billing/purchase',
     body: { productKey: 'report-pack' },
-    status: 503,
+    status: 500,
     errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
   },
   {
     name: 'custom purchase with no amount',
     path: '/billing/purchase',
     body: { productKey: 'donation' },
-    status: 400,
+    status: 422,
     errorKey: ErrorKeys.BILLING.AMOUNT_REQUIRED
   },
   {
     name: 'custom purchase outside the bounds',
     path: '/billing/purchase',
     body: { productKey: 'donation', amountMinor: 99 },
-    status: 400,
+    status: 422,
     errorKey: ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE
   },
   {
@@ -193,7 +193,7 @@ const REFUSALS: Refusal[] = [
     arrange: async () => void (await activate()),
     path: '/billing/subscription/change',
     body: { planKey: 'ghost' },
-    status: 404,
+    status: 422,
     errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND
   },
   {

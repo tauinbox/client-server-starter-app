@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { BadRequestException, HttpException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
+import { createMockResponse } from '../../../common/testing/express.mock';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { FeatureFlagsAdminController } from './feature-flags-admin.controller';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
@@ -93,19 +95,24 @@ describe('FeatureFlagsAdminController', () => {
     expect(flagService.getAttributeCustomKeys).toHaveBeenCalled();
   });
 
-  it('findOne passes the ability and the actor to the service', async () => {
-    await expect(controller.findOne('flag-1', req, fullAbility)).resolves.toBe(
-      sampleFlag
-    );
+  const response = () => createMockResponse({ setHeader: jest.fn() });
+
+  it('findOne passes the ability and the actor and sends the ETag', async () => {
+    const res = response();
+    await expect(
+      controller.findOne('flag-1', req, fullAbility, res)
+    ).resolves.toBe(sampleFlag);
     expect(flagService.findOne).toHaveBeenCalledWith(
       'flag-1',
       fullAbility,
       'actor-1'
     );
+    expect(res.setHeader).toHaveBeenCalledWith('ETag', '"1"');
   });
 
-  it('create passes the ability and the audit actor and emits a change event', async () => {
-    await controller.create({ key: 'new-dashboard' }, req, fullAbility);
+  it('create passes the ability and the audit actor, emits a change event and sends the ETag', async () => {
+    const res = response();
+    await controller.create({ key: 'new-dashboard' }, req, fullAbility, res);
     expect(flagService.create).toHaveBeenCalledWith(
       { key: 'new-dashboard' },
       fullAbility,
@@ -115,51 +122,59 @@ describe('FeatureFlagsAdminController', () => {
       FeatureFlagChangedEvent.name,
       expect.any(FeatureFlagChangedEvent)
     );
+    expect(res.setHeader).toHaveBeenCalledWith('ETag', '"1"');
   });
 
-  it('update requires If-Match header', async () => {
-    await expect(
+  it('update answers 428 without an If-Match header', async () => {
+    await expectApiRejection(
       controller.update(
         'flag-1',
         { enabled: true },
         undefined,
         req,
-        fullAbility
-      )
-    ).rejects.toBeInstanceOf(HttpException);
+        fullAbility,
+        response()
+      ),
+      ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED
+    );
   });
 
-  it.each(['abc', '1abc', '1.5'])(
-    'update rejects If-Match %j with 400 before the lookup',
+  it.each(['5', 'abc', '"1', 'W/1'])(
+    'update rejects the bad syntax %j with 400 before the lookup',
     async (ifMatch) => {
-      await expect(
+      await expectApiRejection(
         controller.update(
           'flag-1',
           { enabled: true },
           ifMatch,
           req,
-          fullAbility
-        )
-      ).rejects.toBeInstanceOf(BadRequestException);
+          fullAbility,
+          response()
+        ),
+        ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID
+      );
       expect(flagService.update).not.toHaveBeenCalled();
     }
   );
 
-  it('update strips quoted ETag and passes parsed version, ability and audit actor', async () => {
+  it('update passes the parsed condition, ability and audit actor, and sends the new ETag', async () => {
+    const res = response();
     await controller.update(
       'flag-1',
       { enabled: true },
       '"5"',
       req,
-      fullAbility
+      fullAbility,
+      res
     );
     expect(flagService.update).toHaveBeenCalledWith(
       'flag-1',
       { enabled: true },
-      5,
+      { any: false, versions: [5] },
       fullAbility,
       actor
     );
+    expect(res.setHeader).toHaveBeenCalledWith('ETag', '"2"');
   });
 
   it('preview evaluates the flag that the checked read returns', async () => {

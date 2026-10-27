@@ -775,8 +775,9 @@ has exactly one meaning.
 
 1. **errorInterceptor** catches the errors and shows a snackbar through
    `NotifyService.error(httpErrorResponse)`. It ignores a 401. `NotifyService` does the parse
-   sequence of `errorKey`, then `message`, then the status. On the first 403, the interceptor reads
-   `GET /auth/permissions` silently. Then it calls `AuthStore.setRules()`, which starts
+   sequence of `errorKey`, then `message`, then the status. On the first 403 with `errors.general.insufficientPermissions`, the
+   interceptor reads `GET /auth/permissions` silently. Any other 403 (a step-up refusal, a
+   self-target, a system role) goes to the caller at once, because new permissions cannot change it. Then it calls `AuthStore.setRules()`, which starts
    `RequirePermissionsDirective` through `effect()`, and `AuthStore.setMfaMandatory()` with the
    policy the same answer carries. Then it retries the original request one time.
    The `RBAC_RETRY_CONTEXT` token prevents a retry loop. The interceptor handles a failed permissions
@@ -785,12 +786,12 @@ has exactly one meaning.
    relative URL resolves against the origin of the app. An absolute cross-origin URL never gets the
    token, and its 401 does not start the refresh path. The interceptor handles a 401 with a token
    refresh and a retry of the request. It uses `shareReplay(1)`, thus two refreshes cannot run
-   together. `TOKEN_REFRESH_EXCLUDED_URLS` holds the session-guarded routes whose 401 reports on the
-   request body and not on the session: `POST /auth/logout` and `POST /auth/mfa/enable`. A wrong
-   two-factor enrolment code answers 401. A refresh there sends the same wrong code again. It spends
-   a second attempt of the account budget and it replaces the refresh cookie for no result. Both
-   routes need the `Authorization` header. Thus neither route can move to `AUTH_EXCLUDED_URLS`, which
-   also removes that header.
+   together. `TOKEN_REFRESH_EXCLUDED_URLS` holds the session-guarded route whose 401 reports on the
+   request and not on the session: `POST /auth/logout`, which answers 401 for a session that already
+   ended. The route needs the `Authorization` header, thus it cannot move to `AUTH_EXCLUDED_URLS`,
+   which also removes that header. A wrong two-factor enrolment code answers 422, not 401, so
+   `POST /auth/mfa/enable` needs no entry. `AUTH_EXCLUDED_URLS` also holds `POST /auth/oauth/exchange`:
+   its credential is the handoff cookie, and a missing or spent cookie answers 401.
 
 ### Path Aliases
 
@@ -883,7 +884,8 @@ on `FeatureFlag`. It is the fourth tab of `AdminPanelComponent`. Its components 
 list with a `mat-fab` at the bottom. `LayoutService.isHandset()` selects the layout. Each row has a
 toggle, an edit action and a delete action. The toggle sends `PATCH /admin/feature-flags/:id` with
 the target value `{ enabled }` and the version of the row in `If-Match`. A repeated click therefore
-does not revert the flag. On HTTP 409 the list shows the error and loads the row again.
+does not revert the flag. On HTTP 412 (`errors.featureFlags.versionConflict`) the list shows the
+error and loads the row again.
 
 If a flag has no include-effect rules, a change of the toggle to **on** first asks for a
 confirmation. Such a flag evaluates to `true` for each authenticated user, because the shared
@@ -896,7 +898,7 @@ is read-only and the update body carries no `key`, because the server rejects a 
 percentage bucket hashes the key.
 
 The environments chip grid gives options only and permits no free text. It gives exactly the
-`APP_ENVIRONMENTS` names that the API accepts. Thus a user cannot type an invented name and get a 400
+`APP_ENVIRONMENTS` names that the API accepts. Thus a user cannot type an invented name and get a 422
 at save time.
 
 The dialog opens at `DialogSize.Wide` on a desktop. On a handset it uses the
@@ -917,10 +919,10 @@ synthetic context, from structured fields or from raw JSON, and posts it to
 rule drafts, the enabled switch and the environment chips that are on screen. The panel merges that
 draft into the request in both modes, thus the server evaluates the unsaved editor state and not the
 stored flag. The server validates a supplied rule set with the validator of the save path, so an
-incomplete rule gets the same 400 that a save would give.
+incomplete rule gets the same 422 that a save would give.
 
 The environment field of the panel is a select. It gives the server default and the
-`APP_ENVIRONMENTS` names only, because the server rejects any other `env` with a 400.
+`APP_ENVIRONMENTS` names only, because the server rejects any other `env` with a 422.
 
 The panel shows the reason as a chip. The reason `excluded` and the reason `not-included` are
 different. The first one says that an exclude rule matched, and the chip beside it gives that
@@ -932,7 +934,7 @@ input. An `attribute` rule uses a field, an op and a value, plus a conditional `
 autocomplete. The dialog reads the registered keys once through
 `FeatureFlagsAdminService.getAttributeKeys()` and passes them to every row, thus a flag with three
 rules makes one request. The dialog also blocks a save that names a key outside that set, because the
-set is a runtime fact of the server and a wrong key is a 400 that lands after the flag itself was
+set is a runtime fact of the server and a wrong key is a 422 that lands after the flag itself was
 written.
 
 The state and the HTTP calls are in `features/admin/{store,services}`:
@@ -943,8 +945,9 @@ The state and the HTTP calls are in `features/admin/{store,services}`:
   On a version conflict, `updateFlag()` loads the row again and then rethrows the error, so the next
   edit from the list switch or the edit dialog sends the current version.
 - **`FeatureFlagsAdminService`** is the HTTP wrapper for `/api/v1/admin/feature-flags/*`. `update()`
-  sets `If-Match: <expectedVersion>` for optimistic locking. If the version is stale, the server
-  answers HTTP 409 with `errors.featureFlags.versionConflict`.
+  sets `If-Match: "<expectedVersion>"` (`versionEtag`, an RFC 9110 entity tag) for optimistic
+  locking. If the version is stale, the server answers HTTP 412 with
+  `errors.featureFlags.versionConflict`.
 
 ## Styling
 
@@ -1185,7 +1188,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 343 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1616 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1622 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

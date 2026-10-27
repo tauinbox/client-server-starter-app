@@ -84,7 +84,7 @@ describe('BreachedPasswordService', () => {
     await expect(
       service.assertNotBreached(password, NO_CONTEXT)
     ).rejects.toMatchObject({
-      status: 400,
+      status: 422,
       response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
     });
     expect(recordBreachLookup).toHaveBeenCalledWith('breached');
@@ -178,7 +178,7 @@ describe('BreachedPasswordService', () => {
       await expect(
         service.assertNotBreached('Password123', NO_CONTEXT)
       ).rejects.toMatchObject({
-        status: 400,
+        status: 422,
         response: { errorKey: ErrorKeys.AUTH.PASSWORD_TOO_COMMON }
       });
       expect(fetchMock).not.toHaveBeenCalled();
@@ -192,7 +192,7 @@ describe('BreachedPasswordService', () => {
           name: 'Martina Rossi'
         })
       ).rejects.toMatchObject({
-        status: 400,
+        status: 422,
         response: { errorKey: ErrorKeys.AUTH.PASSWORD_TOO_COMMON }
       });
       expect(fetchMock).not.toHaveBeenCalled();

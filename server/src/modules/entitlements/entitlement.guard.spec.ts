@@ -1,4 +1,5 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
+import { expectApiRejection } from '../../common/testing/api-error.expect';
 import { Reflector } from '@nestjs/core';
 import { ErrorKeys } from '@app/shared/constants';
 import type { JwtAuthRequest } from '../auth/types/auth.request';
@@ -42,18 +43,17 @@ describe('EntitlementGuard', () => {
   it('throws 403 when the caller lacks the capability', async () => {
     reflector.getAllAndOverride.mockReturnValue('priority-support');
     entitlements.has.mockResolvedValue(false);
-    const refusal = guard.canActivate(contextFor('user-1'));
-
-    await expect(refusal).rejects.toThrow(ForbiddenException);
-    await expect(refusal).rejects.toMatchObject({
-      response: { errorKey: ErrorKeys.BILLING.ENTITLEMENT_REQUIRED }
-    });
+    await expectApiRejection(
+      guard.canActivate(contextFor('user-1')),
+      ErrorKeys.BILLING.ENTITLEMENT_REQUIRED
+    );
   });
 
   it('throws 403 when there is no authenticated user', async () => {
     reflector.getAllAndOverride.mockReturnValue('reports');
-    await expect(guard.canActivate(contextFor(undefined))).rejects.toThrow(
-      ForbiddenException
+    await expectApiRejection(
+      guard.canActivate(contextFor(undefined)),
+      ErrorKeys.BILLING.ENTITLEMENT_REQUIRED
     );
     expect(entitlements.has).not.toHaveBeenCalled();
   });

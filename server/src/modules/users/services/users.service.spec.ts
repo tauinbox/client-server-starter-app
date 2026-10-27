@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
+import { ApiError } from '../../../common/errors/api-error';
 import bcrypt from 'bcrypt';
 import {
   PasswordHashVersion,
@@ -313,7 +314,7 @@ describe('UsersService', () => {
 
       await expect(
         service.create(createUserDto, ability, 'actor-1')
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ApiError);
       expect(
         mockBreachedPasswordService.assertNotBreached
       ).not.toHaveBeenCalled();
@@ -388,7 +389,7 @@ describe('UsersService', () => {
 
       await expect(
         service.findOne('user-1', ability, 'actor-1')
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ApiError);
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ actorId: 'actor-1', targetId: 'user-1' })
       );
@@ -824,7 +825,7 @@ describe('UsersService', () => {
       ).rejects.toThrow('connection lost');
     });
 
-    it('should throw ForbiddenException when ability denies update', async () => {
+    it('should throw ApiError when ability denies update', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const canSpy = jest.fn().mockReturnValue(false);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
@@ -832,7 +833,7 @@ describe('UsersService', () => {
 
       await expect(
         service.update('user-1', { name: 'Updated' }, ability)
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ApiError);
       expect(canSpy).toHaveBeenCalledWith('update', mockUser);
     });
 
@@ -843,7 +844,7 @@ describe('UsersService', () => {
 
       await expect(
         service.update('user-1', { name: 'Updated' }, ability, 'actor-1')
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1068,15 +1069,13 @@ describe('UsersService', () => {
       ).rejects.toThrow(HttpException);
     });
 
-    it('should throw ForbiddenException when ability denies delete', async () => {
+    it('should throw ApiError when ability denies delete', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const canSpy = jest.fn().mockReturnValue(false);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
-      await expect(service.remove('user-1', ability)).rejects.toThrow(
-        ForbiddenException
-      );
+      await expect(service.remove('user-1', ability)).rejects.toThrow(ApiError);
       expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
     });
 
@@ -1087,7 +1086,7 @@ describe('UsersService', () => {
 
       await expect(
         service.remove('user-1', ability, 'actor-1')
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1197,14 +1196,14 @@ describe('UsersService', () => {
       ).rejects.toThrow(HttpException);
     });
 
-    it('should throw ForbiddenException when ability denies restore', async () => {
+    it('should throw ApiError when ability denies restore', async () => {
       mockRepository.findOne.mockResolvedValue(deletedUser);
       const canSpy = jest.fn().mockReturnValue(false);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
       await expect(service.restore('user-1', ability)).rejects.toThrow(
-        ForbiddenException
+        ApiError
       );
       expect(canSpy).toHaveBeenCalledWith('delete', deletedUser);
     });
@@ -1216,7 +1215,7 @@ describe('UsersService', () => {
 
       await expect(
         service.restore('user-1', ability, 'actor-1')
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({

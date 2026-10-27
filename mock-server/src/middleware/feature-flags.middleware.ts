@@ -40,7 +40,12 @@ import {
 import { parseFeatureFlagRulePayload } from '@app/shared/utils/feature-flag-rule-payload';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import { findPreviewAttributesError } from '@app/shared/utils/feature-flag-preview-attributes';
-import { parseIfMatchVersion } from '@app/shared/utils/if-match';
+import {
+  ifMatchHolds,
+  parseIfMatch,
+  versionEtag,
+  type IfMatchCondition
+} from '@app/shared/utils/if-match';
 import {
   assertInstancePermission,
   authenticateRequest,
@@ -49,8 +54,9 @@ import {
 import { filterByAbility } from '../helpers/ability-filter.helpers';
 import {
   requireUuid,
-  validationError
+  sendValidationError
 } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 import {
   booleanErrors,
   nestedErrors,
@@ -95,15 +101,6 @@ const CONFIGURED_ATTRIBUTES: Record<string, boolean> = Object.fromEntries([
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function sendError(
-  res: Response,
-  status: number,
-  message: string,
-  errorKey?: string
-): void {
-  res.status(status).json({ message, statusCode: status, errorKey });
 }
 
 interface CreateFlagBody {
@@ -295,13 +292,11 @@ type ValidatedRule = {
 };
 
 // The server runs the rule-payload validator in the service, after the
-// lookups, and answers the first rejected rule with a bare 400. Call it only on
-// a value that rulesErrors accepted.
+// lookups, and answers the first rejected rule with `INVALID_RULE`. Call it
+// only on a value that rulesErrors accepted.
 function parseRules(
   value: unknown
-):
-  | { ok: true; rules: ValidatedRule[] }
-  | { ok: false; message: string; errorKey: string } {
+): { ok: true; rules: ValidatedRule[] } | { ok: false; message: string } {
   const out: ValidatedRule[] = [];
   for (const entry of value as IncomingRule[]) {
     const parsed = parseFeatureFlagRulePayload(
@@ -309,11 +304,7 @@ function parseRules(
       KNOWN_CUSTOM_KEYS
     );
     if (!parsed.ok) {
-      return {
-        ok: false,
-        message: parsed.message,
-        errorKey: ErrorKeys.FEATURE_FLAGS.INVALID_RULE
-      };
+      return { ok: false, message: parsed.message };
     }
     out.push({
       effect: entry.effect as FeatureFlagRuleEffect,
@@ -323,29 +314,29 @@ function parseRules(
   return { ok: true, rules: out };
 }
 
-function parseIfMatch(
+/** Mirrors `FeatureFlagsAdminController.parseIfMatch`; null once answered. */
+function readIfMatch(
+  res: Response,
   header: string | undefined
-):
-  | { ok: true; version: number }
-  | { ok: false; status: number; message: string; errorKey?: string } {
-  const version = parseIfMatchVersion(header);
-  if (version === 'missing') {
-    return {
-      ok: false,
-      status: 428,
-      message: 'If-Match header is required for optimistic locking',
-      errorKey: ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED
-    };
+): IfMatchCondition | null {
+  const condition = parseIfMatch(header);
+  if (condition === 'missing') {
+    sendError(
+      res,
+      ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED,
+      'If-Match header is required for optimistic locking'
+    );
+    return null;
   }
-  if (version === 'invalid') {
-    return {
-      ok: false,
-      status: 400,
-      message: 'If-Match must be a positive integer',
-      errorKey: ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID
-    };
+  if (condition === 'invalid') {
+    sendError(
+      res,
+      ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID,
+      'If-Match must be "*" or a list of entity tags'
+    );
+    return null;
   }
-  return { ok: true, version };
+  return condition;
 }
 
 // Mirrors the real server's coalescing: a burst of flag changes collapses
@@ -526,7 +517,7 @@ adminRouter.get(
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, FEATURE_FLAG_LIST_QUERY);
     if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
+      sendValidationError(res, 'query', errors);
       return;
     }
     if (rejectInvalidCursor(res, query)) return;
@@ -568,15 +559,15 @@ adminRouter.get(
     if (!flag) {
       sendError(
         res,
-        404,
-        'Feature flag not found',
-        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
+        'Feature flag not found'
       );
       return;
     }
     if (!assertInstancePermission(req, res, 'read', 'FeatureFlag', flag)) {
       return;
     }
+    res.setHeader('ETag', versionEtag(flag.version));
     res.json(toFeatureFlagResponse(flag));
   }
 );
@@ -617,7 +608,7 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
   const body = req.body as CreateFlagBody;
   const validation = validateCreate(body);
   if (!validation.ok) {
-    res.status(400).json(validationError(validation.message));
+    sendValidationError(res, 'body', validation.message);
     return;
   }
   const rules = rulesOf(body);
@@ -636,14 +627,13 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
   if (findFlagByKey(validation.data.key)) {
     sendError(
       res,
-      409,
-      'Feature flag with this key already exists',
-      ErrorKeys.FEATURE_FLAGS.KEY_EXISTS
+      ErrorKeys.FEATURE_FLAGS.KEY_EXISTS,
+      'Feature flag with this key already exists'
     );
     return;
   }
   if (rules && !rules.ok) {
-    sendError(res, 400, rules.message, rules.errorKey);
+    sendError(res, ErrorKeys.FEATURE_FLAGS.INVALID_RULE, rules.message);
     return;
   }
   const now = nowIso();
@@ -672,6 +662,7 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
     }
   });
   broadcastFlagsUpdated();
+  res.setHeader('ETag', versionEtag(flag.version));
   res.status(201).json(toFeatureFlagResponse(flag));
 });
 
@@ -685,24 +676,20 @@ adminRouter.patch(
     const body = req.body as UpdateFlagBody;
     const validation = validateUpdate(body);
     if (!validation.ok) {
-      res.status(400).json(validationError(validation.message));
+      sendValidationError(res, 'body', validation.message);
       return;
     }
     const rules = rulesOf(body);
-    const ifMatch = parseIfMatch(req.header('if-match') ?? undefined);
-    if (!ifMatch.ok) {
-      sendError(res, ifMatch.status, ifMatch.message, ifMatch.errorKey);
-      return;
-    }
+    const ifMatch = readIfMatch(res, req.header('if-match') ?? undefined);
+    if (!ifMatch) return;
     const flag = getState().featureFlags.get(
       (req.params['id'] as string) ?? ''
     );
     if (!flag) {
       sendError(
         res,
-        404,
-        'Feature flag not found',
-        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
+        'Feature flag not found'
       );
       return;
     }
@@ -729,15 +716,14 @@ adminRouter.patch(
       return;
     }
     if (rules && !rules.ok) {
-      sendError(res, 400, rules.message, rules.errorKey);
+      sendError(res, ErrorKeys.FEATURE_FLAGS.INVALID_RULE, rules.message);
       return;
     }
-    if (flag.version !== ifMatch.version) {
+    if (!ifMatchHolds(ifMatch, flag.version)) {
       sendError(
         res,
-        409,
-        'Feature flag was modified by another request — reload and retry',
-        ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
+        ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT,
+        'Feature flag was modified by another request — reload and retry'
       );
       return;
     }
@@ -771,6 +757,7 @@ adminRouter.patch(
       }
     });
     broadcastFlagsUpdated();
+    res.setHeader('ETag', versionEtag(flag.version));
     res.json(toFeatureFlagResponse(flag));
   }
 );
@@ -785,9 +772,8 @@ adminRouter.delete(
     if (!flag) {
       sendError(
         res,
-        404,
-        'Feature flag not found',
-        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
+        'Feature flag not found'
       );
       return;
     }
@@ -880,7 +866,7 @@ adminRouter.post(
       ...environmentErrors(body['environments'])
     ];
     if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
+      sendValidationError(res, 'body', errors);
       return;
     }
     const flag = getState().featureFlags.get(
@@ -889,9 +875,8 @@ adminRouter.post(
     if (!flag) {
       sendError(
         res,
-        404,
-        'Feature flag not found',
-        ErrorKeys.FEATURE_FLAGS.NOT_FOUND
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
+        'Feature flag not found'
       );
       return;
     }
@@ -900,7 +885,7 @@ adminRouter.post(
     }
     const draftRules = rulesOf(body);
     if (draftRules && !draftRules.ok) {
-      sendError(res, 400, draftRules.message, draftRules.errorKey);
+      sendError(res, ErrorKeys.FEATURE_FLAGS.INVALID_RULE, draftRules.message);
       return;
     }
     const draftEnvironments =

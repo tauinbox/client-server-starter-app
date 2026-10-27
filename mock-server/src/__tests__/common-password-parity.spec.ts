@@ -16,7 +16,7 @@ const COMMON_PASSWORD = 'Sunshine123';
 
 const TOO_COMMON = {
   message: PASSWORD_TOO_COMMON_MESSAGE,
-  statusCode: 400,
+  statusCode: 422,
   errorKey: ErrorKeys.AUTH.PASSWORD_TOO_COMMON
 };
 
@@ -73,7 +73,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       password: COMMON_PASSWORD
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(findUserByEmail('common-register@example.com')).toBeUndefined();
   });
@@ -85,7 +85,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       password: 'Katerina-Sunrise-19'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
   });
 
@@ -97,7 +97,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       password: 'Password1'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
       ErrorKeys.AUTH.PASSWORD_TOO_COMMON
     );
@@ -116,7 +116,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       password: 'Regular-Sunrise-19'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(findUserByEmail(email)?.password).toBe('Password1');
   });
@@ -135,7 +135,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       token
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(findUserByEmail('user@example.com')?.name).toBe('Regular User');
   });
@@ -154,7 +154,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       token
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
   });
 
@@ -172,7 +172,7 @@ describe('the local common-password check mirrors the server verdict', () => {
       token
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
     expect(getState().users.get(mockId('user-3'))?.email).toBe(
       'john@example.com'

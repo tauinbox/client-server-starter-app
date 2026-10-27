@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { ErrorKeys } from '@app/shared/constants';
+import { ERROR_STATUS, ErrorKeys } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   emailErrors,
@@ -11,7 +11,7 @@ import {
   validateLocale
 } from '../utils/validation';
 import { findUserByEmail, findUserByPendingEmail } from '../state';
-import { validationError } from './validation-error.helpers';
+import { validationError, validationStatus } from './validation-error.helpers';
 import { newPasswordRefusal } from './breached-password.helpers';
 import type { MockUser } from '../types';
 
@@ -24,7 +24,6 @@ export interface CreateUserFields {
 
 interface ConflictEnvelope {
   message: string;
-  statusCode: number;
   errorKey: string;
 }
 
@@ -71,7 +70,11 @@ function createUserDtoResult(
     ...(localeError ? [localeError] : [])
   ];
   if (errors.length > 0) {
-    return { ok: false, status: 400, body: validationError(errors) };
+    return {
+      ok: false,
+      status: validationStatus('body'),
+      body: validationError(errors)
+    };
   }
 
   // Each check above rejects a non-string value.
@@ -109,15 +112,17 @@ export function findCreateUserConflict(
 ): CreateUserConflict | null {
   const passwordRefusal = newPasswordRefusal(fields.password, fields);
   if (passwordRefusal) {
-    return { status: 400, body: passwordRefusal };
+    return {
+      status: ERROR_STATUS[passwordRefusal.errorKey],
+      body: passwordRefusal
+    };
   }
 
   if (findUserByEmail(fields.email) || findUserByPendingEmail(fields.email)) {
     return {
-      status: 409,
+      status: ERROR_STATUS[ErrorKeys.USERS.EMAIL_EXISTS],
       body: {
         message: 'User with this email already exists',
-        statusCode: 409,
         errorKey: ErrorKeys.USERS.EMAIL_EXISTS
       }
     };

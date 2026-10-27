@@ -14,6 +14,7 @@ import {
 } from '../state';
 import type { Actions, SubjectNames } from '../state';
 import type { AuthenticatedRequest, MockUser } from '../types';
+import { sendError } from './error-envelope.helpers';
 
 export function extractBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
@@ -205,11 +206,11 @@ export function assertInstancePermission(
       subject: subjectName
     }
   });
-  res.status(403).json({
-    message: 'Insufficient permissions',
-    statusCode: 403,
-    errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
-  });
+  sendError(
+    res,
+    ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS,
+    'Insufficient permissions'
+  );
   return false;
 }
 
@@ -252,11 +253,11 @@ export function assertCanWriteUser(
       superTarget: true
     }
   });
-  res.status(403).json({
-    message: 'Only a super actor can modify a super account',
-    statusCode: 403,
-    errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
-  });
+  sendError(
+    res,
+    ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN,
+    'Only a super actor can modify a super account'
+  );
   return false;
 }
 

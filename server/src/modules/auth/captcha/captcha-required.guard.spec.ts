@@ -108,7 +108,7 @@ describe('CaptchaRequiredGuard', () => {
       response: {
         errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
       },
-      status: HttpStatus.BAD_REQUEST
+      status: HttpStatus.UNPROCESSABLE_ENTITY
     });
   });
 

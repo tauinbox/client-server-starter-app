@@ -24,7 +24,8 @@ import {
   totpCodeErrors,
   type StepUpErrorEnvelope
 } from '../helpers/reauth.helpers';
-import { validationError } from '../helpers/validation-error.helpers';
+import { sendValidationError } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 import {
   matchesErrors,
   stringErrors,
@@ -43,17 +44,13 @@ import type { Request, Response } from 'express';
 
 const router = Router();
 
-const invalidCodeEnvelope = {
-  message: 'Verification code is incorrect',
-  statusCode: 401,
-  errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
-};
-
-const invalidPendingTokenEnvelope = {
-  message: 'Two-factor sign-in is invalid or has expired',
-  statusCode: 401,
-  errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN
-};
+function sendInvalidPendingToken(res: Response): void {
+  sendError(
+    res,
+    ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN,
+    'Two-factor sign-in is invalid or has expired'
+  );
+}
 
 /** Mirrors `@IsString() @IsNotEmpty() @MaxLength(4096)` on `mfaToken`. */
 function mfaTokenErrors(value: unknown): string[] {
@@ -138,7 +135,7 @@ router.post('/setup', authGuard, (req, res) => {
     ...currentPasswordErrors(currentPassword)
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -155,11 +152,11 @@ router.post('/setup', authGuard, (req, res) => {
   }
 
   if (user.totpEnabledAt) {
-    res.status(409).json({
-      message: 'Two-factor authentication is already enabled',
-      statusCode: 409,
-      errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_ALREADY_ENABLED,
+      'Two-factor authentication is already enabled'
+    );
     return;
   }
 
@@ -190,25 +187,25 @@ router.post('/enable', authGuard, (req, res) => {
     ...totpCodeErrors(code)
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
   if (user.totpEnabledAt) {
-    res.status(409).json({
-      message: 'Two-factor authentication is already enabled',
-      statusCode: 409,
-      errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_ALREADY_ENABLED,
+      'Two-factor authentication is already enabled'
+    );
     return;
   }
 
   if (user.totpSecret === null) {
-    res.status(400).json({
-      message: 'Start the two-factor setup before you confirm a code',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.MFA_SETUP_REQUIRED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_SETUP_REQUIRED,
+      'Start the two-factor setup before you confirm a code'
+    );
     return;
   }
 
@@ -221,7 +218,11 @@ router.post('/enable', authGuard, (req, res) => {
       details: { stage: 'enrolment' },
       ip: req.ip
     });
-    res.status(401).json(invalidCodeEnvelope);
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_ENROLMENT_INVALID_CODE,
+      'Verification code is incorrect'
+    );
     return;
   }
 
@@ -248,7 +249,7 @@ router.post('/disable', authGuard, (req, res) => {
 
   const bodyErrors = stepUpFactorsBodyErrors(req.body);
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -265,11 +266,11 @@ router.post('/disable', authGuard, (req, res) => {
   }
 
   if (!user.totpEnabledAt) {
-    res.status(400).json({
-      message: 'Two-factor authentication is not enabled',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_NOT_ENABLED,
+      'Two-factor authentication is not enabled'
+    );
     return;
   }
 
@@ -300,7 +301,7 @@ router.post('/recovery-codes', authGuard, (req, res) => {
 
   const bodyErrors = stepUpFactorsBodyErrors(req.body);
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -317,11 +318,11 @@ router.post('/recovery-codes', authGuard, (req, res) => {
   }
 
   if (!user.totpEnabledAt) {
-    res.status(400).json({
-      message: 'Two-factor authentication is not enabled',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_NOT_ENABLED,
+      'Two-factor authentication is not enabled'
+    );
     return;
   }
 
@@ -352,13 +353,13 @@ router.post('/verify', (req, res) => {
     ...totpCodeErrors(code)
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
   const user = userFromPendingToken(mfaToken);
   if (!user) {
-    res.status(401).json(invalidPendingTokenEnvelope);
+    sendInvalidPendingToken(res);
     return;
   }
 
@@ -382,7 +383,11 @@ router.post('/verify', (req, res) => {
       sendWithRetryAfter(res, challengeLockedEnvelope(remainingMs));
       return;
     }
-    res.status(401).json(invalidCodeEnvelope);
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_INVALID_CODE,
+      'Verification code is incorrect'
+    );
     return;
   }
 
@@ -404,13 +409,13 @@ router.post('/recovery', (req, res) => {
     ...matchesErrors('recoveryCode', recoveryCode, RECOVERY_CODE_PATTERN)
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
   const user = userFromPendingToken(mfaToken);
   if (!user) {
-    res.status(401).json(invalidPendingTokenEnvelope);
+    sendInvalidPendingToken(res);
     return;
   }
 
@@ -428,11 +433,11 @@ router.post('/recovery', (req, res) => {
       details: { stage: 'recovery_code' },
       ip: req.ip
     });
-    res.status(401).json({
-      message: 'Recovery code is invalid or was already used',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE,
+      'Recovery code is invalid or was already used'
+    );
     return;
   }
 

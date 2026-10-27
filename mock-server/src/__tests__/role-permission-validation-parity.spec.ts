@@ -218,7 +218,7 @@ describe('POST /roles/:id/permissions validation parity', () => {
   ])('lists every violation of %s', async (_label, body, expected) => {
     const res = await send('POST', body);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(((await res.json()) as { errors: string[] }).errors).toEqual(
       expected
     );
@@ -362,7 +362,7 @@ describe('PUT /roles/:id/permissions validation parity', () => {
   ])('lists every violation of %s', async (_label, body, expected) => {
     const res = await send('PUT', body);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(((await res.json()) as { errors: string[] }).errors).toEqual(
       expected
     );

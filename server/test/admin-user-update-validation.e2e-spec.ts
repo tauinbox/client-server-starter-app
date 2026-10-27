@@ -1,13 +1,10 @@
 // Regression guard: isActive/unlockAccount once had no class-validator
-// decorators, so the forbidNonWhitelisted pipe 400-ed every admin
+// decorators, so the forbidNonWhitelisted pipe refused every admin
 // deactivate/unlock request. Pipe options mirror main.ts.
 
 import { Test } from '@nestjs/testing';
-import {
-  ValidationPipe,
-  VersioningType,
-  type INestApplication
-} from '@nestjs/common';
+import { VersioningType, type INestApplication } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
@@ -69,13 +66,7 @@ describe('Admin user update DTO validation (e2e)', () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.use((req: Request, _res: Response, next: NextFunction) => {
       (
         req as Request & {
@@ -126,11 +117,11 @@ describe('Admin user update DTO validation (e2e)', () => {
   it.each([
     ['isActive', { isActive: 'nope' }],
     ['unlockAccount', { unlockAccount: 'yes' }]
-  ])('rejects a non-boolean %s (400)', async (field, payload) => {
+  ])('rejects a non-boolean %s (422)', async (field, payload) => {
     const res = await request(server)
       .patch(`/api/v1/users/${TARGET_ID}`)
       .send(payload)
-      .expect(400);
+      .expect(422);
 
     const body = res.body as { message: string[] };
     expect(body.message).toEqual(
@@ -139,11 +130,11 @@ describe('Admin user update DTO validation (e2e)', () => {
     expect(usersService.update).not.toHaveBeenCalled();
   });
 
-  it('still rejects an unknown property (400)', async () => {
+  it('still rejects an unknown property (422)', async () => {
     await request(server)
       .patch(`/api/v1/users/${TARGET_ID}`)
       .send({ tokenRevokedAt: new Date().toISOString() })
-      .expect(400);
+      .expect(422);
 
     expect(usersService.update).not.toHaveBeenCalled();
   });

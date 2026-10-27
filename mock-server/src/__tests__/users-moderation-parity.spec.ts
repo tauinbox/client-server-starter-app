@@ -75,12 +75,12 @@ describe('PATCH /api/v1/users/:id moderation-field parity with server', () => {
   it.each([
     ['isActive', { isActive: 'nope' }],
     ['unlockAccount', { unlockAccount: 'yes' }]
-  ])('rejects a non-boolean %s with 400', async (field, payload) => {
+  ])('rejects a non-boolean %s with 422', async (field, payload) => {
     const token = await loginAsAdmin();
 
     const res = await patchUser(token, mockId('user-3'), payload);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
     expect(body.message).toBe(`${field} must be a boolean value`);
   });

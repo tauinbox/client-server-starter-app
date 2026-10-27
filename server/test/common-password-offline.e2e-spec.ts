@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
@@ -35,13 +32,7 @@ runWithInfra('Common password check without the range lookup (e2e)', () => {
     ).compile();
 
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -73,7 +64,7 @@ runWithInfra('Common password check without the range lookup (e2e)', () => {
         password: 'Password123',
         name: 'Common Check'
       })
-      .expect(400);
+      .expect(422);
 
     expect((response.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.PASSWORD_TOO_COMMON

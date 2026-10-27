@@ -91,11 +91,11 @@ describe('PUT /billing/region provider availability (server parity)', () => {
 
     const refused = await region('PUT', token, { region: 'ru' });
 
-    expect(refused.status).toBe(409);
+    expect(refused.status).toBe(403);
     expect(refused.body).toMatchObject({
       message: 'Payments are not available in this billing region.',
       errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE,
-      statusCode: 409
+      statusCode: 403
     });
     const current = await region('GET', token);
     expect(current.body['region']).toBe('auto');
@@ -129,7 +129,7 @@ describe('PUT /billing/region provider availability (server parity)', () => {
 
     const refused = await region('PUT', token, { region: 'ru' });
 
-    expect(refused.status).toBe(409);
+    expect(refused.status).toBe(403);
     expect(refused.body['errorKey']).toBe(ErrorKeys.BILLING.REGION_UNAVAILABLE);
   });
 });

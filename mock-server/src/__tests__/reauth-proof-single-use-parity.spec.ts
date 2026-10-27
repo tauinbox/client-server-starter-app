@@ -130,7 +130,7 @@ describe('a reauth proof is spent on its first successful use', () => {
 
     const second = await unlink(token, 'facebook', proof);
 
-    expect(second.status).toBe(400);
+    expect(second.status).toBe(403);
     expect(await second.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });
@@ -153,7 +153,7 @@ describe('a reauth proof is spent on its first successful use', () => {
 
     const res = await unlink(token, 'google', proof);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(clearsTheProof(res)).toBe(false);
   });
 
@@ -161,7 +161,7 @@ describe('a reauth proof is spent on its first successful use', () => {
     const token = await accessToken(OAUTH_ONLY_ID);
     const proof = await issueProof(OAUTH_ONLY_ID, STEP_UP_OPERATION.OAUTH_LINK);
 
-    expect((await unlink(token, 'google', proof)).status).toBe(400);
+    expect((await unlink(token, 'google', proof)).status).toBe(403);
 
     const accepted = await linkInit(token, proof);
 
@@ -177,7 +177,7 @@ describe('a reauth proof is spent on its first successful use', () => {
 
     const second = await linkInit(token, proof);
 
-    expect(second.status).toBe(400);
+    expect(second.status).toBe(403);
     expect(await second.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });
@@ -219,7 +219,7 @@ describe('a reauth proof is compared with the revocation at whole seconds', () =
   it('refuses a proof issued in the second before the revocation', async () => {
     const res = await unlinkAfterRevocation(-1);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });

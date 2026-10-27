@@ -1,11 +1,6 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { ApiError } from '../../../common/errors/api-error';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { usageIngestStart } from '@app/shared/utils/billing-rules';
@@ -86,11 +81,10 @@ export class UsageService {
     // A negative balance means a refund clawed back already-spent credits:
     // no new usage may accrue until the debt is topped up.
     if (await this.credits.isBlocked(input.customerId)) {
-      throw new ConflictException({
-        message:
-          'Credit balance is negative. Top up credits before recording more usage.',
-        errorKey: ErrorKeys.BILLING.CREDITS_BLOCKED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.CREDITS_BLOCKED,
+        'Credit balance is negative. Top up credits before recording more usage.'
+      );
     }
 
     let saved: UsageRecord;
@@ -155,10 +149,10 @@ export class UsageService {
       true
     );
     if (!subscription) {
-      throw new NotFoundException({
-        message: 'No active subscription for customer to record usage against',
-        errorKey: ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION,
+        'No active subscription for customer to record usage against'
+      );
     }
 
     // One query answers both questions: is this meter in the catalog at all, and
@@ -167,10 +161,10 @@ export class UsageService {
       where: [{ key: subscription.planKey }, { meterKey: input.meterKey }]
     });
     if (!candidates.some((p) => p.meterKey === input.meterKey)) {
-      throw new BadRequestException({
-        message: `Meter "${input.meterKey}" is not declared by any plan`,
-        errorKey: ErrorKeys.BILLING.METER_NOT_DECLARED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.METER_NOT_DECLARED,
+        `Meter "${input.meterKey}" is not declared by any plan`
+      );
     }
 
     const now = Date.now();
@@ -178,16 +172,16 @@ export class UsageService {
       ? new Date(input.occurredAt)
       : new Date(now);
     if (occurredAt.getTime() < usageIngestStart(subscription).getTime()) {
-      throw new BadRequestException({
-        message: 'occurredAt is before the open metered window',
-        errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW,
+        'occurredAt is before the open metered window'
+      );
     }
     if (occurredAt.getTime() > now + USAGE_FUTURE_TOLERANCE_MS) {
-      throw new BadRequestException({
-        message: 'occurredAt is in the future',
-        errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.USAGE_IN_FUTURE,
+        'occurredAt is in the future'
+      );
     }
 
     const usageRecords = manager.getRepository(UsageRecord);

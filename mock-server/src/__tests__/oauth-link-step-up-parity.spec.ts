@@ -99,9 +99,9 @@ describe('POST /api/v1/auth/oauth/link-init demands a step-up', () => {
 
     const res = await linkInit(token, {});
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
-      statusCode: 400,
+      statusCode: 403,
       errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     });
   });
@@ -112,7 +112,7 @@ describe('POST /api/v1/auth/oauth/link-init demands a step-up', () => {
 
     const res = await linkInit(token, { currentPassword: 'WrongPassword1' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     const audit = getState().auditLogs.filter(
       (row) => row.action === 'STEP_UP_FAILURE'
     );
@@ -152,7 +152,7 @@ describe('POST /api/v1/auth/oauth/link-init demands a step-up', () => {
 
     const res = await linkInit(token, {}, proof);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });
@@ -163,6 +163,6 @@ describe('POST /api/v1/auth/oauth/link-init demands a step-up', () => {
 
     const res = await linkInit(token, { currentPassword: '' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 });

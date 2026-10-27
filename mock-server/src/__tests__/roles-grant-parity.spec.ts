@@ -86,7 +86,7 @@ describe('role grant error parity with server', () => {
       expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
     });
 
-    it('returns 400 RESOURCE_NOT_FOUND for an unknown permission id', async () => {
+    it('returns 422 UNKNOWN_PERMISSION for an unknown permission id', async () => {
       const token = await loginAsAdmin();
 
       const res = await fetch(
@@ -101,10 +101,10 @@ describe('role grant error parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string; errorKey: string };
       expect(body.message).toBe(`Permission ${mockId('perm-nope')} not found`);
-      expect(body.errorKey).toBe('errors.general.resourceNotFound');
+      expect(body.errorKey).toBe('errors.roles.unknownPermission');
       expect(editorPermissionIds()).toEqual([]);
     });
 
@@ -142,7 +142,7 @@ describe('role grant error parity with server', () => {
   });
 
   describe('PUT /api/v1/roles/:id/permissions', () => {
-    it('returns 400 RESOURCE_NOT_FOUND for an unknown id and leaves the set untouched', async () => {
+    it('returns 422 UNKNOWN_PERMISSION for an unknown id and leaves the set untouched', async () => {
       const token = await loginAsAdmin();
       getState().rolePermissions.push({
         id: 'rp-test',
@@ -168,16 +168,16 @@ describe('role grant error parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string; errorKey: string };
       expect(body.message).toBe(`Permission ${mockId('perm-nope')} not found`);
-      expect(body.errorKey).toBe('errors.general.resourceNotFound');
+      expect(body.errorKey).toBe('errors.roles.unknownPermission');
       expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
     });
   });
 
   describe('identity-bound conditions on a create grant', () => {
-    it('rejects ownership on a create grant with 400 on POST', async () => {
+    it('rejects ownership on a create grant with 422 on POST', async () => {
       const token = await loginAsAdmin();
       const createUser = permissionIdFor(
         mockId('res-users'),
@@ -199,14 +199,14 @@ describe('role grant error parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string; errorKey: string };
       expect(body.message).toContain('Cannot grant create:User');
       expect(body.errorKey).toBe('errors.roles.conditionNotApplicable');
       expect(editorPermissionIds()).toEqual([]);
     });
 
-    it('rejects userAttr on a create grant with 400 on PUT and leaves the set untouched', async () => {
+    it('rejects userAttr on a create grant with 422 on PUT and leaves the set untouched', async () => {
       const token = await loginAsAdmin();
       getState().rolePermissions.push({
         id: 'rp-test',
@@ -238,7 +238,7 @@ describe('role grant error parity with server', () => {
         }
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errorKey: string };
       expect(body.errorKey).toBe('errors.roles.conditionNotApplicable');
       expect(editorPermissionIds()).toEqual([mockId('perm-1')]);

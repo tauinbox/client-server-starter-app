@@ -1,6 +1,6 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
 import type { FindOptionsWhere } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
+import { ApiError } from '../../../common/errors/api-error';
 import type { User } from '../entities/user.entity';
 
 /**
@@ -17,23 +17,15 @@ export function addressTakenWhere(email: string): FindOptionsWhere<User>[] {
  * pending_email reject the loser, and the callers translate that violation into
  * this body, so that the loser gets the same response as the pre-check gives.
  */
-export function emailExistsConflict(): HttpException {
-  return new HttpException(
-    {
-      message: 'User with this email already exists',
-      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-    },
-    HttpStatus.CONFLICT
+export function emailExistsConflict(): ApiError {
+  return new ApiError(
+    ErrorKeys.USERS.EMAIL_EXISTS,
+    'User with this email already exists'
   );
 }
 
 export function isEmailExistsConflict(error: unknown): boolean {
-  if (!(error instanceof HttpException)) return false;
-  const response = error.getResponse();
   return (
-    typeof response === 'object' &&
-    response !== null &&
-    'errorKey' in response &&
-    response.errorKey === ErrorKeys.USERS.EMAIL_EXISTS
+    error instanceof ApiError && error.errorKey === ErrorKeys.USERS.EMAIL_EXISTS
   );
 }

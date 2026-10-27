@@ -11,8 +11,9 @@ import {
 } from '../helpers/reauth.helpers';
 import {
   requireUuid,
-  validationError
+  sendValidationError
 } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 import {
   endOtherUserSessions,
   endUserSession,
@@ -35,7 +36,7 @@ function passesStepUp(req: Request, res: Response): boolean {
 
   const bodyErrors = stepUpFactorsBodyErrors(req.body);
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return false;
   }
 
@@ -96,22 +97,18 @@ router.delete(
     const target = String(req.params['sessionId']);
 
     if (target === current) {
-      res.status(400).json({
-        message: 'Use sign out to end the session of this device',
-        statusCode: 400,
-        errorKey: ErrorKeys.AUTH.SESSION_IS_CURRENT
-      });
+      sendError(
+        res,
+        ErrorKeys.AUTH.SESSION_IS_CURRENT,
+        'Use sign out to end the session of this device'
+      );
       return;
     }
 
     if (!passesStepUp(req, res)) return;
 
     if (!endUserSession(user.id, target)) {
-      res.status(404).json({
-        message: 'Session not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.AUTH.SESSION_NOT_FOUND
-      });
+      sendError(res, ErrorKeys.AUTH.SESSION_NOT_FOUND, 'Session not found');
       return;
     }
 

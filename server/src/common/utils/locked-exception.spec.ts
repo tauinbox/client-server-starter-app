@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
 import { lockedException } from './locked-exception';
 
 describe('lockedException', () => {
@@ -15,12 +16,16 @@ describe('lockedException', () => {
   it('answers 423 with the lock end and the seconds left', () => {
     const lockedUntil = new Date(now + 90_500);
 
-    const exception = lockedException('Locked', 'errors.auth.x', lockedUntil);
+    const exception = lockedException(
+      'Locked',
+      ErrorKeys.AUTH.ACCOUNT_LOCKED,
+      lockedUntil
+    );
 
     expect(exception.getStatus()).toBe(HttpStatus.LOCKED);
     expect(exception.getResponse()).toEqual({
       message: 'Locked',
-      errorKey: 'errors.auth.x',
+      errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
       lockedUntil: lockedUntil.toISOString(),
       retryAfter: 91
     });
@@ -29,7 +34,7 @@ describe('lockedException', () => {
   it('never asks the caller to wait less than one second', () => {
     const exception = lockedException(
       'Locked',
-      'errors.auth.x',
+      ErrorKeys.AUTH.ACCOUNT_LOCKED,
       new Date(now - 5)
     );
 

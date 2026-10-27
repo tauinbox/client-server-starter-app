@@ -1,8 +1,6 @@
-import {
-  ExecutionContext,
-  ForbiddenException,
-  UnauthorizedException
-} from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ErrorKeys } from '@app/shared/constants';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 import { createMongoAbility } from '@casl/ability';
@@ -148,8 +146,9 @@ describe('PermissionsGuard', () => {
       userId: 'user-1'
     });
 
-    await expect(guard.canActivate(context)).rejects.toThrow(
-      ForbiddenException
+    await expectApiRejection(
+      guard.canActivate(context),
+      ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
     );
     expect(auditService.logFireAndForget).toHaveBeenCalledWith(
       expect.objectContaining({ actorId: 'user-1' })
@@ -207,8 +206,9 @@ describe('PermissionsGuard', () => {
       userId: 'user-1'
     });
 
-    await expect(guard.canActivate(context)).rejects.toThrow(
-      ForbiddenException
+    await expectApiRejection(
+      guard.canActivate(context),
+      ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
     );
   });
 });

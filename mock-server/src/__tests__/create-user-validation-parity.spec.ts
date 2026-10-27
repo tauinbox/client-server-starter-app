@@ -34,7 +34,7 @@ async function adminToken(): Promise<string> {
 }
 
 async function errorsOf(res: Response): Promise<string[]> {
-  expect(res.status).toBe(400);
+  expect(res.status).toBe(422);
   return ((await res.json()) as { errors: string[] }).errors;
 }
 

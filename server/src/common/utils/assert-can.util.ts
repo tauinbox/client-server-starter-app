@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ApiError } from '../errors/api-error';
 import type { AppAbility, Subjects } from '../../modules/auth/casl/app-ability';
 import { auditContextOf } from '../../modules/auth/casl/ability-context';
 import { AuditService } from '../../modules/audit/audit.service';
@@ -51,9 +51,9 @@ export function assertCan(
       level: 'instance',
       denied: [{ action, subject: subjectName }]
     },
-    new ForbiddenException({
-      message: 'Insufficient permissions',
-      errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
-    })
+    new ApiError(
+      ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS,
+      'Insufficient permissions'
+    )
   );
 }

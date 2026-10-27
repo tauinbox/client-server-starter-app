@@ -1,5 +1,6 @@
 import type { Server } from 'http';
 import { APP_ENVIRONMENTS, ErrorKeys } from '@app/shared/constants';
+import { versionEtag } from '@app/shared/utils/if-match';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -58,7 +59,7 @@ async function saveRules(flagId: string, rules: unknown): Promise<Response> {
   const version = current.ok
     ? ((await current.json()) as { version: number }).version
     : 1;
-  return patchFlag(flagId, { rules }, String(version));
+  return patchFlag(flagId, { rules }, versionEtag(version));
 }
 
 async function patchFlag(
@@ -98,16 +99,16 @@ describe('feature-flag validation parity with server', () => {
       expect(res.status).toBe(409);
     });
 
-    it('rejects a key on PATCH with 400 and keeps the flag unchanged', async () => {
+    it('rejects a key on PATCH with 422 and keeps the flag unchanged', async () => {
       const created = await createFlag({ key: 'patch-stable-key' });
       const target = (await created.json()) as { id: string; version: number };
 
       const res = await patchFlag(
         target.id,
         { key: 'patch-renamed-key', enabled: true },
-        String(target.version)
+        versionEtag(target.version)
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
       expect(body.errors).toEqual(['property key should not exist']);
       const flag = getState().featureFlags.get(target.id);
@@ -117,7 +118,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a key that is only whitespace', async () => {
       const res = await createFlag({ key: '   ' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('rejects a whitespace-only key on PATCH', async () => {
@@ -128,9 +129,9 @@ describe('feature-flag validation parity with server', () => {
       const res = await patchFlag(
         flag.id,
         { key: '   ' },
-        String(flag.version)
+        versionEtag(flag.version)
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
   });
 
@@ -155,7 +156,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a name the server can never run as', async () => {
       const res = await createFlag({ key: 'env-bad', environments: ['qa'] });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
       expect(body.message).toContain('environment');
     });
@@ -173,12 +174,12 @@ describe('feature-flag validation parity with server', () => {
           headers: {
             'content-type': 'application/json',
             authorization: `Bearer ${token}`,
-            'if-match': String(flag.version)
+            'if-match': versionEtag(flag.version)
           },
           body: JSON.stringify({ environments: ['qa'] })
         }
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
   });
 
@@ -207,7 +208,7 @@ describe('feature-flag validation parity with server', () => {
           value: true
         }
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(
         'customKey "nope" is not registered in the attribute registry'
@@ -222,7 +223,7 @@ describe('feature-flag validation parity with server', () => {
         effect: 'include',
         payload: { type: 'percentage', percent: 500 }
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(
         'percentage rule requires percent: an integer in [0, 100]'
@@ -250,7 +251,7 @@ describe('feature-flag validation parity with server', () => {
         `payload-${payload.type}-bad`,
         { effect: 'include', payload }
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(message);
       expect(
@@ -268,7 +269,7 @@ describe('feature-flag validation parity with server', () => {
           value: '2026-01-01T00:00:00.000Z'
         }
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(
         'attribute rule with field=createdAt does not support op=eq'
@@ -460,8 +461,8 @@ describe('feature-flag validation parity with server', () => {
       ];
       const previewRes = await preview({ rules });
       const saveRes = await saveRules(flagId, rules);
-      expect(previewRes.status).toBe(400);
-      expect(saveRes.status).toBe(400);
+      expect(previewRes.status).toBe(422);
+      expect(saveRes.status).toBe(422);
       const previewBody = (await previewRes.json()) as { message: string };
       const saveBody = (await saveRes.json()) as { message: string };
       expect(previewBody.message).toBe(saveBody.message);
@@ -480,7 +481,7 @@ describe('feature-flag validation parity with server', () => {
           body: JSON.stringify({ rules: 'nope' })
         }
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
       expect(body.errors).toContain('rules must be an array');
     });
@@ -496,7 +497,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a non-boolean enabled', async () => {
       const res = await preview({ enabled: 'yes' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('evaluates a supplied environment list instead of the stored one', async () => {
@@ -510,7 +511,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects an environment the server can never run as', async () => {
       const res = await preview({ environments: ['qa'] });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('writes nothing while previewing a draft', async () => {
@@ -537,7 +538,7 @@ describe('feature-flag validation parity with server', () => {
   // Every message below was measured by running the body through
   // `PreviewFlagContextDto` with the `main.ts` ValidationPipe options. The mock
   // used to coerce these values instead, so a context that worked here returned
-  // 400 against the real server.
+  // 422 against the real server.
   describe('preview context validation', () => {
     let flagId: string;
 
@@ -555,7 +556,7 @@ describe('feature-flag validation parity with server', () => {
 
     async function errorsOf(body: unknown): Promise<string[]> {
       const res = await preview(body);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       return ((await res.json()) as { errors: string[] }).errors;
     }
 
@@ -757,7 +758,7 @@ describe('feature-flag validation parity with server', () => {
     };
 
     async function errorsOf(res: Response): Promise<string[]> {
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       return ((await res.json()) as { errors: string[] }).errors;
     }
 
@@ -911,7 +912,7 @@ describe('feature-flag validation parity with server', () => {
       ]
     ])('PATCH reports %s', async (_, body, expected) => {
       await expect(
-        errorsOf(await patchFlag(ABSENT_ID, body, '1'))
+        errorsOf(await patchFlag(ABSENT_ID, body, '"1"'))
       ).resolves.toEqual(expected);
     });
 
@@ -964,22 +965,22 @@ describe('feature-flag validation parity with server', () => {
   // failure precedes the If-Match parse and both precede the service lookup.
   // The rule-payload validator is the exception: the service runs it after
   // the lookups (404 on PATCH, 409 for a taken key on POST) and before the
-  // version check, so a rejected rule on a stale version is a 400.
+  // version check, so a rejected rule on a stale version is a 422.
   describe('rejection order', () => {
     const ABSENT_ID = '11111111-1111-4111-8111-111111111111';
 
-    it('rejects a bad PATCH body on an absent flag with 400, not 404', async () => {
+    it('rejects a bad PATCH body on an absent flag with 422, not 404', async () => {
       const res = await patchFlag(ABSENT_ID, { enabled: 'yes' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
       expect(body.errors[0]).toContain('enabled');
     });
 
-    it('rejects a bad PATCH body with 400 before the missing If-Match', async () => {
+    it('rejects a bad PATCH body with 422 before the missing If-Match', async () => {
       const created = await createFlag({ key: 'order-patch-body' });
       const flag = (await created.json()) as { id: string };
       const res = await patchFlag(flag.id, { enabled: 'yes' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('still answers 428 for a valid PATCH body with no If-Match on an absent flag', async () => {
@@ -989,7 +990,7 @@ describe('feature-flag validation parity with server', () => {
       expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED);
     });
 
-    it.each(['1abc', '1.5', '0', '2147483648'])(
+    it.each(['1', '1abc', '"1', 'W/1', '"1" "2"'])(
       'rejects If-Match %j with 400 and keeps the flag unchanged',
       async (ifMatch) => {
         const created = await createFlag({ key: 'order-if-match-junk' });
@@ -997,25 +998,27 @@ describe('feature-flag validation parity with server', () => {
         const res = await patchFlag(flag.id, { enabled: true }, ifMatch);
         expect(res.status).toBe(400);
         const body = (await res.json()) as { message: string };
-        expect(body.message).toBe('If-Match must be a positive integer');
+        expect(body.message).toBe(
+          'If-Match must be "*" or a list of entity tags'
+        );
         const stored = getState().featureFlags.get(flag.id);
         expect(stored?.enabled).toBe(false);
         expect(stored?.version).toBe(flag.version);
       }
     );
 
-    it('rejects a non-array rule set on an absent flag with 400, not 404', async () => {
+    it('rejects a non-array rule set on an absent flag with 422, not 404', async () => {
       const res = await saveRules(ABSENT_ID, 'nope');
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
       expect(body.errors).toContain('rules must be an array');
     });
 
-    it('rejects a non-object rule payload on an absent flag with 400, not 404', async () => {
+    it('rejects a non-object rule payload on an absent flag with 422, not 404', async () => {
       const res = await saveRules(ABSENT_ID, [
         { effect: 'include', payload: 'nope' }
       ]);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('answers 404 for a payload the rule validator rejects on an absent flag', async () => {
@@ -1027,21 +1030,21 @@ describe('feature-flag validation parity with server', () => {
       expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.NOT_FOUND);
     });
 
-    it('answers 400 for a rejected rule payload on a stale version, not 409', async () => {
+    it('answers 422 for a rejected rule payload on a stale version, not 412', async () => {
       const created = await createFlag({ key: 'order-stale-rules' });
       const flag = (await created.json()) as { id: string };
       const res = await patchFlag(
         flag.id,
         { rules: [{ effect: 'include', payload: {} }] },
-        '7'
+        '"7"'
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
-    it('rejects a non-array rule set on a taken key with 400, not 409', async () => {
+    it('rejects a non-array rule set on a taken key with 422, not 409', async () => {
       await createFlag({ key: 'order-taken-key' });
       const res = await createFlag({ key: 'order-taken-key', rules: 'nope' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     it('answers 409 for a rejected rule payload on a taken key', async () => {
@@ -1112,7 +1115,7 @@ describe('feature-flag validation parity with server', () => {
         key: 'atomic-create-rejected',
         rules: [roleRule('a'), { effect: 'include', payload: {} }]
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const keys = [...getState().featureFlags.values()].map((f) => f.key);
       expect(keys).not.toContain('atomic-create-rejected');
     });
@@ -1129,9 +1132,9 @@ describe('feature-flag validation parity with server', () => {
           enabled: true,
           rules: [roleRule('b'), { effect: 'include', payload: {} }]
         },
-        '1'
+        '"1"'
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const stored = getState().featureFlags.get(flag.id);
       expect(stored).toMatchObject({ enabled: false, version: 1 });
       const rules = getState().featureFlagRules.filter(
@@ -1149,7 +1152,7 @@ describe('feature-flag validation parity with server', () => {
       const res = await patchFlag(
         flag.id,
         { enabled: true, rules: [roleRule('b'), roleRule('c')] },
-        '1'
+        '"1"'
       );
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
@@ -1170,7 +1173,7 @@ describe('feature-flag validation parity with server', () => {
         rules: [roleRule('a')]
       });
       const flag = (await created.json()) as { id: string };
-      const res = await patchFlag(flag.id, { enabled: true }, '1');
+      const res = await patchFlag(flag.id, { enabled: true }, '"1"');
       const body = (await res.json()) as { rules: unknown[] };
       expect(body.rules).toHaveLength(1);
     });

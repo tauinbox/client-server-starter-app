@@ -1,5 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
 import type { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
+import { ErrorKeys } from '@app/shared/constants';
+import { expectApiRejection } from '../testing/api-error.expect';
 import { applyKeysetPagination } from './apply-keyset-pagination.util';
 import { encodeCursor } from './cursor.util';
 
@@ -113,12 +114,13 @@ describe('applyKeysetPagination', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('should throw BadRequestException for invalid cursor', async () => {
+  it('refuses an invalid cursor', async () => {
     const qb = createMockQueryBuilder([]);
 
-    await expect(
-      applyKeysetPagination(qb, { ...baseOptions, cursor: 'bad-cursor' })
-    ).rejects.toThrow(BadRequestException);
+    await expectApiRejection(
+      applyKeysetPagination(qb, { ...baseOptions, cursor: 'bad-cursor' }),
+      ErrorKeys.GENERAL.INVALID_CURSOR
+    );
   });
 
   it('should fall back to first column when sortBy is not in map', async () => {

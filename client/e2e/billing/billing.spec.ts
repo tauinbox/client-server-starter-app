@@ -260,7 +260,7 @@ test.describe('Billing', () => {
         response.request().method() !== 'GET'
     );
     await region.getByRole('radio', { name: 'Russia' }).click();
-    expect((await refused).status()).toBe(409);
+    expect((await refused).status()).toBe(403);
 
     await expect(page.locator('mat-snack-bar-container')).toContainText(
       'Payments are not available in this billing region.'

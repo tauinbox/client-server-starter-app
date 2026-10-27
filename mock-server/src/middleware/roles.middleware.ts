@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'crypto';
 import {
   ErrorKeys,
+  type ErrorKey,
   ROLE_LIST_QUERY,
   ROLE_NAME_MAX_LENGTH
 } from '@app/shared/constants';
@@ -48,8 +49,9 @@ import {
 import { rewriteRoleNameInRules } from './feature-flags.middleware';
 import {
   requireUuid,
-  validationError
+  sendValidationError
 } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 import {
   isUuidV4,
   nestedErrors,
@@ -216,7 +218,7 @@ function setPermissionsErrors(body: Record<string, unknown>): string[] {
 function findGrantError(
   permissionId: string,
   conditions: unknown
-): { message: string; errorKey: string } | null {
+): { message: string; errorKey: ErrorKey } | null {
   const state = getState();
   const permission = state.permissions.get(permissionId);
   if (!permission) return null;
@@ -270,11 +272,11 @@ function refuseSystemRole(req: Request, res: Response, roleId: string): void {
     targetType: 'Role',
     details: { deniedAction: 'update', subject: 'Role', systemRole: true }
   });
-  res.status(403).json({
-    message: 'Cannot modify system roles',
-    statusCode: 403,
-    errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-  });
+  sendError(
+    res,
+    ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
+    'Cannot modify system roles'
+  );
 }
 
 // Mirrors RoleService.refuseSuperRole: no API path assigns or removes a super
@@ -290,17 +292,19 @@ function refuseSuperRole(
     targetType: 'Role',
     details: { deniedAction: action, subject: 'Role', superRole: true }
   });
-  res.status(403).json({
-    message:
-      action === 'assign'
-        ? 'Cannot assign super roles'
-        : 'Cannot remove super roles',
-    statusCode: 403,
-    errorKey:
-      action === 'assign'
-        ? ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
-        : ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
-  });
+  if (action === 'assign') {
+    sendError(
+      res,
+      ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN,
+      'Cannot assign super roles'
+    );
+  } else {
+    sendError(
+      res,
+      ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN,
+      'Cannot remove super roles'
+    );
+  }
 }
 
 // Notify every connected holder of a role that its effective permission set
@@ -320,7 +324,7 @@ router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
   const query = req.query as Record<string, unknown>;
   const errors = listQueryErrors(query, ROLE_LIST_QUERY);
   if (errors.length > 0) {
-    res.status(400).json(validationError(errors));
+    sendValidationError(res, 'query', errors);
     return;
   }
   if (rejectInvalidCursor(res, query)) return;
@@ -359,11 +363,7 @@ router.get(
     const role = state.roles.get(id);
 
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -402,11 +402,7 @@ router.get(
     const role = getState().roles.get(id);
 
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -428,7 +424,7 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
     ...(normalized.ok ? [] : [normalized.error])
   ];
   if (errors.length > 0 || !normalized.ok) {
-    res.status(400).json(validationError(errors));
+    sendValidationError(res, 'body', errors);
     return;
   }
   const name = normalized.name;
@@ -444,11 +440,11 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
   const state = getState();
   for (const existing of state.roles.values()) {
     if (existing.name === name) {
-      res.status(400).json({
-        message: 'Role with this name already exists',
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.NAME_EXISTS
-      });
+      sendError(
+        res,
+        ErrorKeys.ROLES.NAME_EXISTS,
+        'Role with this name already exists'
+      );
       return;
     }
   }
@@ -498,18 +494,14 @@ router.patch(
       ...(normalized && !normalized.ok ? [normalized.error] : [])
     ];
     if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
+      sendValidationError(res, 'body', errors);
       return;
     }
 
     const role = state.roles.get(id);
 
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -532,11 +524,11 @@ router.patch(
     }
 
     if (role.isSystem) {
-      res.status(400).json({
-        message: 'Cannot modify system roles',
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-      });
+      sendError(
+        res,
+        ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
+        'Cannot modify system roles'
+      );
       return;
     }
 
@@ -549,11 +541,11 @@ router.patch(
       if (normalized.name !== role.name) {
         for (const existing of state.roles.values()) {
           if (existing.name === normalized.name) {
-            res.status(400).json({
-              message: 'Role with this name already exists',
-              statusCode: 400,
-              errorKey: ErrorKeys.ROLES.NAME_EXISTS
-            });
+            sendError(
+              res,
+              ErrorKeys.ROLES.NAME_EXISTS,
+              'Role with this name already exists'
+            );
             return;
           }
         }
@@ -601,11 +593,7 @@ router.delete(
     const role = state.roles.get(id);
 
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -616,11 +604,11 @@ router.delete(
     }
 
     if (role.isSystem) {
-      res.status(400).json({
-        message: 'Cannot delete system roles',
-        statusCode: 400,
-        errorKey: ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM
-      });
+      sendError(
+        res,
+        ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM,
+        'Cannot delete system roles'
+      );
       return;
     }
 
@@ -679,7 +667,7 @@ router.put(
     // needs the role or the permission registry stays below the 404.
     const errors = setPermissionsErrors(req.body);
     if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
+      sendValidationError(res, 'body', errors);
       return;
     }
     const { items } = req.body as {
@@ -689,11 +677,7 @@ router.put(
     const role = state.roles.get(id);
 
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -711,22 +695,22 @@ router.put(
     for (const item of items) {
       const error = findGrantError(item.permissionId, item.conditions);
       if (error) {
-        res.status(400).json({ ...error, statusCode: 400 });
+        sendError(res, error.errorKey, error.message);
         return;
       }
     }
 
-    // Mirror the server: unknown ids fail validation with 400 before the
-    // existing set is touched.
+    // Mirror the server: unknown ids are refused before the existing set is
+    // touched.
     const unknownItem = items.find(
       (item) => !state.permissions.has(item.permissionId)
     );
     if (unknownItem) {
-      res.status(400).json({
-        message: `Permission ${unknownItem.permissionId} not found`,
-        statusCode: 400,
-        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-      });
+      sendError(
+        res,
+        ErrorKeys.ROLES.UNKNOWN_PERMISSION,
+        `Permission ${unknownItem.permissionId} not found`
+      );
       return;
     }
 
@@ -795,7 +779,7 @@ router.post(
     // needs the role or the permission registry stays below the 404.
     const errors = assignPermissionsErrors(req.body);
     if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
+      sendValidationError(res, 'body', errors);
       return;
     }
     const { permissionIds, conditions } = req.body;
@@ -803,11 +787,7 @@ router.post(
     const role = state.roles.get(id);
 
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -825,7 +805,7 @@ router.post(
     for (const permissionId of permissionIds as string[]) {
       const error = findGrantError(permissionId, conditions);
       if (error) {
-        res.status(400).json({ ...error, statusCode: 400 });
+        sendError(res, error.errorKey, error.message);
         return;
       }
     }
@@ -837,11 +817,11 @@ router.post(
       (permissionId) => !state.permissions.has(permissionId)
     );
     if (unknownId !== undefined) {
-      res.status(400).json({
-        message: `Permission ${unknownId} not found`,
-        statusCode: 400,
-        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-      });
+      sendError(
+        res,
+        ErrorKeys.ROLES.UNKNOWN_PERMISSION,
+        `Permission ${unknownId} not found`
+      );
       return;
     }
 
@@ -859,11 +839,11 @@ router.post(
       )
     );
     if (duplicateId !== undefined) {
-      res.status(409).json({
-        message: 'A record with this value already exists',
-        statusCode: 409,
-        errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
-      });
+      sendError(
+        res,
+        ErrorKeys.DB.UNIQUE_VIOLATION,
+        'A record with this value already exists'
+      );
       return;
     }
 
@@ -904,11 +884,7 @@ router.delete(
     const role = state.roles.get(id);
 
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -935,11 +911,11 @@ router.delete(
         (rp) => rp.roleId === id && rp.permissionId === permissionId
       )
     ) {
-      res.status(404).json({
-        message: 'The role does not hold this permission',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED
-      });
+      sendError(
+        res,
+        ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED,
+        'The role does not hold this permission'
+      );
       return;
     }
 
@@ -975,21 +951,14 @@ router.post(
     const state = getState();
     const user = findUserById(userId);
     if (!user) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
+    // The role id comes from the body, as on the server.
     const role = state.roles.get(roleId);
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.UNKNOWN_ROLE, 'Role not found');
       return;
     }
 
@@ -1021,11 +990,11 @@ router.post(
     // constraint and maps to 409 before any side effect (no token revocation,
     // no audit entry, no SSE push).
     if (user.roles.includes(role.name)) {
-      res.status(409).json({
-        message: 'A record with this value already exists',
-        statusCode: 409,
-        errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
-      });
+      sendError(
+        res,
+        ErrorKeys.DB.UNIQUE_VIOLATION,
+        'A record with this value already exists'
+      );
       return;
     }
 
@@ -1062,21 +1031,13 @@ router.delete(
     const state = getState();
     const user = findUserById(userId);
     if (!user) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
     const role = state.roles.get(roleId);
     if (!role) {
-      res.status(404).json({
-        message: 'Role not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
       return;
     }
 
@@ -1099,11 +1060,11 @@ router.delete(
     }
 
     if (!user.roles.includes(role.name)) {
-      res.status(404).json({
-        message: 'The user does not hold this role',
-        statusCode: 404,
-        errorKey: ErrorKeys.ROLES.ROLE_NOT_ASSIGNED
-      });
+      sendError(
+        res,
+        ErrorKeys.ROLES.ROLE_NOT_ASSIGNED,
+        'The user does not hold this role'
+      );
       return;
     }
 

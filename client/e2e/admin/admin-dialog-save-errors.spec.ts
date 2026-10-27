@@ -92,7 +92,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
           'Content-Type': 'application/json',
-          'If-Match': '1'
+          'If-Match': '"1"'
         },
         body: JSON.stringify({ description: 'Changed by another admin' })
       }

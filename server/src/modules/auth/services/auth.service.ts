@@ -1,10 +1,4 @@
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Cache } from 'cache-manager';
@@ -39,6 +33,7 @@ import { MfaService } from './mfa.service';
 import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { hashToken } from '../../../common/utils/hash-token';
 import { lockedException } from '../../../common/utils/locked-exception';
+import { ApiError } from '../../../common/errors/api-error';
 import {
   hashPassword,
   PasswordHashVersion,
@@ -53,6 +48,7 @@ import {
   BCRYPT_SALT_ROUNDS,
   EMAIL_CHANGE_TOKEN_EXPIRY_MS,
   ErrorKeys,
+  type ErrorKey,
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   REAUTH_PROOF_MAX_AGE_SECONDS,
@@ -83,9 +79,15 @@ type ConfirmEmailChangeOutcome =
   | { kind: 'expired'; userId: string }
   | { kind: 'conflict'; userId: string };
 
-const INVALID_REFRESH_TOKEN_BODY = {
-  message: 'Invalid refresh token',
-  errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+/** The key and the message of one refusal, before it becomes an `ApiError`. */
+interface Refusal {
+  key: ErrorKey;
+  message: string;
+}
+
+const INVALID_REFRESH_TOKEN: Refusal = {
+  key: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
+  message: 'Invalid refresh token'
 };
 
 const ENUMERATION_SAFE_INITIATE_RESPONSE = {
@@ -120,24 +122,25 @@ interface StepUpVerdict {
 }
 
 /**
- * The 400 answer for each factor that can refuse a step-up. Not a 401: on a
- * session route the client takes a 401 as an expired session and refreshes.
+ * The answer for each factor that can refuse a step-up. The session of the
+ * request is valid and only the extra proof is not, so it is a refusal and
+ * not a 401: on a session route the client takes a 401 as an expired session.
  */
 const STEP_UP_REFUSALS: Record<
   NonNullable<StepUpVerdict['factor']>,
-  { message: string; errorKey: string }
+  Refusal
 > = {
   reauth_proof: {
-    message: 'Confirm it is you with your sign-in provider, then try again',
-    errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
+    key: ErrorKeys.AUTH.REAUTH_REQUIRED,
+    message: 'Confirm it is you with your sign-in provider, then try again'
   },
   password: {
-    message: 'Current password is incorrect',
-    errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
+    key: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD,
+    message: 'Current password is incorrect'
   },
   code: {
-    message: 'Verification code is incorrect',
-    errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
+    key: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE,
+    message: 'Verification code is incorrect'
   }
 };
 
@@ -255,12 +258,9 @@ export class AuthService {
     // Check email verification
     if (!user.isEmailVerified) {
       this.metricsService.recordAuthEvent('login_failure');
-      throw new HttpException(
-        {
-          message: 'Please verify your email address before logging in',
-          errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
-        },
-        HttpStatus.FORBIDDEN
+      throw new ApiError(
+        ErrorKeys.AUTH.EMAIL_NOT_VERIFIED,
+        'Please verify your email address before logging in'
       );
     }
 
@@ -382,12 +382,9 @@ export class AuthService {
     const hashedToken = hashToken(token);
     const user =
       await this.usersService.findByEmailVerificationToken(hashedToken);
-    const invalidToken = new HttpException(
-      {
-        message: 'Invalid or expired verification token',
-        errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
-      },
-      HttpStatus.BAD_REQUEST
+    const invalidToken = new ApiError(
+      ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN,
+      'Invalid or expired verification token'
     );
 
     // A deactivated account is refused like an unknown token, matching
@@ -400,12 +397,9 @@ export class AuthService {
       user.emailVerificationExpiresAt &&
       user.emailVerificationExpiresAt.getTime() < Date.now()
     ) {
-      throw new HttpException(
-        {
-          message: 'Verification token has expired. Please request a new one.',
-          errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED,
+        'Verification token has expired. Please request a new one.'
       );
     }
 
@@ -509,12 +503,9 @@ export class AuthService {
     // still active, matching the isActive gate in forgotPassword. The response
     // stays identical to the not-found case so it reveals no account state.
     if (!user || !user.isActive) {
-      throw new HttpException(
-        {
-          message: 'Invalid or expired password reset token',
-          errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.INVALID_RESET_TOKEN,
+        'Invalid or expired password reset token'
       );
     }
 
@@ -522,13 +513,9 @@ export class AuthService {
       user.passwordResetExpiresAt &&
       user.passwordResetExpiresAt.getTime() < Date.now()
     ) {
-      throw new HttpException(
-        {
-          message:
-            'Password reset token has expired. Please request a new one.',
-          errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
+        'Password reset token has expired. Please request a new one.'
       );
     }
 
@@ -572,12 +559,9 @@ export class AuthService {
         }
       );
       if (consumed.affected === 0) {
-        throw new HttpException(
-          {
-            message: 'Invalid or expired password reset token',
-            errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.AUTH.INVALID_RESET_TOKEN,
+          'Invalid or expired password reset token'
         );
       }
       await manager.delete(RefreshToken, { userId: user.id });
@@ -630,7 +614,7 @@ export class AuthService {
         throw this.refreshRefusal(
           'lost_response_replay',
           { actorId: tokenDoc.userId },
-          INVALID_REFRESH_TOKEN_BODY,
+          INVALID_REFRESH_TOKEN,
           {
             sessionId: tokenDoc.sessionId,
             replayAgeMs: successor.ageMs,
@@ -648,9 +632,9 @@ export class AuthService {
         details: { tokenId: tokenDoc.id, sessionId: tokenDoc.sessionId }
       });
       this.metricsService.recordAuthEvent('token_reuse_detected');
-      throw new HttpException(
-        INVALID_REFRESH_TOKEN_BODY,
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        INVALID_REFRESH_TOKEN.key,
+        INVALID_REFRESH_TOKEN.message
       );
     }
 
@@ -674,9 +658,9 @@ export class AuthService {
         'session_absolute_lifetime_exceeded',
         { actorId: tokenDoc.userId },
         {
+          key: ErrorKeys.AUTH.SESSION_EXPIRED,
           message:
-            'Session has reached its maximum duration. Please log in again.',
-          errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
+            'Session has reached its maximum duration. Please log in again.'
         }
       );
     }
@@ -690,9 +674,9 @@ export class AuthService {
         'session_invalidated_by_rotation',
         { actorId: tokenDoc.userId },
         {
+          key: ErrorKeys.AUTH.SESSION_INVALIDATED,
           message:
-            'Session invalidated due to key rotation. Please log in again.',
-          errorKey: ErrorKeys.AUTH.SESSION_INVALIDATED
+            'Session invalidated due to key rotation. Please log in again.'
         }
       );
     }
@@ -704,7 +688,7 @@ export class AuthService {
       throw this.refreshRefusal(
         'user_not_found',
         { actorId: tokenDoc.userId },
-        { message: 'User not found', errorKey: ErrorKeys.AUTH.USER_NOT_FOUND }
+        { key: ErrorKeys.AUTH.USER_NOT_FOUND, message: 'User not found' }
       );
     }
 
@@ -714,8 +698,8 @@ export class AuthService {
         'user_deactivated',
         { actorId: user.id, actorEmail: user.email },
         {
-          message: 'User account is deactivated',
-          errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
+          key: ErrorKeys.AUTH.USER_DEACTIVATED,
+          message: 'User account is deactivated'
         }
       );
     }
@@ -807,12 +791,9 @@ export class AuthService {
     );
 
     if (dto.newEmail === user.email) {
-      throw new HttpException(
-        {
-          message: 'New email is the same as the current email',
-          errorKey: ErrorKeys.AUTH.SAME_EMAIL
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.SAME_EMAIL,
+        'New email is the same as the current email'
       );
     }
 
@@ -912,12 +893,9 @@ export class AuthService {
           // resetPassword. The response stays identical to the not-found case
           // so it reveals no account state.
           if (!user || !user.pendingEmail || !user.isActive) {
-            throw new HttpException(
-              {
-                message: 'Invalid or expired email-change token',
-                errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
-              },
-              HttpStatus.BAD_REQUEST
+            throw new ApiError(
+              ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+              'Invalid or expired email-change token'
             );
           }
           tokenHolderId = user.id;
@@ -961,12 +939,9 @@ export class AuthService {
             }
           );
           if (consumed.affected === 0) {
-            throw new HttpException(
-              {
-                message: 'Invalid or expired email-change token',
-                errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
-              },
-              HttpStatus.BAD_REQUEST
+            throw new ApiError(
+              ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+              'Invalid or expired email-change token'
             );
           }
           await manager.delete(RefreshToken, { userId: user.id });
@@ -994,13 +969,9 @@ export class AuthService {
       await this.usersService.clearPendingEmailChange(outcome.userId);
 
       throw outcome.kind === 'expired'
-        ? new HttpException(
-            {
-              message:
-                'Email-change token has expired. Please request a new one.',
-              errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
-            },
-            HttpStatus.BAD_REQUEST
+        ? new ApiError(
+            ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+            'Email-change token has expired. Please request a new one.'
           )
         : emailExistsConflict();
     }
@@ -1093,7 +1064,8 @@ export class AuthService {
       throw this.stepUpPasswordLockedException(lockedMs);
     }
 
-    throw new HttpException(STEP_UP_REFUSALS[factor], HttpStatus.BAD_REQUEST);
+    const refusal = STEP_UP_REFUSALS[factor];
+    throw new ApiError(refusal.key, refusal.message);
   }
 
   /**
@@ -1178,7 +1150,7 @@ export class AuthService {
    * key is not `ACCOUNT_LOCKED`: the sign-in card keys its countdown off that
    * one, and no step-up route has a sign-in to count down to.
    */
-  private stepUpPasswordLockedException(remainingMs: number): HttpException {
+  private stepUpPasswordLockedException(remainingMs: number): ApiError {
     return lockedException(
       'Too many incorrect passwords. Try again later',
       ErrorKeys.AUTH.STEP_UP_LOCKED,
@@ -1327,22 +1299,22 @@ export class AuthService {
   private refreshRefusal(
     reason: string,
     actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>,
-    body: { message: string; errorKey: string } = INVALID_REFRESH_TOKEN_BODY,
+    refusal: Refusal = INVALID_REFRESH_TOKEN,
     extraDetails: Record<string, unknown> = {}
-  ): HttpException {
+  ): ApiError {
     this.auditService.logFireAndForget({
       action: AuditAction.TOKEN_REFRESH_FAILURE,
       ...actor,
       details: { reason, ...extraDetails }
     });
     this.metricsService.recordAuthEvent('token_refresh_failure');
-    return new HttpException(body, HttpStatus.UNAUTHORIZED);
+    return new ApiError(refusal.key, refusal.message);
   }
 
   private invalidCredentials(
     email: string,
     failedLoginAttempts: number | null
-  ): HttpException {
+  ): ApiError {
     this.auditService.logFireAndForget({
       action: AuditAction.USER_LOGIN_FAILURE,
       actorEmail: email,
@@ -1352,12 +1324,9 @@ export class AuthService {
       }
     });
     this.metricsService.recordAuthEvent('login_failure');
-    return new HttpException(
-      {
-        message: 'Invalid credentials',
-        errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
-      },
-      HttpStatus.UNAUTHORIZED
+    return new ApiError(
+      ErrorKeys.AUTH.INVALID_CREDENTIALS,
+      'Invalid credentials'
     );
   }
 
@@ -1366,7 +1335,7 @@ export class AuthService {
     userId: string,
     lockedUntil: Date,
     details: Record<string, unknown>
-  ): HttpException {
+  ): ApiError {
     this.auditService.logFireAndForget({
       action: AuditAction.USER_LOGIN_FAILURE,
       actorEmail: email,

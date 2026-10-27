@@ -1,14 +1,12 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { versionEtag } from '@app/shared/utils/if-match';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   applyBodyParsers,
@@ -52,13 +50,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -128,7 +120,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     const req = request(http())
       .patch(`/api/v1/${path}`)
       .auth(token, { type: 'bearer' });
-    if (ifMatch !== undefined) req.set('If-Match', String(ifMatch));
+    if (ifMatch !== undefined) req.set('If-Match', versionEtag(ifMatch));
     return req.send(body).expect(200);
   }
 

@@ -1,7 +1,4 @@
 import {
-  ForbiddenException,
-  HttpException,
-  HttpStatus,
   Injectable,
   InternalServerErrorException,
   Logger
@@ -10,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { Role } from '../entities/role.entity';
+import { ApiError } from '../../../common/errors/api-error';
 import type {
   CursorPaginatedResponseDto,
   RoleCursorQueryDto
@@ -84,12 +82,9 @@ export class RoleService {
     return items.map((i) => {
       const p = byId.get(i.permissionId);
       if (!p) {
-        throw new HttpException(
-          {
-            message: `Permission ${i.permissionId} not found`,
-            errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.ROLES.UNKNOWN_PERMISSION,
+          `Permission ${i.permissionId} not found`
         );
       }
       return {
@@ -108,7 +103,7 @@ export class RoleService {
   ): Promise<void> {
     if (ability === SYSTEM_ABILITY) return;
     // Resolve before the super bypass so unknown permission ids fail with a
-    // clean 400 for every caller instead of an opaque FK-violation 409.
+    // clean 422 for every caller instead of an opaque FK-violation 409.
     const resolved = await this.resolveGrantItems(items);
     if (ability.can('manage', 'all')) return;
     const refusal = grantRefusalOf(ability, resolved, {
@@ -190,14 +185,14 @@ export class RoleService {
         denied: [{ action, subject: 'Role' }]
       },
       action === 'assign'
-        ? new ForbiddenException({
-            message: 'Cannot assign super roles',
-            errorKey: ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
-          })
-        : new ForbiddenException({
-            message: 'Cannot remove super roles',
-            errorKey: ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN
-          })
+        ? new ApiError(
+            ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN,
+            'Cannot assign super roles'
+          )
+        : new ApiError(
+            ErrorKeys.ROLES.SUPER_ROLE_REMOVE_FORBIDDEN,
+            'Cannot remove super roles'
+          )
     );
   }
 
@@ -233,12 +228,9 @@ export class RoleService {
         !isDenyCondition(item.conditions ?? null) &&
         !grantableActionNames(resource).includes(action.name)
       ) {
-        throw new HttpException(
-          {
-            message: `Cannot grant ${label} - the resource does not offer this action`,
-            errorKey: ErrorKeys.ROLES.ACTION_NOT_GRANTABLE
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.ROLES.ACTION_NOT_GRANTABLE,
+          `Cannot grant ${label} - the resource does not offer this action`
         );
       }
 
@@ -248,12 +240,9 @@ export class RoleService {
         item.conditions
       );
       if (supportError) {
-        throw new HttpException(
-          {
-            message: `Cannot grant ${label} - ${supportError}`,
-            errorKey: ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED,
+          `Cannot grant ${label} - ${supportError}`
         );
       }
 
@@ -262,12 +251,9 @@ export class RoleService {
         item.conditions
       );
       if (actionError) {
-        throw new HttpException(
-          {
-            message: `Cannot grant ${label} - ${actionError}`,
-            errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE,
+          `Cannot grant ${label} - ${actionError}`
         );
       }
 
@@ -276,12 +262,9 @@ export class RoleService {
         item.conditions
       );
       if (fieldError) {
-        throw new HttpException(
-          {
-            message: `Cannot grant ${label} - ${fieldError}`,
-            errorKey: ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN
-          },
-          HttpStatus.BAD_REQUEST
+        throw new ApiError(
+          ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN,
+          `Cannot grant ${label} - ${fieldError}`
         );
       }
     }
@@ -311,8 +294,8 @@ export class RoleService {
 
   /**
    * A super caller may change the grants of a system role, so a refusal of
-   * any other caller is a refusal by privilege (403). `SYSTEM_ABILITY` has no
-   * principal and is refused as a misuse (400).
+   * any other caller is a refusal by privilege. `SYSTEM_ABILITY` has no
+   * principal and is refused with no audit row.
    */
   private assertNotSystem(
     role: Role,
@@ -320,12 +303,13 @@ export class RoleService {
     actorId?: string
   ): void {
     if (!role.isSystem) return;
-    const error = {
-      message: 'Cannot modify system roles',
-      errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-    };
+    const error = () =>
+      new ApiError(
+        ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
+        'Cannot modify system roles'
+      );
     if (ability === SYSTEM_ABILITY) {
-      throw new HttpException(error, HttpStatus.BAD_REQUEST);
+      throw error();
     }
     if (ability.can('manage', 'all')) return;
     refuseAccess(
@@ -340,7 +324,7 @@ export class RoleService {
         level: 'instance',
         denied: [{ action: 'update', subject: 'Role' }]
       },
-      new HttpException(error, HttpStatus.FORBIDDEN)
+      error()
     );
   }
 
@@ -379,10 +363,7 @@ export class RoleService {
   private async loadRole(id: string): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { id } });
     if (!role) {
-      throw new HttpException(
-        { message: 'Role not found', errorKey: ErrorKeys.ROLES.NOT_FOUND },
-        HttpStatus.NOT_FOUND
-      );
+      throw new ApiError(ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
     }
     return role;
   }
@@ -424,12 +405,9 @@ export class RoleService {
       this.assertCanRole(ability, 'update', record, actorId);
     }
     if (role.isSystem) {
-      throw new HttpException(
-        {
-          message: 'Cannot modify system roles',
-          errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
+        'Cannot modify system roles'
       );
     }
     if (data.name) {
@@ -470,12 +448,9 @@ export class RoleService {
     const role = await this.loadRole(id);
     this.assertCanRole(ability, 'delete', role, actorId);
     if (role.isSystem) {
-      throw new HttpException(
-        {
-          message: 'Cannot delete system roles',
-          errorKey: ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM,
+        'Cannot delete system roles'
       );
     }
     if (this.isScopeChecked(ability)) {
@@ -498,13 +473,10 @@ export class RoleService {
     await this.invalidateHolders(holderIds);
   }
 
-  private nameExists(): HttpException {
-    return new HttpException(
-      {
-        message: 'Role with this name already exists',
-        errorKey: ErrorKeys.ROLES.NAME_EXISTS
-      },
-      HttpStatus.BAD_REQUEST
+  private nameExists(): ApiError {
+    return new ApiError(
+      ErrorKeys.ROLES.NAME_EXISTS,
+      'Role with this name already exists'
     );
   }
 
@@ -579,12 +551,9 @@ export class RoleService {
       relations: { roles: true }
     });
     if (!targetUser) {
-      throw new HttpException(
-        {
-          message: `User with ID ${userId} not found`,
-          errorKey: ErrorKeys.USERS.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
+      throw new ApiError(
+        ErrorKeys.USERS.NOT_FOUND,
+        `User with ID ${userId} not found`
       );
     }
     return targetUser;
@@ -602,7 +571,12 @@ export class RoleService {
     audit?: AuditLogParams
   ): Promise<void> {
     const targetUser = await this.loadRoleAssignmentTarget(userId);
-    const role = await this.loadRole(roleId);
+    // The role id comes from the body, so a missing role is not a missing
+    // target resource.
+    const role = await this.roleRepository.findOne({ where: { id: roleId } });
+    if (!role) {
+      throw new ApiError(ErrorKeys.ROLES.UNKNOWN_ROLE, 'Role not found');
+    }
 
     if (ability !== SYSTEM_ABILITY) {
       if (role.isSuper) {
@@ -717,12 +691,9 @@ export class RoleService {
           .where('user_id = :userId AND role_id = :roleId', { userId, roleId })
           .execute();
         if (!affected) {
-          throw new HttpException(
-            {
-              message: 'The user does not hold this role',
-              errorKey: ErrorKeys.ROLES.ROLE_NOT_ASSIGNED
-            },
-            HttpStatus.NOT_FOUND
+          throw new ApiError(
+            ErrorKeys.ROLES.ROLE_NOT_ASSIGNED,
+            'The user does not hold this role'
           );
         }
       },
@@ -846,12 +817,9 @@ export class RoleService {
           permissionId
         });
         if (!affected) {
-          throw new HttpException(
-            {
-              message: 'The role does not hold this permission',
-              errorKey: ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED
-            },
-            HttpStatus.NOT_FOUND
+          throw new ApiError(
+            ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED,
+            'The role does not hold this permission'
           );
         }
       },

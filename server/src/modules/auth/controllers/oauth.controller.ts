@@ -3,8 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpException,
-  HttpStatus,
   Inject,
   Logger,
   Param,
@@ -71,6 +69,7 @@ import { SignInCompletionService } from '../services/sign-in-completion.service'
 import { UsersService } from '../../users/services/users.service';
 import { SingleUseTokenLedger } from '../../../common/utils/single-use-token-ledger';
 import { MfaRequiredResponseDto } from '../dtos/mfa.dto';
+import { ApiError } from '../../../common/errors/api-error';
 
 /** What the callback signs into the `oauth_data` cookie for a plain sign-in. */
 interface OAuthSignInData {
@@ -78,13 +77,10 @@ interface OAuthSignInData {
   provider: string;
 }
 
-function invalidOAuthData(): HttpException {
-  return new HttpException(
-    {
-      message: 'Invalid or expired OAuth data',
-      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
-    },
-    HttpStatus.BAD_REQUEST
+function invalidOAuthData(): ApiError {
+  return new ApiError(
+    ErrorKeys.AUTH.INVALID_OAUTH_DATA,
+    'Invalid or expired OAuth data'
   );
 }
 
@@ -93,11 +89,8 @@ function oauthFailureReason(error: unknown): string {
   if (error instanceof OAuthAuthenticationFailedException) {
     return error.oauthError;
   }
-  if (error instanceof HttpException) {
-    return (
-      (error.getResponse() as { errorKey?: string })?.errorKey ??
-      'unexpected_error'
-    );
+  if (error instanceof ApiError) {
+    return error.errorKey;
   }
   return 'unexpected_error';
 }
@@ -330,12 +323,9 @@ export class OAuthController {
     @Res({ passthrough: true }) res: Response
   ) {
     if (!Object.values(OAuthProvider).includes(provider as OAuthProvider)) {
-      throw new HttpException(
-        {
-          message: `Invalid OAuth provider: ${provider}`,
-          errorKey: ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER,
+        `Invalid OAuth provider: ${provider}`
       );
     }
 
@@ -399,12 +389,9 @@ export class OAuthController {
     this.cookies.clear(res, OAUTH_DATA_COOKIE);
 
     if (!cookie) {
-      throw new HttpException(
-        {
-          message: 'Missing OAuth data',
-          errorKey: ErrorKeys.AUTH.MISSING_OAUTH_DATA
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.MISSING_OAUTH_DATA,
+        'Missing OAuth data'
       );
     }
 

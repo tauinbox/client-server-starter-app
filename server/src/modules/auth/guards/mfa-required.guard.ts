@@ -1,8 +1,6 @@
 import {
   CanActivate,
   ExecutionContext,
-  HttpException,
-  HttpStatus,
   Injectable,
   UnauthorizedException
 } from '@nestjs/common';
@@ -17,6 +15,7 @@ import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { refuseAccess } from '../../../common/utils/refuse-access.util';
+import { ApiError } from '../../../common/errors/api-error';
 import { describeChecks, requiredLabels } from './permissions.guard';
 
 /**
@@ -73,13 +72,9 @@ export class MfaRequiredGuard implements CanActivate {
           level: 'guard',
           denied: describeChecks(required)
         },
-        new HttpException(
-          {
-            message:
-              'Two-factor authentication must be turned on before this account can use the administration surface',
-            errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED
-          },
-          HttpStatus.FORBIDDEN
+        new ApiError(
+          ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED,
+          'Two-factor authentication must be turned on before this account can use the administration surface'
         )
       );
     }

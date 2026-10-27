@@ -3,40 +3,50 @@ import {
   Catch,
   ExceptionFilter,
   HttpException,
-  HttpStatus,
   Logger
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
-import { ErrorKeys, httpStatusText } from '@app/shared/constants';
+import {
+  ERROR_STATUS,
+  ErrorKeys,
+  httpStatusText,
+  type ErrorKey
+} from '@app/shared/constants';
 import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { ErrorResponse } from './error-response.interface';
 
-const PG_ERROR_MAP: Record<
-  string,
-  { statusCode: number; message: string; errorKey: string }
-> = {
+const PG_ERROR_MAP: Record<string, { key: ErrorKey; message: string }> = {
   '23505': {
-    statusCode: HttpStatus.CONFLICT,
-    message: 'A record with this value already exists',
-    errorKey: ErrorKeys.DB.UNIQUE_VIOLATION
+    key: ErrorKeys.DB.UNIQUE_VIOLATION,
+    message: 'A record with this value already exists'
   },
   '23503': {
-    statusCode: HttpStatus.CONFLICT,
-    message: 'Cannot complete operation due to related data',
-    errorKey: ErrorKeys.DB.FOREIGN_KEY_VIOLATION
+    key: ErrorKeys.DB.FOREIGN_KEY_VIOLATION,
+    message: 'Cannot complete operation due to related data'
   },
   '23502': {
-    statusCode: HttpStatus.BAD_REQUEST,
-    message: 'A required field is missing',
-    errorKey: ErrorKeys.DB.NOT_NULL_VIOLATION
+    key: ErrorKeys.DB.NOT_NULL_VIOLATION,
+    message: 'A required field is missing'
   },
   '22P02': {
-    statusCode: HttpStatus.BAD_REQUEST,
-    message: 'Invalid input format',
-    errorKey: ErrorKeys.DB.INVALID_INPUT
+    key: ErrorKeys.DB.INVALID_INPUT,
+    message: 'Invalid input format'
   }
 };
+
+// RFC 6750 3.1: a request whose token was refused gets `invalid_token`; a
+// request that carried no token gets the bare challenge.
+const INVALID_TOKEN_KEYS: ReadonlySet<string> = new Set<ErrorKey>([
+  ErrorKeys.AUTH.INVALID_TOKEN,
+  ErrorKeys.AUTH.TOKEN_REVOKED,
+  ErrorKeys.AUTH.TOKEN_INVALIDATED_ROTATION
+]);
+
+/** The envelope of an error key that the filter itself raises. */
+function keyed(key: ErrorKey, message: string): ResolvedException {
+  return { statusCode: ERROR_STATUS[key], message, errorKey: key };
+}
 
 /**
  * The envelope is closed: only the fields listed here reach the wire, so a key
@@ -90,6 +100,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     const response = ctx.getResponse<unknown>();
 
+    // RFC 9110 15.5.2: a 401 MUST carry a challenge.
+    if (statusCode === 401) {
+      httpAdapter.setHeader(
+        response,
+        'WWW-Authenticate',
+        errorKey && INVALID_TOKEN_KEYS.has(errorKey)
+          ? 'Bearer error="invalid_token"'
+          : 'Bearer'
+      );
+    }
+
     // Retry-After is the standard carrier of a retry delay. The body field
     // stays as well: no route exposes response headers through CORS, so a
     // browser cannot read this one.
@@ -119,18 +140,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     if (exception instanceof EntityNotFoundError) {
-      return {
-        statusCode: HttpStatus.NOT_FOUND,
-        message: 'The requested resource was not found',
-        errorKey: ErrorKeys.GENERAL.RESOURCE_NOT_FOUND
-      };
+      return keyed(
+        ErrorKeys.GENERAL.RESOURCE_NOT_FOUND,
+        'The requested resource was not found'
+      );
     }
 
-    return {
-      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: 'Internal server error',
-      errorKey: ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR
-    };
+    return keyed(
+      ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
+      'Internal server error'
+    );
   }
 
   private handleHttpException(exception: HttpException): ResolvedException {
@@ -183,15 +202,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const { driverError } = exception;
     const code = 'code' in driverError ? String(driverError.code) : undefined;
 
-    if (code && PG_ERROR_MAP[code]) {
-      return PG_ERROR_MAP[code];
+    const mapped = code ? PG_ERROR_MAP[code] : undefined;
+    if (mapped) {
+      return keyed(mapped.key, mapped.message);
     }
 
-    return {
-      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: 'Internal server error',
-      errorKey: ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR
-    };
+    return keyed(
+      ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
+      'Internal server error'
+    );
   }
 
   /**

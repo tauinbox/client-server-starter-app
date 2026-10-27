@@ -56,7 +56,7 @@ async function send(
 // and the client keys off it to choose a translated generic message over raw
 // validator text - so the mock must reproduce the split, not just the status.
 describe('validation-error envelope parity with server', () => {
-  describe('a 400 mirroring class-validator carries errors[]', () => {
+  describe('a 422 mirroring class-validator carries errors[]', () => {
     it('auth: register with a malformed email', async () => {
       const { status, body } = await send('POST', '/api/v1/auth/register', {
         email: 'not-an-email',
@@ -64,7 +64,7 @@ describe('validation-error envelope parity with server', () => {
         password: 'Password1'
       });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual([body.message]);
       expect(body.errors?.join(' ')).toContain('email');
     });
@@ -79,7 +79,7 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(['isActive must be a boolean value']);
     });
 
@@ -92,7 +92,7 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(['permissionIds should not be empty']);
     });
 
@@ -103,7 +103,7 @@ describe('validation-error envelope parity with server', () => {
       const token = await login('admin@example.com');
       const { status, body } = await send(method, path, payload, token);
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(['property isSuper should not exist']);
       expect(body.message).toBe('property isSuper should not exist');
     });
@@ -117,7 +117,7 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual([
         'property isSuper should not exist',
         'name should not be empty'
@@ -133,7 +133,7 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual([
         'region must be one of the following values: auto, ru, world'
       ]);
@@ -174,7 +174,7 @@ describe('validation-error envelope parity with server', () => {
           token
         );
 
-        expect(status).toBe(400);
+        expect(status).toBe(422);
         expect(body.errors).toEqual(expected);
       }
     );
@@ -191,19 +191,19 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(['rules.0.property type should not exist']);
       expect(body.message).toBe('rules.0.property type should not exist');
     });
   });
 
-  describe('a 400 thrown by service logic carries no errors[]', () => {
+  describe('a refusal thrown by service logic carries no errors[]', () => {
     it('auth: an unknown email-verification token', async () => {
       const { status, body } = await send('POST', '/api/v1/auth/verify-email', {
         token: 'nope'
       });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toBeUndefined();
       expect(body.message).toBe('Invalid or expired verification token');
     });
@@ -232,7 +232,7 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toBeUndefined();
       expect(body.message).toContain('user rule requires userIds');
     });
@@ -269,7 +269,7 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual([msg]);
     });
 
@@ -282,7 +282,7 @@ describe('validation-error envelope parity with server', () => {
         token
       );
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toBeUndefined();
       expect(body.message).toContain('Refund amount must be between 1');
     });
