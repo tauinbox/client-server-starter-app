@@ -63,7 +63,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
 
     const res = await patch(token, target.id, { password: NEW_PASSWORD });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     );
@@ -80,7 +80,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
 
     const res = await patch(token, target.id, { email: 'moved@example.com' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(target.email).toBe('user@example.com');
   });
 
@@ -100,7 +100,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
 
       const res = await patch(token, self.id, body);
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
         ErrorKeys.USERS.CREDENTIAL_SELF
       );
@@ -120,7 +120,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
       currentPassword: 'Wrong-Password-00'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(target.password).toBe(SEED_PASSWORD);
   });
 
@@ -157,7 +157,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
       code: '12'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it('accepts the change with the current password and keeps it out of the audit', async () => {

@@ -64,7 +64,8 @@ import {
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { pushUserCrudEvent } from '../helpers/user-list-events.helpers';
-import { validationError } from '../helpers/validation-error.helpers';
+import { sendValidationError } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 import {
   AUTH_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
@@ -120,11 +121,7 @@ function respondInvalidCredentials(
     },
     ip
   });
-  res.status(401).json({
-    message: 'Invalid credentials',
-    statusCode: 401,
-    errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
-  });
+  sendError(res, ErrorKeys.AUTH.INVALID_CREDENTIALS, 'Invalid credentials');
 }
 
 const router = Router();
@@ -271,10 +268,11 @@ router.post('/login', (req, res) => {
 
   // Check email verification
   if (!user.isEmailVerified) {
-    res.status(403).json({
-      message: 'Please verify your email address before logging in',
-      errorKey: ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.EMAIL_NOT_VERIFIED,
+      'Please verify your email address before logging in'
+    );
     return;
   }
 
@@ -302,7 +300,7 @@ router.post('/verify-email', (req, res) => {
     ...mailedTokenErrors(token)
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -310,27 +308,30 @@ router.post('/verify-email', (req, res) => {
   const issued = state.emailVerificationTokens.get(token);
 
   if (!issued) {
-    res.status(400).json({
-      message: 'Invalid or expired verification token',
-      errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN,
+      'Invalid or expired verification token'
+    );
     return;
   }
 
   const user = findUserById(issued.userId);
   if (!user || !user.isActive) {
-    res.status(400).json({
-      message: 'Invalid or expired verification token',
-      errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN,
+      'Invalid or expired verification token'
+    );
     return;
   }
 
   if (new Date(issued.expiresAt).getTime() < Date.now()) {
-    res.status(400).json({
-      message: 'Verification token has expired. Please request a new one.',
-      errorKey: ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED,
+      'Verification token has expired. Please request a new one.'
+    );
     return;
   }
 
@@ -360,7 +361,7 @@ router.post('/resend-verification', (req, res) => {
   // never the enumeration-safe success message.
   const bodyEmailErrors = emailErrors('email', req.body?.email);
   if (bodyEmailErrors.length > 0) {
-    res.status(400).json(validationError(bodyEmailErrors));
+    sendValidationError(res, 'body', bodyEmailErrors);
     return;
   }
 
@@ -424,7 +425,7 @@ router.post('/forgot-password', (req, res) => {
   // never the enumeration-safe success message.
   const bodyEmailErrors = emailErrors('email', req.body?.email);
   if (bodyEmailErrors.length > 0) {
-    res.status(400).json(validationError(bodyEmailErrors));
+    sendValidationError(res, 'body', bodyEmailErrors);
     return;
   }
 
@@ -482,7 +483,7 @@ router.post('/reset-password', (req, res) => {
     })
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -490,10 +491,11 @@ router.post('/reset-password', (req, res) => {
   const issued = state.passwordResetTokens.get(token);
 
   if (!issued) {
-    res.status(400).json({
-      message: 'Invalid or expired password reset token',
-      errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_RESET_TOKEN,
+      'Invalid or expired password reset token'
+    );
     return;
   }
 
@@ -503,18 +505,20 @@ router.post('/reset-password', (req, res) => {
   // still active, matching the isActive gate in forgot-password. The response
   // stays identical to the not-found case so it reveals no account state.
   if (!user || !user.isActive) {
-    res.status(400).json({
-      message: 'Invalid or expired password reset token',
-      errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_RESET_TOKEN,
+      'Invalid or expired password reset token'
+    );
     return;
   }
 
   if (new Date(issued.expiresAt).getTime() < Date.now()) {
-    res.status(400).json({
-      message: 'Password reset token has expired. Please request a new one.',
-      errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
+      'Password reset token has expired. Please request a new one.'
+    );
     return;
   }
 
@@ -522,7 +526,7 @@ router.post('/reset-password', (req, res) => {
   // that authorise the call: an invalid token must not buy a lookup.
   const passwordRefusal = newPasswordRefusal(password, user);
   if (passwordRefusal) {
-    res.status(400).json(passwordRefusal);
+    sendError(res, passwordRefusal.errorKey, passwordRefusal.message);
     return;
   }
 
@@ -576,11 +580,11 @@ router.post('/refresh-token', (req, res) => {
   ];
 
   if (!cookieToken) {
-    res.status(401).json({
-      message: 'Refresh token is required',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED,
+      'Refresh token is required'
+    );
     return;
   }
 
@@ -611,11 +615,11 @@ router.post('/refresh-token', (req, res) => {
         },
         ip: req.ip
       });
-      res.status(401).json({
-        message: 'Invalid refresh token',
-        statusCode: 401,
-        errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-      });
+      sendError(
+        res,
+        ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
+        'Invalid refresh token'
+      );
       return;
     }
 
@@ -628,11 +632,11 @@ router.post('/refresh-token', (req, res) => {
       ip: req.ip
     });
     revokeUserSessions(reusedUserId);
-    res.status(401).json({
-      message: 'Invalid refresh token',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
+      'Invalid refresh token'
+    );
     return;
   }
 
@@ -642,11 +646,11 @@ router.post('/refresh-token', (req, res) => {
       details: { reason: 'invalid_or_expired_token' },
       ip: req.ip
     });
-    res.status(401).json({
-      message: 'Invalid refresh token',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
+      'Invalid refresh token'
+    );
     return;
   }
 
@@ -660,11 +664,11 @@ router.post('/refresh-token', (req, res) => {
       details: { reason: 'session_absolute_lifetime_exceeded' },
       ip: req.ip
     });
-    res.status(401).json({
-      message: 'Session has reached its maximum duration. Please log in again.',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.SESSION_EXPIRED,
+      'Session has reached its maximum duration. Please log in again.'
+    );
     return;
   }
 
@@ -675,11 +679,7 @@ router.post('/refresh-token', (req, res) => {
       details: { reason: 'user_not_found' },
       ip: req.ip
     });
-    res.status(401).json({
-      message: 'User not found',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.USER_NOT_FOUND
-    });
+    sendError(res, ErrorKeys.AUTH.USER_NOT_FOUND, 'User not found');
     return;
   }
 
@@ -691,11 +691,11 @@ router.post('/refresh-token', (req, res) => {
       details: { reason: 'user_deactivated' },
       ip: req.ip
     });
-    res.status(401).json({
-      message: 'User account is deactivated',
-      statusCode: 401,
-      errorKey: ErrorKeys.AUTH.USER_DEACTIVATED
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.USER_DEACTIVATED,
+      'User account is deactivated'
+    );
     return;
   }
 
@@ -795,7 +795,7 @@ router.patch(
       ...oneOfErrors('locale', locale, SUPPORTED_LOCALES, 'definedOnly')
     ]);
     if (bodyErrors.length > 0) {
-      res.status(400).json(validationError(bodyErrors));
+      sendValidationError(res, 'body', bodyErrors);
       return;
     }
 
@@ -822,7 +822,7 @@ router.patch(
         name: typeof name === 'string' ? name : user.name
       });
       if (passwordRefusal) {
-        res.status(400).json(passwordRefusal);
+        sendError(res, passwordRefusal.errorKey, passwordRefusal.message);
         return;
       }
     }
@@ -874,7 +874,7 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
     emailErrors('newEmail', req.body?.newEmail)
   );
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
@@ -893,11 +893,11 @@ router.post('/profile/email/initiate', authGuard, (req, res) => {
   }
 
   if (newEmail === user.email) {
-    res.status(400).json({
-      message: 'New email is the same as the current email',
-      statusCode: 400,
-      errorKey: ErrorKeys.AUTH.SAME_EMAIL
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.SAME_EMAIL,
+      'New email is the same as the current email'
+    );
     return;
   }
 
@@ -966,18 +966,18 @@ router.post('/profile/email/confirm', (req, res) => {
     ...mailedTokenErrors(token)
   ];
   if (bodyErrors.length > 0) {
-    res.status(400).json(validationError(bodyErrors));
+    sendValidationError(res, 'body', bodyErrors);
     return;
   }
 
   const state = getState();
   const userId = state.pendingEmailTokens.get(token);
   if (!userId) {
-    res.status(400).json({
-      message: 'Invalid or expired email-change token',
-      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
-      statusCode: 400
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      'Invalid or expired email-change token'
+    );
     return;
   }
 
@@ -988,21 +988,21 @@ router.post('/profile/email/confirm', (req, res) => {
   // state, and the token is left in place exactly as the server leaves the
   // column, so a later re-activation behaves the same in both.
   if (user && !user.isActive) {
-    res.status(400).json({
-      message: 'Invalid or expired email-change token',
-      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
-      statusCode: 400
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      'Invalid or expired email-change token'
+    );
     return;
   }
 
   if (!user || !user.pendingEmail) {
     state.pendingEmailTokens.delete(token);
-    res.status(400).json({
-      message: 'Invalid or expired email-change token',
-      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
-      statusCode: 400
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      'Invalid or expired email-change token'
+    );
     return;
   }
 
@@ -1014,11 +1014,11 @@ router.post('/profile/email/confirm', (req, res) => {
     user.pendingEmail = null;
     user.pendingEmailToken = null;
     user.pendingEmailExpiresAt = null;
-    res.status(400).json({
-      message: 'Email-change token has expired. Please request a new one.',
-      errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
-      statusCode: 400
-    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
+      'Email-change token has expired. Please request a new one.'
+    );
     return;
   }
 
@@ -1030,11 +1030,11 @@ router.post('/profile/email/confirm', (req, res) => {
       user.pendingEmail = null;
       user.pendingEmailToken = null;
       user.pendingEmailExpiresAt = null;
-      res.status(409).json({
-        message: 'User with this email already exists',
-        statusCode: 409,
-        errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-      });
+      sendError(
+        res,
+        ErrorKeys.USERS.EMAIL_EXISTS,
+        'User with this email already exists'
+      );
       return;
     }
   }

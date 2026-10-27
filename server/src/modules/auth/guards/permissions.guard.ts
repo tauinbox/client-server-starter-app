@@ -1,7 +1,6 @@
 import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Injectable,
   UnauthorizedException
 } from '@nestjs/common';
@@ -16,6 +15,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { refuseAccess } from '../../../common/utils/refuse-access.util';
+import { ApiError } from '../../../common/errors/api-error';
 
 /** The metric labels and the audited `action:subject` of each check. */
 export function describeChecks(
@@ -84,10 +84,10 @@ export class PermissionsGuard implements CanActivate {
           level: 'guard',
           denied: describeChecks(denied)
         },
-        new ForbiddenException({
-          message: 'Insufficient permissions',
-          errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
-        })
+        new ApiError(
+          ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS,
+          'Insufficient permissions'
+        )
       );
     }
 

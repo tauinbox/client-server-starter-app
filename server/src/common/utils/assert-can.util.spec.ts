@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { AbilityBuilder, createMongoAbility, subject } from '@casl/ability';
 import { assertCan } from './assert-can.util';
 import type { AppAbility } from '../../modules/auth/casl/app-ability';
@@ -6,6 +5,7 @@ import { bindAuditContext } from '../../modules/auth/casl/ability-context';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
 import { thrownBy } from '../testing/thrown-by';
+import { expectApiError } from '../testing/api-error.expect';
 
 describe('assertCan', () => {
   let auditService: { logFireAndForget: jest.Mock };
@@ -33,20 +33,23 @@ describe('assertCan', () => {
     expect(auditService.logFireAndForget).not.toHaveBeenCalled();
   });
 
-  it('should throw ForbiddenException when ability denies the action', () => {
+  it('refuses with INSUFFICIENT_PERMISSIONS when ability denies the action', () => {
     const ability = { can: jest.fn().mockReturnValue(false) };
 
-    expect(() =>
-      assertCan(
-        // @ts-expect-error partial mock
-        ability,
-        'delete',
-        { id: '2' },
-        auditService,
-        { targetId: '2', targetType: 'User' },
-        metricsService
-      )
-    ).toThrow(ForbiddenException);
+    expectApiError(
+      thrownBy(() =>
+        assertCan(
+          // @ts-expect-error partial mock
+          ability,
+          'delete',
+          { id: '2' },
+          auditService,
+          { targetId: '2', targetType: 'User' },
+          metricsService
+        )
+      ),
+      ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+    );
   });
 
   it('carries an errorKey, so the client can translate the refusal', () => {

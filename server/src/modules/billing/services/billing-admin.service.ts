@@ -1,11 +1,6 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ApiError } from '../../../common/errors/api-error';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
@@ -47,10 +42,7 @@ import { CreditService } from './credit.service';
 const ZERO = Money.fromMinor(0);
 
 const invoiceNotFound = () =>
-  new NotFoundException({
-    message: 'Invoice not found',
-    errorKey: ErrorKeys.BILLING.INVOICE_NOT_FOUND
-  });
+  new ApiError(ErrorKeys.BILLING.INVOICE_NOT_FOUND, 'Invoice not found');
 
 /**
  * Admin-facing billing operations. Unlike `BillingUserService`,
@@ -116,16 +108,16 @@ export class BillingAdminService {
       select: { id: true, status: true }
     });
     if (!event) {
-      throw new NotFoundException({
-        message: 'Webhook event not found',
-        errorKey: ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND,
+        'Webhook event not found'
+      );
     }
     if (event.status !== 'dead_letter') {
-      throw new ConflictException({
-        message: 'Only dead-lettered webhook events can be replayed',
-        errorKey: ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE,
+        'Only dead-lettered webhook events can be replayed'
+      );
     }
     await this.webhookEvents.update(
       { id },
@@ -146,10 +138,10 @@ export class BillingAdminService {
   ): Promise<Subscription> {
     const subscription = await this.subscriptions.findOne({ where: { id } });
     if (!subscription) {
-      throw new NotFoundException({
-        message: 'Subscription not found',
-        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_FOUND
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.SUBSCRIPTION_NOT_FOUND,
+        'Subscription not found'
+      );
     }
     return cancelOpenSubscription(
       {
@@ -191,10 +183,10 @@ export class BillingAdminService {
           throw invoiceNotFound();
         }
         if (invoice.status !== 'paid') {
-          throw new ConflictException({
-            message: 'Only paid invoices can be refunded',
-            errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE
-          });
+          throw new ApiError(
+            ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE,
+            'Only paid invoices can be refunded'
+          );
         }
 
         // Rejecting rather than capping is this route's policy: an admin who
@@ -203,11 +195,10 @@ export class BillingAdminService {
         const requested =
           amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
         if (requested.compare(ZERO) <= 0 || requested.compare(remaining) > 0) {
-          throw new BadRequestException({
-            message:
-              'Refund amount must be between 1 and the remaining refundable total',
-            errorKey: ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE
-          });
+          throw new ApiError(
+            ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE,
+            'Refund amount must be between 1 and the remaining refundable total'
+          );
         }
 
         const { reserved: refundAmount, cumulative: cumulativeRefunded } =

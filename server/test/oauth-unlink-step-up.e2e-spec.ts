@@ -2,7 +2,8 @@
 // DELETE body, which only the body parser and the global ValidationPipe make
 // reachable, and the proof rides in a cookie that cookie-parser reads.
 
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -11,7 +12,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { Server } from 'http';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
+import { ApiError } from '../src/common/errors/api-error';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { OAuthController } from '../src/modules/auth/controllers/oauth.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
@@ -123,13 +125,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
         next();
       }
     );
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     await app.init();
     server = app.getHttpServer() as Server;
 
@@ -187,18 +183,15 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
   });
 
   it('removes nothing when the step-up refuses the caller', async () => {
-    refuse = new HttpException(
-      {
-        message: 'Current password is incorrect',
-        errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
-      },
-      HttpStatus.BAD_REQUEST
+    refuse = new ApiError(
+      ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD,
+      'Current password is incorrect'
     );
 
     const res = await request(server)
       .delete('/auth/oauth/accounts/google')
       .send({ currentPassword: 'WrongPassword1' })
-      .expect(400);
+      .expect(403);
 
     expect(res.body).toMatchObject({
       errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
@@ -210,7 +203,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
     await request(server)
       .delete('/auth/oauth/accounts/google')
       .send({ currentPassword: '' })
-      .expect(400);
+      .expect(422);
 
     expect(calls).toEqual([]);
   });
@@ -219,7 +212,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
     await request(server)
       .delete('/auth/oauth/accounts/google')
       .send({ currentPassword: 'CurrentPassword123', totpCode: '123456' })
-      .expect(400);
+      .expect(422);
 
     expect(calls).toEqual([]);
   });
@@ -227,7 +220,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
   it('reports an unknown provider before it asks for a factor', async () => {
     const res = await request(server)
       .delete('/auth/oauth/accounts/myspace')
-      .expect(400);
+      .expect(404);
 
     expect(res.body).toMatchObject({
       errorKey: ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER

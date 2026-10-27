@@ -56,8 +56,9 @@ import type { AuthenticatedRequest } from '../types';
 import { pushUserCrudEvent } from '../helpers/user-list-events.helpers';
 import {
   requireUuid,
-  validationError
+  sendValidationError
 } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 
 /**
  * Both list routes share one DTO and one query on the server, so both apply
@@ -68,7 +69,7 @@ function listUsers(req: Request, res: Response): void {
   const query = req.query as Record<string, unknown>;
   const queryErrors = listQueryErrors(query, USER_LIST_QUERY);
   if (queryErrors.length > 0) {
-    res.status(400).json(validationError(queryErrors));
+    sendValidationError(res, 'query', queryErrors);
     return;
   }
   if (rejectInvalidCursor(res, query)) return;
@@ -154,11 +155,7 @@ router.get(
     const id = req.params['id'] as string;
     const user = findUserById(id);
     if (!user) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
@@ -180,11 +177,7 @@ router.get(
     const id = req.params['id'] as string;
     const user = findUserById(id);
     if (!user) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
@@ -229,7 +222,7 @@ router.patch(
       ...oneOfErrors('locale', locale, SUPPORTED_LOCALES, 'definedOnly')
     ]);
     if (bodyErrors.length > 0) {
-      res.status(400).json(validationError(bodyErrors));
+      sendValidationError(res, 'body', bodyErrors);
       return;
     }
 
@@ -246,22 +239,17 @@ router.patch(
       id === (req as AuthenticatedRequest).user.id &&
       (isActive !== undefined || unlockAccount !== undefined)
     ) {
-      res.status(400).json({
-        message:
-          'You cannot deactivate or unlock your own account. Ask another administrator.',
-        statusCode: 400,
-        errorKey: ErrorKeys.USERS.MODERATION_SELF
-      });
+      sendError(
+        res,
+        ErrorKeys.USERS.MODERATION_SELF,
+        'You cannot deactivate or unlock your own account. Ask another administrator.'
+      );
       return;
     }
 
     const user = findUserById(id);
     if (!user) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
@@ -272,11 +260,11 @@ router.patch(
       id === (req as AuthenticatedRequest).user.id &&
       (password !== undefined || (email !== undefined && email !== user.email))
     ) {
-      res.status(400).json({
-        message: 'Change your own email and password on your profile page',
-        statusCode: 400,
-        errorKey: ErrorKeys.USERS.CREDENTIAL_SELF
-      });
+      sendError(
+        res,
+        ErrorKeys.USERS.CREDENTIAL_SELF,
+        'Change your own email and password on your profile page'
+      );
       return;
     }
 
@@ -325,7 +313,7 @@ router.patch(
             name: typeof name === 'string' ? name : user.name
           });
     if (passwordRefusal) {
-      res.status(400).json(passwordRefusal);
+      sendError(res, passwordRefusal.errorKey, passwordRefusal.message);
       return;
     }
 
@@ -350,11 +338,11 @@ router.patch(
         (u) => !u.deletedAt && u.pendingEmail === email && u.id !== user.id
       );
       if ((existing && existing.id !== user.id) || pendingConflict) {
-        res.status(409).json({
-          message: 'User with this email already exists',
-          statusCode: 409,
-          errorKey: ErrorKeys.USERS.EMAIL_EXISTS
-        });
+        sendError(
+          res,
+          ErrorKeys.USERS.EMAIL_EXISTS,
+          'User with this email already exists'
+        );
         return;
       }
       if (email !== user.email) {
@@ -453,11 +441,7 @@ router.delete(
     const id = req.params['id'] as string;
     const targetUser = findUserById(id);
     if (!targetUser) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
@@ -503,11 +487,7 @@ router.post(
     const id = req.params['id'] as string;
     const targetUser = findUserByIdWithDeleted(id);
     if (!targetUser) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
@@ -517,11 +497,11 @@ router.post(
     }
 
     if (!targetUser.deletedAt) {
-      res.status(409).json({
-        message: `User with ID ${id} is not deleted, so there is nothing to restore`,
-        statusCode: 409,
-        errorKey: ErrorKeys.USERS.NOT_DELETED
-      });
+      sendError(
+        res,
+        ErrorKeys.USERS.NOT_DELETED,
+        `User with ID ${id} is not deleted, so there is nothing to restore`
+      );
       return;
     }
 
@@ -556,28 +536,23 @@ router.post(
     const { currentPassword, code } = req.body;
     const bodyErrors = stepUpFactorsBodyErrors(req.body);
     if (bodyErrors.length > 0) {
-      res.status(400).json(validationError(bodyErrors));
+      sendValidationError(res, 'body', bodyErrors);
       return;
     }
 
     const actor = (req as AuthenticatedRequest).user;
     if (id === actor.id) {
-      res.status(400).json({
-        message:
-          'Turn off your own two-factor authentication from your profile',
-        statusCode: 400,
-        errorKey: ErrorKeys.USERS.MFA_RESET_SELF
-      });
+      sendError(
+        res,
+        ErrorKeys.USERS.MFA_RESET_SELF,
+        'Turn off your own two-factor authentication from your profile'
+      );
       return;
     }
 
     const user = findUserById(id);
     if (!user) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 
@@ -586,11 +561,11 @@ router.post(
     }
 
     if (!user.totpEnabledAt) {
-      res.status(400).json({
-        message: 'Two-factor authentication is not enabled',
-        statusCode: 400,
-        errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-      });
+      sendError(
+        res,
+        ErrorKeys.AUTH.MFA_NOT_ENABLED,
+        'Two-factor authentication is not enabled'
+      );
       return;
     }
 
@@ -639,21 +614,17 @@ router.post(
     const id = req.params['id'] as string;
     const actor = (req as AuthenticatedRequest).user;
     if (id === actor.id) {
-      res.status(400).json({
-        message: 'End your own sessions from your profile',
-        statusCode: 400,
-        errorKey: ErrorKeys.USERS.SESSION_REVOKE_SELF
-      });
+      sendError(
+        res,
+        ErrorKeys.USERS.SESSION_REVOKE_SELF,
+        'End your own sessions from your profile'
+      );
       return;
     }
 
     const user = findUserById(id);
     if (!user) {
-      res.status(404).json({
-        message: 'User not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
       return;
     }
 

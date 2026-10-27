@@ -136,6 +136,7 @@ export function verdictFor(
   if (!refusal) return { rejected: false };
   return {
     rejected: true,
+    // eslint-disable-next-line no-restricted-syntax -- a row of the grant-scope report script, not an HTTP answer
     errorKey: refusal.errorKey,
     reason: refusal.details.reason,
     message: refusal.message

@@ -1,5 +1,8 @@
-import type { RequestHandler } from 'express';
+import type { RequestHandler, Response } from 'express';
 import { isUuid } from '../utils/mock-id';
+
+/** Where a refused value came from: the server pipe answers each differently. */
+export type ValidationLocation = 'body' | 'query';
 
 /**
  * Mirrors `@Param('<name>', ParseUUIDPipe)`. The pipe runs after the guards but
@@ -29,24 +32,33 @@ export function requireUuid(...params: string[]): RequestHandler {
 }
 
 /**
- * Envelope for a 400 that mirrors a class-validator rejection on the real
+ * Body of an answer that mirrors a class-validator rejection on the real
  * server. `GlobalExceptionFilter` turns the ValidationPipe's string[] into a
  * joined `message` plus the original array in `errors`, and the client keys off
  * `errors` to show a translated generic message instead of raw validator text.
- * A 400 the server raises from service logic carries no `errors` key and must
- * keep sending a bare `{ message, statusCode }` here.
+ * A refusal the server raises from service logic carries no `errors` key.
  */
 export function validationError(message: string | string[]): {
   message: string;
   errors: string[];
-  statusCode: number;
-  error: string;
 } {
   const errors = Array.isArray(message) ? message : [message];
-  return {
-    message: errors.join('. '),
-    errors,
-    statusCode: 400,
-    error: 'Bad Request'
-  };
+  return { message: errors.join('. '), errors };
+}
+
+/**
+ * The status of a validation failure, as `ApiValidationPipe` answers it: 422
+ * for a body that parsed but fails its DTO, 400 for a bad query value.
+ */
+export function validationStatus(location: ValidationLocation): 400 | 422 {
+  return location === 'body' ? 422 : 400;
+}
+
+/** Mirrors a rejection of `ApiValidationPipe`. */
+export function sendValidationError(
+  res: Response,
+  location: ValidationLocation,
+  message: string | string[]
+): void {
+  res.status(validationStatus(location)).json(validationError(message));
 }

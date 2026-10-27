@@ -1,5 +1,7 @@
 import type { Server } from 'http';
+import express from 'express';
 import { createApp } from '../app';
+import { errorEnvelope } from '../helpers/error-envelope.helpers';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
 import { ErrorKeys } from '@app/shared/constants';
@@ -45,6 +47,58 @@ describe('error envelope (server parity)', () => {
       path: '/api/v1/auth/login',
       errorKey: ErrorKeys.AUTH.INVALID_CREDENTIALS
     });
+    expect(res.headers.get('www-authenticate')).toBe('Bearer');
+  });
+
+  it('challenges a keyless 401 with a bare Bearer', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
+      headers: { authorization: 'Bearer not-a-token' }
+    });
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toBe('Bearer');
+  });
+
+  describe('a route body that names a key', () => {
+    let probe: Server;
+    let probeUrl: string;
+
+    beforeAll(async () => {
+      const app = express();
+      app.use(errorEnvelope);
+      app.get('/key/:key', (req, res) => {
+        const body = { message: 'probe', errorKey: req.params['key'] };
+        res.status(400).json(body);
+      });
+      probe = await listenOnUnblockedPort(app);
+      probeUrl = baseUrlOf(probe);
+    });
+
+    afterAll((done) => {
+      probe.close(done);
+    });
+
+    it('gets the status of its key, whatever status the route set', async () => {
+      const res = await fetch(
+        `${probeUrl}/key/${ErrorKeys.AUTH.SESSION_IS_CURRENT}`
+      );
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({
+        statusCode: 403,
+        error: 'Forbidden',
+        errorKey: ErrorKeys.AUTH.SESSION_IS_CURRENT
+      });
+      expect(res.headers.get('www-authenticate')).toBeNull();
+    });
+
+    it('names the invalid token in the challenge of a refused session', async () => {
+      const res = await fetch(
+        `${probeUrl}/key/${ErrorKeys.AUTH.TOKEN_REVOKED}`
+      );
+      expect(res.status).toBe(401);
+      expect(res.headers.get('www-authenticate')).toBe(
+        'Bearer error="invalid_token"'
+      );
+    });
   });
 
   it('answers an unknown route with a JSON 404', async () => {
@@ -77,7 +131,7 @@ describe('error envelope (server parity)', () => {
     expect(await res.json()).toEqual({
       statusCode: 413,
       message: 'request entity too large',
-      error: 'Payload Too Large',
+      error: 'Content Too Large',
       timestamp: TIMESTAMP,
       path: '/api/v1/auth/login'
     });

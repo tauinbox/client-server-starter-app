@@ -5,11 +5,8 @@
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
-import {
-  ValidationPipe,
-  VersioningType,
-  type INestApplication
-} from '@nestjs/common';
+import { VersioningType, type INestApplication } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import type { NextFunction, Request, Response } from 'express';
@@ -92,13 +89,7 @@ describe('Profile mass-assignment protection (e2e)', () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.use((req: Request, _res: Response, next: NextFunction) => {
       (
         req as Request & {
@@ -124,12 +115,12 @@ describe('Profile mass-assignment protection (e2e)', () => {
     ['roles', { roles: ['admin'] }],
     ['failedLoginAttempts', { failedLoginAttempts: 0 }]
   ])(
-    'rejects a payload containing the privileged field %s (400)',
+    'rejects a payload containing the privileged field %s (422)',
     async (field, payload) => {
       const res = await request(server)
         .patch('/api/v1/auth/profile')
         .send(payload)
-        .expect(400);
+        .expect(422);
 
       const body = res.body as { message: string[] };
       expect(body.message).toEqual(

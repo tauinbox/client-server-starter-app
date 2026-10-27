@@ -1,12 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-  ServiceUnavailableException
-} from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { ApiError } from '../../../common/errors/api-error';
 import { In, IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
@@ -307,7 +302,7 @@ describe('BillingAdminService', () => {
       const ctx = await build();
       ctx.subscriptions.findOne.mockResolvedValue(null);
       await expect(ctx.service.cancelSubscription('missing')).rejects.toThrow(
-        NotFoundException
+        ApiError
       );
     });
 
@@ -400,14 +395,12 @@ describe('BillingAdminService', () => {
         makeSubscription({ providerSubscriptionId: 'sub_ext_1' })
       );
       ctx.billing.getProviderById.mockImplementation(() => {
-        throw new ServiceUnavailableException({
-          errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-        });
+        throw new ApiError(ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR, 'unknown');
       });
 
       await expect(
         ctx.service.cancelSubscription('sub-1', 'immediate')
-      ).rejects.toThrow(ServiceUnavailableException);
+      ).rejects.toThrow(ApiError);
 
       expect(ctx.subscriptions.update).not.toHaveBeenCalled();
       expect(ctx.emit).not.toHaveBeenCalled();
@@ -426,7 +419,7 @@ describe('BillingAdminService', () => {
 
       const refusal = ctx.service.cancelSubscription('sub-1', 'immediate');
 
-      await expect(refusal).rejects.toThrow(ConflictException);
+      await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED }
       });
@@ -444,7 +437,7 @@ describe('BillingAdminService', () => {
 
       await expect(
         ctx.service.cancelSubscription('sub-1', 'period_end')
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(ApiError);
 
       // `canceled` together with `cancelAtPeriodEnd` is a pair no other writer
       // in the module can produce.
@@ -555,7 +548,7 @@ describe('BillingAdminService', () => {
 
       await expect(
         ctx.service.cancelSubscription('sub-1', 'immediate')
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(ApiError);
 
       expect(yoo.cancel).toHaveBeenCalledWith('sub_ext_1', 'immediate');
       expect(ctx.emit).not.toHaveBeenCalled();
@@ -567,7 +560,7 @@ describe('BillingAdminService', () => {
       const ctx = await build();
       ctx.invoices.findOne.mockResolvedValue(null);
       await expect(ctx.service.refundInvoice('missing')).rejects.toThrow(
-        NotFoundException
+        ApiError
       );
     });
 
@@ -685,7 +678,7 @@ describe('BillingAdminService', () => {
       const firstPromise = ctx.service.refundInvoice('inv-1');
       await new Promise((resolve) => setImmediate(resolve));
       await expect(ctx.service.refundInvoice('inv-1', 10000)).rejects.toThrow(
-        BadRequestException
+        ApiError
       );
       releaseFirst();
       const first = await firstPromise;
@@ -733,13 +726,11 @@ describe('BillingAdminService', () => {
       const invoice = makeInvoice();
       ctx.invoices.findOne.mockResolvedValue(invoice);
       ctx.billing.getProviderById.mockImplementation(() => {
-        throw new ServiceUnavailableException({
-          errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-        });
+        throw new ApiError(ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR, 'unknown');
       });
 
       await expect(ctx.service.refundInvoice('inv-1')).rejects.toThrow(
-        ServiceUnavailableException
+        ApiError
       );
 
       expect(invoice.refundedMinor.toMinorString()).toBe('0');
@@ -810,7 +801,7 @@ describe('BillingAdminService', () => {
       expect(first.status).toBe('refunded');
 
       await expect(ctx.service.refundInvoice('inv-1')).rejects.toThrow(
-        ConflictException
+        ApiError
       );
       expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
     });
@@ -821,7 +812,7 @@ describe('BillingAdminService', () => {
         makeInvoice({ status: 'pending' })
       );
       const refusal = ctx.service.refundInvoice('inv-1');
-      await expect(refusal).rejects.toThrow(ConflictException);
+      await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE }
       });
@@ -831,7 +822,7 @@ describe('BillingAdminService', () => {
       const ctx = await build();
       ctx.invoices.findOne.mockResolvedValue(makeInvoice());
       const refusal = ctx.service.refundInvoice('inv-1', 99001);
-      await expect(refusal).rejects.toThrow(BadRequestException);
+      await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE }
       });
@@ -847,7 +838,7 @@ describe('BillingAdminService', () => {
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await expect(ctx.service.refundInvoice('inv-1', 50000)).rejects.toThrow(
-        BadRequestException
+        ApiError
       );
       expect(yoo.refund).not.toHaveBeenCalled();
     });
@@ -1089,7 +1080,7 @@ describe('BillingAdminService', () => {
       const ctx = await build();
       ctx.webhookEvents.findOne.mockResolvedValue(null);
       await expect(ctx.service.replayWebhookEvent('missing')).rejects.toThrow(
-        NotFoundException
+        ApiError
       );
     });
 
@@ -1100,7 +1091,7 @@ describe('BillingAdminService', () => {
         status: 'received'
       });
       await expect(ctx.service.replayWebhookEvent('wh-1')).rejects.toThrow(
-        ConflictException
+        ApiError
       );
       expect(ctx.webhookEvents.update).not.toHaveBeenCalled();
     });

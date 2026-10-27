@@ -62,7 +62,7 @@ function authHeaders(token: string): Record<string, string> {
 }
 
 describe('PATCH /api/v1/users/:id validates the whole body before mutating', () => {
-  it('a 400 on the password length leaves the other fields untouched', async () => {
+  it('a 422 on the password length leaves the other fields untouched', async () => {
     const token = await login('admin@example.com');
 
     const res = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
@@ -75,7 +75,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
     expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
 
@@ -94,7 +94,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
 });
 
 describe('PATCH /api/v1/auth/profile validates the whole body before mutating', () => {
-  it('a 400 on the password length leaves the profile untouched', async () => {
+  it('a 422 on the password length leaves the profile untouched', async () => {
     const token = await login('user@example.com');
 
     const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
@@ -108,7 +108,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
     expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
 
@@ -135,7 +135,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
     expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
   });
@@ -159,11 +159,11 @@ describe('the breach blocklist mirrors the server verdict', () => {
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual({
       message:
         'This password has appeared in a public data breach. Please choose a different one.',
-      statusCode: 400,
+      statusCode: 422,
       errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED
     });
 
@@ -187,7 +187,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { errorKey: string };
     expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
 
@@ -210,7 +210,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     const body = (await res.json()) as { errorKey: string };
     expect(body.errorKey).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
   });
@@ -226,7 +226,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { errorKey: string };
     expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
   });
@@ -241,7 +241,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { errorKey: string };
     expect(body.errorKey).toBe(ErrorKeys.AUTH.INVALID_RESET_TOKEN);
   });
@@ -272,7 +272,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       })
     });
 
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(422);
     const body = (await refused.json()) as { errorKey: string };
     expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
   });
@@ -293,8 +293,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
 });
 
 // The server's global ValidationPipe runs before the handler, so a body that
-// fails its DTO is a 400 regardless of whether the addressed row exists. Every
-// handler below therefore has to answer 400 on a malformed body against an
+// fails its DTO is a 422 regardless of whether the addressed row exists. Every
+// handler below therefore has to answer 422 on a malformed body against an
 // unknown id, and keep answering 404 once the body is well-formed.
 describe('body validation precedes the entity lookup', () => {
   const UNKNOWN = mockId('no-such-row');
@@ -368,7 +368,7 @@ describe('body validation precedes the entity lookup', () => {
   ];
 
   it.each(cases)(
-    '$name returns 400 on a malformed body against an unknown id',
+    '$name returns 422 on a malformed body against an unknown id',
     async ({ method, path, malformed, malformedMessage }) => {
       const token = await login('admin@example.com');
 
@@ -378,7 +378,7 @@ describe('body validation precedes the entity lookup', () => {
         body: JSON.stringify(malformed)
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
       expect(body.message).toBe(malformedMessage);
     }
@@ -412,7 +412,7 @@ describe('body validation precedes the entity lookup', () => {
       body: JSON.stringify({ isSuper: true })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
     expect(body.errors).toEqual(['property isSuper should not exist']);
   });

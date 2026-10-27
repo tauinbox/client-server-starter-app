@@ -1,5 +1,6 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ApiError } from '../../../common/errors/api-error';
 import { DataSource, EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -201,13 +202,7 @@ export class UsersService {
     // A falsy id would be dropped from the WHERE clause and silently resolve to
     // an arbitrary user rather than matching nothing.
     if (!id) {
-      throw new HttpException(
-        {
-          message: 'User id is required',
-          errorKey: ErrorKeys.USERS.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
-      );
+      throw new ApiError(ErrorKeys.USERS.NOT_FOUND, 'User id is required');
     }
 
     const user = await this.userRepository.findOne({
@@ -215,12 +210,9 @@ export class UsersService {
       relations: { roles: true }
     });
     if (!user) {
-      throw new HttpException(
-        {
-          message: `User with ID ${id} not found`,
-          errorKey: ErrorKeys.USERS.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
+      throw new ApiError(
+        ErrorKeys.USERS.NOT_FOUND,
+        `User with ID ${id} not found`
       );
     }
 
@@ -577,12 +569,9 @@ export class UsersService {
       withDeleted: true
     });
     if (!user) {
-      throw new HttpException(
-        {
-          message: `User with ID ${id} not found`,
-          errorKey: ErrorKeys.USERS.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
+      throw new ApiError(
+        ErrorKeys.USERS.NOT_FOUND,
+        `User with ID ${id} not found`
       );
     }
 
@@ -609,12 +598,9 @@ export class UsersService {
   }
 }
 
-function notDeleted(id: string): HttpException {
-  return new HttpException(
-    {
-      message: `User with ID ${id} is not deleted, so there is nothing to restore`,
-      errorKey: ErrorKeys.USERS.NOT_DELETED
-    },
-    HttpStatus.CONFLICT
+function notDeleted(id: string): ApiError {
+  return new ApiError(
+    ErrorKeys.USERS.NOT_DELETED,
+    `User with ID ${id} is not deleted, so there is nothing to restore`
   );
 }

@@ -44,7 +44,7 @@ management and theming.
   back in. An owner who lost the recovery codes as well is reset by an administrator, who proves
   their identity outside the system and then confirms with their own factor on the user edit page
   (`POST /users/:id/mfa/reset`). The reset ends every session of the account. The shared secret is encrypted at rest
-  with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 503 and every other
+  with `MFA_ENCRYPTION_KEY`; while that key is empty, enrolment answers HTTP 501 and every other
   path is unchanged. An account created through a provider holds no password, so the card takes it
   through a round trip at that provider and picks the enrolment up on the return, and it turns the
   factor off with a code from the authenticator instead of a password. `MFA_REQUIRED_FOR_ADMINS=true`
@@ -234,13 +234,13 @@ management and theming.
   anonymous caller gets the `public: true` flags only.
 
   The administrator CRUD is at `/api/v1/admin/feature-flags`. It uses optimistic locking through the
-  `If-Match` header.
+  `ETag` and `If-Match` headers (RFC 9110): a stale version answers 412.
 
   An attribute rule can reference a `custom` key. The set of valid keys is not a constant: a module
   registers its keys in `onModuleInit`, thus the set is a property of the deployment.
   `GET /api/v1/admin/feature-flags/attribute-keys` reports it, and the rule editor offers it as an
   autocomplete. The editor also blocks a save that names an unregistered key, thus the administrator
-  does not learn the valid set from a 400 after the flag itself was written.
+  does not learn the valid set from a 422 after the flag itself was written.
 
   An anonymous user goes into a bucket by the `nxs_anon_id` cookie. `GET /feature-flags` sets it
   only when a live public flag has a percentage rule, because nothing else reads it. Thus a 10 %
@@ -292,7 +292,7 @@ management and theming.
 - **Resource management.** The "Manage Resources" tab is at `/admin/resources` and needs
   `read:Permission`. The Resources table edits the display name, the description and the offered
   actions of each resource (`allowedActionNames`). An admin can offer fewer actions than the code
-  checks, but never an action that the code does not check: the server answers 400
+  checks, but never an action that the code does not check: the server answers 422
   `errors.resources.actionNotDeclared`.
 - **Actions come from the code.** Each `@RegisterResource` declares the actions that its `@Authorize`
   decorators check (`actions`) and the actions whose checks read the record (`conditionalActions`).
@@ -320,7 +320,7 @@ management and theming.
 
   The `ownership`, `fieldMatch` and `userAttr` editors validate the shape of the condition inline. They
   use the shared finders of `permission-condition-shape.ts`, which are the rules that the server DTO
-  applies. Thus a malformed condition blocks the save with a translated error and needs no 400 round
+  applies. Thus a malformed condition blocks the save with a translated error and needs no 422 round
   trip. An example of a malformed condition is a `fieldMatch` value that is not a non-empty array.
 - **Operator-safe `custom` conditions.** The `custom` branch runs `validateMongoQueryKeys()` on the
   parsed JSON from the user before any merge. That is the same allow-list that
@@ -351,7 +351,7 @@ management and theming.
   key or attribute name.
 
   A condition that is not an object vetoes the permission too. The permission-write routes refuse
-  one with a 400, but a row written before that check can hold an array. A deny in any entry of such
+  one with a 422, but a row written before that check can hold an array. A deny in any entry of such
   an array makes the whole row a deny.
 
   The system never registers a partial resolution. A drop of the malformed part alone widens the
@@ -371,7 +371,7 @@ management and theming.
   both resolve to the id of the acting user. A record that does not exist yet can never carry that id.
   Thus one of these conditions on a `create` permission denies each create instead of restricting it.
 
-  `RoleService` rejects such a grant with a 400 and `errors.roles.conditionNotApplicable`. It does this
+  `RoleService` rejects such a grant with a 422 and `errors.roles.conditionNotApplicable`. It does this
   on the two permission-write routes, `PUT /roles/:id/permissions` and `POST /roles/:id/permissions`,
   for each caller and for a super role. The mock server mirrors the rule.
 
@@ -380,23 +380,23 @@ management and theming.
 - **A condition names only the fields of its subject.** `CONDITION_FIELDS` in
   `shared/src/constants/permission.constants.ts` lists the record fields that a condition on each
   subject can use. No condition can read a column that no response sends, such as the password hash.
-  A deny on a misspelt field cannot silently deny nothing. A write with another field gets a 400 with
+  A deny on a misspelt field cannot silently deny nothing. A write with another field gets a 422 with
   `errors.roles.conditionFieldUnknown`, for a super role too. A stored row with such a field fails
   closed: the allow grants nothing, and the deny denies everything. The permissions dialog shows the
   allowed fields, and the mock server mirrors the rule.
 - **A condition only where a check reads the record.** CASL answers a route check on a subject type
   from the rule alone, so a conditional allow passes it as a full grant and a conditional deny stops
   nothing. A grant can carry a restriction (`ownership`, `fieldMatch`, `userAttr`, `custom`) only on an
-  action that its resource lists in `conditionalActions`; elsewhere the write answers 400
+  action that its resource lists in `conditionalActions`; elsewhere the write answers 422
   `errors.roles.conditionNotSupported`. An allow on an action that the resource does not offer answers
-  400 `errors.roles.actionNotGrantable`. A stored row that breaks either rule fails closed: an allow
+  422 `errors.roles.actionNotGrantable`. A stored row that breaks either rule fails closed: an allow
   grants nothing and a deny denies the whole action. `npm run check:grant-scope` lists such rows.
 - **Condition shape validation at the input.** `PermissionConditionDto` enforces the inner shape of
   `ownership`, `fieldMatch` and `userAttr`. It uses the shared finders in
   `shared/src/utils/permission-condition-shape.ts`, which the client editors and the mock server also
   use.
 
-  Thus the server rejects a partly malformed condition with a 400 at authoring time. It does not
+  Thus the server rejects a partly malformed condition with a 422 at authoring time. It does not
   register a wider rule silently. An example is `{"status": ["active"], "dept": "sales"}`, where the
   author forgot the array brackets.
 
@@ -1038,23 +1038,27 @@ guard on the mock routes. Thus a malformed id is a 400 in the two servers, befor
 A spec and an E2E fixture address a seed row through `mockId('user-1')`, `mockId('role-editor')` and
 similar calls. They do not use a literal id.
 
-A request body obeys the same rule. The global `ValidationPipe` of the server runs before the handler.
-Thus a body that fails its DTO is a 400, and the existence of the addressed row does not change this.
+A request body obeys the same rule. The global `ApiValidationPipe` of the server runs before the handler.
+Thus a body that fails its DTO is a 422, and the existence of the addressed row does not change this.
+A query or a path parameter that fails stays a 400. Each error key has one status, from
+`ERROR_STATUS` (`shared/src/constants/error-status.ts`); the mock sends a keyed error with
+`sendError(res, key, message)`, which reads the same table.
 
 For that reason a mock handler runs its DTO-shape checks first. Those checks cover the type, the
 length, the enum and the range. A check that needs the row stays below the 404. Such a check covers
 the uniqueness, a state transition or a comparison with a remaining total.
 
 A header is not a body. Thus the handler parses `If-Match` after the DTO-shape checks and above the
-404. This gives a 428 for a valid body with no header, and a 400 for a bad body.
+404. This gives a 428 for a valid body with no header, a 400 for a malformed header, and a 422 for
+a bad body.
 
 One helper can hold checks of the two classes. The rule-payload validator of a feature flag is an
-example. Its `source` field tells which server layer rejects the same input. A `dto` failure is a 400
-above the 404. A `service` failure is a 400 below the 404, because the server runs that validator
+example. Its `source` field tells which server layer rejects the same input. A `dto` failure is a 422
+above the 404. A `service` failure is a 422 below the 404, because the server runs that validator
 in the flag service, after the lookup.
 
 The pipe also runs with `whitelist` and `forbidNonWhitelisted`. Thus a property that no DTO declares
-is a 400 by itself.
+is a 422 by itself.
 
 `utils/validation.ts` mirrors the individual class-validator constraints. The mirrors are
 `unknownPropertyErrors`, `stringErrors`, `trimmedStringErrors`, `stringArrayErrors`, `emailErrors`,
@@ -1068,7 +1072,7 @@ gives more than one message, thus a handler must collect them and must not answe
 failure. `emailErrors` mirrors `@Transform(normalizeEmail) @IsEmail() @MaxLength(MAX_EMAIL_LENGTH)`, so an
 absent, null or non-string address gives two messages, and a malformed string gives one. The
 format itself comes from `validator.isEmail` with the default options, the function `@IsEmail()`
-calls, because a regular expression here accepted thirteen shapes that the server answers with 400. That order puts the
+calls, because a regular expression here accepted thirteen shapes that the server answers with 422. That order puts the
 unknown properties first, and then each property as the DTO declares it. Thus a handler composes its
 DTO from them and answers with the envelope of the server.
 
@@ -1143,7 +1147,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before the pool closes an idle connection |
 | `DB_POOL_CONNECTION_TIMEOUT` | `5000` | Milliseconds to wait for a connection before an error |
 | `SMTP_FROM` | `noreply@example.com` | Default "from" address of an email |
-| `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 503 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
+| `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 501 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
 | `MFA_REQUIRED_FOR_ADMINS` | `false` | Set to `true` to make two-factor authentication mandatory for every account that holds a super role. Such an account signs in and reaches its profile as before, but no route behind an authorization check answers it until the enrolment is complete. The requirement stays off while `MFA_ENCRYPTION_KEY` is empty, because enrolment is unavailable in that state |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server seeds the account at startup, and it skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
@@ -1542,7 +1546,7 @@ the script is the authoritative reference for the key list.
 | `DB_PASSWORD` | deploy, rebuild | `server/.env` and root `.env` | It must be equal to the password of the postgres volume. Refer to the caution below |
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | The OAuth client secrets |
 | `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | The password of the initial administrator |
-| `MFA_ENCRYPTION_KEY` | deploy, rebuild | `server/.env` | The AES-256-GCM key of the two-factor secret column. It is not stored with the data it protects. While the secret is empty, two-factor enrolment answers HTTP 503 and nothing else changes |
+| `MFA_ENCRYPTION_KEY` | deploy, rebuild | `server/.env` | The AES-256-GCM key of the two-factor secret column. It is not stored with the data it protects. While the secret is empty, two-factor enrolment answers HTTP 501 and nothing else changes |
 | `MFA_REQUIRED_FOR_ADMINS` | deploy, rebuild | `server/.env` | Not a credential, but carried the same way because this is the only channel that survives a from-scratch rebuild of the host. Set it to `true` to make two-factor authentication mandatory for every account with a super role. It has no effect while `MFA_ENCRYPTION_KEY` is empty |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register`, `/forgot-password` and `/resend-verification`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
@@ -1593,7 +1597,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/refresh-token` | None | Refresh the access token. Reads the `refresh_token` cookie and rotates it |
 | POST | `/auth/logout` | Bearer | Log out this device. It ends the session the `refresh_token` cookie belongs to, leaves the other devices signed in, and cancels a started OAuth link. It answers `Clear-Site-Data` |
 | GET | `/auth/sessions` | Bearer | List the signed-in devices of the caller: session id, `current`, the User-Agent sent at sign-in, the IP address of the latest sign-in or refresh with its country code and city (null without a GeoIP database), start time and last refresh |
-| DELETE | `/auth/sessions/:sessionId` | Bearer + step-up | End one other device. An unknown id and an id of another account both answer 404; the own session answers 400 |
+| DELETE | `/auth/sessions/:sessionId` | Bearer + step-up | End one other device. An unknown id and an id of another account both answer 404; the own session answers 403 |
 | DELETE | `/auth/sessions` | Bearer + step-up | End every device of the account except the caller |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
 | PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one (a code does not replace it), a `code` for a user with OAuth only that carries an authenticator, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only and no authenticator. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
@@ -1608,7 +1612,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/reset-password` | None | Reset the password with a token |
 | POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. The body names the operation the proof is for. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie for that operation, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer + step-up | Start an OAuth account link. The body carries the current password, or the account proves itself with a `reauth_proof` minted for the operation `oauth_link`. A linked provider signs the account in and no recovery path removes it, thus a stolen session must not plant one. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |
-| POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie. The session is issued here, not at the callback, after the session of the presented refresh cookie ends. An account that was deactivated or deleted since the callback gets the 400 of a bad cookie. An account that carries a second factor gets the same challenge the login route gives, and no refresh cookie. The payload is spendable once, thus a replay inside its 60 seconds is refused |
+| POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie. The session is issued here, not at the callback, after the session of the presented refresh cookie ends. An account that was deactivated or deleted since the callback gets the 401 of a bad cookie. An account that carries a second factor gets the same challenge the login route gives, and no refresh cookie. The payload is spendable once, thus a replay inside its 60 seconds is refused |
 | GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
@@ -1617,7 +1621,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/users/:id` | `users:read` | Get a user by ID |
 | GET | `/users/:id/permissions` | `users:read` | Get the effective permissions: the roles, the resolved permissions and the packed CASL rules |
 | POST | `/users` | `users:create` | Create a user |
-| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and an email change or a deactivation clears the same five fields. A password change or a change to a different email of another account needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller, and an email change mails the old address with the new one masked. On the caller's own record both are refused with 400 `errors.users.credentialSelf`: the profile changes them |
+| PATCH | `/users/:id` | `users:update` | Update a user: the email, the name, the password, `isActive` to deactivate or reactivate, and `unlockAccount`. A password change, an email change or a deactivation revokes the sessions of the target. An email change also audits both addresses under `USER_EMAIL_CHANGE_COMPLETE` with `source: 'admin'`. A password change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio on the target, and an email change or a deactivation clears the same five fields. A password change or a change to a different email of another account needs a step-up of the CALLER in the same body: `currentPassword`, or `code` from the authenticator of the caller, and an email change mails the old address with the new one masked. On the caller's own record both are refused with 403 `errors.users.credentialSelf`: the profile changes them |
 | DELETE | `/users/:id` | `users:delete` | Soft-delete a user. Sets `deleted_at` and revokes the sessions |
 | POST | `/users/:id/restore` | `users:delete` | Restore a soft-deleted user. Clears `deleted_at` and does not change `isActive` |
 | POST | `/users/:id/mfa/reset` | `users:update` | Reset the two-factor enrolment of another user who lost the authenticator and the recovery codes. Needs a step-up of the CALLER (`currentPassword` or `code`). Refused for the caller's own account and for an account with no factor. Ends every session of the target, audits `MFA_RESET_BY_ADMIN` and mails the owner |
@@ -1636,14 +1640,14 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted, or does not hold the role |
 | GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events` and `user_list_stale`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
 | GET | `/rbac/resources` | `permissions:read` | List each resource, ordered by name. The user permissions page reads the display names from it |
-| PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 400 for an action that the code does not check |
-| POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 400 when no controller registers it |
+| PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 422 for an action that the code does not check |
+| POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 409 when no controller registers it |
 | GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
 | GET | `/admin/feature-flags/cursor` | `feature-flags:search` | List the feature flags, cursor paginated. Filters: `q` (key or description), `enabled`, `public`, `environment` (a flag with no environments applies in every one) |
 | GET | `/admin/feature-flags/:id` | `feature-flags:read` | Get a feature flag by ID |
 | GET | `/admin/feature-flags/attribute-keys` | `feature-flags:search` | List the `custom` attribute keys that a rule payload can reference. A reference load, not a list |
 | POST | `/admin/feature-flags` | `feature-flags:create` | Create a feature flag, optionally with its targeting rules in the same write |
-| PATCH | `/admin/feature-flags/:id` | `feature-flags:update` | Update a feature flag. The key is immutable after create. An optional `rules` array replaces the targeting rules in the same write. Uses optimistic locking through `If-Match` |
+| PATCH | `/admin/feature-flags/:id` | `feature-flags:update` | Update a feature flag. The key is immutable after create. An optional `rules` array replaces the targeting rules in the same write. Uses optimistic locking through `If-Match: "<version>"`; a stale version answers 412 |
 | DELETE | `/admin/feature-flags/:id` | `feature-flags:delete` | Delete a feature flag |
 | POST | `/admin/feature-flags/:id/preview` | `feature-flags:read` | Show how a flag evaluates for given attributes, and save nothing. The body can carry an unsaved `rules`, `enabled` and `environments` set, which the server evaluates in place of the stored flag |
 
@@ -2122,7 +2126,7 @@ a second request to the registry for a verdict that gates nothing.
 
   A person observed two failure shapes. First, `PATCH /auth/profile` with `{"password": null}` set the
   column to NULL and answered 200. The account could then not log in. The other identity fields
-  changed a 400 into a NOT NULL violation, which the server reported as a 500.
+  changed a validation error into a NOT NULL violation, which the server reported as a 500.
 
   Second, on the money path, `POST /billing/purchase` with `{"amountMinor": null}` got past the guard
   for an omitted amount, which compared with `=== undefined`. The value then compared as `0` against

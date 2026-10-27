@@ -2,8 +2,7 @@ import {
   Inject,
   Injectable,
   Logger,
-  NotImplementedException,
-  ServiceUnavailableException
+  NotImplementedException
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -23,6 +22,8 @@ import { ErrorKeys } from '@app/shared/constants';
 import type { Customer } from '../entities/customer.entity';
 import type { Plan } from '../entities/plan.entity';
 import { PADDLE_CLIENT, paddleEnvironment } from './paddle.client';
+import { ApiError } from '../../../common/errors/api-error';
+import { subscriptionNotLinked } from '../utils/billing-errors.util';
 import {
   MANAGES_LIFECYCLE,
   WEBHOOK_IGNORED
@@ -174,10 +175,10 @@ export class PaddleProvider implements PaymentProvider {
 
   private requireClient(): Paddle {
     if (!this.paddle) {
-      throw new ServiceUnavailableException({
-        message: 'Paddle is not configured',
-        errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED,
+        'Paddle is not configured'
+      );
     }
     return this.paddle;
   }
@@ -315,10 +316,10 @@ export class PaddleProvider implements PaymentProvider {
   }): CheckoutSession {
     const url = transaction.checkout?.url;
     if (!url) {
-      throw new ServiceUnavailableException({
-        message: 'Paddle did not return a checkout URL',
-        errorKey: ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED,
+        'Paddle did not return a checkout URL'
+      );
     }
     return { url, sessionRef: transaction.id };
   }
@@ -326,10 +327,10 @@ export class PaddleProvider implements PaymentProvider {
   private requirePriceId(plan: Plan): string {
     const priceId = plan.prices.paddle?.providerPriceId;
     if (!priceId) {
-      throw new ServiceUnavailableException({
-        message: `Plan "${plan.key}" has no Paddle price configured`,
-        errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PLAN_NOT_CONFIGURED,
+        `Plan "${plan.key}" has no Paddle price configured`
+      );
     }
     return priceId;
   }
@@ -389,10 +390,7 @@ export class PaddleProvider implements PaymentProvider {
   ): Promise<CheckoutSession> {
     const paddle = this.requireClient();
     if (!providerSubscriptionId) {
-      throw new ServiceUnavailableException({
-        message: 'The subscription is not linked to Paddle yet',
-        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED
-      });
+      throw subscriptionNotLinked();
     }
     const transaction =
       await paddle.subscriptions.getPaymentMethodChangeTransaction(
@@ -452,10 +450,10 @@ export class PaddleProvider implements PaymentProvider {
     // so a partial refund applies the amount to that item.
     const lineItem = transaction.details?.lineItems?.[0];
     if (!lineItem) {
-      throw new ServiceUnavailableException({
-        message: `Transaction ${providerInvoiceRef} has no line item to refund`,
-        errorKey: ErrorKeys.BILLING.PROVIDER_REFUND_FAILED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PROVIDER_REFUND_FAILED,
+        `Transaction ${providerInvoiceRef} has no line item to refund`
+      );
     }
     await paddle.adjustments.create({
       transactionId: providerInvoiceRef,

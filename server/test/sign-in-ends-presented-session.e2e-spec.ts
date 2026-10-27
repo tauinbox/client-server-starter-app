@@ -5,9 +5,9 @@ import {
   CanActivate,
   ExecutionContext,
   INestApplication,
-  ValidationPipe,
   VersioningType
 } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -61,13 +61,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     app.use(cookieParser());
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();

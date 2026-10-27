@@ -986,7 +986,7 @@ describe('UsersController', () => {
           getStatus(): number;
           getResponse(): { errorKey?: string };
         };
-        expect(httpErr.getStatus()).toBe(400);
+        expect(httpErr.getStatus()).toBe(403);
         expect(httpErr.getResponse().errorKey).toBe(
           ErrorKeys.USERS.CREDENTIAL_SELF
         );
@@ -1037,7 +1037,7 @@ describe('UsersController', () => {
             getStatus(): number;
             getResponse(): { errorKey?: string };
           };
-          expect(httpErr.getStatus()).toBe(400);
+          expect(httpErr.getStatus()).toBe(403);
           expect(httpErr.getResponse().errorKey).toBe(
             ErrorKeys.USERS.MODERATION_SELF
           );
@@ -1306,7 +1306,7 @@ describe('UsersController', () => {
         .resetMfa('user-9', { code: '123456' }, req, mockAbility)
         .catch((e: unknown) => e);
 
-      expect(statusAndKey(err)).toEqual([400, ErrorKeys.USERS.MFA_RESET_SELF]);
+      expect(statusAndKey(err)).toEqual([403, ErrorKeys.USERS.MFA_RESET_SELF]);
       expect(usersServiceMock.findOne).not.toHaveBeenCalled();
       expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
       expect(mfaServiceMock.resetByAdmin).not.toHaveBeenCalled();
@@ -1323,7 +1323,7 @@ describe('UsersController', () => {
         .resetMfa('user-9', { code: '123456' }, req, mockAbility)
         .catch((e: unknown) => e);
 
-      expect(statusAndKey(err)).toEqual([400, ErrorKeys.AUTH.MFA_NOT_ENABLED]);
+      expect(statusAndKey(err)).toEqual([409, ErrorKeys.AUTH.MFA_NOT_ENABLED]);
       expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
       expect(eventEmitterMock.emitAsync).not.toHaveBeenCalled();
     });
@@ -1399,7 +1399,7 @@ describe('UsersController', () => {
         .catch((e: unknown) => e);
 
       const httpErr = err as { getStatus(): number; getResponse(): unknown };
-      expect(httpErr.getStatus()).toBe(400);
+      expect(httpErr.getStatus()).toBe(403);
       expect((httpErr.getResponse() as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.USERS.SESSION_REVOKE_SELF
       );

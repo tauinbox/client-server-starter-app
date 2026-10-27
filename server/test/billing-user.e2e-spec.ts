@@ -7,11 +7,8 @@
 // the protected handlers can be exercised without a live PostgreSQL.
 
 import { Test } from '@nestjs/testing';
-import {
-  ValidationPipe,
-  VersioningType,
-  type INestApplication
-} from '@nestjs/common';
+import { VersioningType, type INestApplication } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { Reflector } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
@@ -125,7 +122,7 @@ describe('Billing user self-service (e2e)', () => {
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     // Mirrors the prod pipe so the DTO validation contract is exercised.
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
+    app.useGlobalPipes(new ApiValidationPipe());
     // Inject the authenticated user (set by the global JwtAuthGuard in prod).
     app.use((req: Request, _res: Response, next: NextFunction) => {
       const userId = (req.headers['x-test-user'] as string) ?? 'user-1';
@@ -311,7 +308,7 @@ describe('Billing user self-service (e2e)', () => {
     await request(server)
       .post('/api/v1/billing/purchase')
       .send({ amountMinor: 100 })
-      .expect(400);
+      .expect(422);
 
     expect(billingUser.purchase).not.toHaveBeenCalled();
   });
@@ -320,7 +317,7 @@ describe('Billing user self-service (e2e)', () => {
     await request(server)
       .post('/api/v1/billing/purchase')
       .send({ productKey: 'donation', amountMinor: 0 })
-      .expect(400);
+      .expect(422);
 
     expect(billingUser.purchase).not.toHaveBeenCalled();
   });
@@ -393,7 +390,7 @@ describe('Billing user self-service (e2e)', () => {
     await request(server)
       .post('/api/v1/billing/subscription/change')
       .send({})
-      .expect(400);
+      .expect(422);
 
     expect(planChange.changePlan).not.toHaveBeenCalled();
   });
@@ -402,22 +399,24 @@ describe('Billing user self-service (e2e)', () => {
     [
       'a declined charge',
       new ChargeDeclinedError(),
+      409,
       ErrorKeys.BILLING.PAYMENT_DECLINED
     ],
     [
       'a provider timeout',
       new ProviderTimeoutError('yookassa', 'chargeOffSession', 20000),
-      ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+      504,
+      ErrorKeys.BILLING.PROVIDER_TIMEOUT
     ]
   ])(
-    'answers a plan change that fails on %s with 503 and its key',
-    async (_case, error, errorKey) => {
+    'answers a plan change that fails on %s with %i and its key',
+    async (_case, error, status, errorKey) => {
       planChange.changePlan.mockRejectedValue(error);
 
       const res = await request(server)
         .post('/api/v1/billing/subscription/change')
         .send({ planKey: 'business' })
-        .expect(503);
+        .expect(status);
 
       expect((res.body as { errorKey?: string }).errorKey).toBe(errorKey);
     }

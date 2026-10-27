@@ -1,15 +1,14 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ErrorKeys, FEATURE_FLAG_LIST_QUERY } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
+import {
+  ifMatchHolds,
+  type IfMatchCondition
+} from '@app/shared/utils/if-match';
 import { subject } from '@casl/ability';
 import type {
   FeatureFlagAttributeKeysResponse,
@@ -32,6 +31,7 @@ import {
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { applyAbilityToFeatureFlagQuery } from '../../../common/utils/apply-ability.util';
 import { assertCan } from '../../../common/utils/assert-can.util';
+import { ApiError } from '../../../common/errors/api-error';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -58,24 +58,17 @@ const FEATURE_FLAG_LIST_COLUMNS: ListColumns<typeof FEATURE_FLAG_LIST_QUERY> = {
 };
 import { AttributeRegistryService } from './attribute-registry.service';
 
-function keyExistsConflict(): HttpException {
-  return new HttpException(
-    {
-      message: 'Feature flag with this key already exists',
-      errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS
-    },
-    HttpStatus.CONFLICT
+function keyExistsConflict(): ApiError {
+  return new ApiError(
+    ErrorKeys.FEATURE_FLAGS.KEY_EXISTS,
+    'Feature flag with this key already exists'
   );
 }
 
-function versionConflict(): HttpException {
-  return new HttpException(
-    {
-      message:
-        'Feature flag was modified by another request — reload and retry',
-      errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
-    },
-    HttpStatus.CONFLICT
+function versionConflict(): ApiError {
+  return new ApiError(
+    ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT,
+    'Feature flag was modified by another request — reload and retry'
   );
 }
 
@@ -187,10 +180,10 @@ export class FeatureFlagService {
   async #load(id: string): Promise<FeatureFlag> {
     const flag = await this.flagRepo.findOne({ where: { id } });
     if (!flag) {
-      throw new NotFoundException({
-        message: 'Feature flag not found',
-        errorKey: ErrorKeys.FEATURE_FLAGS.NOT_FOUND
-      });
+      throw new ApiError(
+        ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
+        'Feature flag not found'
+      );
     }
     flag.rules = await this.ruleRepo.find({
       where: { flagId: id },
@@ -253,7 +246,7 @@ export class FeatureFlagService {
   async update(
     id: string,
     dto: UpdateFeatureFlagDto,
-    expectedVersion: number,
+    ifMatch: IfMatchCondition,
     ability: AbilityOrSystem,
     actor: FlagAuditActor
   ): Promise<FeatureFlag> {
@@ -270,7 +263,7 @@ export class FeatureFlagService {
     const { rules: ruleDtos, ...fields } = dto;
     const rules = this.#validateRules(ruleDtos);
     // A successful write then replaced exactly `current`, the audit diff base.
-    if (current.version !== expectedVersion) throw versionConflict();
+    if (!ifMatchHolds(ifMatch, current.version)) throw versionConflict();
     await this.dataSource.transaction(async (em) => {
       const result = await em
         .createQueryBuilder()
@@ -289,7 +282,7 @@ export class FeatureFlagService {
         })
         .where('id = :id AND version = :expected', {
           id,
-          expected: expectedVersion
+          expected: current.version
         })
         .execute();
 

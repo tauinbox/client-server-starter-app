@@ -84,7 +84,7 @@ describe('the user name', () => {
       await adminToken()
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(((await res.json()) as { errors: string[] }).errors).toEqual([
       'name should not be empty'
     ]);

@@ -1,20 +1,20 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Headers,
   HttpCode,
-  HttpException,
   HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
-  Req
+  Req,
+  Res
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -30,8 +30,13 @@ import {
 } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ErrorKeys } from '@app/shared/constants';
-import { parseIfMatchVersion } from '@app/shared/utils/if-match';
+import {
+  parseIfMatch,
+  versionEtag,
+  type IfMatchCondition
+} from '@app/shared/utils/if-match';
 import { FeatureFlagCursorQueryDto } from '../../../common/dtos';
+import { ApiError } from '../../../common/errors/api-error';
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { CurrentAbility } from '../../auth/decorators/current-ability.decorator';
 import type { AppAbility } from '../../auth/casl/app-ability';
@@ -101,12 +106,15 @@ export class FeatureFlagsAdminController {
   @ApiParam({ name: 'id' })
   @ApiOkResponse({ type: FeatureFlagResponseDto })
   @ApiNotFoundResponse({ description: 'Feature flag not found' })
-  findOne(
+  async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: JwtAuthRequest,
-    @CurrentAbility() ability: AppAbility
+    @CurrentAbility() ability: AppAbility,
+    @Res({ passthrough: true }) res: Response
   ) {
-    return this.flagService.findOne(id, ability, req.user?.userId);
+    const flag = await this.flagService.findOne(id, ability, req.user?.userId);
+    res.setHeader('ETag', versionEtag(flag.version));
+    return flag;
   }
 
   @Post()
@@ -118,7 +126,8 @@ export class FeatureFlagsAdminController {
   async create(
     @Body() dto: CreateFeatureFlagDto,
     @Req() req: JwtAuthRequest,
-    @CurrentAbility() ability: AppAbility
+    @CurrentAbility() ability: AppAbility,
+    @Res({ passthrough: true }) res: Response
   ) {
     const flag = await this.flagService.create(
       dto,
@@ -129,6 +138,7 @@ export class FeatureFlagsAdminController {
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()
     );
+    res.setHeader('ETag', versionEtag(flag.version));
     return flag;
   }
 
@@ -139,7 +149,8 @@ export class FeatureFlagsAdminController {
   @ApiHeader({
     name: 'If-Match',
     required: true,
-    description: 'Expected current version number for optimistic locking'
+    description:
+      'The ETag of the flag as the caller last read it, for example "3" (RFC 9110 13.1.1)'
   })
   @ApiParam({ name: 'id' })
   @ApiBody({ type: UpdateFeatureFlagDto })
@@ -149,13 +160,14 @@ export class FeatureFlagsAdminController {
     @Body() dto: UpdateFeatureFlagDto,
     @Headers('if-match') ifMatch: string | undefined,
     @Req() req: JwtAuthRequest,
-    @CurrentAbility() ability: AppAbility
+    @CurrentAbility() ability: AppAbility,
+    @Res({ passthrough: true }) res: Response
   ) {
-    const expectedVersion = this.parseIfMatch(ifMatch);
+    const condition = this.parseIfMatch(ifMatch);
     const flag = await this.flagService.update(
       id,
       dto,
-      expectedVersion,
+      condition,
       ability,
       this.auditActor(req)
     );
@@ -163,6 +175,7 @@ export class FeatureFlagsAdminController {
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()
     );
+    res.setHeader('ETag', versionEtag(flag.version));
     return flag;
   }
 
@@ -217,23 +230,20 @@ export class FeatureFlagsAdminController {
     };
   }
 
-  private parseIfMatch(header: string | undefined): number {
-    const version = parseIfMatchVersion(header);
-    if (version === 'missing') {
-      throw new HttpException(
-        {
-          message: 'If-Match header is required for optimistic locking',
-          errorKey: ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED
-        },
-        HttpStatus.PRECONDITION_REQUIRED
+  private parseIfMatch(header: string | undefined): IfMatchCondition {
+    const condition = parseIfMatch(header);
+    if (condition === 'missing') {
+      throw new ApiError(
+        ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED,
+        'If-Match header is required for optimistic locking'
       );
     }
-    if (version === 'invalid') {
-      throw new BadRequestException({
-        message: 'If-Match must be a positive integer',
-        errorKey: ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID
-      });
+    if (condition === 'invalid') {
+      throw new ApiError(
+        ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID,
+        'If-Match must be "*" or a list of entity tags'
+      );
     }
-    return version;
+    return condition;
   }
 }

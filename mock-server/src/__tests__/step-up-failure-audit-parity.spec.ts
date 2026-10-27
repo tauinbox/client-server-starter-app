@@ -93,7 +93,7 @@ describe('a refused step-up is audited', () => {
       token
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(failureRows()).toHaveLength(1);
     expect(failureRows()[0]).toMatchObject({
       actorEmail: CREDENTIALS.email,
@@ -116,7 +116,7 @@ describe('a refused step-up is audited', () => {
 
     const res = await post('/auth/mfa/disable', { code: '000000' }, token);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(failureRows()).toHaveLength(1);
     expect(failureRows()[0].details).toEqual({
       operation: STEP_UP_OPERATION.MFA_DISABLE,
@@ -139,7 +139,7 @@ describe('a refused step-up is audited', () => {
       body: JSON.stringify({ password: NEW_PASSWORD })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(failureRows()[0].details).toEqual({
       operation: STEP_UP_OPERATION.PASSWORD_SET,
       factor: 'reauth_proof',
@@ -156,7 +156,7 @@ describe('a refused step-up is audited', () => {
       token
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(failureRows()[0].details).toEqual({
       operation: STEP_UP_OPERATION.EMAIL_CHANGE,
       factor: 'password',

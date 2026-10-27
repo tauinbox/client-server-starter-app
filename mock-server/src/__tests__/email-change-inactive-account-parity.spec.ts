@@ -67,7 +67,7 @@ function confirm(token: string): Promise<Response> {
 const invalidTokenBody = {
   message: 'Invalid or expired email-change token',
   errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
-  statusCode: 400
+  statusCode: 422
 };
 
 describe('confirm-email-change against a deactivated account', () => {
@@ -77,7 +77,7 @@ describe('confirm-email-change against a deactivated account', () => {
 
     const res = await confirm(token);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(invalidTokenBody);
     expect(findUserByEmail(email)?.email).toBe(email);
     expect(findUserByEmail(email)?.isEmailVerified).toBe(true);
@@ -118,7 +118,7 @@ describe('confirm-email-change against a deactivated account', () => {
     expect(getState().pendingEmailTokens.has(token)).toBe(false);
 
     const res = await confirm(token);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(invalidTokenBody);
   });
 });

@@ -102,7 +102,7 @@ it('refuses a code in place of the current password for a password change', asyn
     code: MOCK_TOTP_CODE
   });
 
-  expect(res.status).toBe(400);
+  expect(res.status).toBe(403);
   expect(await res.json()).toMatchObject({
     errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
   });
@@ -118,9 +118,9 @@ it('names the code, not the password, when only a wrong code is offered', async 
     code: WRONG_CODE
   });
 
-  expect(res.status).toBe(400);
+  expect(res.status).toBe(403);
   expect(await res.json()).toMatchObject({
-    errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
+    errorKey: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE
   });
   expect(user.totpEnabledAt).not.toBeNull();
   expect(
@@ -142,7 +142,7 @@ describe.each(routes)('%s', (_name, method, path, body) => {
 
     const res = await send(token, method, path, body);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });
@@ -153,9 +153,9 @@ describe.each(routes)('%s', (_name, method, path, body) => {
 
     const res = await send(token, method, path, { ...body, code: WRONG_CODE });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
-      errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
+      errorKey: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE
     });
   });
 
@@ -175,6 +175,6 @@ describe.each(routes)('%s', (_name, method, path, body) => {
 
     const res = await send(token, method, path, { ...body, code: '12' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 });

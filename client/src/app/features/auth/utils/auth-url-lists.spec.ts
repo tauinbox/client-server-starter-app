@@ -37,6 +37,16 @@ describe('matchesAnyPath', () => {
       expect(matches(request)).toBe(true);
     });
 
+    // A missing or spent handoff cookie answers 401 and carries no session.
+    it('should return true for the OAuth exchange URL', () => {
+      const request = new HttpRequest(
+        'POST',
+        '/api/v1/auth/oauth/exchange',
+        {}
+      );
+      expect(matches(request)).toBe(true);
+    });
+
     it('should return false for the two-factor setup URL', () => {
       // Enrolment happens inside a session, so a 401 there is a session verdict.
       const request = new HttpRequest('POST', '/api/v1/auth/mfa/setup', {});
@@ -102,9 +112,10 @@ describe('matchesAnyPath', () => {
       expect(matches(request)).toBe(true);
     });
 
-    it('should return true for the two-factor enrolment URL', () => {
+    // A wrong enrolment code answers 422, so a 401 there is a session verdict.
+    it('should return false for the two-factor enrolment URL', () => {
       const request = new HttpRequest('POST', '/api/v1/auth/mfa/enable', {});
-      expect(matches(request)).toBe(true);
+      expect(matches(request)).toBe(false);
     });
 
     it('should return false for the two-factor sign-in challenge URL', () => {

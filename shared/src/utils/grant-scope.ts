@@ -1,4 +1,5 @@
 import { ErrorKeys } from '../constants/error-keys';
+import type { ErrorKey } from '../constants/error-status';
 import type { PermissionCondition } from '../types/role.types';
 import { isJsonScalar, type JsonScalar } from './mongo-query-safety';
 import { resolveConditions, type ResolverLogger } from './resolve-conditions';
@@ -26,11 +27,10 @@ export interface GrantScopeContext {
   logger: ResolverLogger;
 }
 
-/** A 403 refusal. `details` goes to the audit log, not to the response. */
+/** A refusal. `details` goes to the audit log, not to the response. */
 export interface GrantRefusal {
-  status: 403;
   message: string;
-  errorKey: string;
+  errorKey: ErrorKey;
   details: {
     action: string;
     subject: string;
@@ -172,11 +172,10 @@ export function sameConditions(
 function refusal(
   item: GrantScopeItem,
   message: string,
-  errorKey: string,
+  errorKey: ErrorKey,
   reason?: string
 ): GrantRefusal {
   return {
-    status: 403,
     message,
     errorKey,
     details: {

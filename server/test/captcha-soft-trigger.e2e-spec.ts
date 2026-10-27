@@ -100,7 +100,7 @@ describe('CAPTCHA soft-trigger (e2e)', () => {
       .set('X-Forwarded-For', '10.0.0.1')
       .send({ payload: 'x' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(res.body).toMatchObject({
       errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
     });
@@ -115,7 +115,7 @@ describe('CAPTCHA soft-trigger (e2e)', () => {
       .set('X-Forwarded-For', '10.0.0.2')
       .send({ captchaToken: 'bad' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(res.body).toMatchObject({
       errorKey: ErrorKeys.AUTH.CAPTCHA_INVALID
     });

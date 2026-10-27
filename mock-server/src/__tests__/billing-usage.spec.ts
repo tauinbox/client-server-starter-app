@@ -270,7 +270,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(body['subscriptionId']).toBe(newer.id);
   });
 
-  it('returns 404 when the customer has no active subscription', async () => {
+  it('returns 409 when the customer has no active subscription', async () => {
     const token = await login('admin@example.com');
 
     const res = await postUsage(token, {
@@ -280,10 +280,10 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       idempotencyKey: 'evt-x'
     });
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(409);
   });
 
-  it('rejects a meter no plan declares (400)', async () => {
+  it('rejects a meter no plan declares (422)', async () => {
     const token = await login('admin@example.com');
     const customerId = await seedActiveCustomer();
 
@@ -294,15 +294,15 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       idempotencyKey: 'evt-typo'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
       message: 'Meter "api_call" is not declared by any plan',
-      statusCode: 400
+      statusCode: 422
     });
     expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
   });
 
-  it('rejects an occurredAt before the open metered window (400)', async () => {
+  it('rejects an occurredAt before the open metered window (422)', async () => {
     const token = await login('admin@example.com');
     const { customerId, subscriptionId } = await activateSubscription(
       'admin@example.com',
@@ -322,10 +322,10 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       idempotencyKey: 'evt-before-window'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
       message: 'occurredAt is before the open metered window',
-      statusCode: 400,
+      statusCode: 422,
       errorKey: 'errors.billing.usageBeforeOpenWindow'
     });
     expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
@@ -358,7 +358,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       idempotencyKey: 'evt-at-metered-from'
     });
 
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(422);
     expect(accepted.status).toBe(201);
   });
 
@@ -396,14 +396,14 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       idempotencyKey: 'evt-at-seal'
     });
 
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(422);
     expect(await refused.json()).toMatchObject({
       errorKey: 'errors.billing.usageBeforeOpenWindow'
     });
     expect(accepted.status).toBe(201);
   });
 
-  it('rejects an occurredAt past the clock skew tolerance (400)', async () => {
+  it('rejects an occurredAt past the clock skew tolerance (422)', async () => {
     const token = await login('admin@example.com');
     const { customerId } = await activateSubscription(
       'admin@example.com',
@@ -418,10 +418,10 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       idempotencyKey: 'evt-future'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
       message: 'occurredAt is in the future',
-      statusCode: 400,
+      statusCode: 422,
       errorKey: 'errors.billing.usageInFuture'
     });
     expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
@@ -488,7 +488,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     ).toBe(true);
   });
 
-  it('rejects an invalid payload (400)', async () => {
+  it('rejects an invalid payload (422)', async () => {
     const token = await login('admin@example.com');
     const customerId = await seedActiveCustomer();
 
@@ -499,7 +499,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       idempotencyKey: ''
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it('denies a non-admin caller (403)', async () => {

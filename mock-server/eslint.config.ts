@@ -57,9 +57,11 @@ export default defineConfig(
           message: KEYLESS_BODY_MESSAGE
         },
         {
+          // A status written beside a key can differ from ERROR_STATUS.
           selector:
-            "CallExpression[callee.name='sendError'][arguments.length<4]",
-          message: KEYLESS_BODY_MESSAGE
+            "CallExpression[callee.property.name='json'][callee.object.callee.property.name='status'] > ObjectExpression:has(> Property[key.name='errorKey'])",
+          message:
+            'Send a keyed error with sendError(res, ErrorKeys.X.Y, message). It takes the status from ERROR_STATUS, as ApiError does on the server.'
         }
       ]
     }

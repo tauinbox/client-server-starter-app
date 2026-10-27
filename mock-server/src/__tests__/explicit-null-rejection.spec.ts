@@ -55,14 +55,14 @@ async function expectValidation400(
   body: unknown
 ): Promise<void> {
   const res = await send(method, path, body);
-  expect(res.status).toBe(400);
+  expect(res.status).toBe(422);
   const payload = (await res.json()) as { errors?: string[] };
   expect(payload.errors).toBeDefined();
 }
 
 // The server DTOs replaced @IsOptional() with a defined-only condition (or
 // PartialType's skipNullProperties) on every optional field whose column is NOT
-// NULL, so an explicit null is a 400 instead of a NOT NULL violation - and, for
+// NULL, so an explicit null is a 422 instead of a NOT NULL violation - and, for
 // password, instead of a silently wiped credential.
 describe('explicit null parity with server DTOs', () => {
   describe('PATCH /roles/:id', () => {
@@ -170,7 +170,7 @@ describe('explicit null parity with server DTOs', () => {
         body: JSON.stringify({ password: null, currentPassword: 'Password1' })
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const admin = Array.from(getState().users.values()).find(
         (u) => u.email === 'admin@example.com'
       );
@@ -189,7 +189,7 @@ describe('explicit null parity with server DTOs', () => {
         amountMinor: null
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const payload = (await res.json()) as { errors: string[] };
       expect(payload.errors).toEqual([
         'amountMinor must not be less than 1',
@@ -213,7 +213,7 @@ describe('explicit null parity with server DTOs', () => {
         mode: null
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const payload = (await res.json()) as { errors: string[] };
       expect(payload.errors).toEqual([
         'mode must be one of the following values: period_end, immediate'

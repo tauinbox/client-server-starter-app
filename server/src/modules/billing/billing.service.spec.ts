@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ServiceUnavailableException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
+import { thrownBy } from '../../common/testing/thrown-by';
+import {
+  expectApiError,
+  expectApiRejection
+} from '../../common/testing/api-error.expect';
 import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
 import { FeatureFlagResolverService } from '../feature-flags/services/feature-flag-resolver.service';
@@ -75,22 +79,22 @@ describe('BillingService.resolveProvider', () => {
       (_userId: string, key: string) =>
         Promise.resolve(key !== 'billing-paddle')
     );
-    const refusal = service.resolveProvider(args({ country: 'US' }));
-
-    await expect(refusal).rejects.toThrow(ServiceUnavailableException);
-    await expect(refusal).rejects.toMatchObject({
-      response: { errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE }
-    });
+    await expectApiRejection(
+      service.resolveProvider(args({ country: 'US' })),
+      ErrorKeys.BILLING.PROVIDER_UNAVAILABLE
+    );
   });
 
-  it('throws 503 when the resolved provider is not configured', async () => {
+  it('throws 501 when the resolved provider is not configured', async () => {
     billingConfig.isConfigured.mockReturnValue(false);
-    await expect(
-      service.resolveProvider(args({ country: 'RU' }))
-    ).rejects.toThrow(ServiceUnavailableException);
+    await expectApiRejection(
+      service.resolveProvider(args({ country: 'RU' })),
+      ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+    );
+    expect(featureFlags.isEnabledForUserId).not.toHaveBeenCalled();
   });
 
-  it('throws 503 when the resolved provider is not registered', async () => {
+  it('throws 500 when the resolved provider is not registered', async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingService,
@@ -99,14 +103,10 @@ describe('BillingService.resolveProvider', () => {
         { provide: BillingConfigService, useValue: billingConfig }
       ]
     }).compile();
-    const refusal = module
-      .get(BillingService)
-      .resolveProvider(args({ country: 'US' }));
-
-    await expect(refusal).rejects.toThrow(ServiceUnavailableException);
-    await expect(refusal).rejects.toMatchObject({
-      response: { errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE }
-    });
+    await expectApiRejection(
+      module.get(BillingService).resolveProvider(args({ country: 'US' })),
+      ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR
+    );
   });
 
   it('evaluates only the resolved provider flag, for the customer user', async () => {
@@ -203,19 +203,12 @@ describe('BillingService.getProviderById', () => {
     expect(service.getProviderById('yookassa')).toBe(yookassa);
   });
 
-  it('throws 503 when the provider is not registered', async () => {
+  it('throws 500 when the provider is not registered', async () => {
     const service = await build([yookassa]);
 
-    let refusal: unknown;
-    try {
-      service.getProviderById('paddle');
-    } catch (error) {
-      refusal = error;
-    }
-
-    expect(refusal).toBeInstanceOf(ServiceUnavailableException);
-    expect(refusal).toMatchObject({
-      response: { errorKey: ErrorKeys.BILLING.PROVIDER_UNAVAILABLE }
-    });
+    expectApiError(
+      thrownBy(() => service.getProviderById('paddle')),
+      ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR
+    );
   });
 });

@@ -1,5 +1,5 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
+import { ApiError } from '../errors/api-error';
 import type { AppAbility } from '../../modules/auth/casl/app-ability';
 import { auditContextOf } from '../../modules/auth/casl/ability-context';
 import type { AuditService } from '../../modules/audit/audit.service';
@@ -50,12 +50,9 @@ export function assertNotSuperTarget(
       level: 'instance',
       denied: [{ action, subject: 'User' }]
     },
-    new HttpException(
-      {
-        message: 'Only a super actor can modify a super account',
-        errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
-      },
-      HttpStatus.FORBIDDEN
+    new ApiError(
+      ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN,
+      'Only a super actor can modify a super account'
     )
   );
 }

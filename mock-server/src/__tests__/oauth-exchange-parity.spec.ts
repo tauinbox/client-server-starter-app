@@ -122,29 +122,30 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     expect(verified.headers.get('set-cookie')).toContain('refresh_token=');
   });
 
-  it('400s without the cookie', async () => {
+  it('401swithout the cookie', async () => {
     const res = await exchange();
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       message: 'Missing OAuth data',
-      statusCode: 400,
+      statusCode: 401,
       errorKey: ErrorKeys.AUTH.MISSING_OAUTH_DATA
     });
+    expect(res.headers.get('www-authenticate')).toBe('Bearer');
   });
 
-  it('400s on an unknown cookie value', async () => {
+  it('401son an unknown cookie value', async () => {
     const res = await exchange('not-a-real-token');
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       message: 'Invalid or expired OAuth data',
-      statusCode: 400,
+      statusCode: 401,
       errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
     });
   });
 
-  it('400s on an expired payload', async () => {
+  it('401son an expired payload', async () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);
     const pending = getState().oauthDataTokens.get(token)!;
@@ -152,7 +153,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
 
     const res = await exchange(token);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
     });
@@ -163,7 +164,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     const token = await issueOAuthData(admin!.id);
 
     expect((await exchange(token)).status).toBe(200);
-    expect((await exchange(token)).status).toBe(400);
+    expect((await exchange(token)).status).toBe(401);
   });
 
   // The session is issued at the exchange, the one request that carries the
@@ -210,7 +211,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
 
     const res = await exchange(token);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       message: 'Invalid or expired OAuth data',
       errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA

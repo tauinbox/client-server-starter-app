@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -51,13 +48,7 @@ runWithInfra('Active sessions (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -151,7 +142,7 @@ runWithInfra('Active sessions (e2e)', () => {
     const refused = await request(http())
       .delete(`/api/v1/auth/sessions/${b.sessionId}`)
       .auth(a.token, { type: 'bearer' });
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     expect(await profileStatus(b.token)).toBe(200);
 
     await request(http())
@@ -198,7 +189,7 @@ runWithInfra('Active sessions (e2e)', () => {
       .auth(a.token, { type: 'bearer' })
       .send({ currentPassword: password });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect((res.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.SESSION_IS_CURRENT
     );
@@ -215,7 +206,7 @@ runWithInfra('Active sessions (e2e)', () => {
       .delete('/api/v1/auth/sessions')
       .auth(a.token, { type: 'bearer' })
       .send({ currentPassword: 'Wrong-Password-00' });
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     expect(await profileStatus(c.token)).toBe(200);
 
     const res = await request(http())

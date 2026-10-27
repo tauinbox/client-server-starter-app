@@ -461,7 +461,7 @@ runWithInfra('billing write paths (e2e)', () => {
           quantity: 5,
           idempotencyKey: 'wp-usage-unknown'
         })
-      ).rejects.toMatchObject({ status: 400 });
+      ).rejects.toMatchObject({ status: 422 });
 
       const rows = await ds
         .getRepository(UsageRecord)
@@ -486,7 +486,7 @@ runWithInfra('billing write paths (e2e)', () => {
           idempotencyKey: 'wp-usage-before-window'
         })
       ).rejects.toMatchObject({
-        status: 400,
+        status: 422,
         response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
       });
       await expect(
@@ -498,7 +498,7 @@ runWithInfra('billing write paths (e2e)', () => {
           idempotencyKey: 'wp-usage-future'
         })
       ).rejects.toMatchObject({
-        status: 400,
+        status: 422,
         response: { errorKey: 'errors.billing.usageInFuture' }
       });
 

@@ -185,7 +185,7 @@ describe('conditional grants on FeatureFlag', () => {
     expect((await call('GET', outside)).status).toBe(403);
     expect((await call('POST', `${outside}/preview`, {})).status).toBe(403);
     expect(
-      (await call('PATCH', outside, { enabled: false }, { 'if-match': '1' }))
+      (await call('PATCH', outside, { enabled: false }, { 'if-match': '"1"' }))
         .status
     ).toBe(403);
     expect((await call('DELETE', outside)).status).toBe(403);
@@ -207,10 +207,11 @@ describe('conditional grants on FeatureFlag', () => {
     grant([['feature-flags', 'update', { fieldMatch: { enabled: [false] } }]]);
     const path = `/admin/feature-flags/${NEW_DASHBOARD_ID}`;
     expect(
-      (await call('PATCH', path, { enabled: true }, { 'if-match': '1' })).status
+      (await call('PATCH', path, { enabled: true }, { 'if-match': '"1"' }))
+        .status
     ).toBe(403);
     expect(
-      (await call('PATCH', path, { description: 'x' }, { 'if-match': '1' }))
+      (await call('PATCH', path, { description: 'x' }, { 'if-match': '"1"' }))
         .status
     ).toBe(200);
   });

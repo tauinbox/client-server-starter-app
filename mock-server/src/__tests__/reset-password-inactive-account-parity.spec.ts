@@ -47,7 +47,7 @@ async function issueResetToken(): Promise<string> {
 const invalidTokenBody = {
   message: 'Invalid or expired password reset token',
   errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN,
-  statusCode: 400
+  statusCode: 422
 };
 
 describe('reset-password against a deactivated account', () => {
@@ -59,7 +59,7 @@ describe('reset-password against a deactivated account', () => {
       token,
       password: newPassword
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(invalidTokenBody);
     expect(findUserByEmail(email)?.password).toBe(oldPassword);
   });

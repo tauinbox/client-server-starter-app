@@ -290,7 +290,7 @@ describe('admin billing mutations write audit entries', () => {
       quantity: 1,
       idempotencyKey: 'evt-audit-3'
     });
-    expect(usage.status).toBe(404);
+    expect(usage.status).toBe(409);
 
     expect(entriesFor('BILLING_SUBSCRIPTION_CANCEL')).toHaveLength(0);
     expect(entriesFor('BILLING_USAGE_RECORD')).toHaveLength(0);

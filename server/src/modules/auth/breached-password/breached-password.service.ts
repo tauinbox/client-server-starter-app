@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ErrorKeys } from '@app/shared/constants';
 import {
@@ -8,6 +8,7 @@ import {
 import type { PasswordContext } from '@app/shared/utils/password-policy';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { lookupBreachedPassword } from './pwned-range-lookup';
+import { ApiError } from '../../../common/errors/api-error';
 
 export const BREACHED_PASSWORD_MESSAGE =
   'This password has appeared in a public data breach. Please choose a different one.';
@@ -44,12 +45,9 @@ export class BreachedPasswordService {
     // First and with no network, so the most common passwords stay refused
     // while the range lookup below fails open.
     if (localPasswordRefusal(password, context)) {
-      throw new HttpException(
-        {
-          message: PASSWORD_TOO_COMMON_MESSAGE,
-          errorKey: ErrorKeys.AUTH.PASSWORD_TOO_COMMON
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.PASSWORD_TOO_COMMON,
+        PASSWORD_TOO_COMMON_MESSAGE
       );
     }
 
@@ -68,12 +66,9 @@ export class BreachedPasswordService {
     this.metricsService.recordBreachLookup(outcome);
 
     if (outcome === 'breached') {
-      throw new HttpException(
-        {
-          message: BREACHED_PASSWORD_MESSAGE,
-          errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.PASSWORD_BREACHED,
+        BREACHED_PASSWORD_MESSAGE
       );
     }
   }

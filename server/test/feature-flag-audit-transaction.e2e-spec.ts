@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -20,6 +17,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { versionEtag } from '@app/shared/utils/if-match';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
@@ -51,13 +49,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -135,7 +127,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
     await request(http())
       .patch(`/api/v1/admin/feature-flags/${flag.id}`)
       .auth(token, { type: 'bearer' })
-      .set('If-Match', String(flag.version))
+      .set('If-Match', versionEtag(flag.version))
       .send({ description: 'after' })
       .expect(500);
 

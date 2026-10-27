@@ -1,10 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import {
-  NotImplementedException,
-  ServiceUnavailableException
-} from '@nestjs/common';
+import { NotImplementedException } from '@nestjs/common';
 import { EventName } from '@paddle/paddle-node-sdk';
+import { ErrorKeys } from '@app/shared/constants';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { PaddleProvider } from './paddle.provider';
 import { PADDLE_CLIENT } from './paddle.client';
 import type { Customer } from '../entities/customer.entity';
@@ -562,12 +561,13 @@ describe('PaddleProvider', () => {
     it('throws when the plan has no Paddle price configured', async () => {
       const { provider } = await build({});
       const planNoPrice = { key: 'pro', prices: {} } as Plan;
-      await expect(
+      await expectApiRejection(
         provider.startCheckout(customer, planNoPrice, {
           successUrl: 'https://app/return',
           cancelUrl: 'https://app/cancel'
-        })
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        }),
+        ErrorKeys.BILLING.PLAN_NOT_CONFIGURED
+      );
     });
   });
 
@@ -655,7 +655,7 @@ describe('PaddleProvider', () => {
 
     it('rejects when Paddle is not configured', async () => {
       const { provider } = await build({ client: null });
-      await expect(
+      await expectApiRejection(
         provider.createOneTimePayment(customer, {
           amountMinor: 1,
           currency: 'USD',
@@ -663,8 +663,9 @@ describe('PaddleProvider', () => {
           receiptItems: [],
           productId: 'prod-1',
           urls
-        })
-      ).rejects.toThrow(ServiceUnavailableException);
+        }),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 
@@ -691,8 +692,9 @@ describe('PaddleProvider', () => {
 
     it('throws when the subscription is not linked to Paddle', async () => {
       const { provider } = await build({});
-      await expect(provider.updatePaymentMethod(null)).rejects.toBeInstanceOf(
-        ServiceUnavailableException
+      await expectApiRejection(
+        provider.updatePaymentMethod(null),
+        ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED
       );
     });
 
@@ -701,16 +703,18 @@ describe('PaddleProvider', () => {
       client!.subscriptions.getPaymentMethodChangeTransaction.mockResolvedValue(
         { id: 'txn_pmc', checkout: null }
       );
-      await expect(
-        provider.updatePaymentMethod('sub_123')
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.updatePaymentMethod('sub_123'),
+        ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED
+      );
     });
 
     it('throws when Paddle is not configured', async () => {
       const { provider } = await build({ client: null });
-      await expect(
-        provider.updatePaymentMethod('sub_123')
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.updatePaymentMethod('sub_123'),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 
@@ -767,9 +771,10 @@ describe('PaddleProvider', () => {
       const { provider } = await build({});
       const priceless = { key: 'usage', prices: {} } as Plan;
 
-      await expect(
-        provider.changePlan('sub_ext', customer, priceless)
-      ).rejects.toThrow(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.changePlan('sub_ext', customer, priceless),
+        ErrorKeys.BILLING.PLAN_NOT_CONFIGURED
+      );
     });
 
     it('previews the update and returns the immediate net amount', async () => {
@@ -838,9 +843,10 @@ describe('PaddleProvider', () => {
     it('rejects when Paddle is not configured', async () => {
       const { provider } = await build({ client: null });
 
-      await expect(
-        provider.chargeUsage('sub_123', 1, 'USD', 'usage', 'k')
-      ).rejects.toThrow(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.chargeUsage('sub_123', 1, 'USD', 'usage', 'k'),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 

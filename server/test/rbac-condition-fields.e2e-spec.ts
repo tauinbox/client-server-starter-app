@@ -134,7 +134,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
         }
       );
 
-    expect(outcome).toBe(`400 ${ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN}`);
+    expect(outcome).toBe(`422 ${ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN}`);
     expect(
       await dataSource
         .getRepository(RolePermission)

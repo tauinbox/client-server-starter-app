@@ -59,7 +59,7 @@ async function errorsOf(
     headers,
     body: JSON.stringify(body)
   });
-  expect(res.status).toBe(400);
+  expect(res.status).toBe(422);
   return ((await res.json()) as { errors: string[] }).errors;
 }
 

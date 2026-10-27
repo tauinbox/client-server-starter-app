@@ -254,7 +254,7 @@ describe('MfaService', () => {
       await build('');
 
       await expect(service.beginEnrolment(buildUser())).rejects.toMatchObject({
-        status: 503,
+        status: 501,
         response: { errorKey: ErrorKeys.AUTH.MFA_UNAVAILABLE }
       });
       expect(repository.update).not.toHaveBeenCalled();
@@ -329,8 +329,8 @@ describe('MfaService', () => {
       await expect(
         service.completeEnrolment(user, '000000')
       ).rejects.toMatchObject({
-        status: 401,
-        response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
+        status: 422,
+        response: { errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_INVALID_CODE }
       });
       expect(repository.update).not.toHaveBeenCalled();
       expect(auditService.logFireAndForget).toHaveBeenCalledWith(
@@ -351,8 +351,8 @@ describe('MfaService', () => {
       await expect(
         service.completeEnrolment(user, generateSync({ secret }))
       ).rejects.toMatchObject({
-        status: 401,
-        response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
+        status: 422,
+        response: { errorKey: ErrorKeys.AUTH.MFA_ENROLMENT_INVALID_CODE }
       });
       expect(auditService.logFireAndForget).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.MFA_ENABLE })
@@ -364,7 +364,7 @@ describe('MfaService', () => {
       await expect(
         service.completeEnrolment(buildUser(), '000000')
       ).rejects.toMatchObject({
-        status: 400,
+        status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_SETUP_REQUIRED }
       });
     });
@@ -403,7 +403,7 @@ describe('MfaService', () => {
           buildUser({ totpSecret: 'v1.a.b.c', totpEnabledAt: new Date() })
         )
       ).rejects.toMatchObject({
-        status: 400,
+        status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
       expect(auditService.logFireAndForget).not.toHaveBeenCalled();
@@ -412,7 +412,7 @@ describe('MfaService', () => {
 
     it('refuses when the factor is not on', async () => {
       await expect(service.disable(buildUser())).rejects.toMatchObject({
-        status: 400,
+        status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
     });
@@ -471,7 +471,7 @@ describe('MfaService', () => {
       await expect(
         service.resetByAdmin(buildUser(), actor)
       ).rejects.toMatchObject({
-        status: 400,
+        status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
       expect(repository.update).not.toHaveBeenCalled();
@@ -483,7 +483,7 @@ describe('MfaService', () => {
       await expect(
         service.resetByAdmin(enrolled(), actor)
       ).rejects.toMatchObject({
-        status: 400,
+        status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
       expect(auditService.log).not.toHaveBeenCalled();
@@ -546,7 +546,7 @@ describe('MfaService', () => {
           buildUser({ totpSecret: 'v1.a.b.c', totpEnabledAt: new Date() })
         )
       ).rejects.toMatchObject({
-        status: 400,
+        status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
       expect(auditService.logFireAndForget).not.toHaveBeenCalled();
@@ -559,7 +559,7 @@ describe('MfaService', () => {
       await expect(
         service.regenerateRecoveryCodes(buildUser())
       ).rejects.toMatchObject({
-        status: 400,
+        status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
       });
       expect(repository.update).not.toHaveBeenCalled();

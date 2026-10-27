@@ -9,8 +9,7 @@ import {
   Post,
   Request,
   Res,
-  UseGuards,
-  UnauthorizedException
+  UseGuards
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -66,6 +65,7 @@ import { AuthCookies } from '../utils/auth-cookies';
 import { normalizeIpAddress } from '../utils/session-client';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
+import { ApiError } from '../../../common/errors/api-error';
 
 @ApiTags('Auth API')
 @Controller({
@@ -172,10 +172,10 @@ export class AuthController {
   ) {
     const cookieToken = this.cookies.readRefresh(req);
     if (!cookieToken) {
-      throw new UnauthorizedException({
-        message: 'Refresh token is required',
-        errorKey: ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED
-      });
+      throw new ApiError(
+        ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED,
+        'Refresh token is required'
+      );
     }
 
     const result = await this.authService.refreshTokens(

@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  ServiceUnavailableException
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -61,21 +54,20 @@ import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
+import { ApiError } from '../../../common/errors/api-error';
 
-function alreadySubscribed(): ConflictException {
-  return new ConflictException({
-    message:
-      'You already have an active subscription. Cancel it before subscribing to another plan.',
-    errorKey: ErrorKeys.BILLING.ALREADY_SUBSCRIBED
-  });
+function alreadySubscribed(): ApiError {
+  return new ApiError(
+    ErrorKeys.BILLING.ALREADY_SUBSCRIBED,
+    'You already have an active subscription. Cancel it before subscribing to another plan.'
+  );
 }
 
-function regionChangeBlocked(): ConflictException {
-  return new ConflictException({
-    message:
-      'Cancel the current subscription before changing your billing region.',
-    errorKey: ErrorKeys.BILLING.REGION_CHANGE_BLOCKED
-  });
+function regionChangeBlocked(): ApiError {
+  return new ApiError(
+    ErrorKeys.BILLING.REGION_CHANGE_BLOCKED,
+    'Cancel the current subscription before changing your billing region.'
+  );
 }
 
 /**
@@ -250,10 +242,10 @@ export class BillingUserService {
       where: { key: request.productKey }
     });
     if (!product || !product.active) {
-      throw new NotFoundException({
-        message: `Product "${request.productKey}" was not found`,
-        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_FOUND
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PRODUCT_NOT_FOUND,
+        `Product "${request.productKey}" was not found`
+      );
     }
 
     const customer = await this.getOrCreateCustomer(userId);
@@ -261,10 +253,10 @@ export class BillingUserService {
 
     const price = product.prices[provider.id];
     if (!price) {
-      throw new ConflictException({
-        message: `Product "${product.key}" is not available for your billing provider.`,
-        errorKey: ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER,
+        `Product "${product.key}" is not available for your billing provider.`
+      );
     }
 
     const amountMinor = this.resolvePurchaseAmount(
@@ -279,10 +271,10 @@ export class BillingUserService {
       product.type !== 'custom' &&
       !price.paddlePriceId
     ) {
-      throw new ServiceUnavailableException({
-        message: `Product "${product.key}" has no Paddle price configured`,
-        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
+        `Product "${product.key}" has no Paddle price configured`
+      );
     }
     const description = this.purchaseDescription(product, request.description);
 
@@ -317,10 +309,10 @@ export class BillingUserService {
   ): number {
     if (product.type !== 'custom') {
       if (!price.amountMinor || price.amountMinor <= 0) {
-        throw new ServiceUnavailableException({
-          message: `Product "${product.key}" has no price configured`,
-          errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
-        });
+        throw new ApiError(
+          ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
+          `Product "${product.key}" has no price configured`
+        );
       }
       return price.amountMinor;
     }
@@ -329,22 +321,22 @@ export class BillingUserService {
     // `== null`, not falsy: a configured lower bound of 0 (any amount the
     // request DTO already accepts) is a legitimate setting, not "unconfigured".
     if (minAmountMinor == null || maxAmountMinor == null) {
-      throw new ServiceUnavailableException({
-        message: `Product "${product.key}" has no amount bounds configured`,
-        errorKey: ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
+        `Product "${product.key}" has no amount bounds configured`
+      );
     }
     if (requestedMinor === undefined) {
-      throw new BadRequestException({
-        message: 'amountMinor is required for a custom-amount product',
-        errorKey: ErrorKeys.BILLING.AMOUNT_REQUIRED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.AMOUNT_REQUIRED,
+        'amountMinor is required for a custom-amount product'
+      );
     }
     if (requestedMinor < minAmountMinor || requestedMinor > maxAmountMinor) {
-      throw new BadRequestException({
-        message: `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`,
-        errorKey: ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE,
+        `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`
+      );
     }
     return requestedMinor;
   }
@@ -469,7 +461,7 @@ export class BillingUserService {
   private async reuseIncompleteRow(
     pending: Subscription,
     fields: QueryDeepPartialEntity<Subscription>,
-    onMiss: () => ConflictException = alreadySubscribed
+    onMiss: () => ApiError = alreadySubscribed
   ): Promise<void> {
     const applied = await this.subscriptions.update(
       { id: pending.id, status: 'incomplete' },
@@ -570,10 +562,10 @@ export class BillingUserService {
     // Checked before the subscription guard: telling the user to cancel for a
     // region that checkout would then refuse leaves them with nothing.
     if (!(await this.billing.isProviderAvailable(newEffective, userId))) {
-      throw new ConflictException({
-        message: 'Payments are not available in this billing region.',
-        errorKey: ErrorKeys.BILLING.REGION_UNAVAILABLE
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.REGION_UNAVAILABLE,
+        'Payments are not available in this billing region.'
+      );
     }
 
     // No in-place cross-provider migration: if a live subscription
@@ -637,10 +629,7 @@ export class BillingUserService {
 
     const geo = await this.detectGeo(userId);
     if (!geo) {
-      throw new NotFoundException({
-        message: 'User not found',
-        errorKey: ErrorKeys.USERS.NOT_FOUND
-      });
+      throw new ApiError(ErrorKeys.USERS.NOT_FOUND, 'User not found');
     }
     const { country, currency } = geo;
     try {

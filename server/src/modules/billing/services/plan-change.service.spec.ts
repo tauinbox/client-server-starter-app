@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { expectApiError } from '../../../common/testing/api-error.expect';
 import { In, Not } from 'typeorm';
 import type { FindOperator } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
@@ -326,14 +326,13 @@ describe('PlanChangeService', () => {
           'The billing period has ended and its renewal is in progress. Try again shortly.';
 
         await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
-          new ConflictException(message)
+          message
         );
         await expect(
           ctx.service.previewChange('user-1', 'pro')
-        ).rejects.toThrow(new ConflictException(message));
+        ).rejects.toThrow(message);
         await expectRefusal(
           ctx.service.changePlan('user-1', 'pro'),
-          ConflictException,
           ErrorKeys.BILLING.RENEWAL_IN_PROGRESS
         );
 
@@ -830,14 +829,12 @@ describe('PlanChangeService', () => {
       ctx.subscriptions.findOne.mockResolvedValue(null);
       await expectRefusal(
         ctx.service.changePlan('user-1', 'pro'),
-        NotFoundException,
         ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
       );
 
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       await expectRefusal(
         ctx.service.changePlan('user-1', 'pro'),
-        ConflictException,
         ErrorKeys.BILLING.SAME_PLAN
       );
 
@@ -846,7 +843,6 @@ describe('PlanChangeService', () => {
       );
       await expectRefusal(
         ctx.service.changePlan('user-1', 'business'),
-        ConflictException,
         ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE
       );
 
@@ -855,7 +851,6 @@ describe('PlanChangeService', () => {
       );
       await expectRefusal(
         ctx.service.changePlan('user-1', 'business'),
-        ConflictException,
         ErrorKeys.BILLING.CANCELLATION_SCHEDULED
       );
 
@@ -865,7 +860,6 @@ describe('PlanChangeService', () => {
       );
       await expectRefusal(
         ctx.service.changePlan('user-1', 'usage'),
-        ConflictException,
         ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
       );
     });
@@ -900,10 +894,7 @@ describe('PlanChangeService', () => {
         (r): r is PromiseRejectedResult => r.status === 'rejected'
       );
       expect(rejected).toHaveLength(1);
-      expect(rejected[0].reason).toBeInstanceOf(ConflictException);
-      expect(rejected[0].reason).toMatchObject({
-        response: { errorKey: ErrorKeys.BILLING.SUBSCRIPTION_BUSY }
-      });
+      expectApiError(rejected[0].reason, ErrorKeys.BILLING.SUBSCRIPTION_BUSY);
       // The loser never reaches the provider, so the customer is charged once.
       expect(yoo.chargeOffSession).toHaveBeenCalledTimes(1);
     });
@@ -1254,7 +1245,6 @@ describe('PlanChangeService', () => {
 
       await expectRefusal(
         ctx.service.changePlan('user-1', 'business'),
-        ConflictException,
         ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT
       );
 
@@ -1290,7 +1280,6 @@ describe('PlanChangeService', () => {
 
       await expectRefusal(
         ctx.service.changePlan('user-1', 'business'),
-        ConflictException,
         ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT
       );
 

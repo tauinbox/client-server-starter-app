@@ -3,11 +3,8 @@
 // voids that proof, and the write must then miss. Each race is forced by a
 // spy that runs the administrator change after the read.
 
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import * as crypto from 'crypto';
@@ -41,13 +38,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     ).compile();
 
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -123,7 +114,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     const res = await request(http())
       .post('/api/v1/auth/verify-email')
       .send({ token: rawToken })
-      .expect(400);
+      .expect(422);
 
     expect(res.body).toMatchObject({
       message: 'Invalid or expired verification token',
@@ -148,7 +139,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     const res = await request(http())
       .post('/api/v1/auth/verify-email')
       .send({ token: rawToken })
-      .expect(400);
+      .expect(422);
 
     expect(res.body).toMatchObject({
       errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
@@ -188,7 +179,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     const res = await request(http())
       .post('/api/v1/auth/profile/email/confirm')
       .send({ token: rawToken })
-      .expect(400);
+      .expect(422);
 
     expect(injected).toBe(true);
     expect(res.body).toMatchObject({

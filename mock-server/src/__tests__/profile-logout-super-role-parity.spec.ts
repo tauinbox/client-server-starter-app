@@ -92,7 +92,7 @@ describe('PATCH /auth/profile', () => {
 
     const res = await send(token, 'PATCH', '/auth/profile', { name });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
     expect(body.errors).toEqual(['name should not be empty']);
   });
@@ -102,7 +102,7 @@ describe('PATCH /auth/profile', () => {
 
     const res = await send(token, 'PATCH', '/auth/profile', { name: null });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
     expect(body.errors).toEqual([
       'name must be shorter than or equal to 255 characters',

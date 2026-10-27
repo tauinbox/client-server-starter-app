@@ -107,7 +107,7 @@ test.describe('Unlinking a provider demands a step-up', () => {
     await expect(
       page.getByText(/current password is incorrect/i).first()
     ).toBeVisible();
-    expect(unlinkCalls).toEqual([400]);
+    expect(unlinkCalls).toEqual([403]);
     // Refused, so the provider is still a sign-in method.
     await expect(disconnectButton(page, 'Google')).toBeVisible();
   });
@@ -282,7 +282,7 @@ test.describe('Unlinking a provider demands a step-up', () => {
       (res) =>
         res.url().includes('/auth/oauth/accounts/facebook') &&
         res.request().method() === 'DELETE' &&
-        res.status() === 400,
+        res.status() === 403,
       { timeout: 15_000 }
     );
 

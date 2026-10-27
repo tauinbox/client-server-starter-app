@@ -1,5 +1,10 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
-import { ErrorKeys, httpStatusText } from '@app/shared/constants';
+import {
+  ERROR_STATUS,
+  ErrorKeys,
+  httpStatusText,
+  type ErrorKey
+} from '@app/shared/constants';
 
 const FORWARDED_FIELDS = [
   'errors',
@@ -8,9 +13,33 @@ const FORWARDED_FIELDS = [
   'retryAfter'
 ] as const;
 
+// Mirrors `INVALID_TOKEN_KEYS` of `GlobalExceptionFilter` (RFC 6750 3.1).
+const INVALID_TOKEN_KEYS: ReadonlySet<unknown> = new Set<ErrorKey>([
+  ErrorKeys.AUTH.INVALID_TOKEN,
+  ErrorKeys.AUTH.TOKEN_REVOKED,
+  ErrorKeys.AUTH.TOKEN_INVALIDATED_ROTATION
+]);
+
+function isErrorKey(value: unknown): value is ErrorKey {
+  return typeof value === 'string' && Object.hasOwn(ERROR_STATUS, value);
+}
+
+/** Mirrors `ApiError`: the status of the answer comes from `ERROR_STATUS`. */
+export function sendError(
+  res: Response,
+  errorKey: ErrorKey,
+  message: string,
+  extra: Record<string, unknown> = {}
+): void {
+  // eslint-disable-next-line no-restricted-syntax -- the one place that pairs a key with its status
+  res.status(ERROR_STATUS[errorKey]).json({ ...extra, message, errorKey });
+}
+
 /**
  * Mirrors `GlobalExceptionFilter`: each error answer carries the same closed
- * envelope, whatever body the route wrote.
+ * envelope, whatever body the route wrote. A body with an error key gets the
+ * status of that key, so the mock cannot answer a key with another status
+ * than the server.
  */
 export const errorEnvelope: RequestHandler = (req, res, next) => {
   if (req.originalUrl.startsWith('/__control')) {
@@ -28,6 +57,17 @@ export const errorEnvelope: RequestHandler = (req, res, next) => {
       return json(body);
     }
     const source = body as Record<string, unknown>;
+    if (isErrorKey(source['errorKey'])) {
+      res.status(ERROR_STATUS[source['errorKey']]);
+    }
+    if (res.statusCode === 401) {
+      res.setHeader(
+        'WWW-Authenticate',
+        INVALID_TOKEN_KEYS.has(source['errorKey'])
+          ? 'Bearer error="invalid_token"'
+          : 'Bearer'
+      );
+    }
     const envelope: Record<string, unknown> = {
       statusCode: res.statusCode,
       message: source['message'],
@@ -74,8 +114,9 @@ export const unhandledError: ErrorRequestHandler = (err, _req, res, _next) => {
     res.status(status).json({ message });
     return;
   }
-  res.status(500).json({
-    message: 'Internal server error',
-    errorKey: ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR
-  });
+  sendError(
+    res,
+    ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
+    'Internal server error'
+  );
 };

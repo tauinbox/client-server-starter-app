@@ -1,7 +1,8 @@
 import * as dotenv from 'dotenv';
 import { NestFactory } from '@nestjs/core';
 import { CoreModule } from './modules/core/core.module';
-import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
+import { RequestMethod, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from './common/pipes/api-validation.pipe';
 import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
@@ -53,15 +54,7 @@ async function bootstrap() {
    const featureService = app.get(FeatureService);
    */
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      // Automatically transform incoming request payloads into DTO instances before validating them
-      transform: true,
-      // Strip properties not declared in DTOs and reject requests that contain unknown properties
-      whitelist: true,
-      forbidNonWhitelisted: true
-    })
-  );
+  app.useGlobalPipes(new ApiValidationPipe());
 
   const env = process.env['ENVIRONMENT'];
   const swaggerEnabled =

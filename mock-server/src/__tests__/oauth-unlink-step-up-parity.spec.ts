@@ -111,9 +111,9 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
 
     const res = await unlink(token, 'google');
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
-      statusCode: 400,
+      statusCode: 403,
       errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     });
     expect(getState().oauthAccounts.get(user.id)).toHaveLength(1);
@@ -128,7 +128,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
       currentPassword: 'WrongPassword1'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     const audit = getState().auditLogs.filter(
       (row) => row.action === 'STEP_UP_FAILURE'
     );
@@ -191,7 +191,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
 
     const res = await unlink(token, 'google', {}, proof);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     });
@@ -204,7 +204,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
 
     const res = await unlink(token, 'myspace');
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER
     });
@@ -215,7 +215,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
 
     const res = await unlink(token, 'google', { currentPassword: '' });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   // The step-up runs first, so the last-provider refusal is reached only by a
@@ -230,7 +230,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
 
     const res = await unlink(token, 'google', {}, proof);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.UNLINK_LAST_PROVIDER
     });

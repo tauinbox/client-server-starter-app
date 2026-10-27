@@ -1,8 +1,5 @@
-import {
-  INestApplication,
-  ValidationPipe,
-  VersioningType
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -60,13 +57,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -137,7 +128,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
       .post('/api/v1/admin/feature-flags')
       .set('Authorization', `Bearer ${token}`)
       .send({ key: `${flagKey}-typed`, rules: [{ ...roleRule, type: 'role' }] })
-      .expect(400);
+      .expect(422);
     expect(res.body).toMatchObject({
       message: 'rules.0.property type should not exist',
       errors: ['rules.0.property type should not exist']

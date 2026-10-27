@@ -102,7 +102,7 @@ describe('POST /api/v1/users/:id/mfa/reset parity', () => {
 
     const res = await reset(token, target.id, {});
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await errorKeyOf(res)).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
     expect(target.totpEnabledAt).not.toBeNull();
     expect(auditRows('STEP_UP_FAILURE').at(-1)?.details).toMatchObject({
@@ -119,7 +119,7 @@ describe('POST /api/v1/users/:id/mfa/reset parity', () => {
       currentPassword: SEED_PASSWORD
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(await errorKeyOf(res)).toBe(ErrorKeys.USERS.MFA_RESET_SELF);
     expect(admin.totpEnabledAt).not.toBeNull();
   });
@@ -163,7 +163,7 @@ describe('POST /api/v1/users/:id/mfa/reset parity', () => {
       currentPassword: 'Wrong-Password-00'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(await errorKeyOf(res)).toBe(ErrorKeys.AUTH.MFA_NOT_ENABLED);
     expect(auditRows('STEP_UP_FAILURE')).toHaveLength(before);
   });

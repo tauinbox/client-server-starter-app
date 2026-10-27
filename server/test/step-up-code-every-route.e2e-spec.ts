@@ -1,4 +1,5 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { VersioningType } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import type { INestApplication } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -51,13 +52,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
     );
     applyBodyParsers(expressApp);
     app = expressApp;
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
@@ -181,7 +176,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         [method](path)
         .auth(bearer, { type: 'bearer' })
         .send(body);
-      expect(refused.status).toBe(400);
+      expect(refused.status).toBe(403);
       expect((refused.body as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.AUTH.REAUTH_REQUIRED
       );
@@ -191,9 +186,9 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         [method](path)
         .auth(bearer, { type: 'bearer' })
         .send({ ...body, code: WRONG_CODE });
-      expect(wrongCode.status).toBe(400);
+      expect(wrongCode.status).toBe(403);
       expect((wrongCode.body as { errorKey?: string }).errorKey).toBe(
-        ErrorKeys.AUTH.MFA_INVALID_CODE
+        ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE
       );
 
       const accepted = await request(http())
@@ -213,7 +208,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       .auth(await token(), { type: 'bearer' })
       .send({ extra: 1 });
 
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(422);
     expect((refused.body as { message?: string }).message).toBe(
       'property extra should not exist'
     );
@@ -229,7 +224,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       .auth(await token(), { type: 'bearer' })
       .send({ password: 'Harbor-Lantern-61', code: await freshCode() });
 
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     );
@@ -243,9 +238,9 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       .auth(await token(), { type: 'bearer' })
       .send({ code: WRONG_CODE });
 
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
-      ErrorKeys.AUTH.MFA_INVALID_CODE
+      ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE
     );
     expect((await row()).totpEnabledAt).not.toBeNull();
   }, 30000);

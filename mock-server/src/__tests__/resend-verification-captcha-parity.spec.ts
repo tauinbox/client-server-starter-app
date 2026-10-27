@@ -59,10 +59,10 @@ describe('resend-verification captcha gate', () => {
     expect(first.status).toBe(200);
 
     const second = await resend({ email });
-    expect(second.status).toBe(400);
+    expect(second.status).toBe(422);
     expect(await readErrorBody(second)).toEqual({
       message: 'Captcha verification is required',
-      statusCode: 400,
+      statusCode: 422,
       errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
     });
   });
@@ -84,7 +84,7 @@ describe('resend-verification captcha gate', () => {
     expect(issued).toHaveLength(1);
 
     const refused = await resend({ email });
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(422);
     expect([...getState().emailVerificationTokens.keys()]).toEqual(issued);
   });
 

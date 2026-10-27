@@ -77,7 +77,7 @@ runWithInfra('OAuth unlink concurrency (e2e)', () => {
     const rejected = outcomes.filter((o) => o.status === 'rejected');
     expect(rejected).toHaveLength(1);
     expect(rejected[0].reason).toMatchObject({
-      status: 400
+      status: 409
     });
   }, 30000);
 

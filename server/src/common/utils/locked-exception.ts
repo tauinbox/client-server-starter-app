@@ -1,24 +1,20 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import type { ErrorKey } from '@app/shared/constants';
+import { ApiError } from '../errors/api-error';
 
 /**
- * The 423 answer of every per-account brake. The exception filter copies
+ * The answer of every per-account brake. The exception filter copies
  * `retryAfter` into the Retry-After header.
  */
 export function lockedException(
   message: string,
-  errorKey: string,
+  errorKey: ErrorKey,
   lockedUntil: Date
-): HttpException {
-  return new HttpException(
-    {
-      message,
-      errorKey,
-      lockedUntil: lockedUntil.toISOString(),
-      retryAfter: Math.max(
-        1,
-        Math.ceil((lockedUntil.getTime() - Date.now()) / 1000)
-      )
-    },
-    HttpStatus.LOCKED
-  );
+): ApiError {
+  return new ApiError(errorKey, message, {
+    lockedUntil: lockedUntil.toISOString(),
+    retryAfter: Math.max(
+      1,
+      Math.ceil((lockedUntil.getTime() - Date.now()) / 1000)
+    )
+  });
 }

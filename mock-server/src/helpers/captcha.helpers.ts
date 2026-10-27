@@ -1,5 +1,5 @@
 import type { Response } from 'express';
-import { ErrorKeys } from '@app/shared/constants';
+import { ERROR_STATUS, ErrorKeys } from '@app/shared/constants';
 import { getState } from '../state';
 
 const CAPTCHA_THRESHOLD = 1;
@@ -68,10 +68,9 @@ export function evaluateCaptcha(
   if (!token) {
     return {
       ok: false,
-      status: 400,
+      status: ERROR_STATUS[ErrorKeys.AUTH.CAPTCHA_REQUIRED],
       body: {
         message: 'Captcha verification is required',
-        statusCode: 400,
         errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
       }
     };

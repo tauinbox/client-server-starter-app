@@ -73,7 +73,7 @@ describe('register conflict audit parity', () => {
 
   it('does not audit a validation failure', async () => {
     expect((await register({ ...validBody, password: 'weak' })).status).toBe(
-      400
+      422
     );
 
     expect(auditRows('USER_REGISTER_CONFLICT')).toHaveLength(0);

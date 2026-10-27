@@ -1,6 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
 import { thrownBy } from '../testing/thrown-by';
+import { expectApiError } from '../testing/api-error.expect';
 import { encodeCursor, decodeCursor } from './cursor.util';
 
 describe('cursor.util', () => {
@@ -33,8 +33,14 @@ describe('cursor.util', () => {
   });
 
   describe('decodeCursor — invalid input', () => {
-    it('should throw BadRequestException for invalid base64', () => {
-      expect(() => decodeCursor('not-valid!!!')).toThrow(BadRequestException);
+    const expectInvalidCursor = (cursor: string) =>
+      expectApiError(
+        thrownBy(() => decodeCursor(cursor)),
+        ErrorKeys.GENERAL.INVALID_CURSOR
+      );
+
+    it('refuses invalid base64', () => {
+      expectInvalidCursor('not-valid!!!');
     });
 
     it('carries an errorKey, so the client can translate the refusal', () => {
@@ -46,37 +52,36 @@ describe('cursor.util', () => {
       });
     });
 
-    it('should throw BadRequestException for valid base64 but invalid JSON', () => {
-      const encoded = Buffer.from('not json').toString('base64url');
-      expect(() => decodeCursor(encoded)).toThrow(BadRequestException);
+    it('refuses valid base64 but invalid JSON', () => {
+      expectInvalidCursor(Buffer.from('not json').toString('base64url'));
     });
 
-    it('should throw BadRequestException for JSON missing id', () => {
-      const encoded = Buffer.from(JSON.stringify({ sortValue: 'x' })).toString(
-        'base64url'
+    it('refuses JSON missing id', () => {
+      expectInvalidCursor(
+        Buffer.from(JSON.stringify({ sortValue: 'x' })).toString('base64url')
       );
-      expect(() => decodeCursor(encoded)).toThrow(BadRequestException);
     });
 
-    it('should throw BadRequestException for JSON missing sortValue', () => {
-      const encoded = Buffer.from(JSON.stringify({ id: '1' })).toString(
-        'base64url'
+    it('refuses JSON missing sortValue', () => {
+      expectInvalidCursor(
+        Buffer.from(JSON.stringify({ id: '1' })).toString('base64url')
       );
-      expect(() => decodeCursor(encoded)).toThrow(BadRequestException);
     });
 
-    it('should throw BadRequestException when id is not a string', () => {
-      const encoded = Buffer.from(
-        JSON.stringify({ sortValue: 'x', id: 123 })
-      ).toString('base64url');
-      expect(() => decodeCursor(encoded)).toThrow(BadRequestException);
+    it('refuses an id that is not a string', () => {
+      expectInvalidCursor(
+        Buffer.from(JSON.stringify({ sortValue: 'x', id: 123 })).toString(
+          'base64url'
+        )
+      );
     });
 
-    it('should throw BadRequestException when sortValue is an object', () => {
-      const encoded = Buffer.from(
-        JSON.stringify({ sortValue: { nested: true }, id: '1' })
-      ).toString('base64url');
-      expect(() => decodeCursor(encoded)).toThrow(BadRequestException);
+    it('refuses a sortValue that is an object', () => {
+      expectInvalidCursor(
+        Buffer.from(
+          JSON.stringify({ sortValue: { nested: true }, id: '1' })
+        ).toString('base64url')
+      );
     });
   });
 });

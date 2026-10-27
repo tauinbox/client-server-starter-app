@@ -10,6 +10,7 @@ import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-f
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
 import { flagAuditActor } from './flag-audit-actor';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
+import type { IfMatchCondition } from '@app/shared/utils/if-match';
 
 // A flag and its rules save in one transaction: a rejected or failed rule
 // write leaves the flag row, its version and its old rules unchanged.
@@ -23,6 +24,12 @@ const FAILING_PERCENT = 37;
 const percentRule = (percent: number): FeatureFlagRuleDto => ({
   effect: 'include',
   payload: { type: 'percentage', percent }
+});
+
+/** The If-Match condition of one strong version tag. */
+const version = (v: number): IfMatchCondition => ({
+  any: false,
+  versions: [v]
 });
 
 runWithInfra('Feature flag and rules save atomically (e2e)', () => {
@@ -109,7 +116,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     const updated = await flagService.update(
       flag.id,
       { enabled: true, rules: [percentRule(20), percentRule(30)] },
-      flag.version,
+      version(flag.version),
       SYSTEM_ABILITY,
       flagAuditActor()
     );
@@ -124,7 +131,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await flagService.update(
       flag.id,
       { enabled: true },
-      flag.version,
+      version(flag.version),
       SYSTEM_ABILITY,
       flagAuditActor()
     );
@@ -139,11 +146,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
       flagService.update(
         flag.id,
         { enabled: true, rules: [percentRule(20), percentRule(150)] },
-        flag.version,
+        version(flag.version),
         SYSTEM_ABILITY,
         flagAuditActor()
       )
-    ).rejects.toMatchObject({ status: 400 });
+    ).rejects.toMatchObject({ status: 422 });
 
     expect(await flagService.findOne(flag.id, SYSTEM_ABILITY)).toMatchObject({
       enabled: false,
@@ -157,7 +164,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await flagService.update(
       flag.id,
       { enabled: true },
-      flag.version,
+      version(flag.version),
       SYSTEM_ABILITY,
       flagAuditActor()
     );
@@ -166,11 +173,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
       flagService.update(
         flag.id,
         { rules: [percentRule(20)] },
-        flag.version,
+        version(flag.version),
         SYSTEM_ABILITY,
         flagAuditActor()
       )
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({ status: 412 });
 
     expect(await percentsOf(flag.id)).toEqual([10]);
   });
@@ -180,7 +187,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await flagService.update(
       flag.id,
       { enabled: true },
-      flag.version,
+      version(flag.version),
       SYSTEM_ABILITY,
       flagAuditActor()
     );
@@ -193,11 +200,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
       flagService.update(
         flag.id,
         { rules: [percentRule(20)] },
-        flag.version + 1,
+        version(flag.version + 1),
         SYSTEM_ABILITY,
         flagAuditActor()
       )
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({ status: 412 });
 
     expect(await flagService.findOne(flag.id, SYSTEM_ABILITY)).toMatchObject({
       enabled: true,
@@ -217,7 +224,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
           enabled: true,
           rules: [percentRule(20), percentRule(FAILING_PERCENT)]
         },
-        flag.version,
+        version(flag.version),
         SYSTEM_ABILITY,
         flagAuditActor()
       )

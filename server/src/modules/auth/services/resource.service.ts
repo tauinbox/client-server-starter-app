@@ -1,11 +1,6 @@
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ApiError } from '../../../common/errors/api-error';
 import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -106,13 +101,7 @@ export class ResourceService {
   private async loadResource(id: string): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
-      throw new HttpException(
-        {
-          message: 'Resource not found',
-          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
-        },
-        HttpStatus.NOT_FOUND
-      );
+      throw new ApiError(ErrorKeys.RESOURCES.NOT_FOUND, 'Resource not found');
     }
     return resource;
   }
@@ -159,12 +148,9 @@ export class ResourceService {
       (name) => !resource.actionNames.includes(name)
     );
     if (undeclared.length > 0) {
-      throw new HttpException(
-        {
-          message: `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`,
-          errorKey: ErrorKeys.RESOURCES.ACTION_NOT_DECLARED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.RESOURCES.ACTION_NOT_DECLARED,
+        `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`
       );
     }
     if (data.allowedActionNames !== undefined) {
@@ -222,12 +208,9 @@ export class ResourceService {
         level: 'instance',
         denied: [{ action: reEnabled[0], subject: resource.subject }]
       },
-      new HttpException(
-        {
-          message: `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`,
-          errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN
-        },
-        HttpStatus.FORBIDDEN
+      new ApiError(
+        ErrorKeys.RESOURCES.CANNOT_WIDEN,
+        `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`
       )
     );
   }
@@ -283,12 +266,9 @@ export class ResourceService {
     const resource = await this.loadResource(id);
     this.assertCanUpdate(ability, resource, actorId);
     if (!this.registry.isRegistered(resource.name)) {
-      throw new HttpException(
-        {
-          message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
-          errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.RESOURCES.CANNOT_RESTORE,
+        `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`
       );
     }
     if (!resource.isOrphaned) throw notOrphaned(resource);
@@ -333,12 +313,9 @@ export class ResourceService {
       data.subject.charAt(0).toUpperCase() + data.subject.slice(1);
 
     if (CASL_RESERVED_SUBJECT_NAMES.includes(normalizedSubject.toLowerCase())) {
-      throw new HttpException(
-        {
-          message: `Resource subject "${normalizedSubject}" is reserved and cannot be used`,
-          errorKey: ErrorKeys.RESOURCES.SUBJECT_RESERVED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.RESOURCES.SUBJECT_RESERVED,
+        `Resource subject "${normalizedSubject}" is reserved and cannot be used`
       );
     }
 
@@ -372,12 +349,9 @@ export class ResourceService {
   }
 }
 
-function notOrphaned(resource: Resource): HttpException {
-  return new HttpException(
-    {
-      message: `Resource "${resource.name}" is not orphaned, so there is nothing to restore`,
-      errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED
-    },
-    HttpStatus.CONFLICT
+function notOrphaned(resource: Resource): ApiError {
+  return new ApiError(
+    ErrorKeys.RESOURCES.NOT_ORPHANED,
+    `Resource "${resource.name}" is not orphaned, so there is nothing to restore`
   );
 }

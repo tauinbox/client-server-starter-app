@@ -51,7 +51,7 @@ const REGISTER_BODY = {
 
 /*
  * `isValidEmail` was a regular expression, and it accepted thirteen of the
- * twenty addresses below that `@IsEmail()` answers with 400. The two paths that
+ * twenty addresses below that `@IsEmail()` answers with 422. The two paths that
  * read the verdict are `emailErrors`, which every address field uses, and
  * `validateCreateUserBody`, which stands behind `POST /auth/register` and the
  * admin `POST /users`; one route of each is driven here.
@@ -74,12 +74,12 @@ describe('address format parity with `@IsEmail()`', () => {
   });
 
   describe('POST /api/v1/auth/forgot-password', () => {
-    it.each(REFUSED)('answers 400 for %s', async (_reason, address) => {
+    it.each(REFUSED)('answers 422 for %s', async (_reason, address) => {
       const { status, body } = await send('/api/v1/auth/forgot-password', {
         email: address
       });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.errors).toEqual(['email must be an email']);
     });
 
@@ -97,13 +97,13 @@ describe('address format parity with `@IsEmail()`', () => {
   });
 
   describe('POST /api/v1/auth/register', () => {
-    it.each(REFUSED)('answers 400 for %s', async (_reason, address) => {
+    it.each(REFUSED)('answers 422 for %s', async (_reason, address) => {
       const { status, body } = await send('/api/v1/auth/register', {
         ...REGISTER_BODY,
         email: address
       });
 
-      expect(status).toBe(400);
+      expect(status).toBe(422);
       expect(body.message).toBe('email must be an email');
     });
 

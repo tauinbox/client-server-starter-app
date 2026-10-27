@@ -316,7 +316,7 @@ describe('FeatureFlagListComponent', () => {
 
   it('toggleFlag() reloads the row after a version conflict', async () => {
     const conflict = new HttpErrorResponse({
-      status: 409,
+      status: 412,
       error: {
         message: 'Feature flag was modified by another request',
         errorKey: 'errors.featureFlags.versionConflict'

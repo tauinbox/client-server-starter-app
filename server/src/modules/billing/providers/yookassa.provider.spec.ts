@@ -1,7 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import type { ICreatePayment, ICreateRefund } from '@a2seven/yoo-checkout';
 import type { FindOneOptions } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
@@ -229,14 +230,15 @@ describe('YooKassaProvider', () => {
 
     it('throws when the plan has no YooKassa price', async () => {
       const { provider } = await build();
-      await expect(
+      await expectApiRejection(
         provider.startCheckout(
           customer,
           { ...paidPlan, prices: {} },
           urls,
           false
-        )
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        ),
+        ErrorKeys.BILLING.PLAN_NOT_CONFIGURED
+      );
     });
 
     it('throws when YooKassa returns no confirmation url', async () => {
@@ -245,16 +247,18 @@ describe('YooKassaProvider', () => {
         id: 'pay-3',
         confirmation: {}
       });
-      await expect(
-        provider.startCheckout(customer, paidPlan, urls, false)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.startCheckout(customer, paidPlan, urls, false),
+        ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED
+      );
     });
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
-      await expect(
-        provider.startCheckout(customer, paidPlan, urls, false)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.startCheckout(customer, paidPlan, urls, false),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 
@@ -304,16 +308,18 @@ describe('YooKassaProvider', () => {
         id: 'pay-mu',
         confirmation: {}
       });
-      await expect(
-        provider.updatePaymentMethod(null, customer, 'RUB', urls)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.updatePaymentMethod(null, customer, 'RUB', urls),
+        ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED
+      );
     });
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
-      await expect(
-        provider.updatePaymentMethod(null, customer, 'RUB', urls)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.updatePaymentMethod(null, customer, 'RUB', urls),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 
@@ -376,16 +382,18 @@ describe('YooKassaProvider', () => {
         id: 'pay-ot',
         confirmation: {}
       });
-      await expect(
-        provider.createOneTimePayment(customer, params)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.createOneTimePayment(customer, params),
+        ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED
+      );
     });
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
-      await expect(
-        provider.createOneTimePayment(customer, params)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.createOneTimePayment(customer, params),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 
@@ -562,17 +570,19 @@ describe('YooKassaProvider', () => {
 
     it('throws when the customer has no saved payment method', async () => {
       const { provider } = await build();
-      await expect(
-        provider.chargeOffSession(customer, 99000, 'RUB', items)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.chargeOffSession(customer, 99000, 'RUB', items),
+        ErrorKeys.BILLING.PAYMENT_METHOD_MISSING
+      );
     });
 
     it('throws when the saved payment method row is missing', async () => {
       const { provider, paymentMethods } = await build();
       paymentMethods.findOne.mockResolvedValue(null);
-      await expect(
-        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items),
+        ErrorKeys.BILLING.PAYMENT_METHOD_MISSING
+      );
     });
 
     it('never charges a saved method that belongs to another customer', async () => {
@@ -599,9 +609,10 @@ describe('YooKassaProvider', () => {
             : null
       );
 
-      await expect(
-        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.chargeOffSession(savedCustomer, 99000, 'RUB', items),
+        ErrorKeys.BILLING.PAYMENT_METHOD_MISSING
+      );
       expect(client!.createPayment).not.toHaveBeenCalled();
     });
 
@@ -723,17 +734,19 @@ describe('YooKassaProvider', () => {
         next_cursor: 'more'
       });
 
-      await expect(
-        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER),
+        ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+      );
       expect(client!.getPaymentList).toHaveBeenCalledTimes(20);
     });
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
-      await expect(
-        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 
@@ -785,25 +798,28 @@ describe('YooKassaProvider', () => {
         offSession('succeeded', 'renewal:sub-9:456')
       );
 
-      await expect(
-        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY),
+        ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+      );
     });
 
     it('fails loudly when the payment carries no off-session marker', async () => {
       const { provider, client } = await build();
       client!.getPayment.mockResolvedValue(offSession('succeeded', null));
 
-      await expect(
-        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY),
+        ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+      );
     });
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
-      await expect(
-        provider.getOffSessionCharge('pay-ref', CHARGE_KEY)
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expectApiRejection(
+        provider.getOffSessionCharge('pay-ref', CHARGE_KEY),
+        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
+      );
     });
   });
 
@@ -977,9 +993,10 @@ describe('YooKassaProvider', () => {
           next_cursor: 'more'
         });
 
-        await expect(
-          provider.refund('pay-idem', 50000, 'idem-refund-1')
-        ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        await expectApiRejection(
+          provider.refund('pay-idem', 50000, 'idem-refund-1'),
+          ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN
+        );
         expect(client!.getRefundList).toHaveBeenCalledTimes(20);
         expect(client!.createRefund).not.toHaveBeenCalled();
       });

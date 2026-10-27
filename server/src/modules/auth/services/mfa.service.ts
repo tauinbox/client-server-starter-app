@@ -1,10 +1,4 @@
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import { PurposeTokenService } from './purpose-token.service';
@@ -49,6 +43,7 @@ import { hashToken } from '../../../common/utils/hash-token';
 import { lockedException } from '../../../common/utils/locked-exception';
 import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
+import { ApiError } from '../../../common/errors/api-error';
 
 const base32 = new ScureBase32Plugin();
 
@@ -170,12 +165,9 @@ export class MfaService {
     this.assertNotEnabled(user);
 
     if (user.totpSecret === null) {
-      throw new HttpException(
-        {
-          message: 'Start the two-factor setup before you confirm a code',
-          errorKey: ErrorKeys.AUTH.MFA_SETUP_REQUIRED
-        },
-        HttpStatus.BAD_REQUEST
+      throw new ApiError(
+        ErrorKeys.AUTH.MFA_SETUP_REQUIRED,
+        'Start the two-factor setup before you confirm a code'
       );
     }
 
@@ -199,13 +191,13 @@ export class MfaService {
           }
         );
         if (!affected) {
-          throw this.invalidCodeException();
+          throw this.invalidEnrolmentCodeException();
         }
       }
     );
     if (!accepted) {
       this.recordChallengeFailure(user, 'enrolment', context);
-      throw this.invalidCodeException();
+      throw this.invalidEnrolmentCodeException();
     }
 
     this.auditService.logFireAndForget({
@@ -454,12 +446,9 @@ export class MfaService {
 
     if (remaining === null) {
       this.recordChallengeFailure(user, 'recovery_code', context);
-      throw new HttpException(
-        {
-          message: 'Recovery code is invalid or was already used',
-          errorKey: ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE
-        },
-        HttpStatus.UNAUTHORIZED
+      throw new ApiError(
+        ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE,
+        'Recovery code is invalid or was already used'
       );
     }
 
@@ -522,12 +511,9 @@ export class MfaService {
   }
 
   private async userFromPendingToken(mfaToken: string): Promise<User> {
-    const invalidTokenError = new HttpException(
-      {
-        message: 'Two-factor sign-in is invalid or has expired',
-        errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN
-      },
-      HttpStatus.UNAUTHORIZED
+    const invalidTokenError = new ApiError(
+      ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN,
+      'Two-factor sign-in is invalid or has expired'
     );
 
     const payload = this.purposeTokens.verify<{ sub?: string }>(
@@ -657,12 +643,9 @@ export class MfaService {
 
   private assertAvailable(): void {
     if (!this.encryption.isConfigured) {
-      throw new HttpException(
-        {
-          message: 'Two-factor authentication is not available on this server',
-          errorKey: ErrorKeys.AUTH.MFA_UNAVAILABLE
-        },
-        HttpStatus.SERVICE_UNAVAILABLE
+      throw new ApiError(
+        ErrorKeys.AUTH.MFA_UNAVAILABLE,
+        'Two-factor authentication is not available on this server'
       );
     }
   }
@@ -673,13 +656,10 @@ export class MfaService {
     }
   }
 
-  private notEnabledException(): HttpException {
-    return new HttpException(
-      {
-        message: 'Two-factor authentication is not enabled',
-        errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED
-      },
-      HttpStatus.BAD_REQUEST
+  private notEnabledException(): ApiError {
+    return new ApiError(
+      ErrorKeys.AUTH.MFA_NOT_ENABLED,
+      'Two-factor authentication is not enabled'
     );
   }
 
@@ -689,13 +669,10 @@ export class MfaService {
     }
   }
 
-  private alreadyEnabledException(): HttpException {
-    return new HttpException(
-      {
-        message: 'Two-factor authentication is already enabled',
-        errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED
-      },
-      HttpStatus.CONFLICT
+  private alreadyEnabledException(): ApiError {
+    return new ApiError(
+      ErrorKeys.AUTH.MFA_ALREADY_ENABLED,
+      'Two-factor authentication is already enabled'
     );
   }
 
@@ -721,7 +698,7 @@ export class MfaService {
    * stays open on purpose: a brake that closes every door lets a caller who
    * holds only the password deny the owner their own account.
    */
-  private challengeLockedException(remainingMs: number): HttpException {
+  private challengeLockedException(remainingMs: number): ApiError {
     return lockedException(
       'Too many incorrect verification codes. Use a recovery code or try again later',
       ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED,
@@ -734,7 +711,7 @@ export class MfaService {
    * recovery code: that route answers a sign-in challenge, and it opens no
    * step-up.
    */
-  private stepUpLockedException(remainingMs: number): HttpException {
+  private stepUpLockedException(remainingMs: number): ApiError {
     return lockedException(
       'Too many incorrect verification codes. Try again later',
       ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
@@ -742,13 +719,19 @@ export class MfaService {
     );
   }
 
-  private invalidCodeException(): HttpException {
-    return new HttpException(
-      {
-        message: 'Verification code is incorrect',
-        errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE
-      },
-      HttpStatus.UNAUTHORIZED
+  /** A wrong code at the sign-in challenge, where no session exists yet. */
+  private invalidCodeException(): ApiError {
+    return new ApiError(
+      ErrorKeys.AUTH.MFA_INVALID_CODE,
+      'Verification code is incorrect'
+    );
+  }
+
+  /** A wrong code that confirms a setup: a field of a signed-in request. */
+  private invalidEnrolmentCodeException(): ApiError {
+    return new ApiError(
+      ErrorKeys.AUTH.MFA_ENROLMENT_INVALID_CODE,
+      'Verification code is incorrect'
     );
   }
 }

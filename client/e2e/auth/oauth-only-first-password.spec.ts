@@ -174,7 +174,7 @@ test.describe('OAuth-only account sets its first password', () => {
       (res) =>
         res.url().includes('/auth/profile') &&
         res.request().method() === 'PATCH' &&
-        res.status() === 400,
+        res.status() === 403,
       { timeout: 15_000 }
     );
     await page.getByRole('button', { name: 'Save', exact: true }).click();

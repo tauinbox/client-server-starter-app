@@ -6,6 +6,7 @@ import {
   MAX_PAGE_SIZE
 } from '@app/shared/constants';
 import { parseCursor } from '@app/shared/utils/cursor';
+import { sendError } from './error-envelope.helpers';
 import type {
   ListFilterDefinition,
   ListFilterKind,
@@ -244,11 +245,7 @@ export function rejectInvalidCursor(
 ): boolean {
   const { cursor } = parseCursorQuery(query);
   if (!cursor || parseCursor(cursor)) return false;
-  res.status(400).json({
-    message: 'Invalid cursor',
-    statusCode: 400,
-    errorKey: ErrorKeys.GENERAL.INVALID_CURSOR
-  });
+  sendError(res, ErrorKeys.GENERAL.INVALID_CURSOR, 'Invalid cursor');
   return true;
 }
 

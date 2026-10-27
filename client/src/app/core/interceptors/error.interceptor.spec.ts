@@ -17,8 +17,13 @@ import { RBAC_RETRY_CONTEXT } from '@core/context-tokens/rbac-retry';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
+import { ErrorKeys } from '@app/shared/constants';
 
 const mockRules = [[['read', 'User']]];
+
+function denied(message: string): { message: string; errorKey: string } {
+  return { message, errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS };
+}
 
 describe('errorInterceptor', () => {
   let http: HttpClient;
@@ -232,10 +237,7 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
 
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
@@ -255,10 +257,7 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
 
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
@@ -272,12 +271,10 @@ describe('errorInterceptor', () => {
     it('should notify with retry error (not original) when retry fails', () => {
       http.get('/api/test').subscribe({ error: vi.fn() });
 
-      httpMock
-        .expectOne('/api/test')
-        .flush(
-          { message: 'Original Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+      httpMock.expectOne('/api/test').flush(denied('Original Forbidden'), {
+        status: 403,
+        statusText: 'Forbidden'
+      });
 
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
@@ -303,10 +300,7 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Original' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Original'), { status: 403, statusText: 'Forbidden' });
 
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
@@ -329,10 +323,7 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
 
       httpMock
         .expectOne(AuthApiEnum.Permissions)
@@ -356,10 +347,7 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
 
       httpMock
         .expectOne(AuthApiEnum.Permissions)
@@ -375,10 +363,7 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
 
       httpMock.expectNone(AuthApiEnum.Permissions);
 
@@ -392,12 +377,10 @@ describe('errorInterceptor', () => {
       let caughtError: HttpErrorResponse | null = null;
       http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
 
-      httpMock
-        .expectOne('/api/test')
-        .flush(
-          { message: 'Email not verified' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+      httpMock.expectOne('/api/test').flush(denied('Email not verified'), {
+        status: 403,
+        statusText: 'Forbidden'
+      });
 
       httpMock.expectNone(AuthApiEnum.Permissions);
 
@@ -415,10 +398,7 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
 
       httpMock
         .expectOne(AuthApiEnum.Permissions)
@@ -437,21 +417,38 @@ describe('errorInterceptor', () => {
 
       httpMock
         .expectOne('/api/test')
-        .flush(
-          { message: 'Forbidden' },
-          { status: 403, statusText: 'Forbidden' }
-        );
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
 
       httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: mockRules });
 
       httpMock
         .expectOne('/api/test')
+        .flush(denied('Forbidden'), { status: 403, statusText: 'Forbidden' });
+
+      expect(notifyMock.error).not.toHaveBeenCalled();
+    });
+
+    // A self-target or a step-up refusal is a 403 too, and new permissions
+    // cannot change its outcome.
+    it.each([
+      ErrorKeys.AUTH.SESSION_IS_CURRENT,
+      ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD,
+      undefined
+    ])('should not refresh permissions for a 403 with key %s', (errorKey) => {
+      let caughtError: HttpErrorResponse | null = null;
+      http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
+
+      httpMock
+        .expectOne('/api/test')
         .flush(
-          { message: 'Forbidden' },
+          { message: 'Refused', errorKey },
           { status: 403, statusText: 'Forbidden' }
         );
 
-      expect(notifyMock.error).not.toHaveBeenCalled();
+      httpMock.expectNone(AuthApiEnum.Permissions);
+      httpMock.expectNone('/api/test');
+      expect(caughtError!.status).toBe(403);
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
     });
   });
 });

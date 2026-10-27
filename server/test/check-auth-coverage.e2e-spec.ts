@@ -1,9 +1,9 @@
 import {
   INestApplication,
   RequestMethod,
-  ValidationPipe,
   VersioningType
 } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import * as fs from 'fs';
@@ -62,13 +62,7 @@ describe('Auth coverage — every protected route rejects unauthenticated access
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.setGlobalPrefix('api', {
       exclude: [{ path: 'metrics', method: RequestMethod.GET }]
     });

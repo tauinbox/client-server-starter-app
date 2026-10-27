@@ -99,7 +99,7 @@ test.describe('Linking a provider demands a step-up', () => {
     ).toBeVisible();
     await expect(prompt).toBeVisible();
     expect(page.url()).toContain('/profile');
-    expect(linkCalls).toEqual([400]);
+    expect(linkCalls).toEqual([403]);
   });
 
   test('links after the password, at every width', async ({
@@ -295,7 +295,7 @@ test.describe('Linking a provider demands a step-up', () => {
       (res) =>
         res.url().includes('/auth/oauth/link-init') &&
         res.request().method() === 'POST' &&
-        res.status() === 400,
+        res.status() === 403,
       { timeout: 15_000 }
     );
 

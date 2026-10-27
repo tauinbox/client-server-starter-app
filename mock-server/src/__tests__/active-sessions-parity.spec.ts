@@ -155,7 +155,7 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
 
     const res = await revoke(a, b.sessionId);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
     );
@@ -195,7 +195,7 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
 
     const res = await revoke(a, a.sessionId, { currentPassword: PASSWORD });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
       ErrorKeys.AUTH.SESSION_IS_CURRENT
     );
@@ -239,7 +239,7 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
     const second = await revoke(caller, phone.sessionId, {}, proof);
 
     expect(first.status).toBe(200);
-    expect(second.status).toBe(400);
+    expect(second.status).toBe(403);
     expect(((await second.json()) as { errorKey: string }).errorKey).toBe(
       ErrorKeys.AUTH.REAUTH_REQUIRED
     );
@@ -254,7 +254,7 @@ describe('DELETE /api/v1/auth/sessions', () => {
     const foreign = await signIn(OTHER_EMAIL, 'Device-Y');
 
     const refused = await revoke(a, null, { currentPassword: 'Wrong-00' });
-    expect(refused.status).toBe(400);
+    expect(refused.status).toBe(403);
     await expect(profileStatus(c)).resolves.toBe(200);
 
     const res = await revoke(a, null, { currentPassword: PASSWORD });

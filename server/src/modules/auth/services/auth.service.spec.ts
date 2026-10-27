@@ -1095,7 +1095,7 @@ describe('AuthService', () => {
       expect(result.message).toContain('verified successfully');
     });
 
-    it('should throw 400 when token not found', async () => {
+    it('should throw 422 when token not found', async () => {
       mockUsersService.findByEmailVerificationToken.mockResolvedValue(null);
 
       await expect(service.verifyEmail('invalid-token')).rejects.toThrow(
@@ -1133,7 +1133,7 @@ describe('AuthService', () => {
       });
     });
 
-    it('should throw 400 when token is expired', async () => {
+    it('should throw 422 when token is expired', async () => {
       const user = {
         ...mockUser,
         emailVerificationExpiresAt: new Date(Date.now() - 1000)
@@ -1146,7 +1146,7 @@ describe('AuthService', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);
         expect((error as HttpException).getStatus()).toBe(
-          HttpStatus.BAD_REQUEST
+          HttpStatus.UNPROCESSABLE_ENTITY
         );
       }
     });
@@ -1447,7 +1447,7 @@ describe('AuthService', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('should throw 400 when token not found', async () => {
+    it('should throw 422 when token not found', async () => {
       mockUsersService.findByPasswordResetToken.mockResolvedValue(null);
 
       await expect(
@@ -1472,7 +1472,7 @@ describe('AuthService', () => {
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('should throw 400 when token is expired', async () => {
+    it('should throw 422 when token is expired', async () => {
       const user = {
         ...mockUser,
         passwordResetExpiresAt: new Date(Date.now() - 1000)
@@ -1485,7 +1485,7 @@ describe('AuthService', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);
         expect((error as HttpException).getStatus()).toBe(
-          HttpStatus.BAD_REQUEST
+          HttpStatus.UNPROCESSABLE_ENTITY
         );
       }
     });
@@ -2115,7 +2115,7 @@ describe('AuthService', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('should throw 400 with INVALID_CURRENT_PASSWORD when bcrypt.compare fails', async () => {
+    it('should throw 403 with INVALID_CURRENT_PASSWORD when bcrypt.compare fails', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
@@ -2127,7 +2127,7 @@ describe('AuthService', () => {
           STEP_UP_OPERATION.PASSWORD_SET
         )
       ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
+        status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
       });
     });
@@ -2143,7 +2143,7 @@ describe('AuthService', () => {
           STEP_UP_OPERATION.PASSWORD_SET
         )
       ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
+        status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
       });
     });
@@ -2218,7 +2218,7 @@ describe('AuthService', () => {
           STEP_UP_OPERATION.PASSWORD_SET
         )
       ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
+        status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
     });
@@ -2383,8 +2383,8 @@ describe('AuthService', () => {
           '000000'
         )
       ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
+        status: HttpStatus.FORBIDDEN,
+        response: { errorKey: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE }
       });
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2412,8 +2412,8 @@ describe('AuthService', () => {
           '000000'
         )
       ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
+        status: HttpStatus.FORBIDDEN,
+        response: { errorKey: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE }
       });
       expect(compare).not.toHaveBeenCalled();
     });
@@ -2869,7 +2869,7 @@ describe('AuthService', () => {
         fail('Expected HttpException');
       } catch (err) {
         expect(err).toBeInstanceOf(HttpException);
-        expect((err as HttpException).getStatus()).toBe(HttpStatus.BAD_REQUEST);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.FORBIDDEN);
       }
       expect(mockManager.update).not.toHaveBeenCalled();
     });
@@ -3172,7 +3172,7 @@ describe('AuthService', () => {
       expect(result.message).toMatch(/sign in again/);
     });
 
-    it('throws 400 when token not found', async () => {
+    it('throws 422 when token not found', async () => {
       mockManager.findOne.mockResolvedValue(null);
 
       await expect(service.confirmEmailChange('invalid')).rejects.toThrow(
@@ -3199,7 +3199,7 @@ describe('AuthService', () => {
 
       expect(rejection).toBeInstanceOf(HttpException);
       const httpError = rejection as HttpException;
-      expect(httpError.getStatus()).toBe(HttpStatus.BAD_REQUEST);
+      expect(httpError.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
       expect(httpError.getResponse()).toEqual({
         message: 'Invalid or expired email-change token',
         errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
@@ -3232,7 +3232,7 @@ describe('AuthService', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('clears state and throws 400 when token is expired', async () => {
+    it('clears state and throws 422 when token is expired', async () => {
       const pendingUser = {
         ...mockUser,
         pendingEmail: 'new@example.com',

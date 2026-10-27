@@ -9,10 +9,10 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  ValidationPipe,
   VersioningType,
   type INestApplication
 } from '@nestjs/common';
+import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
@@ -128,13 +128,7 @@ describe('Billing admin (e2e)', () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true
-      })
-    );
+    app.useGlobalPipes(new ApiValidationPipe());
     app.use((req: Request, _res: Response, next: NextFunction) => {
       (req as Request & { user: { userId: string } }).user = {
         userId: 'admin-1'
@@ -268,12 +262,12 @@ describe('Billing admin (e2e)', () => {
     expect(billingAdmin.refundInvoice).toHaveBeenCalledWith(uuid, 50000);
   });
 
-  it('rejects an invalid refund amount via DTO validation (400)', async () => {
+  it('rejects an invalid refund amount via DTO validation (422)', async () => {
     await request(server)
       .post(`/api/v1/admin/billing/invoices/${uuid}/refund`)
       .set('x-test-role', 'admin')
       .send({ amountMinor: -5 })
-      .expect(400);
+      .expect(422);
     expect(billingAdmin.refundInvoice).not.toHaveBeenCalled();
   });
 
@@ -327,12 +321,12 @@ describe('Billing admin (e2e)', () => {
     expect(usage.record).not.toHaveBeenCalled();
   });
 
-  it('rejects an invalid usage payload via DTO validation (400)', async () => {
+  it('rejects an invalid usage payload via DTO validation (422)', async () => {
     await request(server)
       .post('/api/v1/admin/billing/usage')
       .set('x-test-role', 'admin')
       .send({ customerId: 'not-a-uuid', meterKey: '', quantity: 0 })
-      .expect(400);
+      .expect(422);
     expect(usage.record).not.toHaveBeenCalled();
   });
 

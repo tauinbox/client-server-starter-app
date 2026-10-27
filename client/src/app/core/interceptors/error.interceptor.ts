@@ -9,6 +9,7 @@ import type {
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { switchMap, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { ErrorKeys } from '@app/shared/constants';
 import type { UserPermissionsResponse } from '@app/shared/types';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
 import { RBAC_RETRY_CONTEXT } from '@core/context-tokens/rbac-retry';
@@ -39,6 +40,16 @@ function retryAfterHeader(headers: HttpHeaders | undefined): string | null {
   return named ? headers.get(named) : null;
 }
 
+function isPermissionRefusal(error: HttpErrorResponse): boolean {
+  const body: unknown = error.error;
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { errorKey?: unknown }).errorKey ===
+      ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
+  );
+}
+
 export const errorInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
   next: HttpHandlerFn
@@ -54,13 +65,15 @@ export const errorInterceptor: HttpInterceptorFn = (
       );
       const isRetry = request.context.get(RBAC_RETRY_CONTEXT);
 
-      // On first 403: refresh user permissions so AuthStore.ability updates
-      // reactively (RequirePermissionsDirective re-evaluates via effect()),
-      // then retry the request once. If the retry also 403s the permission is
-      // genuinely revoked — show a snackbar and propagate the retry error.
-      // A signed-out 403 (an unverified sign-in) has no permissions to
-      // refresh: the permissions read would 401 and force a logout.
-      if (error.status === 403 && !isRetry && authStore.isAuthenticated()) {
+      // A refusal by permissions may be stale: reload them and retry once.
+      // Any other 403 (a step-up proof, a policy) would only repeat. A
+      // signed-out 403 has no permissions to reload.
+      if (
+        error.status === 403 &&
+        isPermissionRefusal(error) &&
+        !isRetry &&
+        authStore.isAuthenticated()
+      ) {
         const permissionsCtx = new HttpContext()
           .set(RBAC_RETRY_CONTEXT, true)
           .set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true);

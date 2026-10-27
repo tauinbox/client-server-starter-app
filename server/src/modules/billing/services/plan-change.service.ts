@@ -1,4 +1,5 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ApiError } from '../../../common/errors/api-error';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
@@ -321,11 +322,10 @@ export class PlanChangeService {
       );
     }
     if (!saved) {
-      throw new ConflictException({
-        message:
-          'This subscription changed while the payment was in flight; the plan was not switched. Any amount charged is on your invoices.',
-        errorKey: ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT,
+        'This subscription changed while the payment was in flight; the plan was not switched. Any amount charged is on your invoices.'
+      );
     }
     return saved;
   }
@@ -353,10 +353,10 @@ export class PlanChangeService {
     });
     if (!unfinished?.providerEventId) return;
     const planKey = unfinished.providerEventId.slice(prefix.length);
-    throw new ConflictException({
-      message: `A switch to plan "${planKey}" was charged but did not finish. Switch to that plan again to finish it.`,
-      errorKey: ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED
-    });
+    throw new ApiError(
+      ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED,
+      `A switch to plan "${planKey}" was charged but did not finish. Switch to that plan again to finish it.`
+    );
   }
 
   /**
@@ -453,10 +453,10 @@ export class PlanChangeService {
       { version: subscription.version + 1, planChangeStartedAt: claimedAt }
     );
     if (result.affected !== 1) {
-      throw new ConflictException({
-        message: 'This subscription is already being updated. Please retry.',
-        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_BUSY
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.SUBSCRIPTION_BUSY,
+        'This subscription is already being updated. Please retry.'
+      );
     }
     subscription.version += 1;
     return claimedAt;
@@ -486,11 +486,10 @@ export class PlanChangeService {
       subscription.lifecycleOwner === 'self' &&
       renewalAnchor(subscription).getTime() <= at.getTime()
     ) {
-      throw new ConflictException({
-        message:
-          'The billing period has ended and its renewal is in progress. Try again shortly.',
-        errorKey: ErrorKeys.BILLING.RENEWAL_IN_PROGRESS
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.RENEWAL_IN_PROGRESS,
+        'The billing period has ended and its renewal is in progress. Try again shortly.'
+      );
     }
   }
 
@@ -643,18 +642,16 @@ export class PlanChangeService {
       'No active subscription to change'
     );
     if (!CHANGEABLE_SUBSCRIPTION_STATUSES.includes(subscription.status)) {
-      throw new ConflictException({
-        message:
-          'The subscription must be active to change plans. Settle any outstanding payment first.',
-        errorKey: ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE,
+        'The subscription must be active to change plans. Settle any outstanding payment first.'
+      );
     }
     if (subscription.cancelAtPeriodEnd) {
-      throw new ConflictException({
-        message:
-          'A cancellation is scheduled for this subscription; it can no longer change plans.',
-        errorKey: ErrorKeys.BILLING.CANCELLATION_SCHEDULED
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.CANCELLATION_SCHEDULED,
+        'A cancellation is scheduled for this subscription; it can no longer change plans.'
+      );
     }
     this.assertBeforeRenewal(subscription, new Date());
 
@@ -663,17 +660,17 @@ export class PlanChangeService {
       throw planNotFound(planKey);
     }
     if (toPlan.key === subscription.planKey) {
-      throw new ConflictException({
-        message: 'You are already on this plan.',
-        errorKey: ErrorKeys.BILLING.SAME_PLAN
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.SAME_PLAN,
+        'You are already on this plan.'
+      );
     }
     const toPrice = toPlan.prices[subscription.provider];
     if (!toPrice) {
-      throw new ConflictException({
-        message: `Plan "${toPlan.key}" is not available for your billing provider.`,
-        errorKey: ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER,
+        `Plan "${toPlan.key}" is not available for your billing provider.`
+      );
     }
 
     const fromPlan = await this.plans.findOne({
@@ -806,11 +803,10 @@ export class PlanChangeService {
       now
     );
     if (!saved) {
-      throw new ConflictException({
-        message:
-          'This subscription changed while the plan change was in flight. Please retry.',
-        errorKey: ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT
-      });
+      throw new ApiError(
+        ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT,
+        'This subscription changed while the plan change was in flight. Please retry.'
+      );
     }
     this.events.emit(
       PlanChangedEvent.name,

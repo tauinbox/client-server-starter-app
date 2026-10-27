@@ -203,7 +203,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
       (res) =>
         res.url().includes('/auth/mfa/setup') &&
         res.request().method() === 'POST' &&
-        res.status() === 400,
+        res.status() === 403,
       { timeout: 15_000 }
     );
     await page.goto('/profile?reauth=ok');

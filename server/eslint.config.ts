@@ -41,6 +41,22 @@ const keylessExceptionSyntax: RestrictedSyntax[] = [
   }
 ];
 
+// ERROR_STATUS holds the one status of each key, and ApiError reads it. A body
+// built by hand can pair a key with another status, so it is refused.
+const API_ERROR_MESSAGE =
+  'Throw new ApiError(ErrorKeys.X.Y, message). It takes the status from ERROR_STATUS, so a key has one status on every route.';
+const handBuiltErrorSyntax: RestrictedSyntax[] = [
+  {
+    selector: "ObjectExpression > Property[key.name='errorKey']",
+    message: API_ERROR_MESSAGE
+  },
+  {
+    selector:
+      "NewExpression[callee.name=/Exception$/][arguments.0.type='ObjectExpression']",
+    message: API_ERROR_MESSAGE
+  }
+];
+
 // These UsersService methods take no ability, because each caller selects the
 // record by a key the server holds: a token hash, a signed token, a refresh
 // row or an event payload. A controller holds a client-chosen id, so it reads
@@ -118,7 +134,8 @@ export default defineConfig(
       'no-restricted-syntax': [
         'error',
         ...restrictedSyntax,
-        ...keylessExceptionSyntax
+        ...keylessExceptionSyntax,
+        ...handBuiltErrorSyntax
       ]
     }
   },
@@ -130,7 +147,23 @@ export default defineConfig(
         'error',
         ...restrictedSyntax,
         ...keylessExceptionSyntax,
+        ...handBuiltErrorSyntax,
         ...uncheckedUserLookupSyntax
+      ]
+    }
+  },
+  {
+    // The factory itself, and the filter that writes the response envelope.
+    basePath: __dirname,
+    files: [
+      'src/common/errors/api-error.ts',
+      'src/modules/core/filters/global-exception.filter.ts'
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedSyntax,
+        ...keylessExceptionSyntax
       ]
     }
   },

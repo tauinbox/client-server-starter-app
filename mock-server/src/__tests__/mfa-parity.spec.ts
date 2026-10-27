@@ -113,7 +113,7 @@ describe('two-factor enrolment', () => {
     const res = await post('/auth/mfa/setup', {}, token);
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
   });
 
@@ -134,8 +134,8 @@ describe('two-factor enrolment', () => {
     const res = await post('/auth/mfa/enable', { code: '000000' }, token);
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(401);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
+    expect(res.status).toBe(422);
+    expect(body['errorKey']).toBe('errors.auth.mfaEnrolmentInvalidCode');
 
     const profile = await login();
     expect(profile).toHaveProperty('tokens');
@@ -147,7 +147,7 @@ describe('two-factor enrolment', () => {
     const res = await post('/auth/mfa/enable', { code: MOCK_TOTP_CODE }, token);
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(body['errorKey']).toBe('errors.auth.mfaSetupRequired');
   });
 
@@ -156,7 +156,7 @@ describe('two-factor enrolment', () => {
 
     const res = await post('/auth/mfa/enable', { code: '12345' }, token);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it('hands back the recovery codes exactly once', async () => {
@@ -190,7 +190,7 @@ describe('two-factor enrolment', () => {
     );
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
   });
 
@@ -450,7 +450,7 @@ describe('recovery codes', () => {
       recoveryCode: 'nope'
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   // Enrolments before the entropy rise got two-group codes, and the owner
@@ -480,7 +480,7 @@ describe('recovery codes', () => {
     });
     const body = (await res.json()) as { errors: string[] };
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(body.errors).toEqual([
       'recoveryCode must match /^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}(?:-?[A-Za-z2-7]{8})?$/ regular expression'
     ]);
@@ -558,7 +558,7 @@ describe('replacing the recovery codes', () => {
     const res = await post('/auth/mfa/recovery-codes', {}, token);
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
   });
 
@@ -580,7 +580,7 @@ describe('replacing the recovery codes', () => {
     );
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(body['errorKey']).toBe('errors.auth.mfaNotEnabled');
   });
 
@@ -589,7 +589,7 @@ describe('replacing the recovery codes', () => {
 
     const res = await post('/auth/mfa/recovery-codes', { code: '12' }, token);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 });
 
@@ -620,8 +620,8 @@ describe('turning the factor off', () => {
     );
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
+    expect(res.status).toBe(403);
+    expect(body['errorKey']).toBe('errors.auth.mfaStepUpInvalidCode');
   });
 
   it('accepts the password', async () => {
@@ -642,7 +642,7 @@ describe('turning the factor off', () => {
     const res = await post('/auth/mfa/disable', {}, token);
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
     expect(await login()).toHaveProperty('mfaRequired');
   });
@@ -657,7 +657,7 @@ describe('turning the factor off', () => {
     );
     const body = (await res.json()) as Record<string, string>;
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(body['errorKey']).toBe('errors.auth.mfaNotEnabled');
   });
 });
@@ -671,7 +671,7 @@ describe('the brake on the step-up code', () => {
   async function guessWrong(token: string, times: number): Promise<void> {
     for (let i = 0; i < times; i += 1) {
       const res = await post('/auth/mfa/disable', { code: '000000' }, token);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
     }
   }
 
@@ -730,7 +730,7 @@ describe('the brake on the step-up code', () => {
 
     for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
       const res = await post('/auth/mfa/disable', {}, token);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
     }
 
     const res = await post(
@@ -754,6 +754,6 @@ describe('the brake on the step-up code', () => {
 
     const res = await post('/auth/mfa/disable', { code: '000000' }, token);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   });
 });

@@ -5,7 +5,7 @@ import { getState, resetState } from '../state';
 import type { MockUser } from '../types';
 
 // The server ValidationPipe runs with `forbidNonWhitelisted`, so a step-up body
-// with a field its DTO does not declare is a 400 before any factor is read.
+// with a field its DTO does not declare is a 422 before any factor is read.
 let server: Server;
 let baseUrl: string;
 
@@ -76,7 +76,7 @@ it.each(routes)(
       body: JSON.stringify({ ...body, extra: 1 })
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
       message: 'property extra should not exist'
     });

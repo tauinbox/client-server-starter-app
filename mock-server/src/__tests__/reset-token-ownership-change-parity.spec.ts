@@ -73,7 +73,7 @@ async function expectResetRefused(resetToken: string): Promise<void> {
     token: resetToken,
     password: 'Amber-Signal-42'
   });
-  expect(reset.status).toBe(400);
+  expect(reset.status).toBe(422);
   expect(await reset.json()).toMatchObject({
     errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
   });

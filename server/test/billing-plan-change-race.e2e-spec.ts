@@ -6,7 +6,6 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConflictException } from '@nestjs/common';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Like } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
@@ -325,7 +324,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
     await expect(
       service.changePlan(user, 'race-business')
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({ status: 409 });
 
     const row = await reload(subscription.id);
     expect(row).toMatchObject({
@@ -344,7 +343,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
     await expect(
       service.changePlan(user, 'race-business')
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({ status: 409 });
 
     const row = await reload(subscription.id);
     expect(row).toMatchObject({ status: 'canceled', planKey: 'race-pro' });
@@ -357,7 +356,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
     await expect(
       service.changePlan(user, 'race-business')
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({ status: 409 });
 
     const invoices = await ds.getRepository(Invoice).find({
       where: { subscriptionId: subscription.id }
@@ -548,9 +547,9 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       return row;
     });
 
-    await expect(users.checkout(user, 'race-business')).rejects.toBeInstanceOf(
-      ConflictException
-    );
+    await expect(users.checkout(user, 'race-business')).rejects.toMatchObject({
+      status: 409
+    });
 
     expect(await reload(subscription.id)).toMatchObject({
       status: 'active',
@@ -566,7 +565,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
     await expect(
       service.changePlan(user, 'race-business')
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({ status: 409 });
 
     expect(await reload(subscription.id)).toMatchObject({
       cancelAtPeriodEnd: true,
@@ -692,7 +691,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       unfinished
     );
     const refused = service.changePlan(user, 'race-max');
-    await expect(refused).rejects.toBeInstanceOf(ConflictException);
+    await expect(refused).rejects.toMatchObject({ status: 409 });
     await expect(refused).rejects.toMatchObject(unfinished);
     expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
     expect(provider.refund).toHaveBeenCalledTimes(1);

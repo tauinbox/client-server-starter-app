@@ -22,8 +22,9 @@ import { assertCanWiden } from '../helpers/grant-scope.helpers';
 import type { AuthenticatedRequest } from '../types';
 import {
   requireUuid,
-  validationError
+  sendValidationError
 } from '../helpers/validation-error.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
 import {
   stringArrayErrors,
   stringErrors,
@@ -41,7 +42,7 @@ router.get(
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, RESOURCE_LIST_QUERY);
     if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
+      sendValidationError(res, 'query', errors);
       return;
     }
     if (rejectInvalidCursor(res, query)) return;
@@ -73,11 +74,7 @@ router.post(
     const resource = state.resources.get(id);
 
     if (!resource) {
-      res.status(404).json({
-        message: 'Resource not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.RESOURCES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.RESOURCES.NOT_FOUND, 'Resource not found');
       return;
     }
 
@@ -97,20 +94,20 @@ router.post(
     }
 
     if (!resource.isRegistered) {
-      res.status(400).json({
-        message: `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`,
-        statusCode: 400,
-        errorKey: ErrorKeys.RESOURCES.CANNOT_RESTORE
-      });
+      sendError(
+        res,
+        ErrorKeys.RESOURCES.CANNOT_RESTORE,
+        `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`
+      );
       return;
     }
 
     if (!resource.isOrphaned) {
-      res.status(409).json({
-        message: `Resource "${resource.name}" is not orphaned, so there is nothing to restore`,
-        statusCode: 409,
-        errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED
-      });
+      sendError(
+        res,
+        ErrorKeys.RESOURCES.NOT_ORPHANED,
+        `Resource "${resource.name}" is not orphaned, so there is nothing to restore`
+      );
       return;
     }
 
@@ -176,7 +173,7 @@ router.patch(
     ];
 
     if (errors.length > 0) {
-      res.status(400).json(validationError(errors));
+      sendValidationError(res, 'body', errors);
       return;
     }
 
@@ -186,11 +183,7 @@ router.patch(
     const resource = state.resources.get(id);
 
     if (!resource) {
-      res.status(404).json({
-        message: 'Resource not found',
-        statusCode: 404,
-        errorKey: ErrorKeys.RESOURCES.NOT_FOUND
-      });
+      sendError(res, ErrorKeys.RESOURCES.NOT_FOUND, 'Resource not found');
       return;
     }
 
@@ -227,11 +220,11 @@ router.patch(
       (name) => !resource.actionNames.includes(name)
     );
     if (undeclared.length > 0) {
-      res.status(400).json({
-        message: `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`,
-        statusCode: 400,
-        errorKey: ErrorKeys.RESOURCES.ACTION_NOT_DECLARED
-      });
+      sendError(
+        res,
+        ErrorKeys.RESOURCES.ACTION_NOT_DECLARED,
+        `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`
+      );
       return;
     }
 

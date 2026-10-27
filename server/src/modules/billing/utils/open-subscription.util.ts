@@ -1,6 +1,6 @@
-import { NotFoundException } from '@nestjs/common';
 import { In, type Repository } from 'typeorm';
 import { ErrorKeys, OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import { ApiError } from '../../../common/errors/api-error';
 import type { Customer } from '../entities/customer.entity';
 import type { Subscription } from '../entities/subscription.entity';
 
@@ -33,10 +33,10 @@ export async function requireOpenSubscription(
     ? await findOpenSubscription(repos.subscriptions, customer.id)
     : null;
   if (!customer || !subscription) {
-    throw new NotFoundException({
-      message: notFoundMessage,
-      errorKey: ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION
-    });
+    throw new ApiError(
+      ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
+      notFoundMessage
+    );
   }
   return { customer, subscription };
 }

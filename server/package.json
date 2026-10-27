@@ -30,6 +30,7 @@
     "check:controllers": "ts-node scripts/check-controllers.ts",
     "check:permissions": "ts-node scripts/check-permissions.ts",
     "check:i18n": "ts-node -r tsconfig-paths/register scripts/check-i18n-keys.ts",
+    "check:error-status": "ts-node -r tsconfig-paths/register scripts/check-error-status.ts",
     "check:imports": "node ../scripts/check-imports.mjs",
     "check:role-conditions": "ts-node scripts/check-existing-role-conditions.ts",
     "check:grant-scope": "ts-node -r tsconfig-paths/register scripts/check-grant-scope.ts",
