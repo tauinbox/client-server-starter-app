@@ -62,7 +62,10 @@ import {
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
-import { readJwtMinIat } from '../jwt-module-options.factory';
+import {
+  issuedBeforeMinIat,
+  readJwtMinIat
+} from '../jwt-module-options.factory';
 import { PurposeTokenService } from './purpose-token.service';
 import type { SessionClient } from '../utils/session-client';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
@@ -665,8 +668,12 @@ export class AuthService {
       );
     }
 
-    const minIat = readJwtMinIat(this.configService);
-    if (minIat !== undefined && tokenDoc.createdAt.getTime() / 1000 < minIat) {
+    if (
+      issuedBeforeMinIat(
+        tokenDoc.createdAt.getTime() / 1000,
+        readJwtMinIat(this.configService)
+      )
+    ) {
       // Deleted, not revoked: a revoked unexpired row is what the reuse
       // detector reads as theft, so a replay would purge every session.
       await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);

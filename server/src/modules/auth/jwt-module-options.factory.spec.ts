@@ -6,6 +6,7 @@ import {
   buildJwtModuleOptions,
   buildJwtVerification,
   issuedBeforeMinIat,
+  readJwtExpirationSeconds,
   readJwtMinIat
 } from './jwt-module-options.factory';
 
@@ -67,6 +68,15 @@ describe('jwt-module-options.factory', () => {
 
   it('decodes the base64 public key for RS256', () => {
     expect(buildJwtVerification(configs.RS256).key).toBe(publicKey);
+  });
+
+  it('reads JWT_EXPIRATION as a number, and throws when unset', () => {
+    expect(readJwtExpirationSeconds(configOf({ JWT_EXPIRATION: '900' }))).toBe(
+      900
+    );
+    expect(() => readJwtExpirationSeconds(configOf({}))).toThrow(
+      'Missing: JWT_EXPIRATION'
+    );
   });
 
   it('reads JWT_MIN_IAT as a number, and undefined when unset', () => {

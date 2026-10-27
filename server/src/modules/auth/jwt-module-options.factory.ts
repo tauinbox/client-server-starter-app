@@ -46,7 +46,8 @@ export function buildJwtModuleOptions(
 ): JwtModuleOptions {
   const { algorithm, key, issuer, audience } =
     buildJwtVerification(configService);
-  const expiresIn = `${configService.get('JWT_EXPIRATION')}s` as StringValue;
+  const expiresIn =
+    `${readJwtExpirationSeconds(configService)}s` as StringValue;
   const signOptions = { expiresIn, algorithm, issuer, audience };
   const verifyOptions = { algorithms: [algorithm], issuer, audience };
 
@@ -60,6 +61,11 @@ export function buildJwtModuleOptions(
   }
 
   return { secret: key, signOptions, verifyOptions };
+}
+
+/** The lifetime of an access token in seconds. */
+export function readJwtExpirationSeconds(configService: ConfigService): number {
+  return Number(configService.getOrThrow<string>('JWT_EXPIRATION'));
 }
 
 /**
