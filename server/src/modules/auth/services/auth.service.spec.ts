@@ -1627,6 +1627,7 @@ describe('AuthService', () => {
       userId: 'user-1',
       sessionId: 'session-1',
       sessionStartedAt: new Date(Date.now() - 3600000),
+      createdAt: new Date(Date.now() - 3600000),
       revoked: false,
       expiresAt: new Date(Date.now() + 86400000),
       isExpired: () => false

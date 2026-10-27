@@ -5,13 +5,18 @@ import * as crypto from 'crypto';
 import { TOKEN_PURPOSE } from '@app/shared/constants';
 import { CustomJwtPayload } from '../types/jwt-payload';
 import { TokensResponseDto } from '../dtos/auth-response.dto';
+import { readJwtExpirationSeconds } from '../jwt-module-options.factory';
 
 @Injectable()
 export class TokenGeneratorService {
+  private readonly accessTokenExpiration: number;
+
   constructor(
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService
-  ) {}
+    configService: ConfigService
+  ) {
+    this.accessTokenExpiration = readJwtExpirationSeconds(configService);
+  }
 
   /**
    * `sessionId` is minted by the caller because the access token has to carry
@@ -30,17 +35,12 @@ export class TokenGeneratorService {
       sid: sessionId
     };
 
-    const accessTokenExpiration = parseInt(
-      this.configService.getOrThrow<string>('JWT_EXPIRATION'),
-      10
-    );
-
     return {
       access_token: this.jwtService.sign(jwtPayload, {
-        expiresIn: accessTokenExpiration
+        expiresIn: this.accessTokenExpiration
       }),
       refresh_token: this.generateRefreshToken(),
-      expires_in: accessTokenExpiration
+      expires_in: this.accessTokenExpiration
     };
   }
 
