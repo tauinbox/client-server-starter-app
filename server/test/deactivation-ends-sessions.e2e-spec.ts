@@ -166,6 +166,34 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
     );
   }, 30000);
 
+  // A failed revocation listener leaves the rows of a deleted account.
+  it('ends the session at the not-found refusal, so a replay is not read as reuse', async () => {
+    const raw = await seedSession();
+    await dataSource.getRepository(User).softDelete(userId);
+
+    try {
+      expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
+        ErrorKeys.AUTH.USER_NOT_FOUND
+      );
+      expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
+        ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      );
+      expect(
+        await dataSource
+          .getRepository(RefreshToken)
+          .count({ where: { userId } })
+      ).toBe(0);
+
+      const reuseRows = logFireAndForget.mock.calls.filter(
+        ([entry]: [{ action: AuditAction }]) =>
+          entry.action === AuditAction.TOKEN_REUSE_DETECTED
+      );
+      expect(reuseRows).toHaveLength(0);
+    } finally {
+      await dataSource.getRepository(User).restore(userId);
+    }
+  }, 30000);
+
   it('keeps the session when the update does not deactivate', async () => {
     const raw = await seedSession();
 

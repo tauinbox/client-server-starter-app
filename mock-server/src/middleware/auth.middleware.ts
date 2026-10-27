@@ -674,6 +674,7 @@ router.post('/refresh-token', (req, res) => {
 
   const user = findUserById(userId);
   if (!user) {
+    endSessionOfToken(cookieToken);
     logAudit('TOKEN_REFRESH_FAILURE', {
       actorId: userId,
       details: { reason: 'user_not_found' },

@@ -128,6 +128,24 @@ describe('refresh-token failure parity', () => {
     expect(rows[0].details).toEqual({ reason: 'user_not_found' });
   });
 
+  it('ends the session at the not-found refusal, so a replay is not read as reuse', async () => {
+    const session = await signIn();
+    const user = getState().users.get(session.userId);
+    expect(user).toBeDefined();
+    user!.deletedAt = new Date().toISOString();
+
+    expect((await refresh(session)).status).toBe(401);
+
+    const replay = await refresh(session);
+    expect(replay.status).toBe(401);
+    expect(await readErrorBody(replay)).toEqual({
+      message: 'Invalid refresh token',
+      statusCode: 401,
+      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+    });
+    expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
+  });
+
   it('ends the session at the deactivated refusal, so a replay is not read as reuse', async () => {
     const phone = await signIn();
     const desktop = await signIn();
