@@ -48,7 +48,7 @@ import {
 } from '@app/shared/utils/if-match';
 import {
   assertInstancePermission,
-  authenticateRequest,
+  optionalAuthentication,
   permissionGuard
 } from '../helpers/auth.helpers';
 import { filterByAbility } from '../helpers/ability-filter.helpers';
@@ -391,8 +391,7 @@ function findFlagByKey(key: string): MockFeatureFlag | undefined {
 }
 
 function actorIdFromReq(req: Request): string | null {
-  const result = authenticateRequest(req);
-  return result?.user.id ?? null;
+  return optionalAuthentication(req)?.user.id ?? null;
 }
 
 function evaluationEnv(): string {
@@ -496,7 +495,7 @@ export function isFlagEnabledForUser(user: MockUser, key: string): boolean {
 const publicRouter = Router();
 
 publicRouter.get('/', (req, res) => {
-  const authenticated = authenticateRequest(req);
+  const authenticated = optionalAuthentication(req);
   const anonId = resolveAnonId(req, res, authenticated !== null);
   const response = authenticated
     ? evaluateAll(

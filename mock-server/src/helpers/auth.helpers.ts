@@ -1,7 +1,7 @@
 import { subject as caslSubject } from '@casl/ability';
 import type { Request, Response, NextFunction } from 'express';
 import { validateToken, type DecodedToken } from '../jwt.utils';
-import { ErrorKeys } from '@app/shared/constants';
+import { ErrorKeys, TOKEN_PURPOSE, type ErrorKey } from '@app/shared/constants';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import {
   buildAbilityForUser,
@@ -23,30 +23,69 @@ export function extractBearerToken(req: Request): string | null {
 }
 
 type AuthResult = { user: MockUser; decoded: DecodedToken; sessionId: string };
+type AuthRefusal = { refusal: { errorKey?: ErrorKey; message: string } };
 
-export function authenticateRequest(req: Request): AuthResult | null {
+// Passport answers a missing, unreadable or expired token before
+// `JwtStrategy.validate` runs, with no key.
+const KEYLESS_REFUSAL: AuthRefusal = { refusal: { message: 'Unauthorized' } };
+
+function refuse(errorKey: ErrorKey, message: string): AuthRefusal {
+  return { refusal: { errorKey, message } };
+}
+
+/** Mirrors `JwtStrategy.validate`: the same checks in the same order. */
+export function authenticateRequest(req: Request): AuthResult | AuthRefusal {
   const token = extractBearerToken(req);
-  if (!token) return null;
+  if (!token) return KEYLESS_REFUSAL;
 
   const decoded = validateToken(token);
-  if (!decoded) return null;
+  if (!decoded) return KEYLESS_REFUSAL;
+
+  if (decoded.purpose !== TOKEN_PURPOSE.ACCESS) {
+    return refuse(ErrorKeys.AUTH.INVALID_TOKEN, 'Token is not an access token');
+  }
+  if (typeof decoded.sub !== 'string' || decoded.sub === '') {
+    return refuse(
+      ErrorKeys.AUTH.INVALID_TOKEN,
+      'Token is missing a valid subject claim'
+    );
+  }
+  if (typeof decoded.iat !== 'number' || !Number.isFinite(decoded.iat)) {
+    return refuse(
+      ErrorKeys.AUTH.INVALID_TOKEN,
+      'Token is missing a valid issued-at claim'
+    );
+  }
 
   const user = findUserById(decoded.sub);
-  if (!user) return null;
+  if (!user) return refuse(ErrorKeys.AUTH.USER_NOT_FOUND, 'User not found');
 
-  if (issuedBeforeRevocation(decoded.iat, user.tokenRevokedAt)) return null;
+  if (issuedBeforeRevocation(decoded.iat, user.tokenRevokedAt)) {
+    return refuse(ErrorKeys.AUTH.TOKEN_REVOKED, 'Token has been revoked');
+  }
 
-  // Fail closed on a missing session claim, matching JwtStrategy: a token that
-  // names no session cannot be ended by a sign-out on its own device.
-  if (typeof decoded.sid !== 'string' || decoded.sid === '') return null;
-  if (!isSessionLive(decoded.sid)) return null;
+  if (typeof decoded.sid !== 'string' || decoded.sid === '') {
+    return refuse(
+      ErrorKeys.AUTH.INVALID_TOKEN,
+      'Token is missing a valid session claim'
+    );
+  }
+  if (!isSessionLive(decoded.sid)) {
+    return refuse(ErrorKeys.AUTH.TOKEN_REVOKED, 'Session has ended');
+  }
 
   return { user, decoded, sessionId: decoded.sid };
 }
 
-export function requireAuth(req: Request): AuthResult | { error: number } {
+/** For a route that serves an anonymous caller too: a refused token is anonymous. */
+export function optionalAuthentication(req: Request): AuthResult | null {
   const result = authenticateRequest(req);
-  if (!result) return { error: 401 };
+  return 'refusal' in result ? null : result;
+}
+
+export function requireAuth(req: Request): AuthResult | GuardError {
+  const result = authenticateRequest(req);
+  if ('refusal' in result) return { error: 401, ...result.refusal };
   return result;
 }
 
@@ -75,9 +114,17 @@ export function logRefusal(
 
 export type GuardError = {
   error: number;
-  message?: string;
-  errorKey?: string;
+  message: string;
+  errorKey?: ErrorKey;
 };
+
+function sendGuardError(res: Response, result: GuardError): void {
+  if (result.errorKey) {
+    sendError(res, result.errorKey, result.message);
+    return;
+  }
+  res.status(result.error).json({ message: result.message });
+}
 
 /**
  * Mirrors the three layers that `@Authorize` composes on the server:
@@ -137,9 +184,7 @@ export function requirePermission(
 export function authGuard(req: Request, res: Response, next: NextFunction) {
   const result = requireAuth(req);
   if ('error' in result) {
-    res
-      .status(result.error)
-      .json({ message: 'Unauthorized', statusCode: result.error });
+    sendGuardError(res, result);
     return;
   }
   (req as AuthenticatedRequest).user = result.user;
@@ -157,13 +202,7 @@ export function permissionGuard(
   return (req: Request, res: Response, next: NextFunction) => {
     const result = check(req);
     if ('error' in result) {
-      const msg =
-        result.message ?? (result.error === 403 ? 'Forbidden' : 'Unauthorized');
-      res.status(result.error).json({
-        message: msg,
-        statusCode: result.error,
-        ...(result.errorKey ? { errorKey: result.errorKey } : {})
-      });
+      sendGuardError(res, result);
       return;
     }
     (req as AuthenticatedRequest).user = result.user;

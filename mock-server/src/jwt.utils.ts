@@ -32,7 +32,7 @@ export function generateAccessToken(
 
 /**
  * What a correct password buys on an account that carries a second factor. It
- * carries the mfa-pending purpose, so validateToken below refuses it as a
+ * carries the mfa-pending purpose, so authenticateRequest refuses it as a
  * bearer credential exactly as JwtStrategy does.
  */
 export function generateMfaPendingToken(
@@ -98,24 +98,14 @@ export function decodeToken(token: string): DecodedToken | null {
   }
 }
 
+/**
+ * Mirrors the checks that Passport runs before `JwtStrategy.validate`: a token
+ * that cannot be read or that has expired. The claim checks of `validate` are
+ * in `authenticateRequest`, because each of them answers with its own key.
+ */
 export function validateToken(token: string): DecodedToken | null {
   const decoded = decodeToken(token);
   if (!decoded) return null;
-
-  // Fail closed on a missing/invalid iat, matching the real server:
-  // the revocation check compares against iat and must not be skippable
-  if (typeof decoded.iat !== 'number' || !Number.isFinite(decoded.iat)) {
-    return null;
-  }
-
-  // Matching the real server: only an access-purpose token authenticates, and a
-  // missing subject fails closed rather than resolving to an arbitrary user
-  if (decoded.purpose !== TOKEN_PURPOSE.ACCESS) {
-    return null;
-  }
-  if (typeof decoded.sub !== 'string' || decoded.sub === '') {
-    return null;
-  }
 
   const now = Math.floor(Date.now() / 1000);
   if (decoded.exp < now) return null;
