@@ -951,7 +951,11 @@ router.post(
     const state = getState();
     const user = findUserById(userId);
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(
+        res,
+        ErrorKeys.USERS.NOT_FOUND,
+        `User with ID ${userId} not found`
+      );
       return;
     }
 
@@ -1031,7 +1035,11 @@ router.delete(
     const state = getState();
     const user = findUserById(userId);
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(
+        res,
+        ErrorKeys.USERS.NOT_FOUND,
+        `User with ID ${userId} not found`
+      );
       return;
     }
 

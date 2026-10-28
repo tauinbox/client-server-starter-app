@@ -155,7 +155,7 @@ router.get(
     const id = req.params['id'] as string;
     const user = findUserById(id);
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
       return;
     }
 
@@ -177,7 +177,7 @@ router.get(
     const id = req.params['id'] as string;
     const user = findUserById(id);
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
       return;
     }
 
@@ -249,7 +249,7 @@ router.patch(
 
     const user = findUserById(id);
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
       return;
     }
 
@@ -441,7 +441,7 @@ router.delete(
     const id = req.params['id'] as string;
     const targetUser = findUserById(id);
     if (!targetUser) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
       return;
     }
 
@@ -487,7 +487,7 @@ router.post(
     const id = req.params['id'] as string;
     const targetUser = findUserByIdWithDeleted(id);
     if (!targetUser) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
       return;
     }
 
@@ -552,7 +552,7 @@ router.post(
 
     const user = findUserById(id);
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
       return;
     }
 
@@ -624,7 +624,7 @@ router.post(
 
     const user = findUserById(id);
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, 'User not found');
+      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
       return;
     }
 
