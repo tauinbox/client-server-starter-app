@@ -123,6 +123,7 @@ function sendGuardError(res: Response, result: GuardError): void {
     sendError(res, result.errorKey, result.message);
     return;
   }
+  // Passport sends this 401 with no key.
   res.status(result.error).json({ message: result.message });
 }
 
