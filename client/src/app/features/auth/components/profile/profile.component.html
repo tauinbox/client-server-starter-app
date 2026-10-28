@@ -54,112 +54,114 @@
 
       <div class="profile-grid">
         <div class="profile-column">
-          <mat-card>
-            <mat-card-header>
-              <mat-card-title>{{
-                t('auth.profile.updateCard')
-              }}</mat-card-title>
-            </mat-card-header>
+          @if (canEditProfile()) {
+            <mat-card>
+              <mat-card-header>
+                <mat-card-title>{{
+                  t('auth.profile.updateCard')
+                }}</mat-card-title>
+              </mat-card-header>
 
-            <mat-card-content>
-              <form (submit)="$event.preventDefault(); onSubmit()">
-                <nxs-form-field
-                  [field]="profileForm.name"
-                  label="auth.profile.name"
-                  prefixIcon="person"
-                  autocomplete="name"
-                />
-
-                <nxs-form-field
-                  [field]="profileForm.email"
-                  label="auth.profile.email"
-                  type="email"
-                  prefixIcon="email"
-                  autocomplete="email"
-                />
-
-                <nxs-form-field
-                  [field]="profileForm.password"
-                  label="auth.profile.newPassword"
-                  [type]="pwdToggle.show() ? 'text' : 'password'"
-                  prefixIcon="lock"
-                  autocomplete="new-password"
-                >
-                  <nxs-password-toggle formFieldSuffix #pwdToggle />
-                </nxs-form-field>
-
-                <nxs-password-strength [password]="profileModel().password" />
-
-                @if (reauthNoticeKey(); as noticeKey) {
-                  <div class="reauth-notice" role="note">
-                    {{ t(noticeKey, { provider: reauthProviderLabel() }) }}
-                  </div>
-                }
-
-                @if (requiresCurrentPassword()) {
+              <mat-card-content>
+                <form (submit)="$event.preventDefault(); onSubmit()">
                   <nxs-form-field
-                    [field]="profileForm.currentPassword"
-                    label="auth.profile.currentPassword"
-                    [type]="currentPwdToggle.show() ? 'text' : 'password'"
-                    prefixIcon="lock"
-                    autocomplete="current-password"
-                  >
-                    <nxs-password-toggle formFieldSuffix #currentPwdToggle />
-                  </nxs-form-field>
-                }
-
-                @if (requiresCode()) {
-                  <nxs-form-field
-                    [field]="profileForm.code"
-                    label="auth.profile.code"
-                    type="text"
-                    prefixIcon="password"
-                    autocomplete="one-time-code"
+                    [field]="profileForm.name"
+                    label="auth.profile.name"
+                    prefixIcon="person"
+                    autocomplete="name"
                   />
-                }
 
-                @if (passwordTyped()) {
                   <nxs-form-field
-                    [field]="profileForm.confirmPassword"
-                    label="auth.profile.confirmPassword"
-                    [type]="confirmPwdToggle.show() ? 'text' : 'password'"
+                    [field]="profileForm.email"
+                    label="auth.profile.email"
+                    type="email"
+                    prefixIcon="email"
+                    autocomplete="email"
+                  />
+
+                  <nxs-form-field
+                    [field]="profileForm.password"
+                    label="auth.profile.newPassword"
+                    [type]="pwdToggle.show() ? 'text' : 'password'"
                     prefixIcon="lock"
                     autocomplete="new-password"
                   >
-                    <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
+                    <nxs-password-toggle formFieldSuffix #pwdToggle />
                   </nxs-form-field>
-                }
 
-                @if (error()) {
-                  <div class="error-message" role="alert">{{ error() }}</div>
-                }
+                  <nxs-password-strength [password]="profileModel().password" />
 
-                <div class="form-actions">
-                  <button
-                    matButton="filled"
-                    type="submit"
-                    [disabled]="
-                      profileForm().invalid() ||
-                      saving() ||
-                      !profileForm().dirty()
-                    "
-                  >
-                    @if (saving()) {
-                      <span class="app-btn-loading">
-                        <mat-spinner
-                          [attr.aria-label]="t('common.loading')"
-                          diameter="24"
-                        ></mat-spinner>
-                        {{ t('auth.profile.saving') }}
-                      </span>
-                    } @else {
-                      {{ t('common.save') }}
-                    }
-                  </button>
-                </div>
-              </form>
-            </mat-card-content>
-          </mat-card>
+                  @if (reauthNoticeKey(); as noticeKey) {
+                    <div class="reauth-notice" role="note">
+                      {{ t(noticeKey, { provider: reauthProviderLabel() }) }}
+                    </div>
+                  }
+
+                  @if (requiresCurrentPassword()) {
+                    <nxs-form-field
+                      [field]="profileForm.currentPassword"
+                      label="auth.profile.currentPassword"
+                      [type]="currentPwdToggle.show() ? 'text' : 'password'"
+                      prefixIcon="lock"
+                      autocomplete="current-password"
+                    >
+                      <nxs-password-toggle formFieldSuffix #currentPwdToggle />
+                    </nxs-form-field>
+                  }
+
+                  @if (requiresCode()) {
+                    <nxs-form-field
+                      [field]="profileForm.code"
+                      label="auth.profile.code"
+                      type="text"
+                      prefixIcon="password"
+                      autocomplete="one-time-code"
+                    />
+                  }
+
+                  @if (passwordTyped()) {
+                    <nxs-form-field
+                      [field]="profileForm.confirmPassword"
+                      label="auth.profile.confirmPassword"
+                      [type]="confirmPwdToggle.show() ? 'text' : 'password'"
+                      prefixIcon="lock"
+                      autocomplete="new-password"
+                    >
+                      <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
+                    </nxs-form-field>
+                  }
+
+                  @if (error()) {
+                    <div class="error-message" role="alert">{{ error() }}</div>
+                  }
+
+                  <div class="form-actions">
+                    <button
+                      matButton="filled"
+                      type="submit"
+                      [disabled]="
+                        profileForm().invalid() ||
+                        saving() ||
+                        !profileForm().dirty()
+                      "
+                    >
+                      @if (saving()) {
+                        <span class="app-btn-loading">
+                          <mat-spinner
+                            [attr.aria-label]="t('common.loading')"
+                            diameter="24"
+                          ></mat-spinner>
+                          {{ t('auth.profile.saving') }}
+                        </span>
+                      } @else {
+                        {{ t('common.save') }}
+                      }
+                    </button>
+                  </div>
+                </form>
+              </mat-card-content>
+            </mat-card>
+          }
 
           <nxs-active-sessions
             [user]="u"
@@ -188,7 +190,11 @@
             (reauthRequested)="startMfaReauth()"
           />
 
-          <nxs-preferences-card [user]="u" (userUpdated)="user.set($event)" />
+          <nxs-preferences-card
+            [user]="u"
+            [canSaveLocale]="canEditProfile()"
+            (userUpdated)="user.set($event)"
+          />
         </div>
       </div>
     }

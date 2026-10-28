@@ -323,6 +323,10 @@ export class AuthController {
     return updatedUser;
   }
 
+  // The address is the recovery channel of the password, so a role that may not
+  // edit the profile may not move it either.
+  @Authorize(['update', 'Profile'])
+  @SkipMfaEnrolmentGate()
   @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @Post('profile/email/initiate')
   @HttpCode(HttpStatus.OK)

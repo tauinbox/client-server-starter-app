@@ -74,7 +74,21 @@ describe('PreferencesCardComponent', () => {
     fixture = TestBed.createComponent(PreferencesCardComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('user', buildUser());
+    fixture.componentRef.setInput('canSaveLocale', true);
     fixture.detectChanges();
+  });
+
+  it('saves no locale and locks the choice without update:Profile', () => {
+    fixture.componentRef.setInput('canSaveLocale', false);
+    fixture.detectChanges();
+
+    component.onLocaleChange('ru');
+
+    expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
+    expect(component['locale']()).toBe('en');
+    const toggles: NodeListOf<HTMLButtonElement> =
+      fixture.nativeElement.querySelectorAll('mat-button-toggle button');
+    expect([...toggles].every((b) => b.disabled)).toBe(true);
   });
 
   it('shows the locale stored on the account', () => {

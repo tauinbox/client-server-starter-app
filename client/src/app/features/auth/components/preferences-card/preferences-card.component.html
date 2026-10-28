@@ -7,7 +7,7 @@
     <p class="preference-label">{{ t('auth.profile.language') }}</p>
     <mat-button-toggle-group
       [value]="locale()"
-      [disabled]="savingLocale()"
+      [disabled]="savingLocale() || !canSaveLocale()"
       [hideSingleSelectionIndicator]="true"
       (change)="onLocaleChange($event.value)"
       [attr.aria-label]="t('auth.profile.language')"

@@ -857,100 +857,105 @@ router.patch(
 );
 
 // POST /api/v1/auth/profile/email/initiate
-router.post('/profile/email/initiate', authGuard, (req, res) => {
-  const { user } = req as AuthenticatedRequest;
-  const { currentPassword, code } = req.body;
-  const successMessage =
-    'If the new email is available, a confirmation link has been sent to it.';
+// Gated like PATCH /profile: the address is the recovery channel of the password.
+router.post(
+  '/profile/email/initiate',
+  permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
+  (req, res) => {
+    const { user } = req as AuthenticatedRequest;
+    const { currentPassword, code } = req.body;
+    const successMessage =
+      'If the new email is available, a confirmation link has been sent to it.';
 
-  const bodyErrors = stepUpFactorsBodyErrors(
-    req.body,
-    ['newEmail'],
-    emailErrors('newEmail', req.body?.newEmail)
-  );
-  if (bodyErrors.length > 0) {
-    sendValidationError(res, 'body', bodyErrors);
-    return;
-  }
-
-  const newEmail = normalizeEmail(req.body.newEmail) ?? '';
-
-  const stepUp = stepUpError(
-    req,
-    user,
-    currentPassword,
-    code,
-    STEP_UP_OPERATION.EMAIL_CHANGE
-  );
-  if (stepUp) {
-    sendWithRetryAfter(res, stepUp);
-    return;
-  }
-
-  if (newEmail === user.email) {
-    sendError(
-      res,
-      ErrorKeys.AUTH.SAME_EMAIL,
-      'New email is the same as the current email'
+    const bodyErrors = stepUpFactorsBodyErrors(
+      req.body,
+      ['newEmail'],
+      emailErrors('newEmail', req.body?.newEmail)
     );
-    return;
-  }
-
-  const state = getState();
-
-  // The server clears the proof once the change is accepted, so a rejected
-  // attempt keeps its remaining window. Everything above this line rejects.
-  clearReauthProofCookie(res);
-
-  // Uniqueness check: primary email OR pending email on any OTHER user.
-  let conflict = false;
-  for (const other of state.users.values()) {
-    if (other.id === user.id || other.deletedAt) continue;
-    if (other.email === newEmail || other.pendingEmail === newEmail) {
-      conflict = true;
-      break;
+    if (bodyErrors.length > 0) {
+      sendValidationError(res, 'body', bodyErrors);
+      return;
     }
-  }
 
-  const domain = newEmail.slice(newEmail.indexOf('@') + 1);
-  logAudit('USER_EMAIL_CHANGE_REQUEST', {
-    actorId: user.id,
-    actorEmail: user.email,
-    targetId: user.id,
-    targetType: 'User',
-    details: { newEmailDomain: domain, conflict },
-    ip: req.ip
-  });
+    const newEmail = normalizeEmail(req.body.newEmail) ?? '';
 
-  if (conflict) {
+    const stepUp = stepUpError(
+      req,
+      user,
+      currentPassword,
+      code,
+      STEP_UP_OPERATION.EMAIL_CHANGE
+    );
+    if (stepUp) {
+      sendWithRetryAfter(res, stepUp);
+      return;
+    }
+
+    if (newEmail === user.email) {
+      sendError(
+        res,
+        ErrorKeys.AUTH.SAME_EMAIL,
+        'New email is the same as the current email'
+      );
+      return;
+    }
+
+    const state = getState();
+
+    // The server clears the proof once the change is accepted, so a rejected
+    // attempt keeps its remaining window. Everything above this line rejects.
+    clearReauthProofCookie(res);
+
+    // Uniqueness check: primary email OR pending email on any OTHER user.
+    let conflict = false;
+    for (const other of state.users.values()) {
+      if (other.id === user.id || other.deletedAt) continue;
+      if (other.email === newEmail || other.pendingEmail === newEmail) {
+        conflict = true;
+        break;
+      }
+    }
+
+    const domain = newEmail.slice(newEmail.indexOf('@') + 1);
+    logAudit('USER_EMAIL_CHANGE_REQUEST', {
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { newEmailDomain: domain, conflict },
+      ip: req.ip
+    });
+
+    if (conflict) {
+      res.json({ message: successMessage });
+      return;
+    }
+
+    // Drop any previous pending token for this user (idempotent re-initiate)
+    if (user.pendingEmailToken) {
+      state.pendingEmailTokens.delete(user.pendingEmailToken);
+    }
+
+    // No hashing in the mock — store the raw token directly.
+    const token = randomUUID();
+    user.pendingEmail = newEmail;
+    user.pendingEmailToken = token;
+    user.pendingEmailExpiresAt = new Date(
+      Date.now() + EMAIL_CHANGE_TOKEN_EXPIRY_MS
+    ).toISOString();
+    state.pendingEmailTokens.set(token, user.id);
+
+    const confirmUrl = `http://localhost:4200/confirm-email-change?token=${token}`;
+    console.log(
+      `[EMAIL CHANGE CONFIRMATION] To: ${newEmail}\n  Confirm URL: ${confirmUrl}`
+    );
+    console.log(
+      `[EMAIL CHANGE NOTIFICATION] To: ${user.email}\n  Pending new address requested`
+    );
+
     res.json({ message: successMessage });
-    return;
   }
-
-  // Drop any previous pending token for this user (idempotent re-initiate)
-  if (user.pendingEmailToken) {
-    state.pendingEmailTokens.delete(user.pendingEmailToken);
-  }
-
-  // No hashing in the mock — store the raw token directly.
-  const token = randomUUID();
-  user.pendingEmail = newEmail;
-  user.pendingEmailToken = token;
-  user.pendingEmailExpiresAt = new Date(
-    Date.now() + EMAIL_CHANGE_TOKEN_EXPIRY_MS
-  ).toISOString();
-  state.pendingEmailTokens.set(token, user.id);
-
-  const confirmUrl = `http://localhost:4200/confirm-email-change?token=${token}`;
-  console.log(
-    `[EMAIL CHANGE CONFIRMATION] To: ${newEmail}\n  Confirm URL: ${confirmUrl}`
-  );
-  console.log(
-    `[EMAIL CHANGE NOTIFICATION] To: ${user.email}\n  Pending new address requested`
-  );
-
-  res.json({ message: successMessage });
-});
+);
 
 // POST /api/v1/auth/profile/email/confirm
 router.post('/profile/email/confirm', (req, res) => {

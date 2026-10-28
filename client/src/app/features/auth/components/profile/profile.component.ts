@@ -232,6 +232,15 @@ export class ProfileComponent implements OnInit {
   /** Shared with the providers card, so a round trip it asks for disables it. */
   protected readonly providersBusy = signal(false);
 
+  /**
+   * The server refuses every write of the own profile record (name, locale,
+   * password, address) without this grant, so the page offers no form. The
+   * header card still shows the name and the address.
+   */
+  protected readonly canEditProfile = computed(() =>
+    this.#authStore.hasPermissions({ action: 'update', subject: 'Profile' })
+  );
+
   readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
 
   readonly profileForm = form(this.profileModel, (path) => {
@@ -666,7 +675,7 @@ export class ProfileComponent implements OnInit {
 
   onSubmit(): void {
     const u = this.user();
-    if (this.profileForm().invalid() || !u) return;
+    if (this.profileForm().invalid() || !u || !this.canEditProfile()) return;
 
     const newEmail = canonicalEmail(this.profileModel().email);
     const emailChanged = !!u.email && newEmail !== canonicalEmail(u.email);
