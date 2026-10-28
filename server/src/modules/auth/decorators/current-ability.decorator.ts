@@ -9,19 +9,22 @@ import type { JwtAuthRequest } from '../types/auth.request';
  * checks in the service layer after loading the resource from the database:
  *
  * @example
- * @Patch(':id')
- * @Authorize(['update', 'User'])
- * async update(
- *   @Param('id') id: string,
- *   @Body() dto: UpdateUserDto,
+ * @Get(':id')
+ * @Authorize(['read', 'User'])
+ * findOne(
+ *   @Param('id', ParseUUIDPipe) id: string,
+ *   @Request() req: JwtAuthRequest,
  *   @CurrentAbility() ability: AppAbility,
  * ) {
- *   return this.usersService.update(id, dto, ability);
+ *   return this.usersService.findOne(id, ability, req.user.userId);
  * }
  *
- * In the service:
- *   const user = await this.repo.findOneBy({ id });
- *   if (!ability.can('update', user)) throw new ForbiddenException();
+ * In the service, which takes `ability: AbilityOrSystem`:
+ *   const user = await this.loadUser(id);
+ *   if (ability !== SYSTEM_ABILITY) {
+ *     assertCan(ability, 'read', subject('User', user), this.auditService,
+ *       { actorId, targetId: id, targetType: 'User' }, this.metricsService);
+ *   }
  *
  * NOTE: Returns undefined when the route is not protected by @Authorize()
  * (PermissionsGuard did not run and ability was not attached to the request).

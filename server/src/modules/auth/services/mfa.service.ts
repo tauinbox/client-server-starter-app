@@ -80,10 +80,9 @@ export class MfaService {
   readonly #challengeFailures: FailedAttemptCounter;
 
   /**
-   * The same brake for the step-up code. The routes that spend one are
-   * `POST /auth/mfa/disable` and `POST /auth/mfa/recovery-codes`, so a caller
-   * who already holds a session must not get a fresh budget of guesses with
-   * every address they add either.
+   * The same brake for the step-up code. Every step-up route that accepts a
+   * code spends one from this budget, so a caller who already holds a session
+   * must not get a fresh budget of guesses with every address they add either.
    */
   readonly #stepUpFailures: FailedAttemptCounter;
 
