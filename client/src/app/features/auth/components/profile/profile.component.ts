@@ -21,7 +21,6 @@ import {
   form,
   maxLength,
   minLength,
-  readonly,
   required,
   validate
 } from '@angular/forms/signals';
@@ -235,7 +234,8 @@ export class ProfileComponent implements OnInit {
 
   /**
    * The server refuses every write of the own profile record (name, locale,
-   * password, address) without this grant, so the form is read only.
+   * password, address) without this grant, so the page offers no form. The
+   * header card still shows the name and the address.
    */
   protected readonly canEditProfile = computed(() =>
     this.#authStore.hasPermissions({ action: 'update', subject: 'Profile' })
@@ -244,7 +244,6 @@ export class ProfileComponent implements OnInit {
   readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
 
   readonly profileForm = form(this.profileModel, (path) => {
-    readonly(path, () => !this.canEditProfile());
     required(path.email, { message: 'auth.profile.emailRequired' });
     emailValidator(path.email, { message: 'auth.profile.emailInvalid' });
     requiredNotBlank(path.name, { message: 'auth.profile.nameRequired' });

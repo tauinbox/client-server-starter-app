@@ -174,17 +174,23 @@ describe('ProfileComponent', () => {
       fixture.detectChanges();
     });
 
-    it('offers no save button and no password field', () => {
+    it('offers no profile form and keeps the name and address in the header', () => {
       const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('form')).toBeNull();
       expect(root.querySelector('button[type="submit"]')).toBeNull();
-      expect(
-        root.querySelector('input[autocomplete="new-password"]')
-      ).toBeNull();
+      expect(root.querySelector('.profile-name')?.textContent).toContain(
+        'Test User'
+      );
+      expect(root.querySelector('.profile-email')?.textContent).toContain(
+        'test@example.com'
+      );
     });
 
-    it('shows the name and the address read only', () => {
-      expect(component.profileForm.name().readonly()).toBe(true);
-      expect(component.profileForm.email().readonly()).toBe(true);
+    it('keeps the security cards', () => {
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('nxs-two-factor')).not.toBeNull();
+      expect(root.querySelector('nxs-active-sessions')).not.toBeNull();
+      expect(root.querySelector('nxs-linked-providers')).not.toBeNull();
     });
 
     it('sends no write on a submit', () => {

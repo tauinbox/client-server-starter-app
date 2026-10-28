@@ -69,7 +69,8 @@ management and theming.
 - **Self-service email change.** A user can change their own email address from `/profile`. The flow
   has two steps and confirms at the new address.
 
-  `POST /api/v1/auth/profile/email/initiate` needs authentication. It has a throttle of 3 calls each
+  `POST /api/v1/auth/profile/email/initiate` needs authentication and the `update:Profile` grant,
+  as `PATCH /api/v1/auth/profile` does. It has a throttle of 3 calls each
   hour. It requires a step-up: the current password, a code from the authenticator, or a provider
   proof for an account that has OAuth only and no authenticator. It stores a
   hashed token on the user row for 1 hour. Then it sends a confirmation link to the new address. It
@@ -1601,7 +1602,7 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/auth/sessions` | Bearer + step-up | End every device of the account except the caller |
 | GET | `/auth/profile` | Bearer | Get the profile of the current user |
 | PATCH | `/auth/profile` | Bearer | Update your own profile: the name and the password. A password change needs a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one (a code does not replace it), a `code` for a user with OAuth only that carries an authenticator, and a `reauth_proof` cookie minted for `password_set` for a user with OAuth only and no authenticator. The change also clears `passwordResetToken`, `passwordResetExpiresAt` and the `pendingEmail` trio, thus a reset link or a confirmation link mailed before it is dead |
-| POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Throttled to 3 calls each hour. Requires a step-up: the current password, a code from the authenticator, or a provider proof |
+| POST | `/auth/profile/email/initiate` | Bearer | Start a self-service email change. Needs `update:Profile`, as `PATCH /auth/profile` does. Throttled to 3 calls each hour. Requires a step-up: the current password, a code from the authenticator, or a provider proof |
 | POST | `/auth/profile/email/confirm` | None | Confirm an email change with the token from the new address. Applies the change in a transaction and revokes each session |
 | GET | `/auth/oauth/:provider` | None | Start an OAuth login. The providers are google, facebook and vk |
 | GET | `/auth/oauth/:provider/callback` | None | Callback of the OAuth provider |
@@ -1911,10 +1912,10 @@ activates the git hooks through the `prepare` script.
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3149 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 709 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 696 pass and 13 skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1622 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 711 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the CI setup), 698 pass and 13 skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1626 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 343 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1252 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1254 tests pass |
 
 ## CI/CD
 

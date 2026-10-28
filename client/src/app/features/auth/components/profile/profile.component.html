@@ -54,31 +54,31 @@
 
       <div class="profile-grid">
         <div class="profile-column">
-          <mat-card>
-            <mat-card-header>
-              <mat-card-title>{{
-                t('auth.profile.updateCard')
-              }}</mat-card-title>
-            </mat-card-header>
+          @if (canEditProfile()) {
+            <mat-card>
+              <mat-card-header>
+                <mat-card-title>{{
+                  t('auth.profile.updateCard')
+                }}</mat-card-title>
+              </mat-card-header>
 
-            <mat-card-content>
-              <form (submit)="$event.preventDefault(); onSubmit()">
-                <nxs-form-field
-                  [field]="profileForm.name"
-                  label="auth.profile.name"
-                  prefixIcon="person"
-                  autocomplete="name"
-                />
+              <mat-card-content>
+                <form (submit)="$event.preventDefault(); onSubmit()">
+                  <nxs-form-field
+                    [field]="profileForm.name"
+                    label="auth.profile.name"
+                    prefixIcon="person"
+                    autocomplete="name"
+                  />
 
-                <nxs-form-field
-                  [field]="profileForm.email"
-                  label="auth.profile.email"
-                  type="email"
-                  prefixIcon="email"
-                  autocomplete="email"
-                />
+                  <nxs-form-field
+                    [field]="profileForm.email"
+                    label="auth.profile.email"
+                    type="email"
+                    prefixIcon="email"
+                    autocomplete="email"
+                  />
 
-                @if (canEditProfile()) {
                   <nxs-form-field
                     [field]="profileForm.password"
                     label="auth.profile.newPassword"
@@ -90,53 +90,51 @@
                   </nxs-form-field>
 
                   <nxs-password-strength [password]="profileModel().password" />
-                }
 
-                @if (reauthNoticeKey(); as noticeKey) {
-                  <div class="reauth-notice" role="note">
-                    {{ t(noticeKey, { provider: reauthProviderLabel() }) }}
-                  </div>
-                }
+                  @if (reauthNoticeKey(); as noticeKey) {
+                    <div class="reauth-notice" role="note">
+                      {{ t(noticeKey, { provider: reauthProviderLabel() }) }}
+                    </div>
+                  }
 
-                @if (requiresCurrentPassword()) {
-                  <nxs-form-field
-                    [field]="profileForm.currentPassword"
-                    label="auth.profile.currentPassword"
-                    [type]="currentPwdToggle.show() ? 'text' : 'password'"
-                    prefixIcon="lock"
-                    autocomplete="current-password"
-                  >
-                    <nxs-password-toggle formFieldSuffix #currentPwdToggle />
-                  </nxs-form-field>
-                }
+                  @if (requiresCurrentPassword()) {
+                    <nxs-form-field
+                      [field]="profileForm.currentPassword"
+                      label="auth.profile.currentPassword"
+                      [type]="currentPwdToggle.show() ? 'text' : 'password'"
+                      prefixIcon="lock"
+                      autocomplete="current-password"
+                    >
+                      <nxs-password-toggle formFieldSuffix #currentPwdToggle />
+                    </nxs-form-field>
+                  }
 
-                @if (requiresCode()) {
-                  <nxs-form-field
-                    [field]="profileForm.code"
-                    label="auth.profile.code"
-                    type="text"
-                    prefixIcon="password"
-                    autocomplete="one-time-code"
-                  />
-                }
+                  @if (requiresCode()) {
+                    <nxs-form-field
+                      [field]="profileForm.code"
+                      label="auth.profile.code"
+                      type="text"
+                      prefixIcon="password"
+                      autocomplete="one-time-code"
+                    />
+                  }
 
-                @if (passwordTyped()) {
-                  <nxs-form-field
-                    [field]="profileForm.confirmPassword"
-                    label="auth.profile.confirmPassword"
-                    [type]="confirmPwdToggle.show() ? 'text' : 'password'"
-                    prefixIcon="lock"
-                    autocomplete="new-password"
-                  >
-                    <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
-                  </nxs-form-field>
-                }
+                  @if (passwordTyped()) {
+                    <nxs-form-field
+                      [field]="profileForm.confirmPassword"
+                      label="auth.profile.confirmPassword"
+                      [type]="confirmPwdToggle.show() ? 'text' : 'password'"
+                      prefixIcon="lock"
+                      autocomplete="new-password"
+                    >
+                      <nxs-password-toggle formFieldSuffix #confirmPwdToggle />
+                    </nxs-form-field>
+                  }
 
-                @if (error()) {
-                  <div class="error-message" role="alert">{{ error() }}</div>
-                }
+                  @if (error()) {
+                    <div class="error-message" role="alert">{{ error() }}</div>
+                  }
 
-                @if (canEditProfile()) {
                   <div class="form-actions">
                     <button
                       matButton="filled"
@@ -160,10 +158,10 @@
                       }
                     </button>
                   </div>
-                }
-              </form>
-            </mat-card-content>
-          </mat-card>
+                </form>
+              </mat-card-content>
+            </mat-card>
+          }
 
           <nxs-active-sessions
             [user]="u"
