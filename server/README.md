@@ -1341,8 +1341,8 @@ The counter is deliberately not bound to the `mfa_pending` token: a fresh token 
 `POST /auth/login` with the password the caller already holds.
 
 **The step-up code carries the same brake, in a namespace of its own.**
-`POST /auth/mfa/disable` and `POST /auth/mfa/recovery-codes` are the two routes that spend a
-step-up code, and the operation the first one opens removes the second factor.
+Every step-up route that accepts a code spends one, and the operation that
+`POST /auth/mfa/disable` opens removes the second factor.
 `MfaService.isValidStepUpCode` therefore counts refused codes against the account too, on a second
 `FailedAttemptCounter` keyed `mfa:step-up-failures:`, with the same threshold, the same window and
 the same 423 envelope. The error key is `errors.auth.mfaStepUpLocked`, because the challenge message
