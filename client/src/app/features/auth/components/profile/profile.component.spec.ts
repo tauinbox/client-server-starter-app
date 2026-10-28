@@ -14,6 +14,7 @@ import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { ProfileComponent } from './profile.component';
 import { LinkedProvidersComponent } from '../linked-providers/linked-providers.component';
 import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import type {
@@ -147,6 +148,10 @@ describe('ProfileComponent', () => {
       ]
     }).compileComponents();
 
+    // The seeded `user` role holds update:Profile; the tests that need an
+    // account without it reset the rules.
+    TestBed.inject(AuthStore).setRules([['update', 'Profile']]);
+
     fixture = TestBed.createComponent(ProfileComponent);
     component = fixture.componentInstance;
   });
@@ -159,6 +164,42 @@ describe('ProfileComponent', () => {
   it('should create', () => {
     fixture.detectChanges();
     expect(component).toBeTruthy();
+  });
+
+  describe('without update:Profile', () => {
+    beforeEach(async () => {
+      TestBed.inject(AuthStore).setRules([['read', 'Profile']]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    });
+
+    it('offers no save button and no password field', () => {
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('button[type="submit"]')).toBeNull();
+      expect(
+        root.querySelector('input[autocomplete="new-password"]')
+      ).toBeNull();
+    });
+
+    it('shows the name and the address read only', () => {
+      expect(component.profileForm.name().readonly()).toBe(true);
+      expect(component.profileForm.email().readonly()).toBe(true);
+    });
+
+    it('sends no write on a submit', () => {
+      component.profileModel.update((m) => ({
+        ...m,
+        email: 'moved@example.com',
+        currentPassword: 'Password1'
+      }));
+
+      component.onSubmit();
+
+      expect(adaptiveDialogMock.openConfirm).not.toHaveBeenCalled();
+      expect(authServiceMock.initiateEmailChange).not.toHaveBeenCalled();
+      expect(authServiceMock.updateProfile).not.toHaveBeenCalled();
+    });
   });
 
   it('marks each password field for password managers by its role', async () => {

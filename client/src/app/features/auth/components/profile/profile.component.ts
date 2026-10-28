@@ -21,6 +21,7 @@ import {
   form,
   maxLength,
   minLength,
+  readonly,
   required,
   validate
 } from '@angular/forms/signals';
@@ -232,9 +233,18 @@ export class ProfileComponent implements OnInit {
   /** Shared with the providers card, so a round trip it asks for disables it. */
   protected readonly providersBusy = signal(false);
 
+  /**
+   * The server refuses every write of the own profile record (name, locale,
+   * password, address) without this grant, so the form is read only.
+   */
+  protected readonly canEditProfile = computed(() =>
+    this.#authStore.hasPermissions({ action: 'update', subject: 'Profile' })
+  );
+
   readonly profileModel = signal<ProfileData>({ ...INITIAL_PROFILE });
 
   readonly profileForm = form(this.profileModel, (path) => {
+    readonly(path, () => !this.canEditProfile());
     required(path.email, { message: 'auth.profile.emailRequired' });
     emailValidator(path.email, { message: 'auth.profile.emailInvalid' });
     requiredNotBlank(path.name, { message: 'auth.profile.nameRequired' });
@@ -666,7 +676,7 @@ export class ProfileComponent implements OnInit {
 
   onSubmit(): void {
     const u = this.user();
-    if (this.profileForm().invalid() || !u) return;
+    if (this.profileForm().invalid() || !u || !this.canEditProfile()) return;
 
     const newEmail = canonicalEmail(this.profileModel().email);
     const emailChanged = !!u.email && newEmail !== canonicalEmail(u.email);

@@ -78,17 +78,19 @@
                   autocomplete="email"
                 />
 
-                <nxs-form-field
-                  [field]="profileForm.password"
-                  label="auth.profile.newPassword"
-                  [type]="pwdToggle.show() ? 'text' : 'password'"
-                  prefixIcon="lock"
-                  autocomplete="new-password"
-                >
-                  <nxs-password-toggle formFieldSuffix #pwdToggle />
-                </nxs-form-field>
+                @if (canEditProfile()) {
+                  <nxs-form-field
+                    [field]="profileForm.password"
+                    label="auth.profile.newPassword"
+                    [type]="pwdToggle.show() ? 'text' : 'password'"
+                    prefixIcon="lock"
+                    autocomplete="new-password"
+                  >
+                    <nxs-password-toggle formFieldSuffix #pwdToggle />
+                  </nxs-form-field>
 
-                <nxs-password-strength [password]="profileModel().password" />
+                  <nxs-password-strength [password]="profileModel().password" />
+                }
 
                 @if (reauthNoticeKey(); as noticeKey) {
                   <div class="reauth-notice" role="note">
@@ -134,29 +136,31 @@
                   <div class="error-message" role="alert">{{ error() }}</div>
                 }
 
-                <div class="form-actions">
-                  <button
-                    matButton="filled"
-                    type="submit"
-                    [disabled]="
-                      profileForm().invalid() ||
-                      saving() ||
-                      !profileForm().dirty()
-                    "
-                  >
-                    @if (saving()) {
-                      <span class="app-btn-loading">
-                        <mat-spinner
-                          [attr.aria-label]="t('common.loading')"
-                          diameter="24"
-                        ></mat-spinner>
-                        {{ t('auth.profile.saving') }}
-                      </span>
-                    } @else {
-                      {{ t('common.save') }}
-                    }
-                  </button>
-                </div>
+                @if (canEditProfile()) {
+                  <div class="form-actions">
+                    <button
+                      matButton="filled"
+                      type="submit"
+                      [disabled]="
+                        profileForm().invalid() ||
+                        saving() ||
+                        !profileForm().dirty()
+                      "
+                    >
+                      @if (saving()) {
+                        <span class="app-btn-loading">
+                          <mat-spinner
+                            [attr.aria-label]="t('common.loading')"
+                            diameter="24"
+                          ></mat-spinner>
+                          {{ t('auth.profile.saving') }}
+                        </span>
+                      } @else {
+                        {{ t('common.save') }}
+                      }
+                    </button>
+                  </div>
+                }
               </form>
             </mat-card-content>
           </mat-card>
@@ -188,7 +192,11 @@
             (reauthRequested)="startMfaReauth()"
           />
 
-          <nxs-preferences-card [user]="u" (userUpdated)="user.set($event)" />
+          <nxs-preferences-card
+            [user]="u"
+            [canSaveLocale]="canEditProfile()"
+            (userUpdated)="user.set($event)"
+          />
         </div>
       </div>
     }

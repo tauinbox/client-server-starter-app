@@ -59,6 +59,9 @@ export class PreferencesCardComponent {
 
   readonly user = input<UserResponse | null>(null);
 
+  /** The locale is a field of the profile record, so it needs update:Profile. */
+  readonly canSaveLocale = input.required<boolean>();
+
   /** Keeps the page's copy of the user in step after a locale save. */
   readonly userUpdated = output<UserResponse>();
 
@@ -77,7 +80,7 @@ export class PreferencesCardComponent {
    */
   onLocaleChange(value: AppLanguage): void {
     const previous = this.locale();
-    if (value === previous) return;
+    if (value === previous || !this.canSaveLocale()) return;
 
     this.locale.set(value);
     this.savingLocale.set(true);
