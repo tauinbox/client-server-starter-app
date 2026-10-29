@@ -2521,7 +2521,7 @@ The base URL is `/api/v1`.
 | POST | `/profile/email/initiate` | Bearer | Step 1 of the self-service email change, with a limit of 3 calls each hour. It needs `update:Profile`, as `PATCH /profile` does, and skips the two-factor enrolment gate. It requires a fresh proof of identity with whatever factor the account holds: `currentPassword` for an account that has one, a `code` for an account that carries an authenticator, and a `reauth_proof` cookie from a provider round trip for an account that has neither. It stores `pendingEmail` and `pendingEmailToken` with an expiry of 1 h. It sends a confirmation link to the new address, and a masked alert with no link to the old address. The response is enumeration-safe |
 | POST | `/profile/email/confirm` | None | Step 2. It confirms the new address with the token, applies the change atomically, revokes each refresh token, and notifies the old address |
 | GET | `/permissions` | Bearer | Get the resolved permissions of the current user |
-| POST | `/verify-email` | None | Verify an email address with a token |
+| POST | `/verify-email` | None | Verify an email address with a token. A completed verification writes an `EMAIL_VERIFIED` audit row |
 | POST | `/resend-verification` | None | Send the verification email again, with a limit of 3 calls each minute. A deactivated account gets no token and no mail, and reads the same enumeration-safe answer |
 | POST | `/forgot-password` | None | Request a password reset email, with a limit of 2 calls each 5 minutes. A CAPTCHA token is necessary near the rate limit |
 | POST | `/reset-password` | None | Reset the password with a token |

@@ -280,6 +280,35 @@ describe('OAuthService', () => {
         { email: 'oauth@example.com' }
       );
       expect(result.isEmailVerified).toBe(true);
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.EMAIL_VERIFIED,
+          actorId: 'oauth-user-1',
+          targetId: 'oauth-user-1',
+          targetType: 'User',
+          details: { source: 'oauth', provider: 'google' }
+        })
+      );
+    });
+
+    it('writes no EMAIL_VERIFIED row when the verification write changes nothing', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findOne.mockResolvedValue({
+        ...oauthUser,
+        isEmailVerified: false
+      });
+      mockUsersService.markEmailVerified.mockResolvedValueOnce(false);
+
+      await loginExpectingUser(oauthProfile);
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.EMAIL_VERIFIED })
+      );
     });
 
     // Regression: the write was keyed on the id only, so an administrator

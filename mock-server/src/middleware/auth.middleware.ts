@@ -337,6 +337,15 @@ router.post('/verify-email', (req, res) => {
   user.isEmailVerified = true;
   state.emailVerificationTokens.delete(token);
 
+  logAudit('EMAIL_VERIFIED', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    details: { source: 'link' },
+    ip: req.ip
+  });
+
   res.json({ message: 'Email verified successfully' });
 });
 

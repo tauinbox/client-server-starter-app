@@ -1012,13 +1012,15 @@ describe('AuthController', () => {
   // ── verifyEmail ───────────────────────────────────────────────────
 
   describe('verifyEmail', () => {
-    it('should delegate to authService.verifyEmail with the token', async () => {
+    it('should delegate to authService.verifyEmail with the token and audit context', async () => {
       const dto = { token: 'verify-token-123' };
+      const req = mockExpressRequest() as ExpressRequest;
 
-      const result = await controller.verifyEmail(dto);
+      const result = await controller.verifyEmail(dto, req);
 
       expect(authServiceMock.verifyEmail).toHaveBeenCalledWith(
-        'verify-token-123'
+        'verify-token-123',
+        expect.objectContaining({ ip: '127.0.0.1' })
       );
       expect(result).toEqual({ message: 'verified' });
     });

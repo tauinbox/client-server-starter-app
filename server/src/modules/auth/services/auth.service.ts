@@ -381,7 +381,10 @@ export class AuthService {
     };
   }
 
-  async verifyEmail(token: string): Promise<{ message: string }> {
+  async verifyEmail(
+    token: string,
+    auditContext?: AuditContext
+  ): Promise<{ message: string }> {
     const hashedToken = hashToken(token);
     const user =
       await this.usersService.findByEmailVerificationToken(hashedToken);
@@ -412,6 +415,16 @@ export class AuthService {
     if (!verified) {
       throw invalidToken;
     }
+
+    this.auditService.logFireAndForget({
+      action: AuditAction.EMAIL_VERIFIED,
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { source: 'link' },
+      context: auditContext
+    });
 
     return { message: 'Email verified successfully' };
   }

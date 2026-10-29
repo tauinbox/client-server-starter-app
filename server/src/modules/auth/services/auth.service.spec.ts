@@ -1099,6 +1099,55 @@ describe('AuthService', () => {
       expect(result.message).toContain('verified successfully');
     });
 
+    it('writes one EMAIL_VERIFIED row for a verified token', async () => {
+      mockUsersService.findByEmailVerificationToken.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false,
+        emailVerificationExpiresAt: new Date(Date.now() + 86400000)
+      });
+      const context = { ip: '203.0.113.5', requestId: 'req-1' };
+
+      await service.verifyEmail('valid-token', context);
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledTimes(1);
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.EMAIL_VERIFIED,
+        actorId: mockUser.id,
+        actorEmail: mockUser.email,
+        targetId: mockUser.id,
+        targetType: 'User',
+        details: { source: 'link' },
+        context
+      });
+    });
+
+    it('writes no audit row for an unknown, expired or cleared token', async () => {
+      mockUsersService.findByEmailVerificationToken.mockResolvedValueOnce(null);
+      await expect(service.verifyEmail('unknown')).rejects.toThrow(
+        HttpException
+      );
+
+      mockUsersService.findByEmailVerificationToken.mockResolvedValueOnce({
+        ...mockUser,
+        emailVerificationExpiresAt: new Date(Date.now() - 1000)
+      });
+      await expect(service.verifyEmail('expired')).rejects.toThrow(
+        HttpException
+      );
+
+      mockUsersService.findByEmailVerificationToken.mockResolvedValueOnce({
+        ...mockUser,
+        isEmailVerified: false,
+        emailVerificationExpiresAt: new Date(Date.now() + 86400000)
+      });
+      mockUsersService.markEmailVerified.mockResolvedValueOnce(false);
+      await expect(service.verifyEmail('cleared')).rejects.toThrow(
+        HttpException
+      );
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
+
     it('should throw 422 when token not found', async () => {
       mockUsersService.findByEmailVerificationToken.mockResolvedValue(null);
 
