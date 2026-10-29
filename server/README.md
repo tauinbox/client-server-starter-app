@@ -1302,7 +1302,10 @@ and ends one other session or every other session. Both deletes demand a step-up
 operation `session_revoke` and name the user id beside the session id
 (`RefreshTokenService.deleteUserSession` and `deleteOtherSessions`), so an id of another account
 answers 404 exactly as an unknown id does. Neither writes `tokenRevokedAt`, which would also end
-the caller. The list is bounded by the plan session allowance, so it is not cursor paginated.
+the caller. The delete is the existence check: `deleteUserSession` is one `DELETE` guarded by
+`EXISTS` on a live row, so of two concurrent requests for one session only one answers 200 and
+writes the audit row. `deleteOtherSessions` counts the live sessions in the rows that its own
+delete returns. The list is bounded by the plan session allowance, so it is not cursor paginated.
 
 **Two-factor codes are single use.** `MfaService.consumeTotp` is the one funnel for every path
 that reads a code: the enrolment, the sign-in challenge and the step-up. It reads the account row

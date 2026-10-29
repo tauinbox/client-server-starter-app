@@ -129,36 +129,39 @@ export class RefreshTokenService {
    * Ends one live session of this user. The user id is part of the lookup and
    * of the delete, so an id that belongs to another account ends nothing and
    * reads the same as an id that does not exist.
+   *
+   * The delete is the existence check, so of two concurrent requests for one
+   * session only one reports the end.
    */
   async deleteUserSession(userId: string, sessionId: string): Promise<boolean> {
-    const live = await this.repository.exists({
-      where: {
-        userId,
-        sessionId,
-        revoked: false,
-        expiresAt: MoreThan(new Date())
-      }
-    });
-    if (!live) return false;
+    const { affected } = await this.repository
+      .createQueryBuilder()
+      .delete()
+      .from(RefreshToken)
+      .where('user_id = :userId AND session_id = :sessionId')
+      .andWhere(
+        'EXISTS (SELECT 1 FROM refresh_tokens live WHERE live.user_id = :userId AND live.session_id = :sessionId AND live.revoked = false AND live.expires_at > :now)'
+      )
+      .setParameters({ userId, sessionId, now: new Date() })
+      .execute();
 
-    await this.repository.delete({ userId, sessionId });
-    return true;
+    return (affected ?? 0) > 0;
   }
 
   /**
    * Ends every session of this user except one, and returns how many live
    * sessions it ended. It writes no `tokenRevokedAt`, because that stamp would
    * end the kept session too.
+   *
+   * The count comes from the deleted rows, so a session that a concurrent
+   * request ended first is not counted again.
    */
   async deleteOtherSessions(
     userId: string,
     keepSessionId: string
   ): Promise<number> {
-    const ended = (await this.findLiveSessions(userId)).filter(
-      (row) => row.sessionId !== keepSessionId
-    ).length;
-
-    await this.repository
+    const now = Date.now();
+    const result = await this.repository
       .createQueryBuilder()
       .delete()
       .from(RefreshToken)
@@ -166,9 +169,20 @@ export class RefreshTokenService {
         userId,
         keepSessionId
       })
+      .returning('session_id, revoked, expires_at')
       .execute();
 
-    return ended;
+    const rows = result.raw as {
+      session_id: string;
+      revoked: boolean;
+      expires_at: Date;
+    }[];
+    const ended = new Set(
+      rows
+        .filter((row) => !row.revoked && row.expires_at.getTime() > now)
+        .map((row) => row.session_id)
+    );
+    return ended.size;
   }
 
   /**
