@@ -23,6 +23,9 @@ describe('RefreshTokenService', () => {
     delete: jest.Mock;
     from: jest.Mock;
     where: jest.Mock;
+    andWhere: jest.Mock;
+    setParameters: jest.Mock;
+    returning: jest.Mock;
     execute: jest.Mock;
   };
   let mockGeoIp: { lookup: jest.Mock };
@@ -32,6 +35,9 @@ describe('RefreshTokenService', () => {
       delete: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      setParameters: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockReturnThis(),
       execute: jest.fn().mockResolvedValue({ affected: 5 })
     };
 
@@ -450,50 +456,61 @@ describe('RefreshTokenService', () => {
   });
 
   describe('deleteUserSession', () => {
-    it('scopes both the lookup and the delete by the user id', async () => {
-      mockRepository.exists.mockResolvedValue(true);
+    it('checks and deletes in one statement scoped by the user id', async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ affected: 3 });
 
       await expect(service.deleteUserSession('user-1', 's-1')).resolves.toBe(
         true
       );
 
-      expect(mockRepository.exists).toHaveBeenCalledWith({
-        where: expect.objectContaining({
-          userId: 'user-1',
-          sessionId: 's-1',
-          revoked: false
-        }) as unknown
-      });
-      expect(mockRepository.delete).toHaveBeenCalledWith({
-        userId: 'user-1',
-        sessionId: 's-1'
-      });
+      expect(mockRepository.exists).not.toHaveBeenCalled();
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'user_id = :userId AND session_id = :sessionId'
+      );
+      expect(mockQueryBuilder.setParameters).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', sessionId: 's-1' })
+      );
     });
 
-    it('deletes nothing when the user holds no such live session', async () => {
-      mockRepository.exists.mockResolvedValue(false);
+    it('reports no end when the statement deletes no row', async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ affected: 0 });
 
       await expect(
         service.deleteUserSession('user-1', 'foreign')
       ).resolves.toBe(false);
-      expect(mockRepository.delete).not.toHaveBeenCalled();
     });
   });
 
   describe('deleteOtherSessions', () => {
-    it('keeps the named session and counts the live sessions it ends', async () => {
-      mockRepository.find.mockResolvedValue([
-        { id: 'r1', sessionId: 'keep' },
-        { id: 'r2', sessionId: 's-2' },
-        { id: 'r3', sessionId: 's-3' }
-      ]);
+    it('keeps the named session and counts the live sessions in the deleted rows', async () => {
+      const future = new Date(Date.now() + 60_000);
+      const past = new Date(Date.now() - 60_000);
+      mockQueryBuilder.execute.mockResolvedValue({
+        affected: 5,
+        raw: [
+          { session_id: 's-2', revoked: false, expires_at: future },
+          { session_id: 's-2', revoked: true, expires_at: future },
+          { session_id: 's-3', revoked: false, expires_at: future },
+          { session_id: 's-4', revoked: true, expires_at: future },
+          { session_id: 's-5', revoked: false, expires_at: past }
+        ]
+      });
 
       await expect(service.deleteOtherSessions('user-1', 'keep')).resolves.toBe(
         2
       );
+      expect(mockRepository.find).not.toHaveBeenCalled();
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
         'user_id = :userId AND session_id <> :keepSessionId',
         { userId: 'user-1', keepSessionId: 'keep' }
+      );
+    });
+
+    it('counts nothing when a concurrent request deleted the rows first', async () => {
+      mockQueryBuilder.execute.mockResolvedValue({ affected: 0, raw: [] });
+
+      await expect(service.deleteOtherSessions('user-1', 'keep')).resolves.toBe(
+        0
       );
     });
   });
