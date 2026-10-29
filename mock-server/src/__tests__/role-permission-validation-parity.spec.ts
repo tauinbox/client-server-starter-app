@@ -50,6 +50,8 @@ const ID = '11111111-1111-4111-8111-111111111111';
 const many = (count: number, value: unknown): unknown[] =>
   Array.from({ length: count }, () => value);
 
+const PERMISSION_IDS_UNIQUE = "All permissionIds's elements must be unique";
+const ITEMS_UNIQUE = "All items's elements must be unique";
 const PERMISSION_IDS_MISSING = [
   'each value in permissionIds must be a UUID',
   'permissionIds must contain no more than 500 elements',
@@ -99,6 +101,30 @@ describe('POST /roles/:id/permissions validation parity', () => {
       [
         'each value in permissionIds must be a UUID',
         'permissionIds must contain no more than 500 elements'
+      ]
+    ],
+    ['a repeated id', { permissionIds: [ID, ID] }, [PERMISSION_IDS_UNIQUE]],
+    [
+      '500 equal ids',
+      { permissionIds: many(500, ID) },
+      [PERMISSION_IDS_UNIQUE]
+    ],
+    [
+      'a repeated id that is not a UUID',
+      { permissionIds: ['bad', 'bad'] },
+      ['each value in permissionIds must be a UUID', PERMISSION_IDS_UNIQUE]
+    ],
+    [
+      'two equal objects in place of ids',
+      { permissionIds: [{}, {}] },
+      ['each value in permissionIds must be a UUID']
+    ],
+    [
+      'a repeated id and a bad effect',
+      { permissionIds: [ID, ID], conditions: { effect: 'x' } },
+      [
+        PERMISSION_IDS_UNIQUE,
+        'conditions.effect must be one of the following values: allow, deny'
       ]
     ],
     [
@@ -353,6 +379,47 @@ describe('PUT /roles/:id/permissions validation parity', () => {
         'each value in items must be an object',
         'items must contain no more than 500 elements'
       ]
+    ],
+    [
+      'a repeated permission id',
+      { items: [{ permissionId: ID }, { permissionId: ID }] },
+      [ITEMS_UNIQUE]
+    ],
+    [
+      'a repeated permission id with other conditions',
+      {
+        items: [
+          { permissionId: ID, conditions: null },
+          { permissionId: ID, conditions: { effect: 'deny' } }
+        ]
+      },
+      [ITEMS_UNIQUE]
+    ],
+    [
+      'a repeated permission id that is not a UUID',
+      { items: [{ permissionId: 'bad' }, { permissionId: 'bad' }] },
+      [
+        'items.0.permissionId must be a UUID',
+        'items.1.permissionId must be a UUID'
+      ]
+    ],
+    [
+      'two items with no permission id',
+      { items: [{}, {}] },
+      [
+        'items.0.permissionId must be a UUID',
+        'items.1.permissionId must be a UUID'
+      ]
+    ],
+    [
+      'a repeated permission id next to a bad item',
+      { items: [{ permissionId: ID }, { permissionId: ID, extra: 1 }] },
+      ['items.1.property extra should not exist']
+    ],
+    [
+      'two equal array items',
+      { items: [[{ permissionId: ID }], [{ permissionId: ID }]] },
+      ['each value in items must be an object']
     ],
     [
       '501 number items',

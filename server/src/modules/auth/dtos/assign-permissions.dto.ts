@@ -11,7 +11,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ArrayUniqueWithin } from '../../../common/validators/array-unique-within.validator';
 import { PermissionConditionDto } from './permission-condition.dto';
+
+const MAX_PERMISSION_ITEMS = 500;
 
 export class AssignPermissionsDto {
   @ApiProperty({
@@ -20,7 +23,8 @@ export class AssignPermissionsDto {
   })
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(500)
+  @ArrayMaxSize(MAX_PERMISSION_ITEMS)
+  @ArrayUniqueWithin(MAX_PERMISSION_ITEMS)
   @IsUUID('4', { each: true })
   permissionIds: string[];
 
@@ -49,13 +53,22 @@ export class PermissionItemDto {
   conditions?: PermissionConditionDto | null;
 }
 
+// An item that is not an object, or that has no permissionId, gets its own
+// key, so that only a repeated permissionId fails the uniqueness check.
+function permissionIdOf(item: unknown): unknown {
+  return typeof item === 'object' && item !== null && 'permissionId' in item
+    ? item.permissionId
+    : Symbol();
+}
+
 export class SetPermissionsDto {
   @ApiProperty({
     description: 'Full desired set of permissions for the role',
     type: [PermissionItemDto]
   })
   @IsArray()
-  @ArrayMaxSize(500)
+  @ArrayMaxSize(MAX_PERMISSION_ITEMS)
+  @ArrayUniqueWithin(MAX_PERMISSION_ITEMS, permissionIdOf)
   @IsObject({ each: true })
   @ValidateNested({ each: true })
   @Type(() => PermissionItemDto)

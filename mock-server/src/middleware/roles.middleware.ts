@@ -154,9 +154,30 @@ function conditionsErrors(parentPath: string, value: unknown): string[] {
   );
 }
 
+// Mirrors `@ArrayUniqueWithin(MAX_PERMISSION_ITEMS, identifier)`: a value that
+// is not an array or is over the cap passes, a null or undefined item is its
+// own key, and keys compare by value.
+function isUniqueArray(
+  value: unknown,
+  identifier: (item: unknown) => unknown = (item) => item
+): boolean {
+  if (!Array.isArray(value) || value.length > MAX_PERMISSION_ITEMS) return true;
+  const keys = value.map((item: unknown) =>
+    item != null ? identifier(item) : item
+  );
+  return new Set(keys).size === keys.length;
+}
+
+// Mirrors `permissionIdOf` of SetPermissionsDto.
+function permissionIdOf(item: unknown): unknown {
+  return typeof item === 'object' && item !== null && 'permissionId' in item
+    ? item.permissionId
+    : Symbol();
+}
+
 // Mirrors AssignPermissionsDto. `permissionIds` carries `@IsArray()
-// @ArrayNotEmpty() @ArrayMaxSize(500) @IsUUID('4', { each: true })`, reported
-// bottom-up.
+// @ArrayNotEmpty() @ArrayMaxSize(500) @ArrayUniqueWithin(MAX_PERMISSION_ITEMS)
+// @IsUUID('4', { each: true })`, reported bottom-up.
 function assignPermissionsErrors(body: Record<string, unknown>): string[] {
   const ids = body['permissionIds'];
   const isArray = Array.isArray(ids);
@@ -165,6 +186,9 @@ function assignPermissionsErrors(body: Record<string, unknown>): string[] {
     ...((isArray ? ids : [ids]).some((id) => !isUuidV4(id))
       ? ['each value in permissionIds must be a UUID']
       : []),
+    ...(isUniqueArray(ids)
+      ? []
+      : ["All permissionIds's elements must be unique"]),
     ...(!isArray || ids.length > MAX_PERMISSION_ITEMS
       ? [
           `permissionIds must contain no more than ${MAX_PERMISSION_ITEMS} elements`
@@ -191,7 +215,8 @@ function permissionItemErrors(path: string, value: object): string[] {
 }
 
 // Mirrors SetPermissionsDto. `items` carries `@IsArray() @ArrayMaxSize(500)
-// @IsObject({ each: true }) @ValidateNested({ each: true })`.
+// @ArrayUniqueWithin(MAX_PERMISSION_ITEMS, permissionIdOf) @IsObject({ each: true })
+// @ValidateNested({ each: true })`.
 function setPermissionsErrors(body: Record<string, unknown>): string[] {
   const items = body['items'];
   const isArray = Array.isArray(items);
@@ -201,6 +226,9 @@ function setPermissionsErrors(body: Record<string, unknown>): string[] {
     ...((isArray ? items : [items]).some((item) => !isPlainObject(item))
       ? ['each value in items must be an object']
       : []),
+    ...(isUniqueArray(items, permissionIdOf)
+      ? []
+      : ["All items's elements must be unique"]),
     ...(!isArray || items.length > MAX_PERMISSION_ITEMS
       ? [`items must contain no more than ${MAX_PERMISSION_ITEMS} elements`]
       : []),
