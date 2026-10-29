@@ -334,7 +334,7 @@ describe('body validation precedes the entity lookup', () => {
       path: `/api/v1/roles/${UNKNOWN}/permissions`,
       malformed: { items: 'not-an-array' },
       malformedMessage:
-        "each value in items must be an object. All items's elements must be unique. items must contain no more than 500 elements. items must be an array. each value in nested property items must be either object or array",
+        'each value in items must be an object. items must contain no more than 500 elements. items must be an array. each value in nested property items must be either object or array',
       wellFormed: { items: [] },
       notFoundKey: ErrorKeys.ROLES.NOT_FOUND
     },

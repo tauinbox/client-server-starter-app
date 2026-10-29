@@ -1,7 +1,6 @@
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
-  ArrayUnique,
   IsArray,
   IsNotEmpty,
   IsObject,
@@ -12,7 +11,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ArrayUniqueWithin } from '../../../common/validators/array-unique-within.validator';
 import { PermissionConditionDto } from './permission-condition.dto';
+
+const MAX_PERMISSION_ITEMS = 500;
 
 export class AssignPermissionsDto {
   @ApiProperty({
@@ -21,8 +23,8 @@ export class AssignPermissionsDto {
   })
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(500)
-  @ArrayUnique()
+  @ArrayMaxSize(MAX_PERMISSION_ITEMS)
+  @ArrayUniqueWithin(MAX_PERMISSION_ITEMS)
   @IsUUID('4', { each: true })
   permissionIds: string[];
 
@@ -65,8 +67,8 @@ export class SetPermissionsDto {
     type: [PermissionItemDto]
   })
   @IsArray()
-  @ArrayMaxSize(500)
-  @ArrayUnique(permissionIdOf)
+  @ArrayMaxSize(MAX_PERMISSION_ITEMS)
+  @ArrayUniqueWithin(MAX_PERMISSION_ITEMS, permissionIdOf)
   @IsObject({ each: true })
   @ValidateNested({ each: true })
   @Type(() => PermissionItemDto)

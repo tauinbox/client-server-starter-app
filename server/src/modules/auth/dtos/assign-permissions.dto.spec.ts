@@ -37,6 +37,16 @@ describe('permission DTOs refuse a repeated permission id', () => {
     ).resolves.toEqual(["All permissionIds's elements must be unique"]);
   });
 
+  it('AssignPermissionsDto skips the uniqueness check over the size cap', async () => {
+    await expect(
+      errors(AssignPermissionsDto, {
+        permissionIds: Array.from({ length: 501 }, () => ID)
+      })
+    ).resolves.toEqual([
+      'permissionIds must contain no more than 500 elements'
+    ]);
+  });
+
   it('AssignPermissionsDto accepts two different ids', async () => {
     await expect(
       errors(AssignPermissionsDto, { permissionIds: [ID, OTHER_ID] })

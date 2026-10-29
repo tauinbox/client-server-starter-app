@@ -54,7 +54,6 @@ const PERMISSION_IDS_UNIQUE = "All permissionIds's elements must be unique";
 const ITEMS_UNIQUE = "All items's elements must be unique";
 const PERMISSION_IDS_MISSING = [
   'each value in permissionIds must be a UUID',
-  PERMISSION_IDS_UNIQUE,
   'permissionIds must contain no more than 500 elements',
   'permissionIds should not be empty',
   'permissionIds must be an array'
@@ -94,21 +93,22 @@ describe('POST /roles/:id/permissions validation parity', () => {
     [
       '501 ids',
       { permissionIds: many(501, ID) },
-      [
-        PERMISSION_IDS_UNIQUE,
-        'permissionIds must contain no more than 500 elements'
-      ]
+      ['permissionIds must contain no more than 500 elements']
     ],
     [
       '501 ids that are not UUIDs',
       { permissionIds: many(501, 'x') },
       [
         'each value in permissionIds must be a UUID',
-        PERMISSION_IDS_UNIQUE,
         'permissionIds must contain no more than 500 elements'
       ]
     ],
     ['a repeated id', { permissionIds: [ID, ID] }, [PERMISSION_IDS_UNIQUE]],
+    [
+      '500 equal ids',
+      { permissionIds: many(500, ID) },
+      [PERMISSION_IDS_UNIQUE]
+    ],
     [
       'a repeated id that is not a UUID',
       { permissionIds: ['bad', 'bad'] },
@@ -258,7 +258,6 @@ describe('PUT /roles/:id/permissions validation parity', () => {
       {},
       [
         'each value in items must be an object',
-        ITEMS_UNIQUE,
         'items must contain no more than 500 elements',
         'items must be an array'
       ]
@@ -269,7 +268,6 @@ describe('PUT /roles/:id/permissions validation parity', () => {
       [
         'property extra should not exist',
         'each value in items must be an object',
-        ITEMS_UNIQUE,
         'items must contain no more than 500 elements',
         'items must be an array',
         NESTED_ITEM
@@ -280,7 +278,6 @@ describe('PUT /roles/:id/permissions validation parity', () => {
       { items: null },
       [
         'each value in items must be an object',
-        ITEMS_UNIQUE,
         'items must contain no more than 500 elements',
         'items must be an array',
         NESTED_ITEM
@@ -368,7 +365,7 @@ describe('PUT /roles/:id/permissions validation parity', () => {
     [
       '501 items',
       { items: many(501, { permissionId: ID }) },
-      [ITEMS_UNIQUE, 'items must contain no more than 500 elements']
+      ['items must contain no more than 500 elements']
     ],
     [
       '501 items with a bad first item',
@@ -380,7 +377,6 @@ describe('PUT /roles/:id/permissions validation parity', () => {
       { items: [[], ...many(500, { permissionId: ID })] },
       [
         'each value in items must be an object',
-        ITEMS_UNIQUE,
         'items must contain no more than 500 elements'
       ]
     ],
