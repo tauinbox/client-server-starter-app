@@ -14,6 +14,10 @@ import {
  * login, the profile update (the long window only) and the email-change
  * initiation (3 per hour). `ThrottlerGuard.generateKey` hashes the handler name
  * into the storage key, so each route keeps a counter of its own.
+ *
+ * Each step-up route also carries `@CountFailuresOnlyWhenBody`: an account with
+ * no password proves itself with the `reauth_proof` cookie, and a request that
+ * presents no secret must not spend the budget that guards one.
  */
 export const CHALLENGE_THROTTLE = {
   default: { ttl: 60000, limit: 5 },

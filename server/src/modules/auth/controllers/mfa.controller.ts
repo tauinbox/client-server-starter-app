@@ -37,6 +37,7 @@ import {
 import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
+import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
 import { AuthCookies } from '../utils/auth-cookies';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
@@ -56,6 +57,7 @@ export class MfaController {
   ) {}
 
   @Throttle(CHALLENGE_THROTTLE)
+  @CountFailuresOnlyWhenBody('currentPassword')
   @Post('setup')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -118,6 +120,7 @@ export class MfaController {
   }
 
   @Throttle(CHALLENGE_THROTTLE)
+  @CountFailuresOnlyWhenBody('currentPassword', 'code')
   @Post('disable')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -148,6 +151,7 @@ export class MfaController {
   }
 
   @Throttle(CHALLENGE_THROTTLE)
+  @CountFailuresOnlyWhenBody('currentPassword', 'code')
   @Post('recovery-codes')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
