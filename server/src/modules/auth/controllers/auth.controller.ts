@@ -402,8 +402,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify email address using token' })
   @ApiBody({ type: VerifyEmailDto })
   @ApiOkResponse({ description: 'Email verified successfully' })
-  verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-    return this.authService.verifyEmail(verifyEmailDto.token);
+  verifyEmail(
+    @Body() verifyEmailDto: VerifyEmailDto,
+    @Request() req: ExpressRequest
+  ) {
+    return this.authService.verifyEmail(
+      verifyEmailDto.token,
+      extractAuditContext(req)
+    );
   }
 
   @Public()

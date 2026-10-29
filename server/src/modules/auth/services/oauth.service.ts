@@ -109,6 +109,17 @@ export class OAuthService {
           user.id,
           { email: user.email }
         );
+        if (user.isEmailVerified) {
+          this.auditService.logFireAndForget({
+            action: AuditAction.EMAIL_VERIFIED,
+            actorId: user.id,
+            actorEmail: user.email,
+            targetId: user.id,
+            targetType: 'User',
+            details: { source: 'oauth', provider: profile.provider },
+            context: auditContext
+          });
+        }
       }
     } else {
       // Canonicalized again here rather than trusted from the strategy: this is
