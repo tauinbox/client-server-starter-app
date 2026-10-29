@@ -1,0 +1,22 @@
+{
+  "scenarios": [
+    {
+      "name": "a duplicate permission id is refused before the role is read",
+      "route": "POST /api/v1/roles/role-admin/permissions",
+      "path": "/api/v1/roles/7d0f4c3e-2b8a-4f6e-9c1d-5a3b2e1f0a9c/permissions",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "permissionIds": [
+          "3c2b1a09-8f7e-4d6c-b5a4-938271605f4e",
+          "3c2b1a09-8f7e-4d6c-b5a4-938271605f4e"
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": null,
+        "audit": []
+      }
+    }
+  ]
+}

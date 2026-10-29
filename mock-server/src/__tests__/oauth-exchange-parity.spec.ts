@@ -66,7 +66,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
 
     const res = await exchange(token);
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     const body = (await res.json()) as {
       tokens: Record<string, unknown>;
       user: { id: string; email: string };
@@ -93,7 +93,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     const token = await issueOAuthData(admin!.id);
     const res = await exchange(token);
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({
       mfaRequired: true,
       expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
@@ -163,7 +163,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);
 
-    expect((await exchange(token)).status).toBe(200);
+    expect((await exchange(token)).status).toBe(201);
     expect((await exchange(token)).status).toBe(401);
   });
 
@@ -193,7 +193,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
       devices[devices.length - 1]
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(liveTokensOf(admin!.id)).toBe(MAX_CONCURRENT_SESSIONS);
     const refresh = (cookie: string) =>
       fetch(`${baseUrl}/api/v1/auth/refresh-token`, {

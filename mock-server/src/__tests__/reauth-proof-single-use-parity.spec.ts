@@ -61,7 +61,7 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
-  expect(exchange.status).toBe(200);
+  expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as { tokens: { access_token: string } };
   return body.tokens.access_token;
 }
@@ -165,7 +165,7 @@ describe('a reauth proof is spent on its first successful use', () => {
 
     const accepted = await linkInit(token, proof);
 
-    expect(accepted.status).toBe(200);
+    expect(accepted.status).toBe(201);
     expect(clearsTheProof(accepted)).toBe(true);
   });
 
@@ -173,7 +173,7 @@ describe('a reauth proof is spent on its first successful use', () => {
     const token = await accessToken(OAUTH_ONLY_ID);
     const proof = await issueProof(OAUTH_ONLY_ID, STEP_UP_OPERATION.OAUTH_LINK);
 
-    expect((await linkInit(token, proof)).status).toBe(200);
+    expect((await linkInit(token, proof)).status).toBe(201);
 
     const second = await linkInit(token, proof);
 

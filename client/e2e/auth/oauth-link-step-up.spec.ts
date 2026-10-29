@@ -147,7 +147,7 @@ test.describe('Linking a provider demands a step-up', () => {
     await prompt.getByRole('button', { name: 'Continue' }).click();
 
     const response = await accepted;
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(201);
     expect(response.request().postDataJSON()).toEqual({
       currentPassword: 'Password1'
     });
@@ -227,7 +227,7 @@ test.describe('Linking a provider demands a step-up', () => {
     await page.goto('/profile?reauth=ok');
 
     const response = await accepted;
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(201);
     await page.waitForURL(/\/api\/v1\/auth\/oauth\/facebook/, {
       timeout: 15_000
     });

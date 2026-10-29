@@ -56,7 +56,7 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
-  expect(exchange.status).toBe(200);
+  expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as {
     tokens: { access_token: string };
   };
@@ -131,7 +131,7 @@ describe('POST /api/v1/auth/oauth/link-init demands a step-up', () => {
 
     const res = await linkInit(token, { currentPassword: PASSWORD });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ message: 'Link initiated' });
   });
 
@@ -142,7 +142,7 @@ describe('POST /api/v1/auth/oauth/link-init demands a step-up', () => {
 
     const res = await linkInit(token, {}, proof);
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
   });
 
   it('refuses a proof minted for another operation', async () => {

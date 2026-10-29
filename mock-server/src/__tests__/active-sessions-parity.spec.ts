@@ -70,7 +70,7 @@ async function providerSignIn(userId: string): Promise<Device> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
-  expect(exchange.status).toBe(200);
+  expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as { tokens: { access_token: string } };
   return withSessionId(body.tokens.access_token);
 }

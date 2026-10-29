@@ -1,0 +1,110 @@
+{
+  "scenarios": [
+    {
+      "name": "the current password unlinks a provider",
+      "route": "DELETE /api/v1/auth/oauth/accounts/google",
+      "path": "/api/v1/auth/oauth/accounts/vk",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "vk-linked"
+      ],
+      "body": {
+        "currentPassword": "$password"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "OAUTH_UNLINK"
+        ]
+      }
+    },
+    {
+      "name": "the oauth_data cookie signs in",
+      "route": "POST /api/v1/auth/oauth/exchange",
+      "actor": "oauth-only",
+      "auth": "none",
+      "state": [
+        "oauth-data"
+      ],
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "USER_LOGIN_SUCCESS"
+        ]
+      }
+    },
+    {
+      "name": "the current password starts a provider link",
+      "route": "POST /api/v1/auth/oauth/link-init",
+      "actor": "user",
+      "auth": "bearer",
+      "body": {
+        "currentPassword": "$password"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "an account with no password starts a provider step-up",
+      "route": "POST /api/v1/auth/oauth/reauth-init",
+      "actor": "oauth-only",
+      "auth": "bearer",
+      "body": {
+        "operation": "email_change"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "an empty body on a provider link costs no sign-in budget",
+      "route": "POST /api/v1/auth/oauth/link-init",
+      "actor": "oauth-only",
+      "auth": "bearer",
+      "body": {},
+      "repeat": 5,
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.auth.reauthRequired",
+        "audit": [
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE"
+        ]
+      }
+    },
+    {
+      "name": "an empty body on a provider unlink costs no sign-in budget",
+      "route": "DELETE /api/v1/auth/oauth/accounts/google",
+      "path": "/api/v1/auth/oauth/accounts/vk",
+      "actor": "oauth-only",
+      "auth": "bearer",
+      "state": [
+        "vk-linked"
+      ],
+      "body": {},
+      "repeat": 5,
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.auth.reauthRequired",
+        "audit": [
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE"
+        ]
+      }
+    }
+  ]
+}

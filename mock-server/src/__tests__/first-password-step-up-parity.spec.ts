@@ -53,7 +53,7 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
-  expect(exchange.status).toBe(200);
+  expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as {
     tokens: { access_token: string };
   };
@@ -229,6 +229,6 @@ describe('POST /api/v1/auth/oauth/reauth-init validates the operation', () => {
       body: JSON.stringify({ operation: STEP_UP_OPERATION.PASSWORD_SET })
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
   });
 });

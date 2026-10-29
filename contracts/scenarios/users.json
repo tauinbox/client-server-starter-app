@@ -1,0 +1,25 @@
+{
+  "scenarios": [
+    {
+      "name": "an empty body on an admin authenticator reset costs no sign-in budget",
+      "route": "POST /api/v1/users/1/mfa/reset",
+      "path": "/api/v1/users/$targetId/mfa/reset",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user-mfa",
+      "body": {},
+      "repeat": 5,
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.auth.invalidCurrentPassword",
+        "audit": [
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE",
+          "STEP_UP_FAILURE"
+        ]
+      }
+    }
+  ]
+}
