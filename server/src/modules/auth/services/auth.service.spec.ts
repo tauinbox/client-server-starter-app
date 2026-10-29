@@ -127,6 +127,7 @@ describe('AuthService', () => {
   let mockEventEmitter: { emit: jest.Mock };
   let mockMfaService: {
     isValidStepUpCode: jest.Mock;
+    stepUpLockedException: jest.Mock;
   };
 
   const mockUserRole = {
@@ -316,7 +317,10 @@ describe('AuthService', () => {
     };
 
     mockMfaService = {
-      isValidStepUpCode: jest.fn().mockResolvedValue('not_offered')
+      isValidStepUpCode: jest.fn().mockResolvedValue({ kind: 'not_offered' }),
+      stepUpLockedException: jest.fn((remainingMs: number) =>
+        MfaService.prototype.stepUpLockedException(remainingMs)
+      )
     };
 
     mockEventEmitter = { emit: jest.fn() };
@@ -2326,7 +2330,9 @@ describe('AuthService', () => {
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockMfaService.isValidStepUpCode.mockImplementation(
         (_user: User, code: string | undefined) =>
-          Promise.resolve(code === '123456' ? 'accepted' : 'not_offered')
+          Promise.resolve({
+            kind: code === '123456' ? 'accepted' : 'not_offered'
+          })
       );
 
       await expect(
@@ -2353,7 +2359,9 @@ describe('AuthService', () => {
       const user = { id: 'user-1', password: null } as User;
       mockMfaService.isValidStepUpCode.mockImplementation(
         (_user: User, code: string | undefined) =>
-          Promise.resolve(code === '123456' ? 'accepted' : 'not_offered')
+          Promise.resolve({
+            kind: code === '123456' ? 'accepted' : 'not_offered'
+          })
       );
 
       await expect(
@@ -2373,7 +2381,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: null
       } as User;
-      mockMfaService.isValidStepUpCode.mockResolvedValue('refused');
+      mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
 
       await expect(
         service.assertStepUp(
@@ -2399,10 +2407,50 @@ describe('AuthService', () => {
       );
     });
 
+    it('audits the code that bars the authenticator, then answers with the lock', async () => {
+      const compare = jest.spyOn(bcrypt, 'compare').mockClear();
+      const user = {
+        id: 'user-1',
+        email: 'user@example.com',
+        password: '$2b$12$hash'
+      } as User;
+      mockMfaService.isValidStepUpCode.mockResolvedValue({
+        kind: 'refused',
+        lockedMs: 60_000
+      });
+
+      await expect(
+        service.assertStepUp(
+          user,
+          'WrongPass1',
+          undefined,
+          STEP_UP_OPERATION.MFA_DISABLE,
+          '000000'
+        )
+      ).rejects.toMatchObject({
+        status: HttpStatus.LOCKED,
+        response: { errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED }
+      });
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.STEP_UP_FAILURE,
+          actorId: 'user-1',
+          actorEmail: 'user@example.com',
+          details: {
+            operation: STEP_UP_OPERATION.MFA_DISABLE,
+            factor: 'code',
+            codeOffered: true
+          }
+        })
+      );
+      // The password is not checked after the code that barred the account.
+      expect(compare).not.toHaveBeenCalled();
+    });
+
     it('names the code when a wrong code is the only factor of an account with a password', async () => {
       const compare = jest.spyOn(bcrypt, 'compare').mockClear();
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
-      mockMfaService.isValidStepUpCode.mockResolvedValue('refused');
+      mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
 
       await expect(
         service.assertStepUp(
@@ -2422,7 +2470,7 @@ describe('AuthService', () => {
     it('still accepts a valid provider proof after a wrong code', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
-      mockMfaService.isValidStepUpCode.mockResolvedValue('refused');
+      mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
@@ -2452,7 +2500,9 @@ describe('AuthService', () => {
       mockMfaService.isValidStepUpCode.mockClear();
       mockMfaService.isValidStepUpCode.mockImplementation(
         (_user: User, code: string | undefined) =>
-          Promise.resolve(code === '123456' ? 'accepted' : 'not_offered')
+          Promise.resolve({
+            kind: code === '123456' ? 'accepted' : 'not_offered'
+          })
       );
 
       await expect(
@@ -2476,7 +2526,7 @@ describe('AuthService', () => {
     it('accepts a valid authenticator code in place of the password', async () => {
       const compare = jest.spyOn(bcrypt, 'compare').mockClear();
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
-      mockMfaService.isValidStepUpCode.mockResolvedValue('accepted');
+      mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'accepted' });
 
       await expect(
         service.assertStepUp(
@@ -2498,7 +2548,7 @@ describe('AuthService', () => {
       } as User;
       // The code was wrong too, but the password that was offered and checked
       // is the factor that the refusal names.
-      mockMfaService.isValidStepUpCode.mockResolvedValue('refused');
+      mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
@@ -2538,7 +2588,9 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: null
       } as User;
-      mockMfaService.isValidStepUpCode.mockResolvedValue('not_offered');
+      mockMfaService.isValidStepUpCode.mockResolvedValue({
+        kind: 'not_offered'
+      });
 
       await expect(
         service.assertStepUp(
@@ -2565,7 +2617,9 @@ describe('AuthService', () => {
 
     it('writes no row when the caller proves itself', async () => {
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
-      mockMfaService.isValidStepUpCode.mockResolvedValue('not_offered');
+      mockMfaService.isValidStepUpCode.mockResolvedValue({
+        kind: 'not_offered'
+      });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
       await service.assertStepUp(
@@ -2616,7 +2670,9 @@ describe('AuthService', () => {
       }
 
       beforeEach(() => {
-        mockMfaService.isValidStepUpCode.mockResolvedValue('not_offered');
+        mockMfaService.isValidStepUpCode.mockResolvedValue({
+          kind: 'not_offered'
+        });
       });
 
       it('bars the account after the same number of tries the sign-in gets', async () => {
@@ -2841,7 +2897,9 @@ describe('AuthService', () => {
       });
       mockMfaService.isValidStepUpCode.mockImplementation(
         (_user: User, code: string | undefined) =>
-          Promise.resolve(code === '123456' ? 'accepted' : 'not_offered')
+          Promise.resolve({
+            kind: code === '123456' ? 'accepted' : 'not_offered'
+          })
       );
 
       await service.initiateEmailChange('user-1', {

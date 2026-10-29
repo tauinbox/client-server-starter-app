@@ -137,6 +137,7 @@ describe('OAuthController', () => {
       sign: jest.fn().mockReturnValue('signed-link-token'),
       verify: jest.fn().mockReturnValue({
         sub: 'user-1',
+        email: 'test@example.com',
         purpose: TOKEN_PURPOSE.OAUTH_LINK,
         iat: LINK_TOKEN_IAT
       })
@@ -448,6 +449,28 @@ describe('OAuthController', () => {
     });
   });
 
+  describe('initOAuthReauth', () => {
+    it('signs the operation and the email of the caller into the intent', () => {
+      const res = mockResponse();
+
+      controller.initOAuthReauth(
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        { operation: STEP_UP_OPERATION.EMAIL_CHANGE },
+        res
+      );
+
+      expect(jwtServiceMock.sign).toHaveBeenCalledWith(
+        {
+          sub: 'user-1',
+          email: 'test@example.com',
+          purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+          operation: STEP_UP_OPERATION.EMAIL_CHANGE
+        },
+        { expiresIn: 300 }
+      );
+    });
+  });
+
   describe('initOAuthLink', () => {
     it('should set oauth_link cookie and return message', async () => {
       const res = mockResponse();
@@ -460,7 +483,11 @@ describe('OAuthController', () => {
       );
 
       expect(jwtServiceMock.sign).toHaveBeenCalledWith(
-        { sub: 'user-1', purpose: TOKEN_PURPOSE.OAUTH_LINK },
+        {
+          sub: 'user-1',
+          email: 'test@example.com',
+          purpose: TOKEN_PURPOSE.OAUTH_LINK
+        },
         { expiresIn: 300 }
       );
       expect(res.cookie).toHaveBeenCalledWith(
@@ -927,6 +954,7 @@ describe('OAuthController', () => {
       expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
         action: AuditAction.OAUTH_LINK_FAILURE,
         actorId: 'user-1',
+        actorEmail: 'test@example.com',
         targetId: 'user-1',
         targetType: 'User',
         details: {
@@ -953,6 +981,7 @@ describe('OAuthController', () => {
       beforeEach(() => {
         jwtServiceMock.verify.mockReturnValue({
           sub: 'user-1',
+          email: 'test@example.com',
           purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
           operation: STEP_UP_OPERATION.EMAIL_CHANGE,
           iat: LINK_TOKEN_IAT
@@ -980,6 +1009,7 @@ describe('OAuthController', () => {
         expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
           action: AuditAction.STEP_UP_FAILURE,
           actorId: 'user-1',
+          actorEmail: 'test@example.com',
           targetId: 'user-1',
           targetType: 'User',
           details: {

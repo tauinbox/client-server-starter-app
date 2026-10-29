@@ -63,9 +63,14 @@ const STEP_UP_FAILURE_KEY_PREFIX = 'mfa:step-up-failures:';
 
 /**
  * What the code of one step-up proved. A refused code is not the same as no
- * code: the refusal must name the factor the caller offered.
+ * code: the refusal must name the factor the caller offered. `lockedMs` is set
+ * only on the refusal that bars the account, so the caller can write its audit
+ * row before it answers with the lock.
  */
-export type StepUpCodeVerdict = 'accepted' | 'refused' | 'not_offered';
+export type StepUpCodeVerdict =
+  | { kind: 'accepted' }
+  | { kind: 'not_offered' }
+  | { kind: 'refused'; lockedMs?: number };
 
 @Injectable()
 export class MfaService {
@@ -482,7 +487,7 @@ export class MfaService {
     // at all. Counting those would let an ordinary password step-up burn the
     // budget of an account that never offered a code.
     if (user.totpEnabledAt === null || !code) {
-      return 'not_offered';
+      return { kind: 'not_offered' };
     }
 
     // Reserve before checking, for the reason given in verifyChallenge.
@@ -498,15 +503,15 @@ export class MfaService {
       this.recordChallengeFailure(user, 'step_up', context, count);
 
       if (count >= MAX_FAILED_ATTEMPTS) {
-        throw this.stepUpLockedException(remainingMs);
+        return { kind: 'refused', lockedMs: remainingMs };
       }
       // The caller may still hold a password, so a wrong code is a refusal of
       // this factor rather than of the whole step-up.
-      return 'refused';
+      return { kind: 'refused' };
     }
 
     await this.#stepUpFailures.clear(user.id);
-    return 'accepted';
+    return { kind: 'accepted' };
   }
 
   private async userFromPendingToken(mfaToken: string): Promise<User> {
@@ -710,7 +715,7 @@ export class MfaService {
    * recovery code: that route answers a sign-in challenge, and it opens no
    * step-up.
    */
-  private stepUpLockedException(remainingMs: number): ApiError {
+  stepUpLockedException(remainingMs: number): ApiError {
     return lockedException(
       'Too many incorrect verification codes. Try again later',
       ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,

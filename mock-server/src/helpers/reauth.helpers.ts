@@ -235,7 +235,8 @@ export interface StepUpErrorEnvelope {
 function stepUpCodeError(
   req: Request,
   user: MockUser,
-  code: unknown
+  code: unknown,
+  operation: StepUpOperation
 ): StepUpErrorEnvelope | null | 'refused' | undefined {
   if (!user.totpEnabledAt || !code) {
     return undefined;
@@ -257,9 +258,11 @@ function stepUpCodeError(
       details: { stage: 'step_up', attempt: count },
       ip: req.ip
     });
-    return count >= MAX_FAILED_ATTEMPTS
-      ? stepUpLockedEnvelope(remainingMs)
-      : 'refused';
+    if (count >= MAX_FAILED_ATTEMPTS) {
+      logStepUpFailure(req, user, operation, 'code', true);
+      return stepUpLockedEnvelope(remainingMs);
+    }
+    return 'refused';
   }
 
   clearFailures(windows, user.id);
@@ -349,7 +352,8 @@ export function stepUpError(
     user,
     operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
       ? undefined
-      : code
+      : code,
+    operation
   );
   if (codeVerdict !== undefined && codeVerdict !== 'refused') {
     return codeVerdict;

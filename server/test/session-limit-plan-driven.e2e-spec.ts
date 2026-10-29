@@ -188,7 +188,9 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
           // never taken.
           provide: MfaService,
           useValue: {
-            isValidStepUpCode: jest.fn().mockResolvedValue('not_offered'),
+            isValidStepUpCode: jest
+              .fn()
+              .mockResolvedValue({ kind: 'not_offered' }),
             issuePendingToken: jest
               .fn()
               .mockReturnValue({ mfaToken: 'mfa', expiresIn: 300 })

@@ -162,7 +162,11 @@ export class OAuthController {
     );
 
     const linkToken = this.jwtService.sign(
-      { sub: req.user.userId, purpose: TOKEN_PURPOSE.OAUTH_LINK },
+      {
+        sub: req.user.userId,
+        email: req.user.email,
+        purpose: TOKEN_PURPOSE.OAUTH_LINK
+      },
       { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
     );
 
@@ -204,6 +208,7 @@ export class OAuthController {
     const reauthToken = this.jwtService.sign(
       {
         sub: req.user.userId,
+        email: req.user.email,
         purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
         operation: dto.operation
       },
@@ -555,10 +560,16 @@ export class OAuthController {
   ): Promise<void> {
     this.cookies.clear(res, OAUTH_REAUTH_COOKIE);
 
-    let payload: { sub: string; operation?: string; iat: number } | null = null;
+    let payload: {
+      sub: string;
+      email?: string;
+      operation?: string;
+      iat: number;
+    } | null = null;
     try {
       payload = this.purposeTokens.verify<{
         sub: string;
+        email?: string;
         operation?: string;
       }>(reauthToken, TOKEN_PURPOSE.OAUTH_REAUTH);
       if (!payload) {
@@ -602,6 +613,7 @@ export class OAuthController {
         this.auditService.logFireAndForget({
           action: AuditAction.STEP_UP_FAILURE,
           actorId: payload.sub,
+          actorEmail: payload.email,
           targetId: payload.sub,
           targetType: 'User',
           details: {
@@ -629,15 +641,17 @@ export class OAuthController {
     this.cookies.clear(res, OAUTH_LINK_COOKIE);
 
     let userId: string | null = null;
+    let userEmail: string | undefined;
     try {
-      const payload = this.purposeTokens.verify<{ sub: string }>(
-        linkToken,
-        TOKEN_PURPOSE.OAUTH_LINK
-      );
+      const payload = this.purposeTokens.verify<{
+        sub: string;
+        email?: string;
+      }>(linkToken, TOKEN_PURPOSE.OAUTH_LINK);
       if (!payload) {
         throw new Error('Invalid link token');
       }
       userId = payload.sub;
+      userEmail = payload.email;
 
       await this.oauthService.linkOAuthToUser(
         userId,
@@ -655,6 +669,7 @@ export class OAuthController {
         this.auditService.logFireAndForget({
           action: AuditAction.OAUTH_LINK_FAILURE,
           actorId: userId,
+          actorEmail: userEmail,
           targetId: userId,
           targetType: 'User',
           details: {

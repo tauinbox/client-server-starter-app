@@ -138,7 +138,8 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
 
     await burst(async () => {
       if (
-        (await mfaService.isValidStepUpCode(user, WRONG_CODE)) !== 'accepted'
+        (await mfaService.isValidStepUpCode(user, WRONG_CODE)).kind !==
+        'accepted'
       ) {
         throw new Error('refused');
       }
