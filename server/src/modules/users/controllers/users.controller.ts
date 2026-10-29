@@ -400,6 +400,7 @@ export class UsersController {
   // For an owner who lost the authenticator and every recovery code. A self
   // target is refused: `POST /auth/mfa/disable` demands the owner's factor.
   @Throttle({ 'login-long-window': CHALLENGE_THROTTLE['login-long-window'] })
+  @CountFailuresOnlyWhenBody('currentPassword', 'code')
   @Post(':id/mfa/reset')
   @HttpCode(HttpStatus.OK)
   @Authorize(['update', 'User'])
