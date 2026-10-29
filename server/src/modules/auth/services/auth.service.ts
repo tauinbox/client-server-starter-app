@@ -1069,7 +1069,9 @@ export class AuthService {
     });
 
     if (lockedMs !== undefined) {
-      throw this.stepUpPasswordLockedException(lockedMs);
+      throw factor === 'code'
+        ? this.mfaService.stepUpLockedException(lockedMs)
+        : this.stepUpPasswordLockedException(lockedMs);
     }
 
     const refusal = STEP_UP_REFUSALS[factor];
@@ -1102,14 +1104,19 @@ export class AuthService {
       code,
       auditContext
     );
-    if (codeVerdict === 'accepted') {
+    if (codeVerdict.kind === 'accepted') {
       return { factor: null };
+    }
+    // The code that bars the authenticator ends the step-up: no other factor
+    // is checked after it, as on the attempt that bars the password.
+    if (codeVerdict.kind === 'refused' && codeVerdict.lockedMs !== undefined) {
+      return { factor: 'code', lockedMs: codeVerdict.lockedMs };
     }
     // A wrong code still falls through to the other factor. When that factor
     // also fails without a password check, the refusal names the code that
     // the caller typed, not a factor the caller never offered.
     const refusal = (factor: 'password' | 'reauth_proof'): StepUpVerdict => ({
-      factor: codeVerdict === 'refused' ? 'code' : factor
+      factor: codeVerdict.kind === 'refused' ? 'code' : factor
     });
 
     if (user.password === null) {

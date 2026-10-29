@@ -1,5 +1,9 @@
 import type { Server } from 'http';
-import { STEP_UP_OPERATION } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  MAX_FAILED_ATTEMPTS,
+  STEP_UP_OPERATION
+} from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -124,6 +128,37 @@ describe('a refused step-up is audited', () => {
       codeOffered: true
     });
     expect(JSON.stringify(failureRows())).not.toContain('000000');
+  });
+
+  it('audits every wrong code, including the one that bars the authenticator', async () => {
+    const token = await accessToken();
+    // Enrolled after the sign-in, which would otherwise answer with a challenge.
+    const user = [...getState().users.values()].find(
+      (u) => u.email === CREDENTIALS.email
+    ) as MockUser;
+    user.totpEnabledAt = '2025-01-01T00:00:00.000Z';
+
+    const statuses: number[] = [];
+    let last: { errorKey?: string } = {};
+    for (let i = 0; i < MAX_FAILED_ATTEMPTS; i += 1) {
+      const res = await post('/auth/mfa/disable', { code: '000000' }, token);
+      statuses.push(res.status);
+      last = (await res.json()) as { errorKey?: string };
+    }
+
+    expect(statuses.at(-1)).toBe(423);
+    expect(last.errorKey).toBe(ErrorKeys.AUTH.MFA_STEP_UP_LOCKED);
+    expect(failureRows()).toHaveLength(MAX_FAILED_ATTEMPTS);
+    for (const row of failureRows()) {
+      expect(row).toMatchObject({
+        actorEmail: CREDENTIALS.email,
+        details: {
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          factor: 'code',
+          codeOffered: true
+        }
+      });
+    }
   });
 
   it('audits a missing provider proof on a first password', async () => {

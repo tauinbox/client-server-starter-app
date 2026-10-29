@@ -1354,7 +1354,9 @@ firing wrong codes at the disable route. That is an availability fan-out rather 
 and it is the same one the recovery route is kept open to prevent. A step-up that offers no code
 never touches the counter: every step-up reaches that method, `PATCH /auth/profile` and
 `POST /auth/oauth/link-init` included, and counting those would let an ordinary password step-up
-burn the budget of an account that never offered a code.
+burn the budget of an account that never offered a code. The wrong code that spends the last of the
+budget does not throw: it returns `{ kind: 'refused', lockedMs }`, so `assertStepUp` writes its
+`STEP_UP_FAILURE` row with `factor: code` before it answers 423, as it does for the password.
 
 **The step-up password carries the third brake.** `AuthService.stepUpFailure` counts refused
 passwords against the account on a `FailedAttemptCounter` keyed `step-up:password-failures:`, with
