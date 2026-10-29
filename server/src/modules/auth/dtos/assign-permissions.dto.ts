@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
+  ArrayUnique,
   IsArray,
   IsNotEmpty,
   IsObject,
@@ -21,6 +22,7 @@ export class AssignPermissionsDto {
   @IsArray()
   @ArrayNotEmpty()
   @ArrayMaxSize(500)
+  @ArrayUnique()
   @IsUUID('4', { each: true })
   permissionIds: string[];
 
@@ -49,6 +51,14 @@ export class PermissionItemDto {
   conditions?: PermissionConditionDto | null;
 }
 
+// An item that is not an object, or that has no permissionId, gets its own
+// key, so that only a repeated permissionId fails the uniqueness check.
+function permissionIdOf(item: unknown): unknown {
+  return typeof item === 'object' && item !== null && 'permissionId' in item
+    ? item.permissionId
+    : Symbol();
+}
+
 export class SetPermissionsDto {
   @ApiProperty({
     description: 'Full desired set of permissions for the role',
@@ -56,6 +66,7 @@ export class SetPermissionsDto {
   })
   @IsArray()
   @ArrayMaxSize(500)
+  @ArrayUnique(permissionIdOf)
   @IsObject({ each: true })
   @ValidateNested({ each: true })
   @Type(() => PermissionItemDto)
