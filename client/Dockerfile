@@ -15,6 +15,10 @@ RUN apk upgrade --no-cache && \
     mkdir -p /var/cache/nginx /tmp/nginx && \
     chown -R nginx:nginx /var/cache/nginx /tmp/nginx /usr/share/nginx/html && \
     sed -i 's|/run/nginx.pid|/tmp/nginx/nginx.pid|' /etc/nginx/nginx.conf
+# CVE_PATCHES_START
+RUN apk add --no-cache --upgrade \
+    brotli-libs
+# CVE_PATCHES_END
 COPY --from=builder /app/client/dist/client/browser /usr/share/nginx/html
 COPY client/nginx.conf /etc/nginx/conf.d/default.conf
 USER nginx
