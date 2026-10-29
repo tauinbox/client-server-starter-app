@@ -1404,6 +1404,15 @@ asserted against the mock server alone, in `mock-server/src/__tests__/contract.s
 wrong status there records mock behaviour and not server behaviour. Measure a new value against the
 real application before you write it.
 
+**Request scenarios** (`contracts/scenarios/`) state the result of one request: the actor, the state
+before the request, the status, the `errorKey` and the audit actions it writes. The e2e suite
+`test/scenarios.e2e-spec.ts` runs them against the real server and database, and
+`mock-server/src/__tests__/scenarios.spec.ts` runs the same files against the mock server. Thus a
+difference between the two servers fails one of the two runs. `npm run check:scenarios` fails when a
+POST, PUT, PATCH or DELETE route has no scenario with a status below 400. The route files in its
+`PENDING` list are not checked yet; today only `auth.json` and `oauth.json` are complete. The format
+is in `contracts/README.md`.
+
 **The `@Public()` decorator** marks an endpoint that a caller can reach with no authentication. The
 routes are the login, the register, the password reset, the OAuth init and callback, the health check
 and `/metrics`.

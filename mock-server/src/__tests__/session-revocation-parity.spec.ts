@@ -94,7 +94,7 @@ describe('a role change ends the sessions (UserRoleChangedListener)', () => {
       },
       body: method === 'POST' ? JSON.stringify({ roleId }) : undefined
     });
-    expect(change.status).toBeLessThan(300);
+    expect(change.status).toBe(method === 'POST' ? 201 : 200);
 
     expect((await refresh(user)).status).toBe(401);
     expect((await profile(user.accessToken)).status).toBe(401);

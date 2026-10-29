@@ -123,6 +123,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       method: 'post' | 'delete' | 'patch',
       path: string,
       body: object,
+      status: number,
       applied: () => Promise<void>
     ]
   > = [
@@ -131,6 +132,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       'post',
       '/api/v1/auth/profile/email/initiate',
       { newEmail: `step-up-code-new-${stamp}@example.com` },
+      200,
       async () => {
         expect((await row()).pendingEmail).toBe(
           `step-up-code-new-${stamp}@example.com`
@@ -142,6 +144,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       'post',
       '/api/v1/auth/oauth/link-init',
       {},
+      201,
       () => Promise.resolve()
     ],
     [
@@ -149,6 +152,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       'delete',
       '/api/v1/auth/oauth/accounts/vk',
       {},
+      200,
       async () => {
         const providers = await dataSource
           .getRepository(OAuthAccount)
@@ -161,6 +165,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       'patch',
       '/api/v1/auth/profile',
       { password: 'Quarry-Bramble-83' },
+      200,
       async () => {
         expect((await row()).password).not.toBeNull();
       }
@@ -169,7 +174,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
 
   it.each(routes)(
     'authorises %s with a code and no provider proof',
-    async (_name, method, path, body, applied) => {
+    async (_name, method, path, body, status, applied) => {
       const bearer = await token();
 
       const refused = await request(http())
@@ -195,7 +200,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         [method](path)
         .auth(bearer, { type: 'bearer' })
         .send({ ...body, code: await freshCode() });
-      expect(accepted.status).toBeLessThan(300);
+      expect(accepted.status).toBe(status);
       await applied();
     },
     30000

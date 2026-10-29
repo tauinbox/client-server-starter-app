@@ -170,6 +170,9 @@ router.post('/exchange', (req, res) => {
     return;
   }
 
+  // The server route sets no other status, so a POST answers 201.
+  res.status(201);
+
   // No session exists behind a challenge, so nothing is handed out but the
   // right to present a code. POST /auth/mfa/verify finishes the sign-in.
   if ('challenge' in pending) {
@@ -213,7 +216,7 @@ router.post('/link-init', authGuard, (req, res) => {
 
   clearReauthProofCookie(res);
 
-  res.json({ message: 'Link initiated' });
+  res.status(201).json({ message: 'Link initiated' });
 });
 
 // POST /api/v1/auth/oauth/reauth-init (stub)
@@ -233,7 +236,7 @@ router.post('/reauth-init', authGuard, (req, res) => {
     return;
   }
 
-  res.json({ message: 'Re-authentication initiated' });
+  res.status(201).json({ message: 'Re-authentication initiated' });
 });
 
 export default router;

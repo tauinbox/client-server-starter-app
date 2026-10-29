@@ -158,7 +158,7 @@ describe('a sign-in ends the session of the presented refresh cookie', () => {
       headers: { cookie: `oauth_data=${token}; ${owner.refreshCookie}` }
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     await expect(refreshStatus(owner.refreshCookie)).resolves.toBe(401);
     await expect(refreshStatus(refreshCookieOf(res))).resolves.toBe(200);
   });

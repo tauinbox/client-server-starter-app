@@ -48,6 +48,7 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run check:routes
+      - run: npm run check:scenarios
       - run: npm run check:enums
       - run: npm run check:controllers
       - run: npm run check:permissions

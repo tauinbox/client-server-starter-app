@@ -74,20 +74,22 @@ function send(
 }
 
 const routes: ReadonlyArray<
-  [name: string, method: string, path: string, body: object]
+  [name: string, method: string, path: string, body: object, status: number]
 > = [
   [
     'an email change',
     'POST',
     '/api/v1/auth/profile/email/initiate',
-    { newEmail: 'step-up-code-new@example.com' }
+    { newEmail: 'step-up-code-new@example.com' },
+    200
   ],
-  ['a provider link', 'POST', '/api/v1/auth/oauth/link-init', {}],
+  ['a provider link', 'POST', '/api/v1/auth/oauth/link-init', {}, 201],
   [
     'a first password',
     'PATCH',
     '/api/v1/auth/profile',
-    { password: 'Quarry-Bramble-83' }
+    { password: 'Quarry-Bramble-83' },
+    200
   ]
 ];
 
@@ -136,7 +138,7 @@ it('names the code, not the password, when only a wrong code is offered', async 
   ]);
 });
 
-describe.each(routes)('%s', (_name, method, path, body) => {
+describe.each(routes)('%s', (_name, method, path, body, status) => {
   it('refuses an account with no password that sends no factor', async () => {
     const token = await oauthOnlyEnrolledToken();
 
@@ -167,7 +169,7 @@ describe.each(routes)('%s', (_name, method, path, body) => {
       code: MOCK_TOTP_CODE
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(status);
   });
 
   it('rejects a code of the wrong shape', async () => {
