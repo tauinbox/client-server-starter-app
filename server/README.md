@@ -1181,11 +1181,11 @@ trialing or past_due in the grace window gives `plan.entitlements`. Each other c
 Free entitlements. The result is the union with the active `CustomerGrant` rows, that is the grants
 that are not revoked and not expired, from a paid one-time sku purchase.
 
-The per-user cache key carries two `CacheVersionCounter` values
-(`common/utils/cache-version-counter.ts`): a global one that `invalidateAll` increments on a plan
-change, and one for each user that `invalidateUser` increments on a subscription change. A read gets
-both versions before its query, so a read that started before an invalidation writes a key that no
-later read uses. The counter uses an atomic Redis `INCR`. Without Redis it falls back to an
+The per-user cache key carries the `CacheVersionCounter` value of that user
+(`common/utils/cache-version-counter.ts`), which `invalidateUser` increments on a subscription
+change. A read gets the version before its query, so a read that started before an invalidation
+writes a key that no later read uses. A plan edit in the seeder reaches a cached user when the entry
+expires, after 60 s. The counter uses an atomic Redis `INCR`. Without Redis it falls back to an
 in-memory read, modify and write sequence. `PermissionService` (one counter for each user, for the
 permissions and the roles) and `ResourceService.getSubjectMaps` (one global counter) use the same
 mechanism.

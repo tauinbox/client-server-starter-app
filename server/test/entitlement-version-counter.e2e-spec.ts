@@ -12,7 +12,7 @@ import { EntitlementService } from '../src/modules/entitlements/entitlement.serv
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 
 const REDIS_URL = process.env['REDIS_URL'];
-const COUNTER_KEY = 'entitlements:version:counter';
+const COUNTER_KEY = 'entitlements:user-version:counter:u1';
 
 // The atomicity claim of CacheVersionCounter is about a Redis command - a
 // mocked client cannot prove it. Skipped when REDIS_URL is unset (CI has no
@@ -71,7 +71,7 @@ runWithRedis('entitlement version counter (real Redis)', () => {
     // The pre-fix read-modify-write could observe the same previous value from
     // several instances and collapse the bumps into one.
     await Promise.all(
-      Array.from({ length: 25 }, () => service.invalidateAll())
+      Array.from({ length: 25 }, () => service.invalidateUser('u1'))
     );
     expect(await redis.get(COUNTER_KEY)).toBe('25');
 
@@ -82,13 +82,13 @@ runWithRedis('entitlement version counter (real Redis)', () => {
 
   it('starts at version 0 with no write, then keys per-user entries by the counter', async () => {
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:v0:u0')).toBeDefined();
+    expect(await cache.get('entitlements:user:u1:u0')).toBeDefined();
     expect(await redis.exists(COUNTER_KEY)).toBe(0);
 
-    await service.invalidateAll();
+    await service.invalidateUser('u1');
     // The bumped suffix orphans the previous entry instead of serving it.
-    expect(await cache.get('entitlements:user:u1:v1:u0')).toBeUndefined();
+    expect(await cache.get('entitlements:user:u1:u1')).toBeUndefined();
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:v1:u0')).toBeDefined();
+    expect(await cache.get('entitlements:user:u1:u1')).toBeDefined();
   });
 });

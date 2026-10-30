@@ -263,34 +263,6 @@ describe('EntitlementService', () => {
       await service.capabilitiesFor('user-1');
       expect(customers.findOne).toHaveBeenCalledTimes(2);
     });
-
-    it('invalidateAll bumps the version monotonically even within the same millisecond', async () => {
-      const now = 1_700_000_000_000;
-      const spy = jest.spyOn(Date, 'now').mockReturnValue(now);
-      try {
-        await service.capabilitiesFor('user-1'); // seeds version = now
-        const v0 = cacheStore.get('entitlements:version') as number;
-
-        await service.invalidateAll();
-        await service.invalidateAll();
-        const v2 = cacheStore.get('entitlements:version') as number;
-
-        // Clock is frozen, so a bare Date.now() would re-emit `now` twice; the
-        // max(prev + 1) guard must still advance the version on each bump.
-        expect(v0).toBe(now);
-        expect(v2).toBe(now + 2);
-      } finally {
-        spy.mockRestore();
-      }
-    });
-
-    it('invalidateAll forces a fresh resolve on the next lookup', async () => {
-      withProSubscription('active');
-      await service.capabilitiesFor('user-1');
-      await service.invalidateAll();
-      await service.capabilitiesFor('user-1');
-      expect(customers.findOne).toHaveBeenCalledTimes(2);
-    });
   });
 
   describe('version counter with a Redis-backed cache', () => {
@@ -338,7 +310,7 @@ describe('EntitlementService', () => {
     }
 
     function userCacheVersions(): string[] {
-      const prefix = 'entitlements:user:user-1:v';
+      const prefix = 'entitlements:user:user-1:u';
       return cache.set.mock.calls
         .map((c: unknown[]) => c[0] as string)
         .filter((k) => k.startsWith(prefix))
@@ -348,12 +320,14 @@ describe('EntitlementService', () => {
     it('bumps the version with an atomic INCR instead of a read-modify-write', async () => {
       const svc = await setupRedisBacked();
 
-      await svc.invalidateAll();
+      await svc.invalidateUser('user-1');
 
-      expect(redis.incr).toHaveBeenCalledWith('entitlements:version:counter');
+      expect(redis.incr).toHaveBeenCalledWith(
+        'entitlements:user-version:counter:user-1'
+      );
       // The racy get -> compute -> set on the version key must be gone.
       expect(cache.set).not.toHaveBeenCalledWith(
-        'entitlements:version',
+        'entitlements:user-version:user-1',
         expect.anything(),
         expect.anything()
       );
@@ -363,15 +337,15 @@ describe('EntitlementService', () => {
       const svc = await setupRedisBacked();
 
       await Promise.all([
-        svc.invalidateAll(),
-        svc.invalidateAll(),
-        svc.invalidateAll()
+        svc.invalidateUser('user-1'),
+        svc.invalidateUser('user-1'),
+        svc.invalidateUser('user-1')
       ]);
 
       // Three INCRs means three distinct versions; the pre-fix read-then-write
       // could observe the same previous value and collapse them into one.
       expect(redis.incr).toHaveBeenCalledTimes(3);
-      expect(counters.get('entitlements:version:counter')).toBe(3);
+      expect(counters.get('entitlements:user-version:counter:user-1')).toBe(3);
     });
 
     it('reads the counter for the per-user cache key and starts at 0', async () => {
@@ -379,11 +353,11 @@ describe('EntitlementService', () => {
       withProSubscription('active');
 
       await svc.capabilitiesFor('user-1');
-      expect(userCacheVersions()).toEqual(['0:u0']);
+      expect(userCacheVersions()).toEqual(['0']);
 
-      await svc.invalidateAll();
+      await svc.invalidateUser('user-1');
       await svc.capabilitiesFor('user-1');
-      expect(userCacheVersions()).toEqual(['0:u0', '1:u0']);
+      expect(userCacheVersions()).toEqual(['0', '1']);
     });
 
     it('invalidateUser bumps the counter of that user only', async () => {
@@ -398,7 +372,7 @@ describe('EntitlementService', () => {
       expect(redis.incr).toHaveBeenCalledTimes(1);
       expect(cache.del).not.toHaveBeenCalled();
       await svc.capabilitiesFor('user-1');
-      expect(userCacheVersions()).toEqual(['0:u1']);
+      expect(userCacheVersions()).toEqual(['1']);
     });
 
     it('falls back to the cache-manager counter when Redis rejects', async () => {
@@ -406,9 +380,9 @@ describe('EntitlementService', () => {
       redis.incr.mockRejectedValue(new Error('connection refused'));
       redis.get.mockRejectedValue(new Error('connection refused'));
 
-      await expect(svc.invalidateAll()).resolves.toBeUndefined();
+      await expect(svc.invalidateUser('user-1')).resolves.toBeUndefined();
       expect(cache.set).toHaveBeenCalledWith(
-        'entitlements:version',
+        'entitlements:user-version:user-1',
         expect.any(Number),
         0
       );
