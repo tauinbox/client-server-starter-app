@@ -54,7 +54,16 @@ export const STATE_FIXTURES = [
   /** The `custom-role` holds `$permissionId` with no conditions. */
   'role-permission',
   /** The target holds the `custom-role`. */
-  'target-role'
+  'target-role',
+  /**
+   * A resource that a controller registers, with the actions `read` and
+   * `update` and no admin narrowing; `$resourceId`.
+   */
+  'resource',
+  /** The `resource` is orphaned. */
+  'orphaned-resource',
+  /** No controller registers the `resource`. */
+  'unregistered-resource'
 ] as const;
 export type StateFixture = (typeof STATE_FIXTURES)[number];
 
@@ -77,7 +86,8 @@ export const SCENARIO_PLACEHOLDERS = [
   '$roleName',
   '$roleId',
   /** The id of the `read:Role` permission. */
-  '$permissionId'
+  '$permissionId',
+  '$resourceId'
 ] as const;
 export type ScenarioPlaceholder = (typeof SCENARIO_PLACEHOLDERS)[number];
 

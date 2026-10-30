@@ -1,0 +1,113 @@
+{
+  "scenarios": [
+    {
+      "name": "an admin restores an orphaned resource",
+      "route": "POST /api/v1/rbac/resources/1/restore",
+      "path": "/api/v1/rbac/resources/$resourceId/restore",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "resource",
+        "orphaned-resource"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "RESOURCE_RESTORE"
+        ]
+      }
+    },
+    {
+      "name": "a resource that no controller registers cannot be restored",
+      "route": "POST /api/v1/rbac/resources/1/restore",
+      "path": "/api/v1/rbac/resources/$resourceId/restore",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "resource",
+        "orphaned-resource",
+        "unregistered-resource"
+      ],
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.resources.cannotRestore",
+        "audit": []
+      }
+    },
+    {
+      "name": "a resource that does not exist cannot be restored",
+      "route": "POST /api/v1/rbac/resources/1/restore",
+      "path": "/api/v1/rbac/resources/5b7e2c1a-9d4f-4e8b-a6c3-1f0e9d8c7b6a/restore",
+      "actor": "admin",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.resources.notFound",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin changes the display name of a resource",
+      "route": "PATCH /api/v1/rbac/resources/1",
+      "path": "/api/v1/rbac/resources/$resourceId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "resource"
+      ],
+      "body": {
+        "displayName": "Renamed by a scenario"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "RESOURCE_UPDATE"
+        ]
+      }
+    },
+    {
+      "name": "an admin narrows the actions that a resource offers",
+      "route": "PATCH /api/v1/rbac/resources/1",
+      "path": "/api/v1/rbac/resources/$resourceId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "resource"
+      ],
+      "body": {
+        "allowedActionNames": [
+          "read"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "RESOURCE_UPDATE"
+        ]
+      }
+    },
+    {
+      "name": "an action that the resource does not check cannot be offered",
+      "route": "PATCH /api/v1/rbac/resources/1",
+      "path": "/api/v1/rbac/resources/$resourceId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "resource"
+      ],
+      "body": {
+        "allowedActionNames": [
+          "delete"
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.resources.actionNotDeclared",
+        "audit": []
+      }
+    }
+  ]
+}

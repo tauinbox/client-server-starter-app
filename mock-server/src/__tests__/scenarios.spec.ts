@@ -299,6 +299,35 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
   'target-role': (ctx) => {
     ctx.target!.roles.push(getState().roles.get(ctx.values.$roleId!)!.name);
     return Promise.resolve();
+  },
+  resource: (ctx) => {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    getState().resources.set(id, {
+      id,
+      name: `scenario-resource-${sequence}`,
+      subject: `ScenarioResource${sequence}`,
+      displayName: 'Scenario resource',
+      description: null,
+      isSystem: false,
+      isOrphaned: false,
+      isRegistered: true,
+      actionNames: ['read', 'update'],
+      conditionalActionNames: [],
+      allowedActionNames: null,
+      lastSyncedAt: now,
+      createdAt: now
+    });
+    ctx.values.$resourceId = id;
+    return Promise.resolve();
+  },
+  'orphaned-resource': (ctx) => {
+    getState().resources.get(ctx.values.$resourceId!)!.isOrphaned = true;
+    return Promise.resolve();
+  },
+  'unregistered-resource': (ctx) => {
+    getState().resources.get(ctx.values.$resourceId!)!.isRegistered = false;
+    return Promise.resolve();
   }
 };
 

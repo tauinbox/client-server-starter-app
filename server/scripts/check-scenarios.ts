@@ -41,8 +41,6 @@ const PENDING_ROUTES = new Set([
   'PATCH /api/v1/admin/feature-flags/1',
   'DELETE /api/v1/admin/feature-flags/1',
   'POST /api/v1/admin/feature-flags/1/preview',
-  'POST /api/v1/rbac/resources/1/restore',
-  'PATCH /api/v1/rbac/resources/1',
   'POST /api/v1/users',
   'PATCH /api/v1/users/1',
   'DELETE /api/v1/users/1',
