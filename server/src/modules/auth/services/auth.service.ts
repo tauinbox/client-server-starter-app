@@ -210,9 +210,8 @@ export class AuthService {
 
     if (user.lockedUntil) {
       if (user.lockedUntil.getTime() > Date.now()) {
-        // Answer before the password is checked: `ACCOUNT_LOCKED` for a right
-        // guess and `INVALID_CREDENTIALS` for a wrong one would let a locked
-        // account keep taking guesses.
+        // Answer before the password is checked: two answers for a right and a
+        // wrong guess would let a locked account keep taking guesses.
         throw this.lockedLogin(email, user.id, user.lockedUntil, {
           reason: 'account_locked'
         });
@@ -566,9 +565,8 @@ export class AuthService {
           pendingEmail: null,
           pendingEmailToken: null,
           pendingEmailExpiresAt: null,
-          // Proving mailbox ownership outranks the failed-guess counter:
-          // without this the reset succeeds and the new password still gets
-          // `ACCOUNT_LOCKED`.
+          // Proving mailbox ownership outranks the failed-guess counter: without
+          // this the reset succeeds and the new password is still locked out.
           failedLoginAttempts: 0,
           lockedUntil: null,
           // Redeeming the token is the same proof of mailbox control that the
@@ -704,9 +702,8 @@ export class AuthService {
       );
     }
 
-    // Not `findOne`: its `USERS.NOT_FOUND` would replace the refresh refusal
-    // below, and a soft-deleted
-    // account whose session is not yet revoked arrives here.
+    // Not `findOne`: its error would replace the refusal below, and a
+    // soft-deleted account whose session is not yet revoked arrives here.
     const user = await this.usersService.findById(tokenDoc.userId);
     if (!user) {
       await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
