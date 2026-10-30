@@ -74,7 +74,7 @@ interface Input {
   throttleConstants: Map<string, string[]>;
 }
 
-// ─── server side ─────────────────────────────────────────────────────────────
+// --- server side ---
 
 function find(
   decorators: readonly ts.Decorator[],
@@ -184,7 +184,7 @@ export function derivePolicy(
   };
 }
 
-// ─── mock side ───────────────────────────────────────────────────────────────
+// --- mock side ---
 
 function pathSegments(p: string): string[] {
   return p.split('/').filter(Boolean);
@@ -375,7 +375,7 @@ function findMockRoute(
   );
 }
 
-// ─── rules ───────────────────────────────────────────────────────────────────
+// --- rules ---
 
 const POLICY_FIELDS = [
   'access',
@@ -485,7 +485,7 @@ export function evaluate(input: Input): string[] {
   return problems;
 }
 
-// ─── loading ─────────────────────────────────────────────────────────────────
+// --- loading ---
 
 function loadContract(): ContractEntry[] {
   return fs
@@ -504,7 +504,7 @@ function readFile(file: string): string {
   return fs.readFileSync(file, 'utf-8');
 }
 
-// ─── self-test ───────────────────────────────────────────────────────────────
+// --- self-test ---
 
 const FIXTURE_CONTROLLER = `
 @Controller({ path: 'things', version: '1' })
@@ -620,7 +620,7 @@ function selfTest(): void {
   console.log('✓ check-route-policy self-test: all four rules report');
 }
 
-// ─── main ────────────────────────────────────────────────────────────────────
+// --- main ---
 
 function main(): void {
   const routes = findControllers().flatMap((f) => extractRoutes(f));
