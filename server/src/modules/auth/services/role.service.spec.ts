@@ -34,7 +34,7 @@ describe('RoleService', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
-    remove: jest.Mock;
+    delete: jest.Mock;
     manager: {
       createQueryBuilder: jest.Mock;
       update: jest.Mock;
@@ -50,6 +50,7 @@ describe('RoleService', () => {
     create: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    lockRole: jest.Mock;
     manager: { transaction: jest.Mock };
   };
   let mockRoleRepoQB: {
@@ -134,7 +135,7 @@ describe('RoleService', () => {
         .mockImplementation((data: Record<string, unknown>) =>
           Promise.resolve({ id: 'new-role', ...data })
         ),
-      remove: jest.fn(),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
       manager: {
         createQueryBuilder: jest
           .fn()
@@ -157,8 +158,8 @@ describe('RoleService', () => {
         cb({
           save: (_target: unknown, entity: unknown): unknown =>
             roleRepo.save(entity) as unknown,
-          remove: (_target: unknown, entity: unknown): unknown =>
-            roleRepo.remove(entity) as unknown,
+          delete: (_target: unknown, criteria: unknown): unknown =>
+            roleRepo.delete(criteria) as unknown,
           createQueryBuilder: (): unknown =>
             roleRepo.manager.createQueryBuilder() as unknown
         })
@@ -176,6 +177,7 @@ describe('RoleService', () => {
         .mockImplementation((data: Record<string, unknown>) => data),
       save: jest.fn(),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      lockRole: jest.fn().mockResolvedValue({ id: 'role-1' }),
       manager: { transaction: jest.fn() }
     };
     const rolePermissionRepo = mockRolePermissionRepo;
@@ -184,6 +186,8 @@ describe('RoleService', () => {
     rolePermissionRepo.manager.transaction.mockImplementation(
       (cb: (em: unknown) => Promise<unknown>) =>
         cb({
+          findOne: (_target: unknown, options: unknown): unknown =>
+            rolePermissionRepo.lockRole(options) as unknown,
           delete: (_target: unknown, criteria: unknown): unknown =>
             rolePermissionRepo.delete(criteria) as unknown,
           create: (_target: unknown, data: unknown) => data,
@@ -588,15 +592,15 @@ describe('RoleService', () => {
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'u-2'
       );
-      expect(mockRoleRepo.remove).toHaveBeenCalledWith(customRole);
+      expect(mockRoleRepo.delete).toHaveBeenCalledWith({ id: customRole.id });
     });
 
-    it('should read the members before the remove and invalidate after it', async () => {
+    it('should read the members before the delete and invalidate after it', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
       await service.delete('role-2', SYSTEM_ABILITY);
       const [read] = mockUserQueryBuilder.getMany.mock.invocationCallOrder;
-      const [remove] = mockRoleRepo.remove.mock.invocationCallOrder;
+      const [remove] = mockRoleRepo.delete.mock.invocationCallOrder;
       const [invalidate] =
         mockPermissionService.invalidateUserCache.mock.invocationCallOrder;
       expect(read).toBeLessThan(remove);
@@ -607,10 +611,22 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await service.delete('role-2', SYSTEM_ABILITY);
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
-      expect(mockRoleRepo.remove).toHaveBeenCalledWith(customRole);
+      expect(mockRoleRepo.delete).toHaveBeenCalledWith({ id: customRole.id });
     });
 
-    it('should emit RoleDeletedEvent in the transaction of the remove', async () => {
+    it('answers ROLES.NOT_FOUND with no event and no invalidation when a concurrent delete won', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockRoleRepo.delete.mockResolvedValue({ affected: 0 });
+
+      await expect(
+        service.delete('role-2', SYSTEM_ABILITY)
+      ).rejects.toMatchObject({ errorKey: ErrorKeys.ROLES.NOT_FOUND });
+      expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+
+    it('should emit RoleDeletedEvent in the transaction of the delete', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
       await service.delete('role-2', SYSTEM_ABILITY);
@@ -620,7 +636,7 @@ describe('RoleService', () => {
         RoleDeletedEvent.name,
         expect.objectContaining({ name: 'editor' })
       );
-      const [remove] = mockRoleRepo.remove.mock.invocationCallOrder;
+      const [remove] = mockRoleRepo.delete.mock.invocationCallOrder;
       const [emit] = mockEventEmitter.emitAsync.mock.invocationCallOrder;
       expect(remove).toBeLessThan(emit);
     });
@@ -1132,6 +1148,39 @@ describe('RoleService', () => {
       await service.setPermissionsForRole('role-2', items, SYSTEM_ABILITY);
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
+    });
+
+    it('locks the role row before it deletes the old grants', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+
+      await service.setPermissionsForRole(
+        'role-2',
+        [{ permissionId: 'perm-1' }],
+        SYSTEM_ABILITY
+      );
+
+      expect(mockRolePermissionRepo.lockRole).toHaveBeenCalledWith({
+        where: { id: 'role-2' },
+        lock: { mode: 'pessimistic_write' }
+      });
+      const [lock] = mockRolePermissionRepo.lockRole.mock.invocationCallOrder;
+      const [remove] = mockRolePermissionRepo.delete.mock.invocationCallOrder;
+      expect(lock).toBeLessThan(remove);
+    });
+
+    it('answers ROLES.NOT_FOUND and writes no grant when the role went before the lock', async () => {
+      mockRoleRepo.findOne.mockResolvedValue(customRole);
+      mockRolePermissionRepo.lockRole.mockResolvedValue(null);
+
+      await expect(
+        service.setPermissionsForRole(
+          'role-2',
+          [{ permissionId: 'perm-1' }],
+          SYSTEM_ABILITY
+        )
+      ).rejects.toMatchObject({ errorKey: ErrorKeys.ROLES.NOT_FOUND });
+      expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
+      expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
     });
 
     it('should skip save when items array is empty', async () => {
@@ -1955,7 +2004,7 @@ describe('RoleService', () => {
         await expect(
           service.delete('role-2', ability(), 'actor-1')
         ).rejects.toMatchObject({ status: 403 });
-        expect(mockRoleRepo.remove).not.toHaveBeenCalled();
+        expect(mockRoleRepo.delete).not.toHaveBeenCalled();
         expectLiftRefusal();
       });
     });
@@ -2017,7 +2066,7 @@ describe('RoleService', () => {
       expectRoleRemoved('user-1', 'role-2');
       expect(mockRolePermissionRepo.delete).toHaveBeenCalled();
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
-      expect(mockRoleRepo.remove).toHaveBeenCalled();
+      expect(mockRoleRepo.delete).toHaveBeenCalled();
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
     });
 
@@ -2042,7 +2091,7 @@ describe('RoleService', () => {
       await service.delete('role-2', superAbility, 'actor-1');
 
       expect(mockRolePermissionRepo.find).not.toHaveBeenCalled();
-      expect(mockRoleRepo.remove).toHaveBeenCalled();
+      expect(mockRoleRepo.delete).toHaveBeenCalled();
     });
   });
 
@@ -2113,7 +2162,7 @@ describe('RoleService', () => {
       // the refetch the event triggers must see the role gone.
       const queryOrder =
         mockUserQueryBuilder.getMany.mock.invocationCallOrder[0];
-      const removeOrder = mockRoleRepo.remove.mock.invocationCallOrder[0];
+      const removeOrder = mockRoleRepo.delete.mock.invocationCallOrder[0];
       const emitOrder = mockEventEmitter.emit.mock.invocationCallOrder[0];
       expect(queryOrder).toBeLessThan(removeOrder);
       expect(emitOrder).toBeGreaterThan(removeOrder);
@@ -2294,12 +2343,12 @@ describe('RoleService', () => {
       await expect(service.delete('role-3', scoped, 'actor-1')).rejects.toThrow(
         ApiError
       );
-      expect(mockRoleRepo.remove).not.toHaveBeenCalled();
+      expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expectRefusal('delete', 'role-3');
 
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
       await service.delete('role-2', scoped, 'actor-1');
-      expect(mockRoleRepo.remove).toHaveBeenCalled();
+      expect(mockRoleRepo.delete).toHaveBeenCalled();
     });
 
     it('builds the audit rows of update and delete from the role before the write', async () => {
@@ -2365,7 +2414,7 @@ describe('RoleService', () => {
         await expect(call()).rejects.toThrow(TypeError);
       }
       expect(mockRoleRepo.save).not.toHaveBeenCalled();
-      expect(mockRoleRepo.remove).not.toHaveBeenCalled();
+      expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
       expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
       expect(mockRelationQueryBuilder.execute).not.toHaveBeenCalled();

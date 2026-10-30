@@ -362,10 +362,12 @@ export class RoleService {
 
   private async loadRole(id: string): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { id } });
-    if (!role) {
-      throw new ApiError(ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
-    }
+    if (!role) throw this.roleNotFound();
     return role;
+  }
+
+  private roleNotFound(): ApiError {
+    return new ApiError(ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
   }
 
   async create(
@@ -459,13 +461,18 @@ export class RoleService {
         roleId: id
       });
     }
-    // Invalidate after the commit of the remove, or a holder read in between
+    // Invalidate after the commit of the delete, or a holder read in between
     // re-caches the deleted grants for the TTL. Holders are read first: the
-    // remove cascades.
+    // delete cascades.
     const holderIds = await this.findHolderIds(id);
     const auditRow = audit?.(role);
     await this.writeWithRoleEvent(
-      (em) => em.remove(Role, role),
+      async (em) => {
+        // The delete is the existence check: of two concurrent deletes, the
+        // loser writes no audit row and sends no event.
+        const { affected } = await em.delete(Role, { id });
+        if (!affected) throw this.roleNotFound();
+      },
       RoleDeletedEvent.name,
       (em, committed) => new RoleDeletedEvent(role.name, em, committed),
       auditRow
@@ -742,6 +749,14 @@ export class RoleService {
     await this.writeAudited(
       this.rolePermissionRepository.manager,
       async (em) => {
+        // Two replaces of one role run one after the other. Without the lock
+        // both delete the old rows, and the second insert breaks the unique
+        // index of the grant.
+        const locked = await em.findOne(Role, {
+          where: { id: roleId },
+          lock: { mode: 'pessimistic_write' }
+        });
+        if (!locked) throw this.roleNotFound();
         await em.delete(RolePermission, { roleId });
         if (items.length > 0) {
           const records = items.map(({ permissionId, conditions }) =>

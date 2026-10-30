@@ -65,6 +65,13 @@ function keyExistsConflict(): ApiError {
   );
 }
 
+function flagNotFound(): ApiError {
+  return new ApiError(
+    ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
+    'Feature flag not found'
+  );
+}
+
 function versionConflict(): ApiError {
   return new ApiError(
     ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT,
@@ -179,12 +186,7 @@ export class FeatureFlagService {
 
   async #load(id: string): Promise<FeatureFlag> {
     const flag = await this.flagRepo.findOne({ where: { id } });
-    if (!flag) {
-      throw new ApiError(
-        ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
-        'Feature flag not found'
-      );
-    }
+    if (!flag) throw flagNotFound();
     flag.rules = await this.ruleRepo.find({
       where: { flagId: id },
       order: { createdAt: 'ASC', id: 'ASC' }
@@ -308,7 +310,10 @@ export class FeatureFlagService {
     // targetId resolves to nothing once the flag no longer exists.
     const { key } = flag;
     await this.dataSource.transaction(async (em) => {
-      await em.remove(FeatureFlag, flag);
+      // The delete is the existence check: of two concurrent deletes, the
+      // loser writes no audit row. The rule rows go by ON DELETE CASCADE.
+      const { affected } = await em.delete(FeatureFlag, { id });
+      if (!affected) throw flagNotFound();
       await this.#audit(em, actor, AuditAction.FEATURE_FLAG_DELETE, id, {
         key
       });
