@@ -2829,7 +2829,7 @@ To exercise the delivery path locally, point that variable at a local Mailpit in
 **Rate-limit counters.** A suite that logs in more than a few times pins the throttler to an
 in-memory store for each application (`test/private-throttler.ts`).
 
-Without Redis, which is how CI runs, each application already gets its own store. A local run with
+Without Redis, which is how the main CI e2e run works, each application already gets its own store. A local run with
 Redis shares one store across each worker. The `/auth/login` limit of 3 calls each minute for each IP
 is then spent by whichever suite arrives first.
 
@@ -2847,8 +2847,11 @@ throttler is `LOCKOUT_DURATION_MS`. A later run then gets a `429` where it expec
 The run rejects database `0` as a target, because that database holds the development cache and the
 queues.
 
-To exercise the in-memory throttler instead, run with `REDIS_URL=` empty. CI does this, because the
-workflows have no Redis service.
+To exercise the in-memory throttler instead, run with `REDIS_URL=` empty. The main CI e2e run does
+this. A second CI step, `E2E – Redis-backed paths`, starts `redis:7.4-alpine`, the image of
+production, and runs with `REDIS_URL` set. It runs each suite that uses `runWithRedis`, and
+`email-delivery`, whose mail then goes through the BullMQ queue. The step fails when one of its tests
+skips, because a skip there means that the suites did not see Redis.
 
 ## Shared Module
 
