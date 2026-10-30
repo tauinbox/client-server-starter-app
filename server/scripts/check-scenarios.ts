@@ -23,17 +23,7 @@ import {
   ScenarioFile
 } from '@app/shared/utils/request-scenarios';
 
-const PENDING_ROUTES = new Set([
-  'POST /api/v1/billing/payment-method',
-  'POST /api/v1/billing/purchase',
-  'POST /api/v1/billing/checkout',
-  'POST /api/v1/billing/subscription/change',
-  'POST /api/v1/billing/subscription/change/preview',
-  'POST /api/v1/billing/subscription/cancel',
-  'PUT /api/v1/billing/region',
-  'POST /api/v1/billing/webhooks/paddle',
-  'POST /api/v1/billing/webhooks/yookassa'
-]);
+const PENDING_ROUTES = new Set<string>();
 
 const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

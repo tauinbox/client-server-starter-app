@@ -1,0 +1,368 @@
+{
+  "scenarios": [
+    {
+      "name": "a subscriber starts an update of the payment method",
+      "route": "POST /api/v1/billing/payment-method",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "fixed-plan"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a user with no subscription cannot update the payment method",
+      "route": "POST /api/v1/billing/payment-method",
+      "actor": "user",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.billing.noActiveSubscription",
+        "audit": []
+      }
+    },
+    {
+      "name": "a user starts the purchase of a product",
+      "route": "POST /api/v1/billing/purchase",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer",
+        "product"
+      ],
+      "body": {
+        "productKey": "$productKey"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a product that does not exist cannot be bought",
+      "route": "POST /api/v1/billing/purchase",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer"
+      ],
+      "body": {
+        "productKey": "$productKey"
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.billing.productNotFound",
+        "audit": []
+      }
+    },
+    {
+      "name": "a purchase is refused while the provider is off",
+      "route": "POST /api/v1/billing/purchase",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer",
+        "product",
+        "providers-disabled"
+      ],
+      "body": {
+        "productKey": "$productKey"
+      },
+      "expect": {
+        "status": 503,
+        "errorKey": "errors.billing.providerUnavailable",
+        "audit": []
+      }
+    },
+    {
+      "name": "a user starts a checkout of a plan",
+      "route": "POST /api/v1/billing/checkout",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer",
+        "fixed-plan"
+      ],
+      "body": {
+        "planKey": "$meterKey"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a subscriber cannot start a second checkout",
+      "route": "POST /api/v1/billing/checkout",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "fixed-plan"
+      ],
+      "body": {
+        "planKey": "$meterKey"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.alreadySubscribed",
+        "audit": []
+      }
+    },
+    {
+      "name": "a subscriber switches to another plan",
+      "route": "POST /api/v1/billing/subscription/change",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "fixed-plan",
+        "other-plan"
+      ],
+      "body": {
+        "planKey": "$planKey"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a switch to the current plan is refused",
+      "route": "POST /api/v1/billing/subscription/change",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "fixed-plan"
+      ],
+      "body": {
+        "planKey": "$meterKey"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.samePlan",
+        "audit": []
+      }
+    },
+    {
+      "name": "a subscriber previews a switch to another plan",
+      "route": "POST /api/v1/billing/subscription/change/preview",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "fixed-plan",
+        "other-plan"
+      ],
+      "body": {
+        "planKey": "$planKey"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a preview of a plan that does not exist is refused",
+      "route": "POST /api/v1/billing/subscription/change/preview",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "fixed-plan"
+      ],
+      "body": {
+        "planKey": "$planKey"
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.billing.planNotFound",
+        "audit": []
+      }
+    },
+    {
+      "name": "a subscriber cancels at the end of the period",
+      "route": "POST /api/v1/billing/subscription/cancel",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a second cancel is refused",
+      "route": "POST /api/v1/billing/subscription/cancel",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "repeat": 2,
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.cancellationAlreadyScheduled",
+        "earlier": {
+          "status": 200,
+          "errorKey": null
+        },
+        "audit": []
+      }
+    },
+    {
+      "name": "a user with no subscription cannot cancel",
+      "route": "POST /api/v1/billing/subscription/cancel",
+      "actor": "user",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.billing.noActiveSubscription",
+        "audit": []
+      }
+    },
+    {
+      "name": "a user sets the billing region",
+      "route": "PUT /api/v1/billing/region",
+      "actor": "user",
+      "auth": "bearer",
+      "body": {
+        "region": "ru"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a subscriber cannot move to the region of another provider",
+      "route": "PUT /api/v1/billing/region",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "body": {
+        "region": "world"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.regionChangeBlocked",
+        "audit": []
+      }
+    },
+    {
+      "name": "a region with no available provider is refused",
+      "route": "PUT /api/v1/billing/region",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "providers-disabled"
+      ],
+      "body": {
+        "region": "ru"
+      },
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.billing.regionUnavailable",
+        "audit": []
+      }
+    },
+    {
+      "name": "a signed Paddle delivery is acknowledged",
+      "route": "POST /api/v1/billing/webhooks/paddle",
+      "auth": "none",
+      "headers": {
+        "paddle-signature": "ts=1;h1=scenario"
+      },
+      "body": {
+        "event_id": "scenario-event",
+        "event_type": "customer.created",
+        "data": {}
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a Paddle delivery with no signature is refused",
+      "route": "POST /api/v1/billing/webhooks/paddle",
+      "auth": "none",
+      "body": {
+        "event_id": "scenario-event",
+        "event_type": "customer.created",
+        "data": {}
+      },
+      "expect": {
+        "status": 400,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a YooKassa payment notification is acknowledged",
+      "route": "POST /api/v1/billing/webhooks/yookassa",
+      "auth": "none",
+      "body": {
+        "type": "notification",
+        "event": "payment.succeeded",
+        "object": {
+          "id": "scenario-payment"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a YooKassa notification outside the payment events is refused",
+      "route": "POST /api/v1/billing/webhooks/yookassa",
+      "auth": "none",
+      "body": {
+        "type": "notification",
+        "event": "refund.succeeded",
+        "object": {
+          "id": "scenario-refund"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a YooKassa notification with no object id is refused",
+      "route": "POST /api/v1/billing/webhooks/yookassa",
+      "auth": "none",
+      "body": {
+        "type": "notification",
+        "event": "payment.succeeded",
+        "object": {}
+      },
+      "expect": {
+        "status": 400,
+        "errorKey": null,
+        "audit": []
+      }
+    }
+  ]
+}

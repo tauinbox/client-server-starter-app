@@ -1417,7 +1417,8 @@ before the request, the status, the `errorKey` and the audit actions it writes. 
 `mock-server/src/__tests__/scenarios.spec.ts` runs the same files against the mock server. Thus a
 difference between the two servers fails one of the two runs. `npm run check:scenarios` fails when a
 POST, PUT, PATCH or DELETE route has no scenario with a status below 400. The routes in its
-`PENDING_ROUTES` list have no scenario yet. A listed route that gets a scenario must leave the list.
+`PENDING_ROUTES` list have no scenario yet. Since 2026-10-30 the list is empty: each such route has a
+success scenario. A listed route that gets a scenario must leave the list.
 CI runs the check with `-- --base origin/master`, which refuses a listed route that is not pending
 on `master`, so the list can only get shorter. `npm run check:scenarios -- --self-test` proves each rule of the
 check. The format is in `contracts/README.md`.

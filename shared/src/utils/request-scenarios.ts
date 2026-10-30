@@ -68,12 +68,23 @@ export const STATE_FIXTURES = [
   'deleted-target',
   /** A flag with the key `$flagKey`, at version 1, with no rules; `$flagId`. */
   'feature-flag',
+  /** A `yookassa` billing customer of the actor in `RU`; `$customerId`. */
+  'customer',
   /**
    * A billing customer of the actor, `$customerId`, with an active
    * subscription that the server renews, `$subscriptionId`. Its period
-   * started one day ago, and its plan key is `$meterKey`.
+   * started one day ago, and its plan key is `$meterKey`. It uses the
+   * `customer` when the scenario has one.
    */
   'subscription',
+  /** A fixed monthly plan `$meterKey` with a `yookassa` price of 1000 RUB. */
+  'fixed-plan',
+  /** A fixed monthly plan `$planKey` with a `yookassa` price of 1000 RUB. */
+  'other-plan',
+  /** A product `$productKey` with a `yookassa` price of 500 RUB. */
+  'product',
+  /** The kill switches of all billing providers are off for the actor. */
+  'providers-disabled',
   /** A paid invoice of 1000 minor units of the `subscription`; `$invoiceId`. */
   'paid-invoice',
   /** A plan with the key `$meterKey` that meters `$meterKey`. */
@@ -113,7 +124,11 @@ export const SCENARIO_PLACEHOLDERS = [
   '$invoiceId',
   /** A meter key, and a plan key, that no plan has before the request. */
   '$meterKey',
-  '$webhookEventId'
+  '$webhookEventId',
+  /** A plan key that no plan has before the request. */
+  '$planKey',
+  /** A product key that no product has before the request. */
+  '$productKey'
 ] as const;
 export type ScenarioPlaceholder = (typeof SCENARIO_PLACEHOLDERS)[number];
 

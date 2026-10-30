@@ -15,6 +15,7 @@ import request from 'supertest';
 import { DataSource, In } from 'typeorm';
 import { generateSync } from 'otplib';
 import {
+  BILLING_PROVIDER_FLAGS,
   MAX_FAILED_ATTEMPTS,
   requiresSecureCookies
 } from '@app/shared/constants';
@@ -61,8 +62,13 @@ import { BillingService } from '../src/modules/billing/billing.service';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
+import { BillingConfigService } from '../src/modules/billing/config/billing-config.service';
+import { PADDLE_CLIENT } from '../src/modules/billing/providers/paddle.client';
+import { YOOKASSA_CLIENT } from '../src/modules/billing/providers/yookassa.client';
+import { FeatureFlagResolverService } from '../src/modules/feature-flags/services/feature-flag-resolver.service';
 import { Money } from '@app/shared/utils/money';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
@@ -123,6 +129,10 @@ runWithInfra('Request scenarios (e2e)', () => {
   let superRole: Role;
   let permissionId: string;
   const previousKey = process.env['MFA_ENCRYPTION_KEY'];
+  const previousPaddleSecret = process.env['PADDLE_WEBHOOK_SECRET'];
+  // The mock seeds every provider kill switch on; `providers-disabled` turns
+  // them off for one scenario.
+  let providersEnabled = true;
   const stamp = `${Date.now()}-${randomBytes(3).toString('hex')}`;
   const emailPrefix = `scenario-${stamp}-`;
   let sequence = 0;
@@ -143,6 +153,26 @@ runWithInfra('Request scenarios (e2e)', () => {
 
   beforeAll(async () => {
     process.env['MFA_ENCRYPTION_KEY'] = randomBytes(32).toString('base64');
+    process.env['PADDLE_WEBHOOK_SECRET'] = 'scenario-webhook-secret';
+
+    // CI has no provider account. The fake clients replace only the calls to
+    // the provider: the HMAC check of the Paddle SDK, which no static
+    // scenario can sign, and the YooKassa re-fetch of the payment. The checks
+    // of the providers before those calls stay real.
+    const paddleClient = {
+      webhooks: {
+        unmarshal: () =>
+          Promise.resolve({
+            eventId: 'scenario-event',
+            eventType: 'customer.created',
+            data: {}
+          })
+      }
+    };
+    const yooKassaClient = {
+      getPayment: (id: string) =>
+        Promise.resolve({ id, status: 'pending', metadata: {} })
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [CoreModule.forRoot()]
@@ -151,6 +181,10 @@ runWithInfra('Request scenarios (e2e)', () => {
       .useValue(throttlerStorage)
       .overrideGuard(GoogleOAuthGuard)
       .useValue(stubGoogleGuard)
+      .overrideProvider(PADDLE_CLIENT)
+      .useValue(paddleClient)
+      .overrideProvider(YOOKASSA_CLIENT)
+      .useValue(yooKassaClient)
       .compile();
 
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
@@ -186,16 +220,52 @@ runWithInfra('Request scenarios (e2e)', () => {
       .mockImplementation(
         (name) => registeredResources.has(name) || isRegistered(name)
       );
-    // A provider call is an allowed difference from the mock, and CI has no
-    // provider account: a refund of a fixture invoice succeeds with no call.
+    // The mock counts every provider as configured, and seeds the kill
+    // switches on. The flags of the database are shared with the other
+    // workers, so the runner answers them here instead of writing them.
     jest
-      .spyOn(app.get(BillingService).getProviderById('yookassa'), 'refund')
-      .mockResolvedValue(undefined);
+      .spyOn(app.get(BillingConfigService), 'isConfigured')
+      .mockReturnValue(true);
+    const resolver = app.get(FeatureFlagResolverService);
+    const isEnabled = resolver.isEnabledForUserId.bind(resolver);
+    const providerFlags = new Set<string>(
+      BILLING_PROVIDER_FLAGS.map((p) => p.enabledFlagKey)
+    );
+    jest
+      .spyOn(resolver, 'isEnabledForUserId')
+      .mockImplementation((userId, key) =>
+        providerFlags.has(key)
+          ? Promise.resolve(providersEnabled)
+          : isEnabled(userId, key)
+      );
+    // A provider call is an allowed difference from the mock, and CI has no
+    // provider account: the runner answers each provider call that a
+    // scenario reaches.
+    const yookassa = app.get(BillingService).getProviderById('yookassa');
+    const session = {
+      url: 'https://provider.invalid/session',
+      sessionRef: 'scenario-session'
+    };
+    jest.spyOn(yookassa, 'refund').mockResolvedValue(undefined);
+    jest.spyOn(yookassa, 'startCheckout').mockResolvedValue(session);
+    jest.spyOn(yookassa, 'createOneTimePayment').mockResolvedValue(session);
+    jest.spyOn(yookassa, 'updatePaymentMethod').mockResolvedValue(session);
+    jest.spyOn(yookassa, 'chargeOffSession').mockImplementation(() =>
+      Promise.resolve({
+        providerInvoiceRef: `${emailPrefix}charge-${randomBytes(4).toString('hex')}`,
+        status: 'captured'
+      })
+    );
   }, 60000);
 
   afterAll(async () => {
     if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
     else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+    if (previousPaddleSecret === undefined) {
+      delete process.env['PADDLE_WEBHOOK_SECRET'];
+    } else {
+      process.env['PADDLE_WEBHOOK_SECRET'] = previousPaddleSecret;
+    }
     if (dataSource) {
       const ids = (
         await dataSource
@@ -220,6 +290,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       }
       for (const [entity, column] of [
         [Plan, 'key'],
+        [Product, 'key'],
         [WebhookEvent, 'provider_event_id']
       ] as const) {
         await dataSource
@@ -270,9 +341,25 @@ runWithInfra('Request scenarios (e2e)', () => {
     return `${emailPrefix}flag-${sequence}`;
   }
 
-  function freshMeterKey(): string {
+  function freshKey(kind: string): string {
     sequence += 1;
-    return `${emailPrefix}meter-${sequence}`;
+    return `${emailPrefix}${kind}-${sequence}`;
+  }
+
+  function fixedPlan(key: string): Partial<Plan> {
+    return {
+      key,
+      name: 'Scenario plan',
+      description: null,
+      billingMode: 'fixed',
+      interval: 'month',
+      meterKey: null,
+      entitlements: [],
+      limits: null,
+      trialDays: 0,
+      active: true,
+      prices: { yookassa: { currency: 'RUB', amountMinor: 1000 } }
+    };
   }
 
   // Each account starts as `user`: the default role, a password and a
@@ -530,7 +617,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       });
       ctx.values.$flagId = flag.id;
     },
-    subscription: async (ctx) => {
+    customer: async (ctx) => {
       const customer = await dataSource.getRepository(Customer).save({
         userId: ctx.actor!.user.id,
         provider: 'yookassa',
@@ -540,9 +627,13 @@ runWithInfra('Request scenarios (e2e)', () => {
         currency: 'RUB',
         defaultPaymentMethodId: null
       });
+      ctx.values.$customerId = customer.id;
+    },
+    subscription: async (ctx) => {
+      if (!ctx.values.$customerId) await STATES.customer(ctx);
       const now = Date.now();
       const subscription = await dataSource.getRepository(Subscription).save({
-        customerId: customer.id,
+        customerId: ctx.values.$customerId!,
         planKey: ctx.values.$meterKey!,
         provider: 'yookassa',
         billingMode: 'fixed',
@@ -553,7 +644,6 @@ runWithInfra('Request scenarios (e2e)', () => {
         cancelAtPeriodEnd: false,
         providerSubscriptionId: null
       });
-      ctx.values.$customerId = customer.id;
       ctx.values.$subscriptionId = subscription.id;
     },
     'paid-invoice': async (ctx) => {
@@ -591,6 +681,31 @@ runWithInfra('Request scenarios (e2e)', () => {
         active: true,
         prices: {}
       });
+    },
+    'fixed-plan': async (ctx) => {
+      await dataSource
+        .getRepository(Plan)
+        .save(fixedPlan(ctx.values.$meterKey!));
+    },
+    'other-plan': async (ctx) => {
+      await dataSource
+        .getRepository(Plan)
+        .save(fixedPlan(ctx.values.$planKey!));
+    },
+    product: async (ctx) => {
+      await dataSource.getRepository(Product).save({
+        key: ctx.values.$productKey!,
+        name: 'Scenario product',
+        description: null,
+        type: 'sku',
+        prices: { yookassa: { currency: 'RUB', amountMinor: 500 } },
+        grant: null,
+        active: true
+      });
+    },
+    'providers-disabled': () => {
+      providersEnabled = false;
+      return Promise.resolve();
     },
     'dead-letter-webhook-event': async (ctx) => {
       const event = await dataSource.getRepository(WebhookEvent).save({
@@ -667,8 +782,11 @@ runWithInfra('Request scenarios (e2e)', () => {
     ctx.values.$newEmail = freshEmail();
     ctx.values.$roleName = freshRoleName();
     ctx.values.$flagKey = freshFlagKey();
-    ctx.values.$meterKey = freshMeterKey();
+    ctx.values.$meterKey = freshKey('meter');
+    ctx.values.$planKey = freshKey('plan');
+    ctx.values.$productKey = freshKey('product');
     ctx.values.$permissionId = permissionId;
+    providersEnabled = true;
     emails.push(ctx.values.$newEmail);
 
     if (scenario.actor) {
