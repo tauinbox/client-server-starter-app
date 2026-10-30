@@ -24,10 +24,6 @@ import {
 } from '@app/shared/utils/request-scenarios';
 
 const PENDING_ROUTES = new Set([
-  'POST /api/v1/admin/billing/subscriptions/1/cancel',
-  'POST /api/v1/admin/billing/invoices/1/refund',
-  'POST /api/v1/admin/billing/webhook-events/1/replay',
-  'POST /api/v1/admin/billing/usage',
   'POST /api/v1/billing/payment-method',
   'POST /api/v1/billing/purchase',
   'POST /api/v1/billing/checkout',

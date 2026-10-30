@@ -231,6 +231,18 @@ export interface MockProduct {
   updatedAt: string;
 }
 
+/** A row of the webhook ledger of the server, with the fields replay reads. */
+export interface MockWebhookEvent {
+  id: string;
+  provider: import('@app/shared/types').BillingProviderId;
+  providerEventId: string;
+  type: string;
+  status: 'received' | 'processed' | 'dead_letter';
+  attempts: number;
+  lastError: string | null;
+  receivedAt: string;
+}
+
 export interface MockCreditBalance {
   customerId: string;
   balanceUnits: number;
@@ -457,6 +469,9 @@ export interface State {
   // Prepaid credit balances keyed by customer id — topped up by paid credit
   // pack purchases, mirroring the server's balance row.
   billingCreditBalances: Map<string, MockCreditBalance>;
+  // The webhook ledger, keyed by id. The mock receiver writes no row, so only
+  // a test adds one, to reach the admin replay route.
+  billingWebhookEvents: Map<string, MockWebhookEvent>;
   // Paddle.js public configuration advertised via /api/v1/billing/paddle-config.
   // Default: no client token. E2E sets one via /__control/billing/paddle-config.
   paddleClientConfig: PaddleClientConfigResponse;

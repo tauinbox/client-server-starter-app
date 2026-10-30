@@ -26,6 +26,8 @@ import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 // Runs every scenario of contracts/scenarios against the mock server. The
 // server e2e suite runs the same files against the real server.
 
+const DAY_MS = 24 * 3600_000;
+
 interface Answer {
   status: number;
   errorKey: string | null;
@@ -356,6 +358,107 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     });
     ctx.values.$flagId = id;
     return Promise.resolve();
+  },
+  subscription: (ctx) => {
+    const nowMs = Date.now();
+    const now = new Date(nowMs).toISOString();
+    const customerId = randomUUID();
+    const subscriptionId = randomUUID();
+    getState().billingCustomers.set(customerId, {
+      id: customerId,
+      userId: ctx.actor!.id,
+      provider: 'yookassa',
+      providerOverride: null,
+      country: 'RU',
+      currency: 'RUB',
+      defaultPaymentMethodId: null,
+      trialUsedAt: null,
+      createdAt: now,
+      updatedAt: now
+    });
+    getState().billingSubscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      customerId,
+      planKey: ctx.values.$meterKey!,
+      provider: 'yookassa',
+      billingMode: 'fixed',
+      status: 'active',
+      lifecycleOwner: 'self',
+      currentPeriodStart: new Date(nowMs - DAY_MS).toISOString(),
+      currentPeriodEnd: new Date(nowMs + 29 * DAY_MS).toISOString(),
+      cancelAtPeriodEnd: false,
+      trialEnd: null,
+      paymentMethodId: null,
+      providerSubscriptionId: null,
+      createdAt: now,
+      updatedAt: now
+    });
+    ctx.values.$customerId = customerId;
+    ctx.values.$subscriptionId = subscriptionId;
+    return Promise.resolve();
+  },
+  'paid-invoice': (ctx) => {
+    const nowMs = Date.now();
+    const now = new Date(nowMs).toISOString();
+    const id = randomUUID();
+    getState().billingInvoices.set(id, {
+      id,
+      customerId: ctx.values.$customerId!,
+      subscriptionId: ctx.values.$subscriptionId!,
+      provider: 'yookassa',
+      providerInvoiceRef: `scenario-payment-${sequence}`,
+      amountMinor: 1000,
+      refundedMinor: 0,
+      currency: 'RUB',
+      status: 'paid',
+      billingMode: 'fixed',
+      kind: 'subscription',
+      productId: null,
+      periodStart: new Date(nowMs - DAY_MS).toISOString(),
+      periodEnd: new Date(nowMs + 29 * DAY_MS).toISOString(),
+      paidAt: now,
+      receiptRef: null,
+      createdAt: now,
+      updatedAt: now
+    });
+    ctx.values.$invoiceId = id;
+    return Promise.resolve();
+  },
+  'metered-plan': (ctx) => {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    getState().plans.set(id, {
+      id,
+      key: ctx.values.$meterKey!,
+      name: 'Scenario plan',
+      description: null,
+      billingMode: 'usage',
+      interval: 'month',
+      meterKey: ctx.values.$meterKey!,
+      entitlements: [],
+      limits: null,
+      trialDays: 0,
+      active: true,
+      prices: {},
+      createdAt: now,
+      updatedAt: now
+    });
+    return Promise.resolve();
+  },
+  'dead-letter-webhook-event': (ctx) => {
+    const id = randomUUID();
+    getState().billingWebhookEvents.set(id, {
+      id,
+      provider: 'yookassa',
+      providerEventId: `scenario-event-${sequence}`,
+      type: 'payment.succeeded',
+      status: 'dead_letter',
+      attempts: 5,
+      lastError: 'scenario',
+      receivedAt: new Date().toISOString()
+    });
+    ctx.values.$webhookEventId = id;
+    return Promise.resolve();
   }
 };
 
@@ -393,6 +496,7 @@ async function run(scenario: RequestScenario) {
   ctx.values.$newEmail = freshEmail();
   ctx.values.$roleName = `scenario-role-${sequence}`;
   ctx.values.$flagKey = `scenario-flag-${sequence}`;
+  ctx.values.$meterKey = `scenario-meter-${sequence}`;
   ctx.values.$permissionId = readRolePermissionId();
   const accounts: MockUser[] = [];
 

@@ -67,7 +67,19 @@ export const STATE_FIXTURES = [
   /** The target is soft-deleted. */
   'deleted-target',
   /** A flag with the key `$flagKey`, at version 1, with no rules; `$flagId`. */
-  'feature-flag'
+  'feature-flag',
+  /**
+   * A billing customer of the actor, `$customerId`, with an active
+   * subscription that the server renews, `$subscriptionId`. Its period
+   * started one day ago, and its plan key is `$meterKey`.
+   */
+  'subscription',
+  /** A paid invoice of 1000 minor units of the `subscription`; `$invoiceId`. */
+  'paid-invoice',
+  /** A plan with the key `$meterKey` that meters `$meterKey`. */
+  'metered-plan',
+  /** A webhook event in `dead_letter`; `$webhookEventId`. */
+  'dead-letter-webhook-event'
 ] as const;
 export type StateFixture = (typeof STATE_FIXTURES)[number];
 
@@ -95,7 +107,13 @@ export const SCENARIO_PLACEHOLDERS = [
   '$resourceId',
   /** A flag key that no flag has before the request. */
   '$flagKey',
-  '$flagId'
+  '$flagId',
+  '$customerId',
+  '$subscriptionId',
+  '$invoiceId',
+  /** A meter key, and a plan key, that no plan has before the request. */
+  '$meterKey',
+  '$webhookEventId'
 ] as const;
 export type ScenarioPlaceholder = (typeof SCENARIO_PLACEHOLDERS)[number];
 

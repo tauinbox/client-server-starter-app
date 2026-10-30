@@ -1420,19 +1420,45 @@ billingAdminRouter.post(
   }
 );
 
-// The mock webhook receiver is a no-op stub with no event ledger, so there is
-// never a dead-lettered row to replay; the route exists only to mirror the
-// server's auth contract (401 unauthenticated / 403 non-admin), then 404.
+// Mirrors BillingAdminService.replayWebhookEvent: only a `dead_letter` row is
+// reset to `received` for the reconciliation sweep.
 billingAdminRouter.post(
   '/webhook-events/:id/replay',
   permissionGuard('update', 'Billing'),
   requireUuid('id'),
-  (_req: Request, res: Response) => {
-    sendError(
-      res,
-      ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND,
-      'Webhook event not found'
+  (req: Request, res: Response) => {
+    const event = getState().billingWebhookEvents.get(
+      (req.params['id'] as string) ?? ''
     );
+    if (!event) {
+      sendError(
+        res,
+        ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND,
+        'Webhook event not found'
+      );
+      return;
+    }
+    if (event.status !== 'dead_letter') {
+      sendError(
+        res,
+        ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE,
+        'Only dead-lettered webhook events can be replayed'
+      );
+      return;
+    }
+    event.status = 'received';
+    event.attempts = 0;
+    event.lastError = null;
+    auditAdminAction(
+      req,
+      'BILLING_WEBHOOK_EVENT_REPLAY',
+      'WebhookEvent',
+      event.id,
+      {
+        status: 'received'
+      }
+    );
+    res.json({ id: event.id, status: 'received' });
   }
 );
 
