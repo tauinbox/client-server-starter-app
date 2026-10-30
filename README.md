@@ -1911,8 +1911,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3165 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 845 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 823 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3172 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 853 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 831 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1633 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 343 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1384 tests pass |
@@ -1923,7 +1923,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server - Checks** | - | audit (high), lint, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:imports | - |
+| **Server - Checks** | - | audit (high), lint, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:imports | - |
 | **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |

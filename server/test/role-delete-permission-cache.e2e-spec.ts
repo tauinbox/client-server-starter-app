@@ -81,9 +81,9 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
     );
     await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
 
-    // Stand-in for a request of the holder that lands after the remove and
+    // Stand-in for a request of the holder that lands after the delete and
     // before its commit: it loads from the DB and fills the cache. The event
-    // runs inside the transaction of the remove.
+    // runs inside the transaction of the delete.
     const eventEmitter = app.get(EventEmitter2);
     const emitAsync = eventEmitter.emitAsync.bind(eventEmitter);
     let readInside = false;

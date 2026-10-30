@@ -30,6 +30,7 @@ export class CacheVersionCounter {
   readonly #counterKey: string;
   readonly #fallbackKey: string;
   readonly #failureLog: ThrottledFailureLog;
+  readonly #fallbackReads = new Map<string, Promise<number>>();
 
   /**
    * @param counterKey raw Redis key holding the integer counter
@@ -66,11 +67,26 @@ export class CacheVersionCounter {
       }
     }
 
-    const cached = await this.#cache.get<number>(fallbackKey);
-    if (typeof cached === 'number') return cached;
-    const initial = Date.now();
-    await this.#cache.set(fallbackKey, initial, 0);
-    return initial;
+    return this.#readFallback(fallbackKey);
+  }
+
+  /**
+   * Concurrent reads of an empty key share one read and one initial value.
+   * Each would else take its own `Date.now()`: two loads that should join get
+   * two versions, and the first caller holds a version that nobody reads again.
+   */
+  #readFallback(fallbackKey: string): Promise<number> {
+    const pending = this.#fallbackReads.get(fallbackKey);
+    if (pending) return pending;
+    const read = (async () => {
+      const cached = await this.#cache.get<number>(fallbackKey);
+      if (typeof cached === 'number') return cached;
+      const initial = Date.now();
+      await this.#cache.set(fallbackKey, initial, 0);
+      return initial;
+    })().finally(() => this.#fallbackReads.delete(fallbackKey));
+    this.#fallbackReads.set(fallbackKey, read);
+    return read;
   }
 
   async bump(scope?: string): Promise<void> {

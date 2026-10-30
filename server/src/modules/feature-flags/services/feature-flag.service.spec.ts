@@ -172,7 +172,6 @@ describe('FeatureFlagService', () => {
     create: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
-    remove: jest.Mock;
     createQueryBuilder: jest.Mock;
   }
 
@@ -180,8 +179,7 @@ describe('FeatureFlagService', () => {
     const em: MockEm = {
       create: jest.fn((_e: unknown, v: unknown) => v),
       save: jest.fn((_e: unknown, v: unknown) => Promise.resolve(v)),
-      delete: jest.fn().mockResolvedValue({}),
-      remove: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
       createQueryBuilder: jest.fn(),
       ...overrides
     };
@@ -778,7 +776,7 @@ describe('FeatureFlagService', () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       const em = mockTransaction();
       await service.delete('flag-1', SYSTEM_ABILITY, actor);
-      expect(em.remove).toHaveBeenCalledWith(FeatureFlag, sampleFlag);
+      expect(em.delete).toHaveBeenCalledWith(FeatureFlag, { id: 'flag-1' });
       expect(auditService.log).toHaveBeenCalledWith(
         {
           ...auditFields,
@@ -788,6 +786,16 @@ describe('FeatureFlagService', () => {
         },
         em
       );
+    });
+
+    it('answers FEATURE_FLAGS.NOT_FOUND with no audit row when a concurrent delete won', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      mockTransaction({ delete: jest.fn().mockResolvedValue({ affected: 0 }) });
+
+      await expect(
+        service.delete('flag-1', SYSTEM_ABILITY, actor)
+      ).rejects.toMatchObject({ errorKey: ErrorKeys.FEATURE_FLAGS.NOT_FOUND });
+      expect(auditService.log).not.toHaveBeenCalled();
     });
 
     it('fails the delete when the audit row cannot be written', async () => {
