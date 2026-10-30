@@ -104,7 +104,7 @@ jobs:
       # Anonymous Docker Hub pulls from shared runner IPs hit the 429 rate
       # limit. A daemon mirror falls back to Docker Hub on a cache miss. A
       # `services:` container starts before the first step and cannot use it,
-      # so postgres and mailpit start here.
+      # so postgres, mailpit and redis start here.
       - name: Configure Docker Hub pull mirror
         working-directory: .
         run: |
@@ -119,7 +119,7 @@ jobs:
           echo "::error::dockerd did not load the mirror.gcr.io registry mirror"
           exit 1
 
-      - name: Start postgres and mailpit
+      - name: Start postgres, mailpit and redis
         working-directory: .
         run: |
           docker run -d --name postgres -p 5432:5432 \
@@ -127,17 +127,23 @@ jobs:
             --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 30 \
             postgres:18-alpine
           docker run -d --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.30.0
-          for _ in $(seq 1 60); do
-            status="$(docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' postgres)"
-            case "$status" in
-              "running healthy") exit 0 ;;
-              exited*|dead*) break ;;
-            esac
-            sleep 1
+          # The same image as production.
+          docker run -d --name redis -p 6379:6379 \
+            --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 5s --health-retries 30 \
+            redis:7.4-alpine
+          for name in postgres redis; do
+            for _ in $(seq 1 60); do
+              status="$(docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "$name")"
+              case "$status" in
+                "running healthy") continue 2 ;;
+                exited*|dead*) break ;;
+              esac
+              sleep 1
+            done
+            echo "::error::$name is not healthy: $status"
+            docker logs "$name"
+            exit 1
           done
-          echo "::error::postgres is not healthy: $status"
-          docker logs postgres
-          exit 1
 
       - uses: actions/checkout@v6
 
@@ -159,6 +165,30 @@ jobs:
 
       - name: E2E – bootstrap & DI
         run: npm run test:e2e
+
+      # Production sets REDIS_URL, and the server then uses the Redis
+      # implementations. The suites that use runWithRedis test those paths and
+      # skip in the run above. email-delivery runs again because with Redis
+      # the mail goes through the BullMQ queue. The full suite stays on the
+      # in-memory storage: with Redis the parallel workers share one login
+      # throttler and get 429.
+      - name: E2E – Redis-backed paths
+        env:
+          REDIS_URL: redis://localhost:6379
+        run: |
+          suites="$(grep -l runWithRedis test/*.e2e-spec.ts | paste -sd '|')"
+          if [ -z "$suites" ]; then
+            echo "::error::no e2e suite uses runWithRedis"
+            exit 1
+          fi
+          suites="$suites|test/email-delivery.e2e-spec.ts"
+          npm run test:e2e -- --testPathPatterns="$suites" --json --outputFile="$RUNNER_TEMP/redis-e2e.json"
+          # A skip here means that the suites did not see Redis.
+          node -e '
+            const r = require(process.argv[1]);
+            console.log(`Redis e2e: ${r.numPassedTests} passed, ${r.numPendingTests} skipped`);
+            if (r.numTotalTests === 0 || r.numPendingTests > 0) process.exit(1);
+          ' "$RUNNER_TEMP/redis-e2e.json"
 
       - uses: actions/upload-artifact@v7
         if: always()
