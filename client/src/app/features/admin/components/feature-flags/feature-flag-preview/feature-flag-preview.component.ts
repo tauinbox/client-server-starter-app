@@ -175,6 +175,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
+          this.#notify.markReported(err);
           this.#notify.error('admin.featureFlagPreview.errorPreviewFailed', {
             detail: parseHttpErrorMessage(err, this.#transloco)
           });

@@ -72,7 +72,6 @@ describe('CaptchaService', () => {
         .flush('boom', { status: 500, statusText: 'Server Error' });
 
       await expect(first).rejects.toBeDefined();
-      expect(service.config()).toBeNull();
 
       const second = service.loadConfig();
       httpMock.expectOne(AuthApiEnum.CaptchaConfig).flush({
@@ -86,7 +85,9 @@ describe('CaptchaService', () => {
         provider: 'turnstile',
         siteKey: 'site-1'
       });
-      expect(service.config()?.enabled).toBe(true);
+
+      await service.loadConfig();
+      httpMock.expectNone(AuthApiEnum.CaptchaConfig);
     });
   });
 

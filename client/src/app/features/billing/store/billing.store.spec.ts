@@ -1,3 +1,4 @@
+import type { MockInstance } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import {
   HttpErrorResponse,
@@ -536,11 +537,13 @@ describe('Billing requests through the error interceptor', () => {
   type Store = InstanceType<typeof BillingStore>;
 
   let httpMock: HttpTestingController;
-  let notifyMock: {
-    success: ReturnType<typeof vi.fn>;
-    error: ReturnType<typeof vi.fn>;
-    warn: ReturnType<typeof vi.fn>;
-  };
+  let notifyError: MockInstance<NotifyService['error']>;
+  let notifyWarn: MockInstance<NotifyService['warn']>;
+
+  // The interceptor shows its message in a later macrotask.
+  function settle(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve));
+  }
 
   function refuse(method: string, path: string): void {
     httpMock
@@ -556,14 +559,13 @@ describe('Billing requests through the error interceptor', () => {
   }
 
   beforeEach(() => {
-    notifyMock = { success: vi.fn(), error: vi.fn(), warn: vi.fn() };
-
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModuleWithLangs],
       providers: [
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
         BillingStore,
-        { provide: NotifyService, useValue: notifyMock },
+        { provide: MatSnackBar, useValue: { open: vi.fn() } },
         {
           provide: AuthStore,
           useValue: { setRules: vi.fn(), setMfaMandatory: vi.fn() }
@@ -571,6 +573,9 @@ describe('Billing requests through the error interceptor', () => {
       ]
     });
     httpMock = TestBed.inject(HttpTestingController);
+    const notify = TestBed.inject(NotifyService);
+    notifyError = vi.spyOn(notify, 'error');
+    notifyWarn = vi.spyOn(notify, 'warn');
   });
 
   afterEach(() => httpMock.verify());
@@ -661,10 +666,11 @@ describe('Billing requests through the error interceptor', () => {
       const done = run(TestBed.inject(BillingStore));
       refuse(method, path);
       await done;
+      await settle();
 
-      expect(notifyMock.warn).not.toHaveBeenCalled();
-      expect(notifyMock.error).toHaveBeenCalledTimes(1);
-      expect(notifyMock.error).toHaveBeenCalledWith(
+      expect(notifyWarn).not.toHaveBeenCalled();
+      expect(notifyError).toHaveBeenCalledTimes(1);
+      expect(notifyError).toHaveBeenCalledWith(
         expect.objectContaining({ status: 409 }),
         fallbackKey
       );
@@ -687,8 +693,9 @@ describe('Billing requests through the error interceptor', () => {
       refuse('GET', path);
     }
     await done;
+    await settle();
 
-    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledTimes(1);
   });
 
   it('a settings load keeps the page flag on until every read lands', async () => {
@@ -730,27 +737,28 @@ describe('Billing requests through the error interceptor', () => {
 
     store.loadMoreInvoices();
     refuse('GET', '/invoices');
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
-    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledTimes(1);
   });
 
-  it('a refused proration preview shows no notification, because the dialog shows it', () => {
+  it('a refused proration preview shows no notification, because the dialog shows it', async () => {
     TestBed.inject(BillingService)
       .previewChange('business')
       .subscribe({ error: vi.fn() });
     refuse('POST', '/subscription/change/preview');
+    await settle();
 
-    expect(notifyMock.error).not.toHaveBeenCalled();
+    expect(notifyError).not.toHaveBeenCalled();
   });
 
-  it('a refused entitlements read keeps the interceptor notification, because no caller shows it', () => {
+  it('a refused entitlements read keeps the interceptor notification, because no caller shows it', async () => {
     TestBed.inject(BillingService)
       .getEntitlements()
       .subscribe({ error: vi.fn() });
     refuse('GET', '/entitlements');
+    await settle();
 
-    expect(notifyMock.error).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledTimes(1);
   });
 });

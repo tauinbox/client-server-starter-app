@@ -73,8 +73,6 @@ export class AuthService {
   readonly #destroyRef = inject(DestroyRef);
   readonly #window = inject(DOCUMENT).defaultView;
 
-  readonly isAuthenticated = this.#authStore.isAuthenticated;
-
   constructor() {
     this.#notificationsService.sessionInvalidated$
       .pipe(takeUntilDestroyed(this.#destroyRef))

@@ -538,16 +538,6 @@ describe('AuthService', () => {
     });
   });
 
-  describe('isAuthenticated', () => {
-    it('should reflect the store isAuthenticated state', () => {
-      authStoreMock.isAuthenticated.mockReturnValue(true);
-      expect(service.isAuthenticated()).toBe(true);
-
-      authStoreMock.isAuthenticated.mockReturnValue(false);
-      expect(service.isAuthenticated()).toBe(false);
-    });
-  });
-
   describe('session_invalidated push', () => {
     it('signs out and keeps the current URL as the return URL', () => {
       const router = TestBed.inject(Router);

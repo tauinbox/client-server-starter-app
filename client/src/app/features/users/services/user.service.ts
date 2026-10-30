@@ -4,7 +4,6 @@ import { silentContext } from '@core/context-tokens/error-notifications';
 import type { Observable } from 'rxjs';
 import type { UserEffectivePermissionsResponse } from '@app/shared/types';
 import type {
-  CreateUser,
   CursorPaginatedResponse,
   UpdateUser,
   User,
@@ -39,10 +38,6 @@ export class UserService {
     return this.#http.get<User>(`${USERS_API_V1}/${id}`, {
       context: silentContext()
     });
-  }
-
-  create(user: CreateUser): Observable<User> {
-    return this.#http.post<User>(USERS_API_V1, user);
   }
 
   update(id: string, user: UpdateUser): Observable<User> {

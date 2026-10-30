@@ -33,6 +33,7 @@ describe('errorInterceptor', () => {
     error: ReturnType<typeof vi.fn>;
     info: ReturnType<typeof vi.fn>;
     warn: ReturnType<typeof vi.fn>;
+    reportLater: ReturnType<typeof vi.fn>;
   };
   let authStoreMock: {
     setRules: ReturnType<typeof vi.fn>;
@@ -45,7 +46,10 @@ describe('errorInterceptor', () => {
       success: vi.fn(),
       error: vi.fn(),
       info: vi.fn(),
-      warn: vi.fn()
+      warn: vi.fn(),
+      reportLater: vi.fn((_error: HttpErrorResponse, show: () => void) =>
+        show()
+      )
     };
     authStoreMock = {
       setRules: vi.fn(),
@@ -80,9 +84,11 @@ describe('errorInterceptor', () => {
       { status: 500, statusText: 'Internal Server Error' }
     );
 
+    expect(notifyMock.reportLater).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
     expect(arg.status).toBe(500);
+    expect(notifyMock.reportLater.mock.calls[0][0]).toBe(arg);
   });
 
   it('should not notify for 401 error', () => {

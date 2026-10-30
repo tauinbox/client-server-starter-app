@@ -152,4 +152,61 @@ describe('NotifyService', () => {
       );
     });
   });
+
+  describe('reportLater', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function refusal(): HttpErrorResponse {
+      return new HttpErrorResponse({ error: null, status: 409 });
+    }
+
+    it('runs the callback in a later macrotask', () => {
+      vi.useFakeTimers();
+      const show = vi.fn();
+
+      service.reportLater(refusal(), show);
+      expect(show).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+      expect(show).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips the callback after error() of the same object', () => {
+      vi.useFakeTimers();
+      const error = refusal();
+      const show = vi.fn();
+
+      service.reportLater(error, show);
+      service.error(error);
+      vi.runAllTimers();
+
+      expect(show).not.toHaveBeenCalled();
+      expect(snackBarMock.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips the callback after markReported() of the same object', () => {
+      vi.useFakeTimers();
+      const error = refusal();
+      const show = vi.fn();
+
+      service.reportLater(error, show);
+      service.markReported(error);
+      vi.runAllTimers();
+
+      expect(show).not.toHaveBeenCalled();
+    });
+
+    it('runs the callback when another error object was reported', () => {
+      vi.useFakeTimers();
+      const show = vi.fn();
+
+      service.reportLater(refusal(), show);
+      service.error(refusal());
+      vi.runAllTimers();
+
+      expect(show).toHaveBeenCalledTimes(1);
+    });
+  });
 });

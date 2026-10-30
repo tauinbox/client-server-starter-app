@@ -86,7 +86,7 @@ export const errorInterceptor: HttpInterceptorFn = (
             catchError(() => {
               // Permissions fetch itself failed — show snackbar for original 403
               if (!silentMode) {
-                notify.error(error);
+                notify.reportLater(error, () => notify.error(error));
               }
               return throwError(() => error);
             }),
@@ -100,7 +100,9 @@ export const errorInterceptor: HttpInterceptorFn = (
                 catchError((retryError: HttpErrorResponse) => {
                   // Retry failed — permission is genuinely revoked
                   if (!silentMode) {
-                    notify.error(retryError);
+                    notify.reportLater(retryError, () =>
+                      notify.error(retryError)
+                    );
                   }
                   return throwError(() => retryError);
                 })
@@ -118,15 +120,17 @@ export const errorInterceptor: HttpInterceptorFn = (
           const retryAfter = parseRetryAfterSeconds(
             retryAfterHeader(error.headers)
           );
-          if (retryAfter !== null) {
-            notify.warn('errors.general.tooManyRequestsRetry', {
-              seconds: retryAfter
-            });
-          } else {
-            notify.warn('errors.general.tooManyRequests');
-          }
+          notify.reportLater(error, () => {
+            if (retryAfter !== null) {
+              notify.warn('errors.general.tooManyRequestsRetry', {
+                seconds: retryAfter
+              });
+            } else {
+              notify.warn('errors.general.tooManyRequests');
+            }
+          });
         } else {
-          notify.error(error);
+          notify.reportLater(error, () => notify.error(error));
         }
       }
 
