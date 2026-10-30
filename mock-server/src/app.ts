@@ -21,7 +21,8 @@ export function createApp() {
   // no preflight, and a login sent that way plants the sender's session.
   app.use(express.json({ limit: '100kb' }));
   // Express 5 leaves `req.body` undefined when no JSON body was parsed. The
-  // handlers validate an empty object into the same 400 as the server.
+  // handlers validate an empty object into the same validation error as the
+  // server.
   app.use((req, _res, next) => {
     req.body ??= {};
     next();

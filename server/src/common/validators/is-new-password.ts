@@ -9,8 +9,8 @@ import {
  * The rules of every field that SETS a password. A field that only verifies a
  * password keeps its own rules. `applyDecorators` registers the list in order,
  * while a decorator stack registers bottom-up, so the list is the reverse of
- * `@IsString() @IsNotEmpty() @MinLength() @MaxLength()`. The 400 list is thus
- * MaxLength, MinLength, IsNotEmpty, IsString.
+ * `@IsString() @IsNotEmpty() @MinLength() @MaxLength()`. The list of messages
+ * is thus MaxLength, MinLength, IsNotEmpty, IsString.
  */
 export const IsNewPassword = (): PropertyDecorator =>
   applyDecorators(

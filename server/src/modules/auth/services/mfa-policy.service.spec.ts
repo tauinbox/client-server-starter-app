@@ -30,7 +30,7 @@ describe('MfaPolicyService', () => {
       expect(build({ MFA_ENCRYPTION_KEY: KEY }).isEnforced).toBe(false);
     });
 
-    it('is off while the encryption key is empty, because enrolment answers 503', () => {
+    it('is off while the encryption key is empty, because enrolment answers MFA_UNAVAILABLE', () => {
       const service = build({
         MFA_ENCRYPTION_KEY: '',
         MFA_REQUIRED_FOR_ADMINS: 'true'

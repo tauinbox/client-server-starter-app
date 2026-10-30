@@ -103,7 +103,7 @@ export class RoleService {
   ): Promise<void> {
     if (ability === SYSTEM_ABILITY) return;
     // Resolve before the super bypass so unknown permission ids fail with a
-    // clean 422 for every caller instead of an opaque FK-violation 409.
+    // clean `UNKNOWN_PERMISSION` for every caller, not a foreign-key error.
     const resolved = await this.resolveGrantItems(items);
     if (ability.can('manage', 'all')) return;
     const refusal = grantRefusalOf(ability, resolved, {
@@ -558,11 +558,11 @@ export class RoleService {
 
   /**
    * Membership writes go straight to `user_roles`, which accepts a soft-deleted
-   * user and answers an unknown one with an opaque FK-violation 409. Resolving
-   * the target up front turns both into a 404 and guarantees the instance-level
-   * check below always has a row to run against. Soft-deleted users are not
-   * mutable through the admin API (same rule as UsersService.update) - restore
-   * the account first.
+   * user and answers an unknown one with a foreign-key error. Resolving the
+   * target up front turns both into `USERS.NOT_FOUND` and guarantees the
+   * instance-level check below always has a row to run against. Soft-deleted
+   * users are not mutable through the admin API (same rule as
+   * UsersService.update) - restore the account first.
    */
   private async loadRoleAssignmentTarget(userId: string): Promise<User> {
     const targetUser = await this.roleRepository.manager.findOne(User, {

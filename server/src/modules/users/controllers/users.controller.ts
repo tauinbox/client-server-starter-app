@@ -507,7 +507,7 @@ export class UsersController {
 
     // The row goes first: the revocation runs in the auth module and cannot
     // share its transaction. A revocation never happens without its row; a
-    // row whose revocation failed is answered 500 and the admin retries.
+    // row whose revocation failed gets a server error and the admin retries.
     await this.auditService.log({
       action: AuditAction.SESSION_REVOKE,
       actorId: req.user.userId,

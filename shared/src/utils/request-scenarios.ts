@@ -77,11 +77,11 @@ export const STATE_FIXTURES = [
    * `customer` when the scenario has one.
    */
   'subscription',
-  /** A fixed monthly plan `$meterKey` with a `yookassa` price of 1000 RUB. */
+  /** A fixed monthly plan `$meterKey` with a `yookassa` price of 10.00 RUB. */
   'fixed-plan',
-  /** A fixed monthly plan `$planKey` with a `yookassa` price of 1000 RUB. */
+  /** A fixed monthly plan `$planKey` with a `yookassa` price of 10.00 RUB. */
   'other-plan',
-  /** A product `$productKey` with a `yookassa` price of 500 RUB. */
+  /** A product `$productKey` with a `yookassa` price of 5.00 RUB. */
   'product',
   /** The kill switches of all billing providers are off for the actor. */
   'providers-disabled',

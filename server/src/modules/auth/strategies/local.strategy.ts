@@ -18,9 +18,10 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
    * passport reads the raw request body: this is the only place credentials
    * can be canonicalized before the lookup. Non-strings and values over the
    * `LoginDto` caps collapse to the empty string, so a malformed body stays on
-   * the ordinary invalid-credentials path (401, audited, constant-time) rather
-   * than being handed to the repository, or written to the audit log, as is.
-   * A 400 here would break the recorded 401 contract of the route.
+   * the ordinary invalid-credentials path (`INVALID_CREDENTIALS`, audited,
+   * constant-time) rather than being handed to the repository, or written to
+   * the audit log, as is. A validation error here would break the recorded
+   * `INVALID_CREDENTIALS` contract of the route.
    *
    * `maxLength` is the check `@MaxLength` runs. It counts a surrogate pair as
    * one character, so a stored password that passed the DTO still fits.

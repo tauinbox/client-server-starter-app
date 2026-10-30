@@ -76,8 +76,9 @@ export class WebhookIngestionService {
       throw new BadRequestException('Webhook verification failed');
     }
     if (event === WEBHOOK_IGNORED) {
-      // Ack: a 400 would retry a delivery that can never do anything, and would
-      // make routine traffic indistinguishable from a forged signature.
+      // Ack: a Bad Request would retry a delivery that can never do anything,
+      // and would make routine traffic indistinguishable from a forged
+      // signature.
       this.logger.debug(`Ignored ${providerId} webhook with nothing to reduce`);
       return;
     }

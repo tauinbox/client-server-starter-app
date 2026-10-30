@@ -600,8 +600,9 @@ export function hasSuperRole(user: MockUser): boolean {
 
 /**
  * Mirrors MfaPolicyService. The real server also needs MFA_ENCRYPTION_KEY,
- * because enrolment answers 503 without it; the mock stores no secret, so its
- * enrolment is always available and the opt-in flag is the whole condition.
+ * because enrolment answers `MFA_UNAVAILABLE` without it; the mock stores no
+ * secret, so its enrolment is always available and the opt-in flag is the whole
+ * condition.
  */
 export function isMfaMandatoryFor(user: MockUser): boolean {
   return (

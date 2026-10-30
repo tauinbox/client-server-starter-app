@@ -10,7 +10,7 @@ const LOGIN_LONG_WINDOW = 'login-long-window';
 
 /**
  * Extends ThrottlerGuard so that the `login-long-window` throttler only counts
- * failed login attempts. On a successful response (HTTP < 400) the increment
+ * failed login attempts. On a successful response (a 2xx or 3xx) the increment
  * that was speculatively written to the store is removed, keeping the counter
  * accurate for brute-force protection without penalising legitimate logins.
  *

@@ -347,8 +347,8 @@ export class OAuthService {
    * Loads the account that an intent cookie names. The cookie can outlive the
    * session that minted it - another tab, another device, a replayed request -
    * so the account must still be active and the intent must postdate the last
-   * revocation. A missing account throws 404 inside `findOne`; the callback
-   * turns each refusal into the same redirect.
+   * revocation. A missing account throws `USERS.NOT_FOUND` inside `findOne`;
+   * the callback turns each refusal into the same redirect.
    */
   private async intentHolder(
     userId: string,

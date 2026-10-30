@@ -101,8 +101,8 @@ export class UsageService {
       ));
     } catch (error: unknown) {
       // Lost an insert race on the same idempotency key — the unique constraint
-      // rejected the second writer. Return the record the winner persisted so the
-      // call stays idempotent rather than surfacing a 500.
+      // rejected the second writer. Return the record the winner persisted so
+      // the call stays idempotent rather than surfacing a server error.
       if (isUniqueViolation(error)) {
         const winner = await this.usageRecords.findOne({
           where: {

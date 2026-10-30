@@ -43,10 +43,10 @@ export const PROTOTYPE_KEYS = new Set([
 ]);
 
 /**
- * Maximum object-nesting depth accepted by the recursive safety checks.
- * No legitimate RBAC condition approaches this; without a cap a crafted
- * deeply nested body overflows the call stack (RangeError -> 500) instead
- * of being rejected as invalid input.
+ * Maximum object-nesting depth accepted by the recursive safety checks. No
+ * legitimate RBAC condition approaches this; without a cap a crafted deeply
+ * nested body overflows the call stack (a RangeError, so a server error)
+ * instead of being rejected as invalid input.
  */
 export const MAX_MONGO_QUERY_DEPTH = 32;
 

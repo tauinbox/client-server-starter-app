@@ -204,9 +204,10 @@ router.patch(
   (req, res) => {
     const id = req.params['id'] as string;
 
-    // The server's global ValidationPipe runs before the handler, so a body that
-    // fails UpdateUserDto is a 400 whether or not the addressed row exists. Only
-    // checks that need the looked-up row stay below the 404.
+    // The server's global ValidationPipe runs before the handler, so a body
+    // that fails UpdateUserDto is a validation error whether or not the
+    // addressed row exists. Only checks that need the looked-up row stay below
+    // `NOT_FOUND`.
     const { password, isActive, unlockAccount, locale, currentPassword, code } =
       req.body;
     const name = trimName(req.body['name']);
@@ -226,8 +227,8 @@ router.patch(
       return;
     }
 
-    // An explicit null is a 400 on the server, not an absent field: UpdateUserDto
-    // uses PartialType(..., { skipNullProperties: false }).
+    // An explicit null fails the DTO on the server, not an absent field:
+    // UpdateUserDto uses PartialType(..., { skipNullProperties: false }).
     const email =
       req.body.email === undefined
         ? undefined
@@ -303,8 +304,8 @@ router.patch(
     }
 
     // The blocklist verdict comes from UsersService.update on the real server,
-    // after the ability check and before any field assignment, so a 400 must
-    // leave the record unchanged.
+    // after the ability check and before any field assignment, so a refused
+    // password must leave the record unchanged.
     const passwordRefusal =
       password === undefined
         ? null

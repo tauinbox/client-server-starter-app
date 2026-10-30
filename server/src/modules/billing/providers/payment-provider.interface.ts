@@ -377,8 +377,8 @@ export interface PaymentProvider {
    * Verifies a raw delivery and maps it onto a `NormalizedEvent`. Returns
    * `null` when the payload is not authentic (bad/absent signature, an object
    * the provider's API does not confirm, an unparseable body) — the seam
-   * answers 400 — and `WEBHOOK_IGNORED` when the delivery is authentic but
-   * carries nothing to reduce, which is acked.
+   * answers Bad Request — and `WEBHOOK_IGNORED` when the delivery is authentic
+   * but carries nothing to reduce, which is acked.
    */
   verifyAndParseWebhook(
     rawBody: Buffer,

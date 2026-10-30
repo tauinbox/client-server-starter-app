@@ -47,10 +47,10 @@ function parseParam<K extends ListFilterKind>(
 }
 
 /**
- * Reads one list param from a string that nothing has validated yet, such as
- * a URL. The result is `undefined` for every value that the server rejects
- * with a 400 or reads as unset, so the caller can drop the param instead of
- * sending it.
+ * Reads one list param from a string that nothing has validated yet, such as a
+ * URL. The result is `undefined` for every value that the server rejects as a
+ * bad query param or reads as unset, so the caller can drop the param instead
+ * of sending it.
  */
 export function parseListParam(
   definition: ListFilterDefinition,

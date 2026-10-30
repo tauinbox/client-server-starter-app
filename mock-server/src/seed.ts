@@ -612,7 +612,8 @@ export const seedFeatureFlagRules: MockFeatureFlagRule[] =
 // Free/Pro/Business (fixed) + the `usage` tier. Two prices per tier
 // (RUB via YooKassa, USD via Paddle) in minor units. Unlike the server seeder,
 // each Paddle price carries a `providerPriceId`: a real id is per Paddle
-// account, and without one a Paddle checkout or plan change answers 503.
+// account, and without one a Paddle checkout or plan change answers
+// `PLAN_NOT_CONFIGURED`.
 function generatePlans(): MockPlan[] {
   const now = '2025-01-01T00:00:00.000Z';
   const base = {
@@ -719,11 +720,12 @@ function generatePlans(): MockPlan[] {
 
 export const seedPlans: MockPlan[] = generatePlans();
 
-// One-time purchase catalog — mirrors server/src/seeders/billing-products.seeder.ts:
-// a fixed-price sku unlocking the `reports` entitlement for 30 days, a bounded
-// custom-amount donation (no grant), and prepaid credit packs. Unlike the server
-// seeder, the fixed-price Paddle entries carry a `paddlePriceId`: a real id is
-// per Paddle account, and without one POST /billing/purchase answers 503.
+// One-time purchase catalog — mirrors
+// server/src/seeders/billing-products.seeder.ts: a fixed-price sku unlocking
+// the `reports` entitlement for 30 days, a bounded custom-amount donation (no
+// grant), and prepaid credit packs. Unlike the server seeder, the fixed-price
+// Paddle entries carry a `paddlePriceId`: a real id is per Paddle account, and
+// without one POST /billing/purchase answers `PRODUCT_NOT_CONFIGURED`.
 function generateProducts(): MockProduct[] {
   const now = '2025-01-01T00:00:00.000Z';
   return [

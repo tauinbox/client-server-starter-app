@@ -1,9 +1,9 @@
 /**
  * Recognises the two spellings a query string can carry for a boolean and
- * leaves anything else untouched, so `@IsBoolean()` rejects it with a 400
- * instead of the filter being silently dropped. An absent or empty parameter
- * (`?isActive=`) stays `undefined` - the same "filter not set" reading the
- * string filters give an empty value.
+ * leaves anything else untouched, so `@IsBoolean()` rejects it as a bad query
+ * param instead of the filter being silently dropped. An absent or empty
+ * parameter (`?isActive=`) stays `undefined` - the same "filter not set"
+ * reading the string filters give an empty value.
  */
 export function toOptionalBoolean({ value }: { value: unknown }): unknown {
   if (value === 'true' || value === true) return true;

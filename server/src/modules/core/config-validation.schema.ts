@@ -54,7 +54,8 @@ export const configValidationSchema = Joi.object({
   MFA_ENCRYPTION_KEY: Joi.string().base64().length(44).optional().allow(''),
   // Opt-in: an account holding a super role reaches no route behind
   // `@Authorize` until it has enrolled a second factor. It stays inert while
-  // MFA_ENCRYPTION_KEY is empty, because enrolment answers 503 in that state.
+  // MFA_ENCRYPTION_KEY is empty, because enrolment answers
+  // `MFA_UNAVAILABLE` in that state.
   MFA_REQUIRED_FOR_ADMINS: Joi.string()
     .valid('true', 'false')
     .optional()
