@@ -7,8 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -26,6 +26,7 @@
     "migrations:run": "npx typeorm-ts-node-esm migration:run -d dist/server/src/postgres-data-source.js",
     "migrations:revert": "npx typeorm-ts-node-esm migration:revert -d dist/server/src/postgres-data-source.js",
     "check:routes": "ts-node scripts/check-routes.ts",
+    "check:route-policy": "ts-node scripts/check-route-policy.ts",
     "check:scenarios": "ts-node -r tsconfig-paths/register scripts/check-scenarios.ts",
     "check:enums": "ts-node scripts/check-enums.ts",
     "check:controllers": "ts-node scripts/check-controllers.ts",

@@ -19,7 +19,40 @@ per server module:
 | `routes/billing.json` | `billing` (user + plans + webhooks) |
 | `routes/billing-admin.json` | `billing` (admin controller) |
 
-Each file is `{ "routes": [{ "method", "path", "expectedStatus" }, ...] }`.
+Each file is `{ "routes": [{ "method", "path", "expectedStatus", "policy" }, ...] }`.
+
+## Access policy (`policy`)
+
+Each route states its access policy. The decorators of the handler and of its
+class must equal it, and so must the gate of the mock-server route.
+
+```json
+"policy": {
+  "access": "update:Profile",
+  "writes": "update:Profile",
+  "stepUp": false,
+  "countFailuresOnlyWhenBody": true,
+  "skipMfaEnrolmentGate": true,
+  "throttle": ["login-long-window"]
+}
+```
+
+- `access`: `public` (`@Public`), `optional` (`@OptionalAuth`), `signed-in`
+  (no decorator: the global JWT guard), or `<action>:<Subject>` (`@Authorize`).
+  The mock route has no guard, `authGuard`, or
+  `permissionGuard('<action>', '<Subject>')`.
+- `writes`: the `<action>:<Subject>` of the records that the route changes.
+  `Profile` is the own account of the caller. It is `null` for a read, and for
+  a route that changes only sign-in, sign-out, token or own-billing state.
+  Routes with the same `writes` must have the same `access`. A route that has a
+  reason to differ carries `"accessExempt": "<reason>"`.
+- `stepUp`: the handler has `@StepUpRoute`. A handler whose body is
+  `StepUpFactorsDto` or `MfaSetupDto` must have it.
+- `countFailuresOnlyWhenBody`: `@CountFailuresOnlyWhenBody` or `@StepUpRoute`.
+- `skipMfaEnrolmentGate`: `@SkipMfaEnrolmentGate`. The mock passes
+  `{ skipMfaEnrolmentGate: true }` to `permissionGuard`.
+- `throttle`: the sorted throttler names that `@Throttle` or `@StepUpRoute`
+  set, `"skip"` for `@SkipThrottle`, or `null`.
 
 ## How it's consumed
 
@@ -29,6 +62,9 @@ list of modules to maintain. **Adding a feature = drop a new `routes/<feature>.j
 - `server/scripts/check-routes.ts` (`npm run check:routes`) — verifies the manifest
   matches the routes extracted from server controllers, and that `version` matches
   `server/package.json`.
+- `server/scripts/check-route-policy.ts` (`npm run check:route-policy`) — verifies
+  each `policy` against the decorators and the mock-server gate, as described
+  above. `--self-test` runs the four rules against planted fixtures.
 - `server/test/check-auth-coverage.e2e-spec.ts` — asserts every `expectedStatus: 401`
   route actually returns 401 unauthenticated.
 - `mock-server/src/__tests__/contract.spec.ts` — asserts the mock server returns each

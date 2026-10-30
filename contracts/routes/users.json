@@ -3,52 +3,136 @@
     {
       "method": "POST",
       "path": "/api/v1/users",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "create:User",
+        "writes": "create:User",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/users/cursor",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "search:User",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/users/search/cursor",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "search:User",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/users/1",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:User",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/users/1/permissions",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:User",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "PATCH",
       "path": "/api/v1/users/1",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:User",
+        "writes": "update:User",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": true,
+        "skipMfaEnrolmentGate": false,
+        "throttle": [
+          "login-long-window"
+        ]
+      }
     },
     {
       "method": "DELETE",
       "path": "/api/v1/users/1",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "delete:User",
+        "writes": "delete:User",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/users/1/restore",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "delete:User",
+        "writes": "delete:User",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/users/1/mfa/reset",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:User",
+        "writes": "update:User",
+        "stepUp": true,
+        "countFailuresOnlyWhenBody": true,
+        "skipMfaEnrolmentGate": false,
+        "throttle": [
+          "login-long-window"
+        ]
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/users/1/sessions/revoke",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:User",
+        "writes": "update:User",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     }
   ]
 }

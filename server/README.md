@@ -1404,6 +1404,13 @@ asserted against the mock server alone, in `mock-server/src/__tests__/contract.s
 wrong status there records mock behaviour and not server behaviour. Measure a new value against the
 real application before you write it.
 
+Each manifest entry also declares its access `policy` (`contracts/README.md`, "Access policy").
+`npm run check:route-policy` compares it with the `@Public`, `@OptionalAuth`, `@Authorize`,
+`@StepUpRoute`, `@CountFailuresOnlyWhenBody`, `@SkipMfaEnrolmentGate`, `@Throttle` and
+`@SkipThrottle` decorators of the handler and its class, and with the guard of the mock-server
+route. Routes that write the same `<action>:<Subject>` must have the same `access`, unless one
+states an `accessExempt` reason.
+
 **Request scenarios** (`contracts/scenarios/`) state the result of one request: the actor, the state
 before the request, the status, the `errorKey` and the audit actions it writes. The e2e suite
 `test/scenarios.e2e-spec.ts` runs them against the real server and database, and
@@ -2103,13 +2110,19 @@ parallel:
 | Throttler | Window | Limit | Notes |
 |-----------|--------|-------|-------|
 | `default` (unnamed) | 60 s | 120 requests for each IP | A soft ceiling for the whole SPA. A `@Throttle({ default: { ttl, limit } })` decorator on a route replaces it on a sensitive endpoint |
-| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | It does nothing at the global level. `/auth/login`, the two two-factor challenge routes, the four step-up routes, the password branch of `PATCH /auth/profile` the credential branch of `PATCH /users/:id` and `POST /users/:id/mfa/reset` tighten it to `MAX_FAILED_ATTEMPTS - 1`. Thus one IP cannot collect enough failed attempts to trip the account-lockout protection (SEC-6). It counts a **failed** attempt only: `LoginThrottlerGuard` refunds the increment when the response finishes below 400. Thus a shared NAT egress cannot lock out its own users with a successful login |
+| `login-long-window` | 15 min (`LOCKOUT_DURATION_MS`) | 4 999 (`MAX_FAILED_ATTEMPTS * 1000`) | It does nothing at the global level. `/auth/login`, the two two-factor challenge routes, the seven step-up routes that take `CHALLENGE_THROTTLE` and `POST /auth/mfa/enable`, the password branch of `PATCH /auth/profile` the credential branch of `PATCH /users/:id` and `POST /users/:id/mfa/reset` tighten it to `MAX_FAILED_ATTEMPTS - 1`. Thus one IP cannot collect enough failed attempts to trip the account-lockout protection (SEC-6). It counts a **failed** attempt only: `LoginThrottlerGuard` refunds the increment when the response finishes below 400. Thus a shared NAT egress cannot lock out its own users with a successful login |
 
 A route that verifies a secret beside fields that verify none marks the secret with
 `@CountFailuresOnlyWhenBody('<field>')` (`modules/core/failure-counter.decorator.ts`). A request
 without that field then skips the `login-long-window` counter and keeps every other limit.
 `PATCH /auth/profile` needs this: it answers a password change and a display-name change through one
 handler, and a name change must never spend the budget that guards the password.
+
+A step-up route (a `StepUpFactorsDto` or `MfaSetupDto` body) uses `@StepUpRoute(dto, throttle?)`
+(`modules/auth/decorators/step-up-route.decorator.ts`). It applies the throttle (`CHALLENGE_THROTTLE`
+by default), `@CountFailuresOnlyWhenBody` with the secret fields of the DTO, and an optional
+`@ApiBody`, so the throttle cannot come without the body rule. `npm run check:route-policy` refuses
+a handler with such a body and no `@StepUpRoute`.
 
 `buildThrottlerOptions(REDIS_URL)` (`modules/core/throttler-options.ts`) builds the two throttlers.
 With `REDIS_URL` set, the throttler uses `RedisThrottlerStorage`, thus each instance shares the

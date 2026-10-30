@@ -15,9 +15,10 @@ import {
  * initiation (3 per hour). `ThrottlerGuard.generateKey` hashes the handler name
  * into the storage key, so each route keeps a counter of its own.
  *
- * Each step-up route also carries `@CountFailuresOnlyWhenBody`: an account with
- * no password proves itself with the `reauth_proof` cookie, and a request that
- * presents no secret must not spend the budget that guards one.
+ * Each step-up route takes this throttle through `@StepUpRoute`, which also
+ * applies `@CountFailuresOnlyWhenBody`: an account with no password proves
+ * itself with the `reauth_proof` cookie, and a request that presents no secret
+ * must not spend the budget that guards one.
  */
 export const CHALLENGE_THROTTLE = {
   default: { ttl: 60000, limit: 5 },

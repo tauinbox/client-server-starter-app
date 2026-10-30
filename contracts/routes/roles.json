@@ -3,67 +3,171 @@
     {
       "method": "GET",
       "path": "/api/v1/roles",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:Role",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/roles/permissions",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:Role",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/roles/role-admin",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:Role",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/roles",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "create:Role",
+        "writes": "create:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "PATCH",
       "path": "/api/v1/roles/role-admin",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Role",
+        "writes": "update:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "DELETE",
       "path": "/api/v1/roles/role-admin",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "delete:Role",
+        "writes": "delete:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/roles/role-admin/permissions",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:Role",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "PUT",
       "path": "/api/v1/roles/role-admin/permissions",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Role",
+        "writes": "update:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/roles/role-admin/permissions",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Role",
+        "writes": "update:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "DELETE",
       "path": "/api/v1/roles/role-admin/permissions/perm-1",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Role",
+        "writes": "update:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/roles/assign/1",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "assign:Role",
+        "writes": "assign:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "DELETE",
       "path": "/api/v1/roles/assign/1/role-admin",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "assign:Role",
+        "writes": "assign:Role",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/roles/cursor",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:Role",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     }
   ]
 }

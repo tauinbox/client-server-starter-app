@@ -37,7 +37,7 @@ import {
 import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
-import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
+import { StepUpRoute } from '../decorators/step-up-route.decorator';
 import { AuthCookies } from '../utils/auth-cookies';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
@@ -56,13 +56,11 @@ export class MfaController {
     private readonly signIn: SignInCompletionService
   ) {}
 
-  @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword')
+  @StepUpRoute(MfaSetupDto)
   @Post('setup')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Start a two-factor enrolment' })
-  @ApiBody({ type: MfaSetupDto })
   @ApiOkResponse({
     description: 'Secret and QR code for the authenticator app',
     type: MfaSetupResponseDto
@@ -119,13 +117,11 @@ export class MfaController {
     );
   }
 
-  @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword', 'code')
+  @StepUpRoute(StepUpFactorsDto)
   @Post('disable')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Turn two-factor off' })
-  @ApiBody({ type: StepUpFactorsDto })
   @ApiOkResponse({ description: 'Two-factor has been turned off' })
   async disable(
     @Request() req: JwtAuthRequest,
@@ -150,13 +146,11 @@ export class MfaController {
     return { message: 'Two-factor authentication has been turned off' };
   }
 
-  @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword', 'code')
+  @StepUpRoute(StepUpFactorsDto)
   @Post('recovery-codes')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Replace the recovery codes with a fresh set' })
-  @ApiBody({ type: StepUpFactorsDto })
   @ApiOkResponse({
     description: 'The new codes, readable only in this response',
     type: MfaRecoveryCodesResponseDto

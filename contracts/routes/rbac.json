@@ -3,22 +3,54 @@
     {
       "method": "GET",
       "path": "/api/v1/rbac/resources",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:Permission",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/rbac/resources/1/restore",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Permission",
+        "writes": "update:Permission",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "PATCH",
       "path": "/api/v1/rbac/resources/1",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Permission",
+        "writes": "update:Permission",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/rbac/resources/cursor",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "read:Permission",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     }
   ]
 }
