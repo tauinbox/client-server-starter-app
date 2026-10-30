@@ -135,11 +135,31 @@ export class RoleService {
     return ability !== SYSTEM_ABILITY && !ability.can('manage', 'all');
   }
 
-  private async findDenyRows(roleId: string): Promise<RolePermission[]> {
-    const rows = await this.rolePermissionRepository.find({
-      where: { roleId }
+  /**
+   * Locks the role row, then refuses the lift of the stored rows that `lifted`
+   * selects. A grant row goes in only under a key-share lock on its role, so
+   * the rows read here stay the same until the commit: a deny that another
+   * request adds cannot slip past the check. Throws `ROLES.NOT_FOUND` when the
+   * role is gone.
+   */
+  private async lockRoleForLift(
+    em: EntityManager,
+    ability: AbilityOrSystem,
+    roleId: string,
+    actorId: string | undefined,
+    lifted: (rows: RolePermission[]) => RolePermission[] = (rows) => rows
+  ): Promise<void> {
+    const locked = await em.findOne(Role, {
+      where: { id: roleId },
+      lock: { mode: 'pessimistic_write' }
     });
-    return rows.filter((row) => isDenyCondition(row.conditions));
+    if (!locked) throw this.roleNotFound();
+    if (!this.isScopeChecked(ability)) return;
+    const rows = await em.find(RolePermission, { where: { roleId } });
+    await this.assertDenyLiftAllowed(ability, lifted(rows), {
+      actorId,
+      roleId
+    });
   }
 
   private refuseGrant(
@@ -455,23 +475,15 @@ export class RoleService {
         'Cannot delete system roles'
       );
     }
-    if (this.isScopeChecked(ability)) {
-      await this.assertDenyLiftAllowed(ability, await this.findDenyRows(id), {
-        actorId,
-        roleId: id
-      });
-    }
-    // Invalidate after the commit of the delete, or a holder read in between
-    // re-caches the deleted grants for the TTL. Holders are read first: the
-    // delete cascades.
-    const holderIds = await this.findHolderIds(id);
+    // Invalidate after the commit, or a holder read in between re-caches the
+    // deleted grants for the TTL. Holders are read before the delete cascades.
+    let holderIds: string[] = [];
     const auditRow = audit?.(role);
     await this.writeWithRoleEvent(
       async (em) => {
-        // The delete is the existence check: of two concurrent deletes, the
-        // loser writes no audit row and sends no event.
-        const { affected } = await em.delete(Role, { id });
-        if (!affected) throw this.roleNotFound();
+        await this.lockRoleForLift(em, ability, id, actorId);
+        holderIds = await this.findHolderIds(em, id);
+        await em.delete(Role, { id });
       },
       RoleDeletedEvent.name,
       (em, committed) => new RoleDeletedEvent(role.name, em, committed),
@@ -677,13 +689,6 @@ export class RoleService {
         { actorId, targetId: roleId, targetType: 'Role' },
         this.metricsService
       );
-      if (this.isScopeChecked(ability)) {
-        await this.assertDenyLiftAllowed(
-          ability,
-          await this.findDenyRows(roleId),
-          { actorId, roleId }
-        );
-      }
     }
 
     // The delete is the existence check, so a concurrent removal cannot
@@ -691,6 +696,7 @@ export class RoleService {
     await this.writeAudited(
       this.roleRepository.manager,
       async (em) => {
+        await this.lockRoleForLift(em, ability, roleId, actorId);
         const { affected } = await em
           .createQueryBuilder()
           .delete()
@@ -733,30 +739,23 @@ export class RoleService {
     this.assertNotSystem(role, ability, actorId);
     await this.assertGrantsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
-    if (this.isScopeChecked(ability)) {
-      // A deny row survives a replace only when it is sent back unchanged;
-      // an edited deny is a lift of the stored one plus a new grant.
-      const lifted = (await this.findDenyRows(roleId)).filter(
-        (row) =>
-          !items.some(
-            (item) =>
-              item.permissionId === row.permissionId &&
-              sameConditions(item.conditions, row.conditions)
-          )
-      );
-      await this.assertDenyLiftAllowed(ability, lifted, { actorId, roleId });
-    }
     await this.writeAudited(
       this.rolePermissionRepository.manager,
       async (em) => {
-        // Two replaces of one role run one after the other. Without the lock
-        // both delete the old rows, and the second insert breaks the unique
-        // index of the grant.
-        const locked = await em.findOne(Role, {
-          where: { id: roleId },
-          lock: { mode: 'pessimistic_write' }
-        });
-        if (!locked) throw this.roleNotFound();
+        // The lock also makes two replaces of one role run one after the
+        // other: else both delete the old rows, and the second insert breaks
+        // the unique index of the grant. A deny row survives a replace only
+        // when it is sent back unchanged.
+        await this.lockRoleForLift(em, ability, roleId, actorId, (rows) =>
+          rows.filter(
+            (row) =>
+              !items.some(
+                (item) =>
+                  item.permissionId === row.permissionId &&
+                  sameConditions(item.conditions, row.conditions)
+              )
+          )
+        );
         await em.delete(RolePermission, { roleId });
         if (items.length > 0) {
           const records = items.map(({ permissionId, conditions }) =>
@@ -816,17 +815,12 @@ export class RoleService {
     const role = await this.loadRole(roleId);
     this.assertCanRole(ability, 'update', role, actorId);
     this.assertNotSystem(role, ability, actorId);
-    if (this.isScopeChecked(ability)) {
-      const row = await this.rolePermissionRepository.findOne({
-        where: { roleId, permissionId }
-      });
-      if (row) {
-        await this.assertDenyLiftAllowed(ability, [row], { actorId, roleId });
-      }
-    }
     await this.writeAudited(
       this.rolePermissionRepository.manager,
       async (em) => {
+        await this.lockRoleForLift(em, ability, roleId, actorId, (rows) =>
+          rows.filter((row) => row.permissionId === permissionId)
+        );
         const { affected } = await em.delete(RolePermission, {
           roleId,
           permissionId
@@ -862,11 +856,16 @@ export class RoleService {
   }
 
   private async invalidateUsersWithRole(roleId: string): Promise<void> {
-    await this.invalidateHolders(await this.findHolderIds(roleId));
+    await this.invalidateHolders(
+      await this.findHolderIds(this.roleRepository.manager, roleId)
+    );
   }
 
-  private async findHolderIds(roleId: string): Promise<string[]> {
-    const users = await this.roleRepository.manager
+  private async findHolderIds(
+    em: EntityManager,
+    roleId: string
+  ): Promise<string[]> {
+    const users = await em
       .createQueryBuilder(User, 'user')
       .select('user.id')
       .innerJoin('user.roles', 'role', 'role.id = :roleId', { roleId })

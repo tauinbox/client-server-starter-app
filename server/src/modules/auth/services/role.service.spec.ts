@@ -160,8 +160,12 @@ describe('RoleService', () => {
             roleRepo.save(entity) as unknown,
           delete: (_target: unknown, criteria: unknown): unknown =>
             roleRepo.delete(criteria) as unknown,
-          createQueryBuilder: (): unknown =>
-            roleRepo.manager.createQueryBuilder() as unknown
+          findOne: (_target: unknown, options: unknown): unknown =>
+            mockRolePermissionRepo.lockRole(options) as unknown,
+          find: (_target: unknown, options: unknown): unknown =>
+            mockRolePermissionRepo.find(options) as unknown,
+          createQueryBuilder: (...args: unknown[]): unknown =>
+            roleRepo.manager.createQueryBuilder(...args) as unknown
         })
     );
 
@@ -188,6 +192,8 @@ describe('RoleService', () => {
         cb({
           findOne: (_target: unknown, options: unknown): unknown =>
             rolePermissionRepo.lockRole(options) as unknown,
+          find: (_target: unknown, options: unknown): unknown =>
+            rolePermissionRepo.find(options) as unknown,
           delete: (_target: unknown, criteria: unknown): unknown =>
             rolePermissionRepo.delete(criteria) as unknown,
           create: (_target: unknown, data: unknown) => data,
@@ -617,11 +623,12 @@ describe('RoleService', () => {
     it('answers ROLES.NOT_FOUND with no event and no invalidation when a concurrent delete won', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
-      mockRoleRepo.delete.mockResolvedValue({ affected: 0 });
+      mockRolePermissionRepo.lockRole.mockResolvedValue(null);
 
       await expect(
         service.delete('role-2', SYSTEM_ABILITY)
       ).rejects.toMatchObject({ errorKey: ErrorKeys.ROLES.NOT_FOUND });
+      expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -1994,9 +2001,7 @@ describe('RoleService', () => {
         await expect(
           service.setPermissionsForRole('role-2', [], ability(), 'actor-1')
         ).rejects.toMatchObject({ status: 403 });
-        expect(
-          mockRolePermissionRepo.manager.transaction
-        ).not.toHaveBeenCalled();
+        expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
         expectLiftRefusal();
       });
 
