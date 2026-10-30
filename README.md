@@ -1923,7 +1923,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server - Checks** | - | audit (high), lint, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:imports | - |
+| **Server - Checks** | - | audit (high), lint, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:imports | - |
 | **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |

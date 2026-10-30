@@ -61,6 +61,8 @@ jobs:
       - run: npm run check:i18n
       - run: npm run check:error-status -- --self-test
       - run: npm run check:error-status
+      - run: npm run check:race -- --self-test
+      - run: npm run check:race
       # Repo-wide, not server-scoped: it walks all four source roots, and
       # `shared/` is linted by no workspace because ESLint cannot reach outside
       # the directory holding its config. The self-test runs first so a check
