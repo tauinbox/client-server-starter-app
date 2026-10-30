@@ -12,14 +12,12 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiBody,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags
 } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -32,8 +30,7 @@ import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { ActiveSessionResponseDto } from '../dtos/active-session-response.dto';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { AuthCookies } from '../utils/auth-cookies';
-import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
-import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
+import { StepUpRoute } from '../decorators/step-up-route.decorator';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { ApiError } from '../../../common/errors/api-error';
 
@@ -87,14 +84,12 @@ export class SessionsController {
    * the refresh cookie in the browser, and the sign-out route already ends it
    * and clears the cookie.
    */
-  @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword', 'code')
+  @StepUpRoute(StepUpFactorsDto)
   @Delete(':sessionId')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'End one other session of the current user' })
   @ApiParam({ name: 'sessionId', format: 'uuid' })
-  @ApiBody({ type: StepUpFactorsDto, required: false })
   @ApiOkResponse({ description: 'The session has ended' })
   @ApiNotFoundResponse({ description: 'No such session for this user' })
   async revokeOne(
@@ -127,15 +122,13 @@ export class SessionsController {
     return { message: 'Session has ended' };
   }
 
-  @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword', 'code')
+  @StepUpRoute(StepUpFactorsDto)
   @Delete()
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'End every session of the current user except this one'
   })
-  @ApiBody({ type: StepUpFactorsDto, required: false })
   @ApiOkResponse({ description: 'Every other session has ended' })
   async revokeOthers(
     @Request() req: JwtAuthRequest,

@@ -3,32 +3,80 @@
     {
       "method": "GET",
       "path": "/api/v1/admin/billing/subscriptions",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "search:Billing",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/billing/invoices",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "search:Billing",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/billing/subscriptions/1/cancel",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Billing",
+        "writes": "update:Billing",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/billing/invoices/1/refund",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "refund:Billing",
+        "writes": "refund:Billing",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/billing/webhook-events/1/replay",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Billing",
+        "writes": "update:Billing",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/billing/usage",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "create:Billing",
+        "writes": "create:Billing",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     }
   ]
 }

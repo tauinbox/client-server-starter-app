@@ -1404,6 +1404,13 @@ asserted against the mock server alone, in `mock-server/src/__tests__/contract.s
 wrong status there records mock behaviour and not server behaviour. Measure a new value against the
 real application before you write it.
 
+Each manifest entry also declares its access `policy` (`contracts/README.md`, "Access policy").
+`npm run check:route-policy` compares it with the `@Public`, `@OptionalAuth`, `@Authorize`,
+`@StepUpRoute`, `@CountFailuresOnlyWhenBody`, `@SkipMfaEnrolmentGate`, `@Throttle` and
+`@SkipThrottle` decorators of the handler and its class, and with the guard of the mock-server
+route. Routes that write the same `<action>:<Subject>` must have the same `access`, unless one
+states an `accessExempt` reason.
+
 **Request scenarios** (`contracts/scenarios/`) state the result of one request: the actor, the state
 before the request, the status, the `errorKey` and the audit actions it writes. The e2e suite
 `test/scenarios.e2e-spec.ts` runs them against the real server and database, and
@@ -2110,6 +2117,12 @@ A route that verifies a secret beside fields that verify none marks the secret w
 without that field then skips the `login-long-window` counter and keeps every other limit.
 `PATCH /auth/profile` needs this: it answers a password change and a display-name change through one
 handler, and a name change must never spend the budget that guards the password.
+
+A step-up route (a `StepUpFactorsDto` or `MfaSetupDto` body) uses `@StepUpRoute(dto, throttle?)`
+(`modules/auth/decorators/step-up-route.decorator.ts`). It applies the throttle (`CHALLENGE_THROTTLE`
+by default), `@CountFailuresOnlyWhenBody` with the secret fields of the DTO, and an optional
+`@ApiBody`, so the throttle cannot come without the body rule. `npm run check:route-policy` refuses
+a handler with such a body and no `@StepUpRoute`.
 
 `buildThrottlerOptions(REDIS_URL)` (`modules/core/throttler-options.ts`) builds the two throttlers.
 With `REDIS_URL` set, the throttler uses `RedisThrottlerStorage`, thus each instance shares the

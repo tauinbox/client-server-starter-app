@@ -55,6 +55,7 @@ import { User } from '../entities/user.entity';
 import { AuthService } from '../../auth/services/auth.service';
 import { CHALLENGE_THROTTLE } from '../../auth/constants/throttle.constants';
 import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
+import { StepUpRoute } from '../../auth/decorators/step-up-route.decorator';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { changedFields } from '@app/shared/utils/changed-fields';
 import { Throttle } from '@nestjs/throttler';
@@ -399,8 +400,9 @@ export class UsersController {
 
   // For an owner who lost the authenticator and every recovery code. A self
   // target is refused: `POST /auth/mfa/disable` demands the owner's factor.
-  @Throttle({ 'login-long-window': CHALLENGE_THROTTLE['login-long-window'] })
-  @CountFailuresOnlyWhenBody('currentPassword', 'code')
+  @StepUpRoute(StepUpFactorsDto, {
+    'login-long-window': CHALLENGE_THROTTLE['login-long-window']
+  })
   @Post(':id/mfa/reset')
   @HttpCode(HttpStatus.OK)
   @Authorize(['update', 'User'])
@@ -409,7 +411,6 @@ export class UsersController {
     summary: 'Reset the two-factor enrolment of another user (admin only)'
   })
   @ApiParam({ name: 'id', description: 'The user ID' })
-  @ApiBody({ type: StepUpFactorsDto })
   @ApiOkResponse({
     description: 'Two-factor has been reset and every session ended',
     type: AdminUserResponseDto

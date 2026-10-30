@@ -62,8 +62,7 @@ import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
 import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
-import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
-import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator';
+import { StepUpRoute } from '../decorators/step-up-route.decorator';
 import { AuthService } from '../services/auth.service';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
 import { UsersService } from '../../users/services/users.service';
@@ -139,12 +138,10 @@ export class OAuthController {
    * the row. A stolen session must therefore not be able to plant one, so this
    * demands the same fresh proof of identity the other credential changes do.
    */
-  @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword', 'code')
+  @StepUpRoute(StepUpFactorsDto)
   @Post('link-init')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Initiate OAuth account linking for current user' })
-  @ApiBody({ type: StepUpFactorsDto })
   async initOAuthLink(
     @Request() req: JwtAuthRequest,
     @Body() dto: StepUpFactorsDto,
@@ -310,8 +307,7 @@ export class OAuthController {
    * be able to strip the owner of one. So the route demands the same fresh
    * proof of identity the link route demands.
    */
-  @Throttle(CHALLENGE_THROTTLE)
-  @CountFailuresOnlyWhenBody('currentPassword', 'code')
+  @StepUpRoute(StepUpFactorsDto)
   @Delete('/accounts/:provider')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Unlink an OAuth provider from current user' })
@@ -320,7 +316,6 @@ export class OAuthController {
     enum: OAuthProvider,
     description: 'OAuth provider to unlink'
   })
-  @ApiBody({ type: StepUpFactorsDto, required: false })
   async unlinkOAuth(
     @Param('provider') provider: string,
     @Request() req: JwtAuthRequest,

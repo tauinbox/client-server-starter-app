@@ -3,12 +3,28 @@
     {
       "method": "GET",
       "path": "/api/health/live",
-      "expectedStatus": 200
+      "expectedStatus": 200,
+      "policy": {
+        "access": "public",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/health/ready",
-      "expectedStatus": 200
+      "expectedStatus": 200,
+      "policy": {
+        "access": "public",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     }
   ]
 }

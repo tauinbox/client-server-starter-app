@@ -3,102 +3,262 @@
     {
       "method": "GET",
       "path": "/api/v1/billing/plans",
-      "expectedStatus": 200
+      "expectedStatus": 200,
+      "policy": {
+        "access": "public",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/paddle-config",
-      "expectedStatus": 200
+      "expectedStatus": 200,
+      "policy": {
+        "access": "public",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/entitlements",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/subscription",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/invoices",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/usage",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/payment-method",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/payment-method",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/products",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/purchase",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/credits",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/checkout",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/subscription/change",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/subscription/change/preview",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/subscription/cancel",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/region",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "PUT",
       "path": "/api/v1/billing/region",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "GET",
       "path": "/api/v1/billing/premium-content",
-      "expectedStatus": 401
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/webhooks/paddle",
-      "expectedStatus": 400
+      "expectedStatus": 400,
+      "policy": {
+        "access": "public",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": "skip"
+      }
     },
     {
       "method": "POST",
       "path": "/api/v1/billing/webhooks/yookassa",
-      "expectedStatus": 400
+      "expectedStatus": 400,
+      "policy": {
+        "access": "public",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": "skip"
+      }
     }
   ]
 }
