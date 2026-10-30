@@ -125,7 +125,8 @@ export function resetState(): void {
     billingCustomerGrants: new Map(),
     billingPurchaseSessions: new Map(),
     billingCheckoutSessions: new Map(),
-    billingCreditBalances: new Map()
+    billingCreditBalances: new Map(),
+    billingWebhookEvents: new Map()
   };
 }
 

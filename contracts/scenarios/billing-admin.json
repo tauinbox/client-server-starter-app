@@ -1,0 +1,294 @@
+{
+  "scenarios": [
+    {
+      "name": "an admin cancels a subscription at the end of the period",
+      "route": "POST /api/v1/admin/billing/subscriptions/1/cancel",
+      "path": "/api/v1/admin/billing/subscriptions/$subscriptionId/cancel",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "BILLING_SUBSCRIPTION_CANCEL"
+        ]
+      }
+    },
+    {
+      "name": "a second period-end cancel is refused and writes no second row",
+      "route": "POST /api/v1/admin/billing/subscriptions/1/cancel",
+      "path": "/api/v1/admin/billing/subscriptions/$subscriptionId/cancel",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "body": {
+        "mode": "period_end"
+      },
+      "repeat": 2,
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.cancellationAlreadyScheduled",
+        "earlier": {
+          "status": 200,
+          "errorKey": null
+        },
+        "audit": [
+          "BILLING_SUBSCRIPTION_CANCEL"
+        ]
+      }
+    },
+    {
+      "name": "an immediate cancel of a canceled subscription is refused",
+      "route": "POST /api/v1/admin/billing/subscriptions/1/cancel",
+      "path": "/api/v1/admin/billing/subscriptions/$subscriptionId/cancel",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "body": {
+        "mode": "immediate"
+      },
+      "repeat": 2,
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.subscriptionAlreadyCanceled",
+        "earlier": {
+          "status": 200,
+          "errorKey": null
+        },
+        "audit": [
+          "BILLING_SUBSCRIPTION_CANCEL"
+        ]
+      }
+    },
+    {
+      "name": "a subscription that does not exist cannot be canceled",
+      "route": "POST /api/v1/admin/billing/subscriptions/1/cancel",
+      "path": "/api/v1/admin/billing/subscriptions/b5b2c1d0-3f4e-4a6b-9c8d-7e6f5a4b3c2d/cancel",
+      "actor": "admin",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.billing.subscriptionNotFound",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin refunds a paid invoice in full",
+      "route": "POST /api/v1/admin/billing/invoices/1/refund",
+      "path": "/api/v1/admin/billing/invoices/$invoiceId/refund",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "paid-invoice"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "BILLING_INVOICE_REFUND"
+        ]
+      }
+    },
+    {
+      "name": "a refund above the remaining total is refused",
+      "route": "POST /api/v1/admin/billing/invoices/1/refund",
+      "path": "/api/v1/admin/billing/invoices/$invoiceId/refund",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "paid-invoice"
+      ],
+      "body": {
+        "amountMinor": 1001
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.billing.refundAmountOutOfRange",
+        "audit": []
+      }
+    },
+    {
+      "name": "a refunded invoice cannot be refunded again",
+      "route": "POST /api/v1/admin/billing/invoices/1/refund",
+      "path": "/api/v1/admin/billing/invoices/$invoiceId/refund",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "paid-invoice"
+      ],
+      "repeat": 2,
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.invoiceNotRefundable",
+        "earlier": {
+          "status": 200,
+          "errorKey": null
+        },
+        "audit": [
+          "BILLING_INVOICE_REFUND"
+        ]
+      }
+    },
+    {
+      "name": "an invoice that does not exist cannot be refunded",
+      "route": "POST /api/v1/admin/billing/invoices/1/refund",
+      "path": "/api/v1/admin/billing/invoices/b5b2c1d0-3f4e-4a6b-9c8d-7e6f5a4b3c2d/refund",
+      "actor": "admin",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.billing.invoiceNotFound",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin replays a dead-lettered webhook event",
+      "route": "POST /api/v1/admin/billing/webhook-events/1/replay",
+      "path": "/api/v1/admin/billing/webhook-events/$webhookEventId/replay",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "dead-letter-webhook-event"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "BILLING_WEBHOOK_EVENT_REPLAY"
+        ]
+      }
+    },
+    {
+      "name": "a replayed webhook event cannot be replayed again",
+      "route": "POST /api/v1/admin/billing/webhook-events/1/replay",
+      "path": "/api/v1/admin/billing/webhook-events/$webhookEventId/replay",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "dead-letter-webhook-event"
+      ],
+      "repeat": 2,
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.webhookEventNotReplayable",
+        "earlier": {
+          "status": 200,
+          "errorKey": null
+        },
+        "audit": [
+          "BILLING_WEBHOOK_EVENT_REPLAY"
+        ]
+      }
+    },
+    {
+      "name": "a webhook event that does not exist cannot be replayed",
+      "route": "POST /api/v1/admin/billing/webhook-events/1/replay",
+      "path": "/api/v1/admin/billing/webhook-events/b5b2c1d0-3f4e-4a6b-9c8d-7e6f5a4b3c2d/replay",
+      "actor": "admin",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.billing.webhookEventNotFound",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin records usage",
+      "route": "POST /api/v1/admin/billing/usage",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "metered-plan"
+      ],
+      "body": {
+        "customerId": "$customerId",
+        "meterKey": "$meterKey",
+        "quantity": 5,
+        "idempotencyKey": "scenario-usage"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "BILLING_USAGE_RECORD"
+        ]
+      }
+    },
+    {
+      "name": "a repeat with the same idempotency key answers the first record and is audited",
+      "route": "POST /api/v1/admin/billing/usage",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "metered-plan"
+      ],
+      "body": {
+        "customerId": "$customerId",
+        "meterKey": "$meterKey",
+        "quantity": 5,
+        "idempotencyKey": "scenario-usage"
+      },
+      "repeat": 2,
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "BILLING_USAGE_RECORD",
+          "BILLING_USAGE_RECORD"
+        ]
+      }
+    },
+    {
+      "name": "usage on a meter that no plan declares is refused",
+      "route": "POST /api/v1/admin/billing/usage",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "body": {
+        "customerId": "$customerId",
+        "meterKey": "$meterKey",
+        "quantity": 5,
+        "idempotencyKey": "scenario-usage"
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.billing.meterNotDeclared",
+        "audit": []
+      }
+    },
+    {
+      "name": "usage of a customer with no active subscription is refused",
+      "route": "POST /api/v1/admin/billing/usage",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "metered-plan"
+      ],
+      "body": {
+        "customerId": "b5b2c1d0-3f4e-4a6b-9c8d-7e6f5a4b3c2d",
+        "meterKey": "$meterKey",
+        "quantity": 5,
+        "idempotencyKey": "scenario-usage"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.customerNoActiveSubscription",
+        "audit": []
+      }
+    }
+  ]
+}

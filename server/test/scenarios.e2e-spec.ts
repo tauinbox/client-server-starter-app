@@ -57,6 +57,13 @@ import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
+import { BillingService } from '../src/modules/billing/billing.service';
+import { Customer } from '../src/modules/billing/entities/customer.entity';
+import { Invoice } from '../src/modules/billing/entities/invoice.entity';
+import { Plan } from '../src/modules/billing/entities/plan.entity';
+import { Subscription } from '../src/modules/billing/entities/subscription.entity';
+import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
+import { Money } from '@app/shared/utils/money';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { MemoryThrottlerStorage } from '../src/modules/core/memory-throttler.storage';
@@ -72,6 +79,7 @@ const WRONG_CODE = '000000';
 // Fire-and-forget audit writes land after the answer.
 const AUDIT_SETTLE_MS = 300;
 const AUDIT_WAIT_MS = 3000;
+const DAY_MS = 24 * 3600_000;
 
 // Each scenario starts with a full rate-limit budget. Rate limiting is an
 // allowed difference from the mock, so no scenario may depend on a 429.
@@ -178,6 +186,11 @@ runWithInfra('Request scenarios (e2e)', () => {
       .mockImplementation(
         (name) => registeredResources.has(name) || isRegistered(name)
       );
+    // A provider call is an allowed difference from the mock, and CI has no
+    // provider account: a refund of a fixture invoice succeeds with no call.
+    jest
+      .spyOn(app.get(BillingService).getProviderById('yookassa'), 'refund')
+      .mockResolvedValue(undefined);
   }, 60000);
 
   afterAll(async () => {
@@ -194,7 +207,27 @@ runWithInfra('Request scenarios (e2e)', () => {
       ).map((u) => u.id);
       if (ids.length > 0) {
         await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
+        // An invoice keeps its customer (RESTRICT); the rest cascades.
+        const customerIds = (
+          await dataSource.getRepository(Customer).findBy({ userId: In(ids) })
+        ).map((c) => c.id);
+        if (customerIds.length > 0) {
+          await dataSource
+            .getRepository(Invoice)
+            .delete({ customerId: In(customerIds) });
+        }
         await dataSource.getRepository(User).delete({ id: In(ids) });
+      }
+      for (const [entity, column] of [
+        [Plan, 'key'],
+        [WebhookEvent, 'provider_event_id']
+      ] as const) {
+        await dataSource
+          .getRepository(entity)
+          .createQueryBuilder()
+          .delete()
+          .where(`${column} LIKE :prefix`, { prefix: `${emailPrefix}%` })
+          .execute();
       }
       await dataSource
         .getRepository(Role)
@@ -235,6 +268,11 @@ runWithInfra('Request scenarios (e2e)', () => {
   function freshFlagKey(): string {
     sequence += 1;
     return `${emailPrefix}flag-${sequence}`;
+  }
+
+  function freshMeterKey(): string {
+    sequence += 1;
+    return `${emailPrefix}meter-${sequence}`;
   }
 
   // Each account starts as `user`: the default role, a password and a
@@ -491,6 +529,80 @@ runWithInfra('Request scenarios (e2e)', () => {
         updatedByUserId: null
       });
       ctx.values.$flagId = flag.id;
+    },
+    subscription: async (ctx) => {
+      const customer = await dataSource.getRepository(Customer).save({
+        userId: ctx.actor!.user.id,
+        provider: 'yookassa',
+        providerOverride: null,
+        providerCustomerId: null,
+        country: 'RU',
+        currency: 'RUB',
+        defaultPaymentMethodId: null
+      });
+      const now = Date.now();
+      const subscription = await dataSource.getRepository(Subscription).save({
+        customerId: customer.id,
+        planKey: ctx.values.$meterKey!,
+        provider: 'yookassa',
+        billingMode: 'fixed',
+        status: 'active',
+        lifecycleOwner: 'self',
+        currentPeriodStart: new Date(now - DAY_MS),
+        currentPeriodEnd: new Date(now + 29 * DAY_MS),
+        cancelAtPeriodEnd: false,
+        providerSubscriptionId: null
+      });
+      ctx.values.$customerId = customer.id;
+      ctx.values.$subscriptionId = subscription.id;
+    },
+    'paid-invoice': async (ctx) => {
+      const now = Date.now();
+      const invoice = await dataSource.getRepository(Invoice).save({
+        customerId: ctx.values.$customerId!,
+        subscriptionId: ctx.values.$subscriptionId!,
+        provider: 'yookassa',
+        providerEventId: null,
+        providerInvoiceRef: `${emailPrefix}payment-${sequence}`,
+        amountMinor: Money.fromMinor(1000),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        status: 'paid',
+        billingMode: 'fixed',
+        kind: 'subscription',
+        productId: null,
+        periodStart: new Date(now - DAY_MS),
+        periodEnd: new Date(now + 29 * DAY_MS),
+        paidAt: new Date(now)
+      });
+      ctx.values.$invoiceId = invoice.id;
+    },
+    'metered-plan': async (ctx) => {
+      await dataSource.getRepository(Plan).save({
+        key: ctx.values.$meterKey!,
+        name: 'Scenario plan',
+        description: null,
+        billingMode: 'usage',
+        interval: 'month',
+        meterKey: ctx.values.$meterKey!,
+        entitlements: [],
+        limits: null,
+        trialDays: 0,
+        active: true,
+        prices: {}
+      });
+    },
+    'dead-letter-webhook-event': async (ctx) => {
+      const event = await dataSource.getRepository(WebhookEvent).save({
+        provider: 'yookassa',
+        providerEventId: `${emailPrefix}event-${sequence}`,
+        type: 'payment.succeeded',
+        status: 'dead_letter',
+        attempts: 5,
+        lastError: 'scenario',
+        payload: null
+      });
+      ctx.values.$webhookEventId = event.id;
     }
   };
 
@@ -555,6 +667,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     ctx.values.$newEmail = freshEmail();
     ctx.values.$roleName = freshRoleName();
     ctx.values.$flagKey = freshFlagKey();
+    ctx.values.$meterKey = freshMeterKey();
     ctx.values.$permissionId = permissionId;
     emails.push(ctx.values.$newEmail);
 
