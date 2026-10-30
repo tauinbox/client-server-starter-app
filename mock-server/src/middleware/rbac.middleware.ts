@@ -78,7 +78,7 @@ router.post(
       return;
     }
 
-    // `ResourceService.restore` raises the isRegistered 400, so it sits below
+    // `ResourceService.restore` raises `CANNOT_RESTORE`, so it sits below
     // the instance check on the server.
     if (
       !assertInstancePermission(
@@ -147,9 +147,9 @@ router.patch(
     const { description, allowedActionNames } = req.body;
     const rawDisplayName: unknown = req.body.displayName;
 
-    // The server's global pipe runs before the handler, so a malformed body is a
-    // 400 whether or not the resource exists, and it reports every violation at
-    // once, in DTO declaration order.
+    // The server's global pipe runs before the handler, so a malformed body
+    // fails the DTO whether or not the resource exists, and it reports every
+    // violation at once, in DTO declaration order.
     const errors = [
       ...unknownPropertyErrors(req.body, [
         'displayName',

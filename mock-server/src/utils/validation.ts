@@ -20,8 +20,8 @@ import isUUID from 'validator/lib/isUUID';
  * `shared/src/test-fixtures/email-address-corpus.ts` keeps the two copies of
  * validator.js on the same verdicts.
  *
- * A regular expression here accepted thirteen shapes that the server answers
- * with 400, among them a local part over 64 characters, a hyphen-edged domain
+ * A regular expression here accepted thirteen shapes that the server rejects,
+ * among them a local part over 64 characters, a hyphen-edged domain
  * label and a single-character last label.
  */
 export function isValidEmail(email: unknown): boolean {
@@ -50,8 +50,8 @@ export function validateLocale(value: unknown): string | null {
 /**
  * Mirrors class-validator's `maxLength` / `minLength`, which treat a non-string
  * as a violation rather than throwing: the DTOs pair every length cap with
- * `@IsString()`, `@IsNotEmpty()` or `@IsEmail()`, so a null or a number is a 400
- * on the server. Reading `.length` off the raw body would be a 500 here.
+ * `@IsString()`, `@IsNotEmpty()` or `@IsEmail()`, so a null or a number fails
+ * the DTO on the server. Reading `.length` off the raw body would throw here.
  */
 export function validateMaxLength(
   value: unknown,

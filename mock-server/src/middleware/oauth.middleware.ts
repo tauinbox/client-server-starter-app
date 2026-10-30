@@ -188,10 +188,10 @@ router.post('/exchange', (req, res) => {
   });
 });
 
-// POST /api/v1/auth/oauth/link-init
-// The real server mints an intent cookie its provider callback consumes. Both
-// provider halves are 501 here, so only the step-up the route now demands is
-// reproduced: a linked provider is a credential no recovery path removes.
+// POST /api/v1/auth/oauth/link-init The real server mints an intent cookie its
+// provider callback consumes. Both provider halves are Not Implemented here, so
+// only the step-up the route now demands is reproduced: a linked provider is a
+// credential no recovery path removes.
 router.post('/link-init', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
@@ -219,11 +219,11 @@ router.post('/link-init', authGuard, (req, res) => {
   res.status(201).json({ message: 'Link initiated' });
 });
 
-// POST /api/v1/auth/oauth/reauth-init (stub)
-// The real server sets an intent cookie that its provider callback consumes.
-// Both provider halves are 501 here, so the proof the callback would mint is
-// seeded by POST /__control/reauth-proof instead. The body is still validated,
-// because the operation it declares is what binds the proof.
+// POST /api/v1/auth/oauth/reauth-init (stub) The real server sets an intent
+// cookie that its provider callback consumes. Both provider halves are Not
+// Implemented here, so the proof the callback would mint is seeded by POST
+// /__control/reauth-proof instead. The body is still validated, because the
+// operation it declares is what binds the proof.
 router.post('/reauth-init', authGuard, (req, res) => {
   const { operation } = req.body as { operation?: unknown };
 

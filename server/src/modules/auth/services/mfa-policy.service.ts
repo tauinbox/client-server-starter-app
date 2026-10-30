@@ -15,10 +15,11 @@ import { SecretEncryptionService } from '../../../common/crypto/secret-encryptio
  * reaches everything is the account that has to prove a second factor.
  *
  * Two conditions turn the requirement on, and both are deliberate. The owner
- * opts in with `MFA_REQUIRED_FOR_ADMINS`, because an unattended deploy must
- * not close the administration surface without a decision. `MFA_ENCRYPTION_KEY`
- * must also be present, because every enrolment path answers 503 without it,
- * so a requirement in that state is a lockout with no way out of it.
+ * opts in with `MFA_REQUIRED_FOR_ADMINS`, because an unattended deploy must not
+ * close the administration surface without a decision. `MFA_ENCRYPTION_KEY`
+ * must also be present, because every enrolment path answers `MFA_UNAVAILABLE`
+ * without it, so a requirement in that state is a lockout with no way out of
+ * it.
  */
 @Injectable()
 export class MfaPolicyService {
@@ -38,7 +39,7 @@ export class MfaPolicyService {
     if (this.optedIn && !this.encryption.isConfigured) {
       this.logger.warn(
         'MFA_REQUIRED_FOR_ADMINS is on while MFA_ENCRYPTION_KEY is empty. ' +
-          'Two-factor enrolment answers 503 in this state, so the requirement stays off.'
+          'Two-factor enrolment is unavailable in this state, so the requirement stays off.'
       );
     }
   }

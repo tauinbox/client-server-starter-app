@@ -35,6 +35,7 @@
     "check:error-status": "ts-node -r tsconfig-paths/register scripts/check-error-status.ts",
     "check:race": "ts-node scripts/check-race.ts",
     "check:imports": "node ../scripts/check-imports.mjs",
+    "check:status-comments": "node ../scripts/check-status-comments.mjs",
     "check:role-conditions": "ts-node scripts/check-existing-role-conditions.ts",
     "check:grant-scope": "ts-node -r tsconfig-paths/register scripts/check-grant-scope.ts",
     "generate:subjects": "ts-node scripts/generate-subjects.ts",

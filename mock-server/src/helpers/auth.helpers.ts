@@ -123,7 +123,7 @@ function sendGuardError(res: Response, result: GuardError): void {
     sendError(res, result.errorKey, result.message);
     return;
   }
-  // Passport sends this 401 with no key.
+  // Passport sends this Unauthorized with no key.
   res.status(result.error).json({ message: result.message });
 }
 
@@ -215,8 +215,9 @@ export function permissionGuard(
 /**
  * Mirrors the controller-level `assertCan` on the server. The route guard is a
  * type-level check that ignores conditions, so a conditional grant has to be
- * re-evaluated against the record the caller submits. Answers 403 and returns
- * false when the caller may not act on that record.
+ * re-evaluated against the record the caller submits. Answers
+ * `INSUFFICIENT_PERMISSIONS` and returns false when the caller may not act on
+ * that record.
  *
  * `targetType` is the audited entity name, which is not always the CASL subject:
  * the rbac routes authorize `Permission` while the server audits `Resource` or
@@ -269,7 +270,8 @@ function roleNamesAreSuper(roleNames: string[]): boolean {
 /**
  * Mirrors `UsersService.assertCanWrite`: the instance check, then the rule
  * that an account holding a super role is out of reach of every actor that is
- * not super itself. Answers 403 and returns false on a refusal.
+ * not super itself. Answers `INSUFFICIENT_PERMISSIONS` or
+ * `SUPER_TARGET_FORBIDDEN` and returns false on a refusal.
  */
 export function assertCanWriteUser(
   req: Request,

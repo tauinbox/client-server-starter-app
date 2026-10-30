@@ -53,13 +53,13 @@ export function createOAuthProviderGuard(
     /**
      * The base guard answers a Passport failure with UnauthorizedException, so
      * a denied consent screen, an expired state cookie or a failed code
-     * exchange leaves the browser on the API origin looking at a JSON 401 -
-     * the callback handler that redirects back to the client is never reached.
-     * Throwing here instead lets OAuthAuthenticationExceptionFilter send the
-     * user back to the client - to the profile page when the failure ends a
-     * link attempt started there. Passport only invokes this hook on
-     * success/fail/error, never on the initiation redirect, so both routes of
-     * a provider can share it.
+     * exchange leaves the browser on the API origin looking at a JSON
+     * Unauthorized - the callback handler that redirects back to the client is
+     * never reached. Throwing here instead lets
+     * OAuthAuthenticationExceptionFilter send the user back to the client - to
+     * the profile page when the failure ends a link attempt started there.
+     * Passport only invokes this hook on success/fail/error, never on the
+     * initiation redirect, so both routes of a provider can share it.
      */
     handleRequest<TUser = unknown>(
       err: unknown,

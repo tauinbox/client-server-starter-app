@@ -4,8 +4,8 @@ import { ENTITLEMENT_KEY } from './entitlement.constants';
 import type { EntitlementCapability } from './entitlement.types';
 
 /**
- * Gates a route behind a billing capability. Returns 403 when the
- * caller's plan does not grant it. Authorization is separate — combine with
+ * Gates a route behind a billing capability. Throws `ENTITLEMENT_REQUIRED` when
+ * the caller's plan does not grant it. Authorization is separate — combine with
  * `@Authorize` for permissions.
  */
 export const RequireEntitlement = (capability: EntitlementCapability) =>

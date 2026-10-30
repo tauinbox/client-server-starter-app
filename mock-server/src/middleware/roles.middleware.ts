@@ -115,8 +115,8 @@ function customConditionErrors(value: unknown): string[] {
   ];
 }
 
-// Mirrors PermissionConditionDto, so a payload the real server rejects with
-// 400 cannot pass the mock and turn an e2e run false-green.
+// Mirrors PermissionConditionDto, so a payload that fails the DTO on the real
+// server cannot pass the mock and turn an e2e run false-green.
 function conditionObjectErrors(path: string, value: object): string[] {
   const cond = value as Record<string, unknown>;
   return [
@@ -176,8 +176,9 @@ function permissionIdOf(item: unknown): unknown {
 }
 
 // Mirrors AssignPermissionsDto. `permissionIds` carries `@IsArray()
-// @ArrayNotEmpty() @ArrayMaxSize(500) @ArrayUniqueWithin(MAX_PERMISSION_ITEMS)
-// @IsUUID('4', { each: true })`, reported bottom-up.
+// @ArrayNotEmpty() @ArrayMaxSize(MAX_PERMISSION_ITEMS)
+// @ArrayUniqueWithin(MAX_PERMISSION_ITEMS) @IsUUID('4', { each: true })`,
+// reported bottom-up.
 function assignPermissionsErrors(body: Record<string, unknown>): string[] {
   const ids = body['permissionIds'];
   const isArray = Array.isArray(ids);
@@ -214,9 +215,9 @@ function permissionItemErrors(path: string, value: object): string[] {
   ];
 }
 
-// Mirrors SetPermissionsDto. `items` carries `@IsArray() @ArrayMaxSize(500)
-// @ArrayUniqueWithin(MAX_PERMISSION_ITEMS, permissionIdOf) @IsObject({ each: true })
-// @ValidateNested({ each: true })`.
+// Mirrors SetPermissionsDto. `items` carries `@IsArray()
+// @ArrayMaxSize(MAX_PERMISSION_ITEMS) @ArrayUniqueWithin(MAX_PERMISSION_ITEMS,
+// permissionIdOf) @IsObject({ each: true }) @ValidateNested({ each: true })`.
 function setPermissionsErrors(body: Record<string, unknown>): string[] {
   const items = body['items'];
   const isArray = Array.isArray(items);
@@ -242,7 +243,7 @@ function setPermissionsErrors(body: Record<string, unknown>): string[] {
 
 // Mirrors RoleService.assertGrantsApplicable, in the same order: a grant that
 // would enforce nothing is rejected on write instead of being stored. Unknown
-// permission ids fall through to the unknown-id 400, as on the server.
+// permission ids fall through to `UNKNOWN_PERMISSION`, as on the server.
 function findGrantError(
   permissionId: string,
   conditions: unknown
@@ -512,8 +513,9 @@ router.patch(
     const id = req.params['id'] as string;
     const state = getState();
 
-    // The server's global ValidationPipe runs before the handler, so a body that
-    // fails UpdateRoleDto is a 400 whether or not the role exists.
+    // The server's global ValidationPipe runs before the handler, so a body
+    // that fails UpdateRoleDto is a validation error whether or not the role
+    // exists.
     const { name, description } = req.body;
 
     const normalized = name === undefined ? undefined : normalizeRoleName(name);
@@ -533,7 +535,7 @@ router.patch(
       return;
     }
 
-    // `RoleService.update` raises the isSystem 400, so it sits below the
+    // `RoleService.update` raises `CANNOT_MODIFY_SYSTEM`, so it sits below the
     // instance check on the server. The record after the write is checked too.
     if (
       !assertInstancePermission(req, res, 'update', 'Role', role) ||
@@ -625,7 +627,7 @@ router.delete(
       return;
     }
 
-    // `RoleService.delete` raises the isSystem 400, so it sits below the
+    // `RoleService.delete` raises `CANNOT_DELETE_SYSTEM`, so it sits below the
     // instance check on the server.
     if (!assertInstancePermission(req, res, 'delete', 'Role', role)) {
       return;
@@ -691,8 +693,8 @@ router.put(
     const state = getState();
 
     // SetPermissionsDto is validated by the server's global pipe before the
-    // handler runs, so its shape checks precede the role lookup. Everything that
-    // needs the role or the permission registry stays below the 404.
+    // handler runs, so its shape checks precede the role lookup. Everything
+    // that needs the role or the permission registry stays below `NOT_FOUND`.
     const errors = setPermissionsErrors(req.body);
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
@@ -709,8 +711,8 @@ router.put(
       return;
     }
 
-    // `RoleService.assertCanUpdateRole` runs above `assertNotSystem`, so the
-    // instance check sits above the isSystem 400 on the server.
+    // `RoleService.assertCanRole` runs above `assertNotSystem`, so the
+    // instance check sits above `CANNOT_MODIFY_SYSTEM` on the server.
     if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
       return;
     }
@@ -803,8 +805,8 @@ router.post(
     const state = getState();
 
     // AssignPermissionsDto is validated by the server's global pipe before the
-    // handler runs, so its shape checks precede the role lookup. Everything that
-    // needs the role or the permission registry stays below the 404.
+    // handler runs, so its shape checks precede the role lookup. Everything
+    // that needs the role or the permission registry stays below `NOT_FOUND`.
     const errors = assignPermissionsErrors(req.body);
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
@@ -819,8 +821,8 @@ router.post(
       return;
     }
 
-    // `RoleService.assertCanUpdateRole` runs above `assertNotSystem`, so the
-    // instance check sits above the isSystem 400 on the server.
+    // `RoleService.assertCanRole` runs above `assertNotSystem`, so the
+    // instance check sits above `CANNOT_MODIFY_SYSTEM` on the server.
     if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
       return;
     }
@@ -838,9 +840,9 @@ router.post(
       }
     }
 
-    // Mirror the server: unknown ids fail validation with 400 before anything
-    // is written, then a duplicate pair maps to 409 (unique constraint) with
-    // no partial writes (single-transaction save on the server).
+    // Mirror the server: unknown ids fail with `UNKNOWN_PERMISSION` before
+    // anything is written, then a duplicate pair maps to `UNIQUE_VIOLATION`
+    // with no partial writes (single-transaction save on the server).
     const unknownId = (permissionIds as string[]).find(
       (permissionId) => !state.permissions.has(permissionId)
     );
@@ -916,8 +918,8 @@ router.delete(
       return;
     }
 
-    // `RoleService.assertCanUpdateRole` runs above `assertNotSystem`, so the
-    // instance check sits above the isSystem 400 on the server.
+    // `RoleService.assertCanRole` runs above `assertNotSystem`, so the
+    // instance check sits above `CANNOT_MODIFY_SYSTEM` on the server.
     if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
       return;
     }
@@ -1003,7 +1005,7 @@ router.post(
 
     // `RoleService.assignRoleToUser` re-checks `update` on the target user,
     // and refuses a super target to a non-super caller, below the super-role
-    // test and above the duplicate 409.
+    // test and above the duplicate `UNIQUE_VIOLATION`.
     if (!assertCanWriteUser(req, res, 'update', user)) {
       return;
     }
@@ -1012,15 +1014,15 @@ router.post(
     }
 
     // `RoleService.assignRoleToUser` checks the rows of the role before the
-    // insert that raises the duplicate 409.
+    // insert that raises the duplicate `UNIQUE_VIOLATION`.
     const roleRows = state.rolePermissions.filter((rp) => rp.roleId === roleId);
     if (!assertGrantScope(req, res, 'grant', roleId, roleRows)) {
       return;
     }
 
     // Mirror the server: a duplicate assignment hits the user_roles unique
-    // constraint and maps to 409 before any side effect (no token revocation,
-    // no audit entry, no SSE push).
+    // constraint and maps to `UNIQUE_VIOLATION` before any side effect (no
+    // token revocation, no audit entry, no SSE push).
     if (user.roles.includes(role.name)) {
       sendError(
         res,

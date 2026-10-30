@@ -218,9 +218,10 @@ router.post('/oauth-data', (req, res) => {
   const token = randomUUID();
   const expiresAt = Date.now() + OAUTH_DATA_MAX_AGE_MS;
 
-  // The real server decides this in its provider callback, which is a 501 stub
-  // here. An account that carries a second factor is not signed in yet, so no
-  // session is minted and the round trip carries a challenge instead.
+  // The real server decides this in its provider callback, which is a Not
+  // Implemented stub here. An account that carries a second factor is not
+  // signed in yet, so no session is minted and the round trip carries a
+  // challenge instead.
   if (user.totpEnabledAt) {
     state.oauthDataTokens.set(token, {
       userId: user.id,
@@ -245,10 +246,10 @@ router.post('/oauth-data', (req, res) => {
   res.json({ token });
 });
 
-// POST /__control/reauth-proof — mint a step-up proof for a user
-// The real server mints this at the end of a provider round trip. Both
-// provider halves answer 501 here, so E2E seeds the proof directly and sets
-// the cookie the value belongs to.
+// POST /__control/reauth-proof — mint a step-up proof for a user The real
+// server mints this at the end of a provider round trip. Both provider halves
+// answer Not Implemented here, so E2E seeds the proof directly and sets the
+// cookie the value belongs to.
 router.post('/reauth-proof', (req, res) => {
   const { userId, operation }: { userId: string; operation?: string } =
     req.body;
@@ -348,7 +349,7 @@ router.post('/role-permissions', (req, res) => {
 // POST /__control/invalidate-access-tokens — end every access token a user
 // holds. The live sessions get new ids, so the session check refuses each
 // token issued so far whatever second it was issued in. Refresh tokens are
-// LEFT INTACT so the client's 401 interceptor can refresh-and-retry.
+// LEFT INTACT so the client's Unauthorized interceptor can refresh-and-retry.
 router.post('/invalidate-access-tokens', (req, res) => {
   const { userId } = req.body as { userId?: string };
   if (!userId) {

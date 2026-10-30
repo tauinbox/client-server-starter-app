@@ -150,7 +150,7 @@ export class BillingUserService {
    * The caller's metered usage aggregated over the current billing period.
    * Null when there is nothing to meter: no customer, no open subscription, or
    * a fixed-mode one. A dangling `planKey` also yields null — a read must not
-   * surface a data-integrity 500.
+   * surface a data-integrity error.
    */
   async getUsageSummary(
     userId: string
@@ -377,8 +377,9 @@ export class BillingUserService {
       throw alreadySubscribed();
     }
 
-    // resolveProvider asserts the geo's provider is enabled + configured (503),
-    // the server-side enforcement behind the UI availability gating.
+    // resolveProvider asserts the geo's provider is configured
+    // (`PROVIDER_NOT_CONFIGURED`) and enabled (`PROVIDER_UNAVAILABLE`), the
+    // server-side enforcement behind the UI availability gating.
     const provider = await this.billing.resolveProvider(customer);
     const trial = plan.trialDays > 0 && !customer.trialUsedAt;
 

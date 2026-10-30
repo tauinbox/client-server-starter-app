@@ -221,7 +221,8 @@ export class UsersService {
 
   /**
    * The lookup for a caller that must answer a missing account itself.
-   * `findOne` throws a 404, which is the wrong status on a token path. A
+   * `findOne` throws `USERS.NOT_FOUND`, which is the wrong answer on a token
+   * path. A
    * soft-deleted account is missing here too.
    */
   async findById(id: string): Promise<User | null> {

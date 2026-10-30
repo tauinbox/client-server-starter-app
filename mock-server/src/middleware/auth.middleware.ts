@@ -199,7 +199,8 @@ router.post('/register', (req, res) => {
 router.post('/login', (req, res) => {
   // No DTO validation here: the real login route has no `@Body()` parameter
   // (guards run before pipes), so a malformed address or an over-long password
-  // is just another failed credential - 401, never 400. Values over the
+  // is just another failed credential - `INVALID_CREDENTIALS`, never a
+  // validation error. Values over the
   // `LoginDto` caps collapse to '' exactly like the server's LocalStrategy, so
   // the audit row never carries an oversized address.
   const rawEmail = normalizeEmail(req.body.email) ?? '';
@@ -365,8 +366,8 @@ router.post('/resend-verification', (req, res) => {
   const successMessage =
     'If an account with that email exists and is not yet verified, a verification email has been sent.';
 
-  // The DTO carries no `@IsOptional()`, so an absent address is a 400 here and
-  // never the enumeration-safe success message.
+  // The DTO carries no `@IsOptional()`, so an absent address is a validation
+  // error here and never the enumeration-safe success message.
   const bodyEmailErrors = emailErrors('email', req.body?.email);
   if (bodyEmailErrors.length > 0) {
     sendValidationError(res, 'body', bodyEmailErrors);
@@ -429,8 +430,8 @@ router.post('/forgot-password', (req, res) => {
   const successMessage =
     'If an account with that email exists, a password reset link has been sent.';
 
-  // The DTO carries no `@IsOptional()`, so an absent address is a 400 here and
-  // never the enumeration-safe success message.
+  // The DTO carries no `@IsOptional()`, so an absent address is a validation
+  // error here and never the enumeration-safe success message.
   const bodyEmailErrors = emailErrors('email', req.body?.email);
   if (bodyEmailErrors.length > 0) {
     sendValidationError(res, 'body', bodyEmailErrors);
@@ -538,7 +539,7 @@ router.post('/reset-password', (req, res) => {
   user.updatedAt = new Date().toISOString();
 
   // Proving mailbox ownership outranks the failed-guess counter: without this
-  // the reset succeeds and the new password is still answered 423.
+  // the reset succeeds and the new password still gets `ACCOUNT_LOCKED`.
   user.failedLoginAttempts = 0;
   user.lockedUntil = null;
 
@@ -818,9 +819,9 @@ router.patch(
         return;
       }
 
-      // The blocklist verdict comes from UsersService.update on the real server,
-      // after the step up and before any field assignment, so a 400 must leave
-      // the profile unchanged.
+      // The blocklist verdict comes from UsersService.update on the real
+      // server, after the step up and before any field assignment, so a refused
+      // password must leave the profile unchanged.
       const passwordRefusal = newPasswordRefusal(password, {
         email: user.email,
         name: typeof name === 'string' ? name : user.name

@@ -4,7 +4,7 @@ import { UUID_PATTERN } from '@app/shared/constants';
 /**
  * Derives a stable UUID from a readable slug. The real server's primary keys
  * are `uuid` columns guarded by `ParseUUIDPipe`, so mock fixtures have to be
- * UUID-shaped to reproduce its 400-on-malformed-id behaviour; hashing a slug
+ * UUID-shaped to reproduce its refusal of a malformed id; hashing a slug
  * keeps the fixtures self-describing and reproducible across restarts instead
  * of scattering opaque literals through seeds and specs.
  */

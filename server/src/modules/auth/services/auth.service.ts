@@ -127,7 +127,8 @@ interface StepUpVerdict {
 /**
  * The answer for each factor that can refuse a step-up. The session of the
  * request is valid and only the extra proof is not, so it is a refusal and
- * not a 401: on a session route the client takes a 401 as an expired session.
+ * not an Unauthorized: on a session route the client takes an Unauthorized
+ * as an expired session.
  */
 const STEP_UP_REFUSALS: Record<
   NonNullable<StepUpVerdict['factor']>,
@@ -209,8 +210,9 @@ export class AuthService {
 
     if (user.lockedUntil) {
       if (user.lockedUntil.getTime() > Date.now()) {
-        // Answer before the password is checked: 423 for a right guess and 401
-        // for a wrong one would let a locked account keep taking guesses.
+        // Answer before the password is checked: `ACCOUNT_LOCKED` for a right
+        // guess and `INVALID_CREDENTIALS` for a wrong one would let a locked
+        // account keep taking guesses.
         throw this.lockedLogin(email, user.id, user.lockedUntil, {
           reason: 'account_locked'
         });
@@ -564,8 +566,9 @@ export class AuthService {
           pendingEmail: null,
           pendingEmailToken: null,
           pendingEmailExpiresAt: null,
-          // Proving mailbox ownership outranks the failed-guess counter: without
-          // this the reset succeeds and the new password is still answered 423.
+          // Proving mailbox ownership outranks the failed-guess counter:
+          // without this the reset succeeds and the new password still gets
+          // `ACCOUNT_LOCKED`.
           failedLoginAttempts: 0,
           lockedUntil: null,
           // Redeeming the token is the same proof of mailbox control that the
@@ -701,7 +704,8 @@ export class AuthService {
       );
     }
 
-    // Not `findOne`: its 404 would replace the 401 below, and a soft-deleted
+    // Not `findOne`: its `USERS.NOT_FOUND` would replace the refresh refusal
+    // below, and a soft-deleted
     // account whose session is not yet revoked arrives here.
     const user = await this.usersService.findById(tokenDoc.userId);
     if (!user) {

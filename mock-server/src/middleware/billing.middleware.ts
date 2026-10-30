@@ -210,7 +210,8 @@ function isProviderAvailable(
   return flagKey !== undefined && isFlagEnabledForUser(user, flagKey);
 }
 
-// Mirrors the 503 of BillingService.resolveProvider at checkout and purchase.
+// Mirrors the `PROVIDER_UNAVAILABLE` of BillingService.resolveProvider at
+// checkout and purchase.
 function rejectUnavailableProvider(
   res: Response,
   provider: BillingProviderId,
@@ -592,10 +593,10 @@ billingRouter.get('/credits', authGuard, (req: Request, res: Response) => {
 });
 
 // POST /billing/purchase — start a one-time purchase. Mirrors the server's
-// validation chain: unknown/inactive product 404, no price for the resolved
-// provider 409, misconfigured catalog 503 (also a Paddle sku/credits price with
-// no `paddlePriceId`), custom amount required and bounded 400. The provider session is recorded as a pending purchase that
-// /__control/billing/complete-purchase settles the way the paid webhook would.
+// validation chain in its order; a Paddle sku/credits price with no
+// `paddlePriceId` is a misconfigured catalog. The provider session is recorded
+// as a pending purchase that /__control/billing/complete-purchase settles the
+// way the paid webhook would.
 billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const body = req.body as Record<string, unknown> | undefined;
@@ -1251,9 +1252,10 @@ billingRouter.get(
 );
 
 // ---------------------------------------------------------------------------
-// Admin billing. Every route carries CASL `manage Billing`: 401
-// unauthenticated, 403 without the permission. Reads and mutations are
-// addressed by entity id across all customers (no per-caller scoping).
+// Admin billing. Every route carries CASL `manage Billing`: Unauthorized
+// unauthenticated, `INSUFFICIENT_PERMISSIONS` without the permission. Reads and
+// mutations are addressed by entity id across all customers (no per-caller
+// scoping).
 // ---------------------------------------------------------------------------
 const billingAdminRouter = Router();
 
@@ -1393,8 +1395,8 @@ billingAdminRouter.post(
       'amountMinor'
     ] as number | undefined;
     // The DTO's @IsInt()/@Min(1) run in the global pipe, before the handler, so
-    // a supplied 0 or a fractional amount is a 400 whether or not the invoice
-    // exists and never reaches the remaining-total check.
+    // a supplied 0 or a fractional amount fails the DTO whether or not the
+    // invoice exists and never reaches the remaining-total check.
     if (
       rejectInvalid(res, [
         ...unknownPropertyErrors(req.body, ['amountMinor']),

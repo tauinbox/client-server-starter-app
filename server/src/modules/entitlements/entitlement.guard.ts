@@ -8,9 +8,10 @@ import { EntitlementService } from './entitlement.service';
 import type { EntitlementCapability } from './entitlement.types';
 
 /**
- * Enforces the capability declared by `@RequireEntitlement`. Returns 403 when the
- * caller's plan does not grant it. This is the paid-access gate, not the
- * authorization gate — pair it with `@Authorize`/auth for the actual permission.
+ * Enforces the capability declared by `@RequireEntitlement`. Throws
+ * `ENTITLEMENT_REQUIRED` when the caller's plan does not grant it. This is the
+ * paid-access gate, not the authorization gate — pair it with `@Authorize`/auth
+ * for the actual permission.
  */
 @Injectable()
 export class EntitlementGuard implements CanActivate {

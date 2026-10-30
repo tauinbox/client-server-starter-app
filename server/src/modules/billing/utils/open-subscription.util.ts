@@ -16,9 +16,9 @@ export function findOpenSubscription(
 }
 
 /**
- * The caller's customer together with its open subscription, for the
- * mutations that need both. The 404 message is passed in - each flow keeps
- * its own wording.
+ * The caller's customer together with its open subscription, for the mutations
+ * that need both. The `NO_ACTIVE_SUBSCRIPTION` message is passed in - each flow
+ * keeps its own wording.
  */
 export async function requireOpenSubscription(
   repos: {

@@ -3,7 +3,8 @@
  * (ownership / fieldMatch / userAttr).
  *
  * Used at three layers:
- * 1. DTO validation (server input) - rejects a malformed branch with 400
+ * 1. DTO validation (server input) - rejects a malformed branch as a body that
+ *    fails its DTO
  * 2. Condition resolution (server ability factory + mock rule packing) -
  *    vetoes a stored malformed branch so it fails closed instead of
  *    silently dropping the restriction and widening the grant

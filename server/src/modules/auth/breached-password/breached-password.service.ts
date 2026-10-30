@@ -32,9 +32,10 @@ export class BreachedPasswordService {
   }
 
   /**
-   * Throws 400 when the password is listed. Call it on paths that SET a
-   * password, never on one that verifies an existing password: an owner whose
-   * password is already listed still has to get in to replace it.
+   * Throws `PASSWORD_TOO_COMMON` or `PASSWORD_BREACHED` when the password is
+   * listed. Call it on paths that SET a password, never on one that verifies an
+   * existing password: an owner whose password is already listed still has to
+   * get in to replace it.
    *
    * `context` holds the values the account will have after the write.
    */

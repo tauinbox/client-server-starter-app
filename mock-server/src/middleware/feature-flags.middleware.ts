@@ -854,10 +854,10 @@ adminRouter.post(
   requireUuid('id'),
   (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
-    // The server resolves the body through the ValidationPipe before the handler
-    // runs, so every DTO-level rejection precedes the 404, and the pipe reports
-    // all of them together. Only the rule-payload validator lives in the service,
-    // below the lookup.
+    // The server resolves the body through the ValidationPipe before the
+    // handler runs, so every DTO-level rejection precedes `NOT_FOUND`, and the
+    // pipe reports all of them together. Only the rule-payload validator lives
+    // in the service, below the lookup.
     const errors = [
       ...previewContextErrors(body),
       ...rulesErrors(body['rules'], 'nullable'),

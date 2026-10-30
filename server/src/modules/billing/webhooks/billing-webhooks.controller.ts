@@ -19,9 +19,9 @@ import { WebhookIpAllowlistGuard } from './webhook-ip-allowlist.guard';
  * HMAC, YooKassa re-fetch). Signature checks need the unparsed bytes, so these
  * read req.rawBody (enabled by rawBody: true in main.ts) instead of a DTO.
  *
- * @SkipThrottle() — providers deliver from a few stable egress IPs, so all of
- * a provider's webhooks share one per-IP throttle bucket; a renewal batch
- * above the global limit would get 429'd and delay entitlements until a
+ * @SkipThrottle() — providers deliver from a few stable egress IPs, so all of a
+ * provider's webhooks share one per-IP throttle bucket; a renewal batch above
+ * the global limit would get Too Many Requests and delay entitlements until a
  * provider retry. Authenticity is signature/re-fetch based and ingestion is
  * idempotent, so the throttle adds no protection here.
  *

@@ -28,7 +28,7 @@ import { CursorPaginationQueryDto } from './cursor-pagination-query.dto';
 
 // The validators of one property are listed in reverse: applyDecorators runs
 // them in array order, while stacked decorators run bottom-up, and the order
-// decides the order of the messages in a 400.
+// decides the order of the messages in a validation error.
 function textParam(description: string): PropertyDecorator {
   return applyDecorators(
     MaxLength(MAX_LIST_FILTER_LENGTH),

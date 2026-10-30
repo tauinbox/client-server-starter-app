@@ -59,10 +59,10 @@ function toGrantItems(items: ScopeItem[]): GrantScopeItem[] {
 
 /**
  * Applies the server grant-scope check: a caller can grant only a pair it
- * holds, not under a deny, and with a condition at least as narrow as its
- * own; only a caller holding the pair without restriction can remove a deny
- * row. Answers 403, audits the refusal like `RoleService` does, and returns
- * false when the write must stop.
+ * holds, not under a deny, and with a condition at least as narrow as its own;
+ * only a caller holding the pair without restriction can remove a deny row.
+ * Answers the refusal key, audits the refusal like `RoleService` does, and
+ * returns false when the write must stop.
  */
 export function assertGrantScope(
   req: Request,
@@ -98,7 +98,8 @@ export function assertGrantScope(
 /**
  * Mirrors `ResourceService.assertCanWiden`: offering a narrowed or orphaned
  * action again wakes its dormant grants, so only a super caller may. Answers
- * 403, audits the refusal, and returns false when the write must stop.
+ * `CANNOT_WIDEN`, audits the refusal, and returns false when the write must
+ * stop.
  */
 export function assertCanWiden(
   req: Request,
