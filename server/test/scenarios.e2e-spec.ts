@@ -53,6 +53,8 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { RolePermission } from '../src/modules/auth/entities/role-permission.entity';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
+import { Resource } from '../src/modules/auth/entities/resource.entity';
+import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
@@ -117,6 +119,9 @@ runWithInfra('Request scenarios (e2e)', () => {
   let sequence = 0;
   let oauthProfile: OAuthUserProfile | undefined;
   const throttlerStorage = new PerScenarioThrottlerStorage();
+  // The registry holds the names that the bootstrap sync found. A scenario
+  // resource has no controller, so the runner registers it here.
+  const registeredResources = new Set<string>();
 
   const stubGoogleGuard: CanActivate = {
     canActivate: (context: ExecutionContext): boolean => {
@@ -165,6 +170,13 @@ runWithInfra('Request scenarios (e2e)', () => {
         where: { resource: { name: 'roles' }, action: { name: 'read' } }
       })
     ).id;
+    const registry = app.get(ResourceRegistryService);
+    const isRegistered = registry.isRegistered.bind(registry);
+    jest
+      .spyOn(registry, 'isRegistered')
+      .mockImplementation(
+        (name) => registeredResources.has(name) || isRegistered(name)
+      );
   }, 60000);
 
   afterAll(async () => {
@@ -185,6 +197,12 @@ runWithInfra('Request scenarios (e2e)', () => {
       }
       await dataSource
         .getRepository(Role)
+        .createQueryBuilder()
+        .delete()
+        .where('name LIKE :prefix', { prefix: `${emailPrefix}%` })
+        .execute();
+      await dataSource
+        .getRepository(Resource)
         .createQueryBuilder()
         .delete()
         .where('name LIKE :prefix', { prefix: `${emailPrefix}%` })
@@ -314,6 +332,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     bearer?: string;
     cookies: string[];
     values: Partial<Record<ScenarioPlaceholder, string>>;
+    resourceName?: string;
   }
 
   const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
@@ -420,6 +439,31 @@ runWithInfra('Request scenarios (e2e)', () => {
         .relation(User, 'roles')
         .of(ctx.target!.user.id)
         .add(ctx.values.$roleId!);
+    },
+    resource: async (ctx) => {
+      sequence += 1;
+      const name = `${emailPrefix}resource-${sequence}`;
+      const resource = await dataSource.getRepository(Resource).save({
+        name,
+        subject: `Scenario${stamp.replace(/\W/g, '')}R${sequence}`,
+        displayName: 'Scenario resource',
+        description: null,
+        actionNames: ['read', 'update'],
+        conditionalActionNames: [],
+        allowedActionNames: null
+      });
+      registeredResources.add(name);
+      ctx.resourceName = name;
+      ctx.values.$resourceId = resource.id;
+    },
+    'orphaned-resource': async (ctx) => {
+      await dataSource
+        .getRepository(Resource)
+        .update(ctx.values.$resourceId!, { isOrphaned: true });
+    },
+    'unregistered-resource': (ctx) => {
+      registeredResources.delete(ctx.resourceName!);
+      return Promise.resolve();
     }
   };
 
