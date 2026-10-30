@@ -109,8 +109,13 @@ Consumers:
   POST, PUT, PATCH or DELETE route of a route file has no scenario with a status
   below 400, unless the route entry carries `"noSuccessScenario": "<reason>"`,
   and when a scenario names a route that its route file does not hold. The
-  files in its `PENDING` list are not checked yet. A `PENDING` file that is
-  complete fails the check, so the list can only get shorter.
+  routes in its `PENDING_ROUTES` list have no scenario yet. A listed route that
+  has a scenario or that no route file holds fails the check, and so does a new
+  route that is not listed. CI runs the check as
+  `npm run check:scenarios -- --base origin/master`: a listed route also fails
+  when it is not a route with no success scenario on `master`, so a change
+  cannot add a route to the list and the list can only get shorter. CI runs
+  `npm run check:scenarios -- --self-test` before the check.
 
 Rate limiting is an allowed difference between the server and the mock, so a
 scenario does not depend on a 429. Each server scenario starts with a full rate
