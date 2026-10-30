@@ -50,6 +50,8 @@ import { MailService } from '../src/modules/mail/mail.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
+import { Permission } from '../src/modules/auth/entities/permission.entity';
+import { RolePermission } from '../src/modules/auth/entities/role-permission.entity';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
@@ -108,6 +110,7 @@ runWithInfra('Request scenarios (e2e)', () => {
   let oauthDataCookieName: string;
   let userRole: Role;
   let superRole: Role;
+  let permissionId: string;
   const previousKey = process.env['MFA_ENCRYPTION_KEY'];
   const stamp = `${Date.now()}-${randomBytes(3).toString('hex')}`;
   const emailPrefix = `scenario-${stamp}-`;
@@ -156,6 +159,12 @@ runWithInfra('Request scenarios (e2e)', () => {
     const roles = dataSource.getRepository(Role);
     userRole = await roles.findOneByOrFail({ name: 'user' });
     superRole = await roles.findOneByOrFail({ isSuper: true });
+    // The resource sync of the bootstrap creates it, also on CI.
+    permissionId = (
+      await dataSource.getRepository(Permission).findOneOrFail({
+        where: { resource: { name: 'roles' }, action: { name: 'read' } }
+      })
+    ).id;
   }, 60000);
 
   afterAll(async () => {
@@ -174,6 +183,12 @@ runWithInfra('Request scenarios (e2e)', () => {
         await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
         await dataSource.getRepository(User).delete({ id: In(ids) });
       }
+      await dataSource
+        .getRepository(Role)
+        .createQueryBuilder()
+        .delete()
+        .where('name LIKE :prefix', { prefix: `${emailPrefix}%` })
+        .execute();
     }
     await app?.close();
   });
@@ -185,6 +200,11 @@ runWithInfra('Request scenarios (e2e)', () => {
   function freshEmail(): string {
     sequence += 1;
     return `${emailPrefix}${sequence}@example.com`;
+  }
+
+  function freshRoleName(): string {
+    sequence += 1;
+    return `${emailPrefix}role-${sequence}`;
   }
 
   // Each account starts as `user`: the default role, a password and a
@@ -290,6 +310,7 @@ runWithInfra('Request scenarios (e2e)', () => {
 
   interface Context {
     actor?: Account;
+    target?: Account;
     bearer?: string;
     cookies: string[];
     values: Partial<Record<ScenarioPlaceholder, string>>;
@@ -379,6 +400,26 @@ runWithInfra('Request scenarios (e2e)', () => {
         provider: 'vk',
         providerId: `vk-${ctx.actor!.user.id}`
       });
+    },
+    'custom-role': async (ctx) => {
+      const role = await dataSource
+        .getRepository(Role)
+        .save({ name: ctx.values.$roleName!, description: null });
+      ctx.values.$roleId = role.id;
+    },
+    'role-permission': async (ctx) => {
+      await dataSource.getRepository(RolePermission).save({
+        roleId: ctx.values.$roleId!,
+        permissionId,
+        conditions: null
+      });
+    },
+    'target-role': async (ctx) => {
+      await dataSource
+        .createQueryBuilder()
+        .relation(User, 'roles')
+        .of(ctx.target!.user.id)
+        .add(ctx.values.$roleId!);
     }
   };
 
@@ -441,6 +482,8 @@ runWithInfra('Request scenarios (e2e)', () => {
     ctx.values.$newPassword = SCENARIO_NEW_PASSWORD;
     ctx.values.$recoveryCode = SCENARIO_RECOVERY_CODE;
     ctx.values.$newEmail = freshEmail();
+    ctx.values.$roleName = freshRoleName();
+    ctx.values.$permissionId = permissionId;
     emails.push(ctx.values.$newEmail);
 
     if (scenario.actor) {
@@ -449,9 +492,9 @@ runWithInfra('Request scenarios (e2e)', () => {
       emails.push(ctx.actor.email);
     }
     if (scenario.target) {
-      const target = await createAccount(scenario.target);
-      ctx.values.$targetId = target.user.id;
-      emails.push(target.email);
+      ctx.target = await createAccount(scenario.target);
+      ctx.values.$targetId = ctx.target.user.id;
+      emails.push(ctx.target.email);
     }
     const states = scenario.state ?? [];
     if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {

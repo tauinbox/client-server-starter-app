@@ -33,6 +33,7 @@ interface Answer {
 
 interface Context {
   actor?: MockUser;
+  target?: MockUser;
   bearer?: string;
   cookies: string[];
   values: Partial<Record<ScenarioPlaceholder, string>>;
@@ -270,8 +271,48 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       }
     ]);
     return Promise.resolve();
+  },
+  'custom-role': (ctx) => {
+    const now = new Date().toISOString();
+    const role = {
+      id: randomUUID(),
+      name: ctx.values.$roleName!,
+      description: null,
+      isSystem: false,
+      isSuper: false,
+      createdAt: now,
+      updatedAt: now
+    };
+    getState().roles.set(role.id, role);
+    ctx.values.$roleId = role.id;
+    return Promise.resolve();
+  },
+  'role-permission': (ctx) => {
+    getState().rolePermissions.push({
+      id: randomUUID(),
+      roleId: ctx.values.$roleId!,
+      permissionId: ctx.values.$permissionId!,
+      conditions: null
+    });
+    return Promise.resolve();
+  },
+  'target-role': (ctx) => {
+    ctx.target!.roles.push(getState().roles.get(ctx.values.$roleId!)!.name);
+    return Promise.resolve();
   }
 };
+
+/** The id of the `read:Role` permission. */
+function readRolePermissionId(): string {
+  const state = getState();
+  const found = [...state.permissions.values()].find(
+    (p) =>
+      state.resources.get(p.resourceId)?.name === 'roles' &&
+      state.actions.get(p.actionId)?.name === 'read'
+  );
+  if (!found) throw new Error('the seed has no read:Role permission');
+  return found.id;
+}
 
 /** The actions of the audit rows that name one of the accounts. */
 function auditActions(ids: string[], emails: string[], from: number) {
@@ -293,6 +334,8 @@ async function run(scenario: RequestScenario) {
   ctx.values.$newPassword = SCENARIO_NEW_PASSWORD;
   ctx.values.$recoveryCode = SCENARIO_RECOVERY_CODE;
   ctx.values.$newEmail = freshEmail();
+  ctx.values.$roleName = `scenario-role-${sequence}`;
+  ctx.values.$permissionId = readRolePermissionId();
   const accounts: MockUser[] = [];
 
   if (scenario.actor) {
@@ -301,9 +344,9 @@ async function run(scenario: RequestScenario) {
     accounts.push(ctx.actor);
   }
   if (scenario.target) {
-    const target = createAccount(scenario.target);
-    ctx.values.$targetId = target.id;
-    accounts.push(target);
+    ctx.target = createAccount(scenario.target);
+    ctx.values.$targetId = ctx.target.id;
+    accounts.push(ctx.target);
   }
   const states = scenario.state ?? [];
   if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {

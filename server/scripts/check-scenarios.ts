@@ -24,7 +24,6 @@ const PENDING = new Set([
   'billing.json',
   'feature-flags.json',
   'rbac.json',
-  'roles.json',
   'users.json'
 ]);
 
