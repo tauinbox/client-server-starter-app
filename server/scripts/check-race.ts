@@ -4,8 +4,9 @@
  * call of a method of the same file that makes one (a `loadRole(id)` helper).
  *
  * 1. A read, then a `delete`, `remove` or `softDelete` that does not decide
- *    from its own result: the method reads no `affected`, takes no pessimistic
- *    lock, and the delete has no `where`. Of two concurrent requests, both
+ *    from its own result: the method reads no `affected`, neither it nor a
+ *    method of the same file that it calls takes a pessimistic lock, and the
+ *    delete has no `where`. Of two concurrent requests, both
  *    pass the read, and both then act as if they removed the row.
  * 2. A read, then a throw of a key that refuses a duplicate (`*_EXISTS`,
  *    `ALREADY_*`), then a `save` or an `insert`, and no unique violation is
@@ -208,7 +209,9 @@ class MethodScan {
     if (
       !unguarded ||
       hasIdentifier(this.method, new Set(['affected'])) ||
-      hasIdentifier(this.method, LOCKS)
+      reachable(this.method, this.local).some((body) =>
+        hasIdentifier(body, LOCKS)
+      )
     ) {
       return undefined;
     }
@@ -334,6 +337,25 @@ const SELF_TEST_CASES: { label: string; source: string; fails: boolean }[] = [
       async replace(roleId: string) {
         await this.repository.findOne({ where: { id: roleId }, lock: { mode: 'pessimistic_write' } });
         await this.repository.delete({ roleId });
+      }
+    }`,
+    fails: false
+  },
+  {
+    label: 'a delete after a lock that a helper of the same file takes',
+    source: `class S {
+      async delete(id: string) {
+        const role = await this.loadRole(id);
+        await this.manager.transaction(async (em) => {
+          await this.lockRole(em, id);
+          await em.delete(Role, { id });
+        });
+      }
+      private async loadRole(id: string) {
+        return this.repository.findOneOrFail({ where: { id } });
+      }
+      private async lockRole(em: EntityManager, id: string) {
+        await em.findOne(Role, { where: { id }, lock: { mode: 'pessimistic_write' } });
       }
     }`,
     fails: false
