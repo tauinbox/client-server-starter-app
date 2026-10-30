@@ -111,7 +111,8 @@ Consumers:
   POST, PUT, PATCH or DELETE route of a route file has no scenario with a status
   below 400, unless the route entry carries `"noSuccessScenario": "<reason>"`,
   and when a scenario names a route that its route file does not hold. The
-  routes in its `PENDING_ROUTES` list have no scenario yet. A listed route that
+  routes in its `PENDING_ROUTES` list have no scenario yet. Since 2026-10-30 the
+  list is empty: each such route has a success scenario. A listed route that
   has a scenario or that no route file holds fails the check, and so does a new
   route that is not listed. CI runs the check as
   `npm run check:scenarios -- --base origin/master`: a listed route also fails

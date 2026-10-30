@@ -123,22 +123,51 @@ function cancelBodyErrors(body: unknown): string[] {
   ];
 }
 
-// Provider webhook receivers. Public — providers verify their own authenticity,
-// so there is no JWT. The mock has no real signature to check, so it mirrors
-// only the server's observable status contract: a missing/empty body is a 400
-// (the server's "Missing webhook body" guard), any payload is accepted with the
-// 200 success shape. Synthetic lifecycle injection is driven through /__control.
-function handleWebhook(req: Request, res: Response): void {
-  if (!req.body || Object.keys(req.body).length === 0) {
-    // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
-    res.status(400).json({ message: 'Missing webhook body', statusCode: 400 });
-    return;
-  }
-  res.status(200).json({ received: true });
+// The mock has no provider secret and no provider API, so it mirrors only the
+// checks that the server runs before it calls the provider.
+function refuseWebhook(res: Response, message: string): void {
+  // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
+  res.status(400).json({ message, statusCode: 400 });
 }
 
-router.post('/paddle', handleWebhook);
-router.post('/yookassa', handleWebhook);
+function handleWebhook(
+  isConfirmable: (req: Request) => boolean
+): (req: Request, res: Response) => void {
+  return (req, res) => {
+    if (!req.body || Object.keys(req.body).length === 0) {
+      refuseWebhook(res, 'Missing webhook body');
+      return;
+    }
+    if (!isConfirmable(req)) {
+      refuseWebhook(res, 'Webhook verification failed');
+      return;
+    }
+    res.status(200).json({ received: true });
+  };
+}
+
+// Mirrors PaddleProvider.verifyAndParseWebhook before the HMAC check.
+router.post(
+  '/paddle',
+  handleWebhook((req) => Boolean(req.headers['paddle-signature']))
+);
+
+// Mirrors YooKassaProvider.verifyAndParseWebhook before the payment re-fetch.
+router.post(
+  '/yookassa',
+  handleWebhook((req) => {
+    const body = req.body as {
+      event?: unknown;
+      object?: { id?: unknown };
+    };
+    return (
+      (body.event === 'payment.succeeded' ||
+        body.event === 'payment.canceled') &&
+      typeof body.object?.id === 'string' &&
+      body.object.id !== ''
+    );
+  })
+);
 
 const billingRouter = Router();
 

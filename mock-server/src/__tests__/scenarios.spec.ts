@@ -1,6 +1,9 @@
 import type { Server } from 'http';
 import { randomUUID } from 'crypto';
-import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
+import {
+  BILLING_PROVIDER_FLAGS,
+  MAX_FAILED_ATTEMPTS
+} from '@app/shared/constants';
 import {
   ACTOR_FIXTURES,
   ActorFixture,
@@ -188,6 +191,28 @@ function tokenOf(tokens: Map<string, MockIssuedToken>, userId: string) {
   return found[0];
 }
 
+function addFixedPlan(key: string): Promise<void> {
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  getState().plans.set(id, {
+    id,
+    key,
+    name: 'Scenario plan',
+    description: null,
+    billingMode: 'fixed',
+    interval: 'month',
+    meterKey: null,
+    entitlements: [],
+    limits: null,
+    trialDays: 0,
+    active: true,
+    prices: { yookassa: { currency: 'RUB', amountMinor: 1000 } },
+    createdAt: now,
+    updatedAt: now
+  });
+  return Promise.resolve();
+}
+
 const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
   'refresh-cookie': async (ctx) => {
     const session = await signIn(ctx.actor!);
@@ -359,13 +384,11 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     ctx.values.$flagId = id;
     return Promise.resolve();
   },
-  subscription: (ctx) => {
-    const nowMs = Date.now();
-    const now = new Date(nowMs).toISOString();
-    const customerId = randomUUID();
-    const subscriptionId = randomUUID();
-    getState().billingCustomers.set(customerId, {
-      id: customerId,
+  customer: (ctx) => {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    getState().billingCustomers.set(id, {
+      id,
       userId: ctx.actor!.id,
       provider: 'yookassa',
       providerOverride: null,
@@ -376,9 +399,17 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       createdAt: now,
       updatedAt: now
     });
+    ctx.values.$customerId = id;
+    return Promise.resolve();
+  },
+  subscription: async (ctx) => {
+    if (!ctx.values.$customerId) await STATES.customer(ctx);
+    const nowMs = Date.now();
+    const now = new Date(nowMs).toISOString();
+    const subscriptionId = randomUUID();
     getState().billingSubscriptions.set(subscriptionId, {
       id: subscriptionId,
-      customerId,
+      customerId: ctx.values.$customerId!,
       planKey: ctx.values.$meterKey!,
       provider: 'yookassa',
       billingMode: 'fixed',
@@ -393,9 +424,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       createdAt: now,
       updatedAt: now
     });
-    ctx.values.$customerId = customerId;
     ctx.values.$subscriptionId = subscriptionId;
-    return Promise.resolve();
   },
   'paid-invoice': (ctx) => {
     const nowMs = Date.now();
@@ -443,6 +472,32 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       createdAt: now,
       updatedAt: now
     });
+    return Promise.resolve();
+  },
+  'fixed-plan': (ctx) => addFixedPlan(ctx.values.$meterKey!),
+  'other-plan': (ctx) => addFixedPlan(ctx.values.$planKey!),
+  product: (ctx) => {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    getState().billingProducts.set(id, {
+      id,
+      key: ctx.values.$productKey!,
+      name: 'Scenario product',
+      description: null,
+      type: 'sku',
+      prices: { yookassa: { currency: 'RUB', amountMinor: 500 } },
+      grant: null,
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    return Promise.resolve();
+  },
+  'providers-disabled': () => {
+    const keys: string[] = BILLING_PROVIDER_FLAGS.map((p) => p.enabledFlagKey);
+    for (const flag of getState().featureFlags.values()) {
+      if (keys.includes(flag.key)) flag.enabled = false;
+    }
     return Promise.resolve();
   },
   'dead-letter-webhook-event': (ctx) => {
@@ -497,6 +552,8 @@ async function run(scenario: RequestScenario) {
   ctx.values.$roleName = `scenario-role-${sequence}`;
   ctx.values.$flagKey = `scenario-flag-${sequence}`;
   ctx.values.$meterKey = `scenario-meter-${sequence}`;
+  ctx.values.$planKey = `scenario-plan-${sequence}`;
+  ctx.values.$productKey = `scenario-product-${sequence}`;
   ctx.values.$permissionId = readRolePermissionId();
   const accounts: MockUser[] = [];
 
