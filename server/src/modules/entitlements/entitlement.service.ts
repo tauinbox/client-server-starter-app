@@ -17,8 +17,6 @@ import {
   type ResolvedEntitlements
 } from './entitlement.types';
 
-const VERSION_KEY = 'entitlements:version';
-const VERSION_COUNTER_KEY = 'entitlements:version:counter';
 const USER_VERSION_KEY = 'entitlements:user-version';
 const USER_VERSION_COUNTER_KEY = 'entitlements:user-version:counter';
 const USER_TTL_MS = 60_000;
@@ -26,7 +24,6 @@ const USER_TTL_MS = 60_000;
 @Injectable()
 export class EntitlementService {
   readonly #logger = new Logger(EntitlementService.name);
-  readonly #version: CacheVersionCounter;
   readonly #userVersion: CacheVersionCounter;
 
   constructor(
@@ -41,12 +38,6 @@ export class EntitlementService {
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly metrics: MetricsService
   ) {
-    this.#version = new CacheVersionCounter(
-      cache,
-      VERSION_COUNTER_KEY,
-      VERSION_KEY,
-      this.#logger
-    );
     this.#userVersion = new CacheVersionCounter(
       cache,
       USER_VERSION_COUNTER_KEY,
@@ -57,15 +48,13 @@ export class EntitlementService {
 
   /**
    * Resolves the capability set + limits in effect for a user. Cached per-user,
-   * keyed by a monotonic global version so a plan-level change (`invalidateAll`)
-   * orphans every user key at once without a SCAN+DEL, and by a per-user
-   * version so a subscription change (`invalidateUser`) orphans the key a
-   * concurrent read is about to write.
+   * keyed by a per-user version so a subscription change (`invalidateUser`)
+   * orphans the key a concurrent read is about to write. A plan edit in the
+   * seeder reaches a cached user when the entry expires (`USER_TTL_MS`).
    */
   async capabilitiesFor(userId: string): Promise<ResolvedEntitlements> {
-    const version = await this.getVersion();
     const userVersion = await this.#userVersion.read(userId);
-    const cacheKey = `entitlements:user:${userId}:v${version}:u${userVersion}`;
+    const cacheKey = `entitlements:user:${userId}:u${userVersion}`;
     const cached = await this.cache.get<ResolvedEntitlements>(cacheKey);
     this.metrics.recordCacheAccess('entitlements', cached ? 'hit' : 'miss');
     if (cached) return cached;
@@ -100,11 +89,6 @@ export class EntitlementService {
   /** Drops the cached entitlements for a single user (subscription change). */
   async invalidateUser(userId: string): Promise<void> {
     await this.#userVersion.bump(userId);
-  }
-
-  /** Bumps the version so every per-user cache key orphans (plan edits). */
-  async invalidateAll(): Promise<void> {
-    await this.bumpVersion();
   }
 
   /**
@@ -169,13 +153,5 @@ export class EntitlementService {
       capabilities: plan.entitlements,
       limits: plan.limits ?? {}
     };
-  }
-
-  private getVersion(): Promise<number> {
-    return this.#version.read();
-  }
-
-  private bumpVersion(): Promise<void> {
-    return this.#version.bump();
   }
 }
