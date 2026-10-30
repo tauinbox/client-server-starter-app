@@ -36,7 +36,7 @@ export default {
   'client/{*.{ts,mjs},scripts/*.mjs}': (files) => {
     return `${clientBin('prettier')} --write ${files.join(' ')}`;
   },
-  'server/{*.ts,scripts/*.ts}': (files) => {
+  'server/{*.ts,scripts/**/*.ts}': (files) => {
     return `${serverBin('prettier')} --write ${files.join(' ')}`;
   },
   'mock-server/*.ts': (files) => {
