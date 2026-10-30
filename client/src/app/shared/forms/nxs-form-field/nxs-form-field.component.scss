@@ -3,7 +3,7 @@
 // NxsFormFieldComponent owns its own vertical rhythm. Containers wrapping
 // these elements MUST NOT add row-gap (use column-gap on grids, no gap on
 // vertical flex). Raw <mat-form-field> siblings need subscriptSizing="dynamic"
-// to match cell height. See CLAUDE.md "Form-field rhythm".
+// to match cell height.
 :host {
   display: block;
   margin-bottom: vars.$space-form-row-gap;

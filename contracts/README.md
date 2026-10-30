@@ -124,5 +124,5 @@ scenario does not depend on a 429. Each server scenario starts with a full rate
 limit budget.
 
 When adding or removing a server endpoint, update the matching `routes/<feature>.json`
-with `expectedStatus: 401` for an authenticated endpoint (see CLAUDE.md). The new route
+with `expectedStatus: 401` for an authenticated endpoint (`npm run check:routes` checks it). The new route
 must also exist in `mock-server/` and return its declared status in the same change.
