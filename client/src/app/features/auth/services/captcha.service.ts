@@ -44,7 +44,6 @@ export class CaptchaService {
   readonly #document = inject(DOCUMENT);
 
   readonly #config = signal<CaptchaConfigResponse | null>(null);
-  readonly config = this.#config.asReadonly();
 
   #configRequest: Promise<CaptchaConfigResponse> | null = null;
   #scriptLoad: Promise<TurnstileApi> | null = null;

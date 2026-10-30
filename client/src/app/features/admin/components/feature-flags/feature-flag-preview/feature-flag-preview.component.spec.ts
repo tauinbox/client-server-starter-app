@@ -19,6 +19,7 @@ describe('FeatureFlagPreviewComponent', () => {
   let previewSpy: ReturnType<typeof vi.fn>;
   let searchUsersSpy: ReturnType<typeof vi.fn>;
   let notifyError: ReturnType<typeof vi.fn>;
+  let notifyMarkReported: ReturnType<typeof vi.fn>;
 
   const setup = async (
     flagId = 'flag-1'
@@ -30,6 +31,7 @@ describe('FeatureFlagPreviewComponent', () => {
         of({ data: [] as User[], meta: { nextCursor: null as string | null } })
       );
     notifyError = vi.fn();
+    notifyMarkReported = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [FeatureFlagPreviewComponent, TranslocoTestingModuleWithLangs],
@@ -40,7 +42,10 @@ describe('FeatureFlagPreviewComponent', () => {
           useValue: { preview: previewSpy }
         },
         { provide: UserService, useValue: { searchCursor: searchUsersSpy } },
-        { provide: NotifyService, useValue: { error: notifyError } }
+        {
+          provide: NotifyService,
+          useValue: { error: notifyError, markReported: notifyMarkReported }
+        }
       ]
     }).compileComponents();
 
@@ -323,17 +328,16 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('puts the server rejection text in the error toast', async () => {
     const fixture = await setup();
-    previewSpy.mockReturnValue(
-      throwError(
-        () =>
-          new HttpErrorResponse({
-            status: 400,
-            error: { message: 'userId must be a UUID' }
-          })
-      )
-    );
+    const rejection = new HttpErrorResponse({
+      status: 400,
+      error: { message: 'userId must be a UUID' }
+    });
+    previewSpy.mockReturnValue(throwError(() => rejection));
 
     fixture.componentInstance.run();
+
+    // The interceptor must not show the same refusal a second time.
+    expect(notifyMarkReported).toHaveBeenCalledWith(rejection);
 
     expect(notifyError).toHaveBeenCalledWith(
       'admin.featureFlagPreview.errorPreviewFailed',

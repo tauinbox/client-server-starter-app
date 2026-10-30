@@ -15,11 +15,16 @@ type NotifyRef = MatSnackBarRef<TextOnlySnackBar>;
  *
  * `error()` accepts an HttpErrorResponse and resolves its text through the
  * shared `parseHttpErrorMessage` funnel.
+ *
+ * One refused request shows one message: the error interceptor reports
+ * through `reportLater()`, and a caller that reports the same error first
+ * wins.
  */
 @Injectable({ providedIn: 'root' })
 export class NotifyService {
   readonly #snackBar = inject(MatSnackBar);
   readonly #transloco = inject(TranslocoService);
+  readonly #reported = new WeakSet<HttpErrorResponse>();
 
   success(messageKey: string, params?: TranslationParams): NotifyRef {
     return this.#open(this.#transloco.translate(messageKey, params));
@@ -55,9 +60,28 @@ export class NotifyService {
     }
     const fallbackKey =
       typeof paramsOrFallbackKey === 'string' ? paramsOrFallbackKey : undefined;
+    this.#reported.add(source);
     return this.#open(
       parseHttpErrorMessage(source, this.#transloco, fallbackKey)
     );
+  }
+
+  /**
+   * Shows the message of `error` unless a caller reports the same error
+   * first. The callback runs in a macrotask, because the `catch` of an
+   * `await firstValueFrom(...)` caller runs in a later microtask.
+   */
+  reportLater(error: HttpErrorResponse, show: () => void): void {
+    setTimeout(() => {
+      if (this.#reported.has(error)) return;
+      this.#reported.add(error);
+      show();
+    });
+  }
+
+  /** For a caller that shows `error` in another way than `error()`. */
+  markReported(error: HttpErrorResponse): void {
+    this.#reported.add(error);
   }
 
   #open(message: string): NotifyRef {

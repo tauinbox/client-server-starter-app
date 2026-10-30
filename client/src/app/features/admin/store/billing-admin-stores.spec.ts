@@ -1,9 +1,12 @@
+import type { MockInstance } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
@@ -14,11 +17,7 @@ const ADMIN_BILLING_API_V1 = '/api/v1/admin/billing';
 
 describe('Admin billing requests through the error interceptor', () => {
   let httpMock: HttpTestingController;
-  let notifyMock: {
-    success: ReturnType<typeof vi.fn>;
-    error: ReturnType<typeof vi.fn>;
-    warn: ReturnType<typeof vi.fn>;
-  };
+  let notifyError: MockInstance<NotifyService['error']>;
 
   function refuse(method: string, path: string): void {
     httpMock
@@ -33,21 +32,20 @@ describe('Admin billing requests through the error interceptor', () => {
       );
   }
 
+  // The interceptor shows its message in a later macrotask.
   async function settle(): Promise<void> {
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve));
   }
 
   beforeEach(() => {
-    notifyMock = { success: vi.fn(), error: vi.fn(), warn: vi.fn() };
-
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModuleWithLangs],
       providers: [
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
         BillingSubscriptionsStore,
         BillingInvoicesStore,
-        { provide: NotifyService, useValue: notifyMock },
+        { provide: MatSnackBar, useValue: { open: vi.fn() } },
         {
           provide: AuthStore,
           useValue: { setRules: vi.fn(), setMfaMandatory: vi.fn() }
@@ -55,6 +53,7 @@ describe('Admin billing requests through the error interceptor', () => {
       ]
     });
     httpMock = TestBed.inject(HttpTestingController);
+    notifyError = vi.spyOn(TestBed.inject(NotifyService), 'error');
   });
 
   afterEach(() => httpMock.verify());
@@ -64,8 +63,8 @@ describe('Admin billing requests through the error interceptor', () => {
     refuse('GET', '/subscriptions');
     await settle();
 
-    expect(notifyMock.error).toHaveBeenCalledTimes(1);
-    expect(notifyMock.error).toHaveBeenCalledWith(
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
       'admin.billing.errorLoadFailed'
     );
@@ -76,8 +75,8 @@ describe('Admin billing requests through the error interceptor', () => {
     refuse('GET', '/invoices');
     await settle();
 
-    expect(notifyMock.error).toHaveBeenCalledTimes(1);
-    expect(notifyMock.error).toHaveBeenCalledWith(
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
       'admin.billing.errorLoadFailed'
     );
@@ -90,8 +89,9 @@ describe('Admin billing requests through the error interceptor', () => {
     refuse('POST', '/subscriptions/sub-1/cancel');
 
     expect(await done).toBe(false);
-    expect(notifyMock.error).toHaveBeenCalledTimes(1);
-    expect(notifyMock.error).toHaveBeenCalledWith(
+    await settle();
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
       'admin.billing.errorCancelFailed'
     );
@@ -102,8 +102,9 @@ describe('Admin billing requests through the error interceptor', () => {
     refuse('POST', '/invoices/inv-1/refund');
 
     expect(await done).toBe(false);
-    expect(notifyMock.error).toHaveBeenCalledTimes(1);
-    expect(notifyMock.error).toHaveBeenCalledWith(
+    await settle();
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(notifyError).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
       'admin.billing.errorRefundFailed'
     );

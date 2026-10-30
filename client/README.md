@@ -739,7 +739,18 @@ does not recycle while it is disconnected or while the user is not authenticated
 `NotifyService` uses `providedIn: 'root'`. It is the central helper for `MatSnackBar`.
 
 Methods: `success(messageKey, params?)`, `info(messageKey, params?)`, `warn(messageKey, params?)`,
-`error(messageKey, params?)` and `error(httpError, fallbackKey?)`.
+`error(messageKey, params?)`, `error(httpError, fallbackKey?)`, `reportLater(httpError, show)` and
+`markReported(httpError)`.
+
+**One refused request shows one message.** `error(httpError)` records the error object in a
+`WeakSet`. The error interceptor does not open its snackbar at once: it calls `reportLater`, which
+waits one macrotask and then shows the message only when no caller recorded the same object. A
+caller that reports through `error(httpError, fallbackKey)` thus replaces the interceptor message,
+with no flag at the call site. A macrotask is necessary, because the `catch` of an
+`await firstValueFrom(...)` caller runs in a later microtask. A caller that shows the refusal in
+another way (a fixed text, an inline message) calls `markReported(httpError)`, or sends the request
+with `silentContext()`. `src/app/core/interceptors/error-report-once.spec.ts` holds this behaviour
+with the real interceptor and the real service.
 
 The service translates the message with `TranslocoService`. It uses the translated `common.close`
 action. It takes the duration and the position from `MAT_SNACK_BAR_DEFAULT_OPTIONS`. Thus a call site
@@ -776,7 +787,8 @@ has exactly one meaning.
 ### HTTP Interceptors
 
 1. **errorInterceptor** catches the errors and shows a snackbar through
-   `NotifyService.error(httpErrorResponse)`. It ignores a 401. `NotifyService` does the parse
+   `NotifyService.reportLater`, one macrotask later, unless the caller reported the same error
+   first (see NotifyService). It ignores a 401. `NotifyService` does the parse
    sequence of `errorKey`, then `message`, then the status. On the first 403 with `errors.general.insufficientPermissions`, the
    interceptor reads `GET /auth/permissions` silently. Any other 403 (a step-up refusal, a
    self-target, a system role) goes to the caller at once, because new permissions cannot change it. Then it calls `AuthStore.setRules()`, which starts
@@ -1190,7 +1202,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 343 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1622 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1633 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and
