@@ -1,0 +1,216 @@
+{
+  "scenarios": [
+    {
+      "name": "an admin creates a flag",
+      "route": "POST /api/v1/admin/feature-flags",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "key": "$flagKey"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "FEATURE_FLAG_CREATE"
+        ]
+      }
+    },
+    {
+      "name": "a key that another flag has is refused",
+      "route": "POST /api/v1/admin/feature-flags",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "body": {
+        "key": "$flagKey"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.featureFlags.keyExists",
+        "audit": []
+      }
+    },
+    {
+      "name": "a rule with an unknown type is refused and writes no flag",
+      "route": "POST /api/v1/admin/feature-flags",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "key": "$flagKey",
+        "rules": [
+          {
+            "effect": "include",
+            "payload": {
+              "type": "unknown"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.featureFlags.invalidRule",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin changes the description of a flag",
+      "route": "PATCH /api/v1/admin/feature-flags/1",
+      "path": "/api/v1/admin/feature-flags/$flagId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "headers": {
+        "If-Match": "\"1\""
+      },
+      "body": {
+        "description": "Changed by a scenario"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "FEATURE_FLAG_UPDATE"
+        ]
+      }
+    },
+    {
+      "name": "a change with no If-Match is refused",
+      "route": "PATCH /api/v1/admin/feature-flags/1",
+      "path": "/api/v1/admin/feature-flags/$flagId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "body": {
+        "description": "Changed by a scenario"
+      },
+      "expect": {
+        "status": 428,
+        "errorKey": "errors.featureFlags.ifMatchRequired",
+        "audit": []
+      }
+    },
+    {
+      "name": "a malformed If-Match is refused",
+      "route": "PATCH /api/v1/admin/feature-flags/1",
+      "path": "/api/v1/admin/feature-flags/$flagId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "headers": {
+        "If-Match": "1"
+      },
+      "body": {
+        "description": "Changed by a scenario"
+      },
+      "expect": {
+        "status": 400,
+        "errorKey": "errors.featureFlags.ifMatchInvalid",
+        "audit": []
+      }
+    },
+    {
+      "name": "a change on a stale version is refused",
+      "route": "PATCH /api/v1/admin/feature-flags/1",
+      "path": "/api/v1/admin/feature-flags/$flagId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "headers": {
+        "If-Match": "\"7\""
+      },
+      "body": {
+        "description": "Changed by a scenario"
+      },
+      "expect": {
+        "status": 412,
+        "errorKey": "errors.featureFlags.versionConflict",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin deletes a flag",
+      "route": "DELETE /api/v1/admin/feature-flags/1",
+      "path": "/api/v1/admin/feature-flags/$flagId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "expect": {
+        "status": 204,
+        "errorKey": null,
+        "audit": [
+          "FEATURE_FLAG_DELETE"
+        ]
+      }
+    },
+    {
+      "name": "a flag that does not exist cannot be deleted",
+      "route": "DELETE /api/v1/admin/feature-flags/1",
+      "path": "/api/v1/admin/feature-flags/9b2f6c1e-4d3a-4f8b-9c7e-2a1d5e6f7a8b",
+      "actor": "admin",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.featureFlags.notFound",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin previews a flag and writes nothing",
+      "route": "POST /api/v1/admin/feature-flags/1/preview",
+      "path": "/api/v1/admin/feature-flags/$flagId/preview",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "body": {
+        "roles": [
+          "user"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a preview with an unknown rule type is refused",
+      "route": "POST /api/v1/admin/feature-flags/1/preview",
+      "path": "/api/v1/admin/feature-flags/$flagId/preview",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "feature-flag"
+      ],
+      "body": {
+        "rules": [
+          {
+            "effect": "include",
+            "payload": {
+              "type": "unknown"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.featureFlags.invalidRule",
+        "audit": []
+      }
+    }
+  ]
+}

@@ -93,6 +93,8 @@ expected status, `errorKey` and audit actions:
   that is exactly a placeholder (`$email`, `$password`, `$code` ...) gets its
   value at run time. The lists, their meaning and the loader are in
   `shared/src/utils/request-scenarios.ts`.
+- `headers` holds request headers, for example `{ "If-Match": "\"1\"" }`. A
+  header value that is exactly a placeholder gets its value too.
 - `audit` is the full list of actions of the rows that the requests write and
   that name an account of the scenario. An empty list is a statement: no row.
   The runners compare the list in any order.
@@ -122,5 +124,5 @@ scenario does not depend on a 429. Each server scenario starts with a full rate
 limit budget.
 
 When adding or removing a server endpoint, update the matching `routes/<feature>.json`
-with `expectedStatus: 401` for an authenticated endpoint (see CLAUDE.md). The new route
+with `expectedStatus: 401` for an authenticated endpoint (`npm run check:routes` checks it). The new route
 must also exist in `mock-server/` and return its declared status in the same change.

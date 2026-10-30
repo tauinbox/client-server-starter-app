@@ -36,11 +36,7 @@ const PENDING_ROUTES = new Set([
   'POST /api/v1/billing/subscription/cancel',
   'PUT /api/v1/billing/region',
   'POST /api/v1/billing/webhooks/paddle',
-  'POST /api/v1/billing/webhooks/yookassa',
-  'POST /api/v1/admin/feature-flags',
-  'PATCH /api/v1/admin/feature-flags/1',
-  'DELETE /api/v1/admin/feature-flags/1',
-  'POST /api/v1/admin/feature-flags/1/preview'
+  'POST /api/v1/billing/webhooks/yookassa'
 ]);
 
 const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);

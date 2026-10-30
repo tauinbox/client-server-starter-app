@@ -65,7 +65,9 @@ export const STATE_FIXTURES = [
   /** No controller registers the `resource`. */
   'unregistered-resource',
   /** The target is soft-deleted. */
-  'deleted-target'
+  'deleted-target',
+  /** A flag with the key `$flagKey`, at version 1, with no rules; `$flagId`. */
+  'feature-flag'
 ] as const;
 export type StateFixture = (typeof STATE_FIXTURES)[number];
 
@@ -90,7 +92,10 @@ export const SCENARIO_PLACEHOLDERS = [
   '$roleId',
   /** The id of the `read:Role` permission. */
   '$permissionId',
-  '$resourceId'
+  '$resourceId',
+  /** A flag key that no flag has before the request. */
+  '$flagKey',
+  '$flagId'
 ] as const;
 export type ScenarioPlaceholder = (typeof SCENARIO_PLACEHOLDERS)[number];
 
@@ -113,6 +118,8 @@ export interface RequestScenario {
   state?: StateFixture[];
   /** A second account; `$targetId` is its id. */
   target?: ActorFixture;
+  /** Request headers, for example `If-Match`. */
+  headers?: Record<string, string>;
   body?: Record<string, unknown>;
   /** Send the request this many times. The last answer must match `expect`. */
   repeat?: number;
@@ -160,6 +167,7 @@ const SCENARIO_KEYS = new Set([
   'auth',
   'state',
   'target',
+  'headers',
   'body',
   'repeat',
   'expect'
@@ -209,6 +217,7 @@ export function scenarioErrors(scenario: RequestScenario): string[] {
   }
   const segments = (scenario.path ?? '').split('/');
   for (const name of [
+    ...placeholdersIn(scenario.headers),
     ...placeholdersIn(scenario.body),
     ...placeholdersIn(segments)
   ]) {

@@ -56,6 +56,7 @@ import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity'
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
+import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { MemoryThrottlerStorage } from '../src/modules/core/memory-throttler.storage';
@@ -207,6 +208,12 @@ runWithInfra('Request scenarios (e2e)', () => {
         .delete()
         .where('name LIKE :prefix', { prefix: `${emailPrefix}%` })
         .execute();
+      await dataSource
+        .getRepository(FeatureFlag)
+        .createQueryBuilder()
+        .delete()
+        .where('key LIKE :prefix', { prefix: `${emailPrefix}%` })
+        .execute();
     }
     await app?.close();
   });
@@ -223,6 +230,11 @@ runWithInfra('Request scenarios (e2e)', () => {
   function freshRoleName(): string {
     sequence += 1;
     return `${emailPrefix}role-${sequence}`;
+  }
+
+  function freshFlagKey(): string {
+    sequence += 1;
+    return `${emailPrefix}flag-${sequence}`;
   }
 
   // Each account starts as `user`: the default role, a password and a
@@ -467,6 +479,18 @@ runWithInfra('Request scenarios (e2e)', () => {
     },
     'deleted-target': async (ctx) => {
       await dataSource.getRepository(User).softDelete(ctx.target!.user.id);
+    },
+    'feature-flag': async (ctx) => {
+      const flag = await dataSource.getRepository(FeatureFlag).save({
+        key: ctx.values.$flagKey!,
+        description: null,
+        enabled: false,
+        environments: [],
+        public: false,
+        version: 1,
+        updatedByUserId: null
+      });
+      ctx.values.$flagId = flag.id;
     }
   };
 
@@ -530,6 +554,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     ctx.values.$recoveryCode = SCENARIO_RECOVERY_CODE;
     ctx.values.$newEmail = freshEmail();
     ctx.values.$roleName = freshRoleName();
+    ctx.values.$flagKey = freshFlagKey();
     ctx.values.$permissionId = permissionId;
     emails.push(ctx.values.$newEmail);
 
@@ -565,9 +590,10 @@ runWithInfra('Request scenarios (e2e)', () => {
       'get' | 'post' | 'put' | 'patch' | 'delete';
     const path = scenarioPath(scenario, ctx.values);
     const body = resolvePlaceholders(scenario.body ?? {}, ctx.values);
+    const headers = resolvePlaceholders(scenario.headers ?? {}, ctx.values);
     const answers: Answer[] = [];
     for (let i = 0; i < (scenario.repeat ?? 1); i++) {
-      let req = request(http())[method](path);
+      let req = request(http())[method](path).set(headers);
       if (scenario.auth === 'bearer') {
         req = req.auth(ctx.bearer!, { type: 'bearer' });
       }

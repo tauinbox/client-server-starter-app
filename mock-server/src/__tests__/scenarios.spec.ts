@@ -54,11 +54,17 @@ afterAll((done) => {
 function call(
   method: string,
   path: string,
-  options: { body?: unknown; bearer?: string; cookies?: string[] } = {}
+  options: {
+    body?: unknown;
+    bearer?: string;
+    cookies?: string[];
+    headers?: Record<string, string>;
+  } = {}
 ): Promise<Response> {
   return fetch(`${baseUrl}${path}`, {
     method,
     headers: {
+      ...options.headers,
       'content-type': 'application/json',
       ...(options.bearer ? { authorization: `Bearer ${options.bearer}` } : {}),
       ...(options.cookies?.length ? { cookie: options.cookies.join('; ') } : {})
@@ -332,6 +338,24 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
   'deleted-target': (ctx) => {
     ctx.target!.deletedAt = new Date().toISOString();
     return Promise.resolve();
+  },
+  'feature-flag': (ctx) => {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    getState().featureFlags.set(id, {
+      id,
+      key: ctx.values.$flagKey!,
+      description: null,
+      enabled: false,
+      environments: [],
+      public: false,
+      version: 1,
+      updatedByUserId: null,
+      createdAt: now,
+      updatedAt: now
+    });
+    ctx.values.$flagId = id;
+    return Promise.resolve();
   }
 };
 
@@ -368,6 +392,7 @@ async function run(scenario: RequestScenario) {
   ctx.values.$recoveryCode = SCENARIO_RECOVERY_CODE;
   ctx.values.$newEmail = freshEmail();
   ctx.values.$roleName = `scenario-role-${sequence}`;
+  ctx.values.$flagKey = `scenario-flag-${sequence}`;
   ctx.values.$permissionId = readRolePermissionId();
   const accounts: MockUser[] = [];
 
@@ -398,10 +423,12 @@ async function run(scenario: RequestScenario) {
   const from = getState().auditLogs.length;
   const path = scenarioPath(scenario, ctx.values);
   const body = resolvePlaceholders(scenario.body ?? {}, ctx.values);
+  const headers = resolvePlaceholders(scenario.headers ?? {}, ctx.values);
   const answers: Answer[] = [];
   for (let i = 0; i < (scenario.repeat ?? 1); i++) {
     const res = await call(scenarioMethod(scenario), path, {
       body,
+      headers,
       bearer: scenario.auth === 'bearer' ? ctx.bearer : undefined,
       cookies: ctx.cookies
     });
