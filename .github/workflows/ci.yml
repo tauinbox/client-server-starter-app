@@ -50,7 +50,11 @@ jobs:
       - run: npm run check:routes
       - run: npm run check:route-policy -- --self-test
       - run: npm run check:route-policy
-      - run: npm run check:scenarios
+      - run: npm run check:scenarios -- --self-test
+      # The base commit lets the check refuse a route that a change adds to
+      # PENDING_ROUTES instead of giving it a scenario.
+      - run: git fetch --no-tags --depth=1 origin master
+      - run: npm run check:scenarios -- --base origin/master
       - run: npm run check:enums
       - run: npm run check:controllers
       - run: npm run check:permissions
