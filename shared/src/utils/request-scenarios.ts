@@ -63,7 +63,9 @@ export const STATE_FIXTURES = [
   /** The `resource` is orphaned. */
   'orphaned-resource',
   /** No controller registers the `resource`. */
-  'unregistered-resource'
+  'unregistered-resource',
+  /** The target is soft-deleted. */
+  'deleted-target'
 ] as const;
 export type StateFixture = (typeof STATE_FIXTURES)[number];
 
@@ -81,6 +83,7 @@ export const SCENARIO_PLACEHOLDERS = [
   '$setupCode',
   '$mfaToken',
   '$otherSessionId',
+  '$actorId',
   '$targetId',
   /** A role name that no role has before the request. */
   '$roleName',

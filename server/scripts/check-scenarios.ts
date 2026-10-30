@@ -40,13 +40,7 @@ const PENDING_ROUTES = new Set([
   'POST /api/v1/admin/feature-flags',
   'PATCH /api/v1/admin/feature-flags/1',
   'DELETE /api/v1/admin/feature-flags/1',
-  'POST /api/v1/admin/feature-flags/1/preview',
-  'POST /api/v1/users',
-  'PATCH /api/v1/users/1',
-  'DELETE /api/v1/users/1',
-  'POST /api/v1/users/1/restore',
-  'POST /api/v1/users/1/mfa/reset',
-  'POST /api/v1/users/1/sessions/revoke'
+  'POST /api/v1/admin/feature-flags/1/preview'
 ]);
 
 const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);

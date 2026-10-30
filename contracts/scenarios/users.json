@@ -1,6 +1,231 @@
 {
   "scenarios": [
     {
+      "name": "an admin creates a user",
+      "route": "POST /api/v1/users",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "email": "$newEmail",
+        "name": "Scenario Owner",
+        "password": "$password"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "USER_CREATE"
+        ]
+      }
+    },
+    {
+      "name": "an address that another account has is refused",
+      "route": "POST /api/v1/users",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "email": "$email",
+        "name": "Scenario Owner",
+        "password": "$password"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.users.emailExists",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin changes the name of a user",
+      "route": "PATCH /api/v1/users/1",
+      "path": "/api/v1/users/$targetId",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "body": {
+        "name": "Renamed Owner"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "USER_UPDATE"
+        ]
+      }
+    },
+    {
+      "name": "an admin sets the password of a user with a step-up",
+      "route": "PATCH /api/v1/users/1",
+      "path": "/api/v1/users/$targetId",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "body": {
+        "password": "$newPassword",
+        "currentPassword": "$password"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "USER_UPDATE",
+          "PASSWORD_CHANGE"
+        ]
+      }
+    },
+    {
+      "name": "an admin cannot deactivate the own account",
+      "route": "PATCH /api/v1/users/1",
+      "path": "/api/v1/users/$actorId",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "isActive": false
+      },
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.users.moderationSelf",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin cannot set the own password on this route",
+      "route": "PATCH /api/v1/users/1",
+      "path": "/api/v1/users/$actorId",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "password": "$newPassword",
+        "currentPassword": "$password"
+      },
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.users.credentialSelf",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin deletes a user",
+      "route": "DELETE /api/v1/users/1",
+      "path": "/api/v1/users/$targetId",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "USER_DELETE"
+        ]
+      }
+    },
+    {
+      "name": "an admin restores a deleted user",
+      "route": "POST /api/v1/users/1/restore",
+      "path": "/api/v1/users/$targetId/restore",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "state": [
+        "deleted-target"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "USER_RESTORE"
+        ]
+      }
+    },
+    {
+      "name": "a user that is not deleted cannot be restored",
+      "route": "POST /api/v1/users/1/restore",
+      "path": "/api/v1/users/$targetId/restore",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.users.notDeleted",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin resets the authenticator of a user with a step-up",
+      "route": "POST /api/v1/users/1/mfa/reset",
+      "path": "/api/v1/users/$targetId/mfa/reset",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user-mfa",
+      "body": {
+        "currentPassword": "$password"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "MFA_RESET_BY_ADMIN"
+        ]
+      }
+    },
+    {
+      "name": "an admin cannot reset the own authenticator on this route",
+      "route": "POST /api/v1/users/1/mfa/reset",
+      "path": "/api/v1/users/$actorId/mfa/reset",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "currentPassword": "$password"
+      },
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.users.mfaResetSelf",
+        "audit": []
+      }
+    },
+    {
+      "name": "an authenticator reset of a user with no authenticator is refused",
+      "route": "POST /api/v1/users/1/mfa/reset",
+      "path": "/api/v1/users/$targetId/mfa/reset",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "body": {
+        "currentPassword": "$password"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.auth.mfaNotEnabled",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin ends every session of a user",
+      "route": "POST /api/v1/users/1/sessions/revoke",
+      "path": "/api/v1/users/$targetId/sessions/revoke",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "SESSION_REVOKE"
+        ]
+      }
+    },
+    {
+      "name": "an admin cannot end the own sessions on this route",
+      "route": "POST /api/v1/users/1/sessions/revoke",
+      "path": "/api/v1/users/$actorId/sessions/revoke",
+      "actor": "admin",
+      "auth": "bearer",
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.users.sessionRevokeSelf",
+        "audit": []
+      }
+    },
+    {
       "name": "an empty body on an admin authenticator reset costs no sign-in budget",
       "route": "POST /api/v1/users/1/mfa/reset",
       "path": "/api/v1/users/$targetId/mfa/reset",
