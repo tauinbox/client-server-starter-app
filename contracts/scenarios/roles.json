@@ -1,6 +1,122 @@
 {
   "scenarios": [
     {
+      "name": "an admin creates a role",
+      "route": "POST /api/v1/roles",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "name": "$roleName"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "ROLE_CREATE"
+        ]
+      }
+    },
+    {
+      "name": "a role name that another role has is refused",
+      "route": "POST /api/v1/roles",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "custom-role"
+      ],
+      "body": {
+        "name": "$roleName"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.roles.nameExists",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin changes the description of a role",
+      "route": "PATCH /api/v1/roles/role-admin",
+      "path": "/api/v1/roles/$roleId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "custom-role"
+      ],
+      "body": {
+        "description": "Changed by a scenario"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "ROLE_UPDATE"
+        ]
+      }
+    },
+    {
+      "name": "an admin deletes a role",
+      "route": "DELETE /api/v1/roles/role-admin",
+      "path": "/api/v1/roles/$roleId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "custom-role"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "ROLE_DELETE"
+        ]
+      }
+    },
+    {
+      "name": "an admin replaces the permissions of a role",
+      "route": "PUT /api/v1/roles/role-admin/permissions",
+      "path": "/api/v1/roles/$roleId/permissions",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "custom-role"
+      ],
+      "body": {
+        "items": [
+          {
+            "permissionId": "$permissionId"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "PERMISSION_ASSIGN"
+        ]
+      }
+    },
+    {
+      "name": "an admin grants a permission to a role",
+      "route": "POST /api/v1/roles/role-admin/permissions",
+      "path": "/api/v1/roles/$roleId/permissions",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "custom-role"
+      ],
+      "body": {
+        "permissionIds": [
+          "$permissionId"
+        ]
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "PERMISSION_ASSIGN"
+        ]
+      }
+    },
+    {
       "name": "a duplicate permission id is refused before the role is read",
       "route": "POST /api/v1/roles/role-admin/permissions",
       "path": "/api/v1/roles/7d0f4c3e-2b8a-4f6e-9c1d-5a3b2e1f0a9c/permissions",
@@ -15,6 +131,95 @@
       "expect": {
         "status": 422,
         "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin removes a permission from a role",
+      "route": "DELETE /api/v1/roles/role-admin/permissions/perm-1",
+      "path": "/api/v1/roles/$roleId/permissions/$permissionId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "custom-role",
+        "role-permission"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "PERMISSION_UNASSIGN"
+        ]
+      }
+    },
+    {
+      "name": "a permission that the role does not hold cannot be removed",
+      "route": "DELETE /api/v1/roles/role-admin/permissions/perm-1",
+      "path": "/api/v1/roles/$roleId/permissions/$permissionId",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "custom-role"
+      ],
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.roles.permissionNotAssigned",
+        "audit": []
+      }
+    },
+    {
+      "name": "an admin assigns a role to a user",
+      "route": "POST /api/v1/roles/assign/1",
+      "path": "/api/v1/roles/assign/$targetId",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "state": [
+        "custom-role"
+      ],
+      "body": {
+        "roleId": "$roleId"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "ROLE_ASSIGN"
+        ]
+      }
+    },
+    {
+      "name": "an admin removes a role from a user",
+      "route": "DELETE /api/v1/roles/assign/1/role-admin",
+      "path": "/api/v1/roles/assign/$targetId/$roleId",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "state": [
+        "custom-role",
+        "target-role"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "ROLE_UNASSIGN"
+        ]
+      }
+    },
+    {
+      "name": "a role that the user does not hold cannot be removed",
+      "route": "DELETE /api/v1/roles/assign/1/role-admin",
+      "path": "/api/v1/roles/assign/$targetId/$roleId",
+      "actor": "admin",
+      "auth": "bearer",
+      "target": "user",
+      "state": [
+        "custom-role"
+      ],
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.roles.roleNotAssigned",
         "audit": []
       }
     }

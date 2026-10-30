@@ -48,7 +48,13 @@ export const STATE_FIXTURES = [
   /** A linked `vk` account. */
   'vk-linked',
   /** Wrong step-up codes of `user-mfa`, one below the lock. */
-  'step-up-code-failures'
+  'step-up-code-failures',
+  /** A role that is not a system role, named `$roleName`; `$roleId`. */
+  'custom-role',
+  /** The `custom-role` holds `$permissionId` with no conditions. */
+  'role-permission',
+  /** The target holds the `custom-role`. */
+  'target-role'
 ] as const;
 export type StateFixture = (typeof STATE_FIXTURES)[number];
 
@@ -66,7 +72,12 @@ export const SCENARIO_PLACEHOLDERS = [
   '$setupCode',
   '$mfaToken',
   '$otherSessionId',
-  '$targetId'
+  '$targetId',
+  /** A role name that no role has before the request. */
+  '$roleName',
+  '$roleId',
+  /** The id of the `read:Role` permission. */
+  '$permissionId'
 ] as const;
 export type ScenarioPlaceholder = (typeof SCENARIO_PLACEHOLDERS)[number];
 
