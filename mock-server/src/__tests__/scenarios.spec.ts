@@ -328,6 +328,10 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
   'unregistered-resource': (ctx) => {
     getState().resources.get(ctx.values.$resourceId!)!.isRegistered = false;
     return Promise.resolve();
+  },
+  'deleted-target': (ctx) => {
+    ctx.target!.deletedAt = new Date().toISOString();
+    return Promise.resolve();
   }
 };
 
@@ -370,6 +374,7 @@ async function run(scenario: RequestScenario) {
   if (scenario.actor) {
     ctx.actor = createAccount(scenario.actor);
     ctx.values.$email = ctx.actor.email;
+    ctx.values.$actorId = ctx.actor.id;
     accounts.push(ctx.actor);
   }
   if (scenario.target) {

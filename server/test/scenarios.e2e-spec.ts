@@ -464,6 +464,9 @@ runWithInfra('Request scenarios (e2e)', () => {
     'unregistered-resource': (ctx) => {
       registeredResources.delete(ctx.resourceName!);
       return Promise.resolve();
+    },
+    'deleted-target': async (ctx) => {
+      await dataSource.getRepository(User).softDelete(ctx.target!.user.id);
     }
   };
 
@@ -533,6 +536,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     if (scenario.actor) {
       ctx.actor = await createAccount(scenario.actor);
       ctx.values.$email = ctx.actor.email;
+      ctx.values.$actorId = ctx.actor.user.id;
       emails.push(ctx.actor.email);
     }
     if (scenario.target) {
