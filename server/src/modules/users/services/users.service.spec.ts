@@ -30,9 +30,8 @@ describe('UsersService', () => {
     find: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
-    softRemove: jest.Mock;
     restore: jest.Mock;
-    merge: jest.Mock;
+    findOneOrFail: jest.Mock;
     createQueryBuilder: jest.Mock;
     increment: jest.Mock;
     update: jest.Mock;
@@ -88,12 +87,11 @@ describe('UsersService', () => {
       find: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
-      softRemove: jest.fn().mockResolvedValue(undefined),
       restore: jest.fn().mockResolvedValue({ affected: 1 }),
-      merge: jest.fn(),
+      findOneOrFail: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
       increment: jest.fn().mockResolvedValue(undefined),
-      update: jest.fn().mockResolvedValue(undefined)
+      update: jest.fn().mockResolvedValue({ affected: 1 })
     };
 
     // The manager writes through the repository mock, so a write in the
@@ -104,12 +102,22 @@ describe('UsersService', () => {
           run: (manager: {
             save: jest.Mock;
             restore: (entity: unknown, criteria: unknown) => Promise<unknown>;
+            update: (
+              entity: unknown,
+              criteria: unknown,
+              set: unknown
+            ) => Promise<unknown>;
+            findOneOrFail: (entity: unknown, options: unknown) => unknown;
           }) => Promise<unknown>
         ) =>
           run({
             save: mockRepository.save,
             restore: (_entity, criteria) =>
-              mockRepository.restore(criteria) as Promise<unknown>
+              mockRepository.restore(criteria) as Promise<unknown>,
+            update: (_entity, criteria, set) =>
+              mockRepository.update(criteria, set) as Promise<unknown>,
+            findOneOrFail: (_entity, options) =>
+              mockRepository.findOneOrFail(options) as unknown
           })
       )
     };
@@ -578,22 +586,97 @@ describe('UsersService', () => {
   });
 
   describe('update', () => {
+    const live = { id: 'user-1', deletedAt: IsNull() };
+    // The manager of the write transaction: `update` collects the columns it
+    // writes, and `findOneOrFail` reads back the loaded row with them applied.
+    let written: Partial<User>;
+    let manager: {
+      update: jest.Mock;
+      exists: jest.Mock;
+      findOneOrFail: jest.Mock;
+    };
+
+    beforeEach(() => {
+      written = {};
+      manager = {
+        update: jest.fn((_entity, _where, set: Partial<User>) => {
+          Object.assign(written, set);
+          return Promise.resolve({ affected: 1 });
+        }),
+        exists: jest.fn().mockResolvedValue(true),
+        findOneOrFail: jest.fn(async () => ({
+          ...(await (mockRepository.findOne.mock.results[0]
+            .value as Promise<User>)),
+          ...written
+        }))
+      };
+      mockDataSource.transaction.mockImplementation(
+        (run: (m: typeof manager) => Promise<unknown>) => run(manager)
+      );
+    });
+
     it('should update user fields', async () => {
       const updateDto = { name: 'Updated' };
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockResolvedValue({ ...mockUser, ...updateDto });
 
       const result = await service.update('user-1', updateDto, SYSTEM_ABILITY);
 
-      expect(mockRepository.merge).toHaveBeenCalledWith(mockUser, updateDto);
-      expect(mockRepository.save).toHaveBeenCalledWith(mockUser);
+      expect(manager.update).toHaveBeenCalledWith(User, live, updateDto);
       expect(result.name).toBe('Updated');
+    });
+
+    it('writes only the changed columns, keyed on the live row', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+
+      await service.update(
+        'user-1',
+        // @ts-expect-error a body may carry a field that is not a column
+        { name: 'Updated', unknownField: 'x' },
+        SYSTEM_ABILITY
+      );
+
+      expect(manager.update).toHaveBeenCalledTimes(1);
+      expect(manager.update).toHaveBeenCalledWith(User, live, {
+        name: 'Updated'
+      });
+    });
+
+    it('answers not found and writes no audit row when the row is gone', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      manager.update.mockResolvedValue({ affected: 0 });
+      const audit = jest.fn().mockReturnValue([]);
+
+      await expect(
+        service.update(
+          'user-1',
+          { name: 'Updated' },
+          SYSTEM_ABILITY,
+          undefined,
+          audit
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+      });
+      expect(audit).not.toHaveBeenCalled();
+      expect(manager.findOneOrFail).not.toHaveBeenCalled();
+    });
+
+    it('checks only the match when the body changes no column', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      manager.exists.mockResolvedValue(false);
+
+      await expect(
+        service.update('user-1', {}, SYSTEM_ABILITY)
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+      });
+      expect(manager.update).not.toHaveBeenCalled();
+      expect(manager.exists).toHaveBeenCalledWith(User, { where: live });
     });
 
     it('should hash password when updating password', async () => {
       const updateDto = { password: 'NewPassword1' };
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
 
       await service.update('user-1', updateDto, SYSTEM_ABILITY);
@@ -602,13 +685,10 @@ describe('UsersService', () => {
         prehashPassword('NewPassword1'),
         BCRYPT_SALT_ROUNDS
       );
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        mockUser,
-        expect.objectContaining({
-          password: 'new-hashed',
-          passwordHashVersion: PasswordHashVersion.PREHASHED
-        })
-      );
+      expect(written).toMatchObject({
+        password: 'new-hashed',
+        passwordHashVersion: PasswordHashVersion.PREHASHED
+      });
     });
 
     it('voids the mailed reset token and the pending email change on a password change', async () => {
@@ -620,7 +700,6 @@ describe('UsersService', () => {
         pendingEmailToken: 'hashed-pending-token',
         pendingEmailExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
       });
-      mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
 
       await service.update(
@@ -629,16 +708,13 @@ describe('UsersService', () => {
         SYSTEM_ABILITY
       );
 
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          passwordResetToken: null,
-          passwordResetExpiresAt: null,
-          pendingEmail: null,
-          pendingEmailToken: null,
-          pendingEmailExpiresAt: null
-        })
-      );
+      expect(written).toMatchObject({
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null
+      });
     });
 
     it('leaves the mailed proofs alone on an update that carries no password', async () => {
@@ -648,18 +724,10 @@ describe('UsersService', () => {
         pendingEmail: 'new@example.com',
         pendingEmailToken: 'hashed-pending-token'
       });
-      mockRepository.save.mockResolvedValue(mockUser);
 
       await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY);
 
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.not.objectContaining({ passwordResetToken: null })
-      );
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.not.objectContaining({ pendingEmailToken: null })
-      );
+      expect(written).toEqual({ name: 'Updated' });
     });
 
     it('refuses a breached password before it hashes anything', async () => {
@@ -681,12 +749,11 @@ describe('UsersService', () => {
         response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
       });
       expect(hash).not.toHaveBeenCalled();
-      expect(mockRepository.save).not.toHaveBeenCalled();
+      expect(manager.update).not.toHaveBeenCalled();
     });
 
     it('checks the password against the names the record has after the update', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockResolvedValue(mockUser);
 
       await service.update(
         'user-1',
@@ -704,7 +771,6 @@ describe('UsersService', () => {
 
     it('spends no lookup on an update that carries no password', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockResolvedValue(mockUser);
 
       await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY);
 
@@ -727,32 +793,21 @@ describe('UsersService', () => {
         failedLoginAttempts: 5,
         lockedUntil: new Date()
       });
-      mockRepository.save.mockResolvedValue(mockUser);
 
       await service.update('user-1', { unlockAccount: true }, SYSTEM_ABILITY);
 
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          failedLoginAttempts: 0,
-          lockedUntil: null
-        })
-      );
+      expect(written).toEqual({ failedLoginAttempts: 0, lockedUntil: null });
     });
 
     it('should revoke tokens when deactivating a user', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockResolvedValue({ ...mockUser, isActive: false });
 
       await service.update('user-1', { isActive: false }, SYSTEM_ABILITY);
 
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          isActive: false,
-          tokenRevokedAt: expect.any(Date) as Date
-        })
-      );
+      expect(written).toMatchObject({
+        isActive: false,
+        tokenRevokedAt: expect.any(Date) as Date
+      });
     });
 
     it('cancels an in-flight email change when deactivating a user', async () => {
@@ -762,18 +817,14 @@ describe('UsersService', () => {
         pendingEmailToken: 'hashed-token',
         pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
       });
-      mockRepository.save.mockResolvedValue({ ...mockUser, isActive: false });
 
       await service.update('user-1', { isActive: false }, SYSTEM_ABILITY);
 
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          pendingEmail: null,
-          pendingEmailToken: null,
-          pendingEmailExpiresAt: null
-        })
-      );
+      expect(written).toMatchObject({
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null
+      });
     });
 
     it('keeps an in-flight email change when activating a user', async () => {
@@ -783,21 +834,17 @@ describe('UsersService', () => {
         pendingEmail: 'new@example.com',
         pendingEmailToken: 'hashed-token'
       });
-      mockRepository.save.mockResolvedValue({ ...mockUser, isActive: true });
 
       await service.update('user-1', { isActive: true }, SYSTEM_ABILITY);
 
-      expect(mockRepository.merge).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.not.objectContaining({ pendingEmailToken: null })
-      );
+      expect(written).toEqual({ isActive: true });
     });
 
-    it('translates a unique violation on save into the same 409', async () => {
+    it('translates a unique violation on the write into the same 409', async () => {
       mockRepository.findOne
         .mockResolvedValueOnce(mockUser) // target user
         .mockResolvedValueOnce(null); // address free at check time
-      mockRepository.save.mockRejectedValue({ code: '23505' });
+      manager.update.mockRejectedValue({ code: '23505' });
 
       try {
         await service.update(
@@ -816,9 +863,9 @@ describe('UsersService', () => {
       }
     });
 
-    it('propagates unrelated database failures from save', async () => {
+    it('propagates unrelated database failures from the write', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockRejectedValue(new Error('connection lost'));
+      manager.update.mockRejectedValue(new Error('connection lost'));
 
       await expect(
         service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY)
@@ -858,10 +905,6 @@ describe('UsersService', () => {
 
     it('should proceed when ability allows update', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockResolvedValue({
-        ...mockUser,
-        name: 'Updated'
-      });
       const canSpy = jest.fn().mockReturnValue(true);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
@@ -878,10 +921,6 @@ describe('UsersService', () => {
 
     it('should skip ability check when ability is not provided', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
-      mockRepository.save.mockResolvedValue({
-        ...mockUser,
-        name: 'Updated'
-      });
 
       const result = await service.update(
         'user-1',
@@ -902,14 +941,6 @@ describe('UsersService', () => {
         isEmailVerified: true,
         emailVerificationToken: null,
         emailVerificationExpiresAt: null
-      });
-
-      beforeEach(() => {
-        mockRepository.merge.mockImplementation(
-          (target: User, changes: Partial<User>) =>
-            Object.assign(target, changes)
-        );
-        mockRepository.save.mockImplementation((u: User) => Promise.resolve(u));
       });
 
       it('resets isEmailVerified, issues a verification token and sends a verification email when email changes', async () => {
@@ -994,17 +1025,19 @@ describe('UsersService', () => {
   });
 
   describe('remove', () => {
+    const live = { id: 'user-1', deletedAt: IsNull() };
+
     interface RemoveManagerMock {
       update: jest.Mock;
-      softRemove: jest.Mock;
+      softDelete: jest.Mock;
     }
 
     function mockRemoveTransaction(
       overrides: Partial<RemoveManagerMock> = {}
     ): RemoveManagerMock {
       const manager: RemoveManagerMock = {
-        update: jest.fn().mockResolvedValue(undefined),
-        softRemove: jest.fn().mockResolvedValue(undefined),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
+        softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
         ...overrides
       };
       mockDataSource.transaction.mockImplementation(
@@ -1023,7 +1056,22 @@ describe('UsersService', () => {
         where: { id: 'user-1' },
         relations: { roles: true }
       });
-      expect(manager.softRemove).toHaveBeenCalledWith(mockUser);
+      expect(manager.softDelete).toHaveBeenCalledWith(User, live);
+    });
+
+    it('answers not found and writes no audit row when a concurrent delete won', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      mockRemoveTransaction({
+        softDelete: jest.fn().mockResolvedValue({ affected: 0 })
+      });
+      const audit = jest.fn().mockReturnValue([]);
+
+      await expect(
+        service.remove('user-1', SYSTEM_ABILITY, undefined, audit)
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+      });
+      expect(audit).not.toHaveBeenCalled();
     });
 
     it('should clear mailed tokens and soft-delete in one transaction', async () => {
@@ -1033,7 +1081,7 @@ describe('UsersService', () => {
       await service.remove('user-1', SYSTEM_ABILITY);
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(manager.update).toHaveBeenCalledWith(User, 'user-1', {
+      expect(manager.update).toHaveBeenCalledWith(User, live, {
         pendingEmail: null,
         pendingEmailToken: null,
         pendingEmailExpiresAt: null,
@@ -1042,13 +1090,12 @@ describe('UsersService', () => {
       });
       // The pending-field clear must not run outside the transaction.
       expect(mockRepository.update).not.toHaveBeenCalled();
-      expect(mockRepository.softRemove).not.toHaveBeenCalled();
     });
 
     it('should roll back the pending-field clear when soft-delete fails', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const manager = mockRemoveTransaction({
-        softRemove: jest.fn().mockRejectedValue(new Error('db down'))
+        softDelete: jest.fn().mockRejectedValue(new Error('db down'))
       });
 
       await expect(service.remove('user-1', SYSTEM_ABILITY)).rejects.toThrow(
@@ -1108,7 +1155,7 @@ describe('UsersService', () => {
       await service.remove('user-1', ability);
 
       expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
-      expect(manager.softRemove).toHaveBeenCalledWith(mockUser);
+      expect(manager.softDelete).toHaveBeenCalledWith(User, live);
     });
   });
 
@@ -1576,7 +1623,7 @@ describe('UsersService', () => {
       expect(
         mockBreachedPasswordService.assertNotBreached
       ).not.toHaveBeenCalled();
-      expect(mockRepository.save).not.toHaveBeenCalled();
+      expect(mockRepository.update).not.toHaveBeenCalled();
     });
 
     it('refuses a deactivation by a delegated actor', async () => {
@@ -1586,7 +1633,7 @@ describe('UsersService', () => {
         service.update('super-1', { isActive: false }, delegated, 'actor-1'),
         'update'
       );
-      expect(mockRepository.save).not.toHaveBeenCalled();
+      expect(mockRepository.update).not.toHaveBeenCalled();
     });
 
     it('refuses a delete by a delegated actor', async () => {
@@ -1614,7 +1661,7 @@ describe('UsersService', () => {
 
     it('lets a super actor write to a super target', async () => {
       mockRepository.findOne.mockResolvedValue(superUser);
-      mockRepository.save.mockResolvedValue(superUser);
+      mockRepository.findOneOrFail.mockResolvedValue(superUser);
 
       await expect(
         service.update('super-1', { name: 'Kept' }, superActor, 'actor-1')
@@ -1631,7 +1678,7 @@ describe('UsersService', () => {
       await expect(
         service.update('user-1', { name: 'Kept' }, delegated, 'actor-1')
       ).rejects.toThrow('assertNotSuperTarget needs the roles of the target');
-      expect(mockRepository.save).not.toHaveBeenCalled();
+      expect(mockRepository.update).not.toHaveBeenCalled();
     });
 
     it('lets a delegated actor write to an ordinary target', async () => {
@@ -1639,7 +1686,7 @@ describe('UsersService', () => {
         ...mockUser,
         roles: [{ name: 'user', isSuper: false }]
       });
-      mockRepository.save.mockResolvedValue(mockUser);
+      mockRepository.findOneOrFail.mockResolvedValue(mockUser);
 
       await expect(
         service.update('user-1', { name: 'Kept' }, delegated, 'actor-1')

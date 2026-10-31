@@ -35,6 +35,8 @@ describe('RoleService', () => {
     create: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    update: jest.Mock;
+    findOneByOrFail: jest.Mock;
     manager: {
       createQueryBuilder: jest.Mock;
       update: jest.Mock;
@@ -136,6 +138,16 @@ describe('RoleService', () => {
           Promise.resolve({ id: 'new-role', ...data })
         ),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      // The custom role with the columns of the last update applied.
+      findOneByOrFail: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          ...customRole,
+          ...((
+            mockRoleRepo.update.mock.lastCall as unknown[] | undefined
+          )?.[1] as Partial<Role>)
+        })
+      ),
       manager: {
         createQueryBuilder: jest
           .fn()
@@ -160,6 +172,13 @@ describe('RoleService', () => {
             roleRepo.save(entity) as unknown,
           delete: (_target: unknown, criteria: unknown): unknown =>
             roleRepo.delete(criteria) as unknown,
+          update: (
+            _target: unknown,
+            criteria: unknown,
+            set: unknown
+          ): unknown => roleRepo.update(criteria, set) as unknown,
+          findOneByOrFail: (_target: unknown, where: unknown): unknown =>
+            roleRepo.findOneByOrFail(where) as unknown,
           findOne: (_target: unknown, options: unknown): unknown =>
             mockRolePermissionRepo.lockRole(options) as unknown,
           find: (_target: unknown, options: unknown): unknown =>
@@ -330,10 +349,6 @@ describe('RoleService', () => {
     it('should update a custom role', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce(customRole);
       mockRoleRepo.findOne.mockResolvedValueOnce(null); // no name conflict
-      mockRoleRepo.save.mockResolvedValue({
-        ...customRole,
-        description: 'Updated'
-      });
 
       const result = await service.update(
         'role-2',
@@ -341,6 +356,31 @@ describe('RoleService', () => {
         SYSTEM_ABILITY
       );
       expect(result.description).toBe('Updated');
+      expect(mockRoleRepo.update).toHaveBeenCalledWith(
+        { id: 'role-2' },
+        { description: 'Updated' }
+      );
+    });
+
+    it('answers not found and writes no audit row when a concurrent delete won', async () => {
+      mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
+      mockRoleRepo.findOne.mockResolvedValueOnce(null);
+      mockRoleRepo.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.update(
+          'role-2',
+          { name: 'senior-editor' },
+          SYSTEM_ABILITY,
+          undefined,
+          () => ({ action: AuditAction.ROLE_UPDATE, targetId: 'role-2' })
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.ROLES.NOT_FOUND }
+      });
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
+      expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
 
     it('should save a rename and emit RoleRenamedEvent in one transaction, then invalidate the holders', async () => {
@@ -366,7 +406,7 @@ describe('RoleService', () => {
         expect.objectContaining({ oldName: 'editor', newName: 'senior-editor' })
       );
       expect(committedInside).toBe(false);
-      const [save] = mockRoleRepo.save.mock.invocationCallOrder;
+      const [save] = mockRoleRepo.update.mock.invocationCallOrder;
       const [emit] = mockEventEmitter.emitAsync.mock.invocationCallOrder;
       const [invalidate] =
         mockPermissionService.invalidateUserCache.mock.invocationCallOrder;
@@ -392,7 +432,7 @@ describe('RoleService', () => {
     it('should answer nameExists when the unique index refuses a rename that a concurrent request took', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
-      mockRoleRepo.save.mockRejectedValueOnce({ code: '23505' });
+      mockRoleRepo.update.mockRejectedValueOnce({ code: '23505' });
 
       await expect(
         service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
@@ -426,8 +466,9 @@ describe('RoleService', () => {
         SYSTEM_ABILITY
       );
 
-      expect(mockRoleRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ description: 'New' })
+      expect(mockRoleRepo.update).toHaveBeenCalledWith(
+        { id: 'role-2' },
+        { name: 'editor', description: 'New' }
       );
       expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
@@ -1110,7 +1151,6 @@ describe('RoleService', () => {
       mockRoleRepo.findOne
         .mockResolvedValueOnce(customRole) // findOne(id)
         .mockResolvedValueOnce(customRole); // same id → no conflict
-      mockRoleRepo.save.mockResolvedValue({ ...customRole, name: 'editor' });
       const result = await service.update(
         'role-2',
         { name: 'editor' },

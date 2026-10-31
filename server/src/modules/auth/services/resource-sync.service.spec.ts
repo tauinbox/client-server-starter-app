@@ -29,6 +29,7 @@ describe('ResourceSyncService', () => {
     find: jest.Mock;
     findOne: jest.Mock;
     save: jest.Mock;
+    update: jest.Mock;
   };
   let permissionRepoMock: {
     find: jest.Mock;
@@ -76,7 +77,8 @@ describe('ResourceSyncService', () => {
     resourceRepoMock = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
-      save: jest.fn().mockResolvedValue(undefined)
+      save: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockResolvedValue({ affected: 1 })
     };
 
     permissionRepoMock = {
@@ -408,12 +410,16 @@ describe('ResourceSyncService', () => {
       await service.onApplicationBootstrap();
 
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"legacy"'));
-      expect(resourceRepoMock.save).toHaveBeenCalledWith(
-        expect.objectContaining({ isOrphaned: true })
+      // Keyed on the active state: the flag is the only column written, so a
+      // concurrent admin edit of the resource is kept.
+      expect(resourceRepoMock.update).toHaveBeenCalledWith(
+        { id: 'old-res', isOrphaned: false },
+        { isOrphaned: true }
       );
+      expect(resourceRepoMock.save).not.toHaveBeenCalled();
     });
 
-    it('should warn (without save) when resource was already orphaned', async () => {
+    it('should warn (without a write) when resource was already orphaned', async () => {
       discoveryServiceMock.getControllers.mockReturnValue([]);
       resourceRepoMock.find.mockResolvedValue([
         { id: 'old-res', name: 'legacy', isOrphaned: true }
@@ -423,7 +429,7 @@ describe('ResourceSyncService', () => {
       await service.onApplicationBootstrap();
 
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"legacy"'));
-      expect(resourceRepoMock.save).not.toHaveBeenCalled();
+      expect(resourceRepoMock.update).not.toHaveBeenCalled();
     });
 
     it('should not warn for resources that are registered', async () => {

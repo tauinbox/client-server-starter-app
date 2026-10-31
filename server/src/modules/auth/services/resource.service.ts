@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ApiError } from '../../../common/errors/api-error';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm';
+import { keyedUpdate } from '../../../common/utils/keyed-update.util';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Resource } from '../entities/resource.entity';
@@ -100,9 +102,7 @@ export class ResourceService {
 
   private async loadResource(id: string): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
-    if (!resource) {
-      throw new ApiError(ErrorKeys.RESOURCES.NOT_FOUND, 'Resource not found');
-    }
+    if (!resource) throw resourceNotFound();
     return resource;
   }
 
@@ -165,8 +165,7 @@ export class ResourceService {
       data.allowedActionNames !== undefined &&
       changesGrantableActions(resource, data.allowedActionNames);
     const auditRow = audit?.({ ...resource });
-    Object.assign(resource, data);
-    const saved = await this.saveAudited(resource, auditRow);
+    const saved = await this.updateAudited(id, data, auditRow);
     await this.invalidateSubjectMapCache();
     if (grantsChange) this.#emitActionsChanged();
     return saved;
@@ -215,15 +214,22 @@ export class ResourceService {
     );
   }
 
-  /** Saves the resource and the audit row of the change in one transaction. */
-  private saveAudited(
-    resource: Resource,
+  /**
+   * Writes the changed columns and the audit row of the change in one
+   * transaction. Keyed on the row, so an edit that loses to a delete answers
+   * not found.
+   */
+  private updateAudited(
+    id: string,
+    changes: QueryDeepPartialEntity<Resource>,
     audit?: AuditLogParams
   ): Promise<Resource> {
     return this.resourceRepository.manager.transaction(async (em) => {
-      const saved = await em.save(resource);
+      if (!(await keyedUpdate(em, Resource, { id }, changes))) {
+        throw resourceNotFound();
+      }
       if (audit) await this.auditService.log(audit, em);
-      return saved;
+      return em.findOneByOrFail(Resource, { id });
     });
   }
 
@@ -325,14 +331,24 @@ export class ResourceService {
 
     // The declared action lists belong to the code and are rewritten on every
     // sync. displayName, description and allowedActionNames are admin fields
-    // and are kept.
+    // and are kept: only these columns are written, so an admin edit that
+    // lands during the sync stays.
     if (existing) {
-      existing.subject = normalizedSubject;
-      existing.description ??= data.description;
-      existing.actionNames = data.actionNames;
-      existing.conditionalActionNames = data.conditionalActionNames;
-      existing.lastSyncedAt = new Date();
-      return this.resourceRepository.save(existing);
+      const { id } = existing;
+      await this.resourceRepository.update(
+        { id },
+        {
+          subject: normalizedSubject,
+          actionNames: data.actionNames,
+          conditionalActionNames: data.conditionalActionNames,
+          lastSyncedAt: new Date()
+        }
+      );
+      await this.resourceRepository.update(
+        { id, description: IsNull() },
+        { description: data.description }
+      );
+      return this.resourceRepository.findOneByOrFail({ id });
     }
 
     const resource = this.resourceRepository.create({
@@ -354,4 +370,8 @@ function notOrphaned(resource: Resource): ApiError {
     ErrorKeys.RESOURCES.NOT_ORPHANED,
     `Resource "${resource.name}" is not orphaned, so there is nothing to restore`
   );
+}
+
+function resourceNotFound(): ApiError {
+  return new ApiError(ErrorKeys.RESOURCES.NOT_FOUND, 'Resource not found');
 }

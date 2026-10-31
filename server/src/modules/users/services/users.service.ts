@@ -2,9 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ApiError } from '../../../common/errors/api-error';
 import { DataSource, EntityManager, IsNull, Not, Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
+import { keyedUpdate } from '../../../common/utils/keyed-update.util';
 import { hashPassword } from '../../../common/utils/password-hash';
 import {
   ErrorKeys,
@@ -209,12 +211,7 @@ export class UsersService {
       where: { id },
       relations: { roles: true }
     });
-    if (!user) {
-      throw new ApiError(
-        ErrorKeys.USERS.NOT_FOUND,
-        `User with ID ${id} not found`
-      );
-    }
+    if (!user) throw userNotFound(id);
 
     return user;
   }
@@ -303,7 +300,13 @@ export class UsersService {
         actorId
       );
     }
-    const changes: Partial<User> = { ...rest };
+    // Only columns: the body also carries the step-up factors of the caller.
+    const changes: QueryDeepPartialEntity<User> = {
+      name: rest.name,
+      email: rest.email,
+      locale: rest.locale,
+      isActive: rest.isActive
+    };
 
     if (rest.password) {
       // After the ability check, which decides whether this caller may write to
@@ -368,11 +371,20 @@ export class UsersService {
       changes.passwordResetExpiresAt = null;
     }
 
-    this.userRepository.merge(user, changes);
     let saved: User;
     try {
       saved = await withTransaction(this.dataSource, async (manager) => {
-        const written = await manager.save(user);
+        // Keyed on the live row: an edit that loses to a delete answers not
+        // found, and a concurrent write to another column (a password reset)
+        // is kept.
+        const live = { id: user.id, deletedAt: IsNull() };
+        if (!(await keyedUpdate(manager, User, live, changes))) {
+          throw userNotFound(id);
+        }
+        const written = await manager.findOneOrFail(User, {
+          where: { id: user.id },
+          relations: { roles: true }
+        });
         await this.writeAudit(manager, audit, written);
         return written;
       });
@@ -544,16 +556,20 @@ export class UsersService {
     // Clear mailed tokens BEFORE soft-delete so a stale link cannot outlive
     // deletedAt and confirm, or revive on restore. Both
     // writes share one transaction so a failing soft-delete cannot leave a
-    // live row stripped of its pending email change.
+    // live row stripped of its pending email change. Keyed on the live row, so
+    // of two concurrent deletes one writes and audits and the other answers
+    // not found.
     await withTransaction(this.dataSource, async (manager) => {
-      await manager.update(User, id, {
+      const live = { id, deletedAt: IsNull() };
+      await manager.update(User, live, {
         pendingEmail: null,
         pendingEmailToken: null,
         pendingEmailExpiresAt: null,
         passwordResetToken: null,
         passwordResetExpiresAt: null
       });
-      await manager.softRemove(user);
+      const { affected } = await manager.softDelete(User, live);
+      if (affected === 0) throw userNotFound(id);
       await this.writeAudit(manager, audit, user);
     });
   }
@@ -569,12 +585,7 @@ export class UsersService {
       relations: { roles: true },
       withDeleted: true
     });
-    if (!user) {
-      throw new ApiError(
-        ErrorKeys.USERS.NOT_FOUND,
-        `User with ID ${id} not found`
-      );
-    }
+    if (!user) throw userNotFound(id);
 
     if (ability !== SYSTEM_ABILITY) {
       this.assertCanWrite(ability, 'delete', user, actorId);
@@ -603,5 +614,12 @@ function notDeleted(id: string): ApiError {
   return new ApiError(
     ErrorKeys.USERS.NOT_DELETED,
     `User with ID ${id} is not deleted, so there is nothing to restore`
+  );
+}
+
+function userNotFound(id: string): ApiError {
+  return new ApiError(
+    ErrorKeys.USERS.NOT_FOUND,
+    `User with ID ${id} not found`
   );
 }

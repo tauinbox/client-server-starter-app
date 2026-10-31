@@ -82,7 +82,7 @@ class TestPermissionsGuard implements CanActivate {
 /** Rows that the stubbed `findOne` of a repository answers, by id. */
 type Rows = Map<string, Record<string, unknown>>;
 
-function repositoryOf(rows: Rows, save: jest.Mock) {
+function repositoryOf(rows: Rows, write: jest.Mock) {
   return {
     findOne: jest.fn(({ where }: { where: { id: string } }) =>
       Promise.resolve(rows.get(where.id) ?? null)
@@ -90,7 +90,18 @@ function repositoryOf(rows: Rows, save: jest.Mock) {
     manager: {
       transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
         work({
-          save: (...args: unknown[]): unknown => save(args[args.length - 1])
+          save: (...args: unknown[]): unknown => write(args[args.length - 1]),
+          // A keyed update is recorded as the row key with the written columns.
+          update: (
+            _target: unknown,
+            where: { id: string },
+            set: Record<string, unknown>
+          ) => {
+            write({ ...where, ...set });
+            return Promise.resolve({ affected: rows.has(where.id) ? 1 : 0 });
+          },
+          findOneByOrFail: (_target: unknown, where: { id: string }) =>
+            Promise.resolve({ ...rows.get(where.id) })
         })
       )
     }
@@ -105,7 +116,7 @@ describe('Instance-level @Authorize re-check', () => {
   const resourceRows: Rows = new Map();
   // Every write of the three services goes through the transaction manager
   // above, so one spy shows whether a refused request wrote anything.
-  const save = jest.fn((entity: unknown) => Promise.resolve(entity));
+  const write = jest.fn((entity: unknown) => Promise.resolve(entity));
 
   beforeAll(async () => {
     holder = new AbilityHolder();
@@ -125,15 +136,15 @@ describe('Instance-level @Authorize re-check', () => {
         { provide: APP_GUARD, useClass: TestPermissionsGuard },
         {
           provide: getRepositoryToken(User),
-          useValue: repositoryOf(userRows, save)
+          useValue: repositoryOf(userRows, write)
         },
         {
           provide: getRepositoryToken(Role),
-          useValue: repositoryOf(roleRows, save)
+          useValue: repositoryOf(roleRows, write)
         },
         {
           provide: getRepositoryToken(Resource),
-          useValue: repositoryOf(resourceRows, save)
+          useValue: repositoryOf(resourceRows, write)
         },
         { provide: getRepositoryToken(Permission), useValue: {} },
         { provide: getRepositoryToken(RolePermission), useValue: {} },
@@ -303,7 +314,7 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/roles/${ROLE_B}`)
         .send({ description: 'x' })
         .expect(403);
-      expect(save).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
     });
 
     it('returns 200 when patching a role that satisfies the condition', async () => {
@@ -311,7 +322,7 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/roles/${ROLE_A}`)
         .send({ description: 'x' })
         .expect(200);
-      expect(save).toHaveBeenCalledWith(
+      expect(write).toHaveBeenCalledWith(
         expect.objectContaining({ id: ROLE_A, description: 'x' })
       );
     });
@@ -344,7 +355,7 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/rbac/resources/${ROLES_RESOURCE}`)
         .send({ displayName: 'Roles' })
         .expect(403);
-      expect(save).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
     });
 
     it('returns 200 when the resource satisfies the condition', async () => {
@@ -352,7 +363,7 @@ describe('Instance-level @Authorize re-check', () => {
         .patch(`/rbac/resources/${USERS_RESOURCE}`)
         .send({ displayName: 'Accounts' })
         .expect(200);
-      expect(save).toHaveBeenCalledWith(
+      expect(write).toHaveBeenCalledWith(
         expect.objectContaining({ id: USERS_RESOURCE, displayName: 'Accounts' })
       );
     });

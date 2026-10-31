@@ -152,8 +152,10 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     for (const resource of allResources) {
       if (registeredNames.has(resource.name)) continue;
       if (!resource.isOrphaned) {
-        resource.isOrphaned = true;
-        await this.resourceRepository.save(resource);
+        await this.resourceRepository.update(
+          { id: resource.id, isOrphaned: false },
+          { isOrphaned: true }
+        );
       }
       this.logger.warn(
         `Resource "${resource.name}" is orphaned — no controller registered it. Permissions for this resource are disabled.`
