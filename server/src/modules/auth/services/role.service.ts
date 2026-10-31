@@ -45,6 +45,7 @@ import type { AuditLogParams } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { assertCan } from '../../../common/utils/assert-can.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
+import { keyedUpdate } from '../../../common/utils/keyed-update.util';
 import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-target.util';
 import { refuseAccess } from '../../../common/utils/refuse-access.util';
 import { auditContextOf } from '../casl/ability-context';
@@ -439,21 +440,20 @@ export class RoleService {
       if (existing && existing.id !== id) throw this.nameExists();
     }
     const oldName = role.name;
+    const newName = data.name ?? oldName;
     const auditRow = audit?.({ ...role });
-    Object.assign(role, data);
-    if (role.name === oldName) {
+    if (newName === oldName) {
       return this.writeAudited(
         this.roleRepository.manager,
-        (em) => this.saveRole(em, role),
+        (em) => this.updateRole(em, id, data),
         auditRow
       );
     }
 
     const saved = await this.writeWithRoleEvent(
-      (em) => this.saveRole(em, role),
+      (em) => this.updateRole(em, id, data),
       RoleRenamedEvent.name,
-      (em, committed) =>
-        new RoleRenamedEvent(oldName, role.name, em, committed),
+      (em, committed) => new RoleRenamedEvent(oldName, newName, em, committed),
       auditRow
     );
     // Holders have the old name in the cached role names that flag rules use.
@@ -507,6 +507,22 @@ export class RoleService {
     } catch (error) {
       throw isUniqueViolation(error) ? this.nameExists() : error;
     }
+  }
+
+  /** Keyed on the row, so an edit that loses to a delete answers not found. */
+  private async updateRole(
+    em: EntityManager,
+    id: string,
+    data: { name?: string; description?: string }
+  ): Promise<Role> {
+    let found: boolean;
+    try {
+      found = await keyedUpdate(em, Role, { id }, data);
+    } catch (error) {
+      throw isUniqueViolation(error) ? this.nameExists() : error;
+    }
+    if (!found) throw this.roleNotFound();
+    return em.findOneByOrFail(Role, { id });
   }
 
   /**

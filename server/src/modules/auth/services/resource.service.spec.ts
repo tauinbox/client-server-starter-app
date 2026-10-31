@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { IsNull } from 'typeorm';
 import { HttpException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -39,9 +40,11 @@ describe('ResourceService', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+    update: jest.Mock;
+    findOneByOrFail: jest.Mock;
     manager: { transaction: jest.Mock };
   };
-  let mockEm: { save: jest.Mock; update: jest.Mock };
+  let mockEm: { update: jest.Mock; findOneByOrFail: jest.Mock };
   let mockAudit: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mockCacheManager: {
     get: jest.Mock;
@@ -127,17 +130,32 @@ describe('ResourceService', () => {
         .mockImplementation((data: Record<string, unknown>) =>
           Promise.resolve(data)
         ),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      // The first resource with the columns of the last update applied.
+      findOneByOrFail: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          ...resource1,
+          ...((
+            mockResourceRepo.update.mock.lastCall as unknown[] | undefined
+          )?.[1] as Partial<Resource>)
+        })
+      ),
       manager: {
         transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
           work(mockEm)
         )
       }
     };
-    // The transactional save goes through the repository mock, so the
-    // assertions on `save` below cover both paths.
+    // The transactional writes go through the repository mock, so the
+    // assertions on `update` below cover both paths.
     mockEm = {
-      save: jest.fn((data: unknown): unknown => mockResourceRepo.save(data)),
-      update: jest.fn().mockResolvedValue({ affected: 1 })
+      update: jest.fn(
+        (_target: unknown, criteria: unknown, set: unknown): unknown =>
+          mockResourceRepo.update(criteria, set)
+      ),
+      findOneByOrFail: jest.fn((_target: unknown, where: unknown): unknown =>
+        mockResourceRepo.findOneByOrFail(where)
+      )
     };
     mockAudit = {
       log: jest.fn().mockResolvedValue(undefined),
@@ -224,7 +242,7 @@ describe('ResourceService', () => {
       await expect(
         service.update('res-2', { description: 'x' }, scoped, 'actor-1')
       ).rejects.toMatchObject(refused);
-      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+      expect(mockResourceRepo.update).not.toHaveBeenCalled();
       expect(mockAudit.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ actorId: 'actor-1', targetId: 'res-2' })
       );
@@ -236,7 +254,7 @@ describe('ResourceService', () => {
       await expect(
         service.update('res-1', { displayName: 'Moved' }, scoped)
       ).rejects.toMatchObject(refused);
-      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+      expect(mockResourceRepo.update).not.toHaveBeenCalled();
     });
 
     it('accepts an update that keeps the record inside the grant', async () => {
@@ -244,7 +262,7 @@ describe('ResourceService', () => {
 
       await service.update('res-1', { description: 'x' }, scoped);
 
-      expect(mockResourceRepo.save).toHaveBeenCalled();
+      expect(mockResourceRepo.update).toHaveBeenCalled();
     });
 
     it('refuses a restore of a record outside the grant', async () => {
@@ -253,7 +271,7 @@ describe('ResourceService', () => {
       await expect(service.restore('res-2', scoped)).rejects.toMatchObject(
         refused
       );
-      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+      expect(mockResourceRepo.update).not.toHaveBeenCalled();
     });
 
     it('answers 404 before the check', async () => {
@@ -271,7 +289,7 @@ describe('ResourceService', () => {
         // @ts-expect-error the ability is required: a skipped check is written as SYSTEM_ABILITY
         service.update('res-1', { description: 'x' })
       ).rejects.toThrow(TypeError);
-      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+      expect(mockResourceRepo.update).not.toHaveBeenCalled();
     });
   });
 
@@ -279,7 +297,6 @@ describe('ResourceService', () => {
     it('should update an existing resource', async () => {
       const updatedResource = { ...resource1, displayName: 'Updated Users' };
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-      mockResourceRepo.save.mockResolvedValue(updatedResource);
 
       const result = await service.update(
         'res-1',
@@ -290,7 +307,7 @@ describe('ResourceService', () => {
       );
 
       expect(result).toEqual(updatedResource);
-      expect(mockResourceRepo.save).toHaveBeenCalled();
+      expect(mockResourceRepo.update).toHaveBeenCalled();
     });
 
     it('should throw Error if resource not found', async () => {
@@ -302,19 +319,14 @@ describe('ResourceService', () => {
 
     it('should invalidate subject map cache after update', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-      mockResourceRepo.save.mockResolvedValue(resource1);
 
       await service.update('res-1', { description: 'New desc' }, superAbility);
 
       expectSubjectMapVersionBumped();
     });
 
-    it('should apply partial update data via Object.assign', async () => {
-      const original = { ...resource1 };
-      mockResourceRepo.findOne.mockResolvedValue(original);
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
+    it('writes only the changed columns, keyed on the row', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
 
       await service.update(
         'res-1',
@@ -325,15 +337,32 @@ describe('ResourceService', () => {
         superAbility
       );
 
-      expect(mockResourceRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          displayName: 'New Name',
-          description: null
-        })
+      expect(mockResourceRepo.update).toHaveBeenCalledWith(
+        { id: 'res-1' },
+        { displayName: 'New Name', description: null }
       );
     });
 
-    it('writes the audit row in the transaction of the save', async () => {
+    it('answers not found and writes no audit row when the row is gone', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      mockResourceRepo.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.update(
+          'res-1',
+          { description: 'x' },
+          superAbility,
+          undefined,
+          () => ({ action: AuditAction.RESOURCE_UPDATE })
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: 'errors.resources.notFound' }
+      });
+      expect(mockAudit.log).not.toHaveBeenCalled();
+      expect(mockCacheManager.set).not.toHaveBeenCalled();
+    });
+
+    it('writes the audit row in the transaction of the write', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
       const audit = {
         action: AuditAction.RESOURCE_UPDATE,
@@ -349,7 +378,7 @@ describe('ResourceService', () => {
         () => audit
       );
 
-      expect(mockEm.save).toHaveBeenCalled();
+      expect(mockEm.update).toHaveBeenCalled();
       expect(mockAudit.log).toHaveBeenCalledWith(audit, mockEm);
     });
 
@@ -391,7 +420,7 @@ describe('ResourceService', () => {
       ).rejects.toMatchObject({
         response: { errorKey: 'errors.resources.actionNotDeclared' }
       });
-      expect(mockResourceRepo.save).not.toHaveBeenCalled();
+      expect(mockResourceRepo.update).not.toHaveBeenCalled();
     });
 
     it('accepts a narrowing to declared actions and a reset to null', async () => {
@@ -404,13 +433,15 @@ describe('ResourceService', () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
       await service.update('res-1', { allowedActionNames: null }, superAbility);
 
-      expect(mockResourceRepo.save).toHaveBeenNthCalledWith(
+      expect(mockResourceRepo.update).toHaveBeenNthCalledWith(
         1,
-        expect.objectContaining({ allowedActionNames: ['read'] })
+        { id: 'res-1' },
+        { allowedActionNames: ['read'] }
       );
-      expect(mockResourceRepo.save).toHaveBeenNthCalledWith(
+      expect(mockResourceRepo.update).toHaveBeenNthCalledWith(
         2,
-        expect.objectContaining({ allowedActionNames: null })
+        { id: 'res-1' },
+        { allowedActionNames: null }
       );
     });
   });
@@ -433,9 +464,9 @@ describe('ResourceService', () => {
           allowedActionNames: before
         });
         mockEventEmitter.emit.mockClear();
-        mockResourceRepo.save.mockImplementationOnce((data: unknown) => {
+        mockResourceRepo.update.mockImplementationOnce(() => {
           expect(emitted()).toHaveLength(0);
-          return Promise.resolve(data);
+          return Promise.resolve({ affected: 1 });
         });
 
         await service.update('res-1', { allowedActionNames }, superAbility);
@@ -455,13 +486,13 @@ describe('ResourceService', () => {
         await service.update('res-1', data, superAbility);
       }
 
-      expect(mockResourceRepo.save).toHaveBeenCalledTimes(3);
+      expect(mockResourceRepo.update).toHaveBeenCalledTimes(3);
       expect(emitted()).toHaveLength(0);
     });
 
     it('emits nothing when the write fails', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-      mockResourceRepo.save.mockRejectedValueOnce(new Error('db down'));
+      mockResourceRepo.update.mockRejectedValueOnce(new Error('db down'));
 
       await expect(
         service.update('res-1', { allowedActionNames: ['read'] }, superAbility)
@@ -526,7 +557,7 @@ describe('ResourceService', () => {
             () => ({ action: AuditAction.RESOURCE_UPDATE, actorId: 'actor-1' })
           )
         ).rejects.toMatchObject(widenRefused);
-        expect(mockResourceRepo.save).not.toHaveBeenCalled();
+        expect(mockResourceRepo.update).not.toHaveBeenCalled();
         expect(mockCacheManager.del).not.toHaveBeenCalled();
         expect(mockAudit.logFireAndForget).toHaveBeenCalledWith({
           action: AuditAction.PERMISSION_GRANT_DENIED,
@@ -590,7 +621,7 @@ describe('ResourceService', () => {
         delegatedAbility
       );
 
-      expect(mockResourceRepo.save).toHaveBeenCalledTimes(3);
+      expect(mockResourceRepo.update).toHaveBeenCalledTimes(3);
       expect(mockAudit.logFireAndForget).not.toHaveBeenCalled();
     });
 
@@ -599,8 +630,9 @@ describe('ResourceService', () => {
 
       await service.update('res-1', { allowedActionNames: null }, superAbility);
 
-      expect(mockResourceRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ allowedActionNames: null })
+      expect(mockResourceRepo.update).toHaveBeenCalledWith(
+        { id: 'res-1' },
+        { allowedActionNames: null }
       );
     });
   });
@@ -712,99 +744,71 @@ describe('ResourceService', () => {
       conditionalActionNames: []
     };
 
-    it('fills an empty description and keeps a stored one', async () => {
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
-      const empty = { ...resource1, description: null };
-      mockResourceRepo.findOne.mockResolvedValue(empty);
-      await service.upsertResource({
-        ...declared,
-        name: 'users',
-        subject: 'User',
-        displayName: 'Users'
-      });
-      expect(empty.description).toBe('Declared description');
+    const syncWrite = () =>
+      mockResourceRepo.update.mock.calls[0] as [
+        { id: string },
+        Partial<Resource>
+      ];
 
-      const edited = { ...resource1, description: 'Edited by an admin' };
-      mockResourceRepo.findOne.mockResolvedValue(edited);
+    it('fills the description only where it is empty', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+
       await service.upsertResource({
         ...declared,
         name: 'users',
         subject: 'User',
         displayName: 'Users'
       });
-      expect(edited.description).toBe('Edited by an admin');
+
+      expect(syncWrite()[1]).not.toHaveProperty('description');
+      expect(mockResourceRepo.update).toHaveBeenCalledWith(
+        { id: 'res-1', description: IsNull() },
+        { description: 'Declared description' }
+      );
     });
 
-    it('updates the existing resource found by name and keeps its display name', async () => {
-      const existing = { ...resource1, displayName: 'Edited by an admin' };
-      mockResourceRepo.findOne.mockResolvedValue(existing);
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
+    it('writes only the declared columns of the existing resource found by name', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
 
-      const result = await service.upsertResource({
+      await service.upsertResource({
         ...declared,
         name: 'users',
         subject: 'UpdatedUser',
         displayName: 'Updated Users'
       });
 
-      expect(result).toEqual(
-        expect.objectContaining({
+      expect(syncWrite()).toEqual([
+        { id: 'res-1' },
+        {
           subject: 'UpdatedUser',
-          displayName: 'Edited by an admin'
-        })
-      );
+          actionNames: ['read'],
+          conditionalActionNames: [],
+          lastSyncedAt: expect.any(Date) as Date
+        }
+      ]);
       expect(mockResourceRepo.findOne).toHaveBeenCalledWith({
         where: { name: 'users' }
       });
       expect(mockResourceRepo.create).not.toHaveBeenCalled();
+      expect(mockResourceRepo.save).not.toHaveBeenCalled();
     });
 
-    it('should set lastSyncedAt when updating existing resource', async () => {
-      const existing = { ...resource1 };
-      mockResourceRepo.findOne.mockResolvedValue(existing);
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
+    it('returns the row read again after the write', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      const reread = { ...resource1, displayName: 'Edited by an admin' };
+      mockResourceRepo.findOneByOrFail.mockResolvedValue(reread);
 
-      await service.upsertResource({
+      const result = await service.upsertResource({
         ...declared,
         name: 'users',
         subject: 'User',
         displayName: 'Users'
       });
 
-      expect(existing.lastSyncedAt).toBeInstanceOf(Date);
-    });
-
-    it('rewrites the declared lists and keeps the admin narrowing', async () => {
-      const existing = {
-        ...resource1,
-        actionNames: ['read'],
-        conditionalActionNames: [],
-        allowedActionNames: ['read']
-      };
-      mockResourceRepo.findOne.mockResolvedValue(existing);
-
-      const result = await service.upsertResource({
-        name: 'users',
-        subject: 'User',
-        displayName: 'Users',
-        description: 'User management',
-        actionNames: ['read', 'update'],
-        conditionalActionNames: ['update']
+      expect(mockResourceRepo.findOneByOrFail).toHaveBeenCalledWith({
+        id: 'res-1'
       });
-
-      expect(result).toEqual(
-        expect.objectContaining({
-          actionNames: ['read', 'update'],
-          conditionalActionNames: ['update'],
-          allowedActionNames: ['read']
-        })
-      );
+      expect(result).toBe(reread);
     });
 
     it('should create new resource if not found by name', async () => {
@@ -901,11 +905,7 @@ describe('ResourceService', () => {
     });
 
     it('should normalize lowercase subject to PascalCase when updating existing', async () => {
-      const existing = { ...resource1 };
-      mockResourceRepo.findOne.mockResolvedValue(existing);
-      mockResourceRepo.save.mockImplementation(
-        (data: Record<string, unknown>) => Promise.resolve(data)
-      );
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
 
       await service.upsertResource({
         ...declared,
@@ -914,7 +914,7 @@ describe('ResourceService', () => {
         displayName: 'Users'
       });
 
-      expect(existing.subject).toBe('User');
+      expect(syncWrite()[1]).toMatchObject({ subject: 'User' });
     });
 
     it('should leave already-PascalCase subject unchanged', async () => {

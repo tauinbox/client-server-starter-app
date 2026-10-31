@@ -3,16 +3,21 @@
  * listeners under src/modules. A read is a `findOne*` or `exists*` call, or a
  * call of a method of the same file that makes one (a `loadRole(id)` helper).
  *
- * 1. A read, then a `delete`, `remove` or `softDelete` that does not decide
- *    from its own result: the method reads no `affected`, neither it nor a
- *    method of the same file that it calls takes a pessimistic lock, and the
- *    delete has no `where`. Of two concurrent requests, both
- *    pass the read, and both then act as if they removed the row.
+ * 1. A read, then a `delete`, `remove`, `softDelete` or `softRemove` that
+ *    does not decide from its own result: the method reads no `affected`,
+ *    neither it nor a method of the same file that it calls takes a
+ *    pessimistic lock, and the delete has no `where`. Of two concurrent
+ *    requests, both pass the read, and both then act as if they removed the
+ *    row.
  * 2. A read, then a throw of a key that refuses a duplicate (`*_EXISTS`,
  *    `ALREADY_*`), then a `save` or an `insert`, and no unique violation is
  *    caught (`isUniqueViolation`, `orIgnore`, `onConflict`) in the method or in
  *    a method of the same file that it calls. The unique index then refuses
  *    the loser of a race with another answer than the read check gives.
+ * 3. An entity loaded by `find*` with no pessimistic lock, then given to
+ *    `save`, in the method or through a parameter of a method of the same
+ *    file. `save` writes every column of the loaded copy, so it undoes a
+ *    concurrent write that landed after the read.
  *
  * A method with `// race-checked: <reason>` on the line above it is skipped.
  *
@@ -29,7 +34,8 @@ const MODULES_DIR = path.join(SRC_DIR, 'modules');
 const SCANNED_SUFFIXES = ['.service.ts', '.listener.ts'];
 
 const READ = /^(findOne|exists)/;
-const DELETES = new Set(['delete', 'remove', 'softDelete']);
+const ENTITY_READ = /^find(By|One(By|OrFail)?)?$/;
+const DELETES = new Set(['delete', 'remove', 'softDelete', 'softRemove']);
 const WRITES = new Set(['save', 'insert']);
 const UNIQUE_HANDLING = new Set([
   'isUniqueViolation',
@@ -41,6 +47,9 @@ const DUPLICATE_KEY = /_EXISTS$|(^|_)ALREADY_/;
 const MARKER = /\/\/\s*race-checked:\s*\S/;
 
 type Body = ts.FunctionLikeDeclaration;
+
+/** Whether a method of the same file returns an entity read with no lock. */
+type ReadMemo = Map<Body, boolean>;
 
 /** Function name to the `GROUP.NAME` error keys that its body names. */
 type KeyIndex = Map<string, Set<string>>;
@@ -166,11 +175,26 @@ class MethodScan {
   ) {}
 
   problems(): string[] {
+    const found = [this.staleSave()];
     const read = this.firstRead();
-    if (read === undefined) return [];
-    return [this.unguardedDelete(read), this.duplicateRead(read)].filter(
-      (p): p is string => p !== undefined
+    if (read !== undefined) {
+      found.push(this.unguardedDelete(read), this.duplicateRead(read));
+    }
+    return found.filter((p): p is string => p !== undefined);
+  }
+
+  private staleSave(): string | undefined {
+    const stale = [...loadedEntities(this.method, this.local)].some((decl) =>
+      reachesSave(
+        scopeOf(decl),
+        decl.name.getText(this.sf),
+        decl.getStart(),
+        this.local,
+        new Set()
+      )
     );
+    if (!stale) return undefined;
+    return `${this.label()}: a loaded entity is written back with save; write only the changed columns with a keyed update`;
   }
 
   private label(): string {
@@ -269,6 +293,135 @@ function deleteHasWhere(call: ts.CallExpression): boolean {
     }
   }
   return false;
+}
+
+/** The method of the same file that `this.name(` or `name(` calls. */
+function localCallee(
+  call: ts.CallExpression,
+  local: Map<string, Body>
+): Body | undefined {
+  const callee = call.expression;
+  const own =
+    ts.isIdentifier(callee) ||
+    (ts.isPropertyAccessExpression(callee) &&
+      callee.expression.kind === ts.SyntaxKind.ThisKeyword);
+  return own ? local.get(calleeName(call)) : undefined;
+}
+
+function unwrap(expr: ts.Expression): ts.Expression {
+  let e = expr;
+  while (
+    ts.isAwaitExpression(e) ||
+    ts.isParenthesizedExpression(e) ||
+    ts.isNonNullExpression(e)
+  ) {
+    e = e.expression;
+  }
+  return e;
+}
+
+/**
+ * An expression that gives an entity read with no lock: a `find*` call, a
+ * name bound to one, or a call of a method of the same file that returns one.
+ */
+function isUnlockedRead(
+  expr: ts.Expression,
+  loaded: Set<string>,
+  local: Map<string, Body>,
+  memo: ReadMemo
+): boolean {
+  const e = unwrap(expr);
+  if (ts.isIdentifier(e)) return loaded.has(e.text);
+  if (!ts.isCallExpression(e)) return false;
+  const helper = localCallee(e, local);
+  if (helper) {
+    const known = memo.get(helper);
+    if (known !== undefined) return known;
+    // A recursive call reads as no read until the helper is resolved.
+    memo.set(helper, false);
+    const result = returnsUnlockedRead(helper, local, memo);
+    memo.set(helper, result);
+    return result;
+  }
+  return ENTITY_READ.test(calleeName(e)) && !hasIdentifier(e, LOCKS);
+}
+
+function returnsUnlockedRead(
+  body: Body,
+  local: Map<string, Body>,
+  memo: ReadMemo
+): boolean {
+  const loaded = new Set(
+    [...loadedEntities(body, local, memo)].map((d) => d.name.getText())
+  );
+  let found = false;
+  walk(body, (n) => {
+    if (
+      ts.isReturnStatement(n) &&
+      n.expression &&
+      isUnlockedRead(n.expression, loaded, local, memo)
+    ) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/** The variables of a body that hold an entity read with no lock. */
+function loadedEntities(
+  body: Body,
+  local: Map<string, Body>,
+  memo: ReadMemo = new Map()
+): Set<ts.VariableDeclaration> {
+  const loaded = new Set<ts.VariableDeclaration>();
+  const names = new Set<string>();
+  walk(body, (n) => {
+    if (!ts.isVariableDeclaration(n) || !ts.isIdentifier(n.name)) return;
+    const loop = n.parent.parent;
+    const source = ts.isForOfStatement(loop) ? loop.expression : n.initializer;
+    if (source && isUnlockedRead(source, names, local, memo)) {
+      loaded.add(n);
+      names.add(n.name.text);
+    }
+  });
+  return loaded;
+}
+
+/** The block of a `const`, or the loop of a `for...of` variable. */
+function scopeOf(decl: ts.VariableDeclaration): ts.Node {
+  const holder = decl.parent.parent;
+  return ts.isVariableStatement(holder) ? holder.parent : holder;
+}
+
+/**
+ * True if `name` is given to `save` after `after`, in the scope or through a
+ * parameter of a method of the same file.
+ */
+function reachesSave(
+  scope: ts.Node,
+  name: string,
+  after: number,
+  local: Map<string, Body>,
+  seen: Set<string>
+): boolean {
+  return calls(scope).some((c) => {
+    if (c.getStart() <= after) return false;
+    const indexes = c.arguments
+      .map((a, i) => (ts.isIdentifier(a) && a.text === name ? i : -1))
+      .filter((i) => i >= 0);
+    if (indexes.length === 0) return false;
+    if (calleeName(c) === 'save') return true;
+    const helper = localCallee(c, local);
+    const body = helper?.body;
+    if (!helper || !body) return false;
+    return indexes.some((i) => {
+      const param = helper.parameters[i]?.name;
+      const key = `${calleeName(c)}#${i}`;
+      if (!param || !ts.isIdentifier(param) || seen.has(key)) return false;
+      seen.add(key);
+      return reachesSave(body, param.text, -1, local, seen);
+    });
+  });
 }
 
 function isMarked(method: Body, sf: ts.SourceFile): boolean {
@@ -405,6 +558,84 @@ const SELF_TEST_CASES: { label: string; source: string; fails: boolean }[] = [
       }
     }`,
     fails: false
+  },
+  {
+    label: 'a loaded entity written back with save',
+    source: `class S {
+      async rename(id: string, name: string) {
+        const role = await this.repository.findOneBy({ id });
+        role.name = name;
+        return this.repository.save(role);
+      }
+    }`,
+    fails: true
+  },
+  {
+    label: 'a loaded entity saved through a helper of the same file',
+    source: `class S {
+      async update(id: string, data: Partial<Role>) {
+        const role = await this.loadRole(id);
+        Object.assign(role, data);
+        return this.manager.transaction((em) => this.saveRole(em, role));
+      }
+      private async loadRole(id: string) {
+        const role = await this.repository.findOne({ where: { id } });
+        if (!role) throw notFound();
+        return role;
+      }
+      private saveRole(em: EntityManager, role: Role) {
+        return em.save(Role, role);
+      }
+    }`,
+    fails: true
+  },
+  {
+    label: 'each item of a loaded list written back with save',
+    source: `class S {
+      async orphan() {
+        const all = await this.repository.find();
+        for (const resource of all) {
+          resource.isOrphaned = true;
+          await this.repository.save(resource);
+        }
+      }
+    }`,
+    fails: true
+  },
+  {
+    label: 'a save of a row read under a pessimistic lock',
+    source: `class S {
+      async pay(em: EntityManager, id: string) {
+        const invoice = await this.lockInvoice(em, id);
+        invoice.status = 'paid';
+        return em.save(invoice);
+      }
+      private lockInvoice(em: EntityManager, id: string) {
+        return em.findOne(Invoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      }
+    }`,
+    fails: false
+  },
+  {
+    label: 'a save of a new entity',
+    source: `class S {
+      async create(name: string) {
+        const existing = await this.repository.findOneBy({ name });
+        if (existing) return existing;
+        return this.repository.save(this.repository.create({ name }));
+      }
+    }`,
+    fails: false
+  },
+  {
+    label: 'a read, then a softRemove with no "affected" read',
+    source: `class S {
+      async remove(id: string) {
+        const user = await this.repository.findOne({ where: { id } });
+        await this.manager.transaction((em) => em.softRemove(user));
+      }
+    }`,
+    fails: true
   },
   {
     label: 'a marked method',

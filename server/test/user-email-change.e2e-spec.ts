@@ -86,24 +86,29 @@ function makeUserRepoMock(store: UserStore) {
         }
         return Promise.resolve(null);
       }
-    ),
-    merge: jest.fn((target: User, partial: Partial<User>): User =>
-      Object.assign(target, partial)
-    ),
-    save: jest.fn((entity: User): Promise<User> => {
-      store.rows.set(entity.id, entity);
-      return Promise.resolve(entity);
-    })
+    )
   };
 }
 
-// The update saves and audits in one transaction; its manager writes to the
-// same in-memory store as the repository.
-function transactionOver(repo: ReturnType<typeof makeUserRepoMock>) {
+// The update writes and audits in one transaction; its manager writes to the
+// same in-memory store as the repository. The soft-delete key of the update is
+// not modelled: every row of the store is live.
+function transactionOver(store: UserStore) {
+  const manager = {
+    update: (_target: unknown, where: { id: string }, set: Partial<User>) => {
+      const row = store.rows.get(where.id);
+      if (row) Object.assign(row, set);
+      return Promise.resolve({ affected: row ? 1 : 0 });
+    },
+    exists: (_target: unknown, options: { where: { id: string } }) =>
+      Promise.resolve(store.rows.has(options.where.id)),
+    findOneOrFail: (_target: unknown, options: { where: { id: string } }) => {
+      const row = store.rows.get(options.where.id);
+      return row ? Promise.resolve(row) : Promise.reject(new Error('no row'));
+    }
+  };
   return {
-    transaction: (
-      run: (manager: { save: typeof repo.save }) => Promise<unknown>
-    ) => run({ save: repo.save })
+    transaction: (run: (m: typeof manager) => Promise<unknown>) => run(manager)
   };
 }
 
@@ -129,7 +134,7 @@ describe('UsersService.update — email change side effects', () => {
         },
         UsersService,
         { provide: getRepositoryToken(User), useValue: repo },
-        { provide: DataSource, useValue: transactionOver(repo) },
+        { provide: DataSource, useValue: transactionOver(store) },
         { provide: AuditService, useValue: { logFireAndForget: jest.fn() } },
         {
           provide: MetricsService,
@@ -311,7 +316,7 @@ describe('Admin email change - session revocation through the real event bus', (
     });
     const userRepo = makeUserRepoMock(store);
     const dataSource = {
-      ...transactionOver(userRepo),
+      ...transactionOver(store),
       getRepository: jest.fn().mockReturnValue({ update: userUpdate })
     };
 
