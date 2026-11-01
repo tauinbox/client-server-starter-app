@@ -11,9 +11,7 @@ export const authGuard: CanActivateFn = (route, state) => {
   const router = inject(Router);
 
   return ensureAuthenticated(
-    authStore,
-    authService,
-    router,
+    { authStore, authService, router },
     state.url,
     () => true
   );

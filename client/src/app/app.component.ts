@@ -37,15 +37,19 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const openHelp = () => this.#openHelp();
     this.#cleanupQuestion = this.#shortcuts.register(
-      '?',
-      'shortcuts.labelHelp',
-      'shortcuts.groupGlobal',
+      {
+        key: '?',
+        label: 'shortcuts.labelHelp',
+        group: 'shortcuts.groupGlobal'
+      },
       openHelp
     );
     this.#cleanupCtrlSlash = this.#shortcuts.register(
-      'ctrl+/',
-      'shortcuts.labelHelp',
-      'shortcuts.groupGlobal',
+      {
+        key: 'ctrl+/',
+        label: 'shortcuts.labelHelp',
+        group: 'shortcuts.groupGlobal'
+      },
       openHelp
     );
   }

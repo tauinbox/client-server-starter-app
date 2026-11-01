@@ -5,6 +5,8 @@ import type { GuardResult } from '@angular/router';
 import { ensureAuthenticated } from './ensure-authenticated';
 import type { TokensResponse } from '../models/auth.types';
 
+type Deps = Parameters<typeof ensureAuthenticated>[0];
+
 describe('ensureAuthenticated', () => {
   let authStoreMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
@@ -28,9 +30,11 @@ describe('ensureAuthenticated', () => {
     onAuthenticated: () => GuardResult | Observable<GuardResult> = () => true
   ) =>
     ensureAuthenticated(
-      authStoreMock as Parameters<typeof ensureAuthenticated>[0],
-      authServiceMock as Parameters<typeof ensureAuthenticated>[1],
-      router,
+      {
+        authStore: authStoreMock as Deps['authStore'],
+        authService: authServiceMock as Deps['authService'],
+        router
+      },
       returnUrl,
       onAuthenticated
     );

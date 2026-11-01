@@ -18,9 +18,11 @@ import type { MockServerApi } from '../fixtures/base.fixture';
  * callback would have set, minted here by the mock control plane.
  */
 async function arriveAtCallback(
-  page: Page,
-  context: BrowserContext,
-  mockServer: MockServerApi,
+  {
+    page,
+    context,
+    mockServer
+  }: { page: Page; context: BrowserContext; mockServer: MockServerApi },
   returnUrl = '/profile'
 ): Promise<void> {
   const state = await mockServer.getState();
@@ -51,7 +53,10 @@ test.describe('OAuth sign-in — completed session', () => {
     page,
     context
   }) => {
-    await arriveAtCallback(page, context, _mockServer, '/admin/users');
+    await arriveAtCallback(
+      { page, context, mockServer: _mockServer },
+      '/admin/users'
+    );
 
     await expect(page).toHaveURL(/\/admin\/users/);
     await expect(page.locator('table')).toBeVisible();
@@ -62,7 +67,7 @@ test.describe('OAuth sign-in — completed session', () => {
     page,
     context
   }) => {
-    await arriveAtCallback(page, context, _mockServer);
+    await arriveAtCallback({ page, context, mockServer: _mockServer });
 
     await expect(page).toHaveURL(/\/profile/);
 

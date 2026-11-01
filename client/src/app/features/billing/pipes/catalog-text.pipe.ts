@@ -27,6 +27,6 @@ export class CatalogTextPipe implements PipeTransform {
     kind: CatalogKind,
     field: CatalogField
   ): string {
-    return item ? catalogText(this.#transloco, kind, item, field) : '';
+    return item ? catalogText(this.#transloco, { kind, item, field }) : '';
   }
 }

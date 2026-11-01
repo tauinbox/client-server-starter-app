@@ -206,12 +206,11 @@ export class PricingPageComponent implements OnInit {
     void this.#purchase(
       { productKey: item.product.key },
       {
-        productName: catalogText(
-          this.#transloco,
-          'products',
-          item.product,
-          'name'
-        ),
+        productName: catalogText(this.#transloco, {
+          kind: 'products',
+          item: item.product,
+          field: 'name'
+        }),
         amountMinor: price?.amountMinor ?? 0,
         currency: price?.currency ?? 'USD'
       }
@@ -227,7 +226,11 @@ export class PricingPageComponent implements OnInit {
         description: submit.note
       },
       {
-        productName: catalogText(this.#transloco, 'products', product, 'name'),
+        productName: catalogText(this.#transloco, {
+          kind: 'products',
+          item: product,
+          field: 'name'
+        }),
         amountMinor: submit.amountMinor,
         currency: price?.currency ?? 'USD'
       }

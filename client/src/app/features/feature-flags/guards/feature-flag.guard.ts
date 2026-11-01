@@ -29,9 +29,7 @@ export function featureFlagGuard(
     const router = inject(Router);
 
     return ensureAuthenticated(
-      authStore,
-      authService,
-      router,
+      { authStore, authService, router },
       state.url,
       () => {
         const evaluate = (): GuardResult => {

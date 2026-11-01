@@ -14,9 +14,11 @@ type AuthServiceLike = {
 };
 
 export function ensureAuthenticated(
-  authStore: AuthStoreLike,
-  authService: AuthServiceLike,
-  router: Router,
+  {
+    authStore,
+    authService,
+    router
+  }: { authStore: AuthStoreLike; authService: AuthServiceLike; router: Router },
   returnUrl: string,
   onAuthenticated: () => GuardResult | Observable<GuardResult>
 ): GuardResult | Observable<GuardResult> {

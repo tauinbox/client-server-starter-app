@@ -212,9 +212,7 @@ describe('session teardown', () => {
     const { featureFlagsStore, entitlementsStore } = await loadCaches();
 
     const guarded = ensureAuthenticated(
-      authStore,
-      authService,
-      router,
+      { authStore, authService, router },
       '/users',
       () => true
     ) as Observable<GuardResult>;

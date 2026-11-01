@@ -17,9 +17,11 @@ export type CatalogItem = {
  */
 export function catalogText(
   transloco: TranslocoService,
-  kind: CatalogKind,
-  item: CatalogItem,
-  field: CatalogField
+  {
+    kind,
+    item,
+    field
+  }: { kind: CatalogKind; item: CatalogItem; field: CatalogField }
 ): string {
   const key = `billing.catalog.${kind}.${item.key}.${field}`;
   const translation = transloco.getTranslation(transloco.getActiveLang());

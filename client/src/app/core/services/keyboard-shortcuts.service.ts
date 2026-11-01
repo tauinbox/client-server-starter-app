@@ -60,9 +60,7 @@ export class KeyboardShortcutsService {
   }
 
   register(
-    key: string,
-    label: string,
-    group: string,
+    { key, label, group }: ShortcutDef,
     handler: () => void
   ): () => void {
     const def: ShortcutDef = { key, label, group };
@@ -94,9 +92,7 @@ export class KeyboardShortcutsService {
    */
   registerSave(label: string, group: string, handler: () => void): () => void {
     return this.register(
-      this.isMac ? 'cmd+s' : 'ctrl+s',
-      label,
-      group,
+      { key: this.isMac ? 'cmd+s' : 'ctrl+s', label, group },
       handler
     );
   }

@@ -39,7 +39,10 @@ describe('KeyboardShortcutsService', () => {
   });
 
   it('register adds to shortcuts signal', () => {
-    const cleanup = service.register('ctrl+s', 'Save', 'Forms', vi.fn());
+    const cleanup = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      vi.fn()
+    );
     expect(service.shortcuts()).toHaveLength(1);
     expect(service.shortcuts()[0]).toEqual({
       key: 'ctrl+s',
@@ -50,7 +53,10 @@ describe('KeyboardShortcutsService', () => {
   });
 
   it('cleanup removes from shortcuts signal', () => {
-    const cleanup = service.register('ctrl+s', 'Save', 'Forms', vi.fn());
+    const cleanup = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      vi.fn()
+    );
     cleanup();
     expect(service.shortcuts()).toHaveLength(0);
   });
@@ -58,8 +64,14 @@ describe('KeyboardShortcutsService', () => {
   it('stack: last registered handler fires, first does not', () => {
     const handler1 = vi.fn();
     const handler2 = vi.fn();
-    const cleanup1 = service.register('ctrl+s', 'Save', 'Forms', handler1);
-    const cleanup2 = service.register('ctrl+s', 'Save', 'Forms', handler2);
+    const cleanup1 = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      handler1
+    );
+    const cleanup2 = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      handler2
+    );
 
     fireKey(doc, { key: 's', ctrlKey: true });
 
@@ -72,8 +84,14 @@ describe('KeyboardShortcutsService', () => {
   it('after unregistering top, lower handler fires', () => {
     const handler1 = vi.fn();
     const handler2 = vi.fn();
-    const cleanup1 = service.register('ctrl+s', 'Save', 'Forms', handler1);
-    const cleanup2 = service.register('ctrl+s', 'Save', 'Forms', handler2);
+    const cleanup1 = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      handler1
+    );
+    const cleanup2 = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      handler2
+    );
     cleanup2();
 
     fireKey(doc, { key: 's', ctrlKey: true });
@@ -85,7 +103,10 @@ describe('KeyboardShortcutsService', () => {
 
   it('fires ? handler when ? key pressed', () => {
     const handler = vi.fn();
-    const cleanup = service.register('?', 'Help', 'Global', handler);
+    const cleanup = service.register(
+      { key: '?', label: 'Help', group: 'Global' },
+      handler
+    );
 
     fireKey(doc, { key: '?', shiftKey: true });
 
@@ -95,7 +116,10 @@ describe('KeyboardShortcutsService', () => {
 
   it('ctrl+s fires inside input element', () => {
     const handler = vi.fn();
-    const cleanup = service.register('ctrl+s', 'Save', 'Forms', handler);
+    const cleanup = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      handler
+    );
 
     const input = doc.createElement('input');
     doc.body.appendChild(input);
@@ -108,7 +132,10 @@ describe('KeyboardShortcutsService', () => {
 
   it('? does NOT fire inside input element', () => {
     const handler = vi.fn();
-    const cleanup = service.register('?', 'Help', 'Global', handler);
+    const cleanup = service.register(
+      { key: '?', label: 'Help', group: 'Global' },
+      handler
+    );
 
     const input = doc.createElement('input');
     doc.body.appendChild(input);
@@ -121,7 +148,10 @@ describe('KeyboardShortcutsService', () => {
 
   it('? does NOT fire inside textarea element', () => {
     const handler = vi.fn();
-    const cleanup = service.register('?', 'Help', 'Global', handler);
+    const cleanup = service.register(
+      { key: '?', label: 'Help', group: 'Global' },
+      handler
+    );
 
     const textarea = doc.createElement('textarea');
     doc.body.appendChild(textarea);
@@ -133,7 +163,10 @@ describe('KeyboardShortcutsService', () => {
   });
 
   it('calls preventDefault when handler is registered', () => {
-    const cleanup = service.register('ctrl+s', 'Save', 'Forms', vi.fn());
+    const cleanup = service.register(
+      { key: 'ctrl+s', label: 'Save', group: 'Forms' },
+      vi.fn()
+    );
     const event = new KeyboardEvent('keydown', {
       key: 's',
       ctrlKey: true,
@@ -164,7 +197,10 @@ describe('KeyboardShortcutsService', () => {
 
   it('normalises cmd+s correctly', () => {
     const handler = vi.fn();
-    const cleanup = service.register('cmd+s', 'Save', 'Forms', handler);
+    const cleanup = service.register(
+      { key: 'cmd+s', label: 'Save', group: 'Forms' },
+      handler
+    );
 
     fireKey(doc, { key: 's', metaKey: true });
 
@@ -173,8 +209,14 @@ describe('KeyboardShortcutsService', () => {
   });
 
   it('shortcuts signal shows only top-of-stack entry per key', () => {
-    const cleanup1 = service.register('ctrl+s', 'Save 1', 'Forms', vi.fn());
-    const cleanup2 = service.register('ctrl+s', 'Save 2', 'Forms', vi.fn());
+    const cleanup1 = service.register(
+      { key: 'ctrl+s', label: 'Save 1', group: 'Forms' },
+      vi.fn()
+    );
+    const cleanup2 = service.register(
+      { key: 'ctrl+s', label: 'Save 2', group: 'Forms' },
+      vi.fn()
+    );
 
     const shortcuts = service.shortcuts();
     expect(shortcuts).toHaveLength(1);
