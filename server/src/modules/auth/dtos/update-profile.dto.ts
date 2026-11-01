@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsNotEmpty, MaxLength, ValidateIf } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsNotEmpty,
+  MaxLength,
+  ValidateIf
+} from 'class-validator';
 import {
   MAX_NAME_LENGTH,
   MIN_PASSWORD_LENGTH,
@@ -33,6 +39,15 @@ export class UpdateProfileDto extends StepUpFactorsDto {
   @ValidateIf(propertyIsDefined)
   @IsNewPassword()
   password?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'With a `password` that replaces an existing password: also remove every linked sign-in provider. Ignored on a first password and without a `password`.',
+    example: true
+  })
+  @ValidateIf(propertyIsDefined)
+  @IsBoolean()
+  removeLinkedProviders?: boolean;
 
   @ApiPropertyOptional({
     description: 'Preferred locale for transactional emails',

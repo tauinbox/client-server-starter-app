@@ -141,3 +141,13 @@ form {
   background: var(--mat-sys-surface-container-low);
   border-radius: func.rem(4);
 }
+
+.provider-removal {
+  margin-bottom: vars.$space-form-row-gap;
+}
+
+.provider-removal-hint {
+  margin: 0;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}

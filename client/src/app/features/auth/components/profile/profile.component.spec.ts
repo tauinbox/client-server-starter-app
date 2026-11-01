@@ -862,6 +862,104 @@ describe('ProfileComponent', () => {
     });
   });
 
+  describe('disconnecting the providers with a new password', () => {
+    const linked = [
+      { provider: 'google', createdAt: '2026-10-01T10:00:00.000Z' },
+      { provider: 'vk', createdAt: '2026-10-20T10:00:00.000Z' }
+    ];
+
+    async function typeNewPassword(): Promise<void> {
+      component.profileModel.set({
+        email: 'test@example.com',
+        name: 'Test User',
+        currentPassword: 'CurrentPass1',
+        password: 'NewPassword1',
+        confirmPassword: 'NewPassword1',
+        code: ''
+      });
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    function checkbox(): HTMLInputElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector(
+        '.provider-removal input[type="checkbox"]'
+      );
+    }
+
+    beforeEach(() => {
+      authServiceMock.getOAuthAccounts.mockReturnValue(of(linked));
+      authServiceMock.updateProfile.mockReturnValue(of(mockUser));
+      vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    });
+
+    it('offers it, checked, once a new password is typed', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(checkbox()).toBeNull();
+
+      await typeNewPassword();
+
+      expect(checkbox()?.checked).toBe(true);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '.provider-removal'
+        )?.textContent
+      ).toContain('Google, VK');
+    });
+
+    it('sends the choice with the new password', async () => {
+      fixture.detectChanges();
+      await typeNewPassword();
+      component.onSubmit();
+
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          password: 'NewPassword1',
+          removeLinkedProviders: true
+        })
+      );
+    });
+
+    it('keeps the providers when the owner clears the box', async () => {
+      fixture.detectChanges();
+      await typeNewPassword();
+      checkbox()?.click();
+      await fixture.whenStable();
+      component.onSubmit();
+
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ removeLinkedProviders: false })
+      );
+    });
+
+    it('does not offer it on an account with no linked provider', async () => {
+      authServiceMock.getOAuthAccounts.mockReturnValue(of([]));
+      fixture.detectChanges();
+      await typeNewPassword();
+      component.onSubmit();
+
+      expect(checkbox()).toBeNull();
+      expect(authServiceMock.updateProfile).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          removeLinkedProviders: expect.anything()
+        })
+      );
+    });
+
+    // The provider is how an account with no password gets in, so its first
+    // password must not take that away.
+    it('does not offer it for a first password', async () => {
+      authServiceMock.getProfile.mockReturnValue(
+        of({ ...mockUser, hasPassword: false })
+      );
+      fixture.detectChanges();
+      await typeNewPassword();
+
+      expect(checkbox()).toBeNull();
+    });
+  });
+
   describe('onSubmit', () => {
     beforeEach(() => {
       fixture.detectChanges(); // Triggers ngOnInit → loadProfile

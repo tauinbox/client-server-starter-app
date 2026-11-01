@@ -506,7 +506,8 @@ export function addOAuthAccounts(
 /**
  * Account recovery (a password reset, or an administrator who sets a new
  * password or address) removes every linked provider, as the server does: a
- * provider that the previous holder linked must not keep signing in.
+ * provider that the previous holder linked must not keep signing in. An owner
+ * who replaces the password on the profile can ask for the same.
  */
 export function removeLinkedProviders(
   user: Pick<MockUser, 'id' | 'email'>,
@@ -516,7 +517,7 @@ export function removeLinkedProviders(
     ip
   }: {
     actor: { id: string; email: string };
-    source: 'password_reset' | 'admin';
+    source: 'password_reset' | 'admin' | 'self';
     ip?: string;
   }
 ): void {

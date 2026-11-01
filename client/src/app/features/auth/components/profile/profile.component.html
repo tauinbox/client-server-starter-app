@@ -131,6 +131,28 @@
                     </nxs-form-field>
                   }
 
+                  @if (offerProviderRemoval()) {
+                    <div class="provider-removal">
+                      <mat-checkbox
+                        [checked]="removeProviders()"
+                        (change)="removeProviders.set($event.checked)"
+                        aria-describedby="provider-removal-hint"
+                      >
+                        {{
+                          t('auth.profile.removeProviders', {
+                            providers: linkedProvidersLabel()
+                          })
+                        }}
+                      </mat-checkbox>
+                      <p
+                        id="provider-removal-hint"
+                        class="provider-removal-hint"
+                      >
+                        {{ t('auth.profile.removeProvidersHint') }}
+                      </p>
+                    </div>
+                  }
+
                   @if (error()) {
                     <div class="error-message" role="alert">{{ error() }}</div>
                   }

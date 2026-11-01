@@ -134,6 +134,33 @@ describe('Profile mass-assignment protection (e2e)', () => {
     }
   );
 
+  it('refuses a removeLinkedProviders that is not a boolean (422)', async () => {
+    const res = await request(server)
+      .patch('/api/v1/auth/profile')
+      .send({ name: 'x', removeLinkedProviders: 'yes' })
+      .expect(422);
+
+    expect((res.body as { message: string[] }).message).toEqual([
+      'removeLinkedProviders must be a boolean value'
+    ]);
+    expect(usersService.update).not.toHaveBeenCalled();
+  });
+
+  it('never passes removeLinkedProviders to the user write', async () => {
+    usersService.update.mockResolvedValue({ id: 'user-1', name: 'x' });
+
+    await request(server)
+      .patch('/api/v1/auth/profile')
+      .send({ name: 'x', removeLinkedProviders: true })
+      .expect(200);
+
+    expect(usersService.update).toHaveBeenCalledWith(
+      'user-1',
+      { name: 'x' },
+      { ability: SYSTEM_ABILITY, expected: undefined }
+    );
+  });
+
   it('accepts a whitelisted payload (200) and dispatches the update', async () => {
     usersService.update.mockResolvedValue({ id: 'user-1', name: 'x' });
 

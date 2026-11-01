@@ -1656,6 +1656,7 @@ describe('AuthService', () => {
       await service.removeLinkedProviders(
         { id: 'user-1', email: 'new@example.com', locale: 'ru' },
         {
+          source: 'admin',
           actor: { actorId: 'admin-1', actorEmail: 'admin@example.com' },
           auditContext: { ip: '203.0.113.9' }
         }

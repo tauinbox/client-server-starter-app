@@ -28,6 +28,16 @@
     align-items: center;
   }
 
+  .oauth-provider-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .oauth-provider-since {
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
   .oauth-step-up-confirm {
     padding-top: vars.$spacing-md;
     border-top: func.rem(1) solid var(--mat-sys-outline-variant);

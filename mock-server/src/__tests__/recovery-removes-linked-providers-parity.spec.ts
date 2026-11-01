@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import {
@@ -121,6 +122,107 @@ describe('account recovery removes the linked providers', () => {
     });
 
     expect(getState().oauthAccounts.get(userId) ?? []).toHaveLength(0);
+  });
+
+  it('a profile password change removes them only when the owner asks', async () => {
+    const userToken = async (): Promise<string> => {
+      const res = await post('auth/login', {
+        email: USER_EMAIL,
+        password: SEED_PASSWORD
+      });
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { tokens: { access_token: string } }).tokens
+        .access_token;
+    };
+    const patchProfile = async (body: Record<string, unknown>) =>
+      fetch(`${baseUrl}/api/v1/auth/profile`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${await userToken()}`
+        },
+        body: JSON.stringify(body)
+      });
+
+    const kept = await patchProfile({
+      password: NEW_PASSWORD,
+      currentPassword: SEED_PASSWORD
+    });
+    expect(kept.status).toBe(200);
+    expect(getState().oauthAccounts.get(userId)).toHaveLength(1);
+
+    findUserByEmail(USER_EMAIL)!.password = SEED_PASSWORD;
+    const removed = await patchProfile({
+      password: NEW_PASSWORD,
+      currentPassword: SEED_PASSWORD,
+      removeLinkedProviders: true
+    });
+    expect(removed.status).toBe(200);
+    expect(getState().oauthAccounts.get(userId) ?? []).toHaveLength(0);
+    expect(unlinkRows()).toEqual([
+      expect.objectContaining({
+        actorId: userId,
+        details: { provider: 'google', source: 'self' }
+      })
+    ]);
+  });
+
+  it('a first password keeps them even when asked', async () => {
+    findUserByEmail(USER_EMAIL)!.password = null;
+    const data = await post('../../__control/oauth-data', { userId });
+    const { token } = (await data.json()) as { token: string };
+    const exchange = await fetch(`${baseUrl}/api/v1/auth/oauth/exchange`, {
+      method: 'POST',
+      headers: { cookie: `oauth_data=${token}` }
+    });
+    const access = (
+      (await exchange.json()) as { tokens: { access_token: string } }
+    ).tokens.access_token;
+    const proofRes = await post('../../__control/reauth-proof', {
+      userId,
+      operation: STEP_UP_OPERATION.PASSWORD_SET
+    });
+    const { token: proof } = (await proofRes.json()) as { token: string };
+
+    const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${access}`,
+        cookie: `reauth_proof=${proof}`
+      },
+      body: JSON.stringify({
+        password: NEW_PASSWORD,
+        removeLinkedProviders: true
+      })
+    });
+
+    expect(res.status).toBe(200);
+    expect(getState().oauthAccounts.get(userId)).toHaveLength(1);
+  });
+
+  it('refuses a removeLinkedProviders that is not a boolean', async () => {
+    const login = await post('auth/login', {
+      email: USER_EMAIL,
+      password: SEED_PASSWORD
+    });
+    const access = (
+      (await login.json()) as { tokens: { access_token: string } }
+    ).tokens.access_token;
+
+    const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${access}`
+      },
+      body: JSON.stringify({ name: 'x', removeLinkedProviders: 'yes' })
+    });
+
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { errors: string[] }).errors).toEqual([
+      'removeLinkedProviders must be a boolean value'
+    ]);
   });
 
   it('a deactivation or a name edit keeps them', async () => {

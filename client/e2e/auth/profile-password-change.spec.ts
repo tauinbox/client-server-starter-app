@@ -1,8 +1,10 @@
+import type { Page } from '@playwright/test';
 import {
   expect,
   loginViaUi,
   routeApiToMockServer,
-  test
+  test,
+  type MockServerApi
 } from '../fixtures/base.fixture';
 
 // Changing password from /auth/profile must require the user's current
@@ -79,6 +81,72 @@ test.describe('Profile password change', () => {
     // The other tab stays quiet on /profile, so only the storage event can move it.
     await expect(otherTab).toHaveURL(/\/login\b/);
     await otherTab.close();
+  });
+
+  // A provider that someone else linked while knowing the old password would
+  // keep signing in, so the new password offers to disconnect them, checked.
+  test.describe('linked providers', () => {
+    type ControlState = {
+      oauthAccounts: Record<string, { provider: string }[]>;
+    };
+
+    // The id that loginViaUi gives the user it signs in.
+    const userId = '100';
+
+    async function signInWithGoogleLinked(
+      page: Page,
+      mockServer: MockServerApi
+    ): Promise<void> {
+      await loginViaUi(page, mockServer.url);
+      await mockServer.seedOAuthAccounts(userId, [
+        {
+          provider: 'google',
+          providerId: 'g-intruder',
+          createdAt: '2026-10-01T10:00:00.000Z'
+        }
+      ]);
+      await page.reload();
+      await expect(page.getByText(/Connected on/)).toBeVisible();
+    }
+
+    async function changePassword(
+      page: Page,
+      { keepProviders }: { keepProviders: boolean }
+    ): Promise<void> {
+      await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
+      await page.getByLabel('Current password').fill('Password1');
+      await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
+
+      const box = page.getByRole('checkbox', {
+        name: 'Also disconnect Google'
+      });
+      await expect(box).toBeChecked();
+      if (keepProviders) await box.uncheck();
+
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(page).toHaveURL(/\/login\?password_changed=1$/);
+    }
+
+    test('disconnects them by default', async ({ _mockServer, page }) => {
+      await signInWithGoogleLinked(page, _mockServer);
+
+      await changePassword(page, { keepProviders: false });
+
+      const state = (await _mockServer.getState()) as ControlState;
+      expect(state.oauthAccounts[userId] ?? []).toHaveLength(0);
+    });
+
+    test('keeps them when the owner clears the box', async ({
+      _mockServer,
+      page
+    }) => {
+      await signInWithGoogleLinked(page, _mockServer);
+
+      await changePassword(page, { keepProviders: true });
+
+      const state = (await _mockServer.getState()) as ControlState;
+      expect(state.oauthAccounts[userId]).toHaveLength(1);
+    });
   });
 
   test('should hide currentPassword field when new password is blank', async ({

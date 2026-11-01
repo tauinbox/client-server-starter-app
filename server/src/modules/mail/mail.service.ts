@@ -169,12 +169,17 @@ export class MailService {
   async sendPasswordChangedNotification(
     email: string,
     source: PasswordChangeSource,
-    { locale = DEFAULT_LOCALE, ip }: CredentialChangeContext = {}
+    {
+      locale = DEFAULT_LOCALE,
+      ip,
+      stillLinked
+    }: CredentialChangeContext & { stillLinked?: string[] } = {}
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).passwordChanged(
       source,
-      credentialChangeDetails(ip)
+      credentialChangeDetails(ip),
+      stillLinked
     );
     await this.send(email, message, loc);
   }

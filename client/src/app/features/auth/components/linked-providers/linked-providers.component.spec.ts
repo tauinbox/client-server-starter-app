@@ -120,10 +120,21 @@ describe('LinkedProvidersComponent', () => {
       expect(component['visibleProviders']()).toEqual(['google', 'vk']);
       expect(providerRowCount()).toBe(2);
     });
+
+    // The date helps the owner spot a provider that they did not link.
+    it('shows when a linked provider was connected, and no date for the others', async () => {
+      await loadFlags({ 'oauth-google': true, 'oauth-vk': true });
+
+      const dates = fixture.nativeElement.querySelectorAll(
+        '.oauth-provider-since'
+      ) as NodeListOf<HTMLElement>;
+      expect(dates).toHaveLength(1);
+      expect(dates[0].textContent).toContain('2025');
+    });
   });
 
-  // A linked provider signs the account in and no recovery path removes it, so
-  // a stolen session must not be able to plant one.
+  // A linked provider signs the account in and outlives every session, so a
+  // stolen session must not be able to plant one.
   describe('connectProvider', () => {
     it('ignores a provider name it does not know', () => {
       const changes = emitted();

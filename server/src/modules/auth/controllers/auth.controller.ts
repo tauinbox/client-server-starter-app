@@ -273,6 +273,7 @@ export class AuthController {
     const {
       currentPassword: _password,
       code: _code,
+      removeLinkedProviders: _removeLinkedProviders,
       ...updatePayload
     } = updateProfileDto;
     const previous =
@@ -303,20 +304,40 @@ export class AuthController {
       await this.authService.revokeAllUserSessions(req.user.userId);
       this.cookies.clearRefresh(res);
       this.cookies.clearIntents(res);
+      const actor = { actorId: req.user.userId, actorEmail: req.user.email };
       this.auditService.logFireAndForget({
         action: AuditAction.PASSWORD_CHANGE,
-        actorId: req.user.userId,
-        actorEmail: req.user.email,
+        ...actor,
         targetId: req.user.userId,
         targetType: 'User',
         details: { source: 'self' },
         context: extractAuditContext(req)
       });
 
+      // An owner who suspects that someone else knew the password can remove
+      // the providers that person could have linked. A first password replaces
+      // nothing, and the provider is the way in the owner has been using.
+      if (updateProfileDto.removeLinkedProviders && verified?.password) {
+        await this.authService.removeLinkedProviders(updatedUser, {
+          source: 'self',
+          actor,
+          auditContext: extractAuditContext(req)
+        });
+      }
+      // Only the notice reads this, and the notice is best effort: a failed
+      // read must not turn a completed change into an error.
+      const stillLinked = await this.authService
+        .linkedProviders(req.user.userId)
+        .catch((err) => {
+          this.logger.error('Failed to read the linked providers', err);
+          return [];
+        });
+
       this.mailService
         .sendPasswordChangedNotification(updatedUser.email, 'self', {
           locale: updatedUser.locale,
-          ip: req.ip
+          ip: req.ip,
+          stillLinked
         })
         .catch((err) =>
           this.logger.error('Failed to send password-changed notification', err)

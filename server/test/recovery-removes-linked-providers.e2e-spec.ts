@@ -176,7 +176,10 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
 
     await auth.removeLinkedProviders(
       { id: userId, email, locale: 'en' },
-      { actor: { actorId: 'admin-id', actorEmail: 'admin@example.com' } }
+      {
+        source: 'admin',
+        actor: { actorId: 'admin-id', actorEmail: 'admin@example.com' }
+      }
     );
 
     expect(await accounts.findByUserId(userId)).toHaveLength(0);
@@ -184,6 +187,24 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
       expect.objectContaining({
         actorId: 'admin-id',
         details: { provider: 'google', source: 'admin' }
+      })
+    ]);
+  }, 30000);
+
+  it('a profile password change that asks for it removes the provider', async () => {
+    await link(`google-intruder-${stamp}`);
+    expect(await auth.linkedProviders(userId)).toEqual(['google']);
+
+    await auth.removeLinkedProviders(
+      { id: userId, email, locale: 'en' },
+      { source: 'self', actor: { actorId: userId, actorEmail: email } }
+    );
+
+    expect(await auth.linkedProviders(userId)).toEqual([]);
+    expect(unlinkRows()).toEqual([
+      expect.objectContaining({
+        actorId: userId,
+        details: { provider: 'google', source: 'self' }
       })
     ]);
   }, 30000);

@@ -388,6 +388,7 @@ export class UsersController {
     // so its row is committed before this delete runs.
     if (changes.password || emailChanged) {
       await this.authService.removeLinkedProviders(updatedUser, {
+        source: 'admin',
         actor: { actorId: rowFields.actorId, actorEmail: rowFields.actorEmail },
         auditContext: rowFields.context
       });

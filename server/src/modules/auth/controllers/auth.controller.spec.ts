@@ -137,6 +137,8 @@ describe('AuthController', () => {
     forgotPassword: jest.Mock;
     resetPassword: jest.Mock;
     assertStepUpForUser: jest.Mock;
+    removeLinkedProviders: jest.Mock;
+    linkedProviders: jest.Mock;
   };
   let mfaServiceMock: {
     issuePendingToken: jest.Mock;
@@ -196,7 +198,9 @@ describe('AuthController', () => {
       resetPassword: jest.fn().mockResolvedValue({ message: 'reset' }),
       assertStepUpForUser: jest
         .fn()
-        .mockResolvedValue({ id: 'user-1', password: 'verified-hash' })
+        .mockResolvedValue({ id: 'user-1', password: 'verified-hash' }),
+      removeLinkedProviders: jest.fn().mockResolvedValue(undefined),
+      linkedProviders: jest.fn().mockResolvedValue([])
     };
 
     mfaServiceMock = {
@@ -836,8 +840,132 @@ describe('AuthController', () => {
         mailServiceMock.sendPasswordChangedNotification
       ).toHaveBeenCalledWith('owner@example.com', 'self', {
         locale: 'ru',
-        ip: '127.0.0.1'
+        ip: '127.0.0.1',
+        stillLinked: []
       });
+    });
+
+    // A provider that someone else linked keeps signing in after the change,
+    // so the notice names every provider that still works.
+    it('names the providers that still sign in, read after the change', async () => {
+      authServiceMock.linkedProviders.mockResolvedValueOnce(['google', 'vk']);
+      userServiceMock.update.mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'owner@example.com',
+        locale: 'en'
+      });
+
+      await controller.updateProfile(
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        { password: 'NewPassword1', currentPassword: 'CurrentPass1' },
+        mockResponse()
+      );
+
+      expect(authServiceMock.removeLinkedProviders).not.toHaveBeenCalled();
+      expect(
+        mailServiceMock.sendPasswordChangedNotification
+      ).toHaveBeenCalledWith(
+        'owner@example.com',
+        'self',
+        expect.objectContaining({ stillLinked: ['google', 'vk'] })
+      );
+    });
+
+    it('completes the change when the read of the providers fails', async () => {
+      authServiceMock.linkedProviders.mockRejectedValueOnce(new Error('db'));
+
+      const result = await controller.updateProfile(
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        { password: 'NewPassword1', currentPassword: 'CurrentPass1' },
+        mockResponse()
+      );
+
+      expect(result).toBeDefined();
+      expect(
+        mailServiceMock.sendPasswordChangedNotification
+      ).toHaveBeenCalledWith(
+        expect.anything(),
+        'self',
+        expect.objectContaining({ stillLinked: [] })
+      );
+    });
+
+    it('removes the linked providers before the notice when the owner asks', async () => {
+      const req = mockJwtRequest(
+        'user-1',
+        'owner@example.com'
+      ) as JwtAuthRequest;
+      const updated = {
+        id: 'user-1',
+        email: 'owner@example.com',
+        locale: 'en'
+      };
+      userServiceMock.update.mockResolvedValueOnce(updated);
+
+      await controller.updateProfile(
+        req,
+        {
+          password: 'NewPassword1',
+          currentPassword: 'CurrentPass1',
+          removeLinkedProviders: true
+        },
+        mockResponse()
+      );
+
+      expect(authServiceMock.removeLinkedProviders).toHaveBeenCalledWith(
+        updated,
+        expect.objectContaining({
+          source: 'self',
+          actor: { actorId: 'user-1', actorEmail: 'owner@example.com' }
+        })
+      );
+      expect(
+        authServiceMock.revokeAllUserSessions.mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        authServiceMock.removeLinkedProviders.mock.invocationCallOrder[0]
+      );
+      expect(
+        authServiceMock.removeLinkedProviders.mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        authServiceMock.linkedProviders.mock.invocationCallOrder[0]
+      );
+      expect(userServiceMock.update).toHaveBeenCalledWith(
+        'user-1',
+        { password: 'NewPassword1' },
+        expect.anything()
+      );
+    });
+
+    // The provider is the way in that an account with no password has used, so
+    // its first password must not take that away.
+    it('keeps the providers on a first password even when asked', async () => {
+      authServiceMock.assertStepUpForUser.mockResolvedValueOnce({
+        id: 'user-1',
+        password: null
+      });
+
+      await controller.updateProfile(
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        { password: 'NewPassword1', removeLinkedProviders: true },
+        mockResponse()
+      );
+
+      expect(authServiceMock.removeLinkedProviders).not.toHaveBeenCalled();
+    });
+
+    it('ignores the request to remove providers without a new password', async () => {
+      await controller.updateProfile(
+        mockJwtRequest('user-1') as JwtAuthRequest,
+        { name: 'Updated', removeLinkedProviders: true },
+        mockResponse()
+      );
+
+      expect(authServiceMock.removeLinkedProviders).not.toHaveBeenCalled();
+      expect(userServiceMock.update).toHaveBeenCalledWith(
+        'user-1',
+        { name: 'Updated' },
+        expect.anything()
+      );
     });
 
     it('should not notify when the profile update carries no password', async () => {

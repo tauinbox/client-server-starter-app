@@ -105,6 +105,23 @@ describe('mail-content', () => {
     expect(withoutIp.paragraphs.join(' ')).not.toContain('IP');
   });
 
+  it('names each provider that still signs in after a password change', () => {
+    const details = { when: '2026-09-01 12:34 UTC' };
+    const without = mailMessages('en').passwordChanged('self', details);
+
+    for (const locale of ['en', 'ru'] as const) {
+      const message = mailMessages(locale).passwordChanged('self', details, [
+        'google',
+        'vk'
+      ]);
+      expect(message.paragraphs).toHaveLength(without.paragraphs.length + 1);
+      expect(message.paragraphs.join(' ')).toContain('Google, VK');
+    }
+    expect(
+      mailMessages('en').passwordChanged('self', details, []).paragraphs
+    ).toEqual(without.paragraphs);
+  });
+
   it('names the provider in the link and unlink notices', () => {
     const details = { when: '2026-09-01 12:34 UTC' };
 

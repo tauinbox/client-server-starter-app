@@ -649,25 +649,32 @@ export class AuthService {
   /**
    * An administrator recovery (a new password or a new address) takes the
    * account back from whoever held it, so the providers that holder could
-   * have linked go too. The password reset removes them in its own
-   * transaction.
+   * have linked go too. An owner who changes the password on the profile can
+   * ask for the same. The password reset removes them in its own transaction.
    */
   async removeLinkedProviders(
     account: Pick<User, 'id' | 'email' | 'locale'>,
     {
+      source,
       actor,
       auditContext
     }: {
+      source: 'admin' | 'self';
       actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>;
       auditContext?: AuditContext;
     }
   ): Promise<void> {
     const removed = await this.oauthAccountService.removeAllForUser(account.id);
     this.reportRemovedProviders(account, removed, {
-      source: 'admin',
+      source,
       actor,
       auditContext
     });
+  }
+
+  async linkedProviders(userId: string): Promise<string[]> {
+    const accounts = await this.oauthAccountService.findByUserId(userId);
+    return accounts.map((account) => account.provider);
   }
 
   private reportRemovedProviders(
@@ -678,7 +685,7 @@ export class AuthService {
       actor,
       auditContext
     }: {
-      source: 'password_reset' | 'admin';
+      source: 'password_reset' | 'admin' | 'self';
       actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>;
       auditContext?: AuditContext;
     }
