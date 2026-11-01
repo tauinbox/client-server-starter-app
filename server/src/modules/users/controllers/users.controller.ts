@@ -383,6 +383,16 @@ export class UsersController {
         new UserSessionRevocationRequiredEvent(id)
       );
     }
+    // After the revocation: a link callback that starts later is refused by
+    // the new revocation time, and one already running holds the user row,
+    // so its row is committed before this delete runs.
+    if (changes.password || emailChanged) {
+      await this.authService.removeLinkedProviders(updatedUser, {
+        source: 'admin',
+        actor: { actorId: rowFields.actorId, actorEmail: rowFields.actorEmail },
+        auditContext: rowFields.context
+      });
+    }
 
     this.eventEmitter.emit(
       UserUpdatedEvent.name,

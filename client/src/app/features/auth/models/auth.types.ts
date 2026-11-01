@@ -20,6 +20,7 @@ export type RegisterRequest = CreateUser;
 export type UpdateProfile = {
   name?: string;
   password?: string;
+  removeLinkedProviders?: boolean;
   currentPassword?: string;
   code?: string;
   locale?: string;

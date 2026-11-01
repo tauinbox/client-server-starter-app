@@ -54,7 +54,8 @@ interface MessageBuilders {
   emailChangeCompleted: (newEmail: string) => EmailMessage;
   passwordChanged: (
     source: PasswordChangeSource,
-    details: CredentialChangeDetails
+    details: CredentialChangeDetails,
+    stillLinked?: string[]
   ) => EmailMessage;
   oauthLinked: (
     provider: string,
@@ -93,6 +94,27 @@ const EN_RECOVERY =
 
 const RU_RECOVERY =
   'Если вы не выполняли это действие, немедленно сбросьте пароль и проверьте подключённые аккаунты на странице профиля.';
+
+/**
+ * A provider that someone else linked keeps signing in after a password change
+ * that kept the providers. The notice names each one that still works, so the
+ * owner can tell whether one of them is not theirs.
+ */
+function enStillLinked(providers: string[] = []): string[] {
+  if (providers.length === 0) return [];
+  const list = providers.map(providerLabel).join(', ');
+  return [
+    `These sign-in providers can still sign in to your account: ${list}. If you did not link one of them, remove it on your profile page.`
+  ];
+}
+
+function ruStillLinked(providers: string[] = []): string[] {
+  if (providers.length === 0) return [];
+  const list = providers.map(providerLabel).join(', ');
+  return [
+    `Для входа в аккаунт по-прежнему можно использовать: ${list}. Если вы не подключали какой-то из этих способов, отключите его на странице профиля.`
+  ];
+}
 
 function enDetails({ when, ip }: CredentialChangeDetails): string {
   return ip ? `Time: ${when}. IP address: ${ip}.` : `Time: ${when}.`;
@@ -147,13 +169,14 @@ const en: MessageBuilders = {
       "If this wasn't you, contact support immediately."
     ]
   }),
-  passwordChanged: (source, details) => ({
+  passwordChanged: (source, details, stillLinked) => ({
     subject: 'Your password was changed',
     heading: 'Password changed',
     paragraphs: [
       EN_PASSWORD_SOURCE[source],
       enDetails(details),
       'All active sessions were signed out.',
+      ...enStillLinked(stillLinked),
       EN_RECOVERY
     ]
   }),
@@ -260,13 +283,14 @@ const ru: MessageBuilders = {
       'Если это были не вы — немедленно свяжитесь с поддержкой.'
     ]
   }),
-  passwordChanged: (source, details) => ({
+  passwordChanged: (source, details, stillLinked) => ({
     subject: 'Пароль вашего аккаунта изменён',
     heading: 'Пароль изменён',
     paragraphs: [
       RU_PASSWORD_SOURCE[source],
       ruDetails(details),
       'Все активные сеансы завершены.',
+      ...ruStillLinked(stillLinked),
       RU_RECOVERY
     ]
   }),

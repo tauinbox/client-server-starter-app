@@ -14,6 +14,7 @@ import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
+import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { GeoIpService } from '../src/modules/auth/services/geo-ip.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
@@ -213,6 +214,8 @@ describe('Refresh token reuse detection (e2e)', () => {
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         AuthService,
         PurposeTokenService,
+        // No suite here resets a password, so no provider row is removed.
+        { provide: OAuthAccountService, useValue: {} },
         {
           // These suites never present a second factor. The mock answers the two
           // members AuthService and AuthController read, so the branch is simply

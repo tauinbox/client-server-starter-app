@@ -133,10 +133,10 @@ export class OAuthController {
   // --- Link initiation ---
 
   /**
-   * A linked provider is a sign-in credential that outlives every session, and
-   * no recovery path deletes it: a password reset ends the sessions and leaves
-   * the row. A stolen session must therefore not be able to plant one, so this
-   * demands the same fresh proof of identity the other credential changes do.
+   * A linked provider is a sign-in credential that outlives every session; only
+   * an unlink or an account recovery deletes it. A stolen session must
+   * therefore not be able to plant one, so this demands the same fresh proof of
+   * identity the other credential changes do.
    */
   @StepUpRoute(StepUpFactorsDto)
   @Post('link-init')

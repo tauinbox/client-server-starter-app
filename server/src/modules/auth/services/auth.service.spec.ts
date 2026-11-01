@@ -42,6 +42,7 @@ import { EntitlementService } from '../../entitlements/entitlement.service';
 import { createMockCache } from '../../../common/testing/cache.mock';
 import { hashToken } from '../../../common/utils/hash-token';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
+import { OAuthAccountService } from './oauth-account.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -105,7 +106,9 @@ describe('AuthService', () => {
     sendEmailChangeConfirmation: jest.Mock;
     sendEmailChangeNotificationOld: jest.Mock;
     sendEmailChangeCompletedNotification: jest.Mock;
+    sendOAuthUnlinkedNotification: jest.Mock;
   };
+  let mockOAuthAccountService: { removeAllForUser: jest.Mock };
   let mockRoleService: {
     findRoleByName: jest.Mock;
   };
@@ -285,7 +288,12 @@ describe('AuthService', () => {
       sendEmailChangeNotificationOld: jest.fn().mockResolvedValue(undefined),
       sendEmailChangeCompletedNotification: jest
         .fn()
-        .mockResolvedValue(undefined)
+        .mockResolvedValue(undefined),
+      sendOAuthUnlinkedNotification: jest.fn().mockResolvedValue(undefined)
+    };
+
+    mockOAuthAccountService = {
+      removeAllForUser: jest.fn().mockResolvedValue([])
     };
 
     mockRoleService = {
@@ -349,6 +357,7 @@ describe('AuthService', () => {
           useValue: mockBreachedPasswordService
         },
         { provide: MfaService, useValue: mockMfaService },
+        { provide: OAuthAccountService, useValue: mockOAuthAccountService },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: CACHE_MANAGER, useValue: createMockCache() }
       ]
@@ -1426,6 +1435,60 @@ describe('AuthService', () => {
       });
     });
 
+    // A provider that an intruder linked while holding the password must not
+    // outlive the reset that takes the account back.
+    it('removes every linked provider inside the reset transaction and reports each', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+      mockOAuthAccountService.removeAllForUser.mockResolvedValue([
+        'google',
+        'vk'
+      ]);
+
+      await service.resetPassword('valid-token', 'NewPassword1', {
+        ip: '198.51.100.7'
+      });
+
+      expect(mockOAuthAccountService.removeAllForUser).toHaveBeenCalledWith(
+        'user-1',
+        mockManager
+      );
+      for (const provider of ['google', 'vk']) {
+        expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.OAUTH_UNLINK,
+            actorId: 'user-1',
+            targetId: 'user-1',
+            details: { provider, source: 'password_reset' }
+          })
+        );
+        expect(
+          mockMailService.sendOAuthUnlinkedNotification
+        ).toHaveBeenCalledWith('test@example.com', provider, {
+          locale: 'en',
+          ip: '198.51.100.7'
+        });
+      }
+    });
+
+    it('writes no unlink row when no provider was linked', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+
+      await service.resetPassword('valid-token', 'NewPassword1');
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.OAUTH_UNLINK })
+      );
+      expect(
+        mockMailService.sendOAuthUnlinkedNotification
+      ).not.toHaveBeenCalled();
+    });
+
     it('should complete the reset when the notification fails', async () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
@@ -1583,6 +1646,40 @@ describe('AuthService', () => {
           HttpStatus.UNPROCESSABLE_ENTITY
         );
       }
+    });
+  });
+
+  describe('removeLinkedProviders', () => {
+    it('deletes the providers and reports each with the administrator as actor', async () => {
+      mockOAuthAccountService.removeAllForUser.mockResolvedValue(['facebook']);
+
+      await service.removeLinkedProviders(
+        { id: 'user-1', email: 'new@example.com', locale: 'ru' },
+        {
+          source: 'admin',
+          actor: { actorId: 'admin-1', actorEmail: 'admin@example.com' },
+          auditContext: { ip: '203.0.113.9' }
+        }
+      );
+
+      expect(mockOAuthAccountService.removeAllForUser).toHaveBeenCalledWith(
+        'user-1'
+      );
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.OAUTH_UNLINK,
+          actorId: 'admin-1',
+          actorEmail: 'admin@example.com',
+          targetId: 'user-1',
+          details: { provider: 'facebook', source: 'admin' }
+        })
+      );
+      expect(
+        mockMailService.sendOAuthUnlinkedNotification
+      ).toHaveBeenCalledWith('new@example.com', 'facebook', {
+        locale: 'ru',
+        ip: '203.0.113.9'
+      });
     });
   });
 

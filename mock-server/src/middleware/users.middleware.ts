@@ -31,6 +31,7 @@ import {
   getResolvedPermissionsForUser,
   getState,
   logAudit,
+  removeLinkedProviders,
   revokeUserSessions,
   toAdminUserResponse
 } from '../state';
@@ -441,6 +442,10 @@ router.patch(
       console.log(
         `[PASSWORD CHANGED] To: ${user.email}\n  Source: administrator | IP: ${req.ip}`
       );
+    }
+
+    if (password !== undefined || previousEmail !== undefined) {
+      removeLinkedProviders(user, { actor, source: 'admin', ip: req.ip });
     }
 
     pushUserCrudEvent('updated', id, previous);

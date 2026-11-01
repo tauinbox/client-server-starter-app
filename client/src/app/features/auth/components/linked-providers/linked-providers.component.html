@@ -10,7 +10,17 @@
           <div class="oauth-provider-row">
             <div class="oauth-provider-info">
               <mat-icon [svgIcon]="provider"></mat-icon>
-              <span>{{ t('auth.providers.' + provider) }}</span>
+              <div class="oauth-provider-text">
+                <span>{{ t('auth.providers.' + provider) }}</span>
+                @let since = linkedAt(provider);
+                @if (since) {
+                  <span class="oauth-provider-since">{{
+                    t('auth.profile.linkedSince', {
+                      date: (since | localizedDate: 'mediumDate')
+                    })
+                  }}</span>
+                }
+              </div>
             </div>
             @if (isProviderLinked(provider)) {
               <button

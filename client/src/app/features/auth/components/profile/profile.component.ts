@@ -26,6 +26,7 @@ import {
 } from '@angular/forms/signals';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { MatButton } from '@angular/material/button';
+import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
 import { DOCUMENT } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
@@ -178,6 +179,7 @@ function canonicalEmail(value: string | undefined): string {
     MatChipAvatar,
     MatProgressSpinner,
     MatButton,
+    MatCheckbox,
     MatIcon,
     LocalizedDatePipe,
     PasswordToggleComponent,
@@ -291,6 +293,28 @@ export class ProfileComponent implements OnInit {
 
   protected readonly passwordTyped = computed(
     () => !!this.profileModel().password
+  );
+
+  /**
+   * A new password that replaces the old one can also disconnect the linked
+   * providers: one that someone else linked while knowing the old password
+   * would keep signing in. A first password replaces nothing, and the provider
+   * is how that account gets in, so it is not offered there.
+   */
+  protected readonly offerProviderRemoval = computed(
+    () =>
+      this.passwordTyped() &&
+      !!this.user()?.hasPassword &&
+      this.oauthAccounts().length > 0
+  );
+
+  /** On by default; the owner turns it off to keep their own providers. */
+  protected readonly removeProviders = signal(true);
+
+  protected readonly linkedProvidersLabel = computed(() =>
+    this.oauthAccounts()
+      .map((account) => this.#providerLabel(account.provider))
+      .join(', ')
   );
 
   /**
@@ -931,6 +955,9 @@ export class ProfileComponent implements OnInit {
       return {
         ...updateData,
         password: values.password,
+        ...(this.offerProviderRemoval()
+          ? { removeLinkedProviders: this.removeProviders() }
+          : {}),
         ...this.#stepUpRequest(values)
       };
     }

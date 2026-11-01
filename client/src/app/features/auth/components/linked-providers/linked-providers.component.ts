@@ -26,6 +26,7 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { OAUTH_PROVIDER_FLAGS, STEP_UP_OPERATION } from '@app/shared/constants';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
@@ -69,6 +70,7 @@ type StepUpPromptMode = 'link' | 'unlink';
     MatProgressSpinner,
     NxsFormFieldComponent,
     PasswordToggleComponent,
+    LocalizedDatePipe,
     TranslocoDirective
   ],
   templateUrl: './linked-providers.component.html',
@@ -168,12 +170,18 @@ export class LinkedProvidersComponent {
     return this.accounts().some((a) => a.provider === provider);
   }
 
+  /** The date shown helps the owner spot a provider that they did not link. */
+  linkedAt(provider: string): string | null {
+    return (
+      this.accounts().find((a) => a.provider === provider)?.createdAt ?? null
+    );
+  }
+
   /**
-   * A link plants a credential the account owner cannot revoke by changing
-   * their password, so it asks for a factor first. An account that holds a
-   * password or an authenticator types it here; an account with neither proves
-   * itself at its provider, which is a round trip of its own before the one
-   * that does the linking.
+   * A link plants a credential that outlives every session, so it asks for a
+   * factor first. An account that holds a password or an authenticator types
+   * it here; an account with neither proves itself at its provider, which is a
+   * round trip of its own before the one that does the linking.
    */
   connectProvider(provider: string): void {
     if (!isOAuthProvider(provider)) return;
@@ -190,8 +198,8 @@ export class LinkedProvidersComponent {
   }
 
   /**
-   * The row an unlink deletes is a sign-in credential that a password change
-   * does not revoke, so removing one costs the factor that adding one costs.
+   * The row an unlink deletes is a sign-in credential that outlives every
+   * session, so removing one costs the factor that adding one costs.
    * An account with neither a password nor an authenticator proves itself at a
    * provider it still holds.
    */

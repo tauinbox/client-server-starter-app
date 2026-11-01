@@ -333,6 +333,7 @@ describe('Admin email change - session revocation through the real event bus', (
           provide: AuthService,
           useValue: {
             assertStepUp: jest.fn(),
+            removeLinkedProviders: jest.fn().mockResolvedValue(undefined),
             revokeAllUserSessions: (userId: string) =>
               AuthService.prototype.revokeAllUserSessions.call(
                 { refreshTokenService, dataSource },

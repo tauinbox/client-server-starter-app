@@ -17,8 +17,6 @@ describe('OAuthAccountService', () => {
   let mockRepository: {
     findOne: jest.Mock;
     find: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
     delete: jest.Mock;
   };
   let mockManager: {
@@ -31,8 +29,6 @@ describe('OAuthAccountService', () => {
     mockRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
       delete: jest.fn()
     };
 
@@ -101,33 +97,6 @@ describe('OAuthAccountService', () => {
         'unknown'
       );
       expect(result).toBeNull();
-    });
-  });
-
-  describe('createOAuthAccount', () => {
-    it('should create and save an OAuth account', async () => {
-      const mockAccount = {
-        id: '1',
-        provider: 'google',
-        providerId: '12345',
-        userId: 'user-1'
-      };
-      mockRepository.create.mockReturnValue(mockAccount);
-      mockRepository.save.mockResolvedValue(mockAccount);
-
-      const result = await service.createOAuthAccount(
-        'user-1',
-        'google',
-        '12345'
-      );
-
-      expect(mockRepository.create).toHaveBeenCalledWith({
-        userId: 'user-1',
-        provider: 'google',
-        providerId: '12345'
-      });
-      expect(mockRepository.save).toHaveBeenCalledWith(mockAccount);
-      expect(result).toEqual(mockAccount);
     });
   });
 

@@ -19,6 +19,7 @@ import {
 import isLength from 'validator/lib/isLength';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
+  booleanErrors,
   emailErrors,
   nameErrors,
   newPasswordErrors,
@@ -43,6 +44,7 @@ import {
   isMfaMandatoryFor,
   logAudit,
   registerSession,
+  removeLinkedProviders,
   revokeUserSessions,
   sessionAgeMs,
   toUserResponse
@@ -84,7 +86,12 @@ import {
 } from '../helpers/reauth.helpers';
 
 /** The own fields of `UpdateProfileDto`, beside the step-up factors. */
-const PROFILE_FIELDS = ['name', 'password', 'locale'] as const;
+const PROFILE_FIELDS = [
+  'name',
+  'password',
+  'removeLinkedProviders',
+  'locale'
+] as const;
 
 /** Mirrors `@IsString() @IsNotEmpty() @MaxLength(512)` on a mailed `token`. */
 function mailedTokenErrors(value: unknown): string[] {
@@ -587,6 +594,11 @@ router.post('/reset-password', (req, res) => {
   console.log(
     `[PASSWORD CHANGED] To: ${user.email}\n  Source: reset link | IP: ${req.ip}`
   );
+  removeLinkedProviders(user, {
+    actor: user,
+    source: 'password_reset',
+    ip: req.ip
+  });
 
   res.json({ message: 'Password has been reset successfully' });
 });
@@ -802,13 +814,20 @@ router.patch(
   '/profile',
   permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
   (req, res) => {
-    const { password, currentPassword, code, locale } = req.body;
+    const {
+      password,
+      currentPassword,
+      code,
+      locale,
+      removeLinkedProviders: unlinkRequested
+    } = req.body;
     const name = trimName(req.body['name']);
     const { user } = req as AuthenticatedRequest;
 
     const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS, [
       ...nameErrors(name, 'definedOnly'),
       ...newPasswordErrors(password, 'definedOnly'),
+      ...booleanErrors('removeLinkedProviders', unlinkRequested, 'definedOnly'),
       ...oneOfErrors('locale', locale, {
         values: SUPPORTED_LOCALES,
         optional: 'definedOnly'
@@ -849,8 +868,15 @@ router.patch(
     if (typeof name === 'string') user.name = name;
     if (locale !== undefined) user.locale = locale as string;
     if (password !== undefined) {
+      // A first password replaces nothing, so it keeps the providers.
+      const replacesPassword = user.password !== null;
       user.password = password;
       clearMailedProofs(user);
+
+      // End every session on password change (matches real server).
+      revokeUserSessions(user.id);
+      clearRefreshTokenCookie(res);
+      clearOAuthIntentCookies(res);
 
       logAudit('PASSWORD_CHANGE', {
         actorId: user.id,
@@ -861,14 +887,23 @@ router.patch(
         ip: req.ip
       });
 
-      console.log(
-        `[PASSWORD CHANGED] To: ${user.email}\n  Source: profile page | IP: ${req.ip}`
+      if (unlinkRequested === true && replacesPassword) {
+        removeLinkedProviders(user, {
+          actor: user,
+          source: 'self',
+          ip: req.ip
+        });
+      }
+      const stillLinked = (getState().oauthAccounts.get(user.id) ?? []).map(
+        (a) => a.provider
       );
 
-      // End every session on password change (matches real server).
-      revokeUserSessions(user.id);
-      clearRefreshTokenCookie(res);
-      clearOAuthIntentCookies(res);
+      console.log(
+        `[PASSWORD CHANGED] To: ${user.email}\n  Source: profile page | IP: ${req.ip}` +
+          (stillLinked.length > 0
+            ? `\n  Still linked: ${stillLinked.join(', ')}`
+            : '')
+      );
     }
     user.updatedAt = new Date().toISOString();
     if (previous.name !== user.name) {
