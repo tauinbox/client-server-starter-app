@@ -1911,8 +1911,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3175 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 859 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 837 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3187 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 864 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 842 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1633 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 343 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1384 tests pass |
@@ -2012,7 +2012,10 @@ a second request to the registry for a verdict that gates nothing.
   administrator change both clear `passwordResetToken`, `passwordResetExpiresAt` and the
   `pendingEmail` trio in the same write. Thus a reset link kept from before the change, and a
   confirmation link for an email change in progress, are both dead after the change. The reset path
-  has cleared the same five columns since it was written.
+  has cleared the same five columns since it was written. A request that read the account before
+  such a change and writes after it loses: a reset link or a verification token is not mailed to an
+  address that an administrator moved, and an email change or a self-service password change whose
+  step-up ran before a reset answers 401 `errors.auth.tokenRevoked` and writes nothing.
 - An **administrator email change** does the same. The endpoint exists to recover an account whose
   address an attacker controls. Thus the previous holder must not continue to authenticate with the
   tokens from before the change. A resubmitted address that does not change revokes nothing.

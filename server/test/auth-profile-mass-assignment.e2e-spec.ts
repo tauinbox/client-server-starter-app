@@ -144,7 +144,8 @@ describe('Profile mass-assignment protection (e2e)', () => {
     expect(usersService.update).toHaveBeenCalledWith(
       'user-1',
       { name: 'x' },
-      SYSTEM_ABILITY
+      SYSTEM_ABILITY,
+      { expected: undefined }
     );
   });
 });

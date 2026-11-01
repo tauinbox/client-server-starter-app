@@ -2,7 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
-import type { UserAuditRows } from '../services/users.service';
+import type {
+  UserAuditRows,
+  UserUpdateOptions
+} from '../services/users.service';
 import type { User } from '../entities/user.entity';
 import { MailService } from '../../mail/mail.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -126,10 +129,10 @@ describe('UsersController', () => {
         return created;
       },
       update: async (
-        ...args: [string, unknown, AppAbility, string, UserAuditRows?]
+        ...args: [string, unknown, AppAbility, UserUpdateOptions?]
       ) => {
         const updated: unknown = await usersServiceMock.update(...args);
-        await writeRows(updated, args[4]);
+        await writeRows(updated, args[3]?.audit);
         return updated;
       },
       remove: async (...args: [string, AppAbility, string, UserAuditRows?]) => {
@@ -440,8 +443,11 @@ describe('UsersController', () => {
           'user-5',
           { password: 'NewPassword1' },
           mockAbility,
-          'user-1',
-          expect.any(Function)
+          {
+            actorId: 'user-1',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            audit: expect.any(Function)
+          }
         );
         expect(auditServiceMock.log).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -464,8 +470,11 @@ describe('UsersController', () => {
         'user-5',
         dto,
         mockAbility,
-        'user-1',
-        expect.any(Function)
+        {
+          actorId: 'user-1',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          audit: expect.any(Function)
+        }
       );
       expect(result).toBe(updatedUser);
     });
@@ -1077,8 +1086,11 @@ describe('UsersController', () => {
           'user-5',
           { isActive: false },
           mockAbility,
-          'user-1',
-          expect.any(Function)
+          {
+            actorId: 'user-1',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            audit: expect.any(Function)
+          }
         );
       });
     });

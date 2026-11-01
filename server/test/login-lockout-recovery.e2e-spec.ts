@@ -90,6 +90,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     await usersService.setPasswordResetToken(
       user.id,
+      user.email,
       hashToken(rawToken),
       new Date(Date.now() + 30 * 60 * 1000)
     );
