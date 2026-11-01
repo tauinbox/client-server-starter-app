@@ -281,7 +281,7 @@ export class OAuthService {
           'This OAuth account is already linked to another user'
         );
       }
-      // Already linked to this user — safe to ignore
+      // Already linked to this user: safe to ignore
       if (existing) {
         return this.intentHolder(userId, linkTokenIssuedAt);
       }
