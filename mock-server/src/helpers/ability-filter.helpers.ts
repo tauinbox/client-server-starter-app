@@ -16,8 +16,10 @@ import type { MockUser } from '../types';
 export function filterByAbility<T extends object>(
   records: T[],
   user: MockUser,
-  action: Actions,
-  subjectName: AbilityFilterSubject
+  {
+    action,
+    subjectName
+  }: { action: Actions; subjectName: AbilityFilterSubject }
 ): T[] {
   const ability = buildAbilityForUser(user);
   if (ability.can('manage', 'all') || ability.can(action, 'all')) {

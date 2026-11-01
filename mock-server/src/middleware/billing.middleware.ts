@@ -119,7 +119,10 @@ function cancelBodyErrors(body: unknown): string[] {
   const fields = body as Record<string, unknown> | undefined;
   return [
     ...unknownPropertyErrors(body, CANCEL_KEYS),
-    ...oneOfErrors('mode', fields?.['mode'], CANCEL_MODES, 'definedOnly')
+    ...oneOfErrors('mode', fields?.['mode'], {
+      values: CANCEL_MODES,
+      optional: 'definedOnly'
+    })
   ];
 }
 
@@ -461,12 +464,10 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
   }
 
   const windowStart = meteredWindowStart(sub);
-  const totalUnits = sumPlanMeterUnits(
-    plan,
-    sub.id,
-    windowStart,
-    sub.currentPeriodEnd
-  );
+  const totalUnits = sumPlanMeterUnits(plan, sub.id, {
+    startIso: windowStart,
+    endIso: sub.currentPeriodEnd
+  });
 
   const rated = rateUsage({ totalUnits, price });
   const summary: UsageSummaryResponse = {
@@ -1194,7 +1195,7 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
   if (
     rejectInvalid(res, [
       ...unknownPropertyErrors(req.body, ['region']),
-      ...oneOfErrors('region', region, ['auto', 'ru', 'world'])
+      ...oneOfErrors('region', region, { values: ['auto', 'ru', 'world'] })
     ])
   ) {
     return;
@@ -1264,10 +1265,17 @@ const billingAdminRouter = Router();
 // target types and projected detail fields.
 function auditAdminAction(
   req: Request,
-  action: string,
-  targetType: string,
-  targetId: string,
-  details: Record<string, unknown>
+  {
+    action,
+    targetType,
+    targetId,
+    details
+  }: {
+    action: string;
+    targetType: string;
+    targetId: string;
+    details: Record<string, unknown>;
+  }
 ): void {
   const { user } = req as AuthenticatedRequest;
   logAudit(action, {
@@ -1339,13 +1347,12 @@ billingAdminRouter.post(
       return;
     }
     if (!cancelOpenSubscription(res, sub, mode)) return;
-    auditAdminAction(
-      req,
-      'BILLING_SUBSCRIPTION_CANCEL',
-      'Subscription',
-      sub.id,
-      { mode }
-    );
+    auditAdminAction(req, {
+      action: 'BILLING_SUBSCRIPTION_CANCEL',
+      targetType: 'Subscription',
+      targetId: sub.id,
+      details: { mode }
+    });
     res.json(toSubscriptionResponse(sub));
   }
 );
@@ -1444,8 +1451,13 @@ billingAdminRouter.post(
       revokeOneTimeEffects(invoice);
     }
     invoice.updatedAt = new Date().toISOString();
-    auditAdminAction(req, 'BILLING_INVOICE_REFUND', 'Invoice', invoice.id, {
-      amountMinor: amountMinor ?? null
+    auditAdminAction(req, {
+      action: 'BILLING_INVOICE_REFUND',
+      targetType: 'Invoice',
+      targetId: invoice.id,
+      details: {
+        amountMinor: amountMinor ?? null
+      }
     });
     res.json(toInvoiceResponse(invoice));
   }
@@ -1480,15 +1492,14 @@ billingAdminRouter.post(
     event.status = 'received';
     event.attempts = 0;
     event.lastError = null;
-    auditAdminAction(
-      req,
-      'BILLING_WEBHOOK_EVENT_REPLAY',
-      'WebhookEvent',
-      event.id,
-      {
+    auditAdminAction(req, {
+      action: 'BILLING_WEBHOOK_EVENT_REPLAY',
+      targetType: 'WebhookEvent',
+      targetId: event.id,
+      details: {
         status: 'received'
       }
-    );
+    });
     res.json({ id: event.id, status: 'received' });
   }
 );
@@ -1547,17 +1558,16 @@ billingAdminRouter.post(
     if (existing) {
       // The server audits by response, so an idempotent replay is recorded too,
       // pointing at the original record's id.
-      auditAdminAction(
-        req,
-        'BILLING_USAGE_RECORD',
-        'UsageRecord',
-        existing.id,
-        {
+      auditAdminAction(req, {
+        action: 'BILLING_USAGE_RECORD',
+        targetType: 'UsageRecord',
+        targetId: existing.id,
+        details: {
           customerId,
           meterKey,
           quantity
         }
-      );
+      });
       res.status(201).json(toUsageResponse(existing));
       return;
     }
@@ -1642,10 +1652,15 @@ billingAdminRouter.post(
       recordedAt: now
     };
     state.billingUsageRecords.set(record.id, record);
-    auditAdminAction(req, 'BILLING_USAGE_RECORD', 'UsageRecord', record.id, {
-      customerId,
-      meterKey,
-      quantity
+    auditAdminAction(req, {
+      action: 'BILLING_USAGE_RECORD',
+      targetType: 'UsageRecord',
+      targetId: record.id,
+      details: {
+        customerId,
+        meterKey,
+        quantity
+      }
     });
     res.status(201).json(toUsageResponse(record));
   }

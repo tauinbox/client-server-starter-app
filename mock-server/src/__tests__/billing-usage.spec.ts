@@ -97,8 +97,7 @@ async function activateSubscription(
 async function seedUsage(
   customerId: string,
   quantity: number,
-  occurredAt?: string,
-  meterKey?: string
+  { occurredAt, meterKey }: { occurredAt?: string; meterKey?: string } = {}
 ): Promise<void> {
   const res = await fetch(`${baseUrl}/__control/billing/seed-usage`, {
     method: 'POST',
@@ -140,10 +139,12 @@ describe('GET /api/v1/billing/usage parity with server', () => {
     await seedUsage(customerId, 30);
     await seedUsage(customerId, 12);
     // Outside the current period — must not count.
-    await seedUsage(customerId, 999, '2000-01-01T00:00:00.000Z');
+    await seedUsage(customerId, 999, {
+      occurredAt: '2000-01-01T00:00:00.000Z'
+    });
     // Recorded against the same subscription under another product's meter —
     // the plan does not price it, so it must not count either.
-    await seedUsage(customerId, 500, undefined, 'other_product_calls');
+    await seedUsage(customerId, 500, { meterKey: 'other_product_calls' });
 
     const res = await getUsage(token);
     expect(res.status).toBe(200);

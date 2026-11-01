@@ -200,7 +200,7 @@ export class MfaService {
       }
     );
     if (!accepted) {
-      this.recordChallengeFailure(user, 'enrolment', context);
+      this.recordChallengeFailure(user, 'enrolment', { context });
       throw this.invalidEnrolmentCodeException();
     }
 
@@ -404,7 +404,10 @@ export class MfaService {
     }
 
     if (!(await this.consumeTotp(user, code))) {
-      this.recordChallengeFailure(user, 'challenge', context, count);
+      this.recordChallengeFailure(user, 'challenge', {
+        context,
+        attempt: count
+      });
 
       if (count >= MAX_FAILED_ATTEMPTS) {
         throw this.challengeLockedException(remainingMs);
@@ -449,7 +452,7 @@ export class MfaService {
     );
 
     if (remaining === null) {
-      this.recordChallengeFailure(user, 'recovery_code', context);
+      this.recordChallengeFailure(user, 'recovery_code', { context });
       throw new ApiError(
         ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE,
         'Recovery code is invalid or was already used'
@@ -500,7 +503,7 @@ export class MfaService {
     }
 
     if (!(await this.consumeTotp(user, code))) {
-      this.recordChallengeFailure(user, 'step_up', context, count);
+      this.recordChallengeFailure(user, 'step_up', { context, attempt: count });
 
       if (count >= MAX_FAILED_ATTEMPTS) {
         return { kind: 'refused', lockedMs: remainingMs };
@@ -683,8 +686,7 @@ export class MfaService {
   private recordChallengeFailure(
     user: User,
     stage: 'enrolment' | 'challenge' | 'recovery_code' | 'step_up',
-    context?: AuditContext,
-    attempt?: number
+    { context, attempt }: { context?: AuditContext; attempt?: number } = {}
   ): void {
     this.auditService.logFireAndForget({
       action: AuditAction.MFA_CHALLENGE_FAILURE,

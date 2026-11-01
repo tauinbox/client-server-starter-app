@@ -90,14 +90,21 @@ runWithRedis('server pushes across instances (e2e)', () => {
     if (!permission) throw new Error('Permission search:User missing');
     searchUser = permission;
     const roleService = first.get(RoleService);
-    role = await roleService.create({ name: roleName }, SYSTEM_ABILITY);
+    role = await roleService.create(
+      { name: roleName },
+      { ability: SYSTEM_ABILITY }
+    );
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: searchUser.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(viewer.id, role.id, SYSTEM_ABILITY);
-    await roleService.assignRoleToUser(idle.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(viewer.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
+    await roleService.assignRoleToUser(idle.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     // Both instances listen before any push is raised.
     const channel = `${namespace}:push:${redis.options.db ?? 0}`;
@@ -231,11 +238,9 @@ runWithRedis('server pushes across instances (e2e)', () => {
     try {
       await first
         .get(RoleService)
-        .setPermissionsForRole(
-          role.id,
-          [{ permissionId: searchUser.id }],
-          SYSTEM_ABILITY
-        );
+        .setPermissionsForRole(role.id, [{ permissionId: searchUser.id }], {
+          ability: SYSTEM_ABILITY
+        });
 
       await settle(viewerOnSecond, 1);
       expect(viewerOnSecond()).toEqual([{ type: 'permissions_updated' }]);

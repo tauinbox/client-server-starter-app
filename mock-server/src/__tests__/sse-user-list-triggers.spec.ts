@@ -97,8 +97,7 @@ const wait = (ms: number): Promise<void> =>
 async function call(
   method: string,
   path: string,
-  token: string | null,
-  body?: unknown
+  { token, body }: { token: string | null; body?: unknown }
 ): Promise<number> {
   const res = await fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -123,10 +122,13 @@ describe('SSE user list events outside the admin user routes', () => {
     const plain = await openStream('user@example.com');
 
     expect(
-      await call('POST', '/auth/register', null, {
-        email: 'sse-registered@example.com',
-        password: 'Sunrise-Kettle-19',
-        name: 'Self Registered'
+      await call('POST', '/auth/register', {
+        token: null,
+        body: {
+          email: 'sse-registered@example.com',
+          password: 'Sunrise-Kettle-19',
+          name: 'Self Registered'
+        }
       })
     ).toBe(201);
 
@@ -144,12 +146,17 @@ describe('SSE user list events outside the admin user routes', () => {
     const admin = await openStream('admin@example.com');
 
     expect(
-      await call('POST', `/roles/assign/${target.id}`, adminToken, {
-        roleId: ROLE_ID
+      await call('POST', `/roles/assign/${target.id}`, {
+        token: adminToken,
+        body: {
+          roleId: ROLE_ID
+        }
       })
     ).toBe(201);
     expect(
-      await call('DELETE', `/roles/assign/${target.id}/${ROLE_ID}`, adminToken)
+      await call('DELETE', `/roles/assign/${target.id}/${ROLE_ID}`, {
+        token: adminToken
+      })
     ).toBe(200);
 
     await wait(100);
@@ -166,10 +173,16 @@ describe('SSE user list events outside the admin user routes', () => {
     const admin = await openStream('admin@example.com');
 
     expect(
-      await call('PATCH', '/auth/profile', userToken, { locale: 'ru' })
+      await call('PATCH', '/auth/profile', {
+        token: userToken,
+        body: { locale: 'ru' }
+      })
     ).toBe(200);
     expect(
-      await call('PATCH', '/auth/profile', userToken, { name: 'Renamed' })
+      await call('PATCH', '/auth/profile', {
+        token: userToken,
+        body: { name: 'Renamed' }
+      })
     ).toBe(200);
 
     await wait(100);
@@ -185,8 +198,11 @@ describe('SSE user list events outside the admin user routes', () => {
     const admin = await openStream('admin@example.com');
 
     expect(
-      await call('POST', '/auth/profile/email/confirm', null, {
-        token: 'sse-token'
+      await call('POST', '/auth/profile/email/confirm', {
+        token: null,
+        body: {
+          token: 'sse-token'
+        }
       })
     ).toBe(200);
 
@@ -201,9 +217,14 @@ describe('SSE user list events outside the admin user routes', () => {
     const plain = await openStream('user@example.com');
 
     expect(
-      await call('PATCH', `/roles/${ROLE_ID}`, adminToken, { name: 'renamed' })
+      await call('PATCH', `/roles/${ROLE_ID}`, {
+        token: adminToken,
+        body: { name: 'renamed' }
+      })
     ).toBe(200);
-    expect(await call('DELETE', `/roles/${ROLE_ID}`, adminToken)).toBe(200);
+    expect(
+      await call('DELETE', `/roles/${ROLE_ID}`, { token: adminToken })
+    ).toBe(200);
 
     await wait(100);
     admin.close();

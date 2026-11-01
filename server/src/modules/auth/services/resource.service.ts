@@ -34,8 +34,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceActionsChangedEvent } from '../events/resource-actions-changed.event';
 import { subject } from '@casl/ability';
 import { withChanges } from '@app/shared/utils/changed-fields';
-import { assertCan } from '../../../common/utils/assert-can.util';
-import { refuseAccess } from '../../../common/utils/refuse-access.util';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { auditContextOf } from '../casl/ability-context';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import type { AbilityOrSystem } from '../casl/app-ability';
@@ -47,6 +46,12 @@ const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map:v3';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
 const SUBJECT_MAP_VERSION_KEY = 'rbac:subject_map:version';
 const SUBJECT_MAP_VERSION_COUNTER_KEY = 'rbac:subject_map:version:counter';
+
+export interface ResourceWriteOptions<A> {
+  ability: AbilityOrSystem;
+  actorId?: string;
+  audit?: A;
+}
 
 @Injectable()
 export class ResourceService {
@@ -61,6 +66,7 @@ export class ResourceService {
     private readonly registry: ResourceRegistryService,
     private readonly metrics: MetricsService,
     private readonly auditService: AuditService,
+    private readonly accessRefusals: AccessRefusalService,
     private readonly eventEmitter: EventEmitter2
   ) {
     this.#subjectMapVersion = new CacheVersionCounter(
@@ -80,8 +86,7 @@ export class ResourceService {
   ): Promise<CursorPaginatedResponseDto<Resource>> {
     const page = await applyList(
       this.resourceRepository.createQueryBuilder('resource'),
-      RESOURCE_LIST_QUERY,
-      RESOURCE_LIST_COLUMNS,
+      { spec: RESOURCE_LIST_QUERY, columns: RESOURCE_LIST_COLUMNS },
       query
     );
     for (const resource of page.data) {
@@ -116,14 +121,13 @@ export class ResourceService {
     actorId?: string
   ): void {
     if (ability === SYSTEM_ABILITY) return;
-    assertCan(
-      ability,
-      'update',
-      subject('Permission', record),
-      this.auditService,
-      { actorId, targetId: record.id, targetType: 'Resource' },
-      this.metrics
-    );
+    this.accessRefusals.assertCan(ability, {
+      action: 'update',
+      subject: subject('Permission', record),
+      actorId,
+      targetId: record.id,
+      targetType: 'Resource'
+    });
   }
 
   /** `audit` gets the resource as it is before the write. */
@@ -134,9 +138,11 @@ export class ResourceService {
       description?: string | null;
       allowedActionNames?: string[] | null;
     },
-    ability: AbilityOrSystem,
-    actorId?: string,
-    audit?: (before: Resource) => AuditLogParams
+    {
+      ability,
+      actorId,
+      audit
+    }: ResourceWriteOptions<(before: Resource) => AuditLogParams>
   ): Promise<Resource> {
     const resource = await this.loadResource(id);
     // The record after the write is checked too: else a grant scoped by a
@@ -154,12 +160,10 @@ export class ResourceService {
       );
     }
     if (data.allowedActionNames !== undefined) {
-      this.assertCanWiden(
-        ability,
-        resource,
-        reofferedActionNames(resource, data.allowedActionNames),
+      this.assertCanWiden(ability, resource, {
+        reEnabled: reofferedActionNames(resource, data.allowedActionNames),
         actorId
-      );
+      });
     }
     const grantsChange =
       data.allowedActionNames !== undefined &&
@@ -180,8 +184,7 @@ export class ResourceService {
   private assertCanWiden(
     ability: AbilityOrSystem,
     resource: Resource,
-    reEnabled: string[],
-    actorId?: string
+    { reEnabled, actorId }: { reEnabled: string[]; actorId?: string }
   ): void {
     if (
       reEnabled.length === 0 ||
@@ -190,9 +193,7 @@ export class ResourceService {
     ) {
       return;
     }
-    refuseAccess(
-      this.auditService,
-      this.metrics,
+    this.accessRefusals.refuse(
       {
         auditAction: AuditAction.PERMISSION_GRANT_DENIED,
         actorId,
@@ -225,7 +226,7 @@ export class ResourceService {
     audit?: AuditLogParams
   ): Promise<Resource> {
     return this.resourceRepository.manager.transaction(async (em) => {
-      if (!(await keyedUpdate(em, Resource, { id }, changes))) {
+      if (!(await keyedUpdate(em, Resource, { where: { id }, changes }))) {
         throw resourceNotFound();
       }
       if (audit) await this.auditService.log(audit, em);
@@ -265,9 +266,7 @@ export class ResourceService {
 
   async restore(
     id: string,
-    ability: AbilityOrSystem,
-    actorId?: string,
-    audit?: AuditLogParams
+    { ability, actorId, audit }: ResourceWriteOptions<AuditLogParams>
   ): Promise<Resource> {
     const resource = await this.loadResource(id);
     this.assertCanUpdate(ability, resource, actorId);
@@ -279,7 +278,7 @@ export class ResourceService {
     }
     if (!resource.isOrphaned) throw notOrphaned(resource);
     const woken = grantableActionNames(resource);
-    this.assertCanWiden(ability, resource, woken, actorId);
+    this.assertCanWiden(ability, resource, { reEnabled: woken, actorId });
     // Keyed on the orphaned state, so of two concurrent restores one writes
     // and audits and the other is refused.
     await this.resourceRepository.manager.transaction(async (em) => {

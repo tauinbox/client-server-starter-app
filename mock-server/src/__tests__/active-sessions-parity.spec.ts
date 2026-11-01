@@ -78,8 +78,7 @@ async function providerSignIn(userId: string): Promise<Device> {
 function revoke(
   caller: Device,
   target: string | null,
-  body?: unknown,
-  proof?: string
+  { body, proof }: { body?: unknown; proof?: string } = {}
 ): Promise<Response> {
   const path = target === null ? '' : `/${target}`;
   return fetch(`${baseUrl}/api/v1/auth/sessions${path}`, {
@@ -166,7 +165,9 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
     const a = await signIn(EMAIL, 'Device-A');
     const b = await signIn(EMAIL, 'Device-B');
 
-    const res = await revoke(a, b.sessionId, { currentPassword: PASSWORD });
+    const res = await revoke(a, b.sessionId, {
+      body: { currentPassword: PASSWORD }
+    });
 
     expect(res.status).toBe(200);
     await expect(profileStatus(b)).resolves.toBe(401);
@@ -181,7 +182,7 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
     const foreign = await signIn(OTHER_EMAIL, 'Device-X');
 
     for (const id of [randomUUID(), foreign.sessionId]) {
-      const res = await revoke(a, id, { currentPassword: PASSWORD });
+      const res = await revoke(a, id, { body: { currentPassword: PASSWORD } });
       expect(res.status).toBe(404);
       expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
         ErrorKeys.AUTH.SESSION_NOT_FOUND
@@ -193,7 +194,9 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
   it('refuses the session of the caller', async () => {
     const a = await signIn(EMAIL, 'Device-A');
 
-    const res = await revoke(a, a.sessionId, { currentPassword: PASSWORD });
+    const res = await revoke(a, a.sessionId, {
+      body: { currentPassword: PASSWORD }
+    });
 
     expect(res.status).toBe(403);
     expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
@@ -205,7 +208,9 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
   it('rejects a malformed id the way ParseUUIDPipe does', async () => {
     const a = await signIn(EMAIL, 'Device-A');
 
-    const res = await revoke(a, 'not-a-uuid', { currentPassword: PASSWORD });
+    const res = await revoke(a, 'not-a-uuid', {
+      body: { currentPassword: PASSWORD }
+    });
 
     expect(res.status).toBe(400);
     expect(((await res.json()) as { message: string }).message).toBe(
@@ -235,8 +240,8 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
     });
     const { token: proof } = (await proofRes.json()) as { token: string };
 
-    const first = await revoke(caller, desktop.sessionId, {}, proof);
-    const second = await revoke(caller, phone.sessionId, {}, proof);
+    const first = await revoke(caller, desktop.sessionId, { body: {}, proof });
+    const second = await revoke(caller, phone.sessionId, { body: {}, proof });
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(403);
@@ -253,11 +258,13 @@ describe('DELETE /api/v1/auth/sessions', () => {
     const d = await signIn(EMAIL, 'Device-D');
     const foreign = await signIn(OTHER_EMAIL, 'Device-Y');
 
-    const refused = await revoke(a, null, { currentPassword: 'Wrong-00' });
+    const refused = await revoke(a, null, {
+      body: { currentPassword: 'Wrong-00' }
+    });
     expect(refused.status).toBe(403);
     await expect(profileStatus(c)).resolves.toBe(200);
 
-    const res = await revoke(a, null, { currentPassword: PASSWORD });
+    const res = await revoke(a, null, { body: { currentPassword: PASSWORD } });
 
     expect(res.status).toBe(200);
     expect(((await res.json()) as { count: number }).count).toBe(2);

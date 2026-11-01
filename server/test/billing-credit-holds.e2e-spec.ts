@@ -42,6 +42,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import type { OffSessionCharge } from '../src/modules/billing/providers/payment-provider.interface';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -210,8 +211,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
     await ds.transaction((m) =>
       new CreditService(ds.getRepository(CreditBalance)).addPurchase(
         m,
-        customer.id,
-        purchase.id,
+        { customerId: customer.id, invoiceId: purchase.id },
         CREDITS
       )
     );
@@ -238,10 +238,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
       chargeOffSession: jest.fn(
         async (
           _customer: Customer,
-          _amountMinor: number,
-          _currency: string,
-          _items: unknown,
-          key: string
+          { idempotencyKey: key = '' }: OffSessionCharge
         ) => {
           keys.push(key);
           if (keys.length === 1) {

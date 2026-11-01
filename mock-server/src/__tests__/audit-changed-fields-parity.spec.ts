@@ -37,9 +37,11 @@ beforeEach(async () => {
 async function send<T>(
   method: string,
   path: string,
-  body: object,
-  expected: number,
-  ifMatch?: number
+  {
+    body,
+    expected,
+    ifMatch
+  }: { body: object; expected: number; ifMatch?: number }
 ): Promise<T> {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
@@ -69,12 +71,10 @@ describe('audit changedFields parity', () => {
       version: number;
       environments: string[];
       public: boolean;
-    }>(
-      'POST',
-      'admin/feature-flags',
-      { key: 'audit-fields-flag', description: 'old', enabled: true },
-      201
-    );
+    }>('POST', 'admin/feature-flags', {
+      body: { key: 'audit-fields-flag', description: 'old', enabled: true },
+      expected: 201
+    });
     const form = {
       description: 'old',
       enabled: true,
@@ -82,43 +82,39 @@ describe('audit changedFields parity', () => {
       public: flag.public
     };
 
-    await send('PATCH', `admin/feature-flags/${flag.id}`, form, 200, 1);
+    await send('PATCH', `admin/feature-flags/${flag.id}`, {
+      body: form,
+      expected: 200,
+      ifMatch: 1
+    });
     expect(lastChangedFields('FEATURE_FLAG_UPDATE', flag.id)).toEqual([]);
 
-    await send(
-      'PATCH',
-      `admin/feature-flags/${flag.id}`,
-      { ...form, description: 'new' },
-      200,
-      2
-    );
+    await send('PATCH', `admin/feature-flags/${flag.id}`, {
+      body: { ...form, description: 'new' },
+      expected: 200,
+      ifMatch: 2
+    });
     expect(lastChangedFields('FEATURE_FLAG_UPDATE', flag.id)).toEqual([
       'description'
     ]);
   });
 
   it('role: a resubmit logs [] and a description edit logs ["description"]', async () => {
-    const role = await send<{ id: string }>(
-      'POST',
-      'roles',
-      { name: 'audit-fields-role', description: 'old' },
-      201
-    );
+    const role = await send<{ id: string }>('POST', 'roles', {
+      body: { name: 'audit-fields-role', description: 'old' },
+      expected: 201
+    });
 
-    await send(
-      'PATCH',
-      `roles/${role.id}`,
-      { name: 'audit-fields-role', description: 'old' },
-      200
-    );
+    await send('PATCH', `roles/${role.id}`, {
+      body: { name: 'audit-fields-role', description: 'old' },
+      expected: 200
+    });
     expect(lastChangedFields('ROLE_UPDATE', role.id)).toEqual([]);
 
-    await send(
-      'PATCH',
-      `roles/${role.id}`,
-      { name: 'audit-fields-role', description: 'new' },
-      200
-    );
+    await send('PATCH', `roles/${role.id}`, {
+      body: { name: 'audit-fields-role', description: 'new' },
+      expected: 200
+    });
     expect(lastChangedFields('ROLE_UPDATE', role.id)).toEqual(['description']);
   });
 
@@ -132,15 +128,16 @@ describe('audit changedFields parity', () => {
       allowedActionNames: resource.allowedActionNames
     };
 
-    await send('PATCH', `rbac/resources/${resource.id}`, form, 200);
+    await send('PATCH', `rbac/resources/${resource.id}`, {
+      body: form,
+      expected: 200
+    });
     expect(lastChangedFields('RESOURCE_UPDATE', resource.id)).toEqual([]);
 
-    await send(
-      'PATCH',
-      `rbac/resources/${resource.id}`,
-      { ...form, description: 'changed' },
-      200
-    );
+    await send('PATCH', `rbac/resources/${resource.id}`, {
+      body: { ...form, description: 'changed' },
+      expected: 200
+    });
     expect(lastChangedFields('RESOURCE_UPDATE', resource.id)).toEqual([
       'description'
     ]);
@@ -155,10 +152,13 @@ describe('audit changedFields parity', () => {
       isActive: user.isActive
     };
 
-    await send('PATCH', `users/${id}`, form, 200);
+    await send('PATCH', `users/${id}`, { body: form, expected: 200 });
     expect(lastChangedFields('USER_UPDATE', id)).toEqual([]);
 
-    await send('PATCH', `users/${id}`, { ...form, name: 'Renamed' }, 200);
+    await send('PATCH', `users/${id}`, {
+      body: { ...form, name: 'Renamed' },
+      expected: 200
+    });
     expect(lastChangedFields('USER_UPDATE', id)).toEqual(['name']);
   });
 
@@ -166,12 +166,18 @@ describe('audit changedFields parity', () => {
     const id = mockId('user-3');
     const user = getState().users.get(id)!;
 
-    await send('PATCH', `users/${id}`, { unlockAccount: true }, 200);
+    await send('PATCH', `users/${id}`, {
+      body: { unlockAccount: true },
+      expected: 200
+    });
     expect(lastChangedFields('USER_UPDATE', id)).toEqual([]);
 
     user.failedLoginAttempts = 5;
     user.lockedUntil = new Date(Date.now() + 60_000).toISOString();
-    await send('PATCH', `users/${id}`, { unlockAccount: true }, 200);
+    await send('PATCH', `users/${id}`, {
+      body: { unlockAccount: true },
+      expected: 200
+    });
     expect(lastChangedFields('USER_UPDATE', id)).toEqual(['unlockAccount']);
   });
 });

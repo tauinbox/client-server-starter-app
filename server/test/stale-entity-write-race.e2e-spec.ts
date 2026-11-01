@@ -61,12 +61,14 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
 
     const admin = await usersService.create(
       { email: adminEmail, password, name: 'Stale Write' },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await roleService.assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(admin.id, superRole.id, {
+      ability: SYSTEM_ABILITY
+    });
     const { tokens } = await app
       .get(AuthService)
       .login(await usersService.findOne(admin.id, SYSTEM_ABILITY), {
@@ -183,7 +185,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
         password,
         name: `Target ${label}`
       },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
   }
 
@@ -195,7 +197,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     async (label, body) => {
       const role = await roleService.create(
         { name: `${prefix}-${label}` },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       const barrier = holdFirstTransaction();
 
@@ -264,12 +266,11 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
   it('keeps a password reset that lands before an administrator edit', async () => {
     const user = await createUser('reset');
     const rawToken = `${prefix}-reset-token`;
-    await usersService.setPasswordResetToken(
-      user.id,
-      user.email,
-      hashToken(rawToken),
-      new Date(Date.now() + 60 * 60 * 1000)
-    );
+    await usersService.setPasswordResetToken(user.id, {
+      email: user.email,
+      hashedToken: hashToken(rawToken),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+    });
     const barrier = holdFirstTransaction();
 
     const patch = request(http())

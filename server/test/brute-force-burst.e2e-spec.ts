@@ -155,12 +155,10 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
     const audit = jest.spyOn(auditService, 'logFireAndForget');
 
     await burst(() =>
-      authService.assertStepUp(
-        user,
-        WRONG_PASSWORD,
-        undefined,
-        STEP_UP_OPERATION.PASSWORD_SET
-      )
+      authService.assertStepUp(user, {
+        currentPassword: WRONG_PASSWORD,
+        operation: STEP_UP_OPERATION.PASSWORD_SET
+      })
     );
 
     const checked = audit.mock.calls.filter(

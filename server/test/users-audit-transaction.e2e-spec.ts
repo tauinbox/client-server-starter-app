@@ -69,28 +69,28 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
     const names = { name: 'Users Tx' };
     const admin = await usersService.create(
       { email: adminEmail, password, ...names },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     targetId = (
       await usersService.create(
         { email: targetEmail, password, ...names },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       )
     ).id;
     deletedId = (
       await usersService.create(
         { email: deletedEmail, password, ...names },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       )
     ).id;
-    await usersService.remove(deletedId, SYSTEM_ABILITY);
+    await usersService.remove(deletedId, { ability: SYSTEM_ABILITY });
 
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     await app
       .get(RoleService)
-      .assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
+      .assignRoleToUser(admin.id, superRole.id, { ability: SYSTEM_ABILITY });
     token = await sessionOf(admin.id);
   }, 60000);
 
@@ -315,7 +315,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
       const audit = jest.fn().mockReturnValue([]);
 
       await expect(
-        usersService.restore(targetId, SYSTEM_ABILITY, undefined, audit)
+        usersService.restore(targetId, { ability: SYSTEM_ABILITY, audit })
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.USERS.NOT_DELETED }

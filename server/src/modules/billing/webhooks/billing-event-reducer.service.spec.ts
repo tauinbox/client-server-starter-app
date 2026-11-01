@@ -841,8 +841,7 @@ describe('BillingEventReducer', () => {
 
       expect(won.credits.spendOnUsage).toHaveBeenCalledWith(
         won.manager,
-        'cust-1',
-        'inv-usage',
+        { customerId: 'cust-1', invoiceId: 'inv-usage' },
         10
       );
       expect(replay.credits.spendOnUsage).not.toHaveBeenCalled();
@@ -1195,8 +1194,7 @@ describe('BillingEventReducer', () => {
 
       expect(credits.spendOnUsage).toHaveBeenCalledWith(
         expect.anything(),
-        'cust-1',
-        'inv-1',
+        { customerId: 'cust-1', invoiceId: 'inv-1' },
         10
       );
     });
@@ -1474,8 +1472,7 @@ describe('BillingEventReducer', () => {
 
       expect(credits.addPurchase).toHaveBeenCalledWith(
         expect.anything(),
-        'cust-1',
-        'inv-cr',
+        { customerId: 'cust-1', invoiceId: 'inv-cr' },
         500
       );
       // A credit pack writes no CustomerGrant.
@@ -1563,8 +1560,7 @@ describe('BillingEventReducer', () => {
         );
         expect(credits.addPurchase).toHaveBeenCalledWith(
           expect.anything(),
-          'cust-1',
-          'inv-cr',
+          { customerId: 'cust-1', invoiceId: 'inv-cr' },
           500
         );
       });

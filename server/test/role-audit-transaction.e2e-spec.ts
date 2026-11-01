@@ -79,23 +79,21 @@ runWithInfra(
       const names = { name: 'Role Tx' };
       const admin = await usersService.create(
         { email: adminEmail, password, ...names },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       targetId = (
         await usersService.create(
           { email: targetEmail, password, ...names },
-          SYSTEM_ABILITY
+          { ability: SYSTEM_ABILITY }
         )
       ).id;
 
       const superRole = await dataSource
         .getRepository(Role)
         .findOneByOrFail({ isSuper: true });
-      await roleService.assignRoleToUser(
-        admin.id,
-        superRole.id,
-        SYSTEM_ABILITY
-      );
+      await roleService.assignRoleToUser(admin.id, superRole.id, {
+        ability: SYSTEM_ABILITY
+      });
       token = await sessionOf(admin.id);
 
       const permissions = await dataSource.getRepository(Permission).find();
@@ -108,18 +106,20 @@ runWithInfra(
 
       heldRole = await roleService.create(
         { name: `${prefix}-held` },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       freeRole = await roleService.create(
         { name: `${prefix}-free` },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       await roleService.setPermissionsForRole(
         heldRole.id,
         [{ permissionId: firstPermissionId }],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
-      await roleService.assignRoleToUser(targetId, heldRole.id, SYSTEM_ABILITY);
+      await roleService.assignRoleToUser(targetId, heldRole.id, {
+        ability: SYSTEM_ABILITY
+      });
 
       resourceId = (
         await dataSource.getRepository(Resource).save({
@@ -358,34 +358,80 @@ runWithInfra(
       });
       const row = (
         action: AuditAction,
-        targetType: string,
-        targetId: string,
-        details: Record<string, unknown> | null
+        {
+          targetType,
+          targetId,
+          details
+        }: {
+          targetType: string;
+          targetId: string;
+          details: Record<string, unknown> | null;
+        }
       ) => ({ action, targetType, targetId, details, hasIp: true });
 
       expect(rows.map(shape)).toHaveLength(10);
       expect(rows.map(shape)).toEqual(
         expect.arrayContaining([
-          row(AuditAction.ROLE_CREATE, 'Role', id, { name }),
-          row(AuditAction.ROLE_UPDATE, 'Role', id, {
-            changedFields: ['description']
+          row(AuditAction.ROLE_CREATE, {
+            targetType: 'Role',
+            targetId: id,
+            details: { name }
           }),
-          row(AuditAction.PERMISSION_ASSIGN, 'Role', id, {
-            permissionIds: [firstPermissionId]
+          row(AuditAction.ROLE_UPDATE, {
+            targetType: 'Role',
+            targetId: id,
+            details: {
+              changedFields: ['description']
+            }
           }),
-          row(AuditAction.PERMISSION_ASSIGN, 'Role', id, {
-            permissionIds: [secondPermissionId]
+          row(AuditAction.PERMISSION_ASSIGN, {
+            targetType: 'Role',
+            targetId: id,
+            details: {
+              permissionIds: [firstPermissionId]
+            }
           }),
-          row(AuditAction.PERMISSION_UNASSIGN, 'Role', id, {
-            permissionId: secondPermissionId
+          row(AuditAction.PERMISSION_ASSIGN, {
+            targetType: 'Role',
+            targetId: id,
+            details: {
+              permissionIds: [secondPermissionId]
+            }
           }),
-          row(AuditAction.ROLE_ASSIGN, 'User', targetId, { roleId: id }),
-          row(AuditAction.ROLE_UNASSIGN, 'User', targetId, { roleId: id }),
-          row(AuditAction.ROLE_DELETE, 'Role', id, { name }),
-          row(AuditAction.RESOURCE_UPDATE, 'Resource', resourceId, {
-            changedFields: ['displayName']
+          row(AuditAction.PERMISSION_UNASSIGN, {
+            targetType: 'Role',
+            targetId: id,
+            details: {
+              permissionId: secondPermissionId
+            }
           }),
-          row(AuditAction.RESOURCE_RESTORE, 'Resource', resourceId, null)
+          row(AuditAction.ROLE_ASSIGN, {
+            targetType: 'User',
+            targetId,
+            details: { roleId: id }
+          }),
+          row(AuditAction.ROLE_UNASSIGN, {
+            targetType: 'User',
+            targetId,
+            details: { roleId: id }
+          }),
+          row(AuditAction.ROLE_DELETE, {
+            targetType: 'Role',
+            targetId: id,
+            details: { name }
+          }),
+          row(AuditAction.RESOURCE_UPDATE, {
+            targetType: 'Resource',
+            targetId: resourceId,
+            details: {
+              changedFields: ['displayName']
+            }
+          }),
+          row(AuditAction.RESOURCE_RESTORE, {
+            targetType: 'Resource',
+            targetId: resourceId,
+            details: null
+          })
         ])
       );
     });

@@ -30,8 +30,7 @@ beforeEach(() => {
 function request(
   method: string,
   path: string,
-  body: unknown,
-  accessToken?: string
+  { body, accessToken }: { body: unknown; accessToken?: string }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -44,18 +43,16 @@ function request(
 }
 
 async function accessToken(): Promise<string> {
-  const res = await request('POST', '/auth/login', CREDENTIALS);
+  const res = await request('POST', '/auth/login', { body: CREDENTIALS });
   const body = (await res.json()) as { tokens: { access_token: string } };
   return body.tokens.access_token;
 }
 
 function setup(token: string, currentPassword?: string): Promise<Response> {
-  return request(
-    'POST',
-    '/auth/mfa/setup',
-    currentPassword === undefined ? {} : { currentPassword },
-    token
-  );
+  return request('POST', '/auth/mfa/setup', {
+    body: currentPassword === undefined ? {} : { currentPassword },
+    accessToken: token
+  });
 }
 
 async function guessWrong(token: string, times: number): Promise<void> {
@@ -112,12 +109,10 @@ describe('the step-up password carries a per-account brake', () => {
 
     // The route throttle is keyed by client address and by handler. This is
     // the brake that neither of those can move.
-    const res = await request(
-      'POST',
-      '/auth/profile/email/initiate',
-      { newEmail: 'new@example.com', currentPassword: WRONG_PASSWORD },
-      token
-    );
+    const res = await request('POST', '/auth/profile/email/initiate', {
+      body: { newEmail: 'new@example.com', currentPassword: WRONG_PASSWORD },
+      accessToken: token
+    });
 
     expect(res.status).toBe(423);
     expect(await res.json()).toMatchObject({
@@ -129,12 +124,10 @@ describe('the step-up password carries a per-account brake', () => {
     const token = await accessToken();
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
 
-    const res = await request(
-      'PATCH',
-      '/auth/profile',
-      { password: NEW_PASSWORD, currentPassword: WRONG_PASSWORD },
-      token
-    );
+    const res = await request('PATCH', '/auth/profile', {
+      body: { password: NEW_PASSWORD, currentPassword: WRONG_PASSWORD },
+      accessToken: token
+    });
 
     expect(res.status).toBe(423);
     expect(await res.json()).toMatchObject({
@@ -174,7 +167,7 @@ describe('the step-up password carries a per-account brake', () => {
     // The two counters hold separate namespaces on purpose: a caller who holds
     // a stolen session must not be able to shut the owner out of the way back
     // in.
-    const res = await request('POST', '/auth/login', CREDENTIALS);
+    const res = await request('POST', '/auth/login', { body: CREDENTIALS });
 
     expect(res.status).toBe(200);
   });

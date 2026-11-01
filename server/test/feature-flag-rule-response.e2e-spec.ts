@@ -80,7 +80,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
       .findOneOrFail({ where: { email: adminEmail } });
     await app
       .get(RoleService)
-      .assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
+      .assignRoleToUser(admin.id, superRole.id, { ability: SYSTEM_ABILITY });
     const { tokens } = await app
       .get(AuthService)
       .login(await app.get(UsersService).findOne(admin.id, SYSTEM_ABILITY), {

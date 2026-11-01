@@ -47,9 +47,7 @@ async function login(email: string): Promise<string> {
 
 function send(
   token: string,
-  method: string,
-  path: string,
-  body?: unknown
+  { method, path, body }: { method: string; path: string; body?: unknown }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -90,7 +88,11 @@ describe('PATCH /auth/profile', () => {
   it.each(['', '   '])('rejects the name %j', async (name) => {
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'PATCH', '/auth/profile', { name });
+    const res = await send(token, {
+      method: 'PATCH',
+      path: '/auth/profile',
+      body: { name }
+    });
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
@@ -100,7 +102,11 @@ describe('PATCH /auth/profile', () => {
   it('reports both rules for an explicit null', async () => {
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'PATCH', '/auth/profile', { name: null });
+    const res = await send(token, {
+      method: 'PATCH',
+      path: '/auth/profile',
+      body: { name: null }
+    });
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
@@ -113,8 +119,12 @@ describe('PATCH /auth/profile', () => {
   it('keeps an accepted name edit working, trimmed', async () => {
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'PATCH', '/auth/profile', {
-      name: '  Renamed  '
+    const res = await send(token, {
+      method: 'PATCH',
+      path: '/auth/profile',
+      body: {
+        name: '  Renamed  '
+      }
     });
 
     expect(res.status).toBe(200);
@@ -135,8 +145,12 @@ describe('PATCH /auth/profile', () => {
     );
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'PATCH', '/auth/profile', {
-      name: 'Renamed'
+    const res = await send(token, {
+      method: 'PATCH',
+      path: '/auth/profile',
+      body: {
+        name: 'Renamed'
+      }
     });
 
     expect(res.status).toBe(403);
@@ -149,9 +163,13 @@ describe('PATCH /auth/profile', () => {
     process.env['MFA_REQUIRED_FOR_ADMINS'] = 'true';
     const token = await login(ADMIN_EMAIL);
 
-    const gated = await send(token, 'GET', '/roles');
-    const profile = await send(token, 'PATCH', '/auth/profile', {
-      locale: 'en'
+    const gated = await send(token, { method: 'GET', path: '/roles' });
+    const profile = await send(token, {
+      method: 'PATCH',
+      path: '/auth/profile',
+      body: {
+        locale: 'en'
+      }
     });
 
     expect(gated.status).toBe(403);
@@ -161,9 +179,13 @@ describe('PATCH /auth/profile', () => {
   it('clears every session-bound cookie on a password change', async () => {
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'PATCH', '/auth/profile', {
-      password: NEW_PASSWORD,
-      currentPassword: PASSWORD
+    const res = await send(token, {
+      method: 'PATCH',
+      path: '/auth/profile',
+      body: {
+        password: NEW_PASSWORD,
+        currentPassword: PASSWORD
+      }
     });
 
     expect(res.status).toBe(200);
@@ -177,7 +199,7 @@ describe('POST /auth/logout', () => {
   it('clears every session-bound cookie', async () => {
     const token = await login(USER_EMAIL);
 
-    const res = await send(token, 'POST', '/auth/logout');
+    const res = await send(token, { method: 'POST', path: '/auth/logout' });
 
     expect(res.status).toBe(200);
     expect(clearedCookies(res)).toEqual(
@@ -191,8 +213,12 @@ describe('super role assignment', () => {
     const token = await login(ADMIN_EMAIL);
     const userId = userIdOf(USER_EMAIL);
 
-    const res = await send(token, 'POST', `/roles/assign/${userId}`, {
-      roleId: ADMIN_ROLE_ID
+    const res = await send(token, {
+      method: 'POST',
+      path: `/roles/assign/${userId}`,
+      body: {
+        roleId: ADMIN_ROLE_ID
+      }
     });
 
     expect(res.status).toBe(403);
@@ -207,11 +233,10 @@ describe('super role assignment', () => {
     const token = await login(ADMIN_EMAIL);
     const adminId = userIdOf(ADMIN_EMAIL);
 
-    const res = await send(
-      token,
-      'DELETE',
-      `/roles/assign/${adminId}/${ADMIN_ROLE_ID}`
-    );
+    const res = await send(token, {
+      method: 'DELETE',
+      path: `/roles/assign/${adminId}/${ADMIN_ROLE_ID}`
+    });
 
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({

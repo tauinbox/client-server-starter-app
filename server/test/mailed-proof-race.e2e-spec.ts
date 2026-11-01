@@ -219,7 +219,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     await usersService.update(
       user.id,
       { email: address('forgot-moved') },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     barrier.release();
     await forgot;
@@ -238,7 +238,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     await usersService.update(
       user.id,
       { email: address('resend-moved') },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     barrier.release();
     await resend;

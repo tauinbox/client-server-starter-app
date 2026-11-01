@@ -84,32 +84,28 @@ runWithInfra('User writes on a super target (e2e)', () => {
     };
     const support = await roleService.create(
       { name: supportRoleName },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     supportRoleId = support.id;
     await roleService.setPermissionsForRole(
       support.id,
       [grant('update'), grant('delete'), grant('assign', 'Role')],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     userRoleId = (
       await dataSource.getRepository(Role).findOneByOrFail({ name: 'user' })
     ).id;
-    await roleService.assignRoleToUser(
-      await userId(supportEmail),
-      support.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(await userId(supportEmail), support.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     for (const email of [superEmail, otherSuperEmail]) {
-      await roleService.assignRoleToUser(
-        await userId(email),
-        superRole.id,
-        SYSTEM_ABILITY
-      );
+      await roleService.assignRoleToUser(await userId(email), superRole.id, {
+        ability: SYSTEM_ABILITY
+      });
     }
   }, 60000);
 
@@ -224,7 +220,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
   it('refuses a restore of a super account by a delegated role', async () => {
     const token = await tokenFor(supportEmail);
     const id = await userId(superEmail);
-    await usersService.remove(id, SYSTEM_ABILITY);
+    await usersService.remove(id, { ability: SYSTEM_ABILITY });
 
     try {
       const res = await request(http())
@@ -234,7 +230,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
       expectSuperTargetRefusal(res);
       expect((await row(superEmail)).deletedAt).not.toBeNull();
     } finally {
-      await usersService.restore(id, SYSTEM_ABILITY);
+      await usersService.restore(id, { ability: SYSTEM_ABILITY });
     }
   }, 30000);
 

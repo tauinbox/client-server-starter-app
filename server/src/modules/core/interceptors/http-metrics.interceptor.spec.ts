@@ -34,9 +34,7 @@ describe('HttpMetricsInterceptor', () => {
       .subscribe({
         complete: () => {
           expect(mockMetricsService.recordHttpRequest).toHaveBeenCalledWith(
-            'GET',
-            '/api/v1/users',
-            200,
+            { method: 'GET', route: '/api/v1/users', statusCode: 200 },
             expect.any(Number)
           );
           done();
@@ -53,9 +51,7 @@ describe('HttpMetricsInterceptor', () => {
       .subscribe({
         complete: () => {
           expect(mockMetricsService.recordHttpRequest).toHaveBeenCalledWith(
-            'GET',
-            '/api/v1/users/:id',
-            200,
+            { method: 'GET', route: '/api/v1/users/:id', statusCode: 200 },
             expect.any(Number)
           );
           done();
@@ -74,9 +70,7 @@ describe('HttpMetricsInterceptor', () => {
       .subscribe({
         error: () => {
           expect(mockMetricsService.recordHttpRequest).toHaveBeenCalledWith(
-            'GET',
-            '/api/v1/users/:id',
-            404,
+            { method: 'GET', route: '/api/v1/users/:id', statusCode: 404 },
             expect.any(Number)
           );
           done();
@@ -94,9 +88,7 @@ describe('HttpMetricsInterceptor', () => {
       .subscribe({
         error: () => {
           expect(mockMetricsService.recordHttpRequest).toHaveBeenCalledWith(
-            'POST',
-            '/api/v1/test',
-            500,
+            { method: 'POST', route: '/api/v1/test', statusCode: 500 },
             expect.any(Number)
           );
           done();

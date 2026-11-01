@@ -18,6 +18,7 @@ import { User } from '../../users/entities/user.entity';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { ErrorKeys, OAUTH_ERROR } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 describe('OAuthService', () => {
   let service: OAuthService;
@@ -152,6 +153,7 @@ describe('OAuthService', () => {
         { provide: MailService, useValue: mockMailService },
         { provide: MfaService, useValue: mockMfaService },
         { provide: MetricsService, useValue: mockMetricsService },
+        AccessRefusalService,
         { provide: EventEmitter2, useValue: mockEventEmitter }
       ]
     }).compile();
@@ -820,9 +822,8 @@ describe('OAuthService', () => {
 
       await service.linkOAuthToUser(
         'user-1',
-        'google',
-        'google-123',
-        LINK_TOKEN_IAT
+        { provider: 'google', providerId: 'google-123' },
+        { linkTokenIssuedAt: LINK_TOKEN_IAT }
       );
 
       expect(mockUsersService.findOne).toHaveBeenCalledWith(
@@ -850,17 +851,17 @@ describe('OAuthService', () => {
 
       await service.linkOAuthToUser(
         'user-1',
-        'google',
-        'google-123',
-        LINK_TOKEN_IAT,
-        { ip: '198.51.100.7' }
+        { provider: 'google', providerId: 'google-123' },
+        {
+          linkTokenIssuedAt: LINK_TOKEN_IAT,
+          auditContext: { ip: '198.51.100.7' }
+        }
       );
 
       expect(mockMailService.sendOAuthLinkedNotification).toHaveBeenCalledWith(
         mockUser.email,
         'google',
-        mockUser.locale,
-        '198.51.100.7'
+        { locale: mockUser.locale, ip: '198.51.100.7' }
       );
     });
 
@@ -875,9 +876,8 @@ describe('OAuthService', () => {
 
       await service.linkOAuthToUser(
         'user-1',
-        'google',
-        'google-123',
-        LINK_TOKEN_IAT
+        { provider: 'google', providerId: 'google-123' },
+        { linkTokenIssuedAt: LINK_TOKEN_IAT }
       );
       await new Promise((resolve) => setImmediate(resolve));
 
@@ -892,9 +892,8 @@ describe('OAuthService', () => {
       await expect(
         service.linkOAuthToUser(
           'user-1',
-          'google',
-          'google-123',
-          LINK_TOKEN_IAT
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toThrow(HttpException);
     });
@@ -913,9 +912,8 @@ describe('OAuthService', () => {
       await expect(
         service.linkOAuthToUser(
           'user-1',
-          'google',
-          'google-123',
-          LINK_TOKEN_IAT
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toThrow(HttpException);
     });
@@ -934,9 +932,8 @@ describe('OAuthService', () => {
       await expect(
         service.linkOAuthToUser(
           'user-1',
-          'google',
-          'google-123',
-          LINK_TOKEN_IAT
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).resolves.toBeUndefined();
     });
@@ -953,9 +950,8 @@ describe('OAuthService', () => {
       await expect(
         service.linkOAuthToUser(
           'user-1',
-          'google',
-          'google-456',
-          LINK_TOKEN_IAT
+          { provider: 'google', providerId: 'google-456' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
@@ -978,9 +974,8 @@ describe('OAuthService', () => {
       await expect(
         service.linkOAuthToUser(
           'user-1',
-          'google',
-          'google-123',
-          LINK_TOKEN_IAT
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).resolves.toBeUndefined();
     });
@@ -996,9 +991,8 @@ describe('OAuthService', () => {
       await expect(
         service.linkOAuthToUser(
           'user-1',
-          'google',
-          'google-123',
-          LINK_TOKEN_IAT
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toThrow(HttpException);
       expect(mockOAuthAccountService.createOAuthAccount).not.toHaveBeenCalled();
@@ -1012,9 +1006,8 @@ describe('OAuthService', () => {
 
       await service.linkOAuthToUser(
         'user-1',
-        'google',
-        'google-123',
-        LINK_TOKEN_IAT
+        { provider: 'google', providerId: 'google-123' },
+        { linkTokenIssuedAt: LINK_TOKEN_IAT }
       );
 
       expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalled();
@@ -1028,9 +1021,8 @@ describe('OAuthService', () => {
 
       await service.linkOAuthToUser(
         'user-1',
-        'google',
-        'google-123',
-        LINK_TOKEN_IAT
+        { provider: 'google', providerId: 'google-123' },
+        { linkTokenIssuedAt: LINK_TOKEN_IAT }
       );
 
       expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
@@ -1048,9 +1040,8 @@ describe('OAuthService', () => {
       await expect(
         service.linkOAuthToUser(
           'user-1',
-          'google',
-          'google-123',
-          LINK_TOKEN_IAT
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toThrow('Connection lost');
     });
@@ -1068,7 +1059,11 @@ describe('OAuthService', () => {
       });
 
       await expect(
-        service.assertReauthenticated(mockUser.id, 'google', 'google-123', IAT)
+        service.assertReauthenticated(
+          mockUser.id,
+          { provider: 'google', providerId: 'google-123' },
+          IAT
+        )
       ).resolves.toBeUndefined();
     });
 
@@ -1081,7 +1076,11 @@ describe('OAuthService', () => {
       });
 
       await expect(
-        service.assertReauthenticated(mockUser.id, 'google', 'google-999', IAT)
+        service.assertReauthenticated(
+          mockUser.id,
+          { provider: 'google', providerId: 'google-999' },
+          IAT
+        )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
@@ -1096,8 +1095,7 @@ describe('OAuthService', () => {
       await expect(
         service.assertReauthenticated(
           mockUser.id,
-          'google',
-          'google-unknown',
+          { provider: 'google', providerId: 'google-unknown' },
           IAT
         )
       ).rejects.toMatchObject({
@@ -1114,8 +1112,7 @@ describe('OAuthService', () => {
       await expect(
         service.assertReauthenticated(
           mockUser.id,
-          'google',
-          'google-123',
+          { provider: 'google', providerId: 'google-123' },
           IAT - 60
         )
       ).rejects.toMatchObject({
@@ -1138,7 +1135,11 @@ describe('OAuthService', () => {
       });
 
       await expect(
-        service.assertReauthenticated(mockUser.id, 'google', 'google-123', IAT)
+        service.assertReauthenticated(
+          mockUser.id,
+          { provider: 'google', providerId: 'google-123' },
+          IAT
+        )
       ).resolves.toBeUndefined();
     });
 
@@ -1149,7 +1150,11 @@ describe('OAuthService', () => {
       });
 
       await expect(
-        service.assertReauthenticated(mockUser.id, 'google', 'google-123', IAT)
+        service.assertReauthenticated(
+          mockUser.id,
+          { provider: 'google', providerId: 'google-123' },
+          IAT
+        )
       ).rejects.toMatchObject({
         response: {
           errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED

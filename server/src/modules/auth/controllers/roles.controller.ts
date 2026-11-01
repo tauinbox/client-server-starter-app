@@ -167,18 +167,17 @@ export class RolesController {
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    return this.roleService.create(
-      createRoleDto,
+    return this.roleService.create(createRoleDto, {
       ability,
-      req.user?.userId,
-      (role) =>
+      actorId: req.user?.userId,
+      audit: (role) =>
         this.auditRow(req, {
           action: AuditAction.ROLE_CREATE,
           targetType: 'Role',
           targetId: role.id,
           details: { name: createRoleDto.name }
         })
-    );
+    });
   }
 
   @Patch(':id')
@@ -195,19 +194,17 @@ export class RolesController {
     @Req() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    return this.roleService.update(
-      id,
-      updateRoleDto,
+    return this.roleService.update(id, updateRoleDto, {
       ability,
-      req.user?.userId,
-      (before) =>
+      actorId: req.user?.userId,
+      audit: (before) =>
         this.auditRow(req, {
           action: AuditAction.ROLE_UPDATE,
           targetType: 'Role',
           targetId: id,
           details: { changedFields: changedFields(before, updateRoleDto) }
         })
-    );
+    });
   }
 
   @Delete(':id')
@@ -224,14 +221,17 @@ export class RolesController {
   ) {
     // The row is gone after the delete, so the name is recorded here: a bare
     // targetId resolves to nothing once the role no longer exists.
-    await this.roleService.delete(id, ability, req.user?.userId, (role) =>
-      this.auditRow(req, {
-        action: AuditAction.ROLE_DELETE,
-        targetType: 'Role',
-        targetId: id,
-        details: { name: role.name }
-      })
-    );
+    await this.roleService.delete(id, {
+      ability,
+      actorId: req.user?.userId,
+      audit: (role) =>
+        this.auditRow(req, {
+          action: AuditAction.ROLE_DELETE,
+          targetType: 'Role',
+          targetId: id,
+          details: { name: role.name }
+        })
+    });
   }
 
   @Put(':id/permissions')
@@ -250,18 +250,16 @@ export class RolesController {
     @CurrentAbility() ability: AppAbility,
     @Req() req: JwtAuthRequest
   ) {
-    return this.roleService.setPermissionsForRole(
-      id,
-      dto.items,
+    return this.roleService.setPermissionsForRole(id, dto.items, {
       ability,
-      req.user?.userId,
-      this.auditRow(req, {
+      actorId: req.user?.userId,
+      audit: this.auditRow(req, {
         action: AuditAction.PERMISSION_ASSIGN,
         targetType: 'Role',
         targetId: id,
         details: { permissionIds: dto.items.map((i) => i.permissionId) }
       })
-    );
+    });
   }
 
   @Post(':id/permissions')
@@ -279,16 +277,17 @@ export class RolesController {
   ) {
     return this.roleService.assignPermissionsToRole(
       id,
-      dto.permissionIds,
-      dto.conditions,
-      ability,
-      req.user?.userId,
-      this.auditRow(req, {
-        action: AuditAction.PERMISSION_ASSIGN,
-        targetType: 'Role',
-        targetId: id,
-        details: { permissionIds: dto.permissionIds }
-      })
+      { permissionIds: dto.permissionIds, conditions: dto.conditions },
+      {
+        ability,
+        actorId: req.user?.userId,
+        audit: this.auditRow(req, {
+          action: AuditAction.PERMISSION_ASSIGN,
+          targetType: 'Role',
+          targetId: id,
+          details: { permissionIds: dto.permissionIds }
+        })
+      }
     );
   }
 
@@ -308,18 +307,16 @@ export class RolesController {
     @CurrentAbility() ability: AppAbility,
     @Req() req: JwtAuthRequest
   ) {
-    return this.roleService.removePermissionFromRole(
-      id,
-      permissionId,
+    return this.roleService.removePermissionFromRole(id, permissionId, {
       ability,
-      req.user?.userId,
-      this.auditRow(req, {
+      actorId: req.user?.userId,
+      audit: this.auditRow(req, {
         action: AuditAction.PERMISSION_UNASSIGN,
         targetType: 'Role',
         targetId: id,
         details: { permissionId }
       })
-    );
+    });
   }
 
   @Post('assign/:userId')
@@ -335,18 +332,16 @@ export class RolesController {
     @CurrentAbility() ability: AppAbility,
     @Req() req: JwtAuthRequest
   ) {
-    const result = await this.roleService.assignRoleToUser(
-      userId,
-      dto.roleId,
+    const result = await this.roleService.assignRoleToUser(userId, dto.roleId, {
       ability,
-      req.user?.userId,
-      this.auditRow(req, {
+      actorId: req.user?.userId,
+      audit: this.auditRow(req, {
         action: AuditAction.ROLE_ASSIGN,
         targetType: 'User',
         targetId: userId,
         details: { roleId: dto.roleId }
       })
-    );
+    });
     await this.emitUserRolesChanged(userId);
     return result;
   }
@@ -367,18 +362,16 @@ export class RolesController {
     @CurrentAbility() ability: AppAbility,
     @Req() req: JwtAuthRequest
   ) {
-    const result = await this.roleService.removeRoleFromUser(
-      userId,
-      roleId,
+    const result = await this.roleService.removeRoleFromUser(userId, roleId, {
       ability,
-      req.user?.userId,
-      this.auditRow(req, {
+      actorId: req.user?.userId,
+      audit: this.auditRow(req, {
         action: AuditAction.ROLE_UNASSIGN,
         targetType: 'User',
         targetId: userId,
         details: { roleId }
       })
-    );
+    });
     await this.emitUserRolesChanged(userId);
     return result;
   }

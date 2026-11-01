@@ -30,12 +30,11 @@ import {
 } from '../../../common/utils/apply-list-query.util';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { applyAbilityToFeatureFlagQuery } from '../../../common/utils/apply-ability.util';
-import { assertCan } from '../../../common/utils/assert-can.util';
 import { ApiError } from '../../../common/errors/api-error';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditService } from '../../audit/audit.service';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 import type { AuditContext } from '../../audit/audit.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
@@ -79,6 +78,12 @@ function versionConflict(): ApiError {
   );
 }
 
+export interface FlagUpdateOptions {
+  ifMatch: IfMatchCondition;
+  ability: AbilityOrSystem;
+  actor: FlagAuditActor;
+}
+
 /** The actor of a flag write, as its audit row records it. */
 export interface FlagAuditActor {
   actorId: string | null;
@@ -97,7 +102,7 @@ export class FeatureFlagService {
     private readonly attributeRegistry: AttributeRegistryService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
-    private readonly metricsService: MetricsService
+    private readonly accessRefusals: AccessRefusalService
   ) {}
 
   /**
@@ -125,8 +130,7 @@ export class FeatureFlagService {
     applyAbilityToFeatureFlagQuery(qb, ability, 'search');
     const page = await applyList(
       qb,
-      FEATURE_FLAG_LIST_QUERY,
-      FEATURE_FLAG_LIST_COLUMNS,
+      { spec: FEATURE_FLAG_LIST_QUERY, columns: FEATURE_FLAG_LIST_COLUMNS },
       query
     );
     await this.#attachRules(page.data);
@@ -155,7 +159,11 @@ export class FeatureFlagService {
     actorId?: string | null
   ): Promise<FeatureFlag> {
     const flag = await this.#load(id);
-    this.#assertCan(ability, 'read', flag, actorId);
+    this.#assertCan(ability, {
+      action: 'read',
+      record: flag,
+      actorId
+    });
     return flag;
   }
 
@@ -165,23 +173,20 @@ export class FeatureFlagService {
    */
   #assertCan(
     ability: AbilityOrSystem,
-    action: string,
-    record: Partial<FeatureFlag>,
-    actorId?: string | null
+    check: {
+      action: string;
+      record: Partial<FeatureFlag>;
+      actorId?: string | null;
+    }
   ): void {
     if (ability === SYSTEM_ABILITY) return;
-    assertCan(
-      ability,
-      action,
-      subject('FeatureFlag', record),
-      this.auditService,
-      {
-        actorId: actorId ?? undefined,
-        targetId: record.id,
-        targetType: 'FeatureFlag'
-      },
-      this.metricsService
-    );
+    this.accessRefusals.assertCan(ability, {
+      action: check.action,
+      subject: subject('FeatureFlag', check.record),
+      actorId: check.actorId ?? undefined,
+      targetId: check.record.id,
+      targetType: 'FeatureFlag'
+    });
   }
 
   async #load(id: string): Promise<FeatureFlag> {
@@ -210,7 +215,11 @@ export class FeatureFlagService {
     ability: AbilityOrSystem,
     actor: FlagAuditActor
   ): Promise<FeatureFlag> {
-    this.#assertCan(ability, 'create', this.#newFlagFields(dto), actor.actorId);
+    this.#assertCan(ability, {
+      action: 'create',
+      record: this.#newFlagFields(dto),
+      actorId: actor.actorId
+    });
     const existing = await this.flagRepo.findOne({ where: { key: dto.key } });
     if (existing) {
       throw keyExistsConflict();
@@ -231,10 +240,14 @@ export class FeatureFlagService {
           })
         );
         if (rules) await this.#writeRules(em, flag.id, rules);
-        await this.#audit(em, actor, AuditAction.FEATURE_FLAG_CREATE, flag.id, {
-          key: flag.key,
+        await this.#audit(em, actor, {
+          action: AuditAction.FEATURE_FLAG_CREATE,
           flagId: flag.id,
-          ...(rules ? { ruleCount: rules.length } : {})
+          details: {
+            key: flag.key,
+            flagId: flag.id,
+            ...(rules ? { ruleCount: rules.length } : {})
+          }
         });
         return flag;
       });
@@ -248,20 +261,21 @@ export class FeatureFlagService {
   async update(
     id: string,
     dto: UpdateFeatureFlagDto,
-    ifMatch: IfMatchCondition,
-    ability: AbilityOrSystem,
-    actor: FlagAuditActor
+    { ifMatch, ability, actor }: FlagUpdateOptions
   ): Promise<FeatureFlag> {
     const current = await this.#load(id);
     // The record after the write is checked too: else a grant scoped by a
     // writable field lets the caller move a flag out of its own scope.
-    this.#assertCan(ability, 'update', current, actor.actorId);
-    this.#assertCan(
-      ability,
-      'update',
-      withChanges(current, { ...dto, rules: undefined }),
-      actor.actorId
-    );
+    this.#assertCan(ability, {
+      action: 'update',
+      record: current,
+      actorId: actor.actorId
+    });
+    this.#assertCan(ability, {
+      action: 'update',
+      record: withChanges(current, { ...dto, rules: undefined }),
+      actorId: actor.actorId
+    });
     const { rules: ruleDtos, ...fields } = dto;
     const rules = this.#validateRules(ruleDtos);
     // A successful write then replaced exactly `current`, the audit diff base.
@@ -291,9 +305,13 @@ export class FeatureFlagService {
       if (result.affected === 0) throw versionConflict();
       if (rules) await this.#writeRules(em, id, rules);
       // Rule rows and rule DTOs do not compare field by field: count them.
-      await this.#audit(em, actor, AuditAction.FEATURE_FLAG_UPDATE, id, {
-        changedFields: changedFields(current, fields),
-        ...(rules ? { ruleCount: rules.length } : {})
+      await this.#audit(em, actor, {
+        action: AuditAction.FEATURE_FLAG_UPDATE,
+        flagId: id,
+        details: {
+          changedFields: changedFields(current, fields),
+          ...(rules ? { ruleCount: rules.length } : {})
+        }
       });
     });
     return this.#load(id);
@@ -305,7 +323,11 @@ export class FeatureFlagService {
     actor: FlagAuditActor
   ): Promise<void> {
     const flag = await this.#load(id);
-    this.#assertCan(ability, 'delete', flag, actor.actorId);
+    this.#assertCan(ability, {
+      action: 'delete',
+      record: flag,
+      actorId: actor.actorId
+    });
     // The row is gone after the delete, so the key is recorded: a bare
     // targetId resolves to nothing once the flag no longer exists.
     const { key } = flag;
@@ -314,8 +336,12 @@ export class FeatureFlagService {
       // loser writes no audit row. The rule rows go by ON DELETE CASCADE.
       const { affected } = await em.delete(FeatureFlag, { id });
       if (!affected) throw flagNotFound();
-      await this.#audit(em, actor, AuditAction.FEATURE_FLAG_DELETE, id, {
-        key
+      await this.#audit(em, actor, {
+        action: AuditAction.FEATURE_FLAG_DELETE,
+        flagId: id,
+        details: {
+          key
+        }
       });
     });
   }
@@ -327,9 +353,11 @@ export class FeatureFlagService {
   #audit(
     em: EntityManager,
     actor: FlagAuditActor,
-    action: AuditAction,
-    flagId: string,
-    details: Record<string, unknown>
+    {
+      action,
+      flagId,
+      details
+    }: { action: AuditAction; flagId: string; details: Record<string, unknown> }
   ): Promise<void> {
     return this.auditService.log(
       {

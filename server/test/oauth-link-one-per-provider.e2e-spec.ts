@@ -18,6 +18,7 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
 import { User } from '../src/modules/users/entities/user.entity';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -64,7 +65,8 @@ runWithInfra('One linked identity per provider (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: MfaService, useValue: {} },
         { provide: RoleService, useValue: {} },
-        { provide: MetricsService, useValue: {} }
+        { provide: MetricsService, useValue: {} },
+        AccessRefusalService
       ]
     }).compile();
 
@@ -93,7 +95,11 @@ runWithInfra('One linked identity per provider (e2e)', () => {
   });
 
   const link = (id: string, providerId: string): Promise<void> =>
-    service.linkOAuthToUser(id, 'google', providerId, LINK_TOKEN_IAT);
+    service.linkOAuthToUser(
+      id,
+      { provider: 'google', providerId },
+      { linkTokenIssuedAt: LINK_TOKEN_IAT }
+    );
 
   it('refuses a second identity of a linked provider, and the unlink removes one row', async () => {
     const id = userId;

@@ -32,6 +32,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { User } from '../src/modules/users/entities/user.entity';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const USER_ID = 'user-1';
 
@@ -251,7 +252,8 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
             recordAuthEvent: jest.fn(),
             recordCacheAccess: jest.fn()
           }
-        }
+        },
+        AccessRefusalService
       ]
     }).compile();
 

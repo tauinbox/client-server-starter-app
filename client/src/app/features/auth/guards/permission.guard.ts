@@ -18,9 +18,7 @@ export function permissionGuard(
     const router = inject(Router);
 
     return ensureAuthenticated(
-      authStore,
-      authService,
-      router,
+      { authStore, authService, router },
       state.url,
       () => {
         const enrolment = mfaEnrolmentRedirect(authStore, router);

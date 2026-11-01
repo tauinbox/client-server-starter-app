@@ -9,7 +9,7 @@ import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
 import { MfaService } from './mfa.service';
-import { OAuthUserProfile } from '../types/oauth-profile';
+import { OAuthUserProfile, ProviderIdentity } from '../types/oauth-profile';
 import { AuditService, AuditContext } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MailService } from '../../mail/mail.service';
@@ -284,8 +284,7 @@ export class OAuthService {
    */
   async assertReauthenticated(
     userId: string,
-    provider: string,
-    providerId: string,
+    { provider, providerId }: ProviderIdentity,
     reauthTokenIssuedAt: number
   ): Promise<void> {
     await this.intentHolder(userId, reauthTokenIssuedAt);
@@ -313,10 +312,11 @@ export class OAuthService {
    */
   async linkOAuthToUser(
     userId: string,
-    provider: string,
-    providerId: string,
-    linkTokenIssuedAt: number,
-    auditContext?: AuditContext
+    { provider, providerId }: ProviderIdentity,
+    {
+      linkTokenIssuedAt,
+      auditContext
+    }: { linkTokenIssuedAt: number; auditContext?: AuditContext }
   ): Promise<void> {
     const user = await this.intentHolder(userId, linkTokenIssuedAt);
     await this.safeCreateOAuthAccount(userId, provider, providerId);
@@ -332,12 +332,10 @@ export class OAuthService {
     });
 
     this.mailService
-      .sendOAuthLinkedNotification(
-        user.email,
-        provider,
-        user.locale,
-        auditContext?.ip
-      )
+      .sendOAuthLinkedNotification(user.email, provider, {
+        locale: user.locale,
+        ip: auditContext?.ip
+      })
       .catch((err) =>
         this.logger.error('Failed to send provider-linked notification', err)
       );

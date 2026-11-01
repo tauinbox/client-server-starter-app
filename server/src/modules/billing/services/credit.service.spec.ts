@@ -147,8 +147,7 @@ describe('CreditService', () => {
       await service.addPurchase(
         // @ts-expect-error - partial EntityManager mock: uses query/create/save
         manager,
-        'cust-1',
-        'inv-1',
+        { customerId: 'cust-1', invoiceId: 'inv-1' },
         500
       );
 
@@ -171,8 +170,7 @@ describe('CreditService', () => {
       await service.spendOnUsage(
         // @ts-expect-error - partial EntityManager mock: uses query/create/save
         manager,
-        'cust-1',
-        'inv-2',
+        { customerId: 'cust-1', invoiceId: 'inv-2' },
         42
       );
 
@@ -194,8 +192,7 @@ describe('CreditService', () => {
       await service.clawbackPurchase(
         // @ts-expect-error - partial EntityManager mock: uses query/create/save
         manager,
-        'cust-1',
-        'inv-1',
+        { customerId: 'cust-1', invoiceId: 'inv-1' },
         500
       );
 

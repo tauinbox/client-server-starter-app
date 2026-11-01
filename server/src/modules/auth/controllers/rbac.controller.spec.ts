@@ -118,13 +118,12 @@ describe('RbacController', () => {
         mockAbility
       );
 
-      expect(resourceServiceMock.update).toHaveBeenCalledWith(
-        'res-1',
-        dto,
-        mockAbility,
-        'user-1',
-        expect.any(Function)
-      );
+      expect(resourceServiceMock.update).toHaveBeenCalledWith('res-1', dto, {
+        ability: mockAbility,
+        actorId: 'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
       expect(result).toBe(updated);
     });
 
@@ -137,12 +136,15 @@ describe('RbacController', () => {
 
       await controller.updateResource('res-1', dto, req, mockAbility);
 
-      const [, , , , row] = resourceServiceMock.update.mock.calls[0] as [
+      const [, , { audit: row }] = resourceServiceMock.update.mock.calls[0] as [
         unknown,
         unknown,
-        unknown,
-        unknown,
-        (before: { displayName: string; description: string }) => unknown
+        {
+          audit: (before: {
+            displayName: string;
+            description: string;
+          }) => unknown;
+        }
       ];
       expect(row({ displayName: 'Old', description: 'old' })).toMatchObject({
         action: AuditAction.RESOURCE_UPDATE,
@@ -165,17 +167,17 @@ describe('RbacController', () => {
 
       await controller.restoreResource('res-1', req, mockAbility);
 
-      expect(resourceServiceMock.restore).toHaveBeenCalledWith(
-        'res-1',
-        mockAbility,
-        'user-99',
-        expect.objectContaining({
+      expect(resourceServiceMock.restore).toHaveBeenCalledWith('res-1', {
+        ability: mockAbility,
+        actorId: 'user-99',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.objectContaining({
           action: AuditAction.RESOURCE_RESTORE,
           actorId: 'user-99',
           targetId: 'res-1',
           targetType: 'Resource'
         })
-      );
+      });
     });
   });
 

@@ -74,11 +74,9 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await roleService.assignRoleToUser(
-      await userId(adminEmail),
-      superRole.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(await userId(adminEmail), superRole.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     const readUser = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'read' && p.resource.subject === 'User'
@@ -86,7 +84,10 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     if (!readUser) throw new Error('Permission read:User missing');
     readUserId = readUser.id;
     customRoleId = (
-      await roleService.create({ name: customRoleName }, SYSTEM_ABILITY)
+      await roleService.create(
+        { name: customRoleName },
+        { ability: SYSTEM_ABILITY }
+      )
     ).id;
   }, 60000);
 
@@ -165,7 +166,9 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
 
   it('removes a role the user holds, audits and ends the sessions of the user', async () => {
     const id = await userId(targetEmail);
-    await roleService.assignRoleToUser(id, customRoleId, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(id, customRoleId, {
+      ability: SYSTEM_ABILITY
+    });
     const target = await sessionFor(targetEmail);
     const admin = await sessionFor(adminEmail);
 

@@ -87,9 +87,7 @@ async function login(): Promise<string> {
 
 async function call(
   token: string,
-  method: string,
-  path: string,
-  body: unknown
+  { method, path, body }: { method: string; path: string; body: unknown }
 ): Promise<{ status: number; errorKey?: string }> {
   const res = await fetch(`${baseUrl}/api/v1/roles${path}`, {
     method,
@@ -163,9 +161,13 @@ describe('grant scope parity with server', () => {
       const token = await login();
 
       expect(
-        await call(token, 'POST', `/${TARGET_ROLE_ID}/permissions`, {
-          permissionIds: [c.permissionId()],
-          ...(c.conditions ? { conditions: c.conditions } : {})
+        await call(token, {
+          method: 'POST',
+          path: `/${TARGET_ROLE_ID}/permissions`,
+          body: {
+            permissionIds: [c.permissionId()],
+            ...(c.conditions ? { conditions: c.conditions } : {})
+          }
         })
       ).toEqual({ status: 403, errorKey: c.errorKey });
       expect(lastRefusalReason()).toBe(c.reason);
@@ -176,8 +178,14 @@ describe('grant scope parity with server', () => {
       const token = await login();
 
       expect(
-        await call(token, 'PUT', `/${TARGET_ROLE_ID}/permissions`, {
-          items: [{ permissionId: c.permissionId(), conditions: c.conditions }]
+        await call(token, {
+          method: 'PUT',
+          path: `/${TARGET_ROLE_ID}/permissions`,
+          body: {
+            items: [
+              { permissionId: c.permissionId(), conditions: c.conditions }
+            ]
+          }
         })
       ).toEqual({ status: 403, errorKey: c.errorKey });
       expect(targetRowCount()).toBe(0);
@@ -193,8 +201,12 @@ describe('grant scope parity with server', () => {
       const token = await login();
 
       expect(
-        await call(token, 'POST', `/assign/${callerId()}`, {
-          roleId: TARGET_ROLE_ID
+        await call(token, {
+          method: 'POST',
+          path: `/assign/${callerId()}`,
+          body: {
+            roleId: TARGET_ROLE_ID
+          }
         })
       ).toEqual({ status: 403, errorKey: c.errorKey });
       expect(getState().users.get(callerId())?.roles).not.toContain('target');
@@ -210,9 +222,13 @@ describe('grant scope parity with server', () => {
   ])('allows %s', async (_name, conditions) => {
     const token = await login();
 
-    const res = await call(token, 'POST', `/${TARGET_ROLE_ID}/permissions`, {
-      permissionIds: [updateUserId()],
-      conditions
+    const res = await call(token, {
+      method: 'POST',
+      path: `/${TARGET_ROLE_ID}/permissions`,
+      body: {
+        permissionIds: [updateUserId()],
+        conditions
+      }
     });
 
     expect(res.status).toBe(201);
@@ -228,9 +244,13 @@ describe('grant scope parity with server', () => {
     it('on POST /:id/permissions', async () => {
       const token = await login();
 
-      const res = await call(token, 'POST', `/${TARGET_ROLE_ID}/permissions`, {
-        permissionIds: [deleteUserId()],
-        conditions: deny
+      const res = await call(token, {
+        method: 'POST',
+        path: `/${TARGET_ROLE_ID}/permissions`,
+        body: {
+          permissionIds: [deleteUserId()],
+          conditions: deny
+        }
       });
 
       expect(res.status).toBe(201);
@@ -240,8 +260,12 @@ describe('grant scope parity with server', () => {
     it('on PUT /:id/permissions', async () => {
       const token = await login();
 
-      const res = await call(token, 'PUT', `/${TARGET_ROLE_ID}/permissions`, {
-        items: [{ permissionId: deleteUserId(), conditions: deny }]
+      const res = await call(token, {
+        method: 'PUT',
+        path: `/${TARGET_ROLE_ID}/permissions`,
+        body: {
+          items: [{ permissionId: deleteUserId(), conditions: deny }]
+        }
       });
 
       expect(res.status).toBe(200);
@@ -257,8 +281,12 @@ describe('grant scope parity with server', () => {
       });
       const token = await login();
 
-      const res = await call(token, 'POST', `/assign/${callerId()}`, {
-        roleId: TARGET_ROLE_ID
+      const res = await call(token, {
+        method: 'POST',
+        path: `/assign/${callerId()}`,
+        body: {
+          roleId: TARGET_ROLE_ID
+        }
       });
 
       expect(res.status).toBe(201);

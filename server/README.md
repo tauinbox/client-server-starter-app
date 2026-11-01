@@ -1497,7 +1497,8 @@ unconditionally.
 malformed condition with a 422 at authoring time.
 
 **Instance-level enforcement.** The service behind each single-entity endpoint loads the target
-record and runs `assertCan(ability, action, subject(<Subject>, entity))` BEFORE it returns or changes
+record and runs `assertCan(ability, { action, subject: subject(<Subject>, entity) })` of
+`AccessRefusalService` BEFORE it returns or changes
 the record. The controller only passes `@CurrentAbility()`; the service method takes it as a
 required `AbilityOrSystem` (`doc/architecture.md` §2.5).
 Those endpoints are `GET/PATCH/DELETE /users/:id`, `GET /users/:id/permissions`, `POST /users/:id/mfa/reset`, `POST /users/:id/sessions/revoke`,
@@ -1536,7 +1537,7 @@ before the grant check.
 The server blocks the assignment and the removal of a super role for every actor, a super actor
 included. No API path grants or removes a super role.
 
-`assertNotSuperTarget` (`common/utils/assert-not-super-target.util.ts`) runs after `assertCan` in
+`AccessRefusalService.assertNotSuperTarget` (`modules/audit/access-refusal.service.ts`) runs after `assertCan` in
 `UsersService.update`, `remove` and `restore` (through `UsersService.assertCanWrite`) and in
 `RoleService.assignRoleToUser` and `removeRoleFromUser`. It refuses an actor without `manage all`
 when the target holds a super role: 403 with `errors.users.superTargetForbidden`, a

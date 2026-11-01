@@ -112,8 +112,10 @@ function routesWithoutScenarioAt(ref: string): Set<string> {
 export function scenarioCoverageErrors(
   routeFiles: RouteFile[],
   scenarioFiles: ScenarioFile[],
-  pending: ReadonlySet<string>,
-  base?: ReadonlySet<string>
+  {
+    pending,
+    base
+  }: { pending: ReadonlySet<string>; base?: ReadonlySet<string> }
 ): string[] {
   const errors: string[] = [];
   const routesByFile = new Map(
@@ -219,12 +221,10 @@ function selfTest(): void {
     'PUT /api/v1/things/1/owner'
   ]);
 
-  const problems = scenarioCoverageErrors(
-    routeFiles,
-    scenarioFiles,
+  const problems = scenarioCoverageErrors(routeFiles, scenarioFiles, {
     pending,
     base
-  );
+  });
 
   const expected = [
     // Rule 1: an unlisted route with no scenario.
@@ -253,12 +253,10 @@ function main(): void {
     console.error('--base needs a git ref, for example origin/master');
     process.exit(1);
   }
-  const errors = scenarioCoverageErrors(
-    loadRouteFiles(),
-    loadScenarioFiles(),
-    PENDING_ROUTES,
-    ref ? routesWithoutScenarioAt(ref) : undefined
-  );
+  const errors = scenarioCoverageErrors(loadRouteFiles(), loadScenarioFiles(), {
+    pending: PENDING_ROUTES,
+    base: ref ? routesWithoutScenarioAt(ref) : undefined
+  });
   if (errors.length > 0) {
     console.error('Request scenario coverage failed:');
     for (const e of errors) console.error(`  - ${e}`);

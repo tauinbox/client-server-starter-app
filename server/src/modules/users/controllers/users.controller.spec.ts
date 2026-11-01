@@ -4,7 +4,8 @@ import { UsersController } from './users.controller';
 import { UsersService } from '../services/users.service';
 import type {
   UserAuditRows,
-  UserUpdateOptions
+  UserUpdateOptions,
+  UserWriteOptions
 } from '../services/users.service';
 import type { User } from '../entities/user.entity';
 import { MailService } from '../../mail/mail.service';
@@ -80,9 +81,11 @@ describe('UsersController', () => {
       restore: jest.fn(),
       // The real instance check reduced to the ability: the super-target rule
       // it adds is covered by the service spec.
-      assertCanWrite: jest.fn((ability: AppAbility, action: string) => {
-        if (!ability.can(action, 'User')) throw new ForbiddenException();
-      })
+      assertCanWrite: jest.fn(
+        (ability: AppAbility, { action }: { action: string }) => {
+          if (!ability.can(action, 'User')) throw new ForbiddenException();
+        }
+      )
     };
 
     eventEmitterMock = {
@@ -121,29 +124,23 @@ describe('UsersController', () => {
     }
     const usersService = {
       ...usersServiceMock,
-      create: async (
-        ...args: [CreateUserDto, AppAbility, string, UserAuditRows?]
-      ) => {
+      create: async (...args: [CreateUserDto, UserWriteOptions]) => {
         const created: unknown = await usersServiceMock.create(...args);
-        await writeRows(created, args[3]);
+        await writeRows(created, args[1].audit);
         return created;
       },
-      update: async (
-        ...args: [string, unknown, AppAbility, UserUpdateOptions?]
-      ) => {
+      update: async (...args: [string, unknown, UserUpdateOptions]) => {
         const updated: unknown = await usersServiceMock.update(...args);
-        await writeRows(updated, args[3]?.audit);
+        await writeRows(updated, args[2].audit);
         return updated;
       },
-      remove: async (...args: [string, AppAbility, string, UserAuditRows?]) => {
+      remove: async (...args: [string, UserWriteOptions]) => {
         await usersServiceMock.remove(...args);
-        await writeRows(await usersServiceMock.findOne(args[0]), args[3]);
+        await writeRows(await usersServiceMock.findOne(args[0]), args[1].audit);
       },
-      restore: async (
-        ...args: [string, AppAbility, string, UserAuditRows?]
-      ) => {
+      restore: async (...args: [string, UserWriteOptions]) => {
         const restored: unknown = await usersServiceMock.restore(...args);
-        await writeRows(restored, args[3]);
+        await writeRows(restored, args[1].audit);
         return restored;
       }
     };
@@ -196,12 +193,12 @@ describe('UsersController', () => {
 
       const result = await controller.create(dto, req, mockAbility);
 
-      expect(usersServiceMock.create).toHaveBeenCalledWith(
-        dto,
-        mockAbility,
-        'user-1',
-        expect.any(Function)
-      );
+      expect(usersServiceMock.create).toHaveBeenCalledWith(dto, {
+        ability: mockAbility,
+        actorId: 'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
       expect(result).toBe(createdUser);
     });
 
@@ -326,14 +323,48 @@ describe('UsersController', () => {
           mockAbility
         );
 
-        expect(authServiceMock.assertStepUp).toHaveBeenCalledWith(
-          actor,
-          'ActorPassword1',
-          undefined,
-          STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
-          '123456',
-          expect.anything()
+        expect(authServiceMock.assertStepUp).toHaveBeenCalledWith(actor, {
+          currentPassword: 'ActorPassword1',
+          operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+          totpCode: '123456',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          auditContext: expect.anything()
+        });
+      });
+
+      it('refuses an actor without update:User before the step-up', async () => {
+        // @ts-expect-error partial mock - only `can` is read
+        const readOnly: AppAbility = {
+          can: jest.fn((action: string) => action === 'read')
+        };
+
+        await expect(
+          controller.update(
+            'user-5',
+            { password: 'NewPassword1', currentPassword: 'ActorPassword1' },
+            mockJwtRequest() as JwtAuthRequest,
+            readOnly
+          )
+        ).rejects.toThrow(ForbiddenException);
+        expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+        expect(usersServiceMock.update).not.toHaveBeenCalled();
+      });
+
+      it('admits an actor whose grant is update:User to the step-up', async () => {
+        // @ts-expect-error partial mock - only `can` is read
+        const updateOnly: AppAbility = {
+          can: jest.fn((action: string) => action === 'update')
+        };
+        usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+
+        await controller.update(
+          'user-5',
+          { password: 'NewPassword1', currentPassword: 'ActorPassword1' },
+          mockJwtRequest() as JwtAuthRequest,
+          updateOnly
         );
+
+        expect(authServiceMock.assertStepUp).toHaveBeenCalled();
       });
 
       it('demands the step-up for a changed email', async () => {
@@ -421,9 +452,12 @@ describe('UsersController', () => {
 
         expect(usersServiceMock.assertCanWrite).toHaveBeenCalledWith(
           mockAbility,
-          'update',
-          expect.objectContaining({ id: 'user-5' }),
-          'user-1'
+          {
+            action: 'update',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            target: expect.objectContaining({ id: 'user-5' }),
+            actorId: 'user-1'
+          }
         );
         expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
         expect(usersServiceMock.update).not.toHaveBeenCalled();
@@ -442,8 +476,8 @@ describe('UsersController', () => {
         expect(usersServiceMock.update).toHaveBeenCalledWith(
           'user-5',
           { password: 'NewPassword1' },
-          mockAbility,
           {
+            ability: mockAbility,
             actorId: 'user-1',
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             audit: expect.any(Function)
@@ -466,16 +500,12 @@ describe('UsersController', () => {
 
       const result = await controller.update('user-5', dto, req, mockAbility);
 
-      expect(usersServiceMock.update).toHaveBeenCalledWith(
-        'user-5',
-        dto,
-        mockAbility,
-        {
-          actorId: 'user-1',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          audit: expect.any(Function)
-        }
-      );
+      expect(usersServiceMock.update).toHaveBeenCalledWith('user-5', dto, {
+        ability: mockAbility,
+        actorId: 'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
       expect(result).toBe(updatedUser);
     });
 
@@ -521,7 +551,10 @@ describe('UsersController', () => {
 
       expect(
         mailServiceMock.sendPasswordChangedNotification
-      ).toHaveBeenCalledWith('target@example.com', 'admin', 'ru', '127.0.0.1');
+      ).toHaveBeenCalledWith('target@example.com', 'admin', {
+        locale: 'ru',
+        ip: '127.0.0.1'
+      });
     });
 
     it('should NOT notify the target account when dto does not contain password', async () => {
@@ -1085,8 +1118,8 @@ describe('UsersController', () => {
         expect(usersServiceMock.update).toHaveBeenCalledWith(
           'user-5',
           { isActive: false },
-          mockAbility,
           {
+            ability: mockAbility,
             actorId: 'user-1',
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             audit: expect.any(Function)
@@ -1107,12 +1140,12 @@ describe('UsersController', () => {
 
       await controller.remove('user-7', req, mockAbility);
 
-      expect(usersServiceMock.remove).toHaveBeenCalledWith(
-        'user-7',
-        mockAbility,
-        'user-1',
-        expect.any(Function)
-      );
+      expect(usersServiceMock.remove).toHaveBeenCalledWith('user-7', {
+        ability: mockAbility,
+        actorId: 'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
     });
 
     it('ends no session when the delete and its audit row fail', async () => {
@@ -1226,12 +1259,12 @@ describe('UsersController', () => {
 
       const result = await controller.restore('user-8', req, mockAbility);
 
-      expect(usersServiceMock.restore).toHaveBeenCalledWith(
-        'user-8',
-        mockAbility,
-        'user-1',
-        expect.any(Function)
-      );
+      expect(usersServiceMock.restore).toHaveBeenCalledWith('user-8', {
+        ability: mockAbility,
+        actorId: 'user-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
       expect(result).toBe(restoredUser);
     });
 
@@ -1293,11 +1326,12 @@ describe('UsersController', () => {
 
       expect(authServiceMock.assertStepUp).toHaveBeenCalledWith(
         { id: actor.id },
-        undefined,
-        undefined,
-        STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
-        '123456',
-        expect.anything()
+        {
+          operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+          totpCode: '123456',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          auditContext: expect.anything()
+        }
       );
       expect(mfaServiceMock.resetByAdmin).toHaveBeenCalledWith(
         enrolled,

@@ -23,6 +23,7 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { MAX_LIST_FILTER_LENGTH } from '@app/shared/constants';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const EMPTY_PAGE = {
   data: [],
@@ -58,6 +59,7 @@ describe('User search query DTO validation (e2e)', () => {
           useValue: { sendPasswordChangedNotification: jest.fn() }
         },
         { provide: MetricsService, useValue: {} },
+        AccessRefusalService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     })

@@ -95,9 +95,7 @@ async function login(email: string): Promise<string> {
 
 async function call(
   token: string,
-  method: string,
-  path: string,
-  body?: unknown
+  { method, path, body }: { method: string; path: string; body?: unknown }
 ): Promise<{ status: number; errorKey?: string }> {
   const res = await fetch(`${baseUrl}/api/v1/rbac/resources/${path}`, {
     method,
@@ -125,7 +123,11 @@ describe('resource widen parity with server', () => {
       const token = await login(ACTOR_EMAIL);
 
       expect(
-        await call(token, 'PATCH', USERS_RESOURCE_ID, { allowedActionNames })
+        await call(token, {
+          method: 'PATCH',
+          path: USERS_RESOURCE_ID,
+          body: { allowedActionNames }
+        })
       ).toEqual(widenRefused);
       expect(actorCanDelete()).toBe(false);
       expect(getState().auditLogs.at(-1)).toMatchObject({
@@ -140,8 +142,12 @@ describe('resource widen parity with server', () => {
     const token = await login(ACTOR_EMAIL);
 
     expect(
-      await call(token, 'PATCH', USERS_RESOURCE_ID, {
-        allowedActionNames: ['read']
+      await call(token, {
+        method: 'PATCH',
+        path: USERS_RESOURCE_ID,
+        body: {
+          allowedActionNames: ['read']
+        }
       })
     ).toEqual({ status: 200, errorKey: undefined });
   });
@@ -150,8 +156,12 @@ describe('resource widen parity with server', () => {
     const token = await login(SUPER_EMAIL);
 
     expect(
-      await call(token, 'PATCH', USERS_RESOURCE_ID, {
-        allowedActionNames: null
+      await call(token, {
+        method: 'PATCH',
+        path: USERS_RESOURCE_ID,
+        body: {
+          allowedActionNames: null
+        }
       })
     ).toEqual({ status: 200, errorKey: undefined });
     expect(actorCanDelete()).toBe(true);
@@ -164,13 +174,19 @@ describe('resource widen parity with server', () => {
 
     const actorToken = await login(ACTOR_EMAIL);
     expect(
-      await call(actorToken, 'POST', `${USERS_RESOURCE_ID}/restore`)
+      await call(actorToken, {
+        method: 'POST',
+        path: `${USERS_RESOURCE_ID}/restore`
+      })
     ).toEqual(widenRefused);
     expect(actorCanDelete()).toBe(false);
 
     const superToken = await login(SUPER_EMAIL);
     expect(
-      await call(superToken, 'POST', `${USERS_RESOURCE_ID}/restore`)
+      await call(superToken, {
+        method: 'POST',
+        path: `${USERS_RESOURCE_ID}/restore`
+      })
     ).toEqual({ status: 200, errorKey: undefined });
     expect(actorCanDelete()).toBe(true);
   });

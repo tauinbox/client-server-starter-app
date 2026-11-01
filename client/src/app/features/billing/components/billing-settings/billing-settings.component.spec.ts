@@ -139,10 +139,17 @@ describe('BillingSettingsComponent', () => {
 
   async function setup(
     hasSub: boolean,
-    usage?: UsageSummaryResponse,
-    subscription?: SubscriptionResponse,
-    credits?: CreditBalanceResponse,
-    sessionsLimit: number | null = null
+    {
+      usage,
+      subscription,
+      credits,
+      sessionsLimit = null
+    }: {
+      usage?: UsageSummaryResponse;
+      subscription?: SubscriptionResponse;
+      credits?: CreditBalanceResponse;
+      sessionsLimit?: number | null;
+    } = {}
   ): Promise<void> {
     storeMock = {
       subscription: signal<SubscriptionResponse | null>(
@@ -232,7 +239,7 @@ describe('BillingSettingsComponent', () => {
   });
 
   it('shows the plan device allowance and its eviction semantics', async () => {
-    await setup(true, undefined, undefined, undefined, 10);
+    await setup(true, { sessionsLimit: 10 });
     expect(entitlementsMock.load).toHaveBeenCalled();
     expect(entitlementsMock.limit).toHaveBeenCalledWith('sessions');
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -249,7 +256,7 @@ describe('BillingSettingsComponent', () => {
   it('renders billing-boundary dates in UTC regardless of the browser timezone', async () => {
     vi.stubEnv('TZ', 'America/Los_Angeles');
     try {
-      await setup(true, usageSummary);
+      await setup(true, { usage: usageSummary });
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
       // currentPeriodEnd, invoice periodEnd and the usage period end are all
       // 2026-07-01T00:00:00Z. West of UTC an un-zoned pipe renders the previous
@@ -262,7 +269,7 @@ describe('BillingSettingsComponent', () => {
   });
 
   it('renders the usage meter when a usage summary is present', async () => {
-    await setup(true, usageSummary);
+    await setup(true, { usage: usageSummary });
     expect(
       fixture.nativeElement.querySelector('nxs-usage-meter')
     ).not.toBeNull();
@@ -295,7 +302,7 @@ describe('BillingSettingsComponent', () => {
   });
 
   it('warns that the closing metered period will be charged', async () => {
-    await setup(true, undefined, { ...activeSub, billingMode: 'usage' });
+    await setup(true, { subscription: { ...activeSub, billingMode: 'usage' } });
     fixture.componentInstance.onCancel();
     expect(dialogMock.openConfirm.mock.calls[0][0].message).toContain(
       'Metered usage recorded so far is charged when the period closes'
@@ -320,7 +327,9 @@ describe('BillingSettingsComponent', () => {
   });
 
   it('hides the change-plan button when a cancellation is scheduled', async () => {
-    await setup(true, undefined, { ...activeSub, cancelAtPeriodEnd: true });
+    await setup(true, {
+      subscription: { ...activeSub, cancelAtPeriodEnd: true }
+    });
     expect(fixture.nativeElement.querySelector('.change-plan-btn')).toBeNull();
   });
 
@@ -362,10 +371,12 @@ describe('BillingSettingsComponent', () => {
   });
 
   it('feeds the store balance into the credits wallet card', async () => {
-    await setup(true, undefined, undefined, {
-      customerId: 'cust-1',
-      balanceUnits: 1240,
-      updatedAt: '2026-06-01T00:00:00.000Z'
+    await setup(true, {
+      credits: {
+        customerId: 'cust-1',
+        balanceUnits: 1240,
+        updatedAt: '2026-06-01T00:00:00.000Z'
+      }
     });
 
     const card = fixture.nativeElement.querySelector(

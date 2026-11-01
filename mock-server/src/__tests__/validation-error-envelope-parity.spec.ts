@@ -38,8 +38,7 @@ type ErrorBody = { message: string; errors?: string[] };
 async function send(
   method: string,
   path: string,
-  body: unknown,
-  token?: string
+  { body, token }: { body: unknown; token?: string }
 ): Promise<{ status: number; body: ErrorBody }> {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
@@ -59,9 +58,11 @@ describe('validation-error envelope parity with server', () => {
   describe('a 422 mirroring class-validator carries errors[]', () => {
     it('auth: register with a malformed email', async () => {
       const { status, body } = await send('POST', '/api/v1/auth/register', {
-        email: 'not-an-email',
-        name: 'A B',
-        password: 'Password1'
+        body: {
+          email: 'not-an-email',
+          name: 'A B',
+          password: 'Password1'
+        }
       });
 
       expect(status).toBe(422);
@@ -75,8 +76,7 @@ describe('validation-error envelope parity with server', () => {
       const { status, body } = await send(
         'PATCH',
         `/api/v1/users/${target?.id}`,
-        { isActive: 'yes' },
-        token
+        { body: { isActive: 'yes' }, token }
       );
 
       expect(status).toBe(422);
@@ -88,8 +88,7 @@ describe('validation-error envelope parity with server', () => {
       const { status, body } = await send(
         'POST',
         `/api/v1/roles/${mockId('role-editor')}/permissions`,
-        { permissionIds: [] },
-        token
+        { body: { permissionIds: [] }, token }
       );
 
       expect(status).toBe(422);
@@ -101,7 +100,10 @@ describe('validation-error envelope parity with server', () => {
       ['PATCH', `/api/v1/roles/${mockId('role-editor')}`, { isSuper: true }]
     ])('roles: %s with isSuper', async (method, path, payload) => {
       const token = await login('admin@example.com');
-      const { status, body } = await send(method, path, payload, token);
+      const { status, body } = await send(method, path, {
+        body: payload,
+        token
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(['property isSuper should not exist']);
@@ -110,12 +112,10 @@ describe('validation-error envelope parity with server', () => {
 
     it('roles: POST with isSuper and a blank name reports both', async () => {
       const token = await login('admin@example.com');
-      const { status, body } = await send(
-        'POST',
-        '/api/v1/roles',
-        { name: '  ', isSuper: true },
+      const { status, body } = await send('POST', '/api/v1/roles', {
+        body: { name: '  ', isSuper: true },
         token
-      );
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual([
@@ -126,12 +126,10 @@ describe('validation-error envelope parity with server', () => {
 
     it('billing: an unsupported region', async () => {
       const token = await login('user@example.com');
-      const { status, body } = await send(
-        'PUT',
-        '/api/v1/billing/region',
-        { region: 'moon' },
+      const { status, body } = await send('PUT', '/api/v1/billing/region', {
+        body: { region: 'moon' },
         token
-      );
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual([
@@ -170,8 +168,7 @@ describe('validation-error envelope parity with server', () => {
         const { status, body } = await send(
           'POST',
           '/api/v1/admin/feature-flags',
-          payload,
-          token
+          { body: payload, token }
         );
 
         expect(status).toBe(422);
@@ -185,10 +182,12 @@ describe('validation-error envelope parity with server', () => {
         'POST',
         '/api/v1/admin/feature-flags',
         {
-          key: 'envelope-rule-type',
-          rules: [{ effect: 'include', type: 'role', payload: {} }]
-        },
-        token
+          body: {
+            key: 'envelope-rule-type',
+            rules: [{ effect: 'include', type: 'role', payload: {} }]
+          },
+          token
+        }
       );
 
       expect(status).toBe(422);
@@ -200,7 +199,9 @@ describe('validation-error envelope parity with server', () => {
   describe('a refusal thrown by service logic carries no errors[]', () => {
     it('auth: an unknown email-verification token', async () => {
       const { status, body } = await send('POST', '/api/v1/auth/verify-email', {
-        token: 'nope'
+        body: {
+          token: 'nope'
+        }
       });
 
       expect(status).toBe(422);
@@ -212,7 +213,7 @@ describe('validation-error envelope parity with server', () => {
       const { status, body } = await send(
         'POST',
         '/api/v1/billing/webhooks/paddle',
-        {}
+        { body: {} }
       );
 
       expect(status).toBe(400);
@@ -226,10 +227,12 @@ describe('validation-error envelope parity with server', () => {
         'POST',
         '/api/v1/admin/feature-flags',
         {
-          key: 'envelope-rule-payload',
-          rules: [{ effect: 'include', payload: { type: 'user' } }]
-        },
-        token
+          body: {
+            key: 'envelope-rule-payload',
+            rules: [{ effect: 'include', payload: { type: 'user' } }]
+          },
+          token
+        }
       );
 
       expect(status).toBe(422);
@@ -265,8 +268,7 @@ describe('validation-error envelope parity with server', () => {
       const { status, body } = await send(
         'POST',
         `/api/v1/admin/billing/invoices/${await paidInvoiceId()}/refund`,
-        { amountMinor: amount },
-        token
+        { body: { amountMinor: amount }, token }
       );
 
       expect(status).toBe(422);
@@ -278,8 +280,7 @@ describe('validation-error envelope parity with server', () => {
       const { status, body } = await send(
         'POST',
         `/api/v1/admin/billing/invoices/${await paidInvoiceId()}/refund`,
-        { amountMinor: 999_999 },
-        token
+        { body: { amountMinor: 999_999 }, token }
       );
 
       expect(status).toBe(422);

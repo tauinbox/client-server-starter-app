@@ -32,6 +32,7 @@ import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.
 import { createMockConfigService } from '../src/common/testing/config-service.mock';
 import { User } from '../src/modules/users/entities/user.entity';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const ENCRYPTION_KEY = Buffer.alloc(32, 3).toString('base64');
 
@@ -101,6 +102,7 @@ describe('Two-factor requirement on the @Authorize surface (e2e)', () => {
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
         },
+        AccessRefusalService,
         { provide: APP_GUARD, useClass: TestJwtAuthGuard }
       ]
     })

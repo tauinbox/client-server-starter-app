@@ -88,7 +88,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     await usersService.update(
       user.id,
       { password: newPassword },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
 
     const afterChange = await dataSource
@@ -116,7 +116,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     await usersService.update(
       user.id,
       { password: newPassword },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
 
     const afterChange = await dataSource
@@ -146,7 +146,11 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
       pendingEmailExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
     });
 
-    await usersService.update(user.id, { name: 'Renamed' }, SYSTEM_ABILITY);
+    await usersService.update(
+      user.id,
+      { name: 'Renamed' },
+      { ability: SYSTEM_ABILITY }
+    );
 
     const afterChange = await dataSource
       .getRepository(User)

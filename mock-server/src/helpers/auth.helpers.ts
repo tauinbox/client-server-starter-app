@@ -226,10 +226,17 @@ export function permissionGuard(
 export function assertInstancePermission(
   req: Request,
   res: Response,
-  action: Actions,
-  subjectName: SubjectNames,
-  record: object,
-  targetType: string = subjectName
+  {
+    action,
+    subjectName,
+    record,
+    targetType = subjectName
+  }: {
+    action: Actions;
+    subjectName: SubjectNames;
+    record: object;
+    targetType?: string;
+  }
 ): boolean {
   const { user } = req as AuthenticatedRequest;
   if (buildAbilityForUser(user).can(action, caslSubject(subjectName, record))) {
@@ -276,10 +283,15 @@ function roleNamesAreSuper(roleNames: string[]): boolean {
 export function assertCanWriteUser(
   req: Request,
   res: Response,
-  action: 'update' | 'delete',
-  target: MockUser
+  { action, target }: { action: 'update' | 'delete'; target: MockUser }
 ): boolean {
-  if (!assertInstancePermission(req, res, action, 'User', target)) {
+  if (
+    !assertInstancePermission(req, res, {
+      action,
+      subjectName: 'User',
+      record: target
+    })
+  ) {
     return false;
   }
   if (isActorSuper(req) || !roleNamesAreSuper(target.roles)) {

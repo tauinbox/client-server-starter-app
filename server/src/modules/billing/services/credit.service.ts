@@ -19,6 +19,11 @@ const ZERO = Money.fromMinor(0);
  * winning flip of its invoice to `paid`, and the refund clawback is gated by
  * the invoice's one-way `paid -> refunded` flip.
  */
+export interface CreditInvoiceRef {
+  customerId: string;
+  invoiceId: string;
+}
+
 @Injectable()
 export class CreditService {
   constructor(
@@ -99,21 +104,27 @@ export class CreditService {
   /** A paid credit-pack purchase tops the balance up. */
   addPurchase(
     manager: EntityManager,
-    customerId: string,
-    invoiceId: string,
+    { customerId, invoiceId }: CreditInvoiceRef,
     credits: number
   ): Promise<void> {
-    return this.applyDelta(manager, customerId, invoiceId, credits, 'purchase');
+    return this.applyDelta(
+      manager,
+      { customerId, invoiceId },
+      { delta: credits, reason: 'purchase' }
+    );
   }
 
   /** A paid usage invoice spends the units its amount was rated against. */
   spendOnUsage(
     manager: EntityManager,
-    customerId: string,
-    invoiceId: string,
+    { customerId, invoiceId }: CreditInvoiceRef,
     units: number
   ): Promise<void> {
-    return this.applyDelta(manager, customerId, invoiceId, -units, 'usage');
+    return this.applyDelta(
+      manager,
+      { customerId, invoiceId },
+      { delta: -units, reason: 'usage' }
+    );
   }
 
   /**
@@ -125,19 +136,20 @@ export class CreditService {
    */
   clawbackPurchase(
     manager: EntityManager,
-    customerId: string,
-    invoiceId: string,
+    { customerId, invoiceId }: CreditInvoiceRef,
     credits: number
   ): Promise<void> {
-    return this.applyDelta(manager, customerId, invoiceId, -credits, 'refund');
+    return this.applyDelta(
+      manager,
+      { customerId, invoiceId },
+      { delta: -credits, reason: 'refund' }
+    );
   }
 
   private async applyDelta(
     manager: EntityManager,
-    customerId: string,
-    invoiceId: string,
-    delta: number,
-    reason: CreditLedgerReason
+    { customerId, invoiceId }: CreditInvoiceRef,
+    { delta, reason }: { delta: number; reason: CreditLedgerReason }
   ): Promise<void> {
     await manager.query(
       `INSERT INTO billing_credit_balances ("customer_id", "balance_units")

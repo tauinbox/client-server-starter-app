@@ -81,7 +81,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     if (!updateUser) throw new Error('Permission update:User missing');
     const selfEdit = await roleService.create(
       { name: selfEditRoleName },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       selfEdit.id,
@@ -91,29 +91,25 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
           conditions: { ownership: { userField: 'id' } }
         }
       ],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     for (const email of [ownerEmail, otherEmail]) {
-      await roleService.assignRoleToUser(
-        await userId(email),
-        selfEdit.id,
-        SYSTEM_ABILITY
-      );
+      await roleService.assignRoleToUser(await userId(email), selfEdit.id, {
+        ability: SYSTEM_ABILITY
+      });
     }
     const adminEdit = await roleService.create(
       { name: adminEditRoleName },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       adminEdit.id,
       [{ permissionId: updateUser.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(
-      await userId(adminEmail),
-      adminEdit.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(await userId(adminEmail), adminEdit.id, {
+      ability: SYSTEM_ABILITY
+    });
   }, 60000);
 
   afterAll(async () => {

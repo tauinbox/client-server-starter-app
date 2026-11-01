@@ -82,8 +82,13 @@ export interface CancelSubscriptionDeps {
 export async function cancelOpenSubscription(
   deps: CancelSubscriptionDeps,
   subscription: Subscription,
-  mode: CancelMode,
-  resolveUserId: (subscription: Subscription) => Promise<string | null>
+  {
+    mode,
+    resolveUserId
+  }: {
+    mode: CancelMode;
+    resolveUserId: (subscription: Subscription) => Promise<string | null>;
+  }
 ): Promise<Subscription> {
   const refusal = cancelRefusal(subscription, mode);
   if (refusal) {

@@ -16,8 +16,10 @@ import type {
 export async function keyedUpdate<T extends ObjectLiteral>(
   manager: EntityManager,
   target: EntityTarget<T>,
-  where: FindOptionsWhere<T>,
-  changes: QueryDeepPartialEntity<T>
+  {
+    where,
+    changes
+  }: { where: FindOptionsWhere<T>; changes: QueryDeepPartialEntity<T> }
 ): Promise<boolean> {
   const set = Object.fromEntries(
     Object.entries(changes).filter(([, value]) => value !== undefined)

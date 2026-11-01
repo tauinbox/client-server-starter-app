@@ -21,9 +21,11 @@ import type { MockServerApi } from '../fixtures/base.fixture';
 const USER_ID = mockId('oauth-factor');
 
 async function arriveAtCallback(
-  page: Page,
-  context: BrowserContext,
-  mockServer: MockServerApi,
+  {
+    page,
+    context,
+    mockServer
+  }: { page: Page; context: BrowserContext; mockServer: MockServerApi },
   options: { enrolled: boolean }
 ): Promise<void> {
   await mockServer.seedUsers([
@@ -62,7 +64,10 @@ test.describe('OAuth sign-in on an account with a second factor', () => {
     page,
     context
   }) => {
-    await arriveAtCallback(page, context, _mockServer, { enrolled: true });
+    await arriveAtCallback(
+      { page, context, mockServer: _mockServer },
+      { enrolled: true }
+    );
 
     await expect(page.getByLabel('Authentication code')).toBeVisible();
     // Still on the callback route: no session, so no landing page.
@@ -80,7 +85,10 @@ test.describe('OAuth sign-in on an account with a second factor', () => {
     page,
     context
   }) => {
-    await arriveAtCallback(page, context, _mockServer, { enrolled: true });
+    await arriveAtCallback(
+      { page, context, mockServer: _mockServer },
+      { enrolled: true }
+    );
 
     await page.getByRole('button', { name: 'Back to sign in' }).click();
 
@@ -93,7 +101,10 @@ test.describe('OAuth sign-in on an account with a second factor', () => {
     page,
     context
   }) => {
-    await arriveAtCallback(page, context, _mockServer, { enrolled: false });
+    await arriveAtCallback(
+      { page, context, mockServer: _mockServer },
+      { enrolled: false }
+    );
 
     await expect(page).toHaveURL(/\/profile/);
     await expect(page.getByLabel('Authentication code')).toHaveCount(0);

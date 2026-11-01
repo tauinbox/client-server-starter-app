@@ -373,16 +373,19 @@ describe('Billing renewal scheduler (e2e)', () => {
 
     expect(chargeOffSession).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'cust-1' }),
-      8400,
-      'RUB',
-      [
-        {
-          description: 'Pay as you go: api_calls × 42',
-          amountMinor: 8400,
-          quantity: 1
-        }
-      ],
-      expect.stringMatching(/^renewal:sub-1:/)
+      {
+        amountMinor: 8400,
+        currency: 'RUB',
+        receiptItems: [
+          {
+            description: 'Pay as you go: api_calls × 42',
+            amountMinor: 8400,
+            quantity: 1
+          }
+        ],
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        idempotencyKey: expect.stringMatching(/^renewal:sub-1:/)
+      }
     );
     expect(store.invoices).toHaveLength(1);
     expect(store.subscriptions[0].currentPeriodEnd).toEqual(

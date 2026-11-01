@@ -27,6 +27,7 @@ import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { MfaRequiredGuard } from '../guards/mfa-required.guard';
 import { AuthCookies } from '../utils/auth-cookies';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 const allowAllGuard = { canActivate: () => true };
 
@@ -257,6 +258,7 @@ describe('AuthController', () => {
           provide: MetricsService,
           useValue: { recordAuthEvent: jest.fn() }
         },
+        AccessRefusalService,
         {
           provide: ConfigService,
           useValue: {
@@ -720,12 +722,10 @@ describe('AuthController', () => {
 
       const result = await controller.updateProfile(req, dto, res);
 
-      expect(userServiceMock.update).toHaveBeenCalledWith(
-        'user-1',
-        dto,
-        SYSTEM_ABILITY,
-        { expected: undefined }
-      );
+      expect(userServiceMock.update).toHaveBeenCalledWith('user-1', dto, {
+        ability: SYSTEM_ABILITY,
+        expected: undefined
+      });
       expect(authServiceMock.assertStepUpForUser).not.toHaveBeenCalled();
       expect(authServiceMock.revokeAllUserSessions).not.toHaveBeenCalled();
       expect(res.clearCookie).not.toHaveBeenCalled();
@@ -786,11 +786,11 @@ describe('AuthController', () => {
 
       expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
         'user-1',
-        'CurrentPass1',
-        undefined,
-        STEP_UP_OPERATION.PASSWORD_SET,
-        undefined,
-        stepUpAuditContext
+        {
+          currentPassword: 'CurrentPass1',
+          operation: STEP_UP_OPERATION.PASSWORD_SET,
+          auditContext: stepUpAuditContext
+        }
       );
       expect(authServiceMock.revokeAllUserSessions).toHaveBeenCalledWith(
         'user-1'
@@ -834,7 +834,10 @@ describe('AuthController', () => {
 
       expect(
         mailServiceMock.sendPasswordChangedNotification
-      ).toHaveBeenCalledWith('owner@example.com', 'self', 'ru', '127.0.0.1');
+      ).toHaveBeenCalledWith('owner@example.com', 'self', {
+        locale: 'ru',
+        ip: '127.0.0.1'
+      });
     });
 
     it('should not notify when the profile update carries no password', async () => {
@@ -879,8 +882,7 @@ describe('AuthController', () => {
       expect(userServiceMock.update).toHaveBeenCalledWith(
         'user-1',
         { password: 'NewPassword1' },
-        SYSTEM_ABILITY,
-        { expected: { password: 'verified-hash' } }
+        { ability: SYSTEM_ABILITY, expected: { password: 'verified-hash' } }
       );
     });
 
@@ -896,17 +898,17 @@ describe('AuthController', () => {
 
       expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
         'user-1',
-        undefined,
-        undefined,
-        STEP_UP_OPERATION.PASSWORD_SET,
-        '123456',
-        expect.anything()
+        {
+          operation: STEP_UP_OPERATION.PASSWORD_SET,
+          totpCode: '123456',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          auditContext: expect.anything()
+        }
       );
       expect(userServiceMock.update).toHaveBeenCalledWith(
         'user-1',
         { password: 'NewPassword1' },
-        SYSTEM_ABILITY,
-        { expected: { password: 'verified-hash' } }
+        { ability: SYSTEM_ABILITY, expected: { password: 'verified-hash' } }
       );
     });
 
@@ -940,11 +942,11 @@ describe('AuthController', () => {
 
       expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
         'user-1',
-        undefined,
-        'proof',
-        STEP_UP_OPERATION.PASSWORD_SET,
-        undefined,
-        stepUpAuditContext
+        {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET,
+          auditContext: stepUpAuditContext
+        }
       );
       expect(res.clearCookie).toHaveBeenCalledWith('__Host-reauth_proof', {
         secure: true,

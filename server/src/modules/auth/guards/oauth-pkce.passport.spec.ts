@@ -141,6 +141,7 @@ describe('OAuth PKCE (real passport-oauth2 against an enforcing provider)', () =
           pkce: true,
           store: new CookieStateStore(OAuthProvider.GOOGLE, true)
         },
+        // eslint-disable-next-line no-restricted-syntax -- Passport defines the verify callback of this strategy
         (
           _accessToken: string,
           _refreshToken: string,

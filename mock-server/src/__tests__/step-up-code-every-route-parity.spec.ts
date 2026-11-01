@@ -59,9 +59,7 @@ async function oauthOnlyEnrolledToken(): Promise<string> {
 
 function send(
   token: string,
-  method: string,
-  path: string,
-  body: object
+  { method, path, body }: { method: string; path: string; body: object }
 ): Promise<Response> {
   return fetch(`${baseUrl}${path}`, {
     method,
@@ -99,9 +97,13 @@ it('refuses a code in place of the current password for a password change', asyn
   const user = getState().users.get(OAUTH_ONLY_ID) as MockUser;
   user.password = 'Current-Orchard-52';
 
-  const res = await send(token, 'PATCH', '/api/v1/auth/profile', {
-    password: 'Quarry-Bramble-83',
-    code: MOCK_TOTP_CODE
+  const res = await send(token, {
+    method: 'PATCH',
+    path: '/api/v1/auth/profile',
+    body: {
+      password: 'Quarry-Bramble-83',
+      code: MOCK_TOTP_CODE
+    }
   });
 
   expect(res.status).toBe(403);
@@ -116,8 +118,12 @@ it('names the code, not the password, when only a wrong code is offered', async 
   const user = getState().users.get(OAUTH_ONLY_ID) as MockUser;
   user.password = 'Current-Orchard-52';
 
-  const res = await send(token, 'POST', '/api/v1/auth/mfa/disable', {
-    code: WRONG_CODE
+  const res = await send(token, {
+    method: 'POST',
+    path: '/api/v1/auth/mfa/disable',
+    body: {
+      code: WRONG_CODE
+    }
   });
 
   expect(res.status).toBe(403);
@@ -142,7 +148,7 @@ describe.each(routes)('%s', (_name, method, path, body, status) => {
   it('refuses an account with no password that sends no factor', async () => {
     const token = await oauthOnlyEnrolledToken();
 
-    const res = await send(token, method, path, body);
+    const res = await send(token, { method, path, body });
 
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
@@ -153,7 +159,11 @@ describe.each(routes)('%s', (_name, method, path, body, status) => {
   it('names the code when a wrong code is the only factor', async () => {
     const token = await oauthOnlyEnrolledToken();
 
-    const res = await send(token, method, path, { ...body, code: WRONG_CODE });
+    const res = await send(token, {
+      method,
+      path,
+      body: { ...body, code: WRONG_CODE }
+    });
 
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
@@ -164,9 +174,13 @@ describe.each(routes)('%s', (_name, method, path, body, status) => {
   it('accepts an authenticator code instead of a provider proof', async () => {
     const token = await oauthOnlyEnrolledToken();
 
-    const res = await send(token, method, path, {
-      ...body,
-      code: MOCK_TOTP_CODE
+    const res = await send(token, {
+      method,
+      path,
+      body: {
+        ...body,
+        code: MOCK_TOTP_CODE
+      }
     });
 
     expect(res.status).toBe(status);
@@ -175,7 +189,11 @@ describe.each(routes)('%s', (_name, method, path, body, status) => {
   it('rejects a code of the wrong shape', async () => {
     const token = await oauthOnlyEnrolledToken();
 
-    const res = await send(token, method, path, { ...body, code: '12' });
+    const res = await send(token, {
+      method,
+      path,
+      body: { ...body, code: '12' }
+    });
 
     expect(res.status).toBe(422);
   });

@@ -128,18 +128,16 @@ runWithInfra(
       target = await saveUser(emails.target);
       const viewerRole = await roleService.create(
         { name: `${tag}-viewer` },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       await roleService.setPermissionsForRole(
         viewerRole.id,
         [{ permissionId: searchUser.id }],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
-      await roleService.assignRoleToUser(
-        viewer.id,
-        viewerRole.id,
-        SYSTEM_ABILITY
-      );
+      await roleService.assignRoleToUser(viewer.id, viewerRole.id, {
+        ability: SYSTEM_ABILITY
+      });
     }, 60000);
 
     afterAll(async () => {
@@ -265,7 +263,7 @@ runWithInfra(
       const stream = await openStream(viewer);
       const extra = await roleService.create(
         { name: `${tag}-extra` },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       const req = requestOf(randomUUID());
 
@@ -328,7 +326,7 @@ runWithInfra(
       const plainStream = await openStream(plain);
       const renamed = await roleService.create(
         { name: `${tag}-doomed` },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       const req = requestOf(randomUUID());
 

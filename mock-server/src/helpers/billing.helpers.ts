@@ -13,8 +13,7 @@ import type { MockInvoice, MockPlan, MockSubscription } from '../types';
 export function sumPlanMeterUnits(
   plan: MockPlan,
   subscriptionId: string,
-  startIso: string,
-  endIso: string
+  { startIso, endIso }: { startIso: string; endIso: string }
 ): number {
   if (!plan.meterKey) return 0;
   return [...getState().billingUsageRecords.values()]
@@ -53,12 +52,10 @@ export function billClosingUsagePeriod(
   const closedStart = meteredWindowStart(subscription);
   if (now.getTime() <= new Date(closedStart).getTime()) return null;
 
-  const totalUnits = sumPlanMeterUnits(
-    plan,
-    subscription.id,
-    closedStart,
-    nowIso
-  );
+  const totalUnits = sumPlanMeterUnits(plan, subscription.id, {
+    startIso: closedStart,
+    endIso: nowIso
+  });
   const balance = state.billingCreditBalances.get(subscription.customerId);
   const { creditUnitsApplied, amountMinor } = rateUsage({
     totalUnits,

@@ -184,12 +184,12 @@ describe('RolesController', () => {
 
       const result = await controller.create(dto, mockReq, mockAbility);
 
-      expect(roleServiceMock.create).toHaveBeenCalledWith(
-        dto,
-        mockAbility,
-        'actor-1',
-        expect.any(Function)
-      );
+      expect(roleServiceMock.create).toHaveBeenCalledWith(dto, {
+        ability: mockAbility,
+        actorId: 'actor-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
       expect(result).toBe(role);
     });
   });
@@ -208,13 +208,12 @@ describe('RolesController', () => {
       );
 
       expect(roleServiceMock.findOne).not.toHaveBeenCalled();
-      expect(roleServiceMock.update).toHaveBeenCalledWith(
-        'role-1',
-        dto,
-        mockAbility,
-        'actor-1',
-        expect.any(Function)
-      );
+      expect(roleServiceMock.update).toHaveBeenCalledWith('role-1', dto, {
+        ability: mockAbility,
+        actorId: 'actor-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
       expect(result).toBe(updated);
     });
   });
@@ -226,12 +225,12 @@ describe('RolesController', () => {
       const result = await controller.remove('role-1', mockReq, mockAbility);
 
       expect(roleServiceMock.findOne).not.toHaveBeenCalled();
-      expect(roleServiceMock.delete).toHaveBeenCalledWith(
-        'role-1',
-        mockAbility,
-        'actor-1',
-        expect.any(Function)
-      );
+      expect(roleServiceMock.delete).toHaveBeenCalledWith('role-1', {
+        ability: mockAbility,
+        actorId: 'actor-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      });
       expect(result).toBeUndefined();
     });
   });
@@ -246,9 +245,14 @@ describe('RolesController', () => {
       expect(roleServiceMock.setPermissionsForRole).toHaveBeenCalledWith(
         'role-1',
         items,
-        mockAbility,
-        'actor-1',
-        expect.objectContaining({ action: AuditAction.PERMISSION_ASSIGN })
+        {
+          ability: mockAbility,
+          actorId: 'actor-1',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          audit: expect.objectContaining({
+            action: AuditAction.PERMISSION_ASSIGN
+          })
+        }
       );
     });
   });
@@ -264,11 +268,15 @@ describe('RolesController', () => {
 
       expect(roleServiceMock.assignPermissionsToRole).toHaveBeenCalledWith(
         'role-1',
-        ['perm-1', 'perm-2'],
-        undefined,
-        mockAbility,
-        'actor-1',
-        expect.objectContaining({ action: AuditAction.PERMISSION_ASSIGN })
+        { permissionIds: ['perm-1', 'perm-2'] },
+        {
+          ability: mockAbility,
+          actorId: 'actor-1',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          audit: expect.objectContaining({
+            action: AuditAction.PERMISSION_ASSIGN
+          })
+        }
       );
     });
   });
@@ -285,9 +293,14 @@ describe('RolesController', () => {
       expect(roleServiceMock.removePermissionFromRole).toHaveBeenCalledWith(
         'role-1',
         'perm-5',
-        mockAbility,
-        'actor-1',
-        expect.objectContaining({ action: AuditAction.PERMISSION_UNASSIGN })
+        {
+          ability: mockAbility,
+          actorId: 'actor-1',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          audit: expect.objectContaining({
+            action: AuditAction.PERMISSION_UNASSIGN
+          })
+        }
       );
     });
   });
@@ -301,9 +314,12 @@ describe('RolesController', () => {
       expect(roleServiceMock.assignRoleToUser).toHaveBeenCalledWith(
         'user-99',
         'role-1',
-        mockAbility,
-        'actor-1',
-        expect.objectContaining({ action: AuditAction.ROLE_ASSIGN })
+        {
+          ability: mockAbility,
+          actorId: 'actor-1',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          audit: expect.objectContaining({ action: AuditAction.ROLE_ASSIGN })
+        }
       );
     });
 
@@ -347,9 +363,12 @@ describe('RolesController', () => {
       expect(roleServiceMock.removeRoleFromUser).toHaveBeenCalledWith(
         'user-99',
         'role-1',
-        mockAbility,
-        'actor-1',
-        expect.objectContaining({ action: AuditAction.ROLE_UNASSIGN })
+        {
+          ability: mockAbility,
+          actorId: 'actor-1',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          audit: expect.objectContaining({ action: AuditAction.ROLE_UNASSIGN })
+        }
       );
     });
 
@@ -415,11 +434,9 @@ describe('RolesController', () => {
     it('create: ROLE_CREATE on the created role with the name', async () => {
       await controller.create({ name: 'editor' }, mockReq, mockAbility);
 
-      const [, , , row] = roleServiceMock.create.mock.calls[0] as [
+      const [, { audit: row }] = roleServiceMock.create.mock.calls[0] as [
         unknown,
-        unknown,
-        unknown,
-        (role: { id: string }) => AuditLogParams
+        { audit: (role: { id: string }) => AuditLogParams }
       ];
       expect(row({ id: 'role-new' })).toEqual({
         ...actorFields,
@@ -438,12 +455,15 @@ describe('RolesController', () => {
         mockAbility
       );
 
-      const [, , , , row] = roleServiceMock.update.mock.calls[0] as [
+      const [, , { audit: row }] = roleServiceMock.update.mock.calls[0] as [
         unknown,
         unknown,
-        unknown,
-        unknown,
-        (before: { name: string; description: string }) => AuditLogParams
+        {
+          audit: (before: {
+            name: string;
+            description: string;
+          }) => AuditLogParams;
+        }
       ];
       expect(row({ name: 'editor', description: 'old' })).toEqual({
         ...actorFields,
@@ -457,11 +477,9 @@ describe('RolesController', () => {
     it('remove: ROLE_DELETE records the name of the deleted role', async () => {
       await controller.remove('role-1', mockReq, mockAbility);
 
-      const [, , , row] = roleServiceMock.delete.mock.calls[0] as [
+      const [, { audit: row }] = roleServiceMock.delete.mock.calls[0] as [
         unknown,
-        unknown,
-        unknown,
-        (role: { name: string }) => AuditLogParams
+        { audit: (role: { name: string }) => AuditLogParams }
       ];
       expect(row({ name: 'editor' })).toEqual({
         ...actorFields,
@@ -483,14 +501,16 @@ describe('RolesController', () => {
       expect(roleServiceMock.setPermissionsForRole).toHaveBeenCalledWith(
         'role-1',
         expect.any(Array),
-        mockAbility,
-        'actor-1',
         {
-          ...actorFields,
-          action: AuditAction.PERMISSION_ASSIGN,
-          targetType: 'Role',
-          targetId: 'role-1',
-          details: { permissionIds: ['p1', 'p2'] }
+          ability: mockAbility,
+          actorId: 'actor-1',
+          audit: {
+            ...actorFields,
+            action: AuditAction.PERMISSION_ASSIGN,
+            targetType: 'Role',
+            targetId: 'role-1',
+            details: { permissionIds: ['p1', 'p2'] }
+          }
         }
       );
     });
@@ -505,16 +525,17 @@ describe('RolesController', () => {
 
       expect(roleServiceMock.assignPermissionsToRole).toHaveBeenCalledWith(
         'role-1',
-        ['p1', 'p2'],
-        undefined,
-        mockAbility,
-        'actor-1',
+        { permissionIds: ['p1', 'p2'] },
         {
-          ...actorFields,
-          action: AuditAction.PERMISSION_ASSIGN,
-          targetType: 'Role',
-          targetId: 'role-1',
-          details: { permissionIds: ['p1', 'p2'] }
+          ability: mockAbility,
+          actorId: 'actor-1',
+          audit: {
+            ...actorFields,
+            action: AuditAction.PERMISSION_ASSIGN,
+            targetType: 'Role',
+            targetId: 'role-1',
+            details: { permissionIds: ['p1', 'p2'] }
+          }
         }
       );
     });
@@ -530,14 +551,16 @@ describe('RolesController', () => {
       expect(roleServiceMock.removePermissionFromRole).toHaveBeenCalledWith(
         'role-1',
         'perm-5',
-        mockAbility,
-        'actor-1',
         {
-          ...actorFields,
-          action: AuditAction.PERMISSION_UNASSIGN,
-          targetType: 'Role',
-          targetId: 'role-1',
-          details: { permissionId: 'perm-5' }
+          ability: mockAbility,
+          actorId: 'actor-1',
+          audit: {
+            ...actorFields,
+            action: AuditAction.PERMISSION_UNASSIGN,
+            targetType: 'Role',
+            targetId: 'role-1',
+            details: { permissionId: 'perm-5' }
+          }
         }
       );
     });
@@ -553,14 +576,16 @@ describe('RolesController', () => {
       expect(roleServiceMock.assignRoleToUser).toHaveBeenCalledWith(
         'user-99',
         'role-1',
-        mockAbility,
-        'actor-1',
         {
-          ...actorFields,
-          action: AuditAction.ROLE_ASSIGN,
-          targetType: 'User',
-          targetId: 'user-99',
-          details: { roleId: 'role-1' }
+          ability: mockAbility,
+          actorId: 'actor-1',
+          audit: {
+            ...actorFields,
+            action: AuditAction.ROLE_ASSIGN,
+            targetType: 'User',
+            targetId: 'user-99',
+            details: { roleId: 'role-1' }
+          }
         }
       );
     });
@@ -571,14 +596,16 @@ describe('RolesController', () => {
       expect(roleServiceMock.removeRoleFromUser).toHaveBeenCalledWith(
         'user-99',
         'role-1',
-        mockAbility,
-        'actor-1',
         {
-          ...actorFields,
-          action: AuditAction.ROLE_UNASSIGN,
-          targetType: 'User',
-          targetId: 'user-99',
-          details: { roleId: 'role-1' }
+          ability: mockAbility,
+          actorId: 'actor-1',
+          audit: {
+            ...actorFields,
+            action: AuditAction.ROLE_UNASSIGN,
+            targetType: 'User',
+            targetId: 'user-99',
+            details: { roleId: 'role-1' }
+          }
         }
       );
     });

@@ -108,9 +108,15 @@ function respondLocked(res: Response, lockedUntil: string): void {
 
 function respondInvalidCredentials(
   res: Response,
-  email: string,
-  failedLoginAttempts: number | null,
-  ip: string | undefined
+  {
+    email,
+    failedLoginAttempts,
+    ip
+  }: {
+    email: string;
+    failedLoginAttempts: number | null;
+    ip: string | undefined;
+  }
 ): void {
   logAudit('USER_LOGIN_FAILURE', {
     actorEmail: email,
@@ -215,7 +221,11 @@ router.post('/login', (req, res) => {
 
   // Plaintext comparison - mock only. Real server uses bcrypt.compare().
   if (!user || !user.isActive || !user.password) {
-    respondInvalidCredentials(res, email, null, req.ip);
+    respondInvalidCredentials(res, {
+      email,
+      failedLoginAttempts: null,
+      ip: req.ip
+    });
     return;
   }
 
@@ -257,7 +267,11 @@ router.post('/login', (req, res) => {
       respondLocked(res, user.lockedUntil);
       return;
     }
-    respondInvalidCredentials(res, email, user.failedLoginAttempts, req.ip);
+    respondInvalidCredentials(res, {
+      email,
+      failedLoginAttempts: user.failedLoginAttempts,
+      ip: req.ip
+    });
     return;
   }
 
@@ -288,7 +302,7 @@ router.post('/login', (req, res) => {
     return;
   }
 
-  completeSignIn(req, res, user);
+  completeSignIn({ req, res }, user);
 });
 
 // POST /api/v1/auth/verify-email
@@ -719,12 +733,10 @@ router.post('/refresh-token', (req, res) => {
   // The binding of the revoked ancestor stays: a session ends as a whole, and
   // `endSessionOfToken` needs the ancestors to clear the reuse-detection map
   // too. Liveness reads the active map only, so this keeps nothing alive.
-  registerSession(
-    tokens.refresh_token,
-    sessionId,
-    null,
-    normalizeIpAddress(req.ip)
-  );
+  registerSession(tokens.refresh_token, sessionId, {
+    userAgent: null,
+    ipAddress: normalizeIpAddress(req.ip)
+  });
 
   const { refresh_token, ...publicTokens } = tokens;
   setRefreshTokenCookie(res, refresh_token);
@@ -797,7 +809,10 @@ router.patch(
     const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS, [
       ...nameErrors(name, 'definedOnly'),
       ...newPasswordErrors(password, 'definedOnly'),
-      ...oneOfErrors('locale', locale, SUPPORTED_LOCALES, 'definedOnly')
+      ...oneOfErrors('locale', locale, {
+        values: SUPPORTED_LOCALES,
+        optional: 'definedOnly'
+      })
     ]);
     if (bodyErrors.length > 0) {
       sendValidationError(res, 'body', bodyErrors);
@@ -807,13 +822,11 @@ router.patch(
     if (password !== undefined) {
       // A first password binds a credential that outlives the session, so it
       // needs the same fresh proof of identity an email change needs.
-      const stepUp = stepUpError(
-        req,
-        user,
+      const stepUp = stepUpError(req, user, {
         currentPassword,
         code,
-        STEP_UP_OPERATION.PASSWORD_SET
-      );
+        operation: STEP_UP_OPERATION.PASSWORD_SET
+      });
       if (stepUp) {
         sendWithRetryAfter(res, stepUp);
         return;
@@ -889,13 +902,11 @@ router.post(
 
     const newEmail = normalizeEmail(req.body.newEmail) ?? '';
 
-    const stepUp = stepUpError(
-      req,
-      user,
+    const stepUp = stepUpError(req, user, {
       currentPassword,
       code,
-      STEP_UP_OPERATION.EMAIL_CHANGE
-    );
+      operation: STEP_UP_OPERATION.EMAIL_CHANGE
+    });
     if (stepUp) {
       sendWithRetryAfter(res, stepUp);
       return;

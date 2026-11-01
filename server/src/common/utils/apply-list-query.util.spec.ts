@@ -52,7 +52,7 @@ describe('applyListQuery', () => {
   it('adds nothing for an empty query', () => {
     const qb = builder();
 
-    applyListQuery(qb, SPEC, COLUMNS, {});
+    applyListQuery(qb, { spec: SPEC, columns: COLUMNS }, {});
 
     expect(render(qb).where).toBe('item.tenant = :tenant');
   });
@@ -60,7 +60,7 @@ describe('applyListQuery', () => {
   it('ORs the search over every search column and ANDs it to the existing condition', () => {
     const qb = builder();
 
-    applyListQuery(qb, SPEC, COLUMNS, { q: 'abc' });
+    applyListQuery(qb, { spec: SPEC, columns: COLUMNS }, { q: 'abc' });
 
     const { where, params } = render(qb);
     expect(where).toBe(
@@ -72,7 +72,11 @@ describe('applyListQuery', () => {
   it('escapes the LIKE wildcards of the search and of a contains filter', () => {
     const qb = builder();
 
-    applyListQuery(qb, SPEC, COLUMNS, { q: '50%_a\\b', email: '%' });
+    applyListQuery(
+      qb,
+      { spec: SPEC, columns: COLUMNS },
+      { q: '50%_a\\b', email: '%' }
+    );
 
     const { params } = render(qb);
     expect(params['listSearch']).toBe('%50\\%\\_a\\\\b%');
@@ -83,11 +87,15 @@ describe('applyListQuery', () => {
     const qb = builder();
     const ids = ['00000000-0000-4000-8000-000000000001'];
 
-    applyListQuery(qb, SPEC, COLUMNS, {
-      active: false,
-      email: 'ann',
-      ids
-    });
+    applyListQuery(
+      qb,
+      { spec: SPEC, columns: COLUMNS },
+      {
+        active: false,
+        email: 'ann',
+        ids
+      }
+    );
 
     const { where, params } = render(qb);
     expect(where).toBe(
@@ -103,7 +111,7 @@ describe('applyListQuery', () => {
   it('matches a scope array that is empty or holds the value', () => {
     const qb = builder();
 
-    applyListQuery(qb, SPEC, COLUMNS, { region: 'eu' });
+    applyListQuery(qb, { spec: SPEC, columns: COLUMNS }, { region: 'eu' });
 
     const { where, params } = render(qb);
     expect(where).toBe(
@@ -123,7 +131,7 @@ describe('applyListQuery', () => {
   ])('renders %p as %s', (query, condition) => {
     const qb = builder();
 
-    applyListQuery(qb, SPEC, COLUMNS, query);
+    applyListQuery(qb, { spec: SPEC, columns: COLUMNS }, query);
 
     expect(render(qb).where).toBe(`item.tenant = :tenant AND ${condition}`);
   });
@@ -131,11 +139,15 @@ describe('applyListQuery', () => {
   it('skips a filter that is not set, an empty text filter and an empty search', () => {
     const qb = builder();
 
-    applyListQuery(qb, SPEC, COLUMNS, {
-      q: '',
-      active: undefined,
-      email: ''
-    });
+    applyListQuery(
+      qb,
+      { spec: SPEC, columns: COLUMNS },
+      {
+        q: '',
+        active: undefined,
+        email: ''
+      }
+    );
 
     expect(render(qb).where).toBe('item.tenant = :tenant');
   });

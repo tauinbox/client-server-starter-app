@@ -110,11 +110,10 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const createdUser = await this.usersService.create(
-      createUserDto,
+    const createdUser = await this.usersService.create(createUserDto, {
       ability,
-      req.user.userId,
-      (user) => [
+      actorId: req.user.userId,
+      audit: (user) => [
         {
           action: AuditAction.USER_CREATE,
           actorId: req.user.userId,
@@ -124,7 +123,7 @@ export class UsersController {
           context: extractAuditContext(req)
         }
       ]
-    );
+    });
     this.eventEmitter.emit(
       UserCreatedEvent.name,
       new UserCreatedEvent(createdUser.id)
@@ -282,13 +281,11 @@ export class UsersController {
         );
       }
       if (changes.password !== undefined || changes.email !== target.email) {
-        await this.assertCredentialStepUp(
-          req,
-          ability,
+        await this.assertCredentialStepUp(req, ability, {
           target,
           currentPassword,
           code
-        );
+        });
       }
     }
 
@@ -308,7 +305,8 @@ export class UsersController {
       targetType: 'User',
       context: extractAuditContext(req)
     };
-    const updatedUser = await this.usersService.update(id, changes, ability, {
+    const updatedUser = await this.usersService.update(id, changes, {
+      ability,
       actorId: req.user.userId,
       audit: (user) => [
         {
@@ -349,12 +347,10 @@ export class UsersController {
 
     if (password) {
       this.mailService
-        .sendPasswordChangedNotification(
-          updatedUser.email,
-          'admin',
-          updatedUser.locale,
-          req.ip
-        )
+        .sendPasswordChangedNotification(updatedUser.email, 'admin', {
+          locale: updatedUser.locale,
+          ip: req.ip
+        })
         .catch((err) =>
           this.logger.error('Failed to send password-changed notification', err)
         );
@@ -431,25 +427,22 @@ export class UsersController {
     const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
     // Before the step-up, so a request refused anyway spends no code; the
     // instance check leads so an outsider cannot probe for the factor.
-    this.usersService.assertCanWrite(
-      ability,
-      'update',
+    this.usersService.assertCanWrite(ability, {
+      action: 'update',
       target,
-      req.user.userId
-    );
+      actorId: req.user.userId
+    });
     if (!target.mfaEnabled) {
       throw new ApiError(
         ErrorKeys.AUTH.MFA_NOT_ENABLED,
         'Two-factor authentication is not enabled'
       );
     }
-    await this.assertCredentialStepUp(
-      req,
-      ability,
+    await this.assertCredentialStepUp(req, ability, {
       target,
-      dto.currentPassword,
-      dto.code
-    );
+      currentPassword: dto.currentPassword,
+      code: dto.code
+    });
 
     await this.mfaService.resetByAdmin(
       target,
@@ -495,12 +488,11 @@ export class UsersController {
     }
 
     const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
-    this.usersService.assertCanWrite(
-      ability,
-      'update',
+    this.usersService.assertCanWrite(ability, {
+      action: 'update',
       target,
-      req.user.userId
-    );
+      actorId: req.user.userId
+    });
 
     // The row goes first: the revocation runs in the auth module and cannot
     // share its transaction. A revocation never happens without its row; a
@@ -534,23 +526,25 @@ export class UsersController {
   private async assertCredentialStepUp(
     req: JwtAuthRequest,
     ability: AppAbility,
-    target: User,
-    currentPassword: string | undefined,
-    code: string | undefined
-  ): Promise<void> {
-    this.usersService.assertCanWrite(
-      ability,
-      'update',
+    {
       target,
-      req.user.userId
-    );
+      currentPassword,
+      code
+    }: { target: User; currentPassword?: string; code?: string }
+  ): Promise<void> {
+    this.usersService.assertCanWrite(ability, {
+      action: 'update',
+      target,
+      actorId: req.user.userId
+    });
     await this.authService.assertStepUp(
       await this.usersService.findOne(req.user.userId, SYSTEM_ABILITY),
-      currentPassword,
-      undefined,
-      STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
-      code,
-      extractAuditContext(req)
+      {
+        currentPassword,
+        operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+        totpCode: code,
+        auditContext: extractAuditContext(req)
+      }
     );
   }
 
@@ -568,17 +562,21 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    await this.usersService.remove(id, ability, req.user.userId, (user) => [
-      {
-        action: AuditAction.USER_DELETE,
-        actorId: req.user.userId,
-        actorEmail: req.user.email,
-        targetId: id,
-        targetType: 'User',
-        details: { targetEmail: user.email },
-        context: extractAuditContext(req)
-      }
-    ]);
+    await this.usersService.remove(id, {
+      ability,
+      actorId: req.user.userId,
+      audit: (user) => [
+        {
+          action: AuditAction.USER_DELETE,
+          actorId: req.user.userId,
+          actorEmail: req.user.email,
+          targetId: id,
+          targetType: 'User',
+          details: { targetEmail: user.email },
+          context: extractAuditContext(req)
+        }
+      ]
+    });
     this.eventEmitter.emit(UserDeletedEvent.name, new UserDeletedEvent(id));
     await this.eventEmitter.emitAsync(
       UserSessionRevocationRequiredEvent.name,
@@ -605,11 +603,10 @@ export class UsersController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    const restoredUser = await this.usersService.restore(
-      id,
+    const restoredUser = await this.usersService.restore(id, {
       ability,
-      req.user.userId,
-      (user) => [
+      actorId: req.user.userId,
+      audit: (user) => [
         {
           action: AuditAction.USER_RESTORE,
           actorId: req.user.userId,
@@ -620,7 +617,7 @@ export class UsersController {
           context: extractAuditContext(req)
         }
       ]
-    );
+    });
     this.eventEmitter.emit(UserRestoredEvent.name, new UserRestoredEvent(id));
     return restoredUser;
   }

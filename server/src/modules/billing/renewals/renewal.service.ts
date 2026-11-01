@@ -229,8 +229,10 @@ export class RenewalService {
       await this.chargeClosingWindow(
         parties,
         { start: windowStart, end: now },
-        `${CLOSING_CHARGE_KEY_PREFIX}${subscription.id}:${windowStart.getTime()}`,
-        now
+        {
+          idempotencyKey: `${CLOSING_CHARGE_KEY_PREFIX}${subscription.id}:${windowStart.getTime()}`,
+          now
+        }
       );
       return;
     }
@@ -243,16 +245,17 @@ export class RenewalService {
       await this.chargeClosingWindow(
         parties,
         { start: windowStart, end: dueAnchor },
-        renewalKey,
-        now
+        { idempotencyKey: renewalKey, now }
       );
     }
     if (now.getTime() > dueAnchor.getTime()) {
       await this.chargeClosingWindow(
         parties,
         { start: dueAnchor, end: now },
-        `${CLOSING_CHARGE_KEY_PREFIX}${subscription.id}:${dueAnchor.getTime()}`,
-        now
+        {
+          idempotencyKey: `${CLOSING_CHARGE_KEY_PREFIX}${subscription.id}:${dueAnchor.getTime()}`,
+          now
+        }
       );
     }
   }
@@ -281,8 +284,7 @@ export class RenewalService {
   private async chargeClosingWindow(
     parties: ChargeParties,
     window: { start: Date; end: Date },
-    idempotencyKey: string,
-    now: Date
+    { idempotencyKey, now }: { idempotencyKey: string; now: Date }
   ): Promise<void> {
     const { subscription, customer, provider } = parties;
     const due = await this.plantCharge({
@@ -303,13 +305,12 @@ export class RenewalService {
       charge = { providerInvoiceRef: idempotencyKey, status: 'captured' };
     } else {
       try {
-        charge = await provider.chargeOffSession(
-          customer,
-          due.rated.amountMinor,
-          due.rated.currency,
-          due.rated.receiptItems,
+        charge = await provider.chargeOffSession(customer, {
+          amountMinor: due.rated.amountMinor,
+          currency: due.rated.currency,
+          receiptItems: due.rated.receiptItems,
           idempotencyKey
-        );
+        });
       } catch (error) {
         this.logger.warn(
           `Closing charge failed for subscription ${subscription.id}: ${(error as Error).message}`
@@ -325,7 +326,10 @@ export class RenewalService {
     }
 
     const paidInvoiceId = await withTransaction(this.dataSource, (manager) =>
-      this.settlePeriodInvoice(manager, due, charge.providerInvoiceRef, now)
+      this.settlePeriodInvoice(manager, due, {
+        providerInvoiceRef: charge.providerInvoiceRef,
+        now
+      })
     );
     if (paidInvoiceId) {
       this.events.emit(
@@ -471,7 +475,7 @@ export class RenewalService {
       return;
     }
 
-    await this.handleSuccess(due, charge, anchor, now);
+    await this.handleSuccess(due, charge, { anchor, now });
   }
 
   /**
@@ -614,13 +618,12 @@ export class RenewalService {
 
     let result: ChargeResult;
     try {
-      result = await provider.chargeOffSession(
-        customer,
-        rated.amountMinor,
-        rated.currency,
-        rated.receiptItems,
+      result = await provider.chargeOffSession(customer, {
+        amountMinor: rated.amountMinor,
+        currency: rated.currency,
+        receiptItems: rated.receiptItems,
         idempotencyKey
-      );
+      });
     } catch (error) {
       this.logger.warn(
         `Renewal charge failed for subscription ${subscription.id}: ${(error as Error).message}`
@@ -670,8 +673,7 @@ export class RenewalService {
         const summary = await this.usageRating.summarizeForPeriodWithCredits(
           subscription,
           plan,
-          period,
-          available
+          { period, availableCreditUnits: available }
         );
         planted = {
           ...due,
@@ -829,19 +831,16 @@ export class RenewalService {
   private async handleSuccess(
     due: PeriodCharge,
     charge: ChargeResult,
-    anchor: Date,
-    now: Date
+    { anchor, now }: { anchor: Date; now: Date }
   ): Promise<void> {
     const { subscription, customer, plan, idempotencyKey, closing } = due;
     const billingAnchor = this.billingAnchor(subscription, anchor);
 
     const result = await withTransaction(this.dataSource, async (manager) => {
-      const paidInvoiceId = await this.settlePeriodInvoice(
-        manager,
-        due,
-        charge.providerInvoiceRef,
+      const paidInvoiceId = await this.settlePeriodInvoice(manager, due, {
+        providerInvoiceRef: charge.providerInvoiceRef,
         now
-      );
+      });
 
       // CAS on the period end and status read at scan start: a cancel landing
       // during the provider round-trip leaves `currentPeriodEnd` untouched and
@@ -927,8 +926,7 @@ export class RenewalService {
   private async settlePeriodInvoice(
     manager: EntityManager,
     due: PeriodCharge,
-    providerInvoiceRef: string,
-    now: Date
+    { providerInvoiceRef, now }: { providerInvoiceRef: string; now: Date }
   ): Promise<string | null> {
     const { subscription, idempotencyKey } = due;
     const flip = await manager.update(
@@ -951,8 +949,7 @@ export class RenewalService {
     if (invoice.creditUnitsApplied > 0) {
       await this.credits.spendOnUsage(
         manager,
-        subscription.customerId,
-        invoice.id,
+        { customerId: subscription.customerId, invoiceId: invoice.id },
         invoice.creditUnitsApplied
       );
     }

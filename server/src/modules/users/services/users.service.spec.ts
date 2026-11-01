@@ -21,6 +21,7 @@ import {
   SYSTEM_ABILITY,
   type AppAbility
 } from '../../auth/casl/app-ability';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -152,6 +153,7 @@ describe('UsersService', () => {
           provide: MetricsService,
           useValue: mockMetricsService
         },
+        AccessRefusalService,
         {
           provide: MailService,
           useValue: mockMailService
@@ -183,7 +185,9 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
-      const result = await service.create(createUserDto, SYSTEM_ABILITY);
+      const result = await service.create(createUserDto, {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: [
@@ -213,7 +217,7 @@ describe('UsersService', () => {
       );
 
       await expect(
-        service.create(createUserDto, SYSTEM_ABILITY)
+        service.create(createUserDto, { ability: SYSTEM_ABILITY })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
       });
@@ -229,7 +233,7 @@ describe('UsersService', () => {
 
       await service.create(
         { ...createUserDto, password: 'kettlesunrise' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(bcrypt.hash).toHaveBeenCalledWith(
@@ -242,10 +246,10 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
       await expect(
-        service.create(createUserDto, SYSTEM_ABILITY)
+        service.create(createUserDto, { ability: SYSTEM_ABILITY })
       ).rejects.toThrow(HttpException);
       await expect(
-        service.create(createUserDto, SYSTEM_ABILITY)
+        service.create(createUserDto, { ability: SYSTEM_ABILITY })
       ).rejects.toThrow('User with this email already exists');
     });
 
@@ -258,7 +262,7 @@ describe('UsersService', () => {
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
       try {
-        await service.create(createUserDto, SYSTEM_ABILITY);
+        await service.create(createUserDto, { ability: SYSTEM_ABILITY });
         fail('Expected HttpException');
       } catch (err) {
         expect(err).toBeInstanceOf(HttpException);
@@ -277,7 +281,7 @@ describe('UsersService', () => {
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
       await expect(
-        service.create(createUserDto, SYSTEM_ABILITY)
+        service.create(createUserDto, { ability: SYSTEM_ABILITY })
       ).rejects.toThrow('connection lost');
     });
 
@@ -287,9 +291,12 @@ describe('UsersService', () => {
       mockRepository.save.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
-      await service.create(createUserDto, SYSTEM_ABILITY, undefined, (user) => [
-        { action: AuditAction.USER_CREATE, targetId: user.id }
-      ]);
+      await service.create(createUserDto, {
+        ability: SYSTEM_ABILITY,
+        audit: (user) => [
+          { action: AuditAction.USER_CREATE, targetId: user.id }
+        ]
+      });
 
       expect(mockAuditService.log).toHaveBeenCalledWith(
         { action: AuditAction.USER_CREATE, targetId: 'user-1' },
@@ -305,9 +312,10 @@ describe('UsersService', () => {
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed' as never);
 
       await expect(
-        service.create(createUserDto, SYSTEM_ABILITY, undefined, () => [
-          { action: AuditAction.USER_CREATE }
-        ])
+        service.create(createUserDto, {
+          ability: SYSTEM_ABILITY,
+          audit: () => [{ action: AuditAction.USER_CREATE }]
+        })
       ).rejects.toThrow('audit down');
     });
 
@@ -321,7 +329,7 @@ describe('UsersService', () => {
       ]);
 
       await expect(
-        service.create(createUserDto, ability, 'actor-1')
+        service.create(createUserDto, { ability, actorId: 'actor-1' })
       ).rejects.toThrow(ApiError);
       expect(
         mockBreachedPasswordService.assertNotBreached
@@ -347,7 +355,7 @@ describe('UsersService', () => {
         }
       ]);
 
-      await expect(service.create(createUserDto, ability)).resolves.toBe(
+      await expect(service.create(createUserDto, { ability })).resolves.toBe(
         mockUser
       );
     });
@@ -355,7 +363,7 @@ describe('UsersService', () => {
     it('requires the ability argument and fails closed without it', async () => {
       await expect(
         // @ts-expect-error the ability is required: a skipped check is written as SYSTEM_ABILITY
-        service.create(createUserDto)
+        service.create(createUserDto, {})
       ).rejects.toThrow(TypeError);
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
@@ -619,7 +627,9 @@ describe('UsersService', () => {
       const updateDto = { name: 'Updated' };
       mockRepository.findOne.mockResolvedValue(mockUser);
 
-      const result = await service.update('user-1', updateDto, SYSTEM_ABILITY);
+      const result = await service.update('user-1', updateDto, {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(manager.update).toHaveBeenCalledWith(User, live, updateDto);
       expect(result.name).toBe('Updated');
@@ -632,7 +642,7 @@ describe('UsersService', () => {
         'user-1',
         // @ts-expect-error a body may carry a field that is not a column
         { name: 'Updated', unknownField: 'x' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(manager.update).toHaveBeenCalledTimes(1);
@@ -647,7 +657,11 @@ describe('UsersService', () => {
       const audit = jest.fn().mockReturnValue([]);
 
       await expect(
-        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, { audit })
+        service.update(
+          'user-1',
+          { name: 'Updated' },
+          { ability: SYSTEM_ABILITY, audit }
+        )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
       });
@@ -658,9 +672,11 @@ describe('UsersService', () => {
     it('keys the write on the expected credential', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
-      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
-        expected: { password: 'verified-hash' }
-      });
+      await service.update(
+        'user-1',
+        { name: 'Updated' },
+        { ability: SYSTEM_ABILITY, expected: { password: 'verified-hash' } }
+      );
 
       expect(manager.update).toHaveBeenCalledWith(
         User,
@@ -672,9 +688,11 @@ describe('UsersService', () => {
     it('keys an account with no password on a null credential', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
-      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
-        expected: { password: null }
-      });
+      await service.update(
+        'user-1',
+        { name: 'Updated' },
+        { ability: SYSTEM_ABILITY, expected: { password: null } }
+      );
 
       expect(manager.update).toHaveBeenCalledWith(
         User,
@@ -689,9 +707,11 @@ describe('UsersService', () => {
       manager.exists.mockResolvedValue(true);
 
       await expect(
-        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
-          expected: { password: 'verified-hash' }
-        })
+        service.update(
+          'user-1',
+          { name: 'Updated' },
+          { ability: SYSTEM_ABILITY, expected: { password: 'verified-hash' } }
+        )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
       });
@@ -704,9 +724,11 @@ describe('UsersService', () => {
       manager.exists.mockResolvedValue(false);
 
       await expect(
-        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
-          expected: { password: 'verified-hash' }
-        })
+        service.update(
+          'user-1',
+          { name: 'Updated' },
+          { ability: SYSTEM_ABILITY, expected: { password: 'verified-hash' } }
+        )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
       });
@@ -717,7 +739,7 @@ describe('UsersService', () => {
       manager.exists.mockResolvedValue(false);
 
       await expect(
-        service.update('user-1', {}, SYSTEM_ABILITY)
+        service.update('user-1', {}, { ability: SYSTEM_ABILITY })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
       });
@@ -730,7 +752,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
 
-      await service.update('user-1', updateDto, SYSTEM_ABILITY);
+      await service.update('user-1', updateDto, { ability: SYSTEM_ABILITY });
 
       expect(bcrypt.hash).toHaveBeenCalledWith(
         prehashPassword('NewPassword1'),
@@ -756,7 +778,7 @@ describe('UsersService', () => {
       await service.update(
         'user-1',
         { password: 'NewPassword1' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(written).toMatchObject({
@@ -776,7 +798,11 @@ describe('UsersService', () => {
         pendingEmailToken: 'hashed-pending-token'
       });
 
-      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY);
+      await service.update(
+        'user-1',
+        { name: 'Updated' },
+        { ability: SYSTEM_ABILITY }
+      );
 
       expect(written).toEqual({ name: 'Updated' });
     });
@@ -795,7 +821,11 @@ describe('UsersService', () => {
       );
 
       await expect(
-        service.update('user-1', { password: 'Password1' }, SYSTEM_ABILITY)
+        service.update(
+          'user-1',
+          { password: 'Password1' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.PASSWORD_BREACHED }
       });
@@ -809,7 +839,7 @@ describe('UsersService', () => {
       await service.update(
         'user-1',
         { password: 'Copper-Meadow-83', name: 'Martina' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(
@@ -823,7 +853,11 @@ describe('UsersService', () => {
     it('spends no lookup on an update that carries no password', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
-      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY);
+      await service.update(
+        'user-1',
+        { name: 'Updated' },
+        { ability: SYSTEM_ABILITY }
+      );
 
       expect(
         mockBreachedPasswordService.assertNotBreached
@@ -834,7 +868,11 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(
-        service.update('nonexistent', { name: 'Updated' }, SYSTEM_ABILITY)
+        service.update(
+          'nonexistent',
+          { name: 'Updated' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toThrow(HttpException);
     });
 
@@ -845,7 +883,11 @@ describe('UsersService', () => {
         lockedUntil: new Date()
       });
 
-      await service.update('user-1', { unlockAccount: true }, SYSTEM_ABILITY);
+      await service.update(
+        'user-1',
+        { unlockAccount: true },
+        { ability: SYSTEM_ABILITY }
+      );
 
       expect(written).toEqual({ failedLoginAttempts: 0, lockedUntil: null });
     });
@@ -853,7 +895,11 @@ describe('UsersService', () => {
     it('should revoke tokens when deactivating a user', async () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
-      await service.update('user-1', { isActive: false }, SYSTEM_ABILITY);
+      await service.update(
+        'user-1',
+        { isActive: false },
+        { ability: SYSTEM_ABILITY }
+      );
 
       expect(written).toMatchObject({
         isActive: false,
@@ -869,7 +915,11 @@ describe('UsersService', () => {
         pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
       });
 
-      await service.update('user-1', { isActive: false }, SYSTEM_ABILITY);
+      await service.update(
+        'user-1',
+        { isActive: false },
+        { ability: SYSTEM_ABILITY }
+      );
 
       expect(written).toMatchObject({
         pendingEmail: null,
@@ -886,7 +936,11 @@ describe('UsersService', () => {
         pendingEmailToken: 'hashed-token'
       });
 
-      await service.update('user-1', { isActive: true }, SYSTEM_ABILITY);
+      await service.update(
+        'user-1',
+        { isActive: true },
+        { ability: SYSTEM_ABILITY }
+      );
 
       expect(written).toEqual({ isActive: true });
     });
@@ -901,7 +955,7 @@ describe('UsersService', () => {
         await service.update(
           'user-1',
           { email: 'taken@example.com' },
-          SYSTEM_ABILITY
+          { ability: SYSTEM_ABILITY }
         );
         fail('Expected HttpException');
       } catch (err) {
@@ -919,7 +973,11 @@ describe('UsersService', () => {
       manager.update.mockRejectedValue(new Error('connection lost'));
 
       await expect(
-        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY)
+        service.update(
+          'user-1',
+          { name: 'Updated' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toThrow('connection lost');
     });
 
@@ -930,7 +988,7 @@ describe('UsersService', () => {
       const ability: AppAbility = { can: canSpy };
 
       await expect(
-        service.update('user-1', { name: 'Updated' }, ability)
+        service.update('user-1', { name: 'Updated' }, { ability })
       ).rejects.toThrow(ApiError);
       expect(canSpy).toHaveBeenCalledWith('update', mockUser);
     });
@@ -941,9 +999,11 @@ describe('UsersService', () => {
       const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
       await expect(
-        service.update('user-1', { name: 'Updated' }, ability, {
-          actorId: 'actor-1'
-        })
+        service.update(
+          'user-1',
+          { name: 'Updated' },
+          { ability, actorId: 'actor-1' }
+        )
       ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -965,7 +1025,7 @@ describe('UsersService', () => {
       const result = await service.update(
         'user-1',
         { name: 'Updated' },
-        ability
+        { ability }
       );
 
       expect(canSpy).toHaveBeenCalledWith('update', mockUser);
@@ -978,7 +1038,7 @@ describe('UsersService', () => {
       const result = await service.update(
         'user-1',
         { name: 'Updated' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(result.name).toBe('Updated');
@@ -1008,7 +1068,7 @@ describe('UsersService', () => {
           {
             email: 'changed@example.com'
           },
-          SYSTEM_ABILITY
+          { ability: SYSTEM_ABILITY }
         );
 
         expect(result.email).toBe('changed@example.com');
@@ -1031,7 +1091,7 @@ describe('UsersService', () => {
         const result = await service.update(
           'user-1',
           { email: user.email },
-          SYSTEM_ABILITY
+          { ability: SYSTEM_ABILITY }
         );
 
         expect(result.isEmailVerified).toBe(true);
@@ -1048,7 +1108,7 @@ describe('UsersService', () => {
           service.update(
             'user-1',
             { email: 'taken@example.com' },
-            SYSTEM_ABILITY
+            { ability: SYSTEM_ABILITY }
           )
         ).rejects.toMatchObject({
           status: HttpStatus.CONFLICT,
@@ -1070,7 +1130,7 @@ describe('UsersService', () => {
           service.update(
             'user-1',
             { email: 'taken@example.com' },
-            SYSTEM_ABILITY
+            { ability: SYSTEM_ABILITY }
           )
         ).resolves.toBeDefined();
       });
@@ -1103,7 +1163,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const manager = mockRemoveTransaction();
 
-      await service.remove('user-1', SYSTEM_ABILITY);
+      await service.remove('user-1', { ability: SYSTEM_ABILITY });
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
@@ -1120,7 +1180,7 @@ describe('UsersService', () => {
       const audit = jest.fn().mockReturnValue([]);
 
       await expect(
-        service.remove('user-1', SYSTEM_ABILITY, undefined, audit)
+        service.remove('user-1', { ability: SYSTEM_ABILITY, audit })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
       });
@@ -1131,7 +1191,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
       const manager = mockRemoveTransaction();
 
-      await service.remove('user-1', SYSTEM_ABILITY);
+      await service.remove('user-1', { ability: SYSTEM_ABILITY });
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(manager.update).toHaveBeenCalledWith(User, live, {
@@ -1151,9 +1211,9 @@ describe('UsersService', () => {
         softDelete: jest.fn().mockRejectedValue(new Error('db down'))
       });
 
-      await expect(service.remove('user-1', SYSTEM_ABILITY)).rejects.toThrow(
-        'db down'
-      );
+      await expect(
+        service.remove('user-1', { ability: SYSTEM_ABILITY })
+      ).rejects.toThrow('db down');
 
       // The clear was issued on the transactional manager, so the rejection
       // propagating out of the callback rolls it back with the soft-delete.
@@ -1165,7 +1225,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(
-        service.remove('nonexistent', SYSTEM_ABILITY)
+        service.remove('nonexistent', { ability: SYSTEM_ABILITY })
       ).rejects.toThrow(HttpException);
     });
 
@@ -1175,7 +1235,9 @@ describe('UsersService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
-      await expect(service.remove('user-1', ability)).rejects.toThrow(ApiError);
+      await expect(service.remove('user-1', { ability })).rejects.toThrow(
+        ApiError
+      );
       expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
     });
 
@@ -1185,7 +1247,7 @@ describe('UsersService', () => {
       const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
       await expect(
-        service.remove('user-1', ability, 'actor-1')
+        service.remove('user-1', { ability, actorId: 'actor-1' })
       ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -1205,7 +1267,7 @@ describe('UsersService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
-      await service.remove('user-1', ability);
+      await service.remove('user-1', { ability });
 
       expect(canSpy).toHaveBeenCalledWith('delete', mockUser);
       expect(manager.softDelete).toHaveBeenCalledWith(User, live);
@@ -1227,7 +1289,9 @@ describe('UsersService', () => {
         .mockResolvedValueOnce(deletedUser) // withDeleted lookup
         .mockResolvedValueOnce(restoredUser); // final findOne after restore
 
-      const result = await service.restore('user-1', SYSTEM_ABILITY);
+      const result = await service.restore('user-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
@@ -1253,7 +1317,9 @@ describe('UsersService', () => {
         .mockResolvedValueOnce(deletedActiveUser)
         .mockResolvedValueOnce(mockUser);
 
-      const result = await service.restore('user-1', SYSTEM_ABILITY);
+      const result = await service.restore('user-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRepository.restore).toHaveBeenCalledTimes(1);
       expect(result.isActive).toBe(true);
@@ -1265,7 +1331,7 @@ describe('UsersService', () => {
       const audit = jest.fn().mockReturnValue([]);
 
       await expect(
-        service.restore('user-1', SYSTEM_ABILITY, undefined, audit)
+        service.restore('user-1', { ability: SYSTEM_ABILITY, audit })
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: 'errors.users.notDeleted' }
@@ -1280,7 +1346,7 @@ describe('UsersService', () => {
       const audit = jest.fn().mockReturnValue([]);
 
       await expect(
-        service.restore('user-1', SYSTEM_ABILITY, undefined, audit)
+        service.restore('user-1', { ability: SYSTEM_ABILITY, audit })
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: 'errors.users.notDeleted' }
@@ -1292,7 +1358,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(
-        service.restore('nonexistent', SYSTEM_ABILITY)
+        service.restore('nonexistent', { ability: SYSTEM_ABILITY })
       ).rejects.toThrow(HttpException);
     });
 
@@ -1302,7 +1368,7 @@ describe('UsersService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
-      await expect(service.restore('user-1', ability)).rejects.toThrow(
+      await expect(service.restore('user-1', { ability })).rejects.toThrow(
         ApiError
       );
       expect(canSpy).toHaveBeenCalledWith('delete', deletedUser);
@@ -1314,7 +1380,7 @@ describe('UsersService', () => {
       const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
       await expect(
-        service.restore('user-1', ability, 'actor-1')
+        service.restore('user-1', { ability, actorId: 'actor-1' })
       ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -1335,7 +1401,7 @@ describe('UsersService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
-      const result = await service.restore('user-1', ability);
+      const result = await service.restore('user-1', { ability });
 
       expect(canSpy).toHaveBeenCalledWith('delete', deletedUser);
       expect(result).toEqual(mockUser);
@@ -1507,12 +1573,11 @@ describe('UsersService', () => {
       const expiresAt = new Date('2025-06-01');
       mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
-      const issued = await service.setEmailVerificationToken(
-        'user-1',
-        'old@example.com',
-        'hashed-token',
+      const issued = await service.setEmailVerificationToken('user-1', {
+        email: 'old@example.com',
+        hashedToken: 'hashed-token',
         expiresAt
-      );
+      });
 
       expect(mockRepository.update).toHaveBeenCalledWith(
         {
@@ -1533,12 +1598,11 @@ describe('UsersService', () => {
       mockRepository.update.mockResolvedValueOnce({ affected: 0 });
 
       await expect(
-        service.setEmailVerificationToken(
-          'user-1',
-          'old@example.com',
-          'hashed-token',
-          new Date()
-        )
+        service.setEmailVerificationToken('user-1', {
+          email: 'old@example.com',
+          hashedToken: 'hashed-token',
+          expiresAt: new Date()
+        })
       ).resolves.toBe(false);
     });
   });
@@ -1602,12 +1666,11 @@ describe('UsersService', () => {
       const expiresAt = new Date('2025-06-01');
       mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
-      const issued = await service.setPasswordResetToken(
-        'user-1',
-        'old@example.com',
-        'hashed-token',
+      const issued = await service.setPasswordResetToken('user-1', {
+        email: 'old@example.com',
+        hashedToken: 'hashed-token',
         expiresAt
-      );
+      });
 
       expect(mockRepository.update).toHaveBeenCalledWith(
         { id: 'user-1', email: 'old@example.com', isActive: true },
@@ -1623,12 +1686,11 @@ describe('UsersService', () => {
       mockRepository.update.mockResolvedValueOnce({ affected: 0 });
 
       await expect(
-        service.setPasswordResetToken(
-          'user-1',
-          'old@example.com',
-          'hashed-token',
-          new Date()
-        )
+        service.setPasswordResetToken('user-1', {
+          email: 'old@example.com',
+          hashedToken: 'hashed-token',
+          expiresAt: new Date()
+        })
       ).resolves.toBe(false);
     });
   });
@@ -1669,16 +1731,16 @@ describe('UsersService', () => {
       // @ts-expect-error ability is required
       void (() => service.findCursorPaginated({ ...query, cursor: undefined }));
       // @ts-expect-error ability is required
-      void (() => service.update('user-1', { name: 'x' }));
+      void (() => service.update('user-1', { name: 'x' }, {}));
       // @ts-expect-error ability is required
-      void (() => service.remove('user-1'));
+      void (() => service.remove('user-1', {}));
       // @ts-expect-error ability is required
-      void (() => service.restore('user-1'));
+      void (() => service.restore('user-1', {}));
     });
 
     it('rejects undefined in place of an ability', () => {
       // @ts-expect-error undefined is not an ability nor the system sentinel
-      void (() => service.remove('user-1', undefined));
+      void (() => service.remove('user-1', { ability: undefined }));
     });
   });
 
@@ -1729,9 +1791,11 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(superUser);
 
       await expectSuperTargetRefusal(
-        service.update('super-1', { password: 'Copper-Meadow-83' }, delegated, {
-          actorId: 'actor-1'
-        }),
+        service.update(
+          'super-1',
+          { password: 'Copper-Meadow-83' },
+          { ability: delegated, actorId: 'actor-1' }
+        ),
         'update'
       );
       expect(
@@ -1744,9 +1808,11 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(superUser);
 
       await expectSuperTargetRefusal(
-        service.update('super-1', { isActive: false }, delegated, {
-          actorId: 'actor-1'
-        }),
+        service.update(
+          'super-1',
+          { isActive: false },
+          { ability: delegated, actorId: 'actor-1' }
+        ),
         'update'
       );
       expect(mockRepository.update).not.toHaveBeenCalled();
@@ -1756,7 +1822,7 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(superUser);
 
       await expectSuperTargetRefusal(
-        service.remove('super-1', delegated, 'actor-1'),
+        service.remove('super-1', { ability: delegated, actorId: 'actor-1' }),
         'delete'
       );
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
@@ -1769,7 +1835,7 @@ describe('UsersService', () => {
       });
 
       await expectSuperTargetRefusal(
-        service.restore('super-1', delegated, 'actor-1'),
+        service.restore('super-1', { ability: delegated, actorId: 'actor-1' }),
         'delete'
       );
       expect(mockRepository.restore).not.toHaveBeenCalled();
@@ -1780,9 +1846,11 @@ describe('UsersService', () => {
       mockRepository.findOneOrFail.mockResolvedValue(superUser);
 
       await expect(
-        service.update('super-1', { name: 'Kept' }, superActor, {
-          actorId: 'actor-1'
-        })
+        service.update(
+          'super-1',
+          { name: 'Kept' },
+          { ability: superActor, actorId: 'actor-1' }
+        )
       ).resolves.toBeDefined();
       expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });
@@ -1794,9 +1862,11 @@ describe('UsersService', () => {
       });
 
       await expect(
-        service.update('user-1', { name: 'Kept' }, delegated, {
-          actorId: 'actor-1'
-        })
+        service.update(
+          'user-1',
+          { name: 'Kept' },
+          { ability: delegated, actorId: 'actor-1' }
+        )
       ).rejects.toThrow('assertNotSuperTarget needs the roles of the target');
       expect(mockRepository.update).not.toHaveBeenCalled();
     });
@@ -1809,9 +1879,11 @@ describe('UsersService', () => {
       mockRepository.findOneOrFail.mockResolvedValue(mockUser);
 
       await expect(
-        service.update('user-1', { name: 'Kept' }, delegated, {
-          actorId: 'actor-1'
-        })
+        service.update(
+          'user-1',
+          { name: 'Kept' },
+          { ability: delegated, actorId: 'actor-1' }
+        )
       ).resolves.toBeDefined();
       expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });

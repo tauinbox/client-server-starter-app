@@ -416,15 +416,15 @@ describe('PlanChangeService', () => {
       const result = await ctx.service.changePlan('user-1', 'business');
 
       // 12 of 30 days: charge 290000*12/30, refund 99000*12/30.
-      expect(yoo.chargeOffSession).toHaveBeenCalledWith(
-        customer,
-        116000,
-        'RUB',
-        expect.arrayContaining([
+      expect(yoo.chargeOffSession).toHaveBeenCalledWith(customer, {
+        amountMinor: 116000,
+        currency: 'RUB',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        receiptItems: expect.arrayContaining([
           expect.objectContaining({ amountMinor: 116000 })
         ]),
-        'change-charge:sub-1:0:business'
-      );
+        idempotencyKey: 'change-charge:sub-1:0:business'
+      });
       expect(yoo.refund).toHaveBeenCalledWith(
         'pay_period',
         39600,
@@ -525,13 +525,14 @@ describe('PlanChangeService', () => {
         { id: 'inv-period', status: 'paid' },
         { status: 'refunded' }
       );
-      expect(yoo.chargeOffSession).toHaveBeenCalledWith(
-        customer,
-        39600,
-        'RUB',
-        expect.any(Array),
-        expect.any(String)
-      );
+      expect(yoo.chargeOffSession).toHaveBeenCalledWith(customer, {
+        amountMinor: 39600,
+        currency: 'RUB',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        receiptItems: expect.any(Array),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        idempotencyKey: expect.any(String)
+      });
     });
 
     it('charges and records both legs in the currency of the price, not the locale currency of the customer', async () => {
@@ -562,10 +563,14 @@ describe('PlanChangeService', () => {
 
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(
         expect.objectContaining({ currency: 'USD' }),
-        116000,
-        'RUB',
-        expect.any(Array),
-        expect.any(String)
+        {
+          amountMinor: 116000,
+          currency: 'RUB',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          receiptItems: expect.any(Array),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          idempotencyKey: expect.any(String)
+        }
       );
       expect(ctx.insertedInvoices).toHaveLength(2);
       expect(ctx.insertedInvoices[0]).toMatchObject({
@@ -1132,13 +1137,13 @@ describe('PlanChangeService', () => {
 
       await ctx.service.changePlan('user-1', 'business');
 
-      expect(yoo.chargeOffSession).toHaveBeenCalledWith(
-        customer,
-        116000,
-        'RUB',
-        expect.any(Array),
-        'change-charge:sub-1:2:business'
-      );
+      expect(yoo.chargeOffSession).toHaveBeenCalledWith(customer, {
+        amountMinor: 116000,
+        currency: 'RUB',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        receiptItems: expect.any(Array),
+        idempotencyKey: 'change-charge:sub-1:2:business'
+      });
       expect(yoo.refund).toHaveBeenCalledWith(
         'pay_period',
         39600,

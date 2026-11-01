@@ -36,8 +36,7 @@ async function adminToken(): Promise<string> {
 async function send(
   method: string,
   path: string,
-  body: unknown,
-  token?: string
+  { body, token }: { body: unknown; token?: string }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -54,9 +53,11 @@ const NEW_USER = { password: 'Lantern-Orchard-47', locale: 'en' };
 describe('the user name', () => {
   it('is trimmed on register', async () => {
     const res = await send('POST', '/auth/register', {
-      ...NEW_USER,
-      email: 'trimmed@example.com',
-      name: '  Ada Lovelace  '
+      body: {
+        ...NEW_USER,
+        email: 'trimmed@example.com',
+        name: '  Ada Lovelace  '
+      }
     });
 
     expect(res.status).toBe(201);
@@ -64,12 +65,10 @@ describe('the user name', () => {
   });
 
   it('is trimmed on an admin create', async () => {
-    const res = await send(
-      'POST',
-      '/users',
-      { ...NEW_USER, email: 'created@example.com', name: '  Madonna ' },
-      await adminToken()
-    );
+    const res = await send('POST', '/users', {
+      body: { ...NEW_USER, email: 'created@example.com', name: '  Madonna ' },
+      token: await adminToken()
+    });
 
     expect(res.status).toBe(201);
     expect(findUserByEmail('created@example.com')?.name).toBe('Madonna');
@@ -77,12 +76,10 @@ describe('the user name', () => {
 
   it('refuses a name of spaces on an admin update and keeps the record', async () => {
     const id = mockId('user-3');
-    const res = await send(
-      'PATCH',
-      `/users/${id}`,
-      { name: '   ' },
-      await adminToken()
-    );
+    const res = await send('PATCH', `/users/${id}`, {
+      body: { name: '   ' },
+      token: await adminToken()
+    });
 
     expect(res.status).toBe(422);
     expect(((await res.json()) as { errors: string[] }).errors).toEqual([
@@ -93,12 +90,10 @@ describe('the user name', () => {
 
   it('is trimmed on an admin update', async () => {
     const id = mockId('user-3');
-    const res = await send(
-      'PATCH',
-      `/users/${id}`,
-      { name: ' Jon Smith ' },
-      await adminToken()
-    );
+    const res = await send('PATCH', `/users/${id}`, {
+      body: { name: ' Jon Smith ' },
+      token: await adminToken()
+    });
 
     expect(res.status).toBe(200);
     expect(getState().users.get(id)?.name).toBe('Jon Smith');

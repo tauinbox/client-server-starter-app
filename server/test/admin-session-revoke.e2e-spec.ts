@@ -79,27 +79,23 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     if (!updateUser) throw new Error('Permission update:User missing');
     const support = await roleService.create(
       { name: supportRoleName },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       support.id,
       [{ permissionId: updateUser.id, conditions: null }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(
-      await userId(supportEmail),
-      support.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(await userId(supportEmail), support.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await roleService.assignRoleToUser(
-      await userId(superEmail),
-      superRole.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(await userId(superEmail), superRole.id, {
+      ability: SYSTEM_ABILITY
+    });
   }, 60000);
 
   afterAll(async () => {

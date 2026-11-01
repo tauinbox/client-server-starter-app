@@ -89,6 +89,12 @@ function closesMeteredWindow(
  * The caller's instant plan change and its proration preview. Like the rest of
  * the self-service, every call is keyed on the caller's `userId`.
  */
+export interface ProrationRefund {
+  refundMinor: number;
+  refundKey: string;
+  excludeInvoiceId?: string | null;
+}
+
 @Injectable()
 export class PlanChangeService {
   constructor(
@@ -199,13 +205,12 @@ export class PlanChangeService {
       } else {
         let charge: ChargeResult;
         try {
-          charge = await provider.chargeOffSession(
-            customer,
-            quote.chargeMinor,
-            quote.currency,
-            quote.chargeItems,
-            chargeKey
-          );
+          charge = await provider.chargeOffSession(customer, {
+            amountMinor: quote.chargeMinor,
+            currency: quote.currency,
+            receiptItems: quote.chargeItems,
+            idempotencyKey: chargeKey
+          });
         } catch (error) {
           await this.failPlantedCharge(chargeKey, error);
           throw error;
@@ -233,12 +238,11 @@ export class PlanChangeService {
     // would strand the reservation; the charge leg is excluded by id.
     const refund =
       quote && quote.refundMinor > 0
-        ? await this.reserveProrationRefund(
-            subscription,
-            quote.refundMinor,
+        ? await this.reserveProrationRefund(subscription, {
+            refundMinor: quote.refundMinor,
             refundKey,
-            chargeInvoiceId
-          )
+            excludeInvoiceId: chargeInvoiceId
+          })
         : null;
 
     let refundIssued = false;
@@ -292,12 +296,10 @@ export class PlanChangeService {
             );
           }
         }
-        const saved = await this.commitPlanChange(
-          manager,
-          subscription,
+        const saved = await this.commitPlanChange(manager, subscription, {
           toPlan,
           now
-        );
+        });
         return { saved, chargeSettled };
       }
     );
@@ -390,8 +392,7 @@ export class PlanChangeService {
   private async commitPlanChange(
     manager: EntityManager,
     subscription: Subscription,
-    toPlan: Plan,
-    now: Date
+    { toPlan, now }: { toPlan: Plan; now: Date }
   ): Promise<Subscription | null> {
     const modeChanges = toPlan.billingMode !== subscription.billingMode;
     const applied = await manager.update(
@@ -557,12 +558,11 @@ export class PlanChangeService {
     const chargeMinor = charge?.status === 'paid' ? 0 : quote.chargeMinor;
     const creditMinor =
       quote.refundMinor > 0
-        ? await this.refundableCredit(
-            subscription,
-            quote.refundMinor,
-            changeRefundKey(subscription.id, seq),
-            charge?.id ?? null
-          )
+        ? await this.refundableCredit(subscription, {
+            refundMinor: quote.refundMinor,
+            refundKey: changeRefundKey(subscription.id, seq),
+            excludeInvoiceId: charge?.id ?? null
+          })
         : 0;
     return {
       ...base,
@@ -576,9 +576,7 @@ export class PlanChangeService {
   /** The refund leg `reserveProrationRefund` would reserve now, without a lock. */
   private async refundableCredit(
     subscription: Subscription,
-    refundMinor: number,
-    refundKey: string,
-    excludeInvoiceId: string | null
+    { refundMinor, refundKey, excludeInvoiceId = null }: ProrationRefund
   ): Promise<number> {
     const leg = await this.invoices.findOne({
       where: { providerEventId: refundKey }
@@ -710,9 +708,7 @@ export class PlanChangeService {
    */
   private async reserveProrationRefund(
     subscription: Subscription,
-    refundMinor: number,
-    refundKey: string,
-    excludeInvoiceId: string | null = null
+    { refundMinor, refundKey, excludeInvoiceId = null }: ProrationRefund
   ): Promise<{ source: Invoice; minor: number; cumulative: Money } | null> {
     return withTransaction(this.dataSource, async (manager) => {
       const leg = await manager.findOne(Invoice, {
@@ -799,8 +795,7 @@ export class PlanChangeService {
     const saved = await this.commitPlanChange(
       this.dataSource.manager,
       subscription,
-      toPlan,
-      now
+      { toPlan, now }
     );
     if (!saved) {
       throw new ApiError(

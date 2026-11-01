@@ -110,8 +110,13 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
   }
 
   it('keeps the targeting on rename and drops the name on delete', async () => {
-    const role = await roleService.create({ name: roleName }, SYSTEM_ABILITY);
-    await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
+    const role = await roleService.create(
+      { name: roleName },
+      { ability: SYSTEM_ABILITY }
+    );
+    await roleService.assignRoleToUser(holder.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     const key = `${tag}-flag`;
     const flag = await flagService.create(
@@ -167,7 +172,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
   it('leaves the flags alone when no rule names the role', async () => {
     const role = await roleService.create(
       { name: `${tag}-unused` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     const key = `${tag}-other`;
     const flag = await flagService.create(
@@ -198,7 +203,10 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
 
   it('rolls the rename and the delete back when the rule rewrite fails', async () => {
     const name = `${tag}-atomic`;
-    const role = await roleService.create({ name }, SYSTEM_ABILITY);
+    const role = await roleService.create(
+      { name },
+      { ability: SYSTEM_ABILITY }
+    );
     const flag = await flagService.create(
       {
         key: `${tag}-atomic-flag`,

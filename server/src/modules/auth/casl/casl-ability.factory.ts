@@ -44,6 +44,10 @@ export class CaslAbilityFactory {
           conditionalActions: {}
         }
       : await this.resourceService.getSubjectMaps();
-    return buildAbility(userId, isSuper, permissions, subjectMaps, this.logger);
+    return buildAbility(
+      { userId, isSuper, permissions },
+      subjectMaps,
+      this.logger
+    );
   }
 }

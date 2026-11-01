@@ -189,7 +189,9 @@ function ruleObjectErrors(path: string, rule: object): string[] {
   const r = rule as Record<string, unknown>;
   return [
     ...unknownPropertyErrors(r, RULE_KEYS),
-    ...oneOfErrors('effect', r['effect'], FEATURE_FLAG_RULE_EFFECTS),
+    ...oneOfErrors('effect', r['effect'], {
+      values: FEATURE_FLAG_RULE_EFFECTS
+    }),
     ...objectErrors('payload', r['payload'])
   ].map((message) => `${path}.${message}`);
 }
@@ -209,7 +211,12 @@ function rulesErrors(value: unknown, optional: OptionalMode): string[] {
       : []),
     ...(isArray ? [] : ['rules must be an array'])
   ];
-  return nestedErrors('', 'rules', value, own, ruleObjectErrors, true);
+  return nestedErrors('rules', value, {
+    parentPath: '',
+    own,
+    validate: ruleObjectErrors,
+    each: true
+  });
 }
 
 // The fields that CreateFeatureFlagDto and UpdateFeatureFlagDto share, in
@@ -524,8 +531,7 @@ adminRouter.get(
       filterByAbility(
         Array.from(getState().featureFlags.values()),
         (req as AuthenticatedRequest).user,
-        'search',
-        'FeatureFlag'
+        { action: 'search', subjectName: 'FeatureFlag' }
       ),
       FEATURE_FLAG_LIST_QUERY,
       query
@@ -563,7 +569,13 @@ adminRouter.get(
       );
       return;
     }
-    if (!assertInstancePermission(req, res, 'read', 'FeatureFlag', flag)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'read',
+        subjectName: 'FeatureFlag',
+        record: flag
+      })
+    ) {
       return;
     }
     res.setHeader('ETag', versionEtag(flag.version));
@@ -613,12 +625,16 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
   const rules = rulesOf(body);
   // The record as the server writes it, defaults included.
   if (
-    !assertInstancePermission(req, res, 'create', 'FeatureFlag', {
-      key: validation.data.key,
-      description: validation.data.description,
-      enabled: validation.data.enabled,
-      environments: validation.data.environments,
-      public: validation.data.isPublic
+    !assertInstancePermission(req, res, {
+      action: 'create',
+      subjectName: 'FeatureFlag',
+      record: {
+        key: validation.data.key,
+        description: validation.data.description,
+        enabled: validation.data.enabled,
+        environments: validation.data.environments,
+        public: validation.data.isPublic
+      }
     })
   ) {
     return;
@@ -709,8 +725,16 @@ adminRouter.patch(
         : {})
     };
     if (
-      !assertInstancePermission(req, res, 'update', 'FeatureFlag', flag) ||
-      !assertInstancePermission(req, res, 'update', 'FeatureFlag', after)
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'FeatureFlag',
+        record: flag
+      }) ||
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'FeatureFlag',
+        record: after
+      })
     ) {
       return;
     }
@@ -776,7 +800,13 @@ adminRouter.delete(
       );
       return;
     }
-    if (!assertInstancePermission(req, res, 'delete', 'FeatureFlag', flag)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'delete',
+        subjectName: 'FeatureFlag',
+        record: flag
+      })
+    ) {
       return;
     }
     const state = getState();
@@ -826,7 +856,10 @@ function previewContextErrors(body: Record<string, unknown>): string[] {
       optional: 'nullable'
     }),
     ...previewAttributesErrors(body['attributes']),
-    ...oneOfErrors('env', body['env'], APP_ENVIRONMENTS, 'nullable'),
+    ...oneOfErrors('env', body['env'], {
+      values: APP_ENVIRONMENTS,
+      optional: 'nullable'
+    }),
     ...anonIdErrors(body['anonId'])
   ];
 }
@@ -879,7 +912,13 @@ adminRouter.post(
       );
       return;
     }
-    if (!assertInstancePermission(req, res, 'read', 'FeatureFlag', flag)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'read',
+        subjectName: 'FeatureFlag',
+        record: flag
+      })
+    ) {
       return;
     }
     const draftRules = rulesOf(body);

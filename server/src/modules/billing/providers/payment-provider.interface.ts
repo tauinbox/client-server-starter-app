@@ -257,6 +257,27 @@ export interface ChangePreview {
  * webhook-ingestion seam stays exercisable without provider credentials, and
  * `WEBHOOK_IGNORED` for an authentic delivery with nothing to reduce.
  */
+export interface CheckoutOptions {
+  urls: CheckoutUrls;
+  trial: boolean;
+}
+
+/** A charge on the saved payment method of the customer. */
+export interface OffSessionCharge {
+  amountMinor: number;
+  currency: string;
+  receiptItems: ReceiptItem[];
+  idempotencyKey?: string;
+}
+
+/** A postpaid usage charge on a provider-managed subscription. */
+export interface UsageCharge {
+  amountMinor: number;
+  currency: string;
+  description: string;
+  chargeKey: string;
+}
+
 export interface PaymentProvider {
   readonly id: BillingProviderId;
   readonly managesLifecycle: boolean;
@@ -267,15 +288,11 @@ export interface PaymentProvider {
   startCheckout(
     customer: Customer,
     plan: Plan,
-    urls: CheckoutUrls,
-    trial: boolean
+    checkout: CheckoutOptions
   ): Promise<CheckoutSession>;
   chargeOffSession(
     customer: Customer,
-    amountMinor: number,
-    currency: string,
-    receiptItems: ReceiptItem[],
-    idempotencyKey?: string
+    charge: OffSessionCharge
   ): Promise<ChargeResult>;
   /**
    * Looks up a prior off-session charge posted under `chargeKey` (the key
@@ -330,10 +347,7 @@ export interface PaymentProvider {
    */
   chargeUsage(
     providerSubscriptionId: string,
-    amountMinor: number,
-    currency: string,
-    description: string,
-    chargeKey: string
+    charge: UsageCharge
   ): Promise<void>;
   /**
    * Switches a provider-managed subscription to `plan` with immediate
@@ -364,8 +378,7 @@ export interface PaymentProvider {
   updatePaymentMethod(
     providerSubscriptionId: string | null,
     customer: Customer,
-    currency: string,
-    urls: CheckoutUrls
+    change: { currency: string; urls: CheckoutUrls }
   ): Promise<CheckoutSession>;
   cancel(providerSubscriptionId: string, mode: CancelMode): Promise<void>;
   refund(

@@ -28,8 +28,7 @@ export class SignInCompletionService {
 
   async complete(
     user: User,
-    req: Request,
-    res: Response,
+    { req, res }: { req: Request; res: Response },
     details?: Record<string, unknown>
   ): Promise<{ tokens: Omit<TokensResponseDto, 'refresh_token'>; user: User }> {
     // Before the new session exists, so the session limit prunes against a

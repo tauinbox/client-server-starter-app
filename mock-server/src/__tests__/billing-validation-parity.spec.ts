@@ -43,8 +43,7 @@ interface ErrorBody {
 async function send(
   method: string,
   path: string,
-  body: unknown,
-  token: string
+  { body, token }: { body: unknown; token: string }
 ): Promise<{ status: number; body: ErrorBody }> {
   const res = await fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -166,12 +165,10 @@ describe('billing request-body validation parity with server', () => {
         route.admin ? 'admin@example.com' : 'user@example.com'
       );
 
-      const { status, body } = await send(
-        route.method,
-        route.path,
-        { ...route.valid, sneaky: 'value' },
+      const { status, body } = await send(route.method, route.path, {
+        body: { ...route.valid, sneaky: 'value' },
         token
-      );
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(['property sneaky should not exist']);
@@ -289,12 +286,10 @@ describe('billing request-body validation parity with server', () => {
         testCase.admin ? 'admin@example.com' : 'user@example.com'
       );
 
-      const { status, body } = await send(
-        testCase.method,
-        testCase.path,
-        testCase.body,
+      const { status, body } = await send(testCase.method, testCase.path, {
+        body: testCase.body,
         token
-      );
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(testCase.errors);
@@ -305,12 +300,10 @@ describe('billing request-body validation parity with server', () => {
   it('reports unknown properties ahead of the field errors, joined into message', async () => {
     const token = await login('user@example.com');
 
-    const { status, body } = await send(
-      'POST',
-      '/billing/checkout',
-      { foo: 1, bar: 2, planKey: '' },
+    const { status, body } = await send('POST', '/billing/checkout', {
+      body: { foo: 1, bar: 2, planKey: '' },
       token
-    );
+    });
 
     expect(status).toBe(422);
     expect(body.errors).toEqual([
@@ -327,12 +320,10 @@ describe('billing request-body validation parity with server', () => {
     it('takes a planKey of exactly 100 chars through to the catalog lookup', async () => {
       const token = await login('user@example.com');
 
-      const { status } = await send(
-        'POST',
-        '/billing/checkout',
-        { planKey: 'x'.repeat(100) },
+      const { status } = await send('POST', '/billing/checkout', {
+        body: { planKey: 'x'.repeat(100) },
         token
-      );
+      });
 
       expect(status).toBe(422);
     });
@@ -340,12 +331,10 @@ describe('billing request-body validation parity with server', () => {
     it('trims before measuring, as the DTO @Transform does', async () => {
       const token = await login('user@example.com');
 
-      const { status } = await send(
-        'POST',
-        '/billing/purchase',
-        { productKey: `  ${'x'.repeat(100)}  ` },
+      const { status } = await send('POST', '/billing/purchase', {
+        body: { productKey: `  ${'x'.repeat(100)}  ` },
         token
-      );
+      });
 
       expect(status).toBe(422);
     });
@@ -353,12 +342,10 @@ describe('billing request-body validation parity with server', () => {
     it('opens a purchase session with a 128-char description', async () => {
       const token = await login('user@example.com');
 
-      const { status } = await send(
-        'POST',
-        '/billing/purchase',
-        { productKey: 'report-pack', description: 'y'.repeat(128) },
+      const { status } = await send('POST', '/billing/purchase', {
+        body: { productKey: 'report-pack', description: 'y'.repeat(128) },
         token
-      );
+      });
 
       expect(status).toBe(200);
     });
@@ -373,12 +360,10 @@ describe('billing request-body validation parity with server', () => {
       if (!sub) throw new Error('subscription not seeded');
       sub.currentPeriodStart = `${today}T00:00:00.000Z`;
 
-      const { status } = await send(
-        'POST',
-        '/admin/billing/usage',
-        { ...validUsageBody(), customerId, occurredAt: today },
+      const { status } = await send('POST', '/admin/billing/usage', {
+        body: { ...validUsageBody(), customerId, occurredAt: today },
         token
-      );
+      });
 
       expect(status).toBe(201);
     });
@@ -386,12 +371,10 @@ describe('billing request-body validation parity with server', () => {
     it('keeps an explicit null optional field legal, as @IsOptional() does', async () => {
       const token = await login('user@example.com');
 
-      const { status } = await send(
-        'POST',
-        '/billing/purchase',
-        { productKey: 'report-pack', description: null },
+      const { status } = await send('POST', '/billing/purchase', {
+        body: { productKey: 'report-pack', description: null },
         token
-      );
+      });
 
       expect(status).toBe(200);
     });

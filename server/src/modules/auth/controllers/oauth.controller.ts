@@ -149,14 +149,13 @@ export class OAuthController {
   ) {
     const reauthProof = this.cookies.readReauthProof(req);
 
-    await this.authService.assertStepUpForUser(
-      req.user.userId,
-      dto.currentPassword,
+    await this.authService.assertStepUpForUser(req.user.userId, {
+      currentPassword: dto.currentPassword,
       reauthProof,
-      STEP_UP_OPERATION.OAUTH_LINK,
-      dto.code,
-      extractAuditContext(req)
-    );
+      operation: STEP_UP_OPERATION.OAUTH_LINK,
+      totpCode: dto.code,
+      auditContext: extractAuditContext(req)
+    });
 
     const linkToken = this.jwtService.sign(
       {
@@ -169,8 +168,7 @@ export class OAuthController {
 
     this.cookies.setShortLived(
       res,
-      OAUTH_LINK_COOKIE,
-      linkToken,
+      { base: OAUTH_LINK_COOKIE, value: linkToken },
       OAuthController.OAUTH_LINK_MAX_AGE_SECONDS
     );
 
@@ -214,8 +212,7 @@ export class OAuthController {
 
     this.cookies.setShortLived(
       res,
-      OAUTH_REAUTH_COOKIE,
-      reauthToken,
+      { base: OAUTH_REAUTH_COOKIE, value: reauthToken },
       OAuthController.OAUTH_LINK_MAX_AGE_SECONDS
     );
 
@@ -333,14 +330,13 @@ export class OAuthController {
 
     const reauthProof = this.cookies.readReauthProof(req);
 
-    await this.authService.assertStepUpForUser(
-      userId,
-      dto.currentPassword,
+    await this.authService.assertStepUpForUser(userId, {
+      currentPassword: dto.currentPassword,
       reauthProof,
-      STEP_UP_OPERATION.OAUTH_UNLINK,
-      dto.code,
-      extractAuditContext(req)
-    );
+      operation: STEP_UP_OPERATION.OAUTH_UNLINK,
+      totpCode: dto.code,
+      auditContext: extractAuditContext(req)
+    });
 
     const { email, locale } = await this.oauthAccountService.unlinkProvider(
       userId,
@@ -362,7 +358,7 @@ export class OAuthController {
     });
 
     this.mailService
-      .sendOAuthUnlinkedNotification(email, provider, locale, req.ip)
+      .sendOAuthUnlinkedNotification(email, provider, { locale, ip: req.ip })
       .catch((err) =>
         this.logger.error('Failed to send provider-unlinked notification', err)
       );
@@ -438,10 +434,14 @@ export class OAuthController {
     if (!user?.isActive) {
       throw invalidOAuthData();
     }
-    return await this.signIn.complete(user, req, res, {
-      method: 'oauth',
-      provider: data.provider
-    });
+    return await this.signIn.complete(
+      user,
+      { req, res },
+      {
+        method: 'oauth',
+        provider: data.provider
+      }
+    );
   }
 
   private async handleOAuthCallback(
@@ -463,7 +463,7 @@ export class OAuthController {
         : null;
 
       if (reauthToken) {
-        return this.handleOAuthReauth(reauthToken, profile, req, res);
+        return this.handleOAuthReauth({ reauthToken, profile }, req, res);
       }
 
       const linkIntent = this.cookies.read(req, OAUTH_LINK_COOKIE);
@@ -472,7 +472,7 @@ export class OAuthController {
         : null;
 
       if (linkToken) {
-        return this.handleOAuthLink(linkToken, profile, req, res);
+        return this.handleOAuthLink({ linkToken, profile }, req, res);
       }
 
       const result = await this.oauthService.loginWithOAuth(
@@ -497,8 +497,7 @@ export class OAuthController {
 
       this.cookies.setShortLived(
         res,
-        OAUTH_DATA_COOKIE,
-        signedData,
+        { base: OAUTH_DATA_COOKIE, value: signedData },
         OAuthController.OAUTH_DATA_MAX_AGE_SECONDS
       );
 
@@ -548,8 +547,10 @@ export class OAuthController {
    * change an address therefore cannot bind a password.
    */
   private async handleOAuthReauth(
-    reauthToken: string,
-    profile: OAuthUserProfile,
+    {
+      reauthToken,
+      profile
+    }: { reauthToken: string; profile: OAuthUserProfile },
     req: ExpressRequest,
     res: Response
   ): Promise<void> {
@@ -576,8 +577,7 @@ export class OAuthController {
 
       await this.oauthService.assertReauthenticated(
         payload.sub,
-        profile.provider,
-        profile.providerId,
+        { provider: profile.provider, providerId: profile.providerId },
         payload.iat
       );
 
@@ -595,8 +595,7 @@ export class OAuthController {
 
       this.cookies.setShortLived(
         res,
-        REAUTH_PROOF_COOKIE,
-        proof,
+        { base: REAUTH_PROOF_COOKIE, value: proof },
         REAUTH_PROOF_MAX_AGE_SECONDS
       );
 
@@ -628,8 +627,7 @@ export class OAuthController {
   }
 
   private async handleOAuthLink(
-    linkToken: string,
-    profile: OAuthUserProfile,
+    { linkToken, profile }: { linkToken: string; profile: OAuthUserProfile },
     req: ExpressRequest,
     res: Response
   ): Promise<void> {
@@ -650,10 +648,11 @@ export class OAuthController {
 
       await this.oauthService.linkOAuthToUser(
         userId,
-        profile.provider,
-        profile.providerId,
-        payload.iat,
-        extractAuditContext(req)
+        { provider: profile.provider, providerId: profile.providerId },
+        {
+          linkTokenIssuedAt: payload.iat,
+          auditContext: extractAuditContext(req)
+        }
       );
 
       res.redirect(

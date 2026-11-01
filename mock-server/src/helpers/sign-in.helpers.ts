@@ -17,8 +17,7 @@ import type { MockUser } from '../types';
  * exchange), as the server's SignInCompletionService is.
  */
 export function completeSignIn(
-  req: Request,
-  res: Response,
+  { req, res }: { req: Request; res: Response },
   user: MockUser,
   details?: Record<string, unknown>
 ): void {
@@ -29,12 +28,10 @@ export function completeSignIn(
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
   state.refreshTokens.set(tokens.refresh_token, user.id);
-  registerSession(
-    tokens.refresh_token,
-    sessionId,
-    normalizeUserAgent(req.headers['user-agent']),
-    normalizeIpAddress(req.ip)
-  );
+  registerSession(tokens.refresh_token, sessionId, {
+    userAgent: normalizeUserAgent(req.headers['user-agent']),
+    ipAddress: normalizeIpAddress(req.ip)
+  });
   // Concurrent-session allowance is plan-driven; a plan carrying no `sessions`
   // limit (Free, usage) keeps the constant, exactly as the server resolves it.
   pruneOldestUserTokens(

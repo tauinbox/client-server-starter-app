@@ -19,9 +19,11 @@ import {
  * application builds.
  */
 export function buildAbility(
-  userId: string,
-  isSuper: boolean,
-  permissions: ResolvedPermission[],
+  {
+    userId,
+    isSuper,
+    permissions
+  }: { userId: string; isSuper: boolean; permissions: ResolvedPermission[] },
   subjectMaps: SubjectMaps,
   logger: AbilityLogger
 ): AppAbility {

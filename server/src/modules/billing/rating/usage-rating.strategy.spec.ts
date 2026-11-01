@@ -185,8 +185,7 @@ describe('UsageRating', () => {
       const summary = await rating.summarizeForPeriodWithCredits(
         makeSubscription(),
         makePlan(),
-        PERIOD,
-        10
+        { period: PERIOD, availableCreditUnits: 10 }
       );
 
       expect(summary).toMatchObject({
@@ -210,8 +209,7 @@ describe('UsageRating', () => {
       const summary = await rating.summarizeForPeriodWithCredits(
         makeSubscription(),
         makePlan(),
-        PERIOD,
-        1000
+        { period: PERIOD, availableCreditUnits: 1000 }
       );
 
       expect(summary).toMatchObject({

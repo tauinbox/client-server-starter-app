@@ -45,8 +45,7 @@ async function tokenOf(caller: Exclude<Caller, 'anonymous'>): Promise<string> {
 async function errorsOf(
   method: string,
   path: string,
-  caller: Caller,
-  body: unknown
+  { caller, body }: { caller: Caller; body: unknown }
 ): Promise<string[]> {
   const headers: Record<string, string> = {
     'content-type': 'application/json'
@@ -465,7 +464,7 @@ describe('a body with several violations lists all of them', () => {
   it.each(cases)(
     '%s (%s %s)',
     async (_label, method, path, caller, body, expected) => {
-      expect(await errorsOf(method, path, caller, body)).toEqual(expected);
+      expect(await errorsOf(method, path, { caller, body })).toEqual(expected);
     }
   );
 });

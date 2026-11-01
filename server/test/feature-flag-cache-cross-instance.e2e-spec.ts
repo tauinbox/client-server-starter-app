@@ -128,9 +128,11 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     const roleService = app.get(RoleService);
     const role = await roleService.create(
       { name: `${tag}-beta` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(holder.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
     const key = `${tag}-flag`;
     await app.get(FeatureFlagService).create(
       {

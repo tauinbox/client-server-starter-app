@@ -153,7 +153,7 @@ export class AuthController {
       return { mfaRequired: true, mfaToken, expiresIn };
     }
 
-    return await this.signIn.complete(req.user, req, res);
+    return await this.signIn.complete(req.user, { req, res });
   }
 
   @Public()
@@ -261,14 +261,13 @@ export class AuthController {
     if (updateProfileDto.password) {
       // A first password binds a credential that outlives the session, so it
       // needs the same fresh proof of identity an email change needs.
-      verified = await this.authService.assertStepUpForUser(
-        req.user.userId,
-        updateProfileDto.currentPassword,
+      verified = await this.authService.assertStepUpForUser(req.user.userId, {
+        currentPassword: updateProfileDto.currentPassword,
         reauthProof,
-        STEP_UP_OPERATION.PASSWORD_SET,
-        updateProfileDto.code,
-        extractAuditContext(req)
-      );
+        operation: STEP_UP_OPERATION.PASSWORD_SET,
+        totpCode: updateProfileDto.code,
+        auditContext: extractAuditContext(req)
+      });
     }
 
     const {
@@ -288,8 +287,10 @@ export class AuthController {
     const updatedUser = await this.userService.update(
       req.user.userId,
       updatePayload,
-      SYSTEM_ABILITY,
-      { expected: verified && { password: verified.password } }
+      {
+        ability: SYSTEM_ABILITY,
+        expected: verified && { password: verified.password }
+      }
     );
     if (previous && previous.name !== updatedUser.name) {
       this.eventEmitter.emit(
@@ -313,12 +314,10 @@ export class AuthController {
       });
 
       this.mailService
-        .sendPasswordChangedNotification(
-          updatedUser.email,
-          'self',
-          updatedUser.locale,
-          req.ip
-        )
+        .sendPasswordChangedNotification(updatedUser.email, 'self', {
+          locale: updatedUser.locale,
+          ip: req.ip
+        })
         .catch((err) =>
           this.logger.error('Failed to send password-changed notification', err)
         );
@@ -351,8 +350,7 @@ export class AuthController {
     const result = await this.authService.initiateEmailChange(
       req.user.userId,
       dto,
-      proof,
-      extractAuditContext(req)
+      { reauthProof: proof, auditContext: extractAuditContext(req) }
     );
 
     // Cleared only after the change is accepted, so a rejected attempt leaves

@@ -31,6 +31,7 @@ import {
 } from './payment-provider.interface';
 import type {
   ChargeResult,
+  CheckoutOptions,
   CheckoutSession,
   CheckoutUrls,
   NormalizedCustomerRef,
@@ -38,6 +39,7 @@ import type {
   NormalizedPaymentFailedPayload,
   NormalizedPaymentMethodPayload,
   OneTimePaymentParams,
+  OffSessionCharge,
   OneTimePaymentSession,
   PaymentProvider,
   ReceiptItem,
@@ -242,8 +244,7 @@ export class YooKassaProvider implements PaymentProvider {
   async startCheckout(
     customer: Customer,
     plan: Plan,
-    urls: CheckoutUrls,
-    isTrial: boolean
+    { urls, trial: isTrial }: CheckoutOptions
   ): Promise<CheckoutSession> {
     const yoo = this.requireClient();
     const price = plan.prices.yookassa;
@@ -342,8 +343,7 @@ export class YooKassaProvider implements PaymentProvider {
   async updatePaymentMethod(
     _providerSubscriptionId: string | null,
     customer: Customer,
-    currency: string,
-    urls: CheckoutUrls
+    { currency, urls }: { currency: string; urls: CheckoutUrls }
   ): Promise<CheckoutSession> {
     const yoo = this.requireClient();
     const payload: ICreatePayment = {
@@ -366,10 +366,7 @@ export class YooKassaProvider implements PaymentProvider {
 
   async chargeOffSession(
     customer: Customer,
-    amountMinor: number,
-    currency: string,
-    receiptItems: ReceiptItem[],
-    idempotencyKey?: string
+    { amountMinor, currency, receiptItems, idempotencyKey }: OffSessionCharge
   ): Promise<ChargeResult> {
     const yoo = this.requireClient();
     const token = await this.resolveSavedMethodRef(customer);

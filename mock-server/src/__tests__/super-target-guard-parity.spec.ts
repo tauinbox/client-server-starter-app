@@ -74,7 +74,10 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-function call(token: string, method: string, path: string, body?: object) {
+function call(
+  token: string,
+  { method, path, body }: { method: string; path: string; body?: object }
+) {
   return fetch(`${baseUrl}/api/v1/users/${path}`, {
     method,
     headers: {
@@ -98,9 +101,13 @@ describe('user writes on a super target parity', () => {
     const target = findUserByEmail('admin@example.com')!;
 
     await expectSuperTargetRefusal(
-      await call(token, 'PATCH', target.id, {
-        password: NEW_PASSWORD,
-        currentPassword: SEED_PASSWORD
+      await call(token, {
+        method: 'PATCH',
+        path: target.id,
+        body: {
+          password: NEW_PASSWORD,
+          currentPassword: SEED_PASSWORD
+        }
       })
     );
     expect(target.password).toBe(SEED_PASSWORD);
@@ -116,7 +123,11 @@ describe('user writes on a super target parity', () => {
     const target = findUserByEmail('admin@example.com')!;
 
     await expectSuperTargetRefusal(
-      await call(token, 'PATCH', target.id, { password: NEW_PASSWORD })
+      await call(token, {
+        method: 'PATCH',
+        path: target.id,
+        body: { password: NEW_PASSWORD }
+      })
     );
   });
 
@@ -125,7 +136,11 @@ describe('user writes on a super target parity', () => {
     const target = findUserByEmail('admin@example.com')!;
 
     await expectSuperTargetRefusal(
-      await call(token, 'PATCH', target.id, { isActive: false })
+      await call(token, {
+        method: 'PATCH',
+        path: target.id,
+        body: { isActive: false }
+      })
     );
     expect(target.isActive).toBe(true);
   });
@@ -134,7 +149,9 @@ describe('user writes on a super target parity', () => {
     const token = await login('user@example.com');
     const target = findUserByEmail('admin@example.com')!;
 
-    await expectSuperTargetRefusal(await call(token, 'DELETE', target.id));
+    await expectSuperTargetRefusal(
+      await call(token, { method: 'DELETE', path: target.id })
+    );
     expect(target.deletedAt).toBeNull();
   });
 
@@ -144,7 +161,7 @@ describe('user writes on a super target parity', () => {
     target.deletedAt = new Date().toISOString();
 
     await expectSuperTargetRefusal(
-      await call(token, 'POST', `${target.id}/restore`)
+      await call(token, { method: 'POST', path: `${target.id}/restore` })
     );
     expect(target.deletedAt).not.toBeNull();
   });
@@ -153,7 +170,11 @@ describe('user writes on a super target parity', () => {
     const token = await login('admin@example.com');
     const target = findUserByEmail('admin@example.com')!;
 
-    const res = await call(token, 'PATCH', target.id, { name: 'Renamed' });
+    const res = await call(token, {
+      method: 'PATCH',
+      path: target.id,
+      body: { name: 'Renamed' }
+    });
 
     expect(res.status).toBe(200);
     expect(target.name).toBe('Renamed');
@@ -163,7 +184,11 @@ describe('user writes on a super target parity', () => {
     const token = await login('user@example.com');
     const target = findUserByEmail('user@example.com')!;
 
-    const res = await call(token, 'PATCH', target.id, { name: 'Renamed' });
+    const res = await call(token, {
+      method: 'PATCH',
+      path: target.id,
+      body: { name: 'Renamed' }
+    });
 
     expect(res.status).toBe(200);
     expect(target.name).toBe('Renamed');

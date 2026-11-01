@@ -81,14 +81,12 @@ router.post(
     // `ResourceService.restore` raises `CANNOT_RESTORE`, so it sits below
     // the instance check on the server.
     if (
-      !assertInstancePermission(
-        req,
-        res,
-        'update',
-        'Permission',
-        resource,
-        'Resource'
-      )
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Permission',
+        record: resource,
+        targetType: 'Resource'
+      })
     ) {
       return;
     }
@@ -112,7 +110,7 @@ router.post(
     }
 
     const woken = grantableActionNames(resource);
-    if (!assertCanWiden(req, res, resource, woken)) {
+    if (!assertCanWiden(req, res, { resource, reEnabled: woken })) {
       return;
     }
 
@@ -194,22 +192,18 @@ router.patch(
       allowedActionNames
     });
     if (
-      !assertInstancePermission(
-        req,
-        res,
-        'update',
-        'Permission',
-        resource,
-        'Resource'
-      ) ||
-      !assertInstancePermission(
-        req,
-        res,
-        'update',
-        'Permission',
-        after,
-        'Resource'
-      )
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Permission',
+        record: resource,
+        targetType: 'Resource'
+      }) ||
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Permission',
+        record: after,
+        targetType: 'Resource'
+      })
     ) {
       return;
     }
@@ -230,12 +224,13 @@ router.patch(
 
     if (
       allowedActionNames !== undefined &&
-      !assertCanWiden(
-        req,
-        res,
+      !assertCanWiden(req, res, {
         resource,
-        reofferedActionNames(resource, allowedActionNames as string[] | null)
-      )
+        reEnabled: reofferedActionNames(
+          resource,
+          allowedActionNames as string[] | null
+        )
+      })
     ) {
       return;
     }

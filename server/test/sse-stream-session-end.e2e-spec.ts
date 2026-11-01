@@ -232,7 +232,10 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
   }, 30000);
 
   it('sends only session_invalidated when a role assignment ends the session', async () => {
-    const role = await roleService.create({ name: roleName }, SYSTEM_ABILITY);
+    const role = await roleService.create(
+      { name: roleName },
+      { ability: SYSTEM_ABILITY }
+    );
     const a = await signIn();
     const stream = await openStream(a.token);
 

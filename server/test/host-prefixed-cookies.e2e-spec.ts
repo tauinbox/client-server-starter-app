@@ -53,6 +53,7 @@ import {
 } from '@app/shared/constants';
 import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
 import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const FLOW_STATE = 'b'.repeat(64);
 
@@ -241,6 +242,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
           useValue: { log: jest.fn(), logFireAndForget: jest.fn() }
         },
         { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
+        AccessRefusalService,
         {
           provide: ConfigService,
           useValue: {

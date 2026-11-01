@@ -175,12 +175,11 @@ describe('RefreshTokenService', () => {
       mockRepository.create.mockReturnValue(mockToken);
       mockRepository.save.mockResolvedValue(mockToken);
 
-      const result = await service.createRefreshToken(
-        'user-1',
-        'raw-token',
-        'session-1',
-        { userAgent: null, ipAddress: null }
-      );
+      const result = await service.createRefreshToken('user-1', {
+        token: 'raw-token',
+        sessionId: 'session-1',
+        client: { userAgent: null, ipAddress: null }
+      });
 
       expect(mockRepository.create).toHaveBeenCalledWith({
         userId: 'user-1',
@@ -206,9 +205,13 @@ describe('RefreshTokenService', () => {
       );
       mockGeoIp.lookup.mockResolvedValue({ countryCode: 'DE', city: 'Berlin' });
 
-      await service.createRefreshToken('user-1', 'token', 'session-1', {
-        userAgent: 'UA',
-        ipAddress: '203.0.113.7'
+      await service.createRefreshToken('user-1', {
+        token: 'token',
+        sessionId: 'session-1',
+        client: {
+          userAgent: 'UA',
+          ipAddress: '203.0.113.7'
+        }
       });
 
       expect(mockGeoIp.lookup).toHaveBeenCalledWith('203.0.113.7');
@@ -231,9 +234,13 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken('user-1', 'token', 'session-1', {
-        userAgent: null,
-        ipAddress: null
+      await service.createRefreshToken('user-1', {
+        token: 'token',
+        sessionId: 'session-1',
+        client: {
+          userAgent: null,
+          ipAddress: null
+        }
       });
       const after = Date.now();
 
@@ -255,9 +262,13 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
-      await service.createRefreshToken('user-1', 'token', 'session-1', {
-        userAgent: null,
-        ipAddress: null
+      await service.createRefreshToken('user-1', {
+        token: 'token',
+        sessionId: 'session-1',
+        client: {
+          userAgent: null,
+          ipAddress: null
+        }
       });
       const after = Date.now();
 

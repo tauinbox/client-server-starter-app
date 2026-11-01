@@ -68,9 +68,11 @@ function getProfile(token: string): Promise<Response> {
 
 async function expectRefusal(
   res: Response,
-  errorKey: string,
-  message: string,
-  challenge: string
+  {
+    errorKey,
+    message,
+    challenge
+  }: { errorKey: string; message: string; challenge: string }
 ): Promise<void> {
   expect(res.status).toBe(401);
   expect(await res.json()).toMatchObject({
@@ -95,12 +97,11 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
     });
     expect(logout.ok).toBe(true);
 
-    await expectRefusal(
-      await getProfile(session.accessToken),
-      ErrorKeys.AUTH.TOKEN_REVOKED,
-      'Session has ended',
-      INVALID_TOKEN_CHALLENGE
-    );
+    await expectRefusal(await getProfile(session.accessToken), {
+      errorKey: ErrorKeys.AUTH.TOKEN_REVOKED,
+      message: 'Session has ended',
+      challenge: INVALID_TOKEN_CHALLENGE
+    });
   });
 
   it('names a token issued before the revocation of the account', async () => {
@@ -109,12 +110,11 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
       Date.now() + 60_000
     ).toISOString();
 
-    await expectRefusal(
-      await getProfile(accessToken),
-      ErrorKeys.AUTH.TOKEN_REVOKED,
-      'Token has been revoked',
-      INVALID_TOKEN_CHALLENGE
-    );
+    await expectRefusal(await getProfile(accessToken), {
+      errorKey: ErrorKeys.AUTH.TOKEN_REVOKED,
+      message: 'Token has been revoked',
+      challenge: INVALID_TOKEN_CHALLENGE
+    });
   });
 
   it('names a token whose user does not exist', async () => {
@@ -122,9 +122,11 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
 
     await expectRefusal(
       await getProfile(withClaims(accessToken, { sub: randomUUID() })),
-      ErrorKeys.AUTH.USER_NOT_FOUND,
-      'User not found',
-      'Bearer'
+      {
+        errorKey: ErrorKeys.AUTH.USER_NOT_FOUND,
+        message: 'User not found',
+        challenge: 'Bearer'
+      }
     );
   });
 
@@ -136,12 +138,11 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
   ])('names an invalid claim set %j', async (claims, message) => {
     const { accessToken } = await signIn();
 
-    await expectRefusal(
-      await getProfile(withClaims(accessToken, claims)),
-      ErrorKeys.AUTH.INVALID_TOKEN,
+    await expectRefusal(await getProfile(withClaims(accessToken, claims)), {
+      errorKey: ErrorKeys.AUTH.INVALID_TOKEN,
       message,
-      INVALID_TOKEN_CHALLENGE
-    );
+      challenge: INVALID_TOKEN_CHALLENGE
+    });
   });
 
   it('keeps an expired token keyless, as Passport answers it', async () => {

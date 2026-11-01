@@ -13,10 +13,14 @@ export const adminPanelGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  return ensureAuthenticated(authStore, authService, router, state.url, () => {
-    const enrolment = mfaEnrolmentRedirect(authStore, router);
-    if (enrolment) return enrolment;
-    if (canAccessAdminPanel(authStore)) return true;
-    return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
-  });
+  return ensureAuthenticated(
+    { authStore, authService, router },
+    state.url,
+    () => {
+      const enrolment = mfaEnrolmentRedirect(authStore, router);
+      if (enrolment) return enrolment;
+      if (canAccessAdminPanel(authStore)) return true;
+      return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
+    }
+  );
 };

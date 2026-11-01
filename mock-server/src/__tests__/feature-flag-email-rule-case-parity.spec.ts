@@ -34,9 +34,7 @@ async function login(email: string): Promise<string> {
 
 async function call(
   token: string,
-  method: string,
-  path: string,
-  body?: unknown
+  { method, path, body }: { method: string; path: string; body?: unknown }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -57,13 +55,17 @@ describe('email and emailDomain rules compare case-insensitively (parity)', () =
   ): Promise<boolean> {
     const admin = await login('admin@example.com');
     const key = `case-${effect}-${String(payload['field']).toLowerCase()}`;
-    const createRes = await call(admin, 'POST', '/admin/feature-flags', {
-      key,
-      enabled: true,
-      rules: [{ effect, payload }]
+    const createRes = await call(admin, {
+      method: 'POST',
+      path: '/admin/feature-flags',
+      body: {
+        key,
+        enabled: true,
+        rules: [{ effect, payload }]
+      }
     });
     expect(createRes.status).toBe(201);
-    const res = await call(admin, 'GET', '/feature-flags');
+    const res = await call(admin, { method: 'GET', path: '/feature-flags' });
     const body = (await res.json()) as { flags: Record<string, boolean> };
     return body.flags[key] === true;
   }

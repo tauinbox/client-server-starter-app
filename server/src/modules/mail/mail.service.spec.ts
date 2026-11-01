@@ -219,24 +219,26 @@ describe('MailService', () => {
   describe('credential-change notifications', () => {
     it('should not throw when sending a password-changed notice', async () => {
       await expect(
-        service.sendPasswordChangedNotification(
-          'user@example.com',
-          'self',
-          'en',
-          '198.51.100.7'
-        )
+        service.sendPasswordChangedNotification('user@example.com', 'self', {
+          locale: 'en',
+          ip: '198.51.100.7'
+        })
       ).resolves.not.toThrow();
     });
 
     it('should not throw when sending a provider-linked notice', async () => {
       await expect(
-        service.sendOAuthLinkedNotification('user@example.com', 'google', 'ru')
+        service.sendOAuthLinkedNotification('user@example.com', 'google', {
+          locale: 'ru'
+        })
       ).resolves.not.toThrow();
     });
 
     it('should not throw when sending a provider-unlinked notice', async () => {
       await expect(
-        service.sendOAuthUnlinkedNotification('user@example.com', 'vk', 'en')
+        service.sendOAuthUnlinkedNotification('user@example.com', 'vk', {
+          locale: 'en'
+        })
       ).resolves.not.toThrow();
     });
 
@@ -302,8 +304,7 @@ describe('MailService', () => {
       await queuedService.sendOAuthLinkedNotification(
         'user@example.com',
         'google',
-        'en',
-        '198.51.100.7'
+        { locale: 'en', ip: '198.51.100.7' }
       );
 
       const [, data] = add.mock.calls[0] as [string, MailJobData];

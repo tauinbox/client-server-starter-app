@@ -8,6 +8,7 @@ import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility, Subjects } from '../casl/app-ability';
 import { auditContextOf } from '../casl/ability-context';
 import type { AuditService } from '../../audit/audit.service';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 import type { MetricsService } from '../../core/metrics/metrics.service';
 
 describe('PermissionsGuard', () => {
@@ -76,8 +77,10 @@ describe('PermissionsGuard', () => {
       reflector,
       // @ts-expect-error testing mock
       caslAbilityFactory,
-      auditService as AuditService,
-      metricsService as MetricsService
+      new AccessRefusalService(
+        auditService as AuditService,
+        metricsService as MetricsService
+      )
     );
   });
 

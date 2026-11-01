@@ -30,6 +30,7 @@ import { bindIntent } from '../utils/oauth-flow-intent';
 import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { AuthCookies } from '../utils/auth-cookies';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 // Seconds, as a JWT `iat` is.
 const LINK_TOKEN_IAT = Math.floor(
@@ -202,6 +203,7 @@ describe('OAuthController', () => {
         { provide: OAuthAccountService, useValue: oauthAccountServiceMock },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: MetricsService, useValue: metricsServiceMock },
+        AccessRefusalService,
         { provide: MailService, useValue: mailServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: CACHE_MANAGER, useValue: createMockCache() },
@@ -272,7 +274,10 @@ describe('OAuthController', () => {
 
       expect(
         mailServiceMock.sendOAuthUnlinkedNotification
-      ).toHaveBeenCalledWith('owner@example.com', 'google', 'ru', '127.0.0.1');
+      ).toHaveBeenCalledWith('owner@example.com', 'google', {
+        locale: 'ru',
+        ip: '127.0.0.1'
+      });
     });
 
     it('should not notify when the unlink is rejected', async () => {
@@ -368,11 +373,13 @@ describe('OAuthController', () => {
 
       expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
         'user-1',
-        'CurrentPassword123',
-        'proof-token',
-        STEP_UP_OPERATION.OAUTH_UNLINK,
-        undefined,
-        expect.anything()
+        {
+          currentPassword: 'CurrentPassword123',
+          reauthProof: 'proof-token',
+          operation: STEP_UP_OPERATION.OAUTH_UNLINK,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          auditContext: expect.anything()
+        }
       );
     });
 
@@ -518,11 +525,13 @@ describe('OAuthController', () => {
 
       expect(authServiceMock.assertStepUpForUser).toHaveBeenCalledWith(
         'user-1',
-        'CurrentPassword123',
-        'proof-token',
-        STEP_UP_OPERATION.OAUTH_LINK,
-        undefined,
-        expect.anything()
+        {
+          currentPassword: 'CurrentPassword123',
+          reauthProof: 'proof-token',
+          operation: STEP_UP_OPERATION.OAUTH_LINK,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          auditContext: expect.anything()
+        }
       );
     });
 
@@ -832,10 +841,12 @@ describe('OAuthController', () => {
       expect(jwtServiceMock.verify).toHaveBeenCalledWith('valid-link-token');
       expect(oauthServiceMock.linkOAuthToUser).toHaveBeenCalledWith(
         'user-1',
-        OAuthProvider.GOOGLE,
-        '456',
-        LINK_TOKEN_IAT,
-        expect.objectContaining({ ip: '127.0.0.1' })
+        { provider: OAuthProvider.GOOGLE, providerId: '456' },
+        {
+          linkTokenIssuedAt: LINK_TOKEN_IAT,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          auditContext: expect.objectContaining({ ip: '127.0.0.1' })
+        }
       );
       expect(res.clearCookie).toHaveBeenCalledWith('__Host-oauth_link', {
         secure: true,

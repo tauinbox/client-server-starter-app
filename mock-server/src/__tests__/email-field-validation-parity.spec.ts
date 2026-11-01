@@ -37,8 +37,7 @@ async function login(email: string): Promise<string> {
 async function send(
   method: string,
   path: string,
-  body: unknown,
-  token?: string
+  { body, token }: { body: unknown; token?: string }
 ): Promise<{ status: number; body: ErrorBody }> {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
@@ -82,7 +81,7 @@ describe('email field validation parity with the server DTOs', () => {
     ['/api/v1/auth/forgot-password']
   ])('POST %s', (path) => {
     it('rejects an absent address with both validator messages', async () => {
-      const { status, body } = await send('POST', path, {});
+      const { status, body } = await send('POST', path, { body: {} });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(TWO_MESSAGES);
@@ -90,35 +89,45 @@ describe('email field validation parity with the server DTOs', () => {
     });
 
     it('rejects a null address with both validator messages', async () => {
-      const { status, body } = await send('POST', path, { email: null });
+      const { status, body } = await send('POST', path, {
+        body: { email: null }
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(TWO_MESSAGES);
     });
 
     it('rejects a non-string address with both validator messages', async () => {
-      const { status, body } = await send('POST', path, { email: 123 });
+      const { status, body } = await send('POST', path, {
+        body: { email: 123 }
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(TWO_MESSAGES);
     });
 
     it('rejects an empty address with the email message alone', async () => {
-      const { status, body } = await send('POST', path, { email: '' });
+      const { status, body } = await send('POST', path, {
+        body: { email: '' }
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(ONE_MESSAGE);
     });
 
     it('rejects a whitespace-only address with the email message alone', async () => {
-      const { status, body } = await send('POST', path, { email: '   ' });
+      const { status, body } = await send('POST', path, {
+        body: { email: '   ' }
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(ONE_MESSAGE);
     });
 
     it('rejects a malformed address with the email message alone', async () => {
-      const { status, body } = await send('POST', path, { email: 'nope' });
+      const { status, body } = await send('POST', path, {
+        body: { email: 'nope' }
+      });
 
       expect(status).toBe(422);
       expect(body.errors).toEqual(ONE_MESSAGE);
@@ -126,7 +135,9 @@ describe('email field validation parity with the server DTOs', () => {
 
     it('stays enumeration-safe for a well-formed unknown address', async () => {
       const { status, body } = await send('POST', path, {
-        email: 'nobody@example.com'
+        body: {
+          email: 'nobody@example.com'
+        }
       });
 
       expect(status).toBe(200);
@@ -141,8 +152,7 @@ describe('email field validation parity with the server DTOs', () => {
       const { status, body } = await send(
         'POST',
         '/api/v1/auth/profile/email/initiate',
-        { currentPassword: 'Password1' },
-        token
+        { body: { currentPassword: 'Password1' }, token }
       );
 
       expect(status).toBe(422);
@@ -157,8 +167,7 @@ describe('email field validation parity with the server DTOs', () => {
       const { status, body } = await send(
         'POST',
         '/api/v1/auth/profile/email/initiate',
-        { newEmail: '', currentPassword: 'Password1' },
-        token
+        { body: { newEmail: '', currentPassword: 'Password1' }, token }
       );
 
       expect(status).toBe(422);
@@ -173,8 +182,7 @@ describe('email field validation parity with the server DTOs', () => {
       const { status, body } = await send(
         'PATCH',
         `/api/v1/users/${target?.id}`,
-        { email: 123 },
-        token
+        { body: { email: 123 }, token }
       );
 
       expect(status).toBe(422);
@@ -187,8 +195,7 @@ describe('email field validation parity with the server DTOs', () => {
       const { status, body } = await send(
         'PATCH',
         `/api/v1/users/${target?.id}`,
-        { email: 'nope' },
-        token
+        { body: { email: 'nope' }, token }
       );
 
       expect(status).toBe(422);

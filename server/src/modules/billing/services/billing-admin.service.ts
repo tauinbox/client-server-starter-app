@@ -76,8 +76,7 @@ export class BillingAdminService {
   ): Promise<CursorPaginatedResponseDto<Subscription>> {
     return applyList(
       this.subscriptions.createQueryBuilder('subscription'),
-      SUBSCRIPTION_LIST_QUERY,
-      SUBSCRIPTION_LIST_COLUMNS,
+      { spec: SUBSCRIPTION_LIST_QUERY, columns: SUBSCRIPTION_LIST_COLUMNS },
       query
     );
   }
@@ -87,8 +86,7 @@ export class BillingAdminService {
   ): Promise<CursorPaginatedResponseDto<Invoice>> {
     return applyList(
       this.invoices.createQueryBuilder('invoice'),
-      INVOICE_LIST_QUERY,
-      INVOICE_LIST_COLUMNS,
+      { spec: INVOICE_LIST_QUERY, columns: INVOICE_LIST_COLUMNS },
       query
     );
   }
@@ -152,8 +150,7 @@ export class BillingAdminService {
         events: this.events
       },
       subscription,
-      mode,
-      (saved) => this.resolveUserId(saved.customerId)
+      { mode, resolveUserId: (saved) => this.resolveUserId(saved.customerId) }
     );
   }
 
@@ -343,8 +340,7 @@ export class BillingAdminService {
     }
     await this.credits.clawbackPurchase(
       manager,
-      invoice.customerId,
-      invoice.id,
+      { customerId: invoice.customerId, invoiceId: invoice.id },
       product.grant.credits
     );
   }

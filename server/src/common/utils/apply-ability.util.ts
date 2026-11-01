@@ -60,9 +60,11 @@ function logSkipped(translation: RuleSetTranslation<unknown>): void {
 export function applyAbilityToQuery<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   ability: AppAbility,
-  action: string,
-  subject: AbilityFilterSubject,
-  alias: string
+  {
+    action,
+    subject,
+    alias
+  }: { action: string; subject: AbilityFilterSubject; alias: string }
 ): SelectQueryBuilder<T> {
   if (ability.can('manage', 'all') || ability.can(action, 'all')) {
     return qb;
@@ -130,7 +132,11 @@ export function applyAbilityToUserQuery(
   ability: AppAbility,
   action: string
 ): SelectQueryBuilder<User> {
-  return applyAbilityToQuery(qb, ability, action, 'User', 'user');
+  return applyAbilityToQuery(qb, ability, {
+    action,
+    subject: 'User',
+    alias: 'user'
+  });
 }
 
 /** `applyAbilityToQuery` for a FeatureFlag query aliased `flag`. */
@@ -139,5 +145,9 @@ export function applyAbilityToFeatureFlagQuery(
   ability: AppAbility,
   action: string
 ): SelectQueryBuilder<FeatureFlag> {
-  return applyAbilityToQuery(qb, ability, action, 'FeatureFlag', 'flag');
+  return applyAbilityToQuery(qb, ability, {
+    action,
+    subject: 'FeatureFlag',
+    alias: 'flag'
+  });
 }

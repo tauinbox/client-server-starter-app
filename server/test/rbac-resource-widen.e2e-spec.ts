@@ -149,18 +149,20 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     // leaves its row dormant.
     const role = await roleService.create(
       { name: `${tag}-admin` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: updatePermission.id }, { permissionId: deleteProbe.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(actor.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(actor.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
     await resourceService.update(
       resource.id,
       { allowedActionNames: ['read'] },
-      superAbility
+      { ability: superAbility }
     );
   }, 60000);
 
@@ -192,7 +194,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
           resourceService.update(
             resource.id,
             { allowedActionNames },
-            actorAbility
+            { ability: actorAbility }
           )
         )
       ).toBe(widenRefused);
@@ -209,7 +211,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
         resourceService.update(
           resource.id,
           { allowedActionNames: [] },
-          actorAbility
+          { ability: actorAbility }
         )
       )
     ).toBe('RESOLVED');
@@ -217,7 +219,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     await resourceService.update(
       resource.id,
       { allowedActionNames: ['read'] },
-      superAbility
+      { ability: superAbility }
     );
   });
 
@@ -227,7 +229,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
         resourceService.update(
           resource.id,
           { allowedActionNames: null },
-          superAbility
+          { ability: superAbility }
         )
       )
     ).toBe('RESOLVED');
@@ -243,12 +245,16 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
     expect(
       await outcome(
-        resourceService.restore(resource.id, await abilityOf(actor.id))
+        resourceService.restore(resource.id, {
+          ability: await abilityOf(actor.id)
+        })
       )
     ).toBe(widenRefused);
     expect(await actorCanDelete()).toBe(false);
 
-    const restored = await resourceService.restore(resource.id, superAbility);
+    const restored = await resourceService.restore(resource.id, {
+      ability: superAbility
+    });
     expect(restored.isOrphaned).toBe(false);
   });
 
@@ -276,12 +282,10 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
       expect(
         await outcome(
-          resourceService.restore(
-            users.id,
-            superAbility,
-            undefined,
-            audit(users.id)
-          )
+          resourceService.restore(users.id, {
+            ability: superAbility,
+            audit: audit(users.id)
+          })
         )
       ).toBe(notOrphaned);
       expect(restoreRows()).toBe(before);
@@ -300,12 +304,10 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
       expect(
         await outcome(
-          resourceService.restore(
-            users.id,
-            SYSTEM_ABILITY,
-            undefined,
-            audit(users.id)
-          )
+          resourceService.restore(users.id, {
+            ability: SYSTEM_ABILITY,
+            audit: audit(users.id)
+          })
         )
       ).toBe(notOrphaned);
       expect(restoreRows()).toBe(before);

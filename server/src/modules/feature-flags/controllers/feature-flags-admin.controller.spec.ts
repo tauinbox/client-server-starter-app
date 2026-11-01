@@ -170,9 +170,7 @@ describe('FeatureFlagsAdminController', () => {
     expect(flagService.update).toHaveBeenCalledWith(
       'flag-1',
       { enabled: true },
-      { any: false, versions: [5] },
-      fullAbility,
-      actor
+      { ifMatch: { any: false, versions: [5] }, ability: fullAbility, actor }
     );
     expect(res.setHeader).toHaveBeenCalledWith('ETag', '"2"');
   });

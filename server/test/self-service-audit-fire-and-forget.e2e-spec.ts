@@ -68,7 +68,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
           password,
           name: 'Self Service'
         },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       )
     ).id;
     await dataSource

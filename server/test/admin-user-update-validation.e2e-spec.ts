@@ -21,6 +21,7 @@ import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const TARGET_ID = '4f9d38f6-6c67-4a54-9d5e-111111111111';
 
@@ -51,6 +52,7 @@ describe('Admin user update DTO validation (e2e)', () => {
           useValue: { sendPasswordChangedNotification: jest.fn() }
         },
         { provide: MetricsService, useValue: {} },
+        AccessRefusalService,
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn(), emitAsync: jest.fn() }
@@ -105,16 +107,11 @@ describe('Admin user update DTO validation (e2e)', () => {
       .send(payload)
       .expect(200);
 
-    expect(usersService.update).toHaveBeenCalledWith(
-      TARGET_ID,
-      payload,
-      undefined,
-      {
-        actorId: 'admin-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        audit: expect.any(Function)
-      }
-    );
+    expect(usersService.update).toHaveBeenCalledWith(TARGET_ID, payload, {
+      actorId: 'admin-1',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      audit: expect.any(Function)
+    });
   });
 
   it.each([

@@ -48,7 +48,7 @@ describe('withProviderDeadline', () => {
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
     await expect(
-      provider.startCheckout(customer, plan, urls, true)
+      provider.startCheckout(customer, plan, { urls, trial: true })
     ).rejects.toThrow(
       new ProviderTimeoutError('yookassa', 'startCheckout', TIMEOUT_MS)
     );
@@ -79,14 +79,12 @@ describe('withProviderDeadline', () => {
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
     await expect(
-      provider.startCheckout(customer, plan, urls, true)
+      provider.startCheckout(customer, plan, { urls, trial: true })
     ).resolves.toBe(session);
-    expect(inner.startCheckout).toHaveBeenCalledWith(
-      customer,
-      plan,
+    expect(inner.startCheckout).toHaveBeenCalledWith(customer, plan, {
       urls,
-      true
-    );
+      trial: true
+    });
   });
 
   it('forwards every argument, including optional ones', async () => {
@@ -98,15 +96,19 @@ describe('withProviderDeadline', () => {
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
     const items = [{ description: 'Pro', amountMinor: 1000, quantity: 1 }];
 
-    await provider.chargeOffSession(customer, 1000, 'RUB', items, 'renewal:1');
+    await provider.chargeOffSession(customer, {
+      amountMinor: 1000,
+      currency: 'RUB',
+      receiptItems: items,
+      idempotencyKey: 'renewal:1'
+    });
 
-    expect(inner.chargeOffSession).toHaveBeenCalledWith(
-      customer,
-      1000,
-      'RUB',
-      items,
-      'renewal:1'
-    );
+    expect(inner.chargeOffSession).toHaveBeenCalledWith(customer, {
+      amountMinor: 1000,
+      currency: 'RUB',
+      receiptItems: items,
+      idempotencyKey: 'renewal:1'
+    });
   });
 
   it('bounds the single-payment charge lookup too', async () => {
@@ -132,7 +134,11 @@ describe('withProviderDeadline', () => {
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
     const error: unknown = await provider
-      .chargeOffSession(customer, 1000, 'RUB', [])
+      .chargeOffSession(customer, {
+        amountMinor: 1000,
+        currency: 'RUB',
+        receiptItems: []
+      })
       .catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ProviderError);
@@ -148,7 +154,11 @@ describe('withProviderDeadline', () => {
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
     await expect(
-      provider.chargeOffSession(customer, 1000, 'RUB', [])
+      provider.chargeOffSession(customer, {
+        amountMinor: 1000,
+        currency: 'RUB',
+        receiptItems: []
+      })
     ).rejects.toBe(declined);
   });
 

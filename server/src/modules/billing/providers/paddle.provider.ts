@@ -31,8 +31,8 @@ import {
 import type {
   ChangePreview,
   ChargeResult,
+  CheckoutOptions,
   CheckoutSession,
-  CheckoutUrls,
   NormalizedCustomerRef,
   NormalizedEvent,
   NormalizedInvoicePayload,
@@ -42,6 +42,7 @@ import type {
   OneTimePaymentSession,
   PaymentProvider,
   WebhookIgnored,
+  UsageCharge,
   WebhookVerificationResult
 } from './payment-provider.interface';
 
@@ -186,7 +187,7 @@ export class PaddleProvider implements PaymentProvider {
   async startCheckout(
     customer: Customer,
     plan: Plan,
-    urls: CheckoutUrls
+    { urls }: CheckoutOptions
   ): Promise<CheckoutSession> {
     const paddle = this.requireClient();
     const priceId = this.requirePriceId(plan);
@@ -284,10 +285,7 @@ export class PaddleProvider implements PaymentProvider {
    */
   async chargeUsage(
     providerSubscriptionId: string,
-    amountMinor: number,
-    currency: string,
-    description: string,
-    chargeKey: string
+    { amountMinor, currency, description, chargeKey }: UsageCharge
   ): Promise<void> {
     const paddle = this.requireClient();
     await paddle.subscriptions.createOneTimeCharge(providerSubscriptionId, {

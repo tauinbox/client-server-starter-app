@@ -103,8 +103,10 @@ export class UsageInvoicingService {
       const summary = await this.usageRating.summarizeForPeriodWithCredits(
         subscription,
         plan,
-        { start: event.periodStart, end: event.periodEnd },
-        availableCredits
+        {
+          period: { start: event.periodStart, end: event.periodEnd },
+          availableCreditUnits: availableCredits
+        }
       );
       const zeroCharge = summary.amountMinor === 0;
 
@@ -130,8 +132,7 @@ export class UsageInvoicingService {
       if (zeroCharge && summary.creditUnitsApplied > 0) {
         await this.credits.spendOnUsage(
           manager,
-          subscription.customerId,
-          invoiceId,
+          { customerId: subscription.customerId, invoiceId },
           summary.creditUnitsApplied
         );
       }
@@ -156,13 +157,12 @@ export class UsageInvoicingService {
     const description =
       summary.receiptItems[0]?.description ?? `${plan.name} usage`;
     try {
-      await provider.chargeUsage(
-        subscription.providerSubscriptionId,
-        summary.amountMinor,
-        summary.currency,
+      await provider.chargeUsage(subscription.providerSubscriptionId, {
+        amountMinor: summary.amountMinor,
+        currency: summary.currency,
         description,
         chargeKey
-      );
+      });
     } catch (error) {
       // The invoice stays `pending` for operator visibility: the provider may
       // or may not have accepted the charge (e.g. a network failure after

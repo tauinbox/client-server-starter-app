@@ -61,8 +61,11 @@ function fakeProvider(id: BillingProviderId): FakeProvider {
     chargeOffSession: jest.fn<
       Promise<ChargeResult>,
       Parameters<PaymentProvider['chargeOffSession']>
-    >((_customer, _amount, _currency, _items, key) =>
-      Promise.resolve({ providerInvoiceRef: `pay_${key}`, status: 'captured' })
+    >((_customer, { idempotencyKey }) =>
+      Promise.resolve({
+        providerInvoiceRef: `pay_${idempotencyKey}`,
+        status: 'captured'
+      })
     ),
     findOffSessionCharge: jest.fn().mockResolvedValue(null),
     getOffSessionCharge: jest.fn().mockResolvedValue(null),
@@ -456,13 +459,14 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await deliverUsageCloses();
 
     expect(provider.chargeUsage).toHaveBeenCalledTimes(1);
-    expect(provider.chargeUsage).toHaveBeenCalledWith(
-      providerSubscriptionRef,
-      200,
-      'USD',
-      expect.any(String),
-      expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
-    );
+    expect(provider.chargeUsage).toHaveBeenCalledWith(providerSubscriptionRef, {
+      amountMinor: 200,
+      currency: 'USD',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      description: expect.any(String),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      chargeKey: expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
+    });
     const invoices = await usageInvoices();
     expect(invoices).toHaveLength(1);
     expect(invoices[0].status).toBe('pending');
@@ -496,13 +500,14 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await deliverUsageCloses();
 
     expect(provider.chargeUsage).toHaveBeenCalledTimes(1);
-    expect(provider.chargeUsage).toHaveBeenCalledWith(
-      providerSubscriptionRef,
-      200,
-      'USD',
-      expect.any(String),
-      expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
-    );
+    expect(provider.chargeUsage).toHaveBeenCalledWith(providerSubscriptionRef, {
+      amountMinor: 200,
+      currency: 'USD',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      description: expect.any(String),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      chargeKey: expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
+    });
     const invoices = await usageInvoices();
     expect(invoices).toHaveLength(1);
     expect(invoices[0].amountMinor.toNumber()).toBe(200);

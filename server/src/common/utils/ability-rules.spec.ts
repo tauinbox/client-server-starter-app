@@ -38,8 +38,13 @@ const DEFAULT_MAPS: SubjectMaps = {
 const grant = (
   resource: string,
   action: string,
-  conditions: ResolvedPermission['conditions'] = null,
-  permission = `${resource}:${action}`
+  {
+    conditions = null,
+    permission = `${resource}:${action}`
+  }: {
+    conditions?: ResolvedPermission['conditions'];
+    permission?: string;
+  } = {}
 ): ResolvedPermission => ({ resource, action, permission, conditions });
 
 describe('compileAbilityRules', () => {
@@ -62,7 +67,7 @@ describe('compileAbilityRules', () => {
     const rules = compileAbilityRules(
       'user-1',
       true,
-      [grant('users', 'read', { effect: 'deny' })],
+      [grant('users', 'read', { conditions: { effect: 'deny' } })],
       DEFAULT_MAPS,
       logger
     );
@@ -87,7 +92,10 @@ describe('compileAbilityRules', () => {
 
     it('still registers a deny on an action the resource does not offer', () => {
       const ability = abilityOf(
-        [grant('users', 'read'), grant('users', 'read', { effect: 'deny' })],
+        [
+          grant('users', 'read'),
+          grant('users', 'read', { conditions: { effect: 'deny' } })
+        ],
         maps
       );
 
@@ -95,7 +103,10 @@ describe('compileAbilityRules', () => {
     });
 
     it('registers no allow whose condition no check of the action reads', () => {
-      const ability = abilityOf([grant('users', 'read', OWN_RECORD)], maps);
+      const ability = abilityOf(
+        [grant('users', 'read', { conditions: OWN_RECORD })],
+        maps
+      );
 
       expect(ability.can('read', 'User')).toBe(false);
     });
@@ -104,7 +115,9 @@ describe('compileAbilityRules', () => {
       const ability = abilityOf(
         [
           grant('users', 'read'),
-          grant('users', 'read', { effect: 'deny', ...OWN_RECORD })
+          grant('users', 'read', {
+            conditions: { effect: 'deny', ...OWN_RECORD }
+          })
         ],
         maps
       );
@@ -114,7 +127,11 @@ describe('compileAbilityRules', () => {
 
     it('registers no allow whose condition names a field off the allow-list', () => {
       const ability = abilityOf(
-        [grant('users', 'update', { fieldMatch: { password: ['x'] } })],
+        [
+          grant('users', 'update', {
+            conditions: { fieldMatch: { password: ['x'] } }
+          })
+        ],
         maps
       );
 
@@ -126,8 +143,10 @@ describe('compileAbilityRules', () => {
         [
           grant('users', 'update'),
           grant('users', 'update', {
-            effect: 'deny',
-            fieldMatch: { Name: ['Typo'] }
+            conditions: {
+              effect: 'deny',
+              fieldMatch: { Name: ['Typo'] }
+            }
           })
         ],
         maps
@@ -137,7 +156,10 @@ describe('compileAbilityRules', () => {
     });
 
     it('keeps a condition on an action whose checks read the record', () => {
-      const ability = abilityOf([grant('users', 'update', OWN_RECORD)], maps);
+      const ability = abilityOf(
+        [grant('users', 'update', { conditions: OWN_RECORD })],
+        maps
+      );
 
       expect(ability.can('update', 'User')).toBe(true);
       expect(ability.rulesFor('update', 'User')[0].conditions).toEqual({
@@ -155,12 +177,10 @@ describe('compileAbilityRules', () => {
 
   it('should use userField from ownership condition as the condition key', () => {
     const ability = abilityOf([
-      grant(
-        'users',
-        'update',
-        { ownership: { userField: 'email' } },
-        'users:update:own'
-      )
+      grant('users', 'update', {
+        conditions: { ownership: { userField: 'email' } },
+        permission: 'users:update:own'
+      })
     ]);
 
     expect(
@@ -179,12 +199,10 @@ describe('compileAbilityRules', () => {
 
   it('should use "id" field when userField is "id"', () => {
     const ability = abilityOf([
-      grant(
-        'users',
-        'update',
-        { ownership: { userField: 'id' } },
-        'users:update:own'
-      )
+      grant('users', 'update', {
+        conditions: { ownership: { userField: 'id' } },
+        permission: 'users:update:own'
+      })
     ]);
 
     expect(
@@ -203,7 +221,10 @@ describe('compileAbilityRules', () => {
 
   it('should skip permissions for unknown resources and log a warning', () => {
     const ability = abilityOf([
-      grant('unknown-resource', 'read', null, 'unknown:read')
+      grant('unknown-resource', 'read', {
+        conditions: null,
+        permission: 'unknown:read'
+      })
     ]);
 
     expect(ability.can('read', 'User')).toBe(false);
@@ -221,7 +242,9 @@ describe('compileAbilityRules', () => {
   });
 
   it('should keep a deny whose resource is orphaned rather than drop it', () => {
-    const ability = abilityOf([grant('legacy', 'read', { effect: 'deny' })]);
+    const ability = abilityOf([
+      grant('legacy', 'read', { conditions: { effect: 'deny' } })
+    ]);
 
     const [rule, ...rest] = ability.rules;
     expect(rest).toHaveLength(0);
@@ -232,7 +255,9 @@ describe('compileAbilityRules', () => {
   });
 
   it('should log at error level when a deny names a resource in neither map', () => {
-    const ability = abilityOf([grant('ghost', 'read', { effect: 'deny' })]);
+    const ability = abilityOf([
+      grant('ghost', 'read', { conditions: { effect: 'deny' } })
+    ]);
 
     expect(ability.rules).toHaveLength(0);
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('ghost'));
@@ -267,7 +292,7 @@ describe('compileAbilityRules', () => {
     it('should keep a deny whose action is reserved', () => {
       const ability = abilityOf([
         grant('users', 'read'),
-        grant('users', 'manage', { effect: 'deny' })
+        grant('users', 'manage', { conditions: { effect: 'deny' } })
       ]);
 
       expect(ability.can('read', 'User')).toBe(false);
@@ -298,7 +323,9 @@ describe('compileAbilityRules', () => {
   it('should apply safe custom conditions as MongoQuery', () => {
     const ability = abilityOf([
       grant('users', 'read', {
-        custom: '{"name":{"$in":["active","pending"]}}'
+        conditions: {
+          custom: '{"name":{"$in":["active","pending"]}}'
+        }
       })
     ]);
 
@@ -318,7 +345,9 @@ describe('compileAbilityRules', () => {
 
   it('should skip custom conditions containing $where and log a warning', () => {
     const ability = abilityOf([
-      grant('users', 'read', { custom: '{"$where":"function(){return true}"}' })
+      grant('users', 'read', {
+        conditions: { custom: '{"$where":"function(){return true}"}' }
+      })
     ]);
 
     // $where block skipped -> no conditions applied -> unconditional deny
@@ -329,7 +358,9 @@ describe('compileAbilityRules', () => {
   it('should skip custom conditions containing nested $where', () => {
     const ability = abilityOf([
       grant('users', 'read', {
-        custom: '{"$or":[{"name":"active"},{"$where":"hack"}]}'
+        conditions: {
+          custom: '{"$or":[{"name":"active"},{"$where":"hack"}]}'
+        }
       })
     ]);
 
@@ -339,7 +370,9 @@ describe('compileAbilityRules', () => {
 
   it('should skip an allow whose custom uses an operator outside the allowed set', () => {
     const ability = abilityOf([
-      grant('users', 'read', { custom: '{"email":{"$regex":"x"}}' })
+      grant('users', 'read', {
+        conditions: { custom: '{"email":{"$regex":"x"}}' }
+      })
     ]);
 
     // $regex has no faithful SQL translation, so honouring it here would grant
@@ -358,8 +391,10 @@ describe('compileAbilityRules', () => {
     const ability = abilityOf([
       grant('users', 'update'),
       grant('users', 'update', {
-        effect: 'deny',
-        custom: '{"email":{"$regex":"x"}}'
+        conditions: {
+          effect: 'deny',
+          custom: '{"email":{"$regex":"x"}}'
+        }
       })
     ]);
 
@@ -374,7 +409,9 @@ describe('compileAbilityRules', () => {
 
   it('should skip custom conditions containing __proto__', () => {
     const ability = abilityOf([
-      grant('users', 'read', { custom: '{"__proto__":{"admin":true}}' })
+      grant('users', 'read', {
+        conditions: { custom: '{"__proto__":{"admin":true}}' }
+      })
     ]);
 
     expect(ability.can('read', 'User')).toBe(false);
@@ -390,9 +427,11 @@ describe('compileAbilityRules', () => {
     // payload.
     const ability = abilityOf([
       grant('users', 'update', {
-        ownership: { userField: 'email' },
-        custom:
-          '{"$or":[{"name":"active"},{"profile":{"constructor":{"x":1}}}]}'
+        conditions: {
+          ownership: { userField: 'email' },
+          custom:
+            '{"$or":[{"name":"active"},{"profile":{"constructor":{"x":1}}}]}'
+        }
       })
     ]);
 
@@ -419,7 +458,7 @@ describe('compileAbilityRules', () => {
     it('should block access when a deny rule with no conditions follows an allow', () => {
       const ability = abilityOf([
         grant('users', 'update'),
-        grant('users', 'update', { effect: 'deny' })
+        grant('users', 'update', { conditions: { effect: 'deny' } })
       ]);
 
       expect(ability.can('update', 'User')).toBe(false);
@@ -427,7 +466,7 @@ describe('compileAbilityRules', () => {
 
     it('should register deny after allow regardless of input order', () => {
       const ability = abilityOf([
-        grant('users', 'update', { effect: 'deny' }),
+        grant('users', 'update', { conditions: { effect: 'deny' } }),
         grant('users', 'update')
       ]);
 
@@ -439,8 +478,10 @@ describe('compileAbilityRules', () => {
       const ability = abilityOf([
         grant('users', 'update'),
         grant('users', 'update', {
-          effect: 'deny',
-          custom: '{"name":{"$in":["archived"]}}'
+          conditions: {
+            effect: 'deny',
+            custom: '{"name":{"$in":["archived"]}}'
+          }
         })
       ]);
 
@@ -467,15 +508,15 @@ describe('compileAbilityRules', () => {
 
     it('should apply conditional deny alongside ownership-based allow', () => {
       const ability = abilityOf([
-        grant(
-          'users',
-          'update',
-          { ownership: { userField: 'email' } },
-          'users:update:own'
-        ),
         grant('users', 'update', {
-          effect: 'deny',
-          fieldMatch: { name: ['locked'] }
+          conditions: { ownership: { userField: 'email' } },
+          permission: 'users:update:own'
+        }),
+        grant('users', 'update', {
+          conditions: {
+            effect: 'deny',
+            fieldMatch: { name: ['locked'] }
+          }
         })
       ]);
 
@@ -511,8 +552,10 @@ describe('compileAbilityRules', () => {
       const ability = abilityOf([
         grant('users', 'update'),
         grant('users', 'update', {
-          effect: 'deny',
-          custom: '{"$where":"hack"}'
+          conditions: {
+            effect: 'deny',
+            custom: '{"$where":"hack"}'
+          }
         })
       ]);
 
@@ -525,8 +568,10 @@ describe('compileAbilityRules', () => {
       const ability = abilityOf([
         grant('users', 'update'),
         grant('users', 'update', {
-          effect: 'deny',
-          ownership: { userField: '$or' }
+          conditions: {
+            effect: 'deny',
+            ownership: { userField: '$or' }
+          }
         })
       ]);
 
@@ -544,8 +589,10 @@ describe('compileAbilityRules', () => {
       const ability = abilityOf([
         grant('users', 'update'),
         grant('users', 'update', {
-          effect: 'deny',
-          fieldMatch: { name: [] }
+          conditions: {
+            effect: 'deny',
+            fieldMatch: { name: [] }
+          }
         })
       ]);
 
@@ -553,7 +600,9 @@ describe('compileAbilityRules', () => {
     });
 
     it('should treat conditions.effect === "allow" as the default', () => {
-      const ability = abilityOf([grant('users', 'read', { effect: 'allow' })]);
+      const ability = abilityOf([
+        grant('users', 'read', { conditions: { effect: 'allow' } })
+      ]);
 
       expect(ability.can('read', 'User')).toBe(true);
     });
@@ -566,7 +615,7 @@ describe('compileAbilityRules', () => {
       ['custom that parses to {}', { custom: '{}' }],
       ['malformed custom JSON', { custom: '{not-valid-json' }]
     ])('should grant nothing (not everything) for %s', (_label, conditions) => {
-      const ability = abilityOf([grant('users', 'update', conditions)]);
+      const ability = abilityOf([grant('users', 'update', { conditions })]);
 
       expect(ability.can('update', 'User')).toBe(false);
       expect(
@@ -582,12 +631,13 @@ describe('compileAbilityRules', () => {
       // ownership branch would drop the authored fieldMatch restriction, so
       // the permission fails closed instead of granting a narrower rule.
       const ability = abilityOf([
-        grant(
-          'users',
-          'update',
-          { ownership: { userField: 'email' }, fieldMatch: { name: [] } },
-          'users:update:own'
-        )
+        grant('users', 'update', {
+          conditions: {
+            ownership: { userField: 'email' },
+            fieldMatch: { name: [] }
+          },
+          permission: 'users:update:own'
+        })
       ]);
 
       expect(
@@ -606,12 +656,10 @@ describe('compileAbilityRules', () => {
 
     it('should still grant conditionally when a benign custom "{}" accompanies a resolving branch', () => {
       const ability = abilityOf([
-        grant(
-          'users',
-          'update',
-          { ownership: { userField: 'email' }, custom: '{}' },
-          'users:update:own'
-        )
+        grant('users', 'update', {
+          conditions: { ownership: { userField: 'email' }, custom: '{}' },
+          permission: 'users:update:own'
+        })
       ]);
 
       expect(

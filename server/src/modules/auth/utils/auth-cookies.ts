@@ -45,11 +45,15 @@ export class AuthCookies {
     token: string,
     maxAge: number = this.refreshMaxAge
   ): void {
-    setHostCookie(res, REFRESH_TOKEN_COOKIE, token, this.secure, {
-      httpOnly: true,
-      sameSite: 'strict',
-      maxAge
-    });
+    setHostCookie(
+      res,
+      { base: REFRESH_TOKEN_COOKIE, value: token, secure: this.secure },
+      {
+        httpOnly: true,
+        sameSite: 'strict',
+        maxAge
+      }
+    );
   }
 
   clearRefresh(res: Response): void {
@@ -62,15 +66,18 @@ export class AuthCookies {
 
   setShortLived(
     res: Response,
-    base: string,
-    value: string,
+    { base, value }: { base: string; value: string },
     maxAgeSeconds: number
   ): void {
-    setHostCookie(res, base, value, this.secure, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: maxAgeSeconds * 1000
-    });
+    setHostCookie(
+      res,
+      { base, value, secure: this.secure },
+      {
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: maxAgeSeconds * 1000
+      }
+    );
   }
 
   read(req: Pick<Request, 'cookies'>, base: string): string | undefined {

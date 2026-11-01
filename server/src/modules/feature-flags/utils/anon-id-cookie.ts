@@ -26,11 +26,15 @@ export function writeAnonId(
   value: string,
   secure: boolean
 ): void {
-  setHostCookie(res, ANON_ID_COOKIE, value, secure, {
-    // Bucketing is resolved server-side from the cookie, so no browser script
-    // needs to read it.
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: ANON_ID_MAX_AGE_MS
-  });
+  setHostCookie(
+    res,
+    { base: ANON_ID_COOKIE, value, secure },
+    {
+      // Bucketing is resolved server-side from the cookie, so no browser script
+      // needs to read it.
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: ANON_ID_MAX_AGE_MS
+    }
+  );
 }

@@ -67,9 +67,11 @@ function toGrantItems(items: ScopeItem[]): GrantScopeItem[] {
 export function assertGrantScope(
   req: Request,
   res: Response,
-  check: ScopeCheck,
-  roleId: string,
-  items: ScopeItem[]
+  {
+    check,
+    roleId,
+    items
+  }: { check: ScopeCheck; roleId: string; items: ScopeItem[] }
 ): boolean {
   const { user } = req as AuthenticatedRequest;
   const ability = scopeOf(buildAbilityForUser(user));
@@ -104,8 +106,13 @@ export function assertGrantScope(
 export function assertCanWiden(
   req: Request,
   res: Response,
-  resource: { id: string; name: string; subject: string },
-  reEnabled: string[]
+  {
+    resource,
+    reEnabled
+  }: {
+    resource: { id: string; name: string; subject: string };
+    reEnabled: string[];
+  }
 ): boolean {
   if (reEnabled.length === 0) return true;
   const { user } = req as AuthenticatedRequest;

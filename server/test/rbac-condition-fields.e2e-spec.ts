@@ -99,8 +99,13 @@ runWithInfra('Grant condition fields (e2e)', () => {
       );
     }
 
-    role = await roleService.create({ name: `${tag}-role` }, SYSTEM_ABILITY);
-    await roleService.assignRoleToUser(users.actor.id, role.id, SYSTEM_ABILITY);
+    role = await roleService.create(
+      { name: `${tag}-role` },
+      { ability: SYSTEM_ABILITY }
+    );
+    await roleService.assignRoleToUser(users.actor.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
   }, 60000);
 
   afterAll(async () => {
@@ -123,7 +128,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
             conditions: { fieldMatch: { password: ['x'] } }
           }
         ],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       )
       .then(
         () => 'RESOLVED',
@@ -152,18 +157,16 @@ runWithInfra('Grant condition fields (e2e)', () => {
     await storeRows([{ effect: 'deny', fieldMatch: { Name: ['Typo'] } }]);
     const allowRole = await roleService.create(
       { name: `${tag}-allow` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       allowRole.id,
       [{ permissionId: readUser.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(
-      users.actor.id,
-      allowRole.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(users.actor.id, allowRole.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     try {
       expect(await canReadTarget()).toBe(false);

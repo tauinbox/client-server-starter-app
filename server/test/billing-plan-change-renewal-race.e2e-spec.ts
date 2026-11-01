@@ -258,7 +258,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   function answerCharges(onCharge: (key: string) => Promise<void>): void {
     provider.chargeOffSession.mockImplementation(
       async (
-        ...[, amount, , , key = '']: Parameters<
+        ...[, { amountMinor: amount, idempotencyKey: key = '' }]: Parameters<
           PaymentProvider['chargeOffSession']
         >
       ): Promise<ChargeResult> => {

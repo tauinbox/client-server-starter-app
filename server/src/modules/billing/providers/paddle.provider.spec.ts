@@ -522,15 +522,13 @@ describe('PaddleProvider', () => {
       const bounded = withProviderDeadline(provider, 20);
 
       await expect(
-        bounded.startCheckout(
-          customer,
-          plan,
-          {
+        bounded.startCheckout(customer, plan, {
+          urls: {
             successUrl: 'https://app/return',
             cancelUrl: 'https://app/cancel'
           },
-          false
-        )
+          trial: false
+        })
       ).rejects.toBeInstanceOf(ProviderTimeoutError);
     });
 
@@ -542,8 +540,11 @@ describe('PaddleProvider', () => {
       });
 
       const session = await provider.startCheckout(customer, plan, {
-        successUrl: 'https://app/return',
-        cancelUrl: 'https://app/cancel'
+        urls: {
+          successUrl: 'https://app/return',
+          cancelUrl: 'https://app/cancel'
+        },
+        trial: false
       });
 
       expect(client!.transactions.create).toHaveBeenCalledWith(
@@ -563,8 +564,11 @@ describe('PaddleProvider', () => {
       const planNoPrice = { key: 'pro', prices: {} } as Plan;
       await expectApiRejection(
         provider.startCheckout(customer, planNoPrice, {
-          successUrl: 'https://app/return',
-          cancelUrl: 'https://app/cancel'
+          urls: {
+            successUrl: 'https://app/return',
+            cancelUrl: 'https://app/cancel'
+          },
+          trial: false
         }),
         ErrorKeys.BILLING.PLAN_NOT_CONFIGURED
       );
@@ -813,13 +817,12 @@ describe('PaddleProvider', () => {
     it('posts an immediate one-time charge with the key in the price custom data', async () => {
       const { provider, client } = await build({});
 
-      await provider.chargeUsage(
-        'sub_123',
-        8400,
-        'USD',
-        'Pay as you go: api_calls × 42',
-        'usage:sub-1:123'
-      );
+      await provider.chargeUsage('sub_123', {
+        amountMinor: 8400,
+        currency: 'USD',
+        description: 'Pay as you go: api_calls × 42',
+        chargeKey: 'usage:sub-1:123'
+      });
 
       expect(client!.subscriptions.createOneTimeCharge).toHaveBeenCalledWith(
         'sub_123',
@@ -844,7 +847,12 @@ describe('PaddleProvider', () => {
       const { provider } = await build({ client: null });
 
       await expectApiRejection(
-        provider.chargeUsage('sub_123', 1, 'USD', 'usage', 'k'),
+        provider.chargeUsage('sub_123', {
+          amountMinor: 1,
+          currency: 'USD',
+          description: 'usage',
+          chargeKey: 'k'
+        }),
         ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
       );
     });

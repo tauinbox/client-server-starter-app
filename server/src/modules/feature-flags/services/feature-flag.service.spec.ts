@@ -17,6 +17,7 @@ import {
   SYSTEM_ABILITY,
   type AppAbility
 } from '../../auth/casl/app-ability';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 interface QueryBuilderMock {
   update: jest.Mock;
@@ -121,7 +122,8 @@ describe('FeatureFlagService', () => {
         { provide: AttributeRegistryService, useValue: attributeRegistry },
         { provide: ConfigService, useValue: configService },
         { provide: AuditService, useValue: auditService },
-        { provide: MetricsService, useValue: metricsService }
+        { provide: MetricsService, useValue: metricsService },
+        AccessRefusalService
       ]
     }).compile();
 
@@ -340,9 +342,7 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { enabled: true },
-          version(2),
-          SYSTEM_ABILITY,
-          actor
+          { ifMatch: version(2), ability: SYSTEM_ABILITY, actor }
         )
       ).rejects.toMatchObject({
         status: 412,
@@ -356,9 +356,11 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { enabled: true },
-          { any: false, versions: [] },
-          SYSTEM_ABILITY,
-          actor
+          {
+            ifMatch: { any: false, versions: [] },
+            ability: SYSTEM_ABILITY,
+            actor
+          }
         )
       ).rejects.toMatchObject({ status: 412 });
     });
@@ -373,9 +375,7 @@ describe('FeatureFlagService', () => {
       await service.update(
         'flag-1',
         { enabled: true },
-        { any: true },
-        SYSTEM_ABILITY,
-        actor
+        { ifMatch: { any: true }, ability: SYSTEM_ABILITY, actor }
       );
 
       expect(qb.where).toHaveBeenCalledWith(
@@ -389,9 +389,7 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { rules: [percentRule(150)] },
-          version(2),
-          SYSTEM_ABILITY,
-          actor
+          { ifMatch: version(2), ability: SYSTEM_ABILITY, actor }
         )
       ).rejects.toMatchObject({ status: 422 });
     });
@@ -404,9 +402,7 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { enabled: true, rules: [percentRule(25)] },
-          version(1),
-          SYSTEM_ABILITY,
-          actor
+          { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
         )
       ).rejects.toMatchObject({
         status: 412,
@@ -429,9 +425,7 @@ describe('FeatureFlagService', () => {
       const result = await service.update(
         'flag-1',
         { enabled: true },
-        version(1),
-        SYSTEM_ABILITY,
-        actor
+        { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
       );
       expect(qb.where).toHaveBeenCalledWith(
         'id = :id AND version = :expected',
@@ -460,9 +454,7 @@ describe('FeatureFlagService', () => {
       await service.update(
         'flag-1',
         { rules: [] },
-        version(1),
-        SYSTEM_ABILITY,
-        actor
+        { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
       );
       expect(qb.execute).toHaveBeenCalledTimes(1);
       expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
@@ -479,9 +471,7 @@ describe('FeatureFlagService', () => {
       await service.update(
         'flag-1',
         { enabled: true, rules: [percentRule(25)] },
-        version(1),
-        SYSTEM_ABILITY,
-        actor
+        { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
       );
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -502,9 +492,7 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { enabled: true },
-          version(1),
-          SYSTEM_ABILITY,
-          actor
+          { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
         )
       ).rejects.toThrow('audit down');
     });
@@ -514,9 +502,7 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { rules: [percentRule(150)] },
-          version(1),
-          SYSTEM_ABILITY,
-          actor
+          { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
         )
       ).rejects.toMatchObject({
         status: 422,
@@ -605,9 +591,7 @@ describe('FeatureFlagService', () => {
         service.update(
           'flag-1',
           { environments: [] },
-          version(1),
-          scoped,
-          actor
+          { ifMatch: version(1), ability: scoped, actor }
         )
       ).rejects.toMatchObject(refused);
       expect(dataSource.transaction).not.toHaveBeenCalled();

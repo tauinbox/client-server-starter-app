@@ -584,8 +584,16 @@ runWithInfra('billing write paths (e2e)', () => {
       const credits = await build(CreditService);
 
       await ds.transaction(async (m) => {
-        await credits.addPurchase(m, customerId, invoice.id, 100);
-        await credits.spendOnUsage(m, customerId, invoice.id, 30);
+        await credits.addPurchase(
+          m,
+          { customerId, invoiceId: invoice.id },
+          100
+        );
+        await credits.spendOnUsage(
+          m,
+          { customerId, invoiceId: invoice.id },
+          30
+        );
       });
 
       expect(await creditUnits()).toBe(70);

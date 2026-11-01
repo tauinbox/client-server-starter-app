@@ -15,6 +15,7 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { createMockRequest } from '../../../common/testing/express.mock';
 import { AuthCookies } from '../utils/auth-cookies';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 type MockedResponse = { cookie: jest.Mock; clearCookie: jest.Mock };
 
@@ -111,6 +112,7 @@ describe('MfaController', () => {
         },
         { provide: AuditService, useValue: auditService },
         { provide: MetricsService, useValue: metricsService },
+        AccessRefusalService,
         {
           provide: ConfigService,
           useValue: {
@@ -134,14 +136,11 @@ describe('MfaController', () => {
         res
       );
 
-      expect(authService.assertStepUp).toHaveBeenCalledWith(
-        mockUser,
-        'Password1',
-        undefined,
-        STEP_UP_OPERATION.MFA_SETUP,
-        undefined,
+      expect(authService.assertStepUp).toHaveBeenCalledWith(mockUser, {
+        currentPassword: 'Password1',
+        operation: STEP_UP_OPERATION.MFA_SETUP,
         auditContext
-      );
+      });
       expect(mfaService.beginEnrolment).toHaveBeenCalledWith(mockUser);
     });
 
@@ -152,14 +151,11 @@ describe('MfaController', () => {
         res
       );
 
-      expect(authService.assertStepUp).toHaveBeenCalledWith(
-        mockUser,
-        undefined,
-        'proof',
-        STEP_UP_OPERATION.MFA_SETUP,
-        undefined,
+      expect(authService.assertStepUp).toHaveBeenCalledWith(mockUser, {
+        reauthProof: 'proof',
+        operation: STEP_UP_OPERATION.MFA_SETUP,
         auditContext
-      );
+      });
     });
 
     it('does not enrol when the step-up fails', async () => {
@@ -196,14 +192,11 @@ describe('MfaController', () => {
     it('accepts an authenticator code in place of the password', async () => {
       await controller.disable(jwtRequest(), { code: '123456' }, res);
 
-      expect(authService.assertStepUp).toHaveBeenCalledWith(
-        mockUser,
-        undefined,
-        undefined,
-        STEP_UP_OPERATION.MFA_DISABLE,
-        '123456',
+      expect(authService.assertStepUp).toHaveBeenCalledWith(mockUser, {
+        operation: STEP_UP_OPERATION.MFA_DISABLE,
+        totpCode: '123456',
         auditContext
-      );
+      });
       expect(mfaService.disable).toHaveBeenCalled();
     });
 
@@ -227,14 +220,11 @@ describe('MfaController', () => {
         res
       );
 
-      expect(authService.assertStepUp).toHaveBeenCalledWith(
-        mockUser,
-        'Password1',
-        undefined,
-        STEP_UP_OPERATION.MFA_RECOVERY_CODES,
-        undefined,
+      expect(authService.assertStepUp).toHaveBeenCalledWith(mockUser, {
+        currentPassword: 'Password1',
+        operation: STEP_UP_OPERATION.MFA_RECOVERY_CODES,
         auditContext
-      );
+      });
       expect(result).toEqual({ recoveryCodes: ['QRSTUVWX-YZ234567'] });
     });
 
@@ -245,14 +235,11 @@ describe('MfaController', () => {
         res
       );
 
-      expect(authService.assertStepUp).toHaveBeenCalledWith(
-        mockUser,
-        undefined,
-        undefined,
-        STEP_UP_OPERATION.MFA_RECOVERY_CODES,
-        '123456',
+      expect(authService.assertStepUp).toHaveBeenCalledWith(mockUser, {
+        operation: STEP_UP_OPERATION.MFA_RECOVERY_CODES,
+        totpCode: '123456',
         auditContext
-      );
+      });
     });
 
     it('does not replace the codes when the step-up fails', async () => {

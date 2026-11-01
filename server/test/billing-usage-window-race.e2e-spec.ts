@@ -22,7 +22,11 @@ import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { UsagePeriodClosedEvent } from '../src/modules/billing/events/billing.events';
-import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
+import {
+  BILLING_PROVIDERS,
+  type OffSessionCharge,
+  type UsageCharge
+} from '../src/modules/billing/providers/payment-provider.interface';
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { CreditService } from '../src/modules/billing/services/credit.service';
@@ -234,8 +238,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
     await ds.transaction((m) =>
       new CreditService(ds.getRepository(CreditBalance)).addPurchase(
         m,
-        customer.id,
-        purchase.id,
+        { customerId: customer.id, invoiceId: purchase.id },
         50
       )
     );
@@ -254,7 +257,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
       id,
       managesLifecycle: id === 'paddle',
       chargeOffSession: jest.fn(
-        async (_customer: Customer, amountMinor: number) => {
+        async (_customer: Customer, { amountMinor }: OffSessionCharge) => {
           recordAmount(amountMinor);
           if (calls === 1) {
             charge.enter();
@@ -263,7 +266,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
           return { providerInvoiceRef: `pay_${calls}`, status: 'captured' };
         }
       ),
-      chargeUsage: jest.fn((_ref: string, amountMinor: number) => {
+      chargeUsage: jest.fn((_ref: string, { amountMinor }: UsageCharge) => {
         recordAmount(amountMinor);
         return Promise.resolve(undefined);
       }),

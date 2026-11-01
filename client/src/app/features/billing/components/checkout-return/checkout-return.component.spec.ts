@@ -74,8 +74,10 @@ describe('CheckoutReturnComponent', () => {
   async function setup(
     mode: 'success' | 'cancel',
     active: boolean,
-    invoices: InvoiceResponse[] = [],
-    transactionId?: string
+    {
+      invoices = [],
+      transactionId
+    }: { invoices?: InvoiceResponse[]; transactionId?: string } = {}
   ): Promise<void> {
     storeMock = {
       plans: signal<PlanResponse[]>(active ? [proPlan] : []),
@@ -135,7 +137,7 @@ describe('CheckoutReturnComponent', () => {
       currency: 'USD'
     });
 
-    await setup('success', false, [paidPurchaseInvoice]);
+    await setup('success', false, { invoices: [paidPurchaseInvoice] });
 
     expect(storeMock.refreshInvoices).toHaveBeenCalled();
     expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
@@ -147,7 +149,7 @@ describe('CheckoutReturnComponent', () => {
   });
 
   it('keeps polling subscription-style when no purchase is pending', async () => {
-    await setup('success', true, [paidPurchaseInvoice]);
+    await setup('success', true, { invoices: [paidPurchaseInvoice] });
     expect(storeMock.refreshSubscription).toHaveBeenCalled();
     expect(storeMock.refreshInvoices).not.toHaveBeenCalled();
   });
@@ -167,7 +169,10 @@ describe('CheckoutReturnComponent', () => {
     it('opens the Paddle checkout and does not poll while it is open', async () => {
       paddleOpen.mockReturnValue(new Promise(() => undefined));
 
-      await setup('success', true, [], 'txn_01abc');
+      await setup('success', true, {
+        invoices: [],
+        transactionId: 'txn_01abc'
+      });
 
       expect(paddleOpen).toHaveBeenCalledWith('txn_01abc');
       expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
@@ -178,7 +183,10 @@ describe('CheckoutReturnComponent', () => {
     it('drops the transaction id and polls after the payment completes', async () => {
       paddleOpen.mockResolvedValue('completed');
 
-      await setup('success', true, [], 'txn_01abc');
+      await setup('success', true, {
+        invoices: [],
+        transactionId: 'txn_01abc'
+      });
 
       expect(router.navigate).toHaveBeenCalledWith([], {
         queryParams: { [PADDLE_TRANSACTION_PARAM]: null },
@@ -193,7 +201,10 @@ describe('CheckoutReturnComponent', () => {
     it('goes to the cancel page when the buyer closes the checkout', async () => {
       paddleOpen.mockResolvedValue('closed');
 
-      await setup('success', false, [], 'txn_01abc');
+      await setup('success', false, {
+        invoices: [],
+        transactionId: 'txn_01abc'
+      });
 
       expect(router.navigate).toHaveBeenCalledWith(['/billing/cancel'], {
         replaceUrl: true
@@ -210,7 +221,10 @@ describe('CheckoutReturnComponent', () => {
       });
       paddleOpen.mockResolvedValue('unavailable');
 
-      await setup('success', false, [], 'txn_01abc');
+      await setup('success', false, {
+        invoices: [],
+        transactionId: 'txn_01abc'
+      });
 
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
       expect(text).toContain('Payment form unavailable');

@@ -39,8 +39,7 @@ function postAuth(path: string, body: unknown): Promise<Response> {
 function adminRequest(
   method: string,
   path: string,
-  accessToken: string,
-  body?: unknown
+  { accessToken, body }: { accessToken: string; body?: unknown }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/users/${path}`, {
     method,
@@ -102,9 +101,12 @@ describe('a reset link dies with an ownership change', () => {
     const resetToken = await issueResetToken(USER_EMAIL);
     const user = findUserByEmail(USER_EMAIL)!;
 
-    const res = await adminRequest('PATCH', user.id, adminToken, {
-      email: MOVED_EMAIL,
-      currentPassword: SEED_PASSWORD
+    const res = await adminRequest('PATCH', user.id, {
+      accessToken: adminToken,
+      body: {
+        email: MOVED_EMAIL,
+        currentPassword: SEED_PASSWORD
+      }
     });
     expect(res.status).toBe(200);
 
@@ -118,8 +120,11 @@ describe('a reset link dies with an ownership change', () => {
     const userId = findUserByEmail(USER_EMAIL)!.id;
 
     for (const isActive of [false, true]) {
-      const res = await adminRequest('PATCH', userId, adminToken, {
-        isActive
+      const res = await adminRequest('PATCH', userId, {
+        accessToken: adminToken,
+        body: {
+          isActive
+        }
       });
       expect(res.status).toBe(200);
     }
@@ -132,13 +137,13 @@ describe('a reset link dies with an ownership change', () => {
     const resetToken = await issueResetToken(USER_EMAIL);
     const userId = findUserByEmail(USER_EMAIL)!.id;
 
-    const removed = await adminRequest('DELETE', userId, adminToken);
+    const removed = await adminRequest('DELETE', userId, {
+      accessToken: adminToken
+    });
     expect(removed.ok).toBe(true);
-    const restored = await adminRequest(
-      'POST',
-      `${userId}/restore`,
-      adminToken
-    );
+    const restored = await adminRequest('POST', `${userId}/restore`, {
+      accessToken: adminToken
+    });
     expect(restored.ok).toBe(true);
 
     await expectResetRefused(resetToken);
@@ -149,8 +154,11 @@ describe('a reset link dies with an ownership change', () => {
     const resetToken = await issueResetToken(USER_EMAIL);
     const userId = findUserByEmail(USER_EMAIL)!.id;
 
-    const res = await adminRequest('PATCH', userId, adminToken, {
-      name: 'Renamed'
+    const res = await adminRequest('PATCH', userId, {
+      accessToken: adminToken,
+      body: {
+        name: 'Renamed'
+      }
     });
     expect(res.status).toBe(200);
 

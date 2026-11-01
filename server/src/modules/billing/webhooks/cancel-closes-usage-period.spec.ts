@@ -167,13 +167,12 @@ describe('a provider-managed cancel closes and charges the metered period', () =
     // The listener runs on the emit's microtask chain, not inside the reduce.
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(ctx.chargeUsage).toHaveBeenCalledWith(
-      'psub_1',
-      8400,
-      'USD',
-      'Pay as you go: api_calls × 42',
-      `usage:sub-1:${PERIOD_END.getTime()}`
-    );
+    expect(ctx.chargeUsage).toHaveBeenCalledWith('psub_1', {
+      amountMinor: 8400,
+      currency: 'USD',
+      description: 'Pay as you go: api_calls × 42',
+      chargeKey: `usage:sub-1:${PERIOD_END.getTime()}`
+    });
     expect(ctx.insertedInvoices).toContainEqual(
       expect.objectContaining({
         providerEventId: `usage:sub-1:${PERIOD_END.getTime()}`,

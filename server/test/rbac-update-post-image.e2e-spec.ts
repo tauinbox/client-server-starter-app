@@ -102,10 +102,10 @@ runWithInfra(
         return found.id;
       };
 
-      await roleService.create({ name: teamA }, SYSTEM_ABILITY);
+      await roleService.create({ name: teamA }, { ability: SYSTEM_ABILITY });
       const actorRole = await roleService.create(
         { name: actorRoleName },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       await roleService.setPermissionsForRole(
         actorRole.id,
@@ -123,12 +123,12 @@ runWithInfra(
             conditions: { fieldMatch: { displayName: [resourceLabel] } }
           }
         ],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       await roleService.assignRoleToUser(
         await userId(actorEmail),
         actorRole.id,
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
     }, 60000);
 

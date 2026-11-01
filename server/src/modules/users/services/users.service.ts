@@ -17,9 +17,7 @@ import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditLogParams } from '../../audit/audit.service';
-import { assertCan } from '../../../common/utils/assert-can.util';
-import { assertNotSuperTarget } from '../../../common/utils/assert-not-super-target.util';
-import { MetricsService } from '../../core/metrics/metrics.service';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { BreachedPasswordService } from '../../auth/breached-password/breached-password.service';
 import { MailService } from '../../mail/mail.service';
 import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util';
@@ -70,15 +68,35 @@ const USER_LIST_COLUMNS: ListColumns<typeof USER_LIST_QUERY> = {
  */
 export type UserAuditRows = (user: User) => AuditLogParams[];
 
-export interface UserUpdateOptions {
+export interface UserWriteOptions {
+  ability: AbilityOrSystem;
   actorId?: string;
   audit?: UserAuditRows;
+}
+
+export interface UserUpdateOptions extends UserWriteOptions {
   /**
    * The credential that the step-up of the caller verified (`null` for an
    * account with no password). The write is keyed on it, so a password change
    * that lands after the step-up wins.
    */
   expected?: Pick<User, 'password'>;
+}
+
+export interface UserWriteCheck {
+  action: 'update' | 'delete';
+  target: User;
+  actorId?: string;
+}
+
+/**
+ * A mailed token, written only while the account still has the address that
+ * the caller mails it to.
+ */
+export interface MailedTokenWrite {
+  email: string;
+  hashedToken: string;
+  expiresAt: Date;
 }
 
 @Injectable()
@@ -90,16 +108,14 @@ export class UsersService {
     private userRepository: Repository<User>,
     private dataSource: DataSource,
     private auditService: AuditService,
-    private metricsService: MetricsService,
+    private accessRefusals: AccessRefusalService,
     private mailService: MailService,
     private breachedPasswordService: BreachedPasswordService
   ) {}
 
   async create(
     createUserDto: CreateUserDto,
-    ability: AbilityOrSystem,
-    actorId?: string,
-    audit?: UserAuditRows
+    { ability, actorId, audit }: UserWriteOptions
   ): Promise<User> {
     const { email, password, ...subjectFields } = createUserDto;
 
@@ -108,14 +124,12 @@ export class UsersService {
     // caller is asking to create. The password is deliberately left out of the
     // subject: no authorization condition can legitimately be written over it.
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'create',
-        subject('User', { email, ...subjectFields }),
-        this.auditService,
-        { actorId, targetType: 'User' },
-        this.metricsService
-      );
+      this.accessRefusals.assertCan(ability, {
+        action: 'create',
+        subject: subject('User', { email, ...subjectFields }),
+        actorId,
+        targetType: 'User'
+      });
     }
 
     // Ahead of the address conflict, matching AuthService.register: both routes
@@ -189,7 +203,11 @@ export class UsersService {
       });
     }
 
-    return applyList(qb, USER_LIST_QUERY, USER_LIST_COLUMNS, query);
+    return applyList(
+      qb,
+      { spec: USER_LIST_QUERY, columns: USER_LIST_COLUMNS },
+      query
+    );
   }
 
   async findOne(
@@ -199,14 +217,13 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.loadUser(id);
     if (ability !== SYSTEM_ABILITY) {
-      assertCan(
-        ability,
-        'read',
-        subject('User', user),
-        this.auditService,
-        { actorId, targetId: id, targetType: 'User' },
-        this.metricsService
-      );
+      this.accessRefusals.assertCan(ability, {
+        action: 'read',
+        subject: subject('User', user),
+        actorId,
+        targetId: id,
+        targetType: 'User'
+      });
     }
     return user;
   }
@@ -260,55 +277,41 @@ export class UsersService {
    * The instance check of a write on `target`: `assertCan`, then the rule that
    * an account holding a super role is out of reach of a non-super actor.
    */
-  assertCanWrite(
-    ability: AppAbility,
-    action: 'update' | 'delete',
-    target: User,
-    actorId?: string
-  ): void {
-    assertCan(
-      ability,
+  assertCanWrite(ability: AppAbility, check: UserWriteCheck): void {
+    const { action, target, actorId } = check;
+    this.accessRefusals.assertCan(ability, {
       action,
-      subject('User', target),
-      this.auditService,
-      { actorId, targetId: target.id, targetType: 'User' },
-      this.metricsService
-    );
-    assertNotSuperTarget(
-      ability,
-      action,
-      target,
-      this.auditService,
+      subject: subject('User', target),
       actorId,
-      this.metricsService
-    );
+      targetId: target.id,
+      targetType: 'User'
+    });
+    this.accessRefusals.assertNotSuperTarget(ability, check);
   }
 
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
-    ability: AbilityOrSystem,
-    { actorId, audit, expected }: UserUpdateOptions = {}
+    { ability, actorId, audit, expected }: UserUpdateOptions
   ): Promise<User> {
     const user = await this.loadUser(id);
     const { unlockAccount, ...rest } = updateUserDto;
 
     if (ability !== SYSTEM_ABILITY) {
-      this.assertCanWrite(ability, 'update', user, actorId);
+      this.assertCanWrite(ability, { action: 'update', target: user, actorId });
       // The record after the write is checked too: else a grant scoped by a
       // writable field lets the caller move a user out of its own scope. The
       // secrets of the body are not fields that a condition reads.
-      this.assertCanWrite(
-        ability,
-        'update',
-        withChanges(user, {
+      this.assertCanWrite(ability, {
+        action: 'update',
+        target: withChanges(user, {
           ...rest,
           password: undefined,
           currentPassword: undefined,
           code: undefined
         }),
         actorId
-      );
+      });
     }
     // Only columns: the body also carries the step-up factors of the caller.
     const changes: QueryDeepPartialEntity<User> = {
@@ -393,7 +396,7 @@ export class UsersService {
         const where = expected
           ? { ...live, password: expected.password ?? IsNull() }
           : live;
-        if (!(await keyedUpdate(manager, User, where, changes))) {
+        if (!(await keyedUpdate(manager, User, { where, changes }))) {
           if (expected && (await manager.exists(User, { where: live }))) {
             throw new ApiError(
               ErrorKeys.AUTH.TOKEN_REVOKED,
@@ -509,9 +512,7 @@ export class UsersService {
    */
   async setEmailVerificationToken(
     userId: string,
-    email: string,
-    hashedToken: string,
-    expiresAt: Date
+    { email, hashedToken, expiresAt }: MailedTokenWrite
   ): Promise<boolean> {
     const { affected } = await this.userRepository.update(
       { id: userId, email, isEmailVerified: false, isActive: true },
@@ -557,9 +558,7 @@ export class UsersService {
    */
   async setPasswordResetToken(
     userId: string,
-    email: string,
-    hashedToken: string,
-    expiresAt: Date
+    { email, hashedToken, expiresAt }: MailedTokenWrite
   ): Promise<boolean> {
     const { affected } = await this.userRepository.update(
       { id: userId, email, isActive: true },
@@ -597,14 +596,12 @@ export class UsersService {
 
   async remove(
     id: string,
-    ability: AbilityOrSystem,
-    actorId?: string,
-    audit?: UserAuditRows
+    { ability, actorId, audit }: UserWriteOptions
   ): Promise<void> {
     const user = await this.loadUser(id);
 
     if (ability !== SYSTEM_ABILITY) {
-      this.assertCanWrite(ability, 'delete', user, actorId);
+      this.assertCanWrite(ability, { action: 'delete', target: user, actorId });
     }
 
     // Clear mailed tokens BEFORE soft-delete so a stale link cannot outlive
@@ -630,9 +627,7 @@ export class UsersService {
 
   async restore(
     id: string,
-    ability: AbilityOrSystem,
-    actorId?: string,
-    audit?: UserAuditRows
+    { ability, actorId, audit }: UserWriteOptions
   ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
@@ -642,7 +637,7 @@ export class UsersService {
     if (!user) throw userNotFound(id);
 
     if (ability !== SYSTEM_ABILITY) {
-      this.assertCanWrite(ability, 'delete', user, actorId);
+      this.assertCanWrite(ability, { action: 'delete', target: user, actorId });
     }
 
     // Lift the soft-delete only. `isActive` is an independent administrative

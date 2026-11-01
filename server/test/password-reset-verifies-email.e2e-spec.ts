@@ -60,12 +60,11 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     user: Pick<User, 'id' | 'email'>
   ): Promise<string> => {
     const rawToken = crypto.randomBytes(32).toString('hex');
-    await usersService.setPasswordResetToken(
-      user.id,
-      user.email,
-      hashToken(rawToken),
-      new Date(Date.now() + 30 * 60 * 1000)
-    );
+    await usersService.setPasswordResetToken(user.id, {
+      email: user.email,
+      hashedToken: hashToken(rawToken),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+    });
     return rawToken;
   };
 

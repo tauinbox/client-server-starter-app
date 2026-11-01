@@ -532,10 +532,12 @@ describe('BillingUserService', () => {
         expect.anything(),
         expect.anything(),
         {
-          successUrl: 'http://localhost:4200/billing/success',
-          cancelUrl: 'http://localhost:4200/billing/cancel'
-        },
-        false
+          urls: {
+            successUrl: 'http://localhost:4200/billing/success',
+            cancelUrl: 'http://localhost:4200/billing/cancel'
+          },
+          trial: false
+        }
       );
     });
 
@@ -560,8 +562,8 @@ describe('BillingUserService', () => {
       expect(yoo.startCheckout).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        expect.anything(),
-        true
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        { urls: expect.anything(), trial: true }
       );
     });
 
@@ -586,8 +588,8 @@ describe('BillingUserService', () => {
       expect(yoo.startCheckout).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        expect.anything(),
-        false
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        { urls: expect.anything(), trial: false }
       );
     });
 
@@ -918,15 +920,13 @@ describe('BillingUserService', () => {
       expect(ctx.plans.findOne).toHaveBeenCalledWith({
         where: { key: 'pro' }
       });
-      expect(yoo.updatePaymentMethod).toHaveBeenCalledWith(
-        null,
-        customer,
-        'RUB',
-        {
+      expect(yoo.updatePaymentMethod).toHaveBeenCalledWith(null, customer, {
+        currency: 'RUB',
+        urls: {
           successUrl: 'http://localhost:4200/billing/settings',
           cancelUrl: 'http://localhost:4200/billing/settings'
         }
-      );
+      });
       expect(result).toEqual({
         provider: 'yookassa',
         url: 'https://method/x',
@@ -958,8 +958,8 @@ describe('BillingUserService', () => {
       expect(paddle.updatePaymentMethod).toHaveBeenCalledWith(
         'sub_ext',
         expect.objectContaining({ id: 'cust-1' }),
-        'USD',
-        expect.anything()
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        { currency: 'USD', urls: expect.anything() }
       );
     });
 
