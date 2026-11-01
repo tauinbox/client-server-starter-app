@@ -166,8 +166,10 @@ describe('UsageInvoicingService', () => {
     expect(summarizeForPeriodWithCredits).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'sub-1' }),
       expect.objectContaining({ key: 'usage' }),
-      { start: PERIOD_START, end: PERIOD_END },
-      0
+      {
+        period: { start: PERIOD_START, end: PERIOD_END },
+        availableCreditUnits: 0
+      }
     );
     expect(capturedValues.value).toMatchObject({
       customerId: 'cust-1',
@@ -181,13 +183,12 @@ describe('UsageInvoicingService', () => {
       periodStart: PERIOD_START,
       periodEnd: PERIOD_END
     });
-    expect(chargeUsage).toHaveBeenCalledWith(
-      'psub_1',
-      8400,
-      'USD',
-      'Pay as you go: api_calls × 42',
-      CHARGE_KEY
-    );
+    expect(chargeUsage).toHaveBeenCalledWith('psub_1', {
+      amountMinor: 8400,
+      currency: 'USD',
+      description: 'Pay as you go: api_calls × 42',
+      chargeKey: CHARGE_KEY
+    });
     // The paid event comes from the provider webhook, never optimistically here.
     expect(emit).not.toHaveBeenCalled();
   });
@@ -273,13 +274,12 @@ describe('UsageInvoicingService', () => {
       status: 'pending',
       creditUnitsApplied: 10
     });
-    expect(chargeUsage).toHaveBeenCalledWith(
-      'psub_1',
-      6400,
-      'USD',
-      'Pay as you go: api_calls × 32',
-      CHARGE_KEY
-    );
+    expect(chargeUsage).toHaveBeenCalledWith('psub_1', {
+      amountMinor: 6400,
+      currency: 'USD',
+      description: 'Pay as you go: api_calls × 32',
+      chargeKey: CHARGE_KEY
+    });
   });
 
   it('covers the whole period with credits: paid zero invoice, spend, no charge', async () => {
@@ -300,8 +300,7 @@ describe('UsageInvoicingService', () => {
     expect(chargeUsage).not.toHaveBeenCalled();
     expect(credits.spendOnUsage).toHaveBeenCalledWith(
       expect.anything(),
-      'cust-1',
-      'inv-1',
+      { customerId: 'cust-1', invoiceId: 'inv-1' },
       42
     );
     expect(capturedValues.value).toMatchObject({

@@ -68,7 +68,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
     const admin = await users.findOneByOrFail({ email: adminEmail });
     await app
       .get(RoleService)
-      .assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
+      .assignRoleToUser(admin.id, superRole.id, { ability: SYSTEM_ABILITY });
 
     await users.softDelete({ id: ids[2] });
 

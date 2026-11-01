@@ -58,9 +58,11 @@ export class RefreshTokenService {
 
   async createRefreshToken(
     userId: string,
-    token: string,
-    sessionId: string,
-    client: SessionClient
+    {
+      token,
+      sessionId,
+      client
+    }: { token: string; sessionId: string; client: SessionClient }
   ): Promise<RefreshToken> {
     const location = await this.geoIp.lookup(client.ipAddress);
     const refreshToken = this.repository.create(

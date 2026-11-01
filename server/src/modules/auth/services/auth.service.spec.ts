@@ -41,6 +41,7 @@ import { SessionLimitService } from './session-limit.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
 import { createMockCache } from '../../../common/testing/cache.mock';
 import { hashToken } from '../../../common/utils/hash-token';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -341,6 +342,7 @@ describe('AuthService', () => {
         { provide: MailService, useValue: mockMailService },
         { provide: AuditService, useValue: mockAuditService },
         { provide: MetricsService, useValue: mockMetricsService },
+        AccessRefusalService,
         { provide: JwtService, useValue: mockJwtService },
         {
           provide: BreachedPasswordService,
@@ -375,12 +377,10 @@ describe('AuthService', () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
-      await service.assertStepUpForUser(
-        'user-1',
-        'Password1',
-        undefined,
-        STEP_UP_OPERATION.PASSWORD_SET
-      );
+      await service.assertStepUpForUser('user-1', {
+        currentPassword: 'Password1',
+        operation: STEP_UP_OPERATION.PASSWORD_SET
+      });
 
       expect(
         mockBreachedPasswordService.assertNotBreached
@@ -839,9 +839,13 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.deleteByUserId).not.toHaveBeenCalled();
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
         'user-1',
-        expect.any(String),
-        expect.any(String),
-        { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
+        {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          token: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          sessionId: expect.any(String),
+          client: { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
+        }
       );
       expect(mockRefreshTokenService.pruneOldestTokens).toHaveBeenCalledWith(
         'user-1',
@@ -1214,9 +1218,13 @@ describe('AuthService', () => {
 
       expect(mockUsersService.setEmailVerificationToken).toHaveBeenCalledWith(
         'user-1',
-        'test@example.com',
-        expect.any(String),
-        expect.any(Date)
+        {
+          email: 'test@example.com',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          hashedToken: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          expiresAt: expect.any(Date)
+        }
       );
       expect(mockMailService.sendEmailVerification).toHaveBeenCalled();
       expect(result.message).toBeDefined();
@@ -1329,9 +1337,13 @@ describe('AuthService', () => {
 
       expect(mockUsersService.setPasswordResetToken).toHaveBeenCalledWith(
         'user-1',
-        'test@example.com',
-        expect.any(String),
-        expect.any(Date)
+        {
+          email: 'test@example.com',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          hashedToken: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          expiresAt: expect.any(Date)
+        }
       );
       expect(mockMailService.sendPasswordReset).toHaveBeenCalledWith(
         'test@example.com',
@@ -1408,7 +1420,10 @@ describe('AuthService', () => {
 
       expect(
         mockMailService.sendPasswordChangedNotification
-      ).toHaveBeenCalledWith('test@example.com', 'reset', 'en', '198.51.100.7');
+      ).toHaveBeenCalledWith('test@example.com', 'reset', {
+        locale: 'en',
+        ip: '198.51.100.7'
+      });
     });
 
     it('should complete the reset when the notification fails', async () => {
@@ -2173,12 +2188,10 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUpForUser(
-          mockUser.id,
-          'CurrentPass1',
-          undefined,
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(mockUser.id, {
+          currentPassword: 'CurrentPass1',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).resolves.toMatchObject({
         password: 'upgraded-hash',
         passwordHashVersion: PasswordHashVersion.PREHASHED
@@ -2194,12 +2207,10 @@ describe('AuthService', () => {
       mockUsersService.upgradePasswordHash.mockResolvedValueOnce(null);
 
       await expect(
-        service.assertStepUpForUser(
-          mockUser.id,
-          'CurrentPass1',
-          undefined,
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(mockUser.id, {
+          currentPassword: 'CurrentPass1',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).resolves.toMatchObject({ password: mockUser.password });
     });
 
@@ -2211,12 +2222,10 @@ describe('AuthService', () => {
       mockUsersService.findOne.mockResolvedValue(legacyUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
-      await service.assertStepUpForUser(
-        mockUser.id,
-        'CurrentPass1',
-        undefined,
-        STEP_UP_OPERATION.PASSWORD_SET
-      );
+      await service.assertStepUpForUser(mockUser.id, {
+        currentPassword: 'CurrentPass1',
+        operation: STEP_UP_OPERATION.PASSWORD_SET
+      });
 
       expect(mockUsersService.upgradePasswordHash).toHaveBeenCalledWith(
         legacyUser,
@@ -2229,12 +2238,10 @@ describe('AuthService', () => {
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
       await expect(
-        service.assertStepUpForUser(
-          mockUser.id,
-          'CurrentPass1',
-          undefined,
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(mockUser.id, {
+          currentPassword: 'CurrentPass1',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).resolves.toMatchObject({ id: mockUser.id });
     });
 
@@ -2243,12 +2250,10 @@ describe('AuthService', () => {
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
-        service.assertStepUpForUser(
-          mockUser.id,
-          'WrongPass1',
-          undefined,
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(mockUser.id, {
+          currentPassword: 'WrongPass1',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
@@ -2259,12 +2264,9 @@ describe('AuthService', () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
 
       await expect(
-        service.assertStepUpForUser(
-          mockUser.id,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(mockUser.id, {
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
@@ -2278,12 +2280,9 @@ describe('AuthService', () => {
       compareSpy.mockClear();
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
@@ -2302,12 +2301,10 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).resolves.toMatchObject({ id: mockUser.id });
     });
 
@@ -2323,23 +2320,19 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).resolves.toMatchObject({ id: mockUser.id });
 
       // The account holds no password, so a refused proof must not fall
       // through to the password branch.
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
@@ -2357,12 +2350,10 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
@@ -2380,23 +2371,19 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.EMAIL_CHANGE
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.EMAIL_CHANGE
+        })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).resolves.toMatchObject({ id: mockUser.id });
     });
 
@@ -2411,12 +2398,10 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
@@ -2432,12 +2417,10 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.PASSWORD_SET
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.PASSWORD_SET
+        })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
@@ -2454,13 +2437,10 @@ describe('AuthService', () => {
       );
 
       await expect(
-        service.assertStepUpForUser(
-          oauthOnlyUser.id,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.OAUTH_LINK,
-          '123456'
-        )
+        service.assertStepUpForUser(oauthOnlyUser.id, {
+          operation: STEP_UP_OPERATION.OAUTH_LINK,
+          totpCode: '123456'
+        })
       ).resolves.toMatchObject({ id: mockUser.id });
       expect(mockMfaService.isValidStepUpCode).toHaveBeenCalledWith(
         oauthOnlyUser,
@@ -2483,13 +2463,10 @@ describe('AuthService', () => {
       );
 
       await expect(
-        service.assertStepUp(
-          user,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.MFA_DISABLE,
-          '123456'
-        )
+        service.assertStepUp(user, {
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          totpCode: '123456'
+        })
       ).resolves.toBeUndefined();
     });
 
@@ -2502,13 +2479,10 @@ describe('AuthService', () => {
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
 
       await expect(
-        service.assertStepUp(
-          user,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.MFA_DISABLE,
-          '000000'
-        )
+        service.assertStepUp(user, {
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          totpCode: '000000'
+        })
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE }
@@ -2538,13 +2512,11 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUp(
-          user,
-          'WrongPass1',
-          undefined,
-          STEP_UP_OPERATION.MFA_DISABLE,
-          '000000'
-        )
+        service.assertStepUp(user, {
+          currentPassword: 'WrongPass1',
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          totpCode: '000000'
+        })
       ).rejects.toMatchObject({
         status: HttpStatus.LOCKED,
         response: { errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED }
@@ -2571,13 +2543,10 @@ describe('AuthService', () => {
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
 
       await expect(
-        service.assertStepUp(
-          user,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.MFA_DISABLE,
-          '000000'
-        )
+        service.assertStepUp(user, {
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          totpCode: '000000'
+        })
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
         response: { errorKey: ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE }
@@ -2598,13 +2567,11 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUp(
-          oauthOnlyUser,
-          undefined,
-          'proof',
-          STEP_UP_OPERATION.MFA_DISABLE,
-          '000000'
-        )
+        service.assertStepUp(oauthOnlyUser, {
+          reauthProof: 'proof',
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          totpCode: '000000'
+        })
       ).resolves.toBeUndefined();
     });
 
@@ -2624,13 +2591,10 @@ describe('AuthService', () => {
       );
 
       await expect(
-        service.assertStepUp(
-          user,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.PASSWORD_SET,
-          '123456'
-        )
+        service.assertStepUp(user, {
+          operation: STEP_UP_OPERATION.PASSWORD_SET,
+          totpCode: '123456'
+        })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
       });
@@ -2647,13 +2611,10 @@ describe('AuthService', () => {
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'accepted' });
 
       await expect(
-        service.assertStepUp(
-          user,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.MFA_DISABLE,
-          '123456'
-        )
+        service.assertStepUp(user, {
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          totpCode: '123456'
+        })
       ).resolves.toBeUndefined();
       expect(compare).not.toHaveBeenCalled();
     });
@@ -2670,14 +2631,12 @@ describe('AuthService', () => {
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
-        service.assertStepUp(
-          user,
-          'WrongPass1',
-          undefined,
-          STEP_UP_OPERATION.MFA_DISABLE,
-          '000000',
-          { ip: '203.0.113.7', requestId: 'req-1' }
-        )
+        service.assertStepUp(user, {
+          currentPassword: 'WrongPass1',
+          operation: STEP_UP_OPERATION.MFA_DISABLE,
+          totpCode: '000000',
+          auditContext: { ip: '203.0.113.7', requestId: 'req-1' }
+        })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
       });
@@ -2711,12 +2670,7 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.assertStepUp(
-          user,
-          undefined,
-          undefined,
-          STEP_UP_OPERATION.MFA_SETUP
-        )
+        service.assertStepUp(user, { operation: STEP_UP_OPERATION.MFA_SETUP })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
       });
@@ -2740,12 +2694,10 @@ describe('AuthService', () => {
       });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
-      await service.assertStepUp(
-        user,
-        'CorrectPassword1',
-        undefined,
-        STEP_UP_OPERATION.PASSWORD_SET
-      );
+      await service.assertStepUp(user, {
+        currentPassword: 'CorrectPassword1',
+        operation: STEP_UP_OPERATION.PASSWORD_SET
+      });
 
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: AuditAction.STEP_UP_FAILURE })
@@ -2763,12 +2715,10 @@ describe('AuthService', () => {
         jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
         for (let i = 0; i < times; i += 1) {
           await expect(
-            service.assertStepUp(
-              passwordUser,
-              'WrongPass1',
-              undefined,
-              STEP_UP_OPERATION.PASSWORD_SET
-            )
+            service.assertStepUp(passwordUser, {
+              currentPassword: 'WrongPass1',
+              operation: STEP_UP_OPERATION.PASSWORD_SET
+            })
           ).rejects.toMatchObject({
             response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
           });
@@ -2778,12 +2728,10 @@ describe('AuthService', () => {
       async function exhaustBudget(): Promise<void> {
         await guessWrong(MAX_FAILED_ATTEMPTS - 1);
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'WrongPass1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'WrongPass1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).rejects.toMatchObject({ status: HttpStatus.LOCKED });
       }
 
@@ -2799,12 +2747,10 @@ describe('AuthService', () => {
         // The route throttle is keyed by client address, so an attacker who
         // holds a session buys a fresh budget with every address it adds.
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'WrongPass1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'WrongPass1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).rejects.toMatchObject({
           status: HttpStatus.LOCKED,
           response: {
@@ -2820,12 +2766,10 @@ describe('AuthService', () => {
         mockAuditService.logFireAndForget.mockClear();
 
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'WrongPass1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'WrongPass1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).rejects.toMatchObject({ status: HttpStatus.LOCKED });
 
         // The attempt that spends the last of the budget is the one a reader
@@ -2845,12 +2789,10 @@ describe('AuthService', () => {
 
         jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'CorrectPassword1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'CorrectPassword1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).rejects.toMatchObject({
           status: HttpStatus.LOCKED,
           response: { errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED }
@@ -2871,12 +2813,9 @@ describe('AuthService', () => {
       it('does not count a step-up that offers no password', async () => {
         for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
           await expect(
-            service.assertStepUp(
-              passwordUser,
-              undefined,
-              undefined,
-              STEP_UP_OPERATION.PASSWORD_SET
-            )
+            service.assertStepUp(passwordUser, {
+              operation: STEP_UP_OPERATION.PASSWORD_SET
+            })
           ).rejects.toMatchObject({
             response: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
           });
@@ -2884,12 +2823,10 @@ describe('AuthService', () => {
 
         jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'CorrectPassword1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'CorrectPassword1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).resolves.toBeUndefined();
       });
 
@@ -2898,12 +2835,9 @@ describe('AuthService', () => {
 
         for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
           await expect(
-            service.assertStepUp(
-              oauthOnly,
-              undefined,
-              undefined,
-              STEP_UP_OPERATION.PASSWORD_SET
-            )
+            service.assertStepUp(oauthOnly, {
+              operation: STEP_UP_OPERATION.PASSWORD_SET
+            })
           ).rejects.toMatchObject({
             response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
           });
@@ -2911,12 +2845,10 @@ describe('AuthService', () => {
 
         jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'CorrectPassword1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'CorrectPassword1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).resolves.toBeUndefined();
       });
 
@@ -2925,23 +2857,19 @@ describe('AuthService', () => {
 
         jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'CorrectPassword1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'CorrectPassword1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).resolves.toBeUndefined();
 
         await guessWrong(MAX_FAILED_ATTEMPTS - 1);
         jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
         await expect(
-          service.assertStepUp(
-            passwordUser,
-            'CorrectPassword1',
-            undefined,
-            STEP_UP_OPERATION.PASSWORD_SET
-          )
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'CorrectPassword1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
         ).resolves.toBeUndefined();
       });
     });
@@ -3112,7 +3040,7 @@ describe('AuthService', () => {
         const result = await service.initiateEmailChange(
           'user-1',
           { newEmail: 'new@example.com' },
-          'proof-token'
+          { reauthProof: 'proof-token' }
         );
 
         expect(result.message).toBeDefined();
@@ -3139,7 +3067,7 @@ describe('AuthService', () => {
           service.initiateEmailChange(
             'user-1',
             { newEmail: 'new@example.com' },
-            'proof-token'
+            { reauthProof: 'proof-token' }
           )
         ).rejects.toMatchObject({
           response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
@@ -3157,7 +3085,7 @@ describe('AuthService', () => {
           service.initiateEmailChange(
             'user-1',
             { newEmail: 'new@example.com' },
-            'access-token'
+            { reauthProof: 'access-token' }
           )
         ).rejects.toMatchObject({
           response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
@@ -3179,7 +3107,7 @@ describe('AuthService', () => {
           service.initiateEmailChange(
             'user-1',
             { newEmail: 'new@example.com' },
-            'stale-proof'
+            { reauthProof: 'stale-proof' }
           )
         ).rejects.toMatchObject({
           response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
@@ -3197,7 +3125,7 @@ describe('AuthService', () => {
         const result = await service.initiateEmailChange(
           'user-1',
           { newEmail: 'new@example.com' },
-          'same-second-proof'
+          { reauthProof: 'same-second-proof' }
         );
 
         expect(result.message).toBeDefined();
@@ -3213,7 +3141,7 @@ describe('AuthService', () => {
           service.initiateEmailChange(
             'user-1',
             { newEmail: 'new@example.com' },
-            'forged'
+            { reauthProof: 'forged' }
           )
         ).rejects.toMatchObject({
           response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }

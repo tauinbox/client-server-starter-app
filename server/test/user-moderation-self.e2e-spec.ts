@@ -73,7 +73,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     // The seeded grant of the `user` role: update, on the own record only.
     const selfEdit = await roleService.create(
       { name: selfEditRoleName },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       selfEdit.id,
@@ -83,27 +83,25 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
           conditions: { ownership: { userField: 'id' } }
         }
       ],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(
-      await userId(ownerEmail),
-      selfEdit.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(await userId(ownerEmail), selfEdit.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     const moderator = await roleService.create(
       { name: moderatorRoleName },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       moderator.id,
       [{ permissionId: updateUser.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.assignRoleToUser(
       await userId(moderatorEmail),
       moderator.id,
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
   }, 60000);
 

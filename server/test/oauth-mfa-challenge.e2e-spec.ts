@@ -29,6 +29,7 @@ import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity'
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -109,7 +110,8 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
         {
           provide: MetricsService,
           useValue: { recordAuthEvent: () => undefined }
-        }
+        },
+        AccessRefusalService
       ]
     }).compile();
 

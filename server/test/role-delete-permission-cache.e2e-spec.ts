@@ -72,14 +72,16 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
 
     const role = await roleService.create(
       { name: `${tag}-role` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: deleteRole.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(holder.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     // Stand-in for a request of the holder that lands after the delete and
     // before its commit: it loads from the DB and fills the cache. The event
@@ -98,7 +100,7 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
         return emitAsync(event, ...values);
       });
 
-    await roleService.delete(role.id, SYSTEM_ABILITY);
+    await roleService.delete(role.id, { ability: SYSTEM_ABILITY });
 
     expect(readInside).toBe(true);
     const roleRepository = dataSource.getRepository(Role);

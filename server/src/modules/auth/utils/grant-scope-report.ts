@@ -247,9 +247,7 @@ export function analyzeGrants(input: {
       }))
     );
     const ability = buildAbility(
-      userId,
-      roles.some((r) => r.is_super),
-      permissions,
+      { userId, isSuper: roles.some((r) => r.is_super), permissions },
       subjectMaps,
       silent
     );

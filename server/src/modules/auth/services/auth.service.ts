@@ -117,6 +117,15 @@ const ENUMERATION_SAFE_FORGOT_RESPONSE = {
 const STEP_UP_PASSWORD_FAILURE_KEY_PREFIX = 'step-up:password-failures:';
 
 /** The outcome of one step-up, and the brake that attempt may have tripped. */
+/** What a caller offers to prove itself again before a sensitive write. */
+export interface StepUpRequest {
+  operation: StepUpOperation;
+  currentPassword?: string;
+  reauthProof?: string;
+  totpCode?: string;
+  auditContext?: AuditContext;
+}
+
 interface StepUpVerdict {
   /** The factor that refused the caller, or null when the caller proved itself. */
   factor: 'password' | 'reauth_proof' | 'code' | null;
@@ -212,9 +221,12 @@ export class AuthService {
       if (user.lockedUntil.getTime() > Date.now()) {
         // Answer before the password is checked: two answers for a right and a
         // wrong guess would let a locked account keep taking guesses.
-        throw this.lockedLogin(email, user.id, user.lockedUntil, {
-          reason: 'account_locked'
-        });
+        throw this.lockedLogin(
+          { email, userId: user.id, lockedUntil: user.lockedUntil },
+          {
+            reason: 'account_locked'
+          }
+        );
       }
       // The window elapsed. Left at the threshold, one wrong password per window
       // would keep any known account locked indefinitely.
@@ -231,9 +243,12 @@ export class AuthService {
       );
 
     if (failedLoginAttempts > MAX_FAILED_ATTEMPTS && lockedUntil) {
-      throw this.lockedLogin(email, user.id, lockedUntil, {
-        reason: 'account_locked'
-      });
+      throw this.lockedLogin(
+        { email, userId: user.id, lockedUntil },
+        {
+          reason: 'account_locked'
+        }
+      );
     }
 
     const verdict = await verifyPassword(
@@ -243,10 +258,13 @@ export class AuthService {
     );
     if (!verdict.valid) {
       if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
-        throw this.lockedLogin(email, user.id, lockedUntil, {
-          reason: 'account_locked_after_max_attempts',
-          failedLoginAttempts
-        });
+        throw this.lockedLogin(
+          { email, userId: user.id, lockedUntil },
+          {
+            reason: 'account_locked_after_max_attempts',
+            failedLoginAttempts
+          }
+        );
       }
       throw this.invalidCredentials(email, failedLoginAttempts);
     }
@@ -447,12 +465,11 @@ export class AuthService {
       VERIFICATION_TOKEN_EXPIRY_MS
     );
 
-    const issued = await this.usersService.setEmailVerificationToken(
-      user.id,
-      user.email,
+    const issued = await this.usersService.setEmailVerificationToken(user.id, {
+      email: user.email,
       hashedToken,
       expiresAt
-    );
+    });
     // The row changed after the read: the address moved, was verified, or the
     // account was deactivated. The same answer as for any of those states.
     if (!issued) {
@@ -491,12 +508,11 @@ export class AuthService {
       RESET_TOKEN_EXPIRY_MS
     );
 
-    const issued = await this.usersService.setPasswordResetToken(
-      user.id,
-      user.email,
+    const issued = await this.usersService.setPasswordResetToken(user.id, {
+      email: user.email,
       hashedToken,
       expiresAt
-    );
+    });
     // The address moved or the account was deactivated after the read: the
     // mailbox that asked no longer owns the account.
     if (!issued) {
@@ -606,12 +622,10 @@ export class AuthService {
     });
 
     this.mailService
-      .sendPasswordChangedNotification(
-        user.email,
-        'reset',
-        user.locale,
-        auditContext?.ip
-      )
+      .sendPasswordChangedNotification(user.email, 'reset', {
+        locale: user.locale,
+        ip: auditContext?.ip
+      })
       .catch((err) =>
         this.logger.error('Failed to send password-changed notification', err)
       );
@@ -643,11 +657,12 @@ export class AuthService {
         throw this.refreshRefusal(
           'lost_response_replay',
           { actorId: tokenDoc.userId },
-          INVALID_REFRESH_TOKEN,
           {
-            sessionId: tokenDoc.sessionId,
-            replayAgeMs: successor.ageMs,
-            sameIp
+            extraDetails: {
+              sessionId: tokenDoc.sessionId,
+              replayAgeMs: successor.ageMs,
+              sameIp
+            }
           }
         );
       }
@@ -687,9 +702,11 @@ export class AuthService {
         'session_absolute_lifetime_exceeded',
         { actorId: tokenDoc.userId },
         {
-          key: ErrorKeys.AUTH.SESSION_EXPIRED,
-          message:
-            'Session has reached its maximum duration. Please log in again.'
+          refusal: {
+            key: ErrorKeys.AUTH.SESSION_EXPIRED,
+            message:
+              'Session has reached its maximum duration. Please log in again.'
+          }
         }
       );
     }
@@ -707,9 +724,11 @@ export class AuthService {
         'session_invalidated_by_rotation',
         { actorId: tokenDoc.userId },
         {
-          key: ErrorKeys.AUTH.SESSION_INVALIDATED,
-          message:
-            'Session invalidated due to key rotation. Please log in again.'
+          refusal: {
+            key: ErrorKeys.AUTH.SESSION_INVALIDATED,
+            message:
+              'Session invalidated due to key rotation. Please log in again.'
+          }
         }
       );
     }
@@ -722,7 +741,12 @@ export class AuthService {
       throw this.refreshRefusal(
         'user_not_found',
         { actorId: tokenDoc.userId },
-        { key: ErrorKeys.AUTH.USER_NOT_FOUND, message: 'User not found' }
+        {
+          refusal: {
+            key: ErrorKeys.AUTH.USER_NOT_FOUND,
+            message: 'User not found'
+          }
+        }
       );
     }
 
@@ -732,8 +756,10 @@ export class AuthService {
         'user_deactivated',
         { actorId: user.id, actorEmail: user.email },
         {
-          key: ErrorKeys.AUTH.USER_DEACTIVATED,
-          message: 'User account is deactivated'
+          refusal: {
+            key: ErrorKeys.AUTH.USER_DEACTIVATED,
+            message: 'User account is deactivated'
+          }
         }
       );
     }
@@ -810,19 +836,20 @@ export class AuthService {
   async initiateEmailChange(
     userId: string,
     dto: InitiateEmailChangeDto,
-    reauthProof?: string,
-    auditContext?: AuditContext
+    {
+      reauthProof,
+      auditContext
+    }: { reauthProof?: string; auditContext?: AuditContext } = {}
   ): Promise<{ message: string }> {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
 
-    await this.assertStepUp(
-      user,
-      dto.currentPassword,
+    await this.assertStepUp(user, {
+      currentPassword: dto.currentPassword,
       reauthProof,
-      STEP_UP_OPERATION.EMAIL_CHANGE,
-      dto.code,
+      operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+      totpCode: dto.code,
       auditContext
-    );
+    });
 
     if (dto.newEmail === user.email) {
       throw new ApiError(
@@ -1083,22 +1110,9 @@ export class AuthService {
    * either of the two. That is the only factor an OAuth-only holder of an
    * authenticator can present without a provider round trip.
    */
-  async assertStepUp(
-    user: User,
-    currentPassword: string | undefined,
-    reauthProof: string | undefined,
-    operation: StepUpOperation,
-    totpCode?: string,
-    auditContext?: AuditContext
-  ): Promise<void> {
-    const { factor, lockedMs } = await this.stepUpFailure(
-      user,
-      currentPassword,
-      reauthProof,
-      operation,
-      totpCode,
-      auditContext
-    );
+  async assertStepUp(user: User, request: StepUpRequest): Promise<void> {
+    const { operation, totpCode, auditContext } = request;
+    const { factor, lockedMs } = await this.stepUpFailure(user, request);
 
     if (factor === null) {
       return;
@@ -1134,11 +1148,13 @@ export class AuthService {
    */
   private async stepUpFailure(
     user: User,
-    currentPassword: string | undefined,
-    reauthProof: string | undefined,
-    operation: StepUpOperation,
-    totpCode?: string,
-    auditContext?: AuditContext
+    {
+      currentPassword,
+      reauthProof,
+      operation,
+      totpCode,
+      auditContext
+    }: StepUpRequest
   ): Promise<StepUpVerdict> {
     // ASVS 6.2.3: an account that holds a password changes it only against
     // the current one. The code stands in for it only on an account that
@@ -1283,22 +1299,11 @@ export class AuthService {
    */
   async assertStepUpForUser(
     userId: string,
-    currentPassword: string | undefined,
-    reauthProof: string | undefined,
-    operation: StepUpOperation,
-    totpCode?: string,
-    auditContext?: AuditContext
+    request: StepUpRequest
   ): Promise<User> {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
 
-    await this.assertStepUp(
-      user,
-      currentPassword,
-      reauthProof,
-      operation,
-      totpCode,
-      auditContext
-    );
+    await this.assertStepUp(user, request);
     return user;
   }
 
@@ -1371,8 +1376,10 @@ export class AuthService {
   private refreshRefusal(
     reason: string,
     actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>,
-    refusal: Refusal = INVALID_REFRESH_TOKEN,
-    extraDetails: Record<string, unknown> = {}
+    {
+      refusal = INVALID_REFRESH_TOKEN,
+      extraDetails = {}
+    }: { refusal?: Refusal; extraDetails?: Record<string, unknown> } = {}
   ): ApiError {
     this.auditService.logFireAndForget({
       action: AuditAction.TOKEN_REFRESH_FAILURE,
@@ -1403,9 +1410,11 @@ export class AuthService {
   }
 
   private lockedLogin(
-    email: string,
-    userId: string,
-    lockedUntil: Date,
+    {
+      email,
+      userId,
+      lockedUntil
+    }: { email: string; userId: string; lockedUntil: Date },
     details: Record<string, unknown>
   ): ApiError {
     this.auditService.logFireAndForget({

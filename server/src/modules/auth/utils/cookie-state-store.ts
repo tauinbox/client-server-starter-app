@@ -91,6 +91,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     meta: OAuth2Strategy.Metadata,
     callback: OAuth2Strategy.StateStoreStoreCallback
   ): void;
+  // eslint-disable-next-line no-restricted-syntax -- the StateStore of passport-oauth2 defines this signature
   store(
     req: Request,
     verifier: string | undefined,
@@ -100,6 +101,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
   ): void;
   // passport-oauth2 dispatches on `store.length`, and only the five-argument
   // form hands over the PKCE verifier, so all five parameters stay declared.
+  // eslint-disable-next-line no-restricted-syntax -- the StateStore of passport-oauth2 defines this signature
   store(
     req: Request,
     verifierOrMetaOrCallback: unknown,
@@ -152,12 +154,14 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     providedState: string,
     callback: OAuth2Strategy.StateStoreVerifyCallback
   ): void;
+  // eslint-disable-next-line no-restricted-syntax -- the StateStore of passport-oauth2 defines this signature
   verify(
     req: Request,
     providedState: string,
     meta: OAuth2Strategy.Metadata,
     callback: OAuth2Strategy.StateStoreVerifyCallback
   ): void;
+  // eslint-disable-next-line no-restricted-syntax -- the StateStore of passport-oauth2 defines this signature
   verify(
     req: Request,
     providedState: string,
@@ -222,9 +226,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
 
       setHostCookie(
         res,
-        base,
-        bindIntent(intent, state),
-        this.secureCookies,
+        { base, value: bindIntent(intent, state), secure: this.secureCookies },
         COOKIE_OPTIONS
       );
     }
@@ -257,9 +259,11 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
   private writePendingStates(res: Response, pending: PendingState[]): void {
     setHostCookie(
       res,
-      this.cookieBase,
-      serialize(pending),
-      this.secureCookies,
+      {
+        base: this.cookieBase,
+        value: serialize(pending),
+        secure: this.secureCookies
+      },
       COOKIE_OPTIONS
     );
   }

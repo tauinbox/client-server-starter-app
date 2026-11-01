@@ -60,7 +60,7 @@ runWithInfra('List search and filters (e2e)', () => {
     const adminId = await userId(adminEmail);
     await app
       .get(RoleService)
-      .assignRoleToUser(adminId, superRole.id, SYSTEM_ABILITY);
+      .assignRoleToUser(adminId, superRole.id, { ability: SYSTEM_ABILITY });
     const { tokens } = await app
       .get(AuthService)
       .login(await usersService.findOne(adminId, SYSTEM_ABILITY), {

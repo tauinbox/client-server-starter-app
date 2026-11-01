@@ -50,8 +50,10 @@ export class UsageRating {
   async summarizeForPeriodWithCredits(
     subscription: Subscription,
     plan: Plan,
-    period: BillingPeriod,
-    availableCreditUnits: number
+    {
+      period,
+      availableCreditUnits
+    }: { period: BillingPeriod; availableCreditUnits: number }
   ): Promise<CreditedUsageSummary> {
     const price = plan.prices[subscription.provider];
     if (!price) {
@@ -90,7 +92,10 @@ export class UsageRating {
     plan: Plan,
     period: BillingPeriod
   ): Promise<UsagePeriodSummary> {
-    return this.summarizeForPeriodWithCredits(subscription, plan, period, 0);
+    return this.summarizeForPeriodWithCredits(subscription, plan, {
+      period,
+      availableCreditUnits: 0
+    });
   }
 
   /**

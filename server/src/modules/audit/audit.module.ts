@@ -3,6 +3,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditLog } from './entities/audit-log.entity';
 import { AuditService } from './audit.service';
+import { AccessRefusalService } from './access-refusal.service';
 import { AuditCleanupService } from './audit-cleanup.service';
 import { AuditLogInterceptor } from './interceptors/audit-log.interceptor';
 
@@ -11,12 +12,13 @@ import { AuditLogInterceptor } from './interceptors/audit-log.interceptor';
   imports: [TypeOrmModule.forFeature([AuditLog])],
   providers: [
     AuditService,
+    AccessRefusalService,
     AuditCleanupService,
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditLogInterceptor
     }
   ],
-  exports: [AuditService]
+  exports: [AuditService, AccessRefusalService]
 })
 export class AuditModule {}

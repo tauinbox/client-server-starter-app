@@ -64,9 +64,13 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
 
   const seedSession = async (): Promise<string> => {
     const raw = `raw-${randomUUID()}`;
-    await refreshTokenService.createRefreshToken(userId, raw, randomUUID(), {
-      userAgent: null,
-      ipAddress: null
+    await refreshTokenService.createRefreshToken(userId, {
+      token: raw,
+      sessionId: randomUUID(),
+      client: {
+        userAgent: null,
+        ipAddress: null
+      }
     });
     return raw;
   };

@@ -29,6 +29,7 @@ import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { TOKEN_PURPOSE } from '@app/shared/constants';
 import { AuthCookies } from '../utils/auth-cookies';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 const CLIENT = 'http://localhost:4200';
 const LINK_TOKEN = 'link-token-for-user-a';
@@ -123,6 +124,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
           state: true,
           store: new CookieStateStore(OAuthProvider.GOOGLE, true)
         },
+        // eslint-disable-next-line no-restricted-syntax -- Passport defines the verify callback of this strategy
         (
           _accessToken: string,
           _refreshToken: string,
@@ -167,6 +169,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
           useValue: { logFireAndForget: jest.fn() }
         },
         { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
+        AccessRefusalService,
         {
           provide: AuthService,
           useValue: { assertStepUpForUser: jest.fn() }
@@ -256,10 +259,13 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
     );
     expect(linkOAuthToUser).toHaveBeenCalledWith(
       OWNER_ID,
-      OAuthProvider.GOOGLE,
-      'google-id-of-the-signer',
-      expect.any(Number),
-      expect.anything()
+      { provider: OAuthProvider.GOOGLE, providerId: 'google-id-of-the-signer' },
+      {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        linkTokenIssuedAt: expect.any(Number),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        auditContext: expect.anything()
+      }
     );
   });
 

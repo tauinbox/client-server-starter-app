@@ -87,7 +87,11 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
 
     await app
       .get(UsersService)
-      .update(userId, { email: `holder@${domainB}` }, SYSTEM_ABILITY);
+      .update(
+        userId,
+        { email: `holder@${domainB}` },
+        { ability: SYSTEM_ABILITY }
+      );
 
     expect(await resolver.isEnabledForUserId(userId, key)).toBe(false);
   });

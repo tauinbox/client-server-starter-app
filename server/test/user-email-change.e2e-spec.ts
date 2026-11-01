@@ -25,6 +25,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 interface UserStore {
   rows: Map<string, User>;
@@ -140,6 +141,7 @@ describe('UsersService.update — email change side effects', () => {
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
         },
+        AccessRefusalService,
         { provide: MailService, useValue: mailService }
       ]
     })
@@ -156,7 +158,7 @@ describe('UsersService.update — email change side effects', () => {
       {
         email: 'after@example.com'
       },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
 
     expect(updated.email).toBe('after@example.com');
@@ -183,7 +185,7 @@ describe('UsersService.update — email change side effects', () => {
         email: 'before@example.com',
         name: 'Updated'
       },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
 
     expect(updated.isEmailVerified).toBe(true);
@@ -200,7 +202,7 @@ describe('UsersService.update — email change side effects', () => {
     await usersService.update(
       'user-1',
       { email: 'admin-set@example.com' },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
 
     const persisted = store.rows.get('user-1');
@@ -221,7 +223,7 @@ describe('UsersService.update — email change side effects', () => {
       await usersService.update(
         'user-1',
         { email: 'reserved@example.com' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
     } catch (err) {
       caught = err;
@@ -241,7 +243,7 @@ describe('UsersService.update — email change side effects', () => {
       await usersService.update(
         'user-1',
         { email: 'taken@example.com' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
     } catch (err) {
       caught = err;
@@ -353,6 +355,7 @@ describe('Admin email change - session revocation through the real event bus', (
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
         },
+        AccessRefusalService,
         {
           provide: MailService,
           useValue: {

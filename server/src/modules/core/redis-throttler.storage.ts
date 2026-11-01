@@ -28,6 +28,7 @@ export class RedisThrottlerStorage
     await this.redis.zpopmax(key, 1);
   }
 
+  // eslint-disable-next-line no-restricted-syntax -- ThrottlerStorage of @nestjs/throttler defines increment
   async increment(
     key: string,
     ttl: number,

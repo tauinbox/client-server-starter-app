@@ -206,8 +206,8 @@ runWithInfra('One trial for each customer (e2e)', () => {
       expect(startCheckout).toHaveBeenLastCalledWith(
         expect.anything(),
         expect.anything(),
-        expect.anything(),
-        true
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        { urls: expect.anything(), trial: true }
       );
       await firstPayment(`pay_trial_${String(converted)}`, 0);
 
@@ -230,8 +230,8 @@ runWithInfra('One trial for each customer (e2e)', () => {
       expect(startCheckout).toHaveBeenLastCalledWith(
         expect.anything(),
         expect.anything(),
-        expect.anything(),
-        false
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        { urls: expect.anything(), trial: false }
       );
       const second = await openRow();
       expect(second.status).toBe('incomplete');

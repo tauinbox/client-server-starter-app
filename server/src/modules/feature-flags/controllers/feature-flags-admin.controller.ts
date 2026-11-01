@@ -164,13 +164,11 @@ export class FeatureFlagsAdminController {
     @Res({ passthrough: true }) res: Response
   ) {
     const condition = this.parseIfMatch(ifMatch);
-    const flag = await this.flagService.update(
-      id,
-      dto,
-      condition,
+    const flag = await this.flagService.update(id, dto, {
+      ifMatch: condition,
       ability,
-      this.auditActor(req)
-    );
+      actor: this.auditActor(req)
+    });
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()

@@ -70,7 +70,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     const adminId = await userId(adminEmail);
     await app
       .get(RoleService)
-      .assignRoleToUser(adminId, superRole.id, SYSTEM_ABILITY);
+      .assignRoleToUser(adminId, superRole.id, { ability: SYSTEM_ABILITY });
     const { tokens } = await app
       .get(AuthService)
       .login(await usersService.findOne(adminId, SYSTEM_ABILITY), {
@@ -161,7 +161,10 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
   it('role: a resubmit logs [] and a description edit logs ["description"]', async () => {
     const role = await app
       .get(RoleService)
-      .create({ name: roleName, description: 'old' }, SYSTEM_ABILITY);
+      .create(
+        { name: roleName, description: 'old' },
+        { ability: SYSTEM_ABILITY }
+      );
 
     await patch(`roles/${role.id}`, { name: roleName, description: 'old' });
     expect(await lastChangedFields(AuditAction.ROLE_UPDATE, role.id)).toEqual(

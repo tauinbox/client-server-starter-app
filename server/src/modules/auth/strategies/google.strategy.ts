@@ -29,6 +29,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     super(options);
   }
 
+  // eslint-disable-next-line no-restricted-syntax -- Passport defines the verify callback of this strategy
   validate(
     _accessToken: string,
     _refreshToken: string,

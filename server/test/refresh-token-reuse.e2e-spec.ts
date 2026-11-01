@@ -32,6 +32,7 @@ import { createMockCache } from '../src/common/testing/cache.mock';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 interface InMemoryStore {
   tokens: Map<string, RefreshToken>;
@@ -276,7 +277,8 @@ describe('Refresh token reuse detection (e2e)', () => {
           provide: AuditService,
           useValue: { log: jest.fn(), logFireAndForget: auditLog }
         },
-        { provide: MetricsService, useValue: { recordAuthEvent } }
+        { provide: MetricsService, useValue: { recordAuthEvent } },
+        AccessRefusalService
       ]
     }).compile();
 

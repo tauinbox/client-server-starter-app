@@ -158,9 +158,12 @@ describe('SessionIssuerService', () => {
     );
     expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
       'user-1',
-      'mock-refresh-token',
-      expect.any(String),
-      { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
+      {
+        token: 'mock-refresh-token',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        sessionId: expect.any(String),
+        client: { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
+      }
     );
     expect(result.user).toBe(mockUser);
   });
@@ -174,11 +177,11 @@ describe('SessionIssuerService', () => {
       string
     ];
     const storedCall = mockRefreshTokenService.createRefreshToken.mock
-      .calls[0] as [string, string, string];
+      .calls[0] as [string, { sessionId: string }];
 
     // A mismatch would leave the access token naming a session that never
     // existed, so JwtStrategy would refuse the caller on its first request.
-    expect(signedCall[2]).toBe(storedCall[2]);
+    expect(signedCall[2]).toBe(storedCall[1].sessionId);
   });
 
   it('mints a distinct session id per sign-in, so one sign-out cannot end another device', async () => {

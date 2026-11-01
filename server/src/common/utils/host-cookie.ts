@@ -27,9 +27,7 @@ export function cookieName(base: string, secure: boolean): string {
 
 export function setHostCookie(
   res: Response,
-  base: string,
-  value: string,
-  secure: boolean,
+  { base, value, secure }: { base: string; value: string; secure: boolean },
   options: HostCookieOptions
 ): void {
   res.cookie(cookieName(base, secure), value, {

@@ -70,7 +70,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
     ).id;
     await app
       .get(RoleService)
-      .assignRoleToUser(adminId, superRole.id, SYSTEM_ABILITY);
+      .assignRoleToUser(adminId, superRole.id, { ability: SYSTEM_ABILITY });
     const { tokens } = await app
       .get(AuthService)
       .login(await app.get(UsersService).findOne(adminId, SYSTEM_ABILITY), {

@@ -44,6 +44,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { RolePermission } from '../src/modules/auth/entities/role-permission.entity';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const ACTOR_ID = 'delegated-admin-id';
 const TARGET_ROLE_ID = '11111111-1111-4111-8111-111111111111';
@@ -196,6 +197,7 @@ describe('Grant scope over the HTTP path', () => {
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
         },
+        AccessRefusalService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         {
           provide: CACHE_MANAGER,

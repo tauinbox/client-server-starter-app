@@ -600,8 +600,7 @@ describe('BillingAdminService', () => {
       );
       expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
         ctx.manager,
-        'cust-1',
-        'inv-1',
+        { customerId: 'cust-1', invoiceId: 'inv-1' },
         500
       );
     });
@@ -968,8 +967,7 @@ describe('BillingAdminService', () => {
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
           ctx.manager,
-          'cust-1',
-          'inv-1',
+          { customerId: 'cust-1', invoiceId: 'inv-1' },
           500
         );
       });
@@ -1032,8 +1030,7 @@ describe('BillingAdminService', () => {
         expect(saved.status).toBe('refunded');
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
           ctx.manager,
-          'cust-1',
-          'inv-1',
+          { customerId: 'cust-1', invoiceId: 'inv-1' },
           500
         );
       });

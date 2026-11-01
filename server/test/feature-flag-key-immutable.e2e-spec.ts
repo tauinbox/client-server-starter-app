@@ -22,6 +22,7 @@ import {
   createMongoAbility
 } from '../src/modules/auth/casl/app-ability';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const FLAG_ID = '4f9d38f6-6c67-4a54-9d5e-222222222222';
 
@@ -47,7 +48,8 @@ describe('Feature flag key is immutable after create (e2e)', () => {
         {
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
-        }
+        },
+        AccessRefusalService
       ]
     })
       .overrideGuard(PermissionsGuard)
@@ -104,9 +106,13 @@ describe('Feature flag key is immutable after create (e2e)', () => {
     expect(flagService.update).toHaveBeenCalledWith(
       FLAG_ID,
       { enabled: true },
-      { any: false, versions: [1] },
-      expect.anything(),
-      expect.objectContaining({ actorId: 'admin-1' })
+      {
+        ifMatch: { any: false, versions: [1] },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        ability: expect.anything(),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        actor: expect.objectContaining({ actorId: 'admin-1' })
+      }
     );
   });
 });

@@ -126,7 +126,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
     await usersService.update(
       user.id,
       { email: recoveredEmail },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
 
     expect(
@@ -142,8 +142,16 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
   it('refuses the link after a deactivation and a reactivation', async () => {
     const { user, rawToken } = await createUserWithResetLink('deactivate');
 
-    await usersService.update(user.id, { isActive: false }, SYSTEM_ABILITY);
-    await usersService.update(user.id, { isActive: true }, SYSTEM_ABILITY);
+    await usersService.update(
+      user.id,
+      { isActive: false },
+      { ability: SYSTEM_ABILITY }
+    );
+    await usersService.update(
+      user.id,
+      { isActive: true },
+      { ability: SYSTEM_ABILITY }
+    );
 
     expect(
       await errorKeyOf(authService.resetPassword(rawToken, attackerPassword))
@@ -153,8 +161,8 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
   it('refuses the link after a soft delete and a restore', async () => {
     const { user, rawToken } = await createUserWithResetLink('restore');
 
-    await usersService.remove(user.id, SYSTEM_ABILITY);
-    await usersService.restore(user.id, SYSTEM_ABILITY);
+    await usersService.remove(user.id, { ability: SYSTEM_ABILITY });
+    await usersService.restore(user.id, { ability: SYSTEM_ABILITY });
 
     expect(
       await errorKeyOf(authService.resetPassword(rawToken, attackerPassword))
@@ -175,7 +183,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
         await usersService.update(
           user.id,
           { password: ownerPassword },
-          SYSTEM_ABILITY
+          { ability: SYSTEM_ABILITY }
         );
         await original(password, context);
       });

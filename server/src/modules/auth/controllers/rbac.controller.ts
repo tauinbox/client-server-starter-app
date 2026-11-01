@@ -90,13 +90,17 @@ export class RbacController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    return this.resourceService.restore(id, ability, req.user.userId, {
-      action: AuditAction.RESOURCE_RESTORE,
+    return this.resourceService.restore(id, {
+      ability,
       actorId: req.user.userId,
-      actorEmail: req.user.email,
-      targetId: id,
-      targetType: 'Resource',
-      context: extractAuditContext(req)
+      audit: {
+        action: AuditAction.RESOURCE_RESTORE,
+        actorId: req.user.userId,
+        actorEmail: req.user.email,
+        targetId: id,
+        targetType: 'Resource',
+        context: extractAuditContext(req)
+      }
     });
   }
 
@@ -114,12 +118,10 @@ export class RbacController {
     @Request() req: JwtAuthRequest,
     @CurrentAbility() ability: AppAbility
   ) {
-    return this.resourceService.update(
-      id,
-      dto,
+    return this.resourceService.update(id, dto, {
       ability,
-      req.user.userId,
-      (before) => ({
+      actorId: req.user.userId,
+      audit: (before) => ({
         action: AuditAction.RESOURCE_UPDATE,
         actorId: req.user.userId,
         actorEmail: req.user.email,
@@ -128,6 +130,6 @@ export class RbacController {
         details: { changedFields: changedFields(before, dto) },
         context: extractAuditContext(req)
       })
-    );
+    });
   }
 }

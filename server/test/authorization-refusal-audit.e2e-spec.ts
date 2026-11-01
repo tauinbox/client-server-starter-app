@@ -90,7 +90,9 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
     const updateUser = find('update', 'User');
 
     const [delegate, restrict, empty] = await Promise.all(
-      roleNames.map((name) => roleService.create({ name }, SYSTEM_ABILITY))
+      roleNames.map((name) =>
+        roleService.create({ name }, { ability: SYSTEM_ABILITY })
+      )
     );
     emptyRole = empty;
     await roleService.setPermissionsForRole(
@@ -100,7 +102,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
         { permissionId: find('update', 'Role').id },
         { permissionId: find('assign', 'Role').id }
       ],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await roleService.setPermissionsForRole(
       restrict.id,
@@ -113,10 +115,14 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
           }
         }
       ],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(ids.actor, delegate.id, SYSTEM_ABILITY);
-    await roleService.assignRoleToUser(ids.actor, restrict.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(ids.actor, delegate.id, {
+      ability: SYSTEM_ABILITY
+    });
+    await roleService.assignRoleToUser(ids.actor, restrict.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     const roleRepository = dataSource.getRepository(Role);
     superRole = await roleRepository.findOneByOrFail({ isSuper: true });
@@ -124,7 +130,9 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       isSystem: true,
       isSuper: false
     });
-    await roleService.assignRoleToUser(ids.super, superRole.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(ids.super, superRole.id, {
+      ability: SYSTEM_ABILITY
+    });
 
     const actor = await app
       .get(UsersService)
@@ -156,8 +164,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
   function send(
     method: 'delete' | 'patch' | 'post' | 'put',
     path: string,
-    requestId: string,
-    body?: object
+    { requestId, body }: { requestId: string; body?: object }
   ) {
     return request(http())
       [method](`/api/v1${path}`)
@@ -181,7 +188,9 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
   }
 
   it('writes the route guard refusal', async () => {
-    const res = await send('delete', `/users/${ids.plain}`, `${tag}-guard`);
+    const res = await send('delete', `/users/${ids.plain}`, {
+      requestId: `${tag}-guard`
+    });
     expect(res.status).toBe(403);
 
     const row = await refusalRow(`${tag}-guard`);
@@ -189,8 +198,11 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
   });
 
   it('writes the instance check refusal', async () => {
-    const res = await send('patch', `/users/${ids.victim}`, `${tag}-instance`, {
-      name: 'Changed'
+    const res = await send('patch', `/users/${ids.victim}`, {
+      requestId: `${tag}-instance`,
+      body: {
+        name: 'Changed'
+      }
     });
     expect(res.status).toBe(403);
     expect((res.body as { errorKey: string }).errorKey).toBe(
@@ -203,8 +215,11 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
   });
 
   it('writes the super-target refusal', async () => {
-    const res = await send('patch', `/users/${ids.super}`, `${tag}-target`, {
-      name: 'Changed'
+    const res = await send('patch', `/users/${ids.super}`, {
+      requestId: `${tag}-target`,
+      body: {
+        name: 'Changed'
+      }
     });
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
@@ -215,12 +230,10 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
   });
 
   it('writes the super-role assignment refusal', async () => {
-    const res = await send(
-      'post',
-      `/roles/assign/${ids.plain}`,
-      `${tag}-super-role`,
-      { roleId: superRole.id }
-    );
+    const res = await send('post', `/roles/assign/${ids.plain}`, {
+      requestId: `${tag}-super-role`,
+      body: { roleId: superRole.id }
+    });
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
     );
@@ -231,12 +244,10 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
   });
 
   it('answers a system role change by privilege with 403 and writes it', async () => {
-    const res = await send(
-      'put',
-      `/roles/${systemRole.id}/permissions`,
-      `${tag}-system-role`,
-      { items: [] }
-    );
+    const res = await send('put', `/roles/${systemRole.id}/permissions`, {
+      requestId: `${tag}-system-role`,
+      body: { items: [] }
+    });
     expect(res.status).toBe(403);
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
@@ -248,12 +259,10 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
   });
 
   it('writes the grant refusal', async () => {
-    const res = await send(
-      'put',
-      `/roles/${emptyRole.id}/permissions`,
-      `${tag}-grant`,
-      { items: [{ permissionId: deleteUser.id }] }
-    );
+    const res = await send('put', `/roles/${emptyRole.id}/permissions`, {
+      requestId: `${tag}-grant`,
+      body: { items: [{ permissionId: deleteUser.id }] }
+    });
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION
     );

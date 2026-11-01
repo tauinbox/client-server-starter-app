@@ -22,7 +22,10 @@ import { BillingService } from '../src/modules/billing/billing.service';
 import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
 import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
-import { ChargeDeclinedError } from '../src/modules/billing/providers/payment-provider.interface';
+import {
+  ChargeDeclinedError,
+  type OffSessionCharge
+} from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
@@ -264,8 +267,10 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   async function setup(
     providerId: 'yookassa' | 'paddle',
     duringCall: ConcurrentWrite | null,
-    planKey = 'race-pro',
-    status: Subscription['status'] = 'active'
+    {
+      planKey = 'race-pro',
+      status = 'active'
+    }: { planKey?: string; status?: Subscription['status'] } = {}
   ): Promise<{
     subscription: Subscription;
     user: string;
@@ -460,10 +465,6 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   it('prices the proration refund against a refund committed during the provider call', async () => {
     const { subscription, user, provider } = await setup(
       'yookassa',
-      // An admin refund of the same source invoice, reserved the way
-      // BillingAdminService reserves it, lands mid-flight. The switch's own
-      // charge leg is already recorded by now but is excluded from the source
-      // lookup by id, so the reservation still prices against the seeded one.
       (subscriptionId) =>
         ds
           .getRepository(Invoice)
@@ -471,7 +472,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
             { subscriptionId },
             { refundedMinor: Money.fromMinor(80000) }
           ),
-      'race-business'
+      { planKey: 'race-business' }
     );
     const source = await seedSourceInvoice(subscription, 99000);
 
@@ -493,11 +494,9 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   }, 30000);
 
   it('marks the source refunded only when the switch refunds all of it', async () => {
-    const { subscription, user } = await setup(
-      'yookassa',
-      null,
-      'race-business'
-    );
+    const { subscription, user } = await setup('yookassa', null, {
+      planKey: 'race-business'
+    });
     // The downgrade remainder of the business plan exceeds this source.
     const source = await seedSourceInvoice(subscription, 99000);
 
@@ -525,12 +524,10 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   }, 30000);
 
   it('refuses a checkout whose incomplete row was activated inside the read-write window', async () => {
-    const { subscription, user } = await setup(
-      'yookassa',
-      null,
-      'race-pro',
-      'incomplete'
-    );
+    const { subscription, user } = await setup('yookassa', null, {
+      planKey: 'race-pro',
+      status: 'incomplete'
+    });
     const activatedAt = new Date(Date.now() - DAY_MS);
     // The success webhook commits between the pending-row read and the write
     // that reuses it - the only window checkout leaves open.
@@ -579,7 +576,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     // The provider key store: a reused key returns the first payment.
     const payments = new Map<string, string>();
     provider.chargeOffSession.mockImplementation((...args: unknown[]) => {
-      const key = args[4] as string;
+      const key = (args[1] as OffSessionCharge).idempotencyKey ?? '';
       const ref = payments.get(key) ?? `pay_${payments.size + 1}`;
       payments.set(key, ref);
       return Promise.resolve({ providerInvoiceRef: ref, status: 'captured' });

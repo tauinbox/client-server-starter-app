@@ -423,9 +423,15 @@ export class BillingEventReducer {
    */
   private reportUnsettledCharge(
     provider: BillingProviderId,
-    chargeKey: string,
-    recorded: Invoice | null,
-    payload: NormalizedInvoicePayload
+    {
+      chargeKey,
+      recorded,
+      payload
+    }: {
+      chargeKey: string;
+      recorded: Invoice | null;
+      payload: NormalizedInvoicePayload;
+    }
   ): void {
     if (
       !isPlantedBeforeCharge(chargeKey) ||
@@ -484,7 +490,11 @@ export class BillingEventReducer {
               { providerEventId: chargeKey },
               { providerInvoiceRef: payload.providerInvoiceRef }
             );
-            this.reportUnsettledCharge(provider, chargeKey, recorded, payload);
+            this.reportUnsettledCharge(provider, {
+              chargeKey,
+              recorded,
+              payload
+            });
             return null;
           }
           const invoice = await manager.findOne(Invoice, {
@@ -499,8 +509,7 @@ export class BillingEventReducer {
           if (invoice.creditUnitsApplied > 0) {
             await this.credits.spendOnUsage(
               manager,
-              invoice.customerId,
-              invoice.id,
+              { customerId: invoice.customerId, invoiceId: invoice.id },
               invoice.creditUnitsApplied
             );
           }
@@ -544,8 +553,7 @@ export class BillingEventReducer {
           if (reconciled.affected && invoice.creditUnitsApplied > 0) {
             await this.credits.spendOnUsage(
               manager,
-              invoice.customerId,
-              invoice.id,
+              { customerId: invoice.customerId, invoiceId: invoice.id },
               invoice.creditUnitsApplied
             );
           }
@@ -616,10 +624,8 @@ export class BillingEventReducer {
       if (oneTime) {
         await this.applyOneTimeGrant(
           manager,
-          customerId,
-          invoiceId,
-          product,
-          now
+          { customerId, invoiceId },
+          { product, now }
         );
         return {
           invoiceId,
@@ -631,7 +637,10 @@ export class BillingEventReducer {
 
       const activatedSubscriptionId =
         selfManaged && subscription
-          ? await this.activateSelfManaged(manager, subscription, payload, now)
+          ? await this.activateSelfManaged(manager, subscription, {
+              payload,
+              now
+            })
           : null;
       // A trial binding moves no money, so there is nothing to give back.
       const unclaimed =
@@ -674,10 +683,8 @@ export class BillingEventReducer {
    */
   private async applyOneTimeGrant(
     manager: EntityManager,
-    customerId: string,
-    invoiceId: string,
-    product: Product | null,
-    now: Date
+    { customerId, invoiceId }: { customerId: string; invoiceId: string },
+    { product, now }: { product: Product | null; now: Date }
   ): Promise<void> {
     if (!product?.grant) {
       return;
@@ -686,8 +693,7 @@ export class BillingEventReducer {
     if (product.type === 'credits' && product.grant.credits) {
       await this.credits.addPurchase(
         manager,
-        customerId,
-        invoiceId,
+        { customerId, invoiceId },
         product.grant.credits
       );
       return;
@@ -726,8 +732,7 @@ export class BillingEventReducer {
   private async activateSelfManaged(
     manager: EntityManager,
     subscription: Subscription,
-    payload: NormalizedInvoicePayload,
-    now: Date
+    { payload, now }: { payload: NormalizedInvoicePayload; now: Date }
   ): Promise<string | null> {
     const trialing =
       subscription.trialEnd != null &&

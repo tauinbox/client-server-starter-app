@@ -142,14 +142,13 @@ describe('SessionsController', () => {
         res
       );
 
-      expect(authService.assertStepUp).toHaveBeenCalledWith(
-        mockUser,
-        'secret',
-        'proof-token',
-        STEP_UP_OPERATION.SESSION_REVOKE,
-        '123456',
-        { ip: '127.0.0.1', requestId: undefined }
-      );
+      expect(authService.assertStepUp).toHaveBeenCalledWith(mockUser, {
+        currentPassword: 'secret',
+        reauthProof: 'proof-token',
+        operation: STEP_UP_OPERATION.SESSION_REVOKE,
+        totpCode: '123456',
+        auditContext: { ip: '127.0.0.1', requestId: undefined }
+      });
       expect(refreshTokenService.deleteUserSession).toHaveBeenCalledWith(
         'user-1',
         'other-session'
@@ -230,14 +229,11 @@ describe('SessionsController', () => {
         res
       );
 
-      expect(authService.assertStepUp).toHaveBeenCalledWith(
-        mockUser,
-        undefined,
-        undefined,
-        STEP_UP_OPERATION.SESSION_REVOKE,
-        '123456',
-        { ip: '127.0.0.1', requestId: undefined }
-      );
+      expect(authService.assertStepUp).toHaveBeenCalledWith(mockUser, {
+        operation: STEP_UP_OPERATION.SESSION_REVOKE,
+        totpCode: '123456',
+        auditContext: { ip: '127.0.0.1', requestId: undefined }
+      });
       expect(refreshTokenService.deleteOtherSessions).toHaveBeenCalledWith(
         'user-1',
         'current-session'

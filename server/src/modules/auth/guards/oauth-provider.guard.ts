@@ -61,6 +61,7 @@ export function createOAuthProviderGuard(
      * Passport only invokes this hook on success/fail/error, never on the
      * initiation redirect, so both routes of a provider can share it.
      */
+    // eslint-disable-next-line no-restricted-syntax -- AuthGuard of @nestjs/passport defines handleRequest
     handleRequest<TUser = unknown>(
       err: unknown,
       user: unknown,

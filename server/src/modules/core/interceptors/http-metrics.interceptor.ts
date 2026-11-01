@@ -36,9 +36,7 @@ export class HttpMetricsInterceptor implements NestInterceptor {
   private record(req: Request, statusCode: number, durationMs: number): void {
     const route = this.normalizeRoute(req.path);
     this.metricsService.recordHttpRequest(
-      req.method,
-      route,
-      statusCode,
+      { method: req.method, route, statusCode },
       durationMs
     );
   }

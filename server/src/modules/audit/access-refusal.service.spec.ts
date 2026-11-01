@@ -1,33 +1,40 @@
 import { AbilityBuilder, createMongoAbility, subject } from '@casl/ability';
-import { assertCan } from './assert-can.util';
-import type { AppAbility } from '../../modules/auth/casl/app-ability';
-import { bindAuditContext } from '../../modules/auth/casl/ability-context';
+import { AccessRefusalService } from './access-refusal.service';
+import type { AppAbility } from '../auth/casl/app-ability';
+import { bindAuditContext } from '../auth/casl/ability-context';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
-import { thrownBy } from '../testing/thrown-by';
-import { expectApiError } from '../testing/api-error.expect';
+import { thrownBy } from '../../common/testing/thrown-by';
+import { expectApiError } from '../../common/testing/api-error.expect';
 
-describe('assertCan', () => {
+describe('AccessRefusalService.assertCan', () => {
   let auditService: { logFireAndForget: jest.Mock };
   let metricsService: { recordPermissionDenied: jest.Mock };
+  let refusals: AccessRefusalService;
 
   beforeEach(() => {
     auditService = { logFireAndForget: jest.fn() };
     metricsService = { recordPermissionDenied: jest.fn() };
+    refusals = new AccessRefusalService(
+      // @ts-expect-error partial mock
+      auditService,
+      metricsService
+    );
   });
 
   it('should not throw when ability allows the action', () => {
     const ability = { can: jest.fn().mockReturnValue(true) };
 
     expect(() =>
-      assertCan(
+      refusals.assertCan(
         // @ts-expect-error partial mock
         ability,
-        'update',
-        { id: '1' },
-        auditService,
-        { targetId: '1', targetType: 'User' },
-        metricsService
+        {
+          action: 'update',
+          subject: { id: '1' },
+          targetId: '1',
+          targetType: 'User'
+        }
       )
     ).not.toThrow();
     expect(auditService.logFireAndForget).not.toHaveBeenCalled();
@@ -38,14 +45,15 @@ describe('assertCan', () => {
 
     expectApiError(
       thrownBy(() =>
-        assertCan(
+        refusals.assertCan(
           // @ts-expect-error partial mock
           ability,
-          'delete',
-          { id: '2' },
-          auditService,
-          { targetId: '2', targetType: 'User' },
-          metricsService
+          {
+            action: 'delete',
+            subject: { id: '2' },
+            targetId: '2',
+            targetType: 'User'
+          }
         )
       ),
       ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
@@ -57,14 +65,15 @@ describe('assertCan', () => {
 
     expect(
       thrownBy(() =>
-        assertCan(
+        refusals.assertCan(
           // @ts-expect-error partial mock
           ability,
-          'delete',
-          { id: '2' },
-          auditService,
-          { targetId: '2', targetType: 'User' },
-          metricsService
+          {
+            action: 'delete',
+            subject: { id: '2' },
+            targetId: '2',
+            targetType: 'User'
+          }
         )
       )
     ).toMatchObject({
@@ -79,14 +88,16 @@ describe('assertCan', () => {
     const ability = { can: jest.fn().mockReturnValue(false) };
 
     try {
-      assertCan(
+      refusals.assertCan(
         // @ts-expect-error partial mock
         ability,
-        'update',
-        { id: '3' },
-        auditService,
-        { actorId: 'actor-1', targetId: '3', targetType: 'User' },
-        metricsService
+        {
+          action: 'update',
+          subject: { id: '3' },
+          actorId: 'actor-1',
+          targetId: '3',
+          targetType: 'User'
+        }
       );
     } catch {
       // expected
@@ -114,14 +125,10 @@ describe('assertCan', () => {
     const user = new User();
 
     try {
-      assertCan(
+      refusals.assertCan(
         // @ts-expect-error partial mock
         ability,
-        'delete',
-        user,
-        auditService,
-        { targetId: '4', targetType: 'User' },
-        metricsService
+        { action: 'delete', subject: user, targetId: '4', targetType: 'User' }
       );
     } catch {
       // expected
@@ -145,14 +152,16 @@ describe('assertCan', () => {
     const user = new User();
 
     try {
-      assertCan(
+      refusals.assertCan(
         // @ts-expect-error partial mock
         ability,
-        'update',
-        user,
-        auditService,
-        { actorId: 'actor-1', targetId: '5', targetType: 'User' },
-        metricsService
+        {
+          action: 'update',
+          subject: user,
+          actorId: 'actor-1',
+          targetId: '5',
+          targetType: 'User'
+        }
       );
     } catch {
       // expected
@@ -174,14 +183,16 @@ describe('assertCan', () => {
     const branded = subject('User', new FooEntity());
 
     try {
-      assertCan(
+      refusals.assertCan(
         // @ts-expect-error partial mock
         ability,
-        'update',
-        branded,
-        auditService,
-        { actorId: 'actor-1', targetId: '7', targetType: 'User' },
-        metricsService
+        {
+          action: 'update',
+          subject: branded,
+          actorId: 'actor-1',
+          targetId: '7',
+          targetType: 'User'
+        }
       );
     } catch {
       // expected
@@ -206,15 +217,13 @@ describe('assertCan', () => {
     bindAuditContext(ability, { ip: '203.0.113.7', requestId: 'req-1' });
 
     thrownBy(() =>
-      assertCan(
-        ability,
-        'update',
-        subject('User', { id: '8' }),
-        // @ts-expect-error partial mock
-        auditService,
-        { actorId: 'actor-1', targetId: '8', targetType: 'User' },
-        metricsService
-      )
+      refusals.assertCan(ability, {
+        action: 'update',
+        subject: subject('User', { id: '8' }),
+        actorId: 'actor-1',
+        targetId: '8',
+        targetType: 'User'
+      })
     );
 
     expect(auditService.logFireAndForget).toHaveBeenCalledWith(
@@ -227,14 +236,15 @@ describe('assertCan', () => {
   it('does not touch metrics on allow path', () => {
     const ability = { can: jest.fn().mockReturnValue(true) };
 
-    assertCan(
+    refusals.assertCan(
       // @ts-expect-error partial mock
       ability,
-      'update',
-      { id: '6' },
-      auditService,
-      { targetId: '6', targetType: 'User' },
-      metricsService
+      {
+        action: 'update',
+        subject: { id: '6' },
+        targetId: '6',
+        targetType: 'User'
+      }
     );
 
     expect(metricsService.recordPermissionDenied).not.toHaveBeenCalled();

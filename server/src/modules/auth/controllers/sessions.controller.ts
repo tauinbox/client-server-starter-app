@@ -159,14 +159,13 @@ export class SessionsController {
       req.user.userId,
       SYSTEM_ABILITY
     );
-    await this.authService.assertStepUp(
-      user,
-      dto.currentPassword,
-      this.cookies.readReauthProof(req),
-      STEP_UP_OPERATION.SESSION_REVOKE,
-      dto.code,
-      extractAuditContext(req)
-    );
+    await this.authService.assertStepUp(user, {
+      currentPassword: dto.currentPassword,
+      reauthProof: this.cookies.readReauthProof(req),
+      operation: STEP_UP_OPERATION.SESSION_REVOKE,
+      totpCode: dto.code,
+      auditContext: extractAuditContext(req)
+    });
   }
 
   /** The device label is client data, so it never enters the audit row. */

@@ -91,7 +91,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
   }
 
   function adminChangesEmail(id: string, email: string): Promise<User> {
-    return usersService.update(id, { email }, SYSTEM_ABILITY);
+    return usersService.update(id, { email }, { ability: SYSTEM_ABILITY });
   }
 
   async function userWithVerificationToken(

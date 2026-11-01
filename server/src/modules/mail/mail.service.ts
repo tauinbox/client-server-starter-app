@@ -29,6 +29,12 @@ function credentialChangeDetails(ip?: string): CredentialChangeDetails {
   return ip ? { when, ip } : { when };
 }
 
+/** Where and in which language a credential change notice is sent. */
+export interface CredentialChangeContext {
+  locale?: string;
+  ip?: string;
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -163,8 +169,7 @@ export class MailService {
   async sendPasswordChangedNotification(
     email: string,
     source: PasswordChangeSource,
-    locale: string = DEFAULT_LOCALE,
-    ip?: string
+    { locale = DEFAULT_LOCALE, ip }: CredentialChangeContext = {}
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).passwordChanged(
@@ -177,8 +182,7 @@ export class MailService {
   async sendOAuthLinkedNotification(
     email: string,
     provider: string,
-    locale: string = DEFAULT_LOCALE,
-    ip?: string
+    { locale = DEFAULT_LOCALE, ip }: CredentialChangeContext = {}
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).oauthLinked(
@@ -191,8 +195,7 @@ export class MailService {
   async sendOAuthUnlinkedNotification(
     email: string,
     provider: string,
-    locale: string = DEFAULT_LOCALE,
-    ip?: string
+    { locale = DEFAULT_LOCALE, ip }: CredentialChangeContext = {}
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).oauthUnlinked(

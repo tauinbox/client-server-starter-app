@@ -10,11 +10,9 @@ import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { bindAuditContext } from '../casl/ability-context';
 import type { PermissionCheck } from '../casl/app-ability';
 import { JwtAuthRequest } from '../types/auth.request';
-import { AuditService } from '../../audit/audit.service';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { ErrorKeys } from '@app/shared/constants';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { refuseAccess } from '../../../common/utils/refuse-access.util';
 import { ApiError } from '../../../common/errors/api-error';
 
 /** The metric labels and the audited `action:subject` of each check. */
@@ -39,8 +37,7 @@ export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly caslAbilityFactory: CaslAbilityFactory,
-    private readonly auditService: AuditService,
-    private readonly metricsService: MetricsService
+    private readonly accessRefusals: AccessRefusalService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -74,9 +71,7 @@ export class PermissionsGuard implements CanActivate {
     );
 
     if (denied.length > 0) {
-      refuseAccess(
-        this.auditService,
-        this.metricsService,
+      this.accessRefusals.refuse(
         {
           actorId: user.userId,
           details: { required: requiredLabels(requiredPermissions) },

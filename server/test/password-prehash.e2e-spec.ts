@@ -59,7 +59,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
         name: 'Prehash Check',
         password
       },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await dataSource
       .getRepository(User)

@@ -114,10 +114,14 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     ): Promise<Role> => {
       const role = await roleService.create(
         { name: `${tag}-${suffix}` },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
-      await roleService.setPermissionsForRole(role.id, items, SYSTEM_ABILITY);
-      await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
+      await roleService.setPermissionsForRole(role.id, items, {
+        ability: SYSTEM_ABILITY
+      });
+      await roleService.assignRoleToUser(holder.id, role.id, {
+        ability: SYSTEM_ABILITY
+      });
       return role;
     };
 
@@ -155,17 +159,13 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await roleService.assignRoleToUser(
-      users.superUser.id,
-      superRole.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(users.superUser.id, superRole.id, {
+      ability: SYSTEM_ABILITY
+    });
 
-    await roleService.assignRoleToUser(
-      users.deleted.id,
-      wideRole.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.assignRoleToUser(users.deleted.id, wideRole.id, {
+      ability: SYSTEM_ABILITY
+    });
     await repository.softDelete(users.deleted.id);
   }, 60000);
 

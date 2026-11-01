@@ -68,7 +68,10 @@ describe('MetricsService', () => {
 
   describe('recordHttpRequest', () => {
     it('increments the requests counter with correct labels', () => {
-      service.recordHttpRequest('GET', '/api/v1/users', 200, 42);
+      service.recordHttpRequest(
+        { method: 'GET', route: '/api/v1/users', statusCode: 200 },
+        42
+      );
 
       expect(mockCounter.inc).toHaveBeenCalledWith({
         method: 'GET',
@@ -78,7 +81,10 @@ describe('MetricsService', () => {
     });
 
     it('observes duration in seconds', () => {
-      service.recordHttpRequest('POST', '/api/v1/auth/login', 201, 150);
+      service.recordHttpRequest(
+        { method: 'POST', route: '/api/v1/auth/login', statusCode: 201 },
+        150
+      );
 
       expect(mockHistogram.observe).toHaveBeenCalledWith(
         { method: 'POST', route: '/api/v1/auth/login', status_code: '201' },

@@ -22,6 +22,7 @@ export class MemoryThrottlerStorage
   private readonly entries = new Map<string, Entry>();
   private sweepTimer: NodeJS.Timeout | undefined;
 
+  // eslint-disable-next-line no-restricted-syntax -- ThrottlerStorage of @nestjs/throttler defines increment
   increment(
     key: string,
     ttl: number,

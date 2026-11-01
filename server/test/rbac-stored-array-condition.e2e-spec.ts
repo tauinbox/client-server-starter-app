@@ -43,7 +43,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
   const giveGrant = async (user: User, conditions: unknown): Promise<void> => {
     const role = await roleService.create(
       { name: `${tag}-${user.name}-${Math.random()}` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     await dataSource.getRepository(RolePermission).insert({
       roleId: role.id,
@@ -51,7 +51,9 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
       // @ts-expect-error -- a stored row can hold what the type forbids
       conditions
     });
-    await roleService.assignRoleToUser(user.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(user.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
   };
 
   const canUpdateTarget = async (user: User): Promise<boolean> => {

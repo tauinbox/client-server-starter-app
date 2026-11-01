@@ -77,9 +77,13 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
   async function seedSession(): Promise<{ raw: string; sessionId: string }> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const sessionId = randomUUID();
-    await refreshTokenService.createRefreshToken(userId, raw, sessionId, {
-      userAgent: null,
-      ipAddress: null
+    await refreshTokenService.createRefreshToken(userId, {
+      token: raw,
+      sessionId,
+      client: {
+        userAgent: null,
+        ipAddress: null
+      }
     });
     return { raw, sessionId };
   }
@@ -197,24 +201,20 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
 
     expect(
       await errorKeyOf(
-        authService.assertStepUp(
-          user,
-          undefined,
-          proof(minIat - 600),
-          STEP_UP_OPERATION.MFA_DISABLE
-        )
+        authService.assertStepUp(user, {
+          reauthProof: proof(minIat - 600),
+          operation: STEP_UP_OPERATION.MFA_DISABLE
+        })
       )
     ).toEqual(
       expect.objectContaining({ errorKey: 'errors.auth.reauthRequired' })
     );
     expect(
       await errorKeyOf(
-        authService.assertStepUp(
-          user,
-          undefined,
-          proof(Math.floor(Date.now() / 1000)),
-          STEP_UP_OPERATION.MFA_DISABLE
-        )
+        authService.assertStepUp(user, {
+          reauthProof: proof(Math.floor(Date.now() / 1000)),
+          operation: STEP_UP_OPERATION.MFA_DISABLE
+        })
       )
     ).toBe('RESOLVED');
   }, 30000);

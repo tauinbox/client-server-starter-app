@@ -56,8 +56,7 @@ const FILTER_CONDITIONS: { [K in ListFilterKind]: FilterCondition<K> } = {
 
 function filterCondition<K extends ListFilterKind>(
   kind: K,
-  column: string,
-  param: string,
+  { column, param }: { column: string; param: string },
   value: unknown
 ): [string, ObjectLiteral] {
   // The DTO has already validated and transformed the value for its kind.
@@ -75,6 +74,15 @@ export type ListColumns<S extends ListQuerySpec> = ListQueryColumns<S> & {
   id: string;
 };
 
+/** A list definition and the columns that its query reads. */
+export interface ListDefinition<
+  S extends ListQuerySpec,
+  C extends ListQueryColumns<S> = ListColumns<S>
+> {
+  spec: S;
+  columns: C;
+}
+
 /**
  * ANDs the search and the filters of `query` onto `qb`. Call it after the
  * ability filter and before `applyKeysetPagination`: every condition is an
@@ -86,8 +94,7 @@ export function applyListQuery<
   S extends ListQuerySpec
 >(
   qb: SelectQueryBuilder<T>,
-  spec: S,
-  columns: ListQueryColumns<S>,
+  { spec, columns }: ListDefinition<S, ListQueryColumns<S>>,
   query: ListQuery<S>
 ): void {
   const searchColumns: Readonly<Record<string, string>> = columns.search;
@@ -114,8 +121,7 @@ export function applyListQuery<
     if (value === undefined || value === '') continue;
     const [condition, parameters] = filterCondition(
       definition.kind,
-      filterColumns[name],
-      `listFilter_${name}`,
+      { column: filterColumns[name], param: `listFilter_${name}` },
       value
     );
     qb.andWhere(condition, parameters);
@@ -132,11 +138,11 @@ export async function applyList<
   S extends ListQuerySpec
 >(
   qb: SelectQueryBuilder<T>,
-  spec: S,
-  columns: ListColumns<S>,
+  list: ListDefinition<S>,
   query: ListCursorQuery<S>
 ): Promise<CursorPaginatedResponseDto<T>> {
-  applyListQuery(qb, spec, columns, query);
+  applyListQuery(qb, list, query);
+  const { columns } = list;
   const { cursor, limit, sortBy, sortOrder } = query;
   const { data, nextCursor } = await applyKeysetPagination(qb, {
     cursor,

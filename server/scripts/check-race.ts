@@ -185,13 +185,12 @@ class MethodScan {
 
   private staleSave(): string | undefined {
     const stale = [...loadedEntities(this.method, this.local)].some((decl) =>
-      reachesSave(
-        scopeOf(decl),
-        decl.name.getText(this.sf),
-        decl.getStart(),
-        this.local,
-        new Set()
-      )
+      reachesSave(scopeOf(decl), {
+        name: decl.name.getText(this.sf),
+        after: decl.getStart(),
+        local: this.local,
+        seen: new Set()
+      })
     );
     if (!stale) return undefined;
     return `${this.label()}: a loaded entity is written back with save; write only the changed columns with a keyed update`;
@@ -326,9 +325,11 @@ function unwrap(expr: ts.Expression): ts.Expression {
  */
 function isUnlockedRead(
   expr: ts.Expression,
-  loaded: Set<string>,
-  local: Map<string, Body>,
-  memo: ReadMemo
+  {
+    loaded,
+    local,
+    memo
+  }: { loaded: Set<string>; local: Map<string, Body>; memo: ReadMemo }
 ): boolean {
   const e = unwrap(expr);
   if (ts.isIdentifier(e)) return loaded.has(e.text);
@@ -359,7 +360,7 @@ function returnsUnlockedRead(
     if (
       ts.isReturnStatement(n) &&
       n.expression &&
-      isUnlockedRead(n.expression, loaded, local, memo)
+      isUnlockedRead(n.expression, { loaded, local, memo })
     ) {
       found = true;
     }
@@ -379,7 +380,7 @@ function loadedEntities(
     if (!ts.isVariableDeclaration(n) || !ts.isIdentifier(n.name)) return;
     const loop = n.parent.parent;
     const source = ts.isForOfStatement(loop) ? loop.expression : n.initializer;
-    if (source && isUnlockedRead(source, names, local, memo)) {
+    if (source && isUnlockedRead(source, { loaded: names, local, memo })) {
       loaded.add(n);
       names.add(n.name.text);
     }
@@ -399,10 +400,17 @@ function scopeOf(decl: ts.VariableDeclaration): ts.Node {
  */
 function reachesSave(
   scope: ts.Node,
-  name: string,
-  after: number,
-  local: Map<string, Body>,
-  seen: Set<string>
+  {
+    name,
+    after,
+    local,
+    seen
+  }: {
+    name: string;
+    after: number;
+    local: Map<string, Body>;
+    seen: Set<string>;
+  }
 ): boolean {
   return calls(scope).some((c) => {
     if (c.getStart() <= after) return false;
@@ -419,7 +427,7 @@ function reachesSave(
       const key = `${calleeName(c)}#${i}`;
       if (!param || !ts.isIdentifier(param) || seen.has(key)) return false;
       seen.add(key);
-      return reachesSave(body, param.text, -1, local, seen);
+      return reachesSave(body, { name: param.text, after: -1, local, seen });
     });
   });
 }

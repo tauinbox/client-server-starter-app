@@ -7,12 +7,14 @@ import type { Plan } from '../entities/plan.entity';
 import type {
   ChangePreview,
   ChargeResult,
+  CheckoutOptions,
   CheckoutSession,
   CheckoutUrls,
   OneTimePaymentParams,
+  OffSessionCharge,
   OneTimePaymentSession,
   PaymentProvider,
-  ReceiptItem,
+  UsageCharge,
   WebhookVerificationResult
 } from './payment-provider.interface';
 
@@ -104,29 +106,19 @@ export class DeadlineBoundProvider implements PaymentProvider {
   startCheckout(
     customer: Customer,
     plan: Plan,
-    urls: CheckoutUrls,
-    trial: boolean
+    checkout: CheckoutOptions
   ): Promise<CheckoutSession> {
     return this.bound('startCheckout', () =>
-      this.inner.startCheckout(customer, plan, urls, trial)
+      this.inner.startCheckout(customer, plan, checkout)
     );
   }
 
   chargeOffSession(
     customer: Customer,
-    amountMinor: number,
-    currency: string,
-    receiptItems: ReceiptItem[],
-    idempotencyKey?: string
+    charge: OffSessionCharge
   ): Promise<ChargeResult> {
     return this.bound('chargeOffSession', () =>
-      this.inner.chargeOffSession(
-        customer,
-        amountMinor,
-        currency,
-        receiptItems,
-        idempotencyKey
-      )
+      this.inner.chargeOffSession(customer, charge)
     );
   }
 
@@ -159,19 +151,10 @@ export class DeadlineBoundProvider implements PaymentProvider {
 
   chargeUsage(
     providerSubscriptionId: string,
-    amountMinor: number,
-    currency: string,
-    description: string,
-    chargeKey: string
+    charge: UsageCharge
   ): Promise<void> {
     return this.bound('chargeUsage', () =>
-      this.inner.chargeUsage(
-        providerSubscriptionId,
-        amountMinor,
-        currency,
-        description,
-        chargeKey
-      )
+      this.inner.chargeUsage(providerSubscriptionId, charge)
     );
   }
 
@@ -197,16 +180,10 @@ export class DeadlineBoundProvider implements PaymentProvider {
   updatePaymentMethod(
     providerSubscriptionId: string | null,
     customer: Customer,
-    currency: string,
-    urls: CheckoutUrls
+    change: { currency: string; urls: CheckoutUrls }
   ): Promise<CheckoutSession> {
     return this.bound('updatePaymentMethod', () =>
-      this.inner.updatePaymentMethod(
-        providerSubscriptionId,
-        customer,
-        currency,
-        urls
-      )
+      this.inner.updatePaymentMethod(providerSubscriptionId, customer, change)
     );
   }
 

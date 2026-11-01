@@ -82,16 +82,20 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
         { permissionId: find('assign', 'Role').id },
         { permissionId: find('delete', 'Role').id }
       ],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     const restrict = await createRole('restrict');
     await roleService.setPermissionsForRole(
       restrict.id,
       [{ permissionId: updateUser.id, conditions: denyCeo() }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(actor.id, admin.id, SYSTEM_ABILITY);
-    await roleService.assignRoleToUser(actor.id, restrict.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(actor.id, admin.id, {
+      ability: SYSTEM_ABILITY
+    });
+    await roleService.assignRoleToUser(actor.id, restrict.id, {
+      ability: SYSTEM_ABILITY
+    });
   }, 60000);
 
   afterEach(() => {
@@ -114,7 +118,10 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
   });
 
   function createRole(name: string): Promise<Role> {
-    return roleService.create({ name: `${tag}-${name}` }, SYSTEM_ABILITY);
+    return roleService.create(
+      { name: `${tag}-${name}` },
+      { ability: SYSTEM_ABILITY }
+    );
   }
 
   async function abilityOf(userId: string): Promise<AppAbility> {
@@ -162,9 +169,8 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
   function addDeny(roleId: string): Promise<void> {
     return roleService.assignPermissionsToRole(
       roleId,
-      [updateUser.id],
-      denyCeo(),
-      SYSTEM_ABILITY
+      { permissionIds: [updateUser.id], conditions: denyCeo() },
+      { ability: SYSTEM_ABILITY }
     );
   }
 
@@ -183,7 +189,10 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
 
     expect(
       await outcome(
-        roleService.setPermissionsForRole(role.id, [], ability, actor.id)
+        roleService.setPermissionsForRole(role.id, [], {
+          ability,
+          actorId: actor.id
+        })
       )
     ).toBe(liftRefused);
     expect(await denyCount(role.id)).toBe(1);
@@ -194,9 +203,9 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
     const ability = await abilityOf(actor.id);
     beforeFirstTransaction(() => addDeny(role.id));
 
-    expect(await outcome(roleService.delete(role.id, ability, actor.id))).toBe(
-      liftRefused
-    );
+    expect(
+      await outcome(roleService.delete(role.id, { ability, actorId: actor.id }))
+    ).toBe(liftRefused);
     expect(await dataSource.getRepository(Role).countBy({ id: role.id })).toBe(
       1
     );
@@ -207,25 +216,23 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: updateUser.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     const ability = await abilityOf(actor.id);
     beforeFirstTransaction(() =>
       roleService.setPermissionsForRole(
         role.id,
         [{ permissionId: updateUser.id, conditions: denyCeo() }],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       )
     );
 
     expect(
       await outcome(
-        roleService.removePermissionFromRole(
-          role.id,
-          updateUser.id,
+        roleService.removePermissionFromRole(role.id, updateUser.id, {
           ability,
-          actor.id
-        )
+          actorId: actor.id
+        })
       )
     ).toBe(liftRefused);
     expect(await denyCount(role.id)).toBe(1);
@@ -233,13 +240,18 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
 
   it('refuses a role removal from a user when the role gained a deny after the check', async () => {
     const role = await createRole('unassign');
-    await roleService.assignRoleToUser(member.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(member.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
     const ability = await abilityOf(actor.id);
     beforeFirstTransaction(() => addDeny(role.id));
 
     expect(
       await outcome(
-        roleService.removeRoleFromUser(member.id, role.id, ability, actor.id)
+        roleService.removeRoleFromUser(member.id, role.id, {
+          ability,
+          actorId: actor.id
+        })
       )
     ).toBe(liftRefused);
     const held: unknown[] = await dataSource.query(
@@ -254,16 +266,18 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: updateUser.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     beforeFirstTransaction(async () => {
-      await roleService.assignRoleToUser(member.id, role.id, SYSTEM_ABILITY);
+      await roleService.assignRoleToUser(member.id, role.id, {
+        ability: SYSTEM_ABILITY
+      });
       expect(await permissionService.getRoleNamesForUser(member.id)).toContain(
         role.name
       );
     });
 
-    await roleService.delete(role.id, SYSTEM_ABILITY);
+    await roleService.delete(role.id, { ability: SYSTEM_ABILITY });
 
     expect(
       await permissionService.getRoleNamesForUser(member.id)

@@ -140,15 +140,17 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
   async function grantDeleteRole(): Promise<Role> {
     const role = await roleService.create(
       { name: `${tag}-${roleIds.length}` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     roleIds.push(role.id);
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: deleteRole.id }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
-    await roleService.assignRoleToUser(holder.id, role.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(holder.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
     return role;
   }
 
@@ -159,11 +161,9 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
     const reader = permissionService.getPermissionsForUser(holder.id);
     await held.reached;
-    await roleService.removePermissionFromRole(
-      role.id,
-      deleteRole.id,
-      SYSTEM_ABILITY
-    );
+    await roleService.removePermissionFromRole(role.id, deleteRole.id, {
+      ability: SYSTEM_ABILITY
+    });
     held.release();
     expect((await reader).map((p) => p.permission)).toContain(
       `${deleteRole.resource.name}:delete`
@@ -182,7 +182,9 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
     const reader = permissionService.getRolesForUser(holder.id);
     await held.reached;
-    await roleService.removeRoleFromUser(holder.id, role.id, SYSTEM_ABILITY);
+    await roleService.removeRoleFromUser(holder.id, role.id, {
+      ability: SYSTEM_ABILITY
+    });
     held.release();
     expect((await reader).map((r) => r.name)).toContain(role.name);
 
@@ -219,7 +221,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     await resourceService.update(
       resource.id,
       { allowedActionNames: ['read'] },
-      superAbility
+      { ability: superAbility }
     );
     held.release();
     expect((await reader).grantableActions[tag]).toEqual(['read', 'delete']);

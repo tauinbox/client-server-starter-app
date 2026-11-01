@@ -4,6 +4,7 @@ import { SKIP_MFA_ENROLMENT_GATE_KEY } from '../decorators/skip-mfa-enrolment-ga
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { MfaRequiredGuard } from './mfa-required.guard';
 import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
 
@@ -23,8 +24,11 @@ describe('MfaRequiredGuard', () => {
       reflector,
       // @ts-expect-error testing mock
       mfaPolicy,
-      auditService,
-      metricsService
+      new AccessRefusalService(
+        // @ts-expect-error testing mock
+        auditService,
+        metricsService
+      )
     );
   });
 

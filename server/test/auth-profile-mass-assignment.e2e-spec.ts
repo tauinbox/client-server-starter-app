@@ -29,6 +29,7 @@ import { CaptchaRequiredGuard } from '../src/modules/auth/captcha/captcha-requir
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
 import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 describe('Profile mass-assignment protection (e2e)', () => {
   let app: INestApplication;
@@ -77,6 +78,7 @@ describe('Profile mass-assignment protection (e2e)', () => {
         },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
+        AccessRefusalService,
         Reflector
       ]
     })
@@ -144,8 +146,7 @@ describe('Profile mass-assignment protection (e2e)', () => {
     expect(usersService.update).toHaveBeenCalledWith(
       'user-1',
       { name: 'x' },
-      SYSTEM_ABILITY,
-      { expected: undefined }
+      { ability: SYSTEM_ABILITY, expected: undefined }
     );
   });
 });

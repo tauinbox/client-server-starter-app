@@ -9,3 +9,9 @@ export interface OAuthUserProfile {
   // neither provider asserts that the person owns the mailbox.
   emailVerified: boolean;
 }
+
+/** The account of a user at a provider. */
+export type ProviderIdentity = Pick<
+  OAuthUserProfile,
+  'provider' | 'providerId'
+>;

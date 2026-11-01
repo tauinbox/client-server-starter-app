@@ -59,12 +59,14 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
 
     const admin = await usersService.create(
       { email: adminEmail, password, name: 'Write Race' },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
-    await roleService.assignRoleToUser(admin.id, superRole.id, SYSTEM_ABILITY);
+    await roleService.assignRoleToUser(admin.id, superRole.id, {
+      ability: SYSTEM_ABILITY
+    });
     const { tokens } = await app
       .get(AuthService)
       .login(await usersService.findOne(admin.id, SYSTEM_ABILITY), {
@@ -128,7 +130,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
   it('reports a role delete once and writes one audit row', async () => {
     const role = await roleService.create(
       { name: `${prefix}-deleted` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     const barrier = holdTwoTransactions();
 
@@ -174,7 +176,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
   it('runs two replaces of the grants of one role one after the other', async () => {
     const role = await roleService.create(
       { name: `${prefix}-granted` },
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     const [permission] = await dataSource
       .getRepository(Permission)

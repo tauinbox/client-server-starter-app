@@ -61,9 +61,11 @@ export class MetricsService {
   }
 
   recordHttpRequest(
-    method: string,
-    route: string,
-    statusCode: number,
+    {
+      method,
+      route,
+      statusCode
+    }: { method: string; route: string; statusCode: number },
     durationMs: number
   ): void {
     const labels = { method, route, status_code: String(statusCode) };

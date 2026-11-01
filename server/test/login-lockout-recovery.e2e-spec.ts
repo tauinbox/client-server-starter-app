@@ -88,12 +88,11 @@ runWithInfra('Lockout recovery (e2e)', () => {
     const user = await createLockedUser('reset');
 
     const rawToken = crypto.randomBytes(32).toString('hex');
-    await usersService.setPasswordResetToken(
-      user.id,
-      user.email,
-      hashToken(rawToken),
-      new Date(Date.now() + 30 * 60 * 1000)
-    );
+    await usersService.setPasswordResetToken(user.id, {
+      email: user.email,
+      hashedToken: hashToken(rawToken),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+    });
 
     await authService.resetPassword(rawToken, newPassword);
 

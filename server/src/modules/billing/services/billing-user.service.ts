@@ -143,7 +143,11 @@ export class BillingUserService {
     const qb = this.invoices
       .createQueryBuilder('invoice')
       .where('invoice.customerId = :customerId', { customerId: customer.id });
-    return applyList(qb, INVOICE_LIST_QUERY, INVOICE_LIST_COLUMNS, query);
+    return applyList(
+      qb,
+      { spec: INVOICE_LIST_QUERY, columns: INVOICE_LIST_COLUMNS },
+      query
+    );
   }
 
   /**
@@ -434,15 +438,13 @@ export class BillingUserService {
       await this.reuseIncompleteRow(pending, { status: 'canceled' });
     }
 
-    const session = await provider.startCheckout(
-      customer,
-      plan,
-      {
+    const session = await provider.startCheckout(customer, plan, {
+      urls: {
         successUrl: this.checkoutUrl('success'),
         cancelUrl: this.checkoutUrl('cancel')
       },
       trial
-    );
+    });
     return {
       provider: provider.id,
       url: session.url,
@@ -505,10 +507,12 @@ export class BillingUserService {
     const session = await provider.updatePaymentMethod(
       subscription.providerSubscriptionId,
       customer,
-      price.currency,
       {
-        successUrl: this.settingsUrl(),
-        cancelUrl: this.settingsUrl()
+        currency: price.currency,
+        urls: {
+          successUrl: this.settingsUrl(),
+          cancelUrl: this.settingsUrl()
+        }
       }
     );
     return {
@@ -536,8 +540,7 @@ export class BillingUserService {
         events: this.events
       },
       subscription,
-      mode,
-      () => Promise.resolve(userId)
+      { mode, resolveUserId: () => Promise.resolve(userId) }
     );
   }
 

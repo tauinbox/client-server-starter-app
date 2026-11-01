@@ -19,6 +19,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RoleRenamedEvent } from '../events/role-renamed.event';
 import { RoleDeletedEvent } from '../events/role-deleted.event';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 // Every action offered and evaluated, so a fixture tests the grant rules alone.
 const OFFERS_ALL = {
@@ -254,6 +255,7 @@ describe('RoleService', () => {
         { provide: PermissionService, useValue: mockPermissionService },
         { provide: AuditService, useValue: mockAuditService },
         { provide: MetricsService, useValue: mockMetricsService },
+        AccessRefusalService,
         { provide: EventEmitter2, useValue: mockEventEmitter }
       ]
     }).compile();
@@ -293,7 +295,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
       const result = await service.create(
         { name: 'viewer', description: 'View only' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       expect(result.name).toBe('viewer');
     });
@@ -301,7 +303,7 @@ describe('RoleService', () => {
     it('should throw if name already exists', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       await expect(
-        service.create({ name: 'editor' }, SYSTEM_ABILITY)
+        service.create({ name: 'editor' }, { ability: SYSTEM_ABILITY })
       ).rejects.toThrow(HttpException);
     });
 
@@ -311,7 +313,10 @@ describe('RoleService', () => {
       const audit = jest.fn();
 
       await expect(
-        service.create({ name: 'viewer' }, SYSTEM_ABILITY, 'a', audit)
+        service.create(
+          { name: 'viewer' },
+          { ability: SYSTEM_ABILITY, actorId: 'a', audit }
+        )
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.ROLES.NAME_EXISTS }
@@ -325,13 +330,13 @@ describe('RoleService', () => {
       mockRoleRepo.save.mockRejectedValueOnce(failure);
 
       await expect(
-        service.create({ name: 'viewer' }, SYSTEM_ABILITY)
+        service.create({ name: 'viewer' }, { ability: SYSTEM_ABILITY })
       ).rejects.toBe(failure);
     });
 
     it('should always create role with isSuper false regardless of input', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
-      await service.create({ name: 'viewer' }, SYSTEM_ABILITY);
+      await service.create({ name: 'viewer' }, { ability: SYSTEM_ABILITY });
       expect(mockRoleRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ isSuper: false })
       );
@@ -342,7 +347,11 @@ describe('RoleService', () => {
     it('should throw if role is system', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
       await expect(
-        service.update('role-1', { name: 'superadmin' }, SYSTEM_ABILITY)
+        service.update(
+          'role-1',
+          { name: 'superadmin' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toThrow(HttpException);
     });
 
@@ -353,7 +362,7 @@ describe('RoleService', () => {
       const result = await service.update(
         'role-2',
         { description: 'Updated' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       expect(result.description).toBe('Updated');
       expect(mockRoleRepo.update).toHaveBeenCalledWith(
@@ -371,9 +380,13 @@ describe('RoleService', () => {
         service.update(
           'role-2',
           { name: 'senior-editor' },
-          SYSTEM_ABILITY,
-          undefined,
-          () => ({ action: AuditAction.ROLE_UPDATE, targetId: 'role-2' })
+          {
+            ability: SYSTEM_ABILITY,
+            audit: () => ({
+              action: AuditAction.ROLE_UPDATE,
+              targetId: 'role-2'
+            })
+          }
         )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.ROLES.NOT_FOUND }
@@ -398,7 +411,11 @@ describe('RoleService', () => {
         }
       );
 
-      await service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY);
+      await service.update(
+        'role-2',
+        { name: 'senior-editor' },
+        { ability: SYSTEM_ABILITY }
+      );
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
       expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
@@ -424,7 +441,11 @@ describe('RoleService', () => {
       mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
 
       await expect(
-        service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
+        service.update(
+          'role-2',
+          { name: 'senior-editor' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toThrow('db down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -435,7 +456,11 @@ describe('RoleService', () => {
       mockRoleRepo.update.mockRejectedValueOnce({ code: '23505' });
 
       await expect(
-        service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
+        service.update(
+          'role-2',
+          { name: 'senior-editor' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.ROLES.NAME_EXISTS }
@@ -451,7 +476,11 @@ describe('RoleService', () => {
       mockEventEmitter.emitAsync.mockRejectedValueOnce(failure);
 
       await expect(
-        service.update('role-2', { name: 'senior-editor' }, SYSTEM_ABILITY)
+        service.update(
+          'role-2',
+          { name: 'senior-editor' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toBe(failure);
     });
 
@@ -463,7 +492,7 @@ describe('RoleService', () => {
       await service.update(
         'role-2',
         { name: 'editor', description: 'New' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(mockRoleRepo.update).toHaveBeenCalledWith(
@@ -483,9 +512,13 @@ describe('RoleService', () => {
 
       await service.create(
         { name: 'editor' },
-        SYSTEM_ABILITY,
-        undefined,
-        (role) => ({ action: AuditAction.ROLE_CREATE, targetId: role.id })
+        {
+          ability: SYSTEM_ABILITY,
+          audit: (role) => ({
+            action: AuditAction.ROLE_CREATE,
+            targetId: role.id
+          })
+        }
       );
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalled();
@@ -501,9 +534,7 @@ describe('RoleService', () => {
       await service.update(
         'role-2',
         { description: 'New' },
-        SYSTEM_ABILITY,
-        undefined,
-        () => audit
+        { ability: SYSTEM_ABILITY, audit: () => audit }
       );
 
       expect(mockAuditService.log).toHaveBeenCalledWith(
@@ -519,9 +550,7 @@ describe('RoleService', () => {
       await service.update(
         'role-2',
         { name: 'renamed' },
-        SYSTEM_ABILITY,
-        undefined,
-        () => audit
+        { ability: SYSTEM_ABILITY, audit: () => audit }
       );
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
@@ -538,7 +567,10 @@ describe('RoleService', () => {
       mockAuditService.log.mockRejectedValue(new Error('audit down'));
 
       await expect(
-        service.delete('role-2', SYSTEM_ABILITY, undefined, () => audit)
+        service.delete('role-2', {
+          ability: SYSTEM_ABILITY,
+          audit: () => audit
+        })
       ).rejects.toThrow('audit down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -546,13 +578,11 @@ describe('RoleService', () => {
     it('a role assignment writes the row and fails without it', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
-      await service.assignRoleToUser(
-        'user-1',
-        'role-2',
-        SYSTEM_ABILITY,
-        'a',
+      await service.assignRoleToUser('user-1', 'role-2', {
+        ability: SYSTEM_ABILITY,
+        actorId: 'a',
         audit
-      );
+      });
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
       expect(mockAuditService.log).toHaveBeenCalledWith(
         audit,
@@ -562,13 +592,11 @@ describe('RoleService', () => {
       mockAuditService.log.mockRejectedValue(new Error('audit down'));
       mockPermissionService.invalidateUserCache.mockClear();
       await expect(
-        service.removeRoleFromUser(
-          'user-1',
-          'role-2',
-          SYSTEM_ABILITY,
-          'a',
+        service.removeRoleFromUser('user-1', 'role-2', {
+          ability: SYSTEM_ABILITY,
+          actorId: 'a',
           audit
-        )
+        })
       ).rejects.toThrow('audit down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -576,28 +604,21 @@ describe('RoleService', () => {
     it('a permission write writes the row in the transaction of the grants', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
-      await service.setPermissionsForRole(
-        'role-2',
-        [],
-        SYSTEM_ABILITY,
-        'a',
+      await service.setPermissionsForRole('role-2', [], {
+        ability: SYSTEM_ABILITY,
+        actorId: 'a',
         audit
-      );
+      });
       await service.assignPermissionsToRole(
         'role-2',
-        [],
-        undefined,
-        SYSTEM_ABILITY,
-        'a',
-        audit
+        { permissionIds: [] },
+        { ability: SYSTEM_ABILITY, actorId: 'a', audit }
       );
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-1',
-        SYSTEM_ABILITY,
-        'a',
+      await service.removePermissionFromRole('role-2', 'perm-1', {
+        ability: SYSTEM_ABILITY,
+        actorId: 'a',
         audit
-      );
+      });
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalledTimes(
         3
@@ -608,11 +629,9 @@ describe('RoleService', () => {
     it('writes no row without audit params', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-1',
-        SYSTEM_ABILITY
-      );
+      await service.removePermissionFromRole('role-2', 'perm-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockAuditService.log).not.toHaveBeenCalled();
     });
@@ -621,9 +640,9 @@ describe('RoleService', () => {
   describe('delete', () => {
     it('should throw if role is system', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
-      await expect(service.delete('role-1', SYSTEM_ABILITY)).rejects.toThrow(
-        HttpException
-      );
+      await expect(
+        service.delete('role-1', { ability: SYSTEM_ABILITY })
+      ).rejects.toThrow(HttpException);
     });
 
     it('should delete a custom role and invalidate cache for its members', async () => {
@@ -632,7 +651,7 @@ describe('RoleService', () => {
         { id: 'u-1' },
         { id: 'u-2' }
       ]);
-      await service.delete('role-2', SYSTEM_ABILITY);
+      await service.delete('role-2', { ability: SYSTEM_ABILITY });
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'u-1'
       );
@@ -645,7 +664,7 @@ describe('RoleService', () => {
     it('should read the members before the delete and invalidate after it', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
-      await service.delete('role-2', SYSTEM_ABILITY);
+      await service.delete('role-2', { ability: SYSTEM_ABILITY });
       const [read] = mockUserQueryBuilder.getMany.mock.invocationCallOrder;
       const [remove] = mockRoleRepo.delete.mock.invocationCallOrder;
       const [invalidate] =
@@ -656,7 +675,7 @@ describe('RoleService', () => {
 
     it('should delete a custom role with no members without calling invalidate', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      await service.delete('role-2', SYSTEM_ABILITY);
+      await service.delete('role-2', { ability: SYSTEM_ABILITY });
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
       expect(mockRoleRepo.delete).toHaveBeenCalledWith({ id: customRole.id });
     });
@@ -667,7 +686,7 @@ describe('RoleService', () => {
       mockRolePermissionRepo.lockRole.mockResolvedValue(null);
 
       await expect(
-        service.delete('role-2', SYSTEM_ABILITY)
+        service.delete('role-2', { ability: SYSTEM_ABILITY })
       ).rejects.toMatchObject({ errorKey: ErrorKeys.ROLES.NOT_FOUND });
       expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
@@ -677,7 +696,7 @@ describe('RoleService', () => {
     it('should emit RoleDeletedEvent in the transaction of the delete', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.delete('role-2', SYSTEM_ABILITY);
+      await service.delete('role-2', { ability: SYSTEM_ABILITY });
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
       expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
@@ -694,9 +713,9 @@ describe('RoleService', () => {
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
       mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
 
-      await expect(service.delete('role-2', SYSTEM_ABILITY)).rejects.toThrow(
-        'db down'
-      );
+      await expect(
+        service.delete('role-2', { ability: SYSTEM_ABILITY })
+      ).rejects.toThrow('db down');
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
   });
@@ -712,9 +731,8 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-1', 'perm-2'],
-        undefined,
-        SYSTEM_ABILITY
+        { permissionIds: ['perm-1', 'perm-2'] },
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
@@ -732,9 +750,8 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-1'],
-        undefined,
-        SYSTEM_ABILITY
+        { permissionIds: ['perm-1'] },
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
@@ -749,13 +766,11 @@ describe('RoleService', () => {
       const audit = { action: AuditAction.PERMISSION_UNASSIGN, actorId: 'a' };
 
       await expect(
-        service.removePermissionFromRole(
-          'role-2',
-          'perm-1',
-          SYSTEM_ABILITY,
-          'a',
+        service.removePermissionFromRole('role-2', 'perm-1', {
+          ability: SYSTEM_ABILITY,
+          actorId: 'a',
           audit
-        )
+        })
       ).rejects.toMatchObject({
         status: 404,
         response: { errorKey: ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED }
@@ -769,11 +784,9 @@ describe('RoleService', () => {
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
 
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-1',
-        SYSTEM_ABILITY
-      );
+      await service.removePermissionFromRole('role-2', 'perm-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRolePermissionRepo.delete).toHaveBeenCalledWith({
         roleId: 'role-2',
@@ -788,11 +801,9 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
 
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-1',
-        SYSTEM_ABILITY
-      );
+      await service.removePermissionFromRole('role-2', 'perm-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
@@ -814,12 +825,10 @@ describe('RoleService', () => {
       });
 
       await expect(
-        service.assignRoleToUser(
-          'user-1',
-          'role-2',
-          assignAbility('support'),
-          'actor-1'
-        )
+        service.assignRoleToUser('user-1', 'role-2', {
+          ability: assignAbility('support'),
+          actorId: 'actor-1'
+        })
       ).rejects.toThrow(ApiError);
       expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -839,11 +848,9 @@ describe('RoleService', () => {
       });
       mockRolePermissionRepo.find.mockResolvedValue([]);
 
-      await service.assignRoleToUser(
-        'user-1',
-        'role-2',
-        assignAbility('editor')
-      );
+      await service.assignRoleToUser('user-1', 'role-2', {
+        ability: assignAbility('editor')
+      });
 
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
     });
@@ -852,7 +859,9 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.assignRoleToUser('user-1', 'role-missing', SYSTEM_ABILITY)
+        service.assignRoleToUser('user-1', 'role-missing', {
+          ability: SYSTEM_ABILITY
+        })
       ).rejects.toMatchObject({
         status: 422,
         response: { errorKey: ErrorKeys.ROLES.UNKNOWN_ROLE }
@@ -862,7 +871,9 @@ describe('RoleService', () => {
 
     it('should assign role and invalidate cache', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      await service.assignRoleToUser('user-1', 'role-2', SYSTEM_ABILITY);
+      await service.assignRoleToUser('user-1', 'role-2', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -875,12 +886,10 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
-      const refusal = service.assignRoleToUser(
-        'user-1',
-        'role-1',
+      const refusal = service.assignRoleToUser('user-1', 'role-1', {
         ability,
-        'actor-1'
-      );
+        actorId: 'actor-1'
+      });
       await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: {
@@ -908,7 +917,7 @@ describe('RoleService', () => {
       const ability: AppAbility = { can: canSpy };
 
       await expect(
-        service.assignRoleToUser('user-99', 'role-2', ability)
+        service.assignRoleToUser('user-99', 'role-2', { ability })
       ).rejects.toThrow(ApiError);
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
     });
@@ -922,7 +931,7 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
-      await service.assignRoleToUser('user-1', 'role-2', ability);
+      await service.assignRoleToUser('user-1', 'role-2', { ability });
 
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
@@ -936,7 +945,7 @@ describe('RoleService', () => {
       const ability: AppAbility = { can: canSpy };
 
       await expect(
-        service.assignRoleToUser('user-99', 'role-2', ability)
+        service.assignRoleToUser('user-99', 'role-2', { ability })
       ).rejects.toMatchObject({
         status: 404,
         response: { errorKey: 'errors.users.notFound' }
@@ -969,13 +978,11 @@ describe('RoleService', () => {
       const audit = { action: AuditAction.ROLE_UNASSIGN, actorId: 'a' };
 
       await expect(
-        service.removeRoleFromUser(
-          'user-1',
-          'role-2',
-          SYSTEM_ABILITY,
-          'a',
+        service.removeRoleFromUser('user-1', 'role-2', {
+          ability: SYSTEM_ABILITY,
+          actorId: 'a',
           audit
-        )
+        })
       ).rejects.toMatchObject({
         status: 404,
         response: { errorKey: ErrorKeys.ROLES.ROLE_NOT_ASSIGNED }
@@ -992,7 +999,9 @@ describe('RoleService', () => {
       });
 
       await expect(
-        service.removeRoleFromUser('user-1', 'role-2', assignAbility('support'))
+        service.removeRoleFromUser('user-1', 'role-2', {
+          ability: assignAbility('support')
+        })
       ).rejects.toThrow(ApiError);
       expect(mockRelationQueryBuilder.execute).not.toHaveBeenCalled();
     });
@@ -1005,11 +1014,9 @@ describe('RoleService', () => {
       });
       mockRolePermissionRepo.find.mockResolvedValue([]);
 
-      await service.removeRoleFromUser(
-        'user-1',
-        'role-2',
-        assignAbility('editor')
-      );
+      await service.removeRoleFromUser('user-1', 'role-2', {
+        ability: assignAbility('editor')
+      });
 
       expectRoleRemoved('user-1', 'role-2');
     });
@@ -1017,7 +1024,9 @@ describe('RoleService', () => {
     it('should remove role and invalidate cache', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.removeRoleFromUser('user-1', 'role-2', SYSTEM_ABILITY);
+      await service.removeRoleFromUser('user-1', 'role-2', {
+        ability: SYSTEM_ABILITY
+      });
 
       expectRoleRemoved('user-1', 'role-2');
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -1031,7 +1040,9 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
-      const refusal = service.removeRoleFromUser('user-1', 'role-1', ability);
+      const refusal = service.removeRoleFromUser('user-1', 'role-1', {
+        ability
+      });
       await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: {
@@ -1050,7 +1061,7 @@ describe('RoleService', () => {
       const ability: AppAbility = { can: canSpy };
 
       await expect(
-        service.removeRoleFromUser('user-99', 'role-2', ability)
+        service.removeRoleFromUser('user-99', 'role-2', { ability })
       ).rejects.toThrow(ApiError);
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
     });
@@ -1062,7 +1073,10 @@ describe('RoleService', () => {
       const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
       await expect(
-        service.removeRoleFromUser('user-99', 'role-2', ability, 'actor-1')
+        service.removeRoleFromUser('user-99', 'role-2', {
+          ability,
+          actorId: 'actor-1'
+        })
       ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -1083,7 +1097,7 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };
 
-      await service.removeRoleFromUser('user-1', 'role-2', ability);
+      await service.removeRoleFromUser('user-1', 'role-2', { ability });
 
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
       expectRoleRemoved('user-1', 'role-2');
@@ -1097,7 +1111,7 @@ describe('RoleService', () => {
       const ability: AppAbility = { can: canSpy };
 
       await expect(
-        service.removeRoleFromUser('user-99', 'role-2', ability)
+        service.removeRoleFromUser('user-99', 'role-2', { ability })
       ).rejects.toMatchObject({
         status: 404,
         response: { errorKey: 'errors.users.notFound' }
@@ -1114,7 +1128,9 @@ describe('RoleService', () => {
     it('should remove super role and invalidate cache (token revocation handled by listener)', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
 
-      await service.removeRoleFromUser('user-1', 'role-1', SYSTEM_ABILITY);
+      await service.removeRoleFromUser('user-1', 'role-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expectRoleRemoved('user-1', 'role-1');
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -1143,7 +1159,11 @@ describe('RoleService', () => {
         .mockResolvedValueOnce(customRole) // findOne(id) call
         .mockResolvedValueOnce(conflictRole); // findOne({ name }) conflict check
       await expect(
-        service.update('role-2', { name: 'viewer' }, SYSTEM_ABILITY)
+        service.update(
+          'role-2',
+          { name: 'viewer' },
+          { ability: SYSTEM_ABILITY }
+        )
       ).rejects.toThrow(HttpException);
     });
 
@@ -1154,7 +1174,7 @@ describe('RoleService', () => {
       const result = await service.update(
         'role-2',
         { name: 'editor' },
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
       expect(result.name).toBe('editor');
     });
@@ -1192,7 +1212,9 @@ describe('RoleService', () => {
       mockUserQueryBuilder.getMany.mockResolvedValue([]);
       const items = [{ permissionId: 'perm-1' }, { permissionId: 'perm-2' }];
 
-      await service.setPermissionsForRole('role-2', items, SYSTEM_ABILITY);
+      await service.setPermissionsForRole('role-2', items, {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
     });
@@ -1203,7 +1225,7 @@ describe('RoleService', () => {
       await service.setPermissionsForRole(
         'role-2',
         [{ permissionId: 'perm-1' }],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(mockRolePermissionRepo.lockRole).toHaveBeenCalledWith({
@@ -1220,11 +1242,9 @@ describe('RoleService', () => {
       mockRolePermissionRepo.lockRole.mockResolvedValue(null);
 
       await expect(
-        service.setPermissionsForRole(
-          'role-2',
-          [{ permissionId: 'perm-1' }],
-          SYSTEM_ABILITY
-        )
+        service.setPermissionsForRole('role-2', [{ permissionId: 'perm-1' }], {
+          ability: SYSTEM_ABILITY
+        })
       ).rejects.toMatchObject({ errorKey: ErrorKeys.ROLES.NOT_FOUND });
       expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
       expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
@@ -1234,7 +1254,9 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([]);
 
-      await service.setPermissionsForRole('role-2', [], SYSTEM_ABILITY);
+      await service.setPermissionsForRole('role-2', [], {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
     });
@@ -1246,7 +1268,7 @@ describe('RoleService', () => {
       await service.setPermissionsForRole(
         'role-2',
         [{ permissionId: 'perm-1' }],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -1303,8 +1325,7 @@ describe('RoleService', () => {
               conditions: { ownership: { userField: 'createdBy' } }
             }
           ],
-          superAbility,
-          'actor-1'
+          { ability: superAbility, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 422,
@@ -1321,10 +1342,11 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-2',
-          ['perm-create-user'],
-          { userAttr: { ownerId: 'id' } },
-          superAbility,
-          'actor-1'
+          {
+            permissionIds: ['perm-create-user'],
+            conditions: { userAttr: { ownerId: 'id' } }
+          },
+          { ability: superAbility, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 422,
@@ -1341,10 +1363,11 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-update-user'],
-        { ownership: { userField: 'id' } },
-        superAbility,
-        'actor-1'
+        {
+          permissionIds: ['perm-update-user'],
+          conditions: { ownership: { userField: 'id' } }
+        },
+        { ability: superAbility, actorId: 'actor-1' }
       );
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
@@ -1368,8 +1391,7 @@ describe('RoleService', () => {
               conditions: { fieldMatch: { locale: ['ru'] } }
             }
           ],
-          superAbility,
-          'actor-1'
+          { ability: superAbility, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 422,
@@ -1390,10 +1412,8 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-2',
-          ['perm-update-user'],
-          undefined,
-          superAbility,
-          'actor-1'
+          { permissionIds: ['perm-update-user'] },
+          { ability: superAbility, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 422,
@@ -1414,10 +1434,8 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-update-user'],
-        { effect: 'deny' },
-        superAbility,
-        'actor-1'
+        { permissionIds: ['perm-update-user'], conditions: { effect: 'deny' } },
+        { ability: superAbility, actorId: 'actor-1' }
       );
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
@@ -1474,10 +1492,8 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-create-role'],
-        undefined,
-        ability,
-        'actor-1'
+        { permissionIds: ['perm-create-role'] },
+        { ability, actorId: 'actor-1' }
       );
 
       // Existence is still validated for super callers; only the can-grant
@@ -1495,10 +1511,8 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-2',
-          ['perm-missing'],
-          undefined,
-          ability,
-          'actor-1'
+          { permissionIds: ['perm-missing'] },
+          { ability, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 422,
@@ -1517,8 +1531,7 @@ describe('RoleService', () => {
         service.setPermissionsForRole(
           'role-2',
           [{ permissionId: 'perm-missing', conditions: null }],
-          ability,
-          'actor-1'
+          { ability, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 422,
@@ -1538,10 +1551,8 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-2',
-          ['perm-create-role'],
-          undefined,
-          ability,
-          'actor-1'
+          { permissionIds: ['perm-create-role'] },
+          { ability, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 403,
@@ -1577,10 +1588,8 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-2',
-          ['perm-update-user'],
-          undefined,
-          ability,
-          'actor-1'
+          { permissionIds: ['perm-update-user'] },
+          { ability, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 403,
@@ -1610,10 +1619,11 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-2',
-          ['perm-update-user'],
-          { fieldMatch: { isActive: [true] } },
-          ability,
-          'actor-1'
+          {
+            permissionIds: ['perm-update-user'],
+            conditions: { fieldMatch: { isActive: [true] } }
+          },
+          { ability, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 403,
@@ -1644,13 +1654,14 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-update-user'],
         {
-          ownership: { userField: 'id' },
-          fieldMatch: { isActive: [true] }
+          permissionIds: ['perm-update-user'],
+          conditions: {
+            ownership: { userField: 'id' },
+            fieldMatch: { isActive: [true] }
+          }
         },
-        ability,
-        'actor-1'
+        { ability, actorId: 'actor-1' }
       );
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
@@ -1667,10 +1678,8 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-create-role'],
-        undefined,
-        ability,
-        'actor-1'
+        { permissionIds: ['perm-create-role'] },
+        { ability, actorId: 'actor-1' }
       );
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
@@ -1686,8 +1695,7 @@ describe('RoleService', () => {
         service.setPermissionsForRole(
           'role-2',
           [{ permissionId: 'perm-create-role', conditions: null }],
-          ability,
-          'actor-1'
+          { ability, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 403,
@@ -1711,7 +1719,10 @@ describe('RoleService', () => {
       });
 
       await expect(
-        service.assignRoleToUser('user-1', 'role-2', ability, 'actor-1')
+        service.assignRoleToUser('user-1', 'role-2', {
+          ability,
+          actorId: 'actor-1'
+        })
       ).rejects.toMatchObject({ status: 403 });
 
       expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
@@ -1757,12 +1768,10 @@ describe('RoleService', () => {
 
     it('setPermissionsForRole rejects a role outside the caller scope', async () => {
       await expect(
-        service.setPermissionsForRole(
-          'role-2',
-          [],
-          abilityForRoleNamed('viewer'),
-          'actor-1'
-        )
+        service.setPermissionsForRole('role-2', [], {
+          ability: abilityForRoleNamed('viewer'),
+          actorId: 'actor-1'
+        })
       ).rejects.toBeInstanceOf(ApiError);
 
       expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
@@ -1770,12 +1779,10 @@ describe('RoleService', () => {
     });
 
     it('setPermissionsForRole proceeds when the condition matches the role', async () => {
-      await service.setPermissionsForRole(
-        'role-2',
-        [],
-        abilityForRoleNamed('editor'),
-        'actor-1'
-      );
+      await service.setPermissionsForRole('role-2', [], {
+        ability: abilityForRoleNamed('editor'),
+        actorId: 'actor-1'
+      });
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
@@ -1785,10 +1792,8 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-2',
-          [],
-          undefined,
-          abilityForRoleNamed('viewer'),
-          'actor-1'
+          { permissionIds: [] },
+          { ability: abilityForRoleNamed('viewer'), actorId: 'actor-1' }
         )
       ).rejects.toBeInstanceOf(ApiError);
 
@@ -1799,10 +1804,8 @@ describe('RoleService', () => {
     it('assignPermissionsToRole proceeds when the condition matches the role', async () => {
       await service.assignPermissionsToRole(
         'role-2',
-        [],
-        undefined,
-        abilityForRoleNamed('editor'),
-        'actor-1'
+        { permissionIds: [] },
+        { ability: abilityForRoleNamed('editor'), actorId: 'actor-1' }
       );
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
@@ -1811,12 +1814,10 @@ describe('RoleService', () => {
 
     it('removePermissionFromRole rejects a role outside the caller scope', async () => {
       await expect(
-        service.removePermissionFromRole(
-          'role-2',
-          'perm-1',
-          abilityForRoleNamed('viewer'),
-          'actor-1'
-        )
+        service.removePermissionFromRole('role-2', 'perm-1', {
+          ability: abilityForRoleNamed('viewer'),
+          actorId: 'actor-1'
+        })
       ).rejects.toBeInstanceOf(ApiError);
 
       expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
@@ -1824,12 +1825,10 @@ describe('RoleService', () => {
     });
 
     it('removePermissionFromRole proceeds when the condition matches the role', async () => {
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-1',
-        abilityForRoleNamed('editor'),
-        'actor-1'
-      );
+      await service.removePermissionFromRole('role-2', 'perm-1', {
+        ability: abilityForRoleNamed('editor'),
+        actorId: 'actor-1'
+      });
 
       expect(mockRolePermissionRepo.delete).toHaveBeenCalledWith({
         roleId: 'role-2',
@@ -1859,7 +1858,10 @@ describe('RoleService', () => {
       const ability = nonSuperAbility();
 
       await expect(
-        service.setPermissionsForRole('role-1', [], ability, 'actor-1')
+        service.setPermissionsForRole('role-1', [], {
+          ability,
+          actorId: 'actor-1'
+        })
       ).rejects.toMatchObject({
         status: 403,
         response: { errorKey: 'errors.roles.cannotModifySystem' }
@@ -1887,10 +1889,8 @@ describe('RoleService', () => {
       await expect(
         service.assignPermissionsToRole(
           'role-1',
-          ['perm-1'],
-          undefined,
-          ability,
-          'actor-1'
+          { permissionIds: ['perm-1'] },
+          { ability, actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({
         status: 403,
@@ -1903,7 +1903,7 @@ describe('RoleService', () => {
       const ability = nonSuperAbility();
 
       await expect(
-        service.removePermissionFromRole('role-1', 'perm-1', ability)
+        service.removePermissionFromRole('role-1', 'perm-1', { ability })
       ).rejects.toMatchObject({
         status: 403,
         response: { errorKey: 'errors.roles.cannotModifySystem' }
@@ -1916,7 +1916,7 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock
       const ability: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
-      await service.removePermissionFromRole('role-1', 'perm-1', ability);
+      await service.removePermissionFromRole('role-1', 'perm-1', { ability });
 
       expect(mockRolePermissionRepo.delete).toHaveBeenCalledWith({
         roleId: 'role-1',
@@ -1928,7 +1928,9 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
 
       await expect(
-        service.removePermissionFromRole('role-1', 'perm-1', SYSTEM_ABILITY)
+        service.removePermissionFromRole('role-1', 'perm-1', {
+          ability: SYSTEM_ABILITY
+        })
       ).rejects.toMatchObject({
         status: 403,
         response: { errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM }
@@ -2015,7 +2017,10 @@ describe('RoleService', () => {
     ])('a %s caller', (_label, ability) => {
       it('cannot take the restriction role away from a user', async () => {
         await expect(
-          service.removeRoleFromUser('user-1', 'role-2', ability(), 'actor-1')
+          service.removeRoleFromUser('user-1', 'role-2', {
+            ability: ability(),
+            actorId: 'actor-1'
+          })
         ).rejects.toMatchObject({
           status: 403,
           response: { errorKey: 'errors.roles.cannotLiftDeny' }
@@ -2026,12 +2031,10 @@ describe('RoleService', () => {
 
       it('cannot remove the deny row', async () => {
         await expect(
-          service.removePermissionFromRole(
-            'role-2',
-            'perm-update-user',
-            ability(),
-            'actor-1'
-          )
+          service.removePermissionFromRole('role-2', 'perm-update-user', {
+            ability: ability(),
+            actorId: 'actor-1'
+          })
         ).rejects.toMatchObject({ status: 403 });
         expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
         expectLiftRefusal();
@@ -2039,7 +2042,10 @@ describe('RoleService', () => {
 
       it('cannot omit the deny row from a full replace', async () => {
         await expect(
-          service.setPermissionsForRole('role-2', [], ability(), 'actor-1')
+          service.setPermissionsForRole('role-2', [], {
+            ability: ability(),
+            actorId: 'actor-1'
+          })
         ).rejects.toMatchObject({ status: 403 });
         expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
         expectLiftRefusal();
@@ -2047,7 +2053,7 @@ describe('RoleService', () => {
 
       it('cannot delete the role that holds the deny row', async () => {
         await expect(
-          service.delete('role-2', ability(), 'actor-1')
+          service.delete('role-2', { ability: ability(), actorId: 'actor-1' })
         ).rejects.toMatchObject({ status: 403 });
         expect(mockRoleRepo.delete).not.toHaveBeenCalled();
         expectLiftRefusal();
@@ -2061,8 +2067,7 @@ describe('RoleService', () => {
       await service.setPermissionsForRole(
         'role-2',
         [{ permissionId: 'perm-update-user', conditions: resent }],
-        restricted(),
-        'actor-1'
+        { ability: restricted(), actorId: 'actor-1' }
       );
 
       expect(mockRolePermissionRepo.manager.transaction).toHaveBeenCalled();
@@ -2081,32 +2086,28 @@ describe('RoleService', () => {
               }
             }
           ],
-          restricted(),
-          'actor-1'
+          { ability: restricted(), actorId: 'actor-1' }
         )
       ).rejects.toMatchObject({ status: 403 });
     });
 
     it('an unrestricted caller lifts the restriction on every path', async () => {
-      await service.removeRoleFromUser(
-        'user-1',
-        'role-2',
-        unrestricted(),
-        'actor-1'
-      );
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-update-user',
-        unrestricted(),
-        'actor-1'
-      );
-      await service.setPermissionsForRole(
-        'role-2',
-        [],
-        unrestricted(),
-        'actor-1'
-      );
-      await service.delete('role-2', unrestricted(), 'actor-1');
+      await service.removeRoleFromUser('user-1', 'role-2', {
+        ability: unrestricted(),
+        actorId: 'actor-1'
+      });
+      await service.removePermissionFromRole('role-2', 'perm-update-user', {
+        ability: unrestricted(),
+        actorId: 'actor-1'
+      });
+      await service.setPermissionsForRole('role-2', [], {
+        ability: unrestricted(),
+        actorId: 'actor-1'
+      });
+      await service.delete('role-2', {
+        ability: unrestricted(),
+        actorId: 'actor-1'
+      });
 
       expectRoleRemoved('user-1', 'role-2');
       expect(mockRolePermissionRepo.delete).toHaveBeenCalled();
@@ -2120,12 +2121,10 @@ describe('RoleService', () => {
         { ...denyRow, conditions: null }
       ]);
 
-      await service.removeRoleFromUser(
-        'user-1',
-        'role-2',
-        restricted(),
-        'actor-1'
-      );
+      await service.removeRoleFromUser('user-1', 'role-2', {
+        ability: restricted(),
+        actorId: 'actor-1'
+      });
 
       expectRoleRemoved('user-1', 'role-2');
     });
@@ -2133,7 +2132,10 @@ describe('RoleService', () => {
     it('a super caller skips the check without reading the role rows', async () => {
       const superAbility = abilityOf((b) => b.can('manage', 'all'));
 
-      await service.delete('role-2', superAbility, 'actor-1');
+      await service.delete('role-2', {
+        ability: superAbility,
+        actorId: 'actor-1'
+      });
 
       expect(mockRolePermissionRepo.find).not.toHaveBeenCalled();
       expect(mockRoleRepo.delete).toHaveBeenCalled();
@@ -2163,7 +2165,7 @@ describe('RoleService', () => {
       await service.setPermissionsForRole(
         'role-2',
         [{ permissionId: 'perm-1' }],
-        SYSTEM_ABILITY
+        { ability: SYSTEM_ABILITY }
       );
 
       expectFannedOutTo(['u-1', 'u-2']);
@@ -2176,9 +2178,8 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-1'],
-        undefined,
-        SYSTEM_ABILITY
+        { permissionIds: ['perm-1'] },
+        { ability: SYSTEM_ABILITY }
       );
 
       expectFannedOutTo(['u-1', 'u-2']);
@@ -2188,11 +2189,9 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
 
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-1',
-        SYSTEM_ABILITY
-      );
+      await service.removePermissionFromRole('role-2', 'perm-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expectFannedOutTo(['u-1', 'u-2']);
     });
@@ -2200,7 +2199,7 @@ describe('RoleService', () => {
     it('captures holders before deletion on delete', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.delete('role-2', SYSTEM_ABILITY);
+      await service.delete('role-2', { ability: SYSTEM_ABILITY });
 
       expectFannedOutTo(['u-1', 'u-2']);
       // The remove cascades to user_roles, so the holders are read before it;
@@ -2220,9 +2219,8 @@ describe('RoleService', () => {
 
       await service.assignPermissionsToRole(
         'role-2',
-        ['perm-1'],
-        undefined,
-        SYSTEM_ABILITY
+        { permissionIds: ['perm-1'] },
+        { ability: SYSTEM_ABILITY }
       );
 
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
@@ -2231,11 +2229,9 @@ describe('RoleService', () => {
     it('never emits the token-revoking UserRoleChangedEvent on a permission change', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
 
-      await service.removePermissionFromRole(
-        'role-2',
-        'perm-1',
-        SYSTEM_ABILITY
-      );
+      await service.removePermissionFromRole('role-2', 'perm-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
         'UserRoleChangedEvent',
@@ -2279,7 +2275,10 @@ describe('RoleService', () => {
       mockRoleRepo.manager.findOne.mockResolvedValue(superTarget);
 
       await expectSuperTargetRefusal(
-        service.assignRoleToUser('super-1', 'role-2', delegated, 'actor-1')
+        service.assignRoleToUser('super-1', 'role-2', {
+          ability: delegated,
+          actorId: 'actor-1'
+        })
       );
     });
 
@@ -2288,7 +2287,10 @@ describe('RoleService', () => {
       mockRoleRepo.manager.findOne.mockResolvedValue(superTarget);
 
       await expectSuperTargetRefusal(
-        service.removeRoleFromUser('super-1', 'role-2', delegated, 'actor-1')
+        service.removeRoleFromUser('super-1', 'role-2', {
+          ability: delegated,
+          actorId: 'actor-1'
+        })
       );
     });
 
@@ -2299,12 +2301,10 @@ describe('RoleService', () => {
       // @ts-expect-error partial mock - only `can` is needed for instance-level tests
       const superActor: AppAbility = { can: jest.fn().mockReturnValue(true) };
 
-      await service.assignRoleToUser(
-        'super-1',
-        'role-2',
-        superActor,
-        'actor-1'
-      );
+      await service.assignRoleToUser('super-1', 'role-2', {
+        ability: superActor,
+        actorId: 'actor-1'
+      });
 
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
     });
@@ -2359,7 +2359,10 @@ describe('RoleService', () => {
 
     it('create refuses a record outside the grant before the name check', async () => {
       await expect(
-        service.create({ name: 'viewer' }, scoped, 'actor-1')
+        service.create(
+          { name: 'viewer' },
+          { ability: scoped, actorId: 'actor-1' }
+        )
       ).rejects.toThrow(ApiError);
       expect(mockRoleRepo.findOne).not.toHaveBeenCalled();
       expectRefusal('create');
@@ -2369,7 +2372,11 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
       await expect(
-        service.update('role-2', { name: 'viewer' }, scoped, 'actor-1')
+        service.update(
+          'role-2',
+          { name: 'viewer' },
+          { ability: scoped, actorId: 'actor-1' }
+        )
       ).rejects.toThrow(ApiError);
       expect(mockRoleRepo.save).not.toHaveBeenCalled();
       expectRefusal('update', 'role-2');
@@ -2379,20 +2386,24 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...systemRole });
 
       await expect(
-        service.update('role-1', { description: 'x' }, scoped, 'actor-1')
+        service.update(
+          'role-1',
+          { description: 'x' },
+          { ability: scoped, actorId: 'actor-1' }
+        )
       ).rejects.toThrow(ApiError);
     });
 
     it('delete refuses a role outside the grant and removes one inside it', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...otherRole });
-      await expect(service.delete('role-3', scoped, 'actor-1')).rejects.toThrow(
-        ApiError
-      );
+      await expect(
+        service.delete('role-3', { ability: scoped, actorId: 'actor-1' })
+      ).rejects.toThrow(ApiError);
       expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expectRefusal('delete', 'role-3');
 
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
-      await service.delete('role-2', scoped, 'actor-1');
+      await service.delete('role-2', { ability: scoped, actorId: 'actor-1' });
       expect(mockRoleRepo.delete).toHaveBeenCalled();
     });
 
@@ -2408,9 +2419,7 @@ describe('RoleService', () => {
       await service.update(
         'role-2',
         { description: 'New' },
-        SYSTEM_ABILITY,
-        undefined,
-        updateRow
+        { ability: SYSTEM_ABILITY, audit: updateRow }
       );
       expect(updateRow).toHaveBeenCalledWith(
         expect.objectContaining({ description: 'Editor role' })
@@ -2420,7 +2429,10 @@ describe('RoleService', () => {
         action: AuditAction.ROLE_DELETE,
         details: { name: role.name }
       }));
-      await service.delete('role-2', SYSTEM_ABILITY, undefined, deleteRow);
+      await service.delete('role-2', {
+        ability: SYSTEM_ABILITY,
+        audit: deleteRow
+      });
       expect(mockAuditService.log).toHaveBeenLastCalledWith(
         { action: AuditAction.ROLE_DELETE, details: { name: 'editor' } },
         expect.anything()
@@ -2439,21 +2451,22 @@ describe('RoleService', () => {
         // @ts-expect-error the ability is required
         () => service.getPermissionsForRole('role-2'),
         // @ts-expect-error the ability is required
-        () => service.create({ name: 'editor' }),
+        () => service.create({ name: 'editor' }, {}),
         // @ts-expect-error the ability is required
-        () => service.update('role-2', { description: 'x' }),
+        () => service.update('role-2', { description: 'x' }, {}),
         // @ts-expect-error the ability is required
-        () => service.delete('role-2'),
+        () => service.delete('role-2', {}),
         // @ts-expect-error the ability is required
-        () => service.assignRoleToUser('user-1', 'role-2'),
+        () => service.assignRoleToUser('user-1', 'role-2', {}),
         // @ts-expect-error the ability is required
-        () => service.removeRoleFromUser('user-1', 'role-2'),
+        () => service.removeRoleFromUser('user-1', 'role-2', {}),
         // @ts-expect-error the ability is required
-        () => service.setPermissionsForRole('role-2', []),
+        () => service.setPermissionsForRole('role-2', [], {}),
+        () =>
+          // @ts-expect-error the ability is required
+          service.assignPermissionsToRole('role-2', { permissionIds: [] }, {}),
         // @ts-expect-error the ability is required
-        () => service.assignPermissionsToRole('role-2', [], undefined),
-        // @ts-expect-error the ability is required
-        () => service.removePermissionFromRole('role-2', 'perm-1')
+        () => service.removePermissionFromRole('role-2', 'perm-1', {})
       ];
       for (const call of calls) {
         await expect(call()).rejects.toThrow(TypeError);
@@ -2468,7 +2481,9 @@ describe('RoleService', () => {
     it('lets SYSTEM_ABILITY assign a super role, which no API caller can pass', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...systemRole });
 
-      await service.assignRoleToUser('user-1', 'role-1', SYSTEM_ABILITY);
+      await service.assignRoleToUser('user-1', 'role-1', {
+        ability: SYSTEM_ABILITY
+      });
 
       expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-1');
     });

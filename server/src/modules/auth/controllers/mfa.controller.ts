@@ -77,14 +77,12 @@ export class MfaController {
     );
     // A stolen session must not be able to enrol a device of its own, which
     // would lock the owner out of their own account.
-    await this.authService.assertStepUp(
-      user,
-      dto.currentPassword,
-      this.cookies.readReauthProof(req),
-      STEP_UP_OPERATION.MFA_SETUP,
-      undefined,
-      extractAuditContext(req)
-    );
+    await this.authService.assertStepUp(user, {
+      currentPassword: dto.currentPassword,
+      reauthProof: this.cookies.readReauthProof(req),
+      operation: STEP_UP_OPERATION.MFA_SETUP,
+      auditContext: extractAuditContext(req)
+    });
 
     const enrolment = await this.mfaService.beginEnrolment(user);
     this.cookies.clearReauthProof(res);
@@ -132,14 +130,13 @@ export class MfaController {
       req.user.userId,
       SYSTEM_ABILITY
     );
-    await this.authService.assertStepUp(
-      user,
-      dto.currentPassword,
-      this.cookies.readReauthProof(req),
-      STEP_UP_OPERATION.MFA_DISABLE,
-      dto.code,
-      extractAuditContext(req)
-    );
+    await this.authService.assertStepUp(user, {
+      currentPassword: dto.currentPassword,
+      reauthProof: this.cookies.readReauthProof(req),
+      operation: STEP_UP_OPERATION.MFA_DISABLE,
+      totpCode: dto.code,
+      auditContext: extractAuditContext(req)
+    });
 
     await this.mfaService.disable(user, extractAuditContext(req));
     this.cookies.clearReauthProof(res);
@@ -164,14 +161,13 @@ export class MfaController {
       req.user.userId,
       SYSTEM_ABILITY
     );
-    await this.authService.assertStepUp(
-      user,
-      dto.currentPassword,
-      this.cookies.readReauthProof(req),
-      STEP_UP_OPERATION.MFA_RECOVERY_CODES,
-      dto.code,
-      extractAuditContext(req)
-    );
+    await this.authService.assertStepUp(user, {
+      currentPassword: dto.currentPassword,
+      reauthProof: this.cookies.readReauthProof(req),
+      operation: STEP_UP_OPERATION.MFA_RECOVERY_CODES,
+      totpCode: dto.code,
+      auditContext: extractAuditContext(req)
+    });
 
     const codes = await this.mfaService.regenerateRecoveryCodes(
       user,
@@ -237,6 +233,6 @@ export class MfaController {
    * password check that preceded it.
    */
   private issueSession(user: User, req: ExpressRequest, res: Response) {
-    return this.signIn.complete(user, req, res, { factor: 'mfa' });
+    return this.signIn.complete(user, { req, res }, { factor: 'mfa' });
   }
 }

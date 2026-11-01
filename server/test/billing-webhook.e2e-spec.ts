@@ -982,13 +982,12 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
     await settle();
 
     // 142 units − 100 included = 42 × $0.02 = 84 minor units.
-    expect(chargeUsage).toHaveBeenCalledWith(
-      'sub_paddle_1',
-      84,
-      'USD',
-      'Pay as you go: api_calls × 42',
-      CHARGE_KEY
-    );
+    expect(chargeUsage).toHaveBeenCalledWith('sub_paddle_1', {
+      amountMinor: 84,
+      currency: 'USD',
+      description: 'Pay as you go: api_calls × 42',
+      chargeKey: CHARGE_KEY
+    });
     expect(stores.invoices).toHaveLength(1);
     expect(stores.invoices[0]).toMatchObject({
       providerEventId: CHARGE_KEY,
@@ -1037,13 +1036,12 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
     await settle();
 
     // 42 billable − 10 credits = 32 × $0.02 = 64 minor units.
-    expect(chargeUsage).toHaveBeenCalledWith(
-      'sub_paddle_1',
-      64,
-      'USD',
-      'Pay as you go: api_calls × 32',
-      CHARGE_KEY
-    );
+    expect(chargeUsage).toHaveBeenCalledWith('sub_paddle_1', {
+      amountMinor: 64,
+      currency: 'USD',
+      description: 'Pay as you go: api_calls × 32',
+      chargeKey: CHARGE_KEY
+    });
     expect(stores.invoices[0]).toMatchObject({
       amountMinor: Money.fromMinor(64),
       status: 'pending',

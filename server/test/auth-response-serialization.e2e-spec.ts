@@ -47,6 +47,7 @@ import { CLIENT_URL } from '../src/modules/auth/providers/client-url.provider';
 import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
 import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
 import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 const PUBLIC_USER_FIELDS = [
   'id',
@@ -278,6 +279,7 @@ describe('Auth response serialization (e2e)', () => {
           useValue: { log: jest.fn(), logFireAndForget: jest.fn() }
         },
         { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
+        AccessRefusalService,
         {
           provide: ConfigService,
           useValue: {

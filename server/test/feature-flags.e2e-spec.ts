@@ -56,6 +56,7 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { createMockConfigService } from '../src/common/testing/config-service.mock';
 import { flagAuditActor } from './flag-audit-actor';
 import type { IfMatchCondition } from '@app/shared/utils/if-match';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 /** The If-Match condition of one strong version tag. */
 const version = (v: number): IfMatchCondition => ({
@@ -67,16 +68,13 @@ const version = (v: number): IfMatchCondition => ({
 async function setRules(
   service: FeatureFlagService,
   id: string,
-  rules: FeatureFlagRuleDto[],
-  actor: FlagAuditActor
+  { rules, actor }: { rules: FeatureFlagRuleDto[]; actor: FlagAuditActor }
 ): Promise<FeatureFlag> {
   const current = await service.findOne(id, SYSTEM_ABILITY);
   return service.update(
     id,
     { rules },
-    version(current.version),
-    SYSTEM_ABILITY,
-    actor
+    { ifMatch: version(current.version), ability: SYSTEM_ABILITY, actor }
   );
 }
 
@@ -337,6 +335,7 @@ describe('Feature flags end-to-end', () => {
           provide: MetricsService,
           useValue: { recordCacheAccess: jest.fn() }
         },
+        AccessRefusalService,
         {
           provide: AuditService,
           useValue: { log: jest.fn().mockResolvedValue(undefined) }
@@ -382,17 +381,15 @@ describe('Feature flags end-to-end', () => {
       throw new Error('expected at least one id below bucket 10');
     })();
 
-    await setRules(
-      flagService,
-      flag.id,
-      [
+    await setRules(flagService, flag.id, {
+      rules: [
         {
           effect: 'include',
           payload: { type: 'percentage', percent: 10 }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
     await resolver.invalidateAll();
 
     const insider = await resolver.evaluateForUser(
@@ -409,17 +406,15 @@ describe('Feature flags end-to-end', () => {
     expect('beta-export' in outsider.flags).toBe(false);
 
     // Bump to 100% — everyone gets true.
-    await setRules(
-      flagService,
-      flag.id,
-      [
+    await setRules(flagService, flag.id, {
+      rules: [
         {
           effect: 'include',
           payload: { type: 'percentage', percent: 100 }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
     await resolver.invalidateAll();
 
     const all = await resolver.evaluateForUser(
@@ -435,10 +430,8 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    await setRules(
-      flagService,
-      flag.id,
-      [
+    await setRules(flagService, flag.id, {
+      rules: [
         {
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
@@ -448,8 +441,8 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'role', roleNames: ['banned'] }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
     await resolver.invalidateAll();
 
     const beta = await resolver.evaluateForUser(
@@ -483,9 +476,11 @@ describe('Feature flags end-to-end', () => {
     const next = await flagService.update(
       flag.id,
       { enabled: true },
-      version(1),
-      SYSTEM_ABILITY,
-      flagAuditActor('actor-2')
+      {
+        ifMatch: version(1),
+        ability: SYSTEM_ABILITY,
+        actor: flagAuditActor('actor-2')
+      }
     );
     expect(next.version).toBe(2);
 
@@ -494,9 +489,11 @@ describe('Feature flags end-to-end', () => {
       flagService.update(
         flag.id,
         { enabled: false },
-        version(1),
-        SYSTEM_ABILITY,
-        flagAuditActor('actor-3')
+        {
+          ifMatch: version(1),
+          ability: SYSTEM_ABILITY,
+          actor: flagAuditActor('actor-3')
+        }
       )
     ).rejects.toMatchObject({ status: 412 });
   });
@@ -531,10 +528,8 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    await setRules(
-      flagService,
-      flag.id,
-      [
+    await setRules(flagService, flag.id, {
+      rules: [
         {
           effect: 'include',
           payload: { type: 'percentage', percent: 0 }
@@ -544,8 +539,8 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'role', roleNames: ['beta-tester'] }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
 
     const result = flagService.preview(
       await flagService.findOne(flag.id, SYSTEM_ABILITY),
@@ -566,10 +561,8 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    await setRules(
-      flagService,
-      flag.id,
-      [
+    await setRules(flagService, flag.id, {
+      rules: [
         {
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
@@ -579,8 +572,8 @@ describe('Feature flags end-to-end', () => {
           payload: { type: 'role', roleNames: ['banned'] }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
 
     const result = flagService.preview(
       await flagService.findOne(flag.id, SYSTEM_ABILITY),
@@ -603,17 +596,15 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    await setRules(
-      flagService,
-      flag.id,
-      [
+    await setRules(flagService, flag.id, {
+      rules: [
         {
           effect: 'include',
           payload: { type: 'role', roleNames: ['beta'] }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
 
     const result = flagService.preview(
       await flagService.findOne(flag.id, SYSTEM_ABILITY),
@@ -635,10 +626,8 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
     await expect(
-      setRules(
-        flagService,
-        flag.id,
-        [
+      setRules(flagService, flag.id, {
+        rules: [
           {
             effect: 'include',
             payload: {
@@ -649,8 +638,8 @@ describe('Feature flags end-to-end', () => {
             }
           }
         ],
-        flagAuditActor('actor-1')
-      )
+        actor: flagAuditActor('actor-1')
+      })
     ).rejects.toMatchObject({
       status: 422,
       message: 'attribute rule with field=createdAt does not support op=eq'
@@ -680,12 +669,10 @@ describe('Feature flags end-to-end', () => {
       flagAuditActor('actor-1')
     );
     await expect(
-      setRules(
-        flagService,
-        flag.id,
-        [{ effect: 'include', payload }],
-        flagAuditActor('actor-1')
-      )
+      setRules(flagService, flag.id, {
+        rules: [{ effect: 'include', payload }],
+        actor: flagAuditActor('actor-1')
+      })
     ).rejects.toMatchObject({ status: 422, message });
     await expect(
       flagService.findOne(flag.id, SYSTEM_ABILITY)
@@ -702,10 +689,8 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    await setRules(
-      flagService,
-      flag.id,
-      [
+    await setRules(flagService, flag.id, {
+      rules: [
         {
           effect: 'include',
           payload: {
@@ -716,8 +701,8 @@ describe('Feature flags end-to-end', () => {
           }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
     await resolver.invalidateAll();
 
     const preview = flagService.preview(
@@ -928,6 +913,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
           provide: MetricsService,
           useValue: { recordCacheAccess: jest.fn() }
         },
+        AccessRefusalService,
         {
           provide: AuditService,
           useValue: { log: jest.fn().mockResolvedValue(undefined) }
@@ -982,12 +968,10 @@ describe('GET /feature-flags anonymous rollout id', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    await setRules(
-      flagService,
-      flag.id,
-      [{ effect: 'include', payload }],
-      flagAuditActor('actor-1')
-    );
+    await setRules(flagService, flag.id, {
+      rules: [{ effect: 'include', payload }],
+      actor: flagAuditActor('actor-1')
+    });
     await resolver.invalidateAll();
   }
 
@@ -1014,17 +998,15 @@ describe('GET /feature-flags anonymous rollout id', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
-    await setRules(
-      flagService,
-      hidden.id,
-      [
+    await setRules(flagService, hidden.id, {
+      rules: [
         {
           effect: 'include',
           payload: { type: 'percentage', percent: 50 }
         }
       ],
-      flagAuditActor('actor-1')
-    );
+      actor: flagAuditActor('actor-1')
+    });
 
     const res = await request(server).get('/feature-flags').expect(200);
 

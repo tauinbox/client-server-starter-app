@@ -81,11 +81,13 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
   const grantRefused = `403 ${ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION}`;
 
   const createRole = (name: string): Promise<Role> =>
-    roleService.create({ name: `${tag}-${name}` }, SYSTEM_ABILITY);
+    roleService.create({ name: `${tag}-${name}` }, { ability: SYSTEM_ABILITY });
 
   const giveRoles = async (user: User, roles: Role[]): Promise<void> => {
     for (const role of roles) {
-      await roleService.assignRoleToUser(user.id, role.id, SYSTEM_ABILITY);
+      await roleService.assignRoleToUser(user.id, role.id, {
+        ability: SYSTEM_ABILITY
+      });
     }
   };
 
@@ -142,13 +144,13 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
         { permissionId: assignRole.id },
         { permissionId: deleteRole.id }
       ],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     restrictRole = await createRole('restrict');
     await roleService.setPermissionsForRole(
       restrictRole.id,
       [{ permissionId: updateUser.id, conditions: denyCeo() }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     accompliceRole = await createRole('accomplice');
     blockerRole = await createRole('blocker');
@@ -184,12 +186,10 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
     expect(
       await outcome(
-        roleService.removeRoleFromUser(
-          users.actor.id,
-          restrictRole.id,
-          actorAbility,
-          users.actor.id
-        )
+        roleService.removeRoleFromUser(users.actor.id, restrictRole.id, {
+          ability: actorAbility,
+          actorId: users.actor.id
+        })
       )
     ).toBe(liftRefused);
     expect(await canUpdateCeo(users.actor.id)).toBe(false);
@@ -200,22 +200,18 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
     expect(
       await outcome(
-        roleService.removePermissionFromRole(
-          restrictRole.id,
-          updateUser.id,
-          actorAbility,
-          users.actor.id
-        )
+        roleService.removePermissionFromRole(restrictRole.id, updateUser.id, {
+          ability: actorAbility,
+          actorId: users.actor.id
+        })
       )
     ).toBe(liftRefused);
     expect(
       await outcome(
-        roleService.setPermissionsForRole(
-          restrictRole.id,
-          [],
-          actorAbility,
-          users.actor.id
-        )
+        roleService.setPermissionsForRole(restrictRole.id, [], {
+          ability: actorAbility,
+          actorId: users.actor.id
+        })
       )
     ).toBe(liftRefused);
     expect(
@@ -234,8 +230,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
         roleService.setPermissionsForRole(
           restrictRole.id,
           [{ permissionId: updateUser.id, conditions: denyCeo() }],
-          actorAbility,
-          users.actor.id
+          { ability: actorAbility, actorId: users.actor.id }
         )
       )
     ).toBe('RESOLVED');
@@ -247,7 +242,10 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
     expect(
       await outcome(
-        roleService.delete(restrictRole.id, actorAbility, users.actor.id)
+        roleService.delete(restrictRole.id, {
+          ability: actorAbility,
+          actorId: users.actor.id
+        })
       )
     ).toBe(liftRefused);
     expect(
@@ -263,19 +261,16 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
         roleService.setPermissionsForRole(
           accompliceRole.id,
           [{ permissionId: updateUser.id }],
-          actorAbility,
-          users.actor.id
+          { ability: actorAbility, actorId: users.actor.id }
         )
       )
     ).toBe(grantRefused);
     expect(
       await outcome(
-        roleService.assignRoleToUser(
-          users.accomplice.id,
-          adminRole.id,
-          actorAbility,
-          users.actor.id
-        )
+        roleService.assignRoleToUser(users.accomplice.id, adminRole.id, {
+          ability: actorAbility,
+          actorId: users.actor.id
+        })
       )
     ).toBe(grantRefused);
     expect(await canUpdateCeo(users.accomplice.id)).toBe(false);
@@ -288,33 +283,27 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
     expect(
       await outcome(
-        roleService.setPermissionsForRole(
-          accompliceRole.id,
-          [denyDelete],
-          actorAbility,
-          users.actor.id
-        )
+        roleService.setPermissionsForRole(accompliceRole.id, [denyDelete], {
+          ability: actorAbility,
+          actorId: users.actor.id
+        })
       )
     ).toBe('RESOLVED');
     expect(
       await outcome(
         roleService.assignPermissionsToRole(
           blockerRole.id,
-          [deleteUser.id],
-          denyCeo(),
-          actorAbility,
-          users.actor.id
+          { permissionIds: [deleteUser.id], conditions: denyCeo() },
+          { ability: actorAbility, actorId: users.actor.id }
         )
       )
     ).toBe('RESOLVED');
     expect(
       await outcome(
-        roleService.assignRoleToUser(
-          users.accomplice.id,
-          blockerRole.id,
-          actorAbility,
-          users.actor.id
-        )
+        roleService.assignRoleToUser(users.accomplice.id, blockerRole.id, {
+          ability: actorAbility,
+          actorId: users.actor.id
+        })
       )
     ).toBe('RESOLVED');
     expect((await abilityOf(users.accomplice.id)).can('delete', 'User')).toBe(
@@ -328,50 +317,49 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
     expect(
       await outcome(
-        roleService.removeRoleFromUser(
-          users.actor.id,
-          restrictRole.id,
-          adminAbility,
-          actingId
-        )
+        roleService.removeRoleFromUser(users.actor.id, restrictRole.id, {
+          ability: adminAbility,
+          actorId: actingId
+        })
       )
     ).toBe('RESOLVED');
     expect(await canUpdateCeo(users.actor.id)).toBe(true);
 
     expect(
       await outcome(
-        roleService.removePermissionFromRole(
-          restrictRole.id,
-          updateUser.id,
-          adminAbility,
-          actingId
-        )
+        roleService.removePermissionFromRole(restrictRole.id, updateUser.id, {
+          ability: adminAbility,
+          actorId: actingId
+        })
       )
     ).toBe('RESOLVED');
 
     await roleService.setPermissionsForRole(
       restrictRole.id,
       [{ permissionId: updateUser.id, conditions: denyCeo() }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     expect(
       await outcome(
-        roleService.setPermissionsForRole(
-          restrictRole.id,
-          [],
-          adminAbility,
-          actingId
-        )
+        roleService.setPermissionsForRole(restrictRole.id, [], {
+          ability: adminAbility,
+          actorId: actingId
+        })
       )
     ).toBe('RESOLVED');
 
     await roleService.setPermissionsForRole(
       restrictRole.id,
       [{ permissionId: updateUser.id, conditions: denyCeo() }],
-      SYSTEM_ABILITY
+      { ability: SYSTEM_ABILITY }
     );
     expect(
-      await outcome(roleService.delete(restrictRole.id, adminAbility, actingId))
+      await outcome(
+        roleService.delete(restrictRole.id, {
+          ability: adminAbility,
+          actorId: actingId
+        })
+      )
     ).toBe('RESOLVED');
   });
 });

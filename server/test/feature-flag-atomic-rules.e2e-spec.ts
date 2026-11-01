@@ -116,9 +116,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     const updated = await flagService.update(
       flag.id,
       { enabled: true, rules: [percentRule(20), percentRule(30)] },
-      version(flag.version),
-      SYSTEM_ABILITY,
-      flagAuditActor()
+      {
+        ifMatch: version(flag.version),
+        ability: SYSTEM_ABILITY,
+        actor: flagAuditActor()
+      }
     );
 
     expect(updated).toMatchObject({ enabled: true, version: flag.version + 1 });
@@ -131,9 +133,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await flagService.update(
       flag.id,
       { enabled: true },
-      version(flag.version),
-      SYSTEM_ABILITY,
-      flagAuditActor()
+      {
+        ifMatch: version(flag.version),
+        ability: SYSTEM_ABILITY,
+        actor: flagAuditActor()
+      }
     );
 
     expect(await percentsOf(flag.id)).toEqual([10]);
@@ -146,9 +150,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
       flagService.update(
         flag.id,
         { enabled: true, rules: [percentRule(20), percentRule(150)] },
-        version(flag.version),
-        SYSTEM_ABILITY,
-        flagAuditActor()
+        {
+          ifMatch: version(flag.version),
+          ability: SYSTEM_ABILITY,
+          actor: flagAuditActor()
+        }
       )
     ).rejects.toMatchObject({ status: 422 });
 
@@ -164,18 +170,22 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await flagService.update(
       flag.id,
       { enabled: true },
-      version(flag.version),
-      SYSTEM_ABILITY,
-      flagAuditActor()
+      {
+        ifMatch: version(flag.version),
+        ability: SYSTEM_ABILITY,
+        actor: flagAuditActor()
+      }
     );
 
     await expect(
       flagService.update(
         flag.id,
         { rules: [percentRule(20)] },
-        version(flag.version),
-        SYSTEM_ABILITY,
-        flagAuditActor()
+        {
+          ifMatch: version(flag.version),
+          ability: SYSTEM_ABILITY,
+          actor: flagAuditActor()
+        }
       )
     ).rejects.toMatchObject({ status: 412 });
 
@@ -187,9 +197,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await flagService.update(
       flag.id,
       { enabled: true },
-      version(flag.version),
-      SYSTEM_ABILITY,
-      flagAuditActor()
+      {
+        ifMatch: version(flag.version),
+        ability: SYSTEM_ABILITY,
+        actor: flagAuditActor()
+      }
     );
     // The read of the next update returns the row as it was before that write.
     jest
@@ -200,9 +212,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
       flagService.update(
         flag.id,
         { rules: [percentRule(20)] },
-        version(flag.version + 1),
-        SYSTEM_ABILITY,
-        flagAuditActor()
+        {
+          ifMatch: version(flag.version + 1),
+          ability: SYSTEM_ABILITY,
+          actor: flagAuditActor()
+        }
       )
     ).rejects.toMatchObject({ status: 412 });
 
@@ -224,9 +238,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
           enabled: true,
           rules: [percentRule(20), percentRule(FAILING_PERCENT)]
         },
-        version(flag.version),
-        SYSTEM_ABILITY,
-        flagAuditActor()
+        {
+          ifMatch: version(flag.version),
+          ability: SYSTEM_ABILITY,
+          actor: flagAuditActor()
+        }
       )
     ).rejects.toThrow('rule insert failed');
 

@@ -78,7 +78,7 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
       .findOneByOrFail({ isSuper: true });
     await app
       .get(RoleService)
-      .assignRoleToUser(actorId, superRole.id, SYSTEM_ABILITY);
+      .assignRoleToUser(actorId, superRole.id, { ability: SYSTEM_ABILITY });
 
     // An account created through a provider holds no password.
     await users.update(actorId, { password: null, isEmailVerified: true });

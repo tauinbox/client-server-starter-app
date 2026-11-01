@@ -45,6 +45,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
+import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 // ── Per-test ability container ──────────────────────────────────────
 // A single mutable holder lets each test build the ability it wants
@@ -183,6 +184,7 @@ describe('Instance-level @Authorize re-check', () => {
           provide: MetricsService,
           useValue: { recordPermissionDenied: jest.fn() }
         },
+        AccessRefusalService,
         {
           provide: CACHE_MANAGER,
           useValue: {

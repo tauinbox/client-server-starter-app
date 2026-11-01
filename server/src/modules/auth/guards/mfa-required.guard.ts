@@ -11,10 +11,8 @@ import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import type { PermissionCheck } from '../casl/app-ability';
 import { MfaPolicyService } from '../services/mfa-policy.service';
 import { JwtAuthRequest } from '../types/auth.request';
-import { AuditService } from '../../audit/audit.service';
-import { MetricsService } from '../../core/metrics/metrics.service';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
-import { refuseAccess } from '../../../common/utils/refuse-access.util';
 import { ApiError } from '../../../common/errors/api-error';
 import { describeChecks, requiredLabels } from './permissions.guard';
 
@@ -30,8 +28,7 @@ export class MfaRequiredGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly mfaPolicy: MfaPolicyService,
-    private readonly auditService: AuditService,
-    private readonly metricsService: MetricsService
+    private readonly accessRefusals: AccessRefusalService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -59,9 +56,7 @@ export class MfaRequiredGuard implements CanActivate {
           PERMISSIONS_KEY,
           targets
         ) ?? [];
-      refuseAccess(
-        this.auditService,
-        this.metricsService,
+      this.accessRefusals.refuse(
         {
           actorId: user.userId,
           details: {

@@ -29,6 +29,7 @@ import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { STEP_UP_OPERATION, TOKEN_PURPOSE } from '@app/shared/constants';
 import { AuthCookies } from '../utils/auth-cookies';
+import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 const CLIENT = 'http://localhost:4200';
 const REAUTH_TOKEN = 'reauth-token-for-user-a';
@@ -128,6 +129,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
           state: true,
           store: new CookieStateStore(OAuthProvider.GOOGLE, true)
         },
+        // eslint-disable-next-line no-restricted-syntax -- Passport defines the verify callback of this strategy
         (
           _accessToken: string,
           _refreshToken: string,
@@ -173,6 +175,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
           useValue: { logFireAndForget: jest.fn() }
         },
         { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
+        AccessRefusalService,
         {
           provide: AuthService,
           useValue: { assertStepUpForUser: jest.fn() }
@@ -282,8 +285,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     expect(await callback(jar, state)).toBe(`${CLIENT}/profile?reauth=ok`);
     expect(assertReauthenticated).toHaveBeenCalledWith(
       OWNER_ID,
-      OAuthProvider.GOOGLE,
-      PROVIDER_ID,
+      { provider: OAuthProvider.GOOGLE, providerId: PROVIDER_ID },
       expect.any(Number)
     );
     expect(jar.get('__Host-reauth_proof')).toBe(SIGNED_PROOF);

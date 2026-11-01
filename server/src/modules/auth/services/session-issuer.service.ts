@@ -49,12 +49,11 @@ export class SessionIssuerService {
       sessionId
     );
 
-    await this.refreshTokenService.createRefreshToken(
-      user.id,
-      tokens.refresh_token,
+    await this.refreshTokenService.createRefreshToken(user.id, {
+      token: tokens.refresh_token,
       sessionId,
       client
-    );
+    });
     await this.refreshTokenService.pruneOldestTokens(
       user.id,
       await this.sessionLimitService.maxSessionsFor(user.id)
