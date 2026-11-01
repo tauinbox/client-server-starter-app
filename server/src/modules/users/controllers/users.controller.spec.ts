@@ -332,6 +332,41 @@ describe('UsersController', () => {
         });
       });
 
+      it('refuses an actor without update:User before the step-up', async () => {
+        // @ts-expect-error partial mock - only `can` is read
+        const readOnly: AppAbility = {
+          can: jest.fn((action: string) => action === 'read')
+        };
+
+        await expect(
+          controller.update(
+            'user-5',
+            { password: 'NewPassword1', currentPassword: 'ActorPassword1' },
+            mockJwtRequest() as JwtAuthRequest,
+            readOnly
+          )
+        ).rejects.toThrow(ForbiddenException);
+        expect(authServiceMock.assertStepUp).not.toHaveBeenCalled();
+        expect(usersServiceMock.update).not.toHaveBeenCalled();
+      });
+
+      it('admits an actor whose grant is update:User to the step-up', async () => {
+        // @ts-expect-error partial mock - only `can` is read
+        const updateOnly: AppAbility = {
+          can: jest.fn((action: string) => action === 'update')
+        };
+        usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+
+        await controller.update(
+          'user-5',
+          { password: 'NewPassword1', currentPassword: 'ActorPassword1' },
+          mockJwtRequest() as JwtAuthRequest,
+          updateOnly
+        );
+
+        expect(authServiceMock.assertStepUp).toHaveBeenCalled();
+      });
+
       it('demands the step-up for a changed email', async () => {
         usersServiceMock.update.mockResolvedValue({
           id: 'user-5',
