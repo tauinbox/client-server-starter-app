@@ -40,13 +40,11 @@ function passesStepUp(req: Request, res: Response): boolean {
     return false;
   }
 
-  const refusal = stepUpError(
-    req,
-    user,
+  const refusal = stepUpError(req, user, {
     currentPassword,
     code,
-    STEP_UP_OPERATION.SESSION_REVOKE
-  );
+    operation: STEP_UP_OPERATION.SESSION_REVOKE
+  });
   if (refusal) {
     sendWithRetryAfter(res, refusal);
     return false;

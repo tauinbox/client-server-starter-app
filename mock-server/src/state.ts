@@ -142,8 +142,10 @@ export function getState(): State {
 export function registerSession(
   refreshToken: string,
   sessionId: string,
-  userAgent: string | null = null,
-  ipAddress: string | null = null
+  {
+    userAgent = null,
+    ipAddress = null
+  }: { userAgent?: string | null; ipAddress?: string | null } = {}
 ): void {
   state.refreshSessions.set(refreshToken, sessionId);
   state.sessionLastActive.set(sessionId, Date.now());

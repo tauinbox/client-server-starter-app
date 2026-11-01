@@ -78,12 +78,10 @@ function listUsers(req: Request, res: Response): void {
     (u) => (includeDeleted || !u.deletedAt) && (!role || u.roles.includes(role))
   );
   const page = listPage(
-    filterByAbility(
-      users,
-      (req as AuthenticatedRequest).user,
-      'search',
-      'User'
-    ),
+    filterByAbility(users, (req as AuthenticatedRequest).user, {
+      action: 'search',
+      subjectName: 'User'
+    }),
     USER_LIST_QUERY,
     query
   );
@@ -113,7 +111,13 @@ router.post('/', permissionGuard('create', 'User'), (req, res) => {
   // The password is left out of the subject on purpose: no authorization
   // condition can legitimately be written over it.
   const { password: _password, ...subjectFields } = validated.fields;
-  if (!assertInstancePermission(req, res, 'create', 'User', subjectFields)) {
+  if (
+    !assertInstancePermission(req, res, {
+      action: 'create',
+      subjectName: 'User',
+      record: subjectFields
+    })
+  ) {
     return;
   }
 
@@ -159,7 +163,13 @@ router.get(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'read', 'User', user)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'read',
+        subjectName: 'User',
+        record: user
+      })
+    ) {
       return;
     }
 
@@ -181,7 +191,13 @@ router.get(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'read', 'User', user)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'read',
+        subjectName: 'User',
+        record: user
+      })
+    ) {
       return;
     }
 
@@ -220,7 +236,10 @@ router.patch(
       ...emailErrors('email', req.body.email, 'definedOnly'),
       ...nameErrors(name, 'definedOnly'),
       ...newPasswordErrors(password, 'definedOnly'),
-      ...oneOfErrors('locale', locale, SUPPORTED_LOCALES, 'definedOnly')
+      ...oneOfErrors('locale', locale, {
+        values: SUPPORTED_LOCALES,
+        optional: 'definedOnly'
+      })
     ]);
     if (bodyErrors.length > 0) {
       sendValidationError(res, 'body', bodyErrors);
@@ -271,13 +290,11 @@ router.patch(
 
     // The record after the write is checked too, as in UsersService.update.
     if (
-      !assertCanWriteUser(req, res, 'update', user) ||
-      !assertCanWriteUser(
-        req,
-        res,
-        'update',
-        withChanges(user, { email, name, locale, isActive })
-      )
+      !assertCanWriteUser(req, res, { action: 'update', target: user }) ||
+      !assertCanWriteUser(req, res, {
+        action: 'update',
+        target: withChanges(user, { email, name, locale, isActive })
+      })
     ) {
       return;
     }
@@ -289,14 +306,12 @@ router.patch(
       password !== undefined ||
       (email !== undefined && email !== user.email)
     ) {
-      const refusal = stepUpError(
-        req,
-        (req as AuthenticatedRequest).user,
+      const refusal = stepUpError(req, (req as AuthenticatedRequest).user, {
         currentPassword,
         code,
-        STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
-        false
-      );
+        operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+        acceptsReauthProof: false
+      });
       if (refusal) {
         sendWithRetryAfter(res, refusal);
         return;
@@ -446,7 +461,9 @@ router.delete(
       return;
     }
 
-    if (!assertCanWriteUser(req, res, 'delete', targetUser)) {
+    if (
+      !assertCanWriteUser(req, res, { action: 'delete', target: targetUser })
+    ) {
       return;
     }
 
@@ -493,7 +510,9 @@ router.post(
     }
 
     // `UsersService.restore` gates on `delete`, not `update`.
-    if (!assertCanWriteUser(req, res, 'delete', targetUser)) {
+    if (
+      !assertCanWriteUser(req, res, { action: 'delete', target: targetUser })
+    ) {
       return;
     }
 
@@ -557,7 +576,7 @@ router.post(
       return;
     }
 
-    if (!assertCanWriteUser(req, res, 'update', user)) {
+    if (!assertCanWriteUser(req, res, { action: 'update', target: user })) {
       return;
     }
 
@@ -570,14 +589,12 @@ router.post(
       return;
     }
 
-    const refusal = stepUpError(
-      req,
-      actor,
+    const refusal = stepUpError(req, actor, {
       currentPassword,
       code,
-      STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
-      false
-    );
+      operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
+      acceptsReauthProof: false
+    });
     if (refusal) {
       sendWithRetryAfter(res, refusal);
       return;
@@ -629,7 +646,7 @@ router.post(
       return;
     }
 
-    if (!assertCanWriteUser(req, res, 'update', user)) {
+    if (!assertCanWriteUser(req, res, { action: 'update', target: user })) {
       return;
     }
 

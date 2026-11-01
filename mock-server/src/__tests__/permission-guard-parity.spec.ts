@@ -204,9 +204,7 @@ describe('permission-based route authorization', () => {
 
     async function send(
       token: string,
-      method: string,
-      path: string,
-      body?: unknown
+      { method, path, body }: { method: string; path: string; body?: unknown }
     ): Promise<Response> {
       return fetch(`${baseUrl}${path}`, {
         method,
@@ -257,18 +255,30 @@ describe('permission-based route authorization', () => {
       ]);
 
       expect(
-        (await send(token, 'GET', `/api/v1/users/${REGULAR_ID}`)).status
+        (
+          await send(token, {
+            method: 'GET',
+            path: `/api/v1/users/${REGULAR_ID}`
+          })
+        ).status
       ).toBe(200);
       await expectRefused(
-        await send(token, 'GET', `/api/v1/users/${ADMIN_ID}`)
+        await send(token, { method: 'GET', path: `/api/v1/users/${ADMIN_ID}` })
       );
 
       expect(
-        (await send(token, 'GET', `/api/v1/users/${REGULAR_ID}/permissions`))
-          .status
+        (
+          await send(token, {
+            method: 'GET',
+            path: `/api/v1/users/${REGULAR_ID}/permissions`
+          })
+        ).status
       ).toBe(200);
       await expectRefused(
-        await send(token, 'GET', `/api/v1/users/${ADMIN_ID}/permissions`)
+        await send(token, {
+          method: 'GET',
+          path: `/api/v1/users/${ADMIN_ID}/permissions`
+        })
       );
     });
 
@@ -280,20 +290,28 @@ describe('permission-based route authorization', () => {
         }
       ]);
 
-      const allowed = await send(token, 'POST', '/api/v1/users', {
-        email: 'allowed@example.com',
-        name: 'Ada Lovelace',
-        password: UNBREACHED_PASSWORD,
-        locale: 'ru'
+      const allowed = await send(token, {
+        method: 'POST',
+        path: '/api/v1/users',
+        body: {
+          email: 'allowed@example.com',
+          name: 'Ada Lovelace',
+          password: UNBREACHED_PASSWORD,
+          locale: 'ru'
+        }
       });
       expect(allowed.status).toBe(201);
 
       await expectRefused(
-        await send(token, 'POST', '/api/v1/users', {
-          email: 'refused@example.com',
-          name: 'Ada Lovelace',
-          password: UNBREACHED_PASSWORD,
-          locale: 'en'
+        await send(token, {
+          method: 'POST',
+          path: '/api/v1/users',
+          body: {
+            email: 'refused@example.com',
+            name: 'Ada Lovelace',
+            password: UNBREACHED_PASSWORD,
+            locale: 'en'
+          }
         })
       );
     });
@@ -306,11 +324,15 @@ describe('permission-based route authorization', () => {
         }
       ]);
 
-      const res = await send(token, 'POST', '/api/v1/users', {
-        email: 'refused@example.com',
-        name: '   ',
-        password: UNBREACHED_PASSWORD,
-        locale: 'en'
+      const res = await send(token, {
+        method: 'POST',
+        path: '/api/v1/users',
+        body: {
+          email: 'refused@example.com',
+          name: '   ',
+          password: UNBREACHED_PASSWORD,
+          locale: 'en'
+        }
       });
 
       expect(res.status).toBe(422);
@@ -325,11 +347,15 @@ describe('permission-based route authorization', () => {
       ]);
 
       await expectRefused(
-        await send(token, 'POST', '/api/v1/users', {
-          email: 'refused@example.com',
-          name: 'Ada Lovelace',
-          password: 'Password1',
-          locale: 'en'
+        await send(token, {
+          method: 'POST',
+          path: '/api/v1/users',
+          body: {
+            email: 'refused@example.com',
+            name: 'Ada Lovelace',
+            password: 'Password1',
+            locale: 'en'
+          }
         })
       );
     });
@@ -342,17 +368,20 @@ describe('permission-based route authorization', () => {
         }
       ]);
 
-      const allowed = await send(
-        token,
-        'PATCH',
-        `/api/v1/users/${REGULAR_ID}`,
-        { name: 'Renamed' }
-      );
+      const allowed = await send(token, {
+        method: 'PATCH',
+        path: `/api/v1/users/${REGULAR_ID}`,
+        body: { name: 'Renamed' }
+      });
       expect(allowed.status).toBe(200);
 
       await expectRefused(
-        await send(token, 'PATCH', `/api/v1/users/${ADMIN_ID}`, {
-          name: 'Renamed'
+        await send(token, {
+          method: 'PATCH',
+          path: `/api/v1/users/${ADMIN_ID}`,
+          body: {
+            name: 'Renamed'
+          }
         })
       );
     });
@@ -366,8 +395,12 @@ describe('permission-based route authorization', () => {
       ]);
 
       await expectRefused(
-        await send(token, 'PATCH', `/api/v1/users/${ADMIN_ID}`, {
-          password: 'Password1'
+        await send(token, {
+          method: 'PATCH',
+          path: `/api/v1/users/${ADMIN_ID}`,
+          body: {
+            password: 'Password1'
+          }
         })
       );
     });
@@ -382,17 +415,33 @@ describe('permission-based route authorization', () => {
       ]);
 
       expect(
-        (await send(token, 'DELETE', `/api/v1/users/${OTHER_ID}`)).status
+        (
+          await send(token, {
+            method: 'DELETE',
+            path: `/api/v1/users/${OTHER_ID}`
+          })
+        ).status
       ).toBe(200);
       await expectRefused(
-        await send(token, 'DELETE', `/api/v1/users/${REGULAR_ID}`)
+        await send(token, {
+          method: 'DELETE',
+          path: `/api/v1/users/${REGULAR_ID}`
+        })
       );
 
       expect(
-        (await send(token, 'POST', `/api/v1/users/${OTHER_ID}/restore`)).status
+        (
+          await send(token, {
+            method: 'POST',
+            path: `/api/v1/users/${OTHER_ID}/restore`
+          })
+        ).status
       ).toBe(200);
       await expectRefused(
-        await send(token, 'POST', `/api/v1/users/${REGULAR_ID}/restore`)
+        await send(token, {
+          method: 'POST',
+          path: `/api/v1/users/${REGULAR_ID}/restore`
+        })
       );
     });
 
@@ -407,9 +456,14 @@ describe('permission-based route authorization', () => {
       ]);
 
       await expectRefused(
-        await send(token, 'GET', `/api/v1/roles/${EDITOR_ROLE_ID}`)
+        await send(token, {
+          method: 'GET',
+          path: `/api/v1/roles/${EDITOR_ROLE_ID}`
+        })
       );
-      await expectRefused(await send(token, 'GET', '/api/v1/roles/cursor'));
+      await expectRefused(
+        await send(token, { method: 'GET', path: '/api/v1/roles/cursor' })
+      );
     });
 
     it('applies a conditional update:Role grant to PATCH /roles/:id', async () => {
@@ -420,17 +474,20 @@ describe('permission-based route authorization', () => {
         }
       ]);
 
-      const allowed = await send(
-        token,
-        'PATCH',
-        `/api/v1/roles/${MODERATOR_ROLE_ID}`,
-        { description: 'Renamed' }
-      );
+      const allowed = await send(token, {
+        method: 'PATCH',
+        path: `/api/v1/roles/${MODERATOR_ROLE_ID}`,
+        body: { description: 'Renamed' }
+      });
       expect(allowed.status).toBe(200);
 
       await expectRefused(
-        await send(token, 'PATCH', `/api/v1/roles/${SUPPORT_ROLE_ID}`, {
-          description: 'Renamed'
+        await send(token, {
+          method: 'PATCH',
+          path: `/api/v1/roles/${SUPPORT_ROLE_ID}`,
+          body: {
+            description: 'Renamed'
+          }
         })
       );
     });
@@ -444,11 +501,18 @@ describe('permission-based route authorization', () => {
       ]);
 
       expect(
-        (await send(token, 'DELETE', `/api/v1/roles/${MODERATOR_ROLE_ID}`))
-          .status
+        (
+          await send(token, {
+            method: 'DELETE',
+            path: `/api/v1/roles/${MODERATOR_ROLE_ID}`
+          })
+        ).status
       ).toBe(200);
       await expectRefused(
-        await send(token, 'DELETE', `/api/v1/roles/${SUPPORT_ROLE_ID}`)
+        await send(token, {
+          method: 'DELETE',
+          path: `/api/v1/roles/${SUPPORT_ROLE_ID}`
+        })
       );
     });
 
@@ -466,57 +530,51 @@ describe('permission-based route authorization', () => {
 
       expect(
         (
-          await send(
-            token,
-            'PUT',
-            `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`,
-            { items: [] }
-          )
+          await send(token, {
+            method: 'PUT',
+            path: `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`,
+            body: { items: [] }
+          })
         ).status
       ).toBe(200);
       await expectRefused(
-        await send(
-          token,
-          'PUT',
-          `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions`,
-          { items: [] }
-        )
+        await send(token, {
+          method: 'PUT',
+          path: `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions`,
+          body: { items: [] }
+        })
       );
 
       expect(
         (
-          await send(
-            token,
-            'POST',
-            `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`,
-            { permissionIds: [granted] }
-          )
+          await send(token, {
+            method: 'POST',
+            path: `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions`,
+            body: { permissionIds: [granted] }
+          })
         ).status
       ).toBe(201);
       await expectRefused(
-        await send(
-          token,
-          'POST',
-          `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions`,
-          { permissionIds: [granted] }
-        )
+        await send(token, {
+          method: 'POST',
+          path: `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions`,
+          body: { permissionIds: [granted] }
+        })
       );
 
       expect(
         (
-          await send(
-            token,
-            'DELETE',
-            `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions/${granted}`
-          )
+          await send(token, {
+            method: 'DELETE',
+            path: `/api/v1/roles/${MODERATOR_ROLE_ID}/permissions/${granted}`
+          })
         ).status
       ).toBe(200);
       await expectRefused(
-        await send(
-          token,
-          'DELETE',
-          `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions/${granted}`
-        )
+        await send(token, {
+          method: 'DELETE',
+          path: `/api/v1/roles/${SUPPORT_ROLE_ID}/permissions/${granted}`
+        })
       );
     });
 
@@ -532,32 +590,38 @@ describe('permission-based route authorization', () => {
 
       expect(
         (
-          await send(token, 'POST', `/api/v1/roles/assign/${OTHER_ID}`, {
-            roleId: SUPPORT_ROLE_ID
+          await send(token, {
+            method: 'POST',
+            path: `/api/v1/roles/assign/${OTHER_ID}`,
+            body: {
+              roleId: SUPPORT_ROLE_ID
+            }
           })
         ).status
       ).toBe(201);
       await expectRefused(
-        await send(token, 'POST', `/api/v1/roles/assign/${REGULAR_ID}`, {
-          roleId: SUPPORT_ROLE_ID
+        await send(token, {
+          method: 'POST',
+          path: `/api/v1/roles/assign/${REGULAR_ID}`,
+          body: {
+            roleId: SUPPORT_ROLE_ID
+          }
         })
       );
 
       expect(
         (
-          await send(
-            token,
-            'DELETE',
-            `/api/v1/roles/assign/${OTHER_ID}/${SUPPORT_ROLE_ID}`
-          )
+          await send(token, {
+            method: 'DELETE',
+            path: `/api/v1/roles/assign/${OTHER_ID}/${SUPPORT_ROLE_ID}`
+          })
         ).status
       ).toBe(200);
       await expectRefused(
-        await send(
-          token,
-          'DELETE',
-          `/api/v1/roles/assign/${REGULAR_ID}/${SUPPORT_ROLE_ID}`
-        )
+        await send(token, {
+          method: 'DELETE',
+          path: `/api/v1/roles/assign/${REGULAR_ID}/${SUPPORT_ROLE_ID}`
+        })
       );
     });
 
@@ -571,21 +635,19 @@ describe('permission-based route authorization', () => {
 
       expect(
         (
-          await send(
-            token,
-            'PATCH',
-            `/api/v1/rbac/resources/${USERS_RESOURCE_ID}`,
-            { displayName: 'Renamed' }
-          )
+          await send(token, {
+            method: 'PATCH',
+            path: `/api/v1/rbac/resources/${USERS_RESOURCE_ID}`,
+            body: { displayName: 'Renamed' }
+          })
         ).status
       ).toBe(200);
       await expectRefused(
-        await send(
-          token,
-          'PATCH',
-          `/api/v1/rbac/resources/${ROLES_RESOURCE_ID}`,
-          { displayName: 'Renamed' }
-        )
+        await send(token, {
+          method: 'PATCH',
+          path: `/api/v1/rbac/resources/${ROLES_RESOURCE_ID}`,
+          body: { displayName: 'Renamed' }
+        })
       );
 
       // Orphaned, and offering no action, so the restore wakes no grant
@@ -595,19 +657,17 @@ describe('permission-based route authorization', () => {
       usersResource.allowedActionNames = [];
       expect(
         (
-          await send(
-            token,
-            'POST',
-            `/api/v1/rbac/resources/${USERS_RESOURCE_ID}/restore`
-          )
+          await send(token, {
+            method: 'POST',
+            path: `/api/v1/rbac/resources/${USERS_RESOURCE_ID}/restore`
+          })
         ).status
       ).toBe(200);
       await expectRefused(
-        await send(
-          token,
-          'POST',
-          `/api/v1/rbac/resources/${ROLES_RESOURCE_ID}/restore`
-        )
+        await send(token, {
+          method: 'POST',
+          path: `/api/v1/rbac/resources/${ROLES_RESOURCE_ID}/restore`
+        })
       );
     });
   });

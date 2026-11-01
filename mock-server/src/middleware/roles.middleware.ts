@@ -121,7 +121,10 @@ function conditionObjectErrors(path: string, value: object): string[] {
   const cond = value as Record<string, unknown>;
   return [
     ...unknownPropertyErrors(cond, CONDITION_KEYS),
-    ...oneOfErrors('effect', cond['effect'], ['allow', 'deny'], 'nullable'),
+    ...oneOfErrors('effect', cond['effect'], {
+      values: ['allow', 'deny'],
+      optional: 'nullable'
+    }),
     ...conditionBranchErrors(
       'ownership',
       cond['ownership'],
@@ -145,13 +148,11 @@ function conditionObjectErrors(path: string, value: object): string[] {
 // @Type(() => PermissionConditionDto)`.
 function conditionsErrors(parentPath: string, value: unknown): string[] {
   if (value === undefined || value === null) return [];
-  return nestedErrors(
+  return nestedErrors('conditions', value, {
     parentPath,
-    'conditions',
-    value,
-    objectErrors('conditions', value),
-    conditionObjectErrors
-  );
+    own: objectErrors('conditions', value),
+    validate: conditionObjectErrors
+  });
 }
 
 // Mirrors `@ArrayUniqueWithin(MAX_PERMISSION_ITEMS, identifier)`: a value that
@@ -237,7 +238,12 @@ function setPermissionsErrors(body: Record<string, unknown>): string[] {
   ];
   return [
     ...unknownPropertyErrors(body, SET_PERMISSIONS_KEYS),
-    ...nestedErrors('', 'items', items, own, permissionItemErrors, true)
+    ...nestedErrors('items', items, {
+      parentPath: '',
+      own,
+      validate: permissionItemErrors,
+      each: true
+    })
   ];
 }
 
@@ -313,8 +319,7 @@ function refuseSystemRole(req: Request, res: Response, roleId: string): void {
 function refuseSuperRole(
   req: Request,
   res: Response,
-  action: 'assign' | 'unassign',
-  roleId: string
+  { action, roleId }: { action: 'assign' | 'unassign'; roleId: string }
 ): void {
   logRefusal(req, (req as AuthenticatedRequest).user.id, {
     targetId: roleId,
@@ -396,7 +401,13 @@ router.get(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'read', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'read',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
@@ -435,7 +446,13 @@ router.get(
       return;
     }
 
-    if (!assertInstancePermission(req, res, 'read', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'read',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
@@ -461,7 +478,11 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
   // CreateRoleDto carries `name` and `description`; the service raises every
   // check below, so the instance check sits between the pipe and the service.
   if (
-    !assertInstancePermission(req, res, 'create', 'Role', { name, description })
+    !assertInstancePermission(req, res, {
+      action: 'create',
+      subjectName: 'Role',
+      record: { name, description }
+    })
   ) {
     return;
   }
@@ -538,17 +559,19 @@ router.patch(
     // `RoleService.update` raises `CANNOT_MODIFY_SYSTEM`, so it sits below the
     // instance check on the server. The record after the write is checked too.
     if (
-      !assertInstancePermission(req, res, 'update', 'Role', role) ||
-      !assertInstancePermission(
-        req,
-        res,
-        'update',
-        'Role',
-        withChanges(role, {
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Role',
+        record: role
+      }) ||
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Role',
+        record: withChanges(role, {
           name: normalized?.ok ? normalized.name : undefined,
           description
         })
-      )
+      })
     ) {
       return;
     }
@@ -629,7 +652,13 @@ router.delete(
 
     // `RoleService.delete` raises `CANNOT_DELETE_SYSTEM`, so it sits below the
     // instance check on the server.
-    if (!assertInstancePermission(req, res, 'delete', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'delete',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
@@ -642,7 +671,13 @@ router.delete(
       return;
     }
 
-    if (!assertGrantScope(req, res, 'lift', id, denyRowsOf(id))) {
+    if (
+      !assertGrantScope(req, res, {
+        check: 'lift',
+        roleId: id,
+        items: denyRowsOf(id)
+      })
+    ) {
       return;
     }
 
@@ -713,7 +748,13 @@ router.put(
 
     // `RoleService.assertCanRole` runs above `assertNotSystem`, so the
     // instance check sits above `CANNOT_MODIFY_SYSTEM` on the server.
-    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
@@ -748,7 +789,13 @@ router.put(
       permissionId: item.permissionId,
       conditions: (item.conditions as PermissionCondition | null) ?? null
     }));
-    if (!assertGrantScope(req, res, 'grant', id, grantItems)) {
+    if (
+      !assertGrantScope(req, res, {
+        check: 'grant',
+        roleId: id,
+        items: grantItems
+      })
+    ) {
       return;
     }
 
@@ -761,7 +808,13 @@ router.put(
             sameConditions(item.conditions, row.conditions)
         )
     );
-    if (!assertGrantScope(req, res, 'lift', id, liftedRows)) {
+    if (
+      !assertGrantScope(req, res, {
+        check: 'lift',
+        roleId: id,
+        items: liftedRows
+      })
+    ) {
       return;
     }
 
@@ -823,7 +876,13 @@ router.post(
 
     // `RoleService.assertCanRole` runs above `assertNotSystem`, so the
     // instance check sits above `CANNOT_MODIFY_SYSTEM` on the server.
-    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
@@ -859,7 +918,13 @@ router.post(
       permissionId,
       conditions: (conditions as PermissionCondition | undefined) ?? null
     }));
-    if (!assertGrantScope(req, res, 'grant', id, grantItems)) {
+    if (
+      !assertGrantScope(req, res, {
+        check: 'grant',
+        roleId: id,
+        items: grantItems
+      })
+    ) {
       return;
     }
 
@@ -920,7 +985,13 @@ router.delete(
 
     // `RoleService.assertCanRole` runs above `assertNotSystem`, so the
     // instance check sits above `CANNOT_MODIFY_SYSTEM` on the server.
-    if (!assertInstancePermission(req, res, 'update', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'update',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
@@ -932,7 +1003,13 @@ router.delete(
     const removedRows = denyRowsOf(id).filter(
       (row) => row.permissionId === permissionId
     );
-    if (!assertGrantScope(req, res, 'lift', id, removedRows)) {
+    if (
+      !assertGrantScope(req, res, {
+        check: 'lift',
+        roleId: id,
+        items: removedRows
+      })
+    ) {
       return;
     }
 
@@ -999,24 +1076,32 @@ router.post(
     // `RoleService.assignRoleToUser` refuses a super role to every caller of
     // this route, a super caller included: no API path grants one.
     if (role.isSuper) {
-      refuseSuperRole(req, res, 'assign', roleId);
+      refuseSuperRole(req, res, { action: 'assign', roleId });
       return;
     }
 
     // `RoleService.assignRoleToUser` re-checks `update` on the target user,
     // and refuses a super target to a non-super caller, below the super-role
     // test and above the duplicate `UNIQUE_VIOLATION`.
-    if (!assertCanWriteUser(req, res, 'update', user)) {
+    if (!assertCanWriteUser(req, res, { action: 'update', target: user })) {
       return;
     }
-    if (!assertInstancePermission(req, res, 'assign', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'assign',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
     // `RoleService.assignRoleToUser` checks the rows of the role before the
     // insert that raises the duplicate `UNIQUE_VIOLATION`.
     const roleRows = state.rolePermissions.filter((rp) => rp.roleId === roleId);
-    if (!assertGrantScope(req, res, 'grant', roleId, roleRows)) {
+    if (
+      !assertGrantScope(req, res, { check: 'grant', roleId, items: roleRows })
+    ) {
       return;
     }
 
@@ -1082,18 +1167,30 @@ router.delete(
     // `RoleService.removeRoleFromUser` refuses a super role to every caller of
     // this route, a super caller included: no API path removes one.
     if (role.isSuper) {
-      refuseSuperRole(req, res, 'unassign', roleId);
+      refuseSuperRole(req, res, { action: 'unassign', roleId });
       return;
     }
 
-    if (!assertCanWriteUser(req, res, 'update', user)) {
+    if (!assertCanWriteUser(req, res, { action: 'update', target: user })) {
       return;
     }
-    if (!assertInstancePermission(req, res, 'assign', 'Role', role)) {
+    if (
+      !assertInstancePermission(req, res, {
+        action: 'assign',
+        subjectName: 'Role',
+        record: role
+      })
+    ) {
       return;
     }
 
-    if (!assertGrantScope(req, res, 'lift', roleId, denyRowsOf(roleId))) {
+    if (
+      !assertGrantScope(req, res, {
+        check: 'lift',
+        roleId,
+        items: denyRowsOf(roleId)
+      })
+    ) {
       return;
     }
 

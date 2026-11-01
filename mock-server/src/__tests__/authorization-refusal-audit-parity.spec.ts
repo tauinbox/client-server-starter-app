@@ -88,8 +88,7 @@ async function login(email: string): Promise<string> {
 async function call(
   method: string,
   path: string,
-  body?: object,
-  email = 'user@example.com'
+  { body, email = 'user@example.com' }: { body?: object; email?: string } = {}
 ): Promise<{ status: number; errorKey?: string }> {
   const res = await fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -124,7 +123,9 @@ describe('audit row of an authorization refusal parity', () => {
     const victim = findUserByEmail('admin@example.com')!;
 
     const res = await call('PATCH', `/users/${victim.id}`, {
-      name: 'Changed'
+      body: {
+        name: 'Changed'
+      }
     });
     expect(res.errorKey).toBe(ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS);
     expect(lastRow()).toMatchObject({
@@ -138,7 +139,9 @@ describe('audit row of an authorization refusal parity', () => {
     const target = findUserByEmail('user@example.com')!;
 
     const res = await call('POST', `/roles/assign/${target.id}`, {
-      roleId: mockId('role-admin')
+      body: {
+        roleId: mockId('role-admin')
+      }
     });
     expect(res.errorKey).toBe(ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN);
     expect(lastRow()).toMatchObject({
@@ -150,7 +153,9 @@ describe('audit row of an authorization refusal parity', () => {
 
   it('answers a system role change by privilege with 403 and writes it', async () => {
     const res = await call('PUT', `/roles/${mockId('role-user')}/permissions`, {
-      items: []
+      body: {
+        items: []
+      }
     });
     expect(res).toEqual({
       status: 403,
@@ -167,7 +172,11 @@ describe('audit row of an authorization refusal parity', () => {
     const res = await call(
       'PUT',
       `/roles/${mockId('role-moderator')}/permissions`,
-      { items: [{ permissionId: permissionId('act-delete', 'res-users') }] }
+      {
+        body: {
+          items: [{ permissionId: permissionId('act-delete', 'res-users') }]
+        }
+      }
     );
     expect(res.errorKey).toBe(ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION);
     expect(lastRow()).toMatchObject({
@@ -179,7 +188,7 @@ describe('audit row of an authorization refusal parity', () => {
   it('writes the two-factor enrolment refusal', async () => {
     process.env['MFA_REQUIRED_FOR_ADMINS'] = 'true';
 
-    const res = await call('GET', '/roles', undefined, 'admin@example.com');
+    const res = await call('GET', '/roles', { email: 'admin@example.com' });
     expect(res.errorKey).toBe(ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED);
     expect(lastRow()).toMatchObject({
       action: 'PERMISSION_CHECK_FAILURE',

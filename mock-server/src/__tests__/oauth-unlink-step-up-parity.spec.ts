@@ -87,8 +87,7 @@ async function issueProof(userId: string, operation: string): Promise<string> {
 function unlink(
   accessTokenValue: string,
   provider: string,
-  body?: unknown,
-  proof?: string
+  { body, proof }: { body?: unknown; proof?: string } = {}
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/auth/oauth/accounts/${provider}`, {
     method: 'DELETE',
@@ -125,7 +124,9 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
     const token = await accessToken(user.id);
 
     const res = await unlink(token, 'google', {
-      currentPassword: 'WrongPassword1'
+      body: {
+        currentPassword: 'WrongPassword1'
+      }
     });
 
     expect(res.status).toBe(403);
@@ -147,7 +148,9 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
     getState().oauthAccounts.set(user.id, [account('google')]);
     const token = await accessToken(user.id);
 
-    const res = await unlink(token, 'google', { currentPassword: PASSWORD });
+    const res = await unlink(token, 'google', {
+      body: { currentPassword: PASSWORD }
+    });
 
     expect(res.status).toBe(200);
     expect(getState().oauthAccounts.get(user.id)).toHaveLength(0);
@@ -161,7 +164,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
       STEP_UP_OPERATION.OAUTH_UNLINK
     );
 
-    const res = await unlink(token, 'google', {}, proof);
+    const res = await unlink(token, 'google', { body: {}, proof });
 
     expect(res.status).toBe(200);
     expect(getState().oauthAccounts.get(OAUTH_ONLY_ID)).toEqual([
@@ -176,7 +179,9 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
     getState().users.get(OAUTH_ONLY_ID)!.totpEnabledAt =
       '2025-01-01T00:00:00.000Z';
 
-    const res = await unlink(token, 'google', { code: MOCK_TOTP_CODE });
+    const res = await unlink(token, 'google', {
+      body: { code: MOCK_TOTP_CODE }
+    });
 
     expect(res.status).toBe(200);
     expect(getState().oauthAccounts.get(OAUTH_ONLY_ID)).toEqual([
@@ -189,7 +194,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
     const token = await accessToken(OAUTH_ONLY_ID);
     const proof = await issueProof(OAUTH_ONLY_ID, STEP_UP_OPERATION.OAUTH_LINK);
 
-    const res = await unlink(token, 'google', {}, proof);
+    const res = await unlink(token, 'google', { body: {}, proof });
 
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({
@@ -213,7 +218,9 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
   it('rejects a currentPassword of the wrong shape', async () => {
     const token = await accessToken(passwordUser().id);
 
-    const res = await unlink(token, 'google', { currentPassword: '' });
+    const res = await unlink(token, 'google', {
+      body: { currentPassword: '' }
+    });
 
     expect(res.status).toBe(422);
   });
@@ -228,7 +235,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
       STEP_UP_OPERATION.OAUTH_UNLINK
     );
 
-    const res = await unlink(token, 'google', {}, proof);
+    const res = await unlink(token, 'google', { body: {}, proof });
 
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({

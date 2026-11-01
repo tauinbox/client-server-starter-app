@@ -61,13 +61,11 @@ router.delete('/accounts/:provider', authGuard, (req, res) => {
     return;
   }
 
-  const stepUp = stepUpError(
-    req,
-    user,
+  const stepUp = stepUpError(req, user, {
     currentPassword,
     code,
-    STEP_UP_OPERATION.OAUTH_UNLINK
-  );
+    operation: STEP_UP_OPERATION.OAUTH_UNLINK
+  });
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
     return;
@@ -182,7 +180,7 @@ router.post('/exchange', (req, res) => {
 
   // The session is issued here, as on the server: only this request carries
   // the refresh cookie of the session it replaces.
-  completeSignIn(req, res, user, {
+  completeSignIn({ req, res }, user, {
     method: 'oauth',
     provider: pending.provider
   });
@@ -202,13 +200,11 @@ router.post('/link-init', authGuard, (req, res) => {
     return;
   }
 
-  const stepUp = stepUpError(
-    req,
-    user,
+  const stepUp = stepUpError(req, user, {
     currentPassword,
     code,
-    STEP_UP_OPERATION.OAUTH_LINK
-  );
+    operation: STEP_UP_OPERATION.OAUTH_LINK
+  });
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
     return;
@@ -229,7 +225,7 @@ router.post('/reauth-init', authGuard, (req, res) => {
 
   const bodyErrors = [
     ...unknownPropertyErrors(req.body, ['operation']),
-    ...oneOfErrors('operation', operation, STEP_UP_OPERATIONS)
+    ...oneOfErrors('operation', operation, { values: STEP_UP_OPERATIONS })
   ];
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);

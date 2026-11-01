@@ -35,8 +35,10 @@ export function notifyEntitlementsChanged(customerId: string): void {
 export function activateSubscription(
   user: MockUser,
   plan: MockPlan,
-  status: MockSubscription['status'],
-  provider?: BillingProviderId
+  {
+    status,
+    provider
+  }: { status: MockSubscription['status']; provider?: BillingProviderId }
 ): MockSubscription {
   const state = getState();
   const now = new Date();
@@ -158,8 +160,7 @@ export function activateSubscription(
 export function settleSelfManagedCheckout(
   user: MockUser,
   plan: MockPlan,
-  customerId: string,
-  trial: boolean
+  { customerId, trial }: { customerId: string; trial: boolean }
 ): void {
   const state = getState();
   const open = [...state.billingSubscriptions.values()].find(
@@ -168,12 +169,10 @@ export function settleSelfManagedCheckout(
   if (open?.status === 'incomplete' && open.planKey === plan.key) {
     const trialing =
       open.trialEnd !== null && Date.parse(open.trialEnd) > Date.now();
-    activateSubscription(
-      user,
-      plan,
-      trialing ? 'trialing' : 'active',
-      'yookassa'
-    );
+    activateSubscription(user, plan, {
+      status: trialing ? 'trialing' : 'active',
+      provider: 'yookassa'
+    });
     return;
   }
 

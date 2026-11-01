@@ -104,9 +104,7 @@ async function login(email: string): Promise<string> {
 
 async function call(
   token: string,
-  method: string,
-  path: string,
-  body?: unknown
+  { method, path, body }: { method: string; path: string; body?: unknown }
 ): Promise<{ status: number; errorKey?: string }> {
   const res = await fetch(`${baseUrl}/api/v1/roles${path}`, {
     method,
@@ -144,7 +142,10 @@ describe('deny lift parity with server', () => {
       const self = userId(RESTRICTED_EMAIL);
 
       expect(
-        await call(token, 'DELETE', `/assign/${self}/${RESTRICT_ROLE_ID}`)
+        await call(token, {
+          method: 'DELETE',
+          path: `/assign/${self}/${RESTRICT_ROLE_ID}`
+        })
       ).toEqual(liftRefused);
       expect(getState().users.get(self)?.roles).toContain('restrict');
       const audit = getState().auditLogs.filter(
@@ -168,28 +169,35 @@ describe('deny lift parity with server', () => {
       const token = await login(RESTRICTED_EMAIL);
 
       expect(
-        await call(
-          token,
-          'DELETE',
-          `/${RESTRICT_ROLE_ID}/permissions/${updateUserId()}`
-        )
-      ).toEqual(liftRefused);
-      expect(
-        await call(token, 'PUT', `/${RESTRICT_ROLE_ID}/permissions`, {
-          items: []
+        await call(token, {
+          method: 'DELETE',
+          path: `/${RESTRICT_ROLE_ID}/permissions/${updateUserId()}`
         })
       ).toEqual(liftRefused);
       expect(
-        await call(token, 'PUT', `/${RESTRICT_ROLE_ID}/permissions`, {
-          items: [
-            {
-              permissionId: updateUserId(),
-              conditions: {
-                effect: 'deny',
-                fieldMatch: { email: ['someone-else@example.com'] }
+        await call(token, {
+          method: 'PUT',
+          path: `/${RESTRICT_ROLE_ID}/permissions`,
+          body: {
+            items: []
+          }
+        })
+      ).toEqual(liftRefused);
+      expect(
+        await call(token, {
+          method: 'PUT',
+          path: `/${RESTRICT_ROLE_ID}/permissions`,
+          body: {
+            items: [
+              {
+                permissionId: updateUserId(),
+                conditions: {
+                  effect: 'deny',
+                  fieldMatch: { email: ['someone-else@example.com'] }
+                }
               }
-            }
-          ]
+            ]
+          }
         })
       ).toEqual(liftRefused);
       expect(restrictRowCount()).toBe(1);
@@ -198,14 +206,18 @@ describe('deny lift parity with server', () => {
     it('keeps a deny row that a replace sends back unchanged', async () => {
       const token = await login(RESTRICTED_EMAIL);
 
-      const res = await call(token, 'PUT', `/${RESTRICT_ROLE_ID}/permissions`, {
-        items: [
-          {
-            permissionId: updateUserId(),
-            // Key order differs from the stored row on purpose.
-            conditions: { fieldMatch: DENY_CEO.fieldMatch, effect: 'deny' }
-          }
-        ]
+      const res = await call(token, {
+        method: 'PUT',
+        path: `/${RESTRICT_ROLE_ID}/permissions`,
+        body: {
+          items: [
+            {
+              permissionId: updateUserId(),
+              // Key order differs from the stored row on purpose.
+              conditions: { fieldMatch: DENY_CEO.fieldMatch, effect: 'deny' }
+            }
+          ]
+        }
       });
 
       expect(res.status).toBe(200);
@@ -215,9 +227,9 @@ describe('deny lift parity with server', () => {
     it('cannot delete the restriction role', async () => {
       const token = await login(RESTRICTED_EMAIL);
 
-      expect(await call(token, 'DELETE', `/${RESTRICT_ROLE_ID}`)).toEqual(
-        liftRefused
-      );
+      expect(
+        await call(token, { method: 'DELETE', path: `/${RESTRICT_ROLE_ID}` })
+      ).toEqual(liftRefused);
       expect(getState().roles.has(RESTRICT_ROLE_ID)).toBe(true);
     });
 
@@ -226,18 +238,30 @@ describe('deny lift parity with server', () => {
       const editor = mockId('role-editor');
 
       expect(
-        await call(token, 'POST', `/${editor}/permissions`, {
-          permissionIds: [updateUserId()]
+        await call(token, {
+          method: 'POST',
+          path: `/${editor}/permissions`,
+          body: {
+            permissionIds: [updateUserId()]
+          }
         })
       ).toEqual(grantRefused);
       expect(
-        await call(token, 'PUT', `/${editor}/permissions`, {
-          items: [{ permissionId: updateUserId() }]
+        await call(token, {
+          method: 'PUT',
+          path: `/${editor}/permissions`,
+          body: {
+            items: [{ permissionId: updateUserId() }]
+          }
         })
       ).toEqual(grantRefused);
       expect(
-        await call(token, 'POST', `/assign/${mockId('user-4')}`, {
-          roleId: DELEGATED_ROLE_ID
+        await call(token, {
+          method: 'POST',
+          path: `/assign/${mockId('user-4')}`,
+          body: {
+            roleId: DELEGATED_ROLE_ID
+          }
         })
       ).toEqual(grantRefused);
       expect(getState().users.get(mockId('user-4'))?.roles).not.toContain(
@@ -248,12 +272,11 @@ describe('deny lift parity with server', () => {
     it('can still hand out a deny on the restricted pair', async () => {
       const token = await login(RESTRICTED_EMAIL);
 
-      const res = await call(
-        token,
-        'POST',
-        `/${mockId('role-editor')}/permissions`,
-        { permissionIds: [updateUserId()], conditions: DENY_CEO }
-      );
+      const res = await call(token, {
+        method: 'POST',
+        path: `/${mockId('role-editor')}/permissions`,
+        body: { permissionIds: [updateUserId()], conditions: DENY_CEO }
+      });
 
       expect(res.status).toBe(201);
     });
@@ -264,16 +287,19 @@ describe('deny lift parity with server', () => {
     const restricted = userId(RESTRICTED_EMAIL);
 
     expect(
-      (await call(token, 'DELETE', `/assign/${restricted}/${RESTRICT_ROLE_ID}`))
-        .status
+      (
+        await call(token, {
+          method: 'DELETE',
+          path: `/assign/${restricted}/${RESTRICT_ROLE_ID}`
+        })
+      ).status
     ).toBe(200);
     expect(
       (
-        await call(
-          token,
-          'DELETE',
-          `/${RESTRICT_ROLE_ID}/permissions/${updateUserId()}`
-        )
+        await call(token, {
+          method: 'DELETE',
+          path: `/${RESTRICT_ROLE_ID}/permissions/${updateUserId()}`
+        })
       ).status
     ).toBe(200);
     expect(restrictRowCount()).toBe(0);
@@ -286,8 +312,12 @@ describe('deny lift parity with server', () => {
     });
     expect(
       (
-        await call(token, 'PUT', `/${RESTRICT_ROLE_ID}/permissions`, {
-          items: []
+        await call(token, {
+          method: 'PUT',
+          path: `/${RESTRICT_ROLE_ID}/permissions`,
+          body: {
+            items: []
+          }
         })
       ).status
     ).toBe(200);
@@ -298,9 +328,10 @@ describe('deny lift parity with server', () => {
       permissionId: updateUserId(),
       conditions: DENY_CEO
     });
-    expect((await call(token, 'DELETE', `/${RESTRICT_ROLE_ID}`)).status).toBe(
-      200
-    );
+    expect(
+      (await call(token, { method: 'DELETE', path: `/${RESTRICT_ROLE_ID}` }))
+        .status
+    ).toBe(200);
     expect(
       getState().auditLogs.filter(
         (row) => row.action === 'PERMISSION_GRANT_DENIED'

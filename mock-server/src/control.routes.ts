@@ -573,7 +573,9 @@ router.post('/billing/activate-subscription', (req, res) => {
     return;
   }
 
-  res.json(toSubscriptionResponse(activateSubscription(user, plan, status)));
+  res.json(
+    toSubscriptionResponse(activateSubscription(user, plan, { status }))
+  );
 });
 
 // POST /__control/billing/seed-usage — pre-seed a usage record for E2E without
@@ -783,12 +785,10 @@ router.post('/billing/advance-renewal', (req, res) => {
   let periodStart = nowIso;
   let periodEnd = newEnd.toISOString();
   if (subscription.billingMode === 'usage') {
-    const totalUnits = sumPlanMeterUnits(
-      plan,
-      subscription.id,
-      closedStart,
-      nowIso
-    );
+    const totalUnits = sumPlanMeterUnits(plan, subscription.id, {
+      startIso: closedStart,
+      endIso: nowIso
+    });
     // The deduction settles with the postpaid invoice below, as the server's
     // spend commit does.
     const balance = state.billingCreditBalances.get(subscription.customerId);

@@ -38,8 +38,7 @@ beforeEach(() => {
 function send(
   method: string,
   path: string,
-  body: unknown,
-  token?: string
+  { body, token }: { body: unknown; token?: string }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/${path}`, {
     method,
@@ -53,8 +52,10 @@ function send(
 
 async function login(email: string): Promise<string> {
   const res = await send('POST', 'auth/login', {
-    email,
-    password: 'Password1'
+    body: {
+      email,
+      password: 'Password1'
+    }
   });
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
@@ -68,9 +69,11 @@ describe('the local common-password check mirrors the server verdict', () => {
 
   it('refuses a listed password on register with the server envelope', async () => {
     const res = await send('POST', 'auth/register', {
-      email: 'common-register@example.com',
-      name: 'Common Register',
-      password: COMMON_PASSWORD
+      body: {
+        email: 'common-register@example.com',
+        name: 'Common Register',
+        password: COMMON_PASSWORD
+      }
     });
 
     expect(res.status).toBe(422);
@@ -80,9 +83,11 @@ describe('the local common-password check mirrors the server verdict', () => {
 
   it('refuses a password that contains the first name sent with it', async () => {
     const res = await send('POST', 'auth/register', {
-      email: 'k.ivanova@example.com',
-      name: 'Katerina Ivanova',
-      password: 'Katerina-Sunrise-19'
+      body: {
+        email: 'k.ivanova@example.com',
+        name: 'Katerina Ivanova',
+        password: 'Katerina-Sunrise-19'
+      }
     });
 
     expect(res.status).toBe(422);
@@ -92,9 +97,11 @@ describe('the local common-password check mirrors the server verdict', () => {
   it('answers the local check before the breach corpus', async () => {
     // 'Password1' is in both; the server runs the local check first.
     const res = await send('POST', 'auth/register', {
-      email: 'both-lists@example.com',
-      name: 'Both Lists',
-      password: 'Password1'
+      body: {
+        email: 'both-lists@example.com',
+        name: 'Both Lists',
+        password: 'Password1'
+      }
     });
 
     expect(res.status).toBe(422);
@@ -105,15 +112,17 @@ describe('the local common-password check mirrors the server verdict', () => {
 
   it('refuses a password that contains the account name on reset', async () => {
     const email = 'user@example.com';
-    expect((await send('POST', 'auth/forgot-password', { email })).status).toBe(
-      200
-    );
+    expect(
+      (await send('POST', 'auth/forgot-password', { body: { email } })).status
+    ).toBe(200);
     const [token] = [...getState().passwordResetTokens.keys()];
 
     // The seeded account is named Regular User.
     const res = await send('POST', 'auth/reset-password', {
-      token,
-      password: 'Regular-Sunrise-19'
+      body: {
+        token,
+        password: 'Regular-Sunrise-19'
+      }
     });
 
     expect(res.status).toBe(422);
@@ -124,16 +133,14 @@ describe('the local common-password check mirrors the server verdict', () => {
   it('checks the profile password against the first name sent in the same body', async () => {
     const token = await login('user@example.com');
 
-    const res = await send(
-      'PATCH',
-      'auth/profile',
-      {
+    const res = await send('PATCH', 'auth/profile', {
+      body: {
         name: 'Anastasia',
         password: 'Anastasia-Sunrise-19',
         currentPassword: 'Password1'
       },
       token
-    );
+    });
 
     expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
@@ -143,16 +150,14 @@ describe('the local common-password check mirrors the server verdict', () => {
   it('refuses a listed password on the admin create', async () => {
     const token = await login('admin@example.com');
 
-    const res = await send(
-      'POST',
-      'users',
-      {
+    const res = await send('POST', 'users', {
+      body: {
         email: 'common-create@example.com',
         name: 'Common Create',
         password: COMMON_PASSWORD
       },
       token
-    );
+    });
 
     expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);
@@ -161,16 +166,14 @@ describe('the local common-password check mirrors the server verdict', () => {
   it('checks the admin update password against the email sent in the same body', async () => {
     const token = await login('admin@example.com');
 
-    const res = await send(
-      'PATCH',
-      `users/${mockId('user-3')}`,
-      {
+    const res = await send('PATCH', `users/${mockId('user-3')}`, {
+      body: {
         email: 'zeppelin@example.com',
         password: 'Sunrise-Zeppelin-19',
         currentPassword: 'Password1'
       },
       token
-    );
+    });
 
     expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(TOO_COMMON);

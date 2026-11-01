@@ -134,9 +134,15 @@ export function clearReauthProofCookie(res: Response): void {
 export function logStepUpFailure(
   req: Request,
   user: MockUser,
-  operation: StepUpOperation,
-  factor: 'password' | 'reauth_proof' | 'code',
-  codeOffered: boolean
+  {
+    operation,
+    factor,
+    codeOffered
+  }: {
+    operation: StepUpOperation;
+    factor: 'password' | 'reauth_proof' | 'code';
+    codeOffered: boolean;
+  }
 ): void {
   logAudit('STEP_UP_FAILURE', {
     actorId: user.id,
@@ -153,7 +159,10 @@ export function totpCodeErrors(
   value: unknown,
   optional?: OptionalMode
 ): string[] {
-  return fixedLengthStringErrors('code', value, TOTP_DIGITS, optional);
+  return fixedLengthStringErrors('code', value, {
+    length: TOTP_DIGITS,
+    optional
+  });
 }
 
 /**
@@ -235,8 +244,7 @@ export interface StepUpErrorEnvelope {
 function stepUpCodeError(
   req: Request,
   user: MockUser,
-  code: unknown,
-  operation: StepUpOperation
+  { code, operation }: { code: unknown; operation: StepUpOperation }
 ): StepUpErrorEnvelope | null | 'refused' | undefined {
   if (!user.totpEnabledAt || !code) {
     return undefined;
@@ -259,7 +267,11 @@ function stepUpCodeError(
       ip: req.ip
     });
     if (count >= MAX_FAILED_ATTEMPTS) {
-      logStepUpFailure(req, user, operation, 'code', true);
+      logStepUpFailure(req, user, {
+        operation,
+        factor: 'code',
+        codeOffered: true
+      });
       return stepUpLockedEnvelope(remainingMs);
     }
     return 'refused';
@@ -338,23 +350,27 @@ function invalidCurrentPasswordEnvelope(): StepUpErrorEnvelope {
 export function stepUpError(
   req: Request,
   user: MockUser,
-  currentPassword: unknown,
-  code: unknown,
-  operation: StepUpOperation,
-  // False on a route outside the path the proof cookie is scoped to, which a
-  // browser never sends it to. The server passes no proof there.
-  acceptsReauthProof = true
+  {
+    currentPassword,
+    code,
+    operation,
+    acceptsReauthProof = true
+  }: {
+    currentPassword?: unknown;
+    code?: unknown;
+    operation: StepUpOperation;
+    acceptsReauthProof?: boolean;
+  }
 ): StepUpErrorEnvelope | null {
   // ASVS 6.2.3, as on the server: an account that holds a password changes it
   // only against the current one.
-  const codeVerdict = stepUpCodeError(
-    req,
-    user,
-    operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
-      ? undefined
-      : code,
+  const codeVerdict = stepUpCodeError(req, user, {
+    code:
+      operation === STEP_UP_OPERATION.PASSWORD_SET && user.password !== null
+        ? undefined
+        : code,
     operation
-  );
+  });
   if (codeVerdict !== undefined && codeVerdict !== 'refused') {
     return codeVerdict;
   }
@@ -371,24 +387,30 @@ export function stepUpError(
     }
 
     if (codeRefused) {
-      logStepUpFailure(req, user, operation, 'code', true);
+      logStepUpFailure(req, user, {
+        operation,
+        factor: 'code',
+        codeOffered: true
+      });
       return invalidStepUpCodeEnvelope();
     }
-    logStepUpFailure(req, user, operation, 'reauth_proof', code !== undefined);
+    logStepUpFailure(req, user, {
+      operation,
+      factor: 'reauth_proof',
+      codeOffered: code !== undefined
+    });
     return {
       message: 'Confirm it is you with your sign-in provider, then try again',
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
     };
   }
 
-  return stepUpPasswordError(
-    req,
-    user,
+  return stepUpPasswordError(req, user, {
     currentPassword,
     operation,
-    code !== undefined,
+    codeOffered: code !== undefined,
     codeRefused
-  );
+  });
 }
 
 /**
@@ -401,17 +423,24 @@ export function stepUpError(
 function stepUpPasswordError(
   req: Request,
   user: MockUser,
-  currentPassword: unknown,
-  operation: StepUpOperation,
-  codeOffered: boolean,
-  codeRefused: boolean
+  {
+    currentPassword,
+    operation,
+    codeOffered,
+    codeRefused
+  }: {
+    currentPassword: unknown;
+    operation: StepUpOperation;
+    codeOffered: boolean;
+    codeRefused: boolean;
+  }
 ): StepUpErrorEnvelope | null {
   if (!currentPassword) {
     if (codeRefused) {
-      logStepUpFailure(req, user, operation, 'code', codeOffered);
+      logStepUpFailure(req, user, { operation, factor: 'code', codeOffered });
       return invalidStepUpCodeEnvelope();
     }
-    logStepUpFailure(req, user, operation, 'password', codeOffered);
+    logStepUpFailure(req, user, { operation, factor: 'password', codeOffered });
     return invalidCurrentPasswordEnvelope();
   }
 
@@ -428,7 +457,7 @@ function stepUpPasswordError(
   }
 
   const { count, remainingMs } = recordFailure(windows, user.id);
-  logStepUpFailure(req, user, operation, 'password', codeOffered);
+  logStepUpFailure(req, user, { operation, factor: 'password', codeOffered });
   return count >= MAX_FAILED_ATTEMPTS
     ? stepUpPasswordLockedEnvelope(remainingMs)
     : invalidCurrentPasswordEnvelope();

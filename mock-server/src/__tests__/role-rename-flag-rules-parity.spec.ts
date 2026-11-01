@@ -34,9 +34,7 @@ async function login(email: string): Promise<string> {
 
 async function call(
   token: string,
-  method: string,
-  path: string,
-  body?: unknown
+  { method, path, body }: { method: string; path: string; body?: unknown }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -71,7 +69,11 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
     key: string;
   }> {
     const admin = await login('admin@example.com');
-    const roleRes = await call(admin, 'POST', '/roles', { name: 'beta' });
+    const roleRes = await call(admin, {
+      method: 'POST',
+      path: '/roles',
+      body: { name: 'beta' }
+    });
     expect(roleRes.status).toBe(201);
     const roleId = ((await roleRes.json()) as { id: string }).id;
 
@@ -83,13 +85,17 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
     const user = await login('user@example.com');
 
     const key = 'beta-feature';
-    const flagRes = await call(admin, 'POST', '/admin/feature-flags', {
-      key,
-      enabled: true,
-      rules: roleNames.map((names) => ({
-        effect: 'include',
-        payload: { type: 'role', roleNames: names }
-      }))
+    const flagRes = await call(admin, {
+      method: 'POST',
+      path: '/admin/feature-flags',
+      body: {
+        key,
+        enabled: true,
+        rules: roleNames.map((names) => ({
+          effect: 'include',
+          payload: { type: 'role', roleNames: names }
+        }))
+      }
     });
     expect(flagRes.status).toBe(201);
     const flagId = ((await flagRes.json()) as { id: string }).id;
@@ -97,7 +103,7 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
   }
 
   async function userSees(user: string, key: string): Promise<boolean> {
-    const res = await call(user, 'GET', '/feature-flags');
+    const res = await call(user, { method: 'GET', path: '/feature-flags' });
     const body = (await res.json()) as { flags: Record<string, boolean> };
     return body.flags[key] === true;
   }
@@ -110,8 +116,12 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
     const versionBefore = versionOf(flagId);
     expect(await userSees(user, key)).toBe(true);
 
-    const renameRes = await call(admin, 'PATCH', `/roles/${roleId}`, {
-      name: 'beta-2'
+    const renameRes = await call(admin, {
+      method: 'PATCH',
+      path: `/roles/${roleId}`,
+      body: {
+        name: 'beta-2'
+      }
     });
     expect(renameRes.status).toBe(200);
 
@@ -119,7 +129,10 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
     expect(versionOf(flagId)).toBe(versionBefore + 1);
     expect(await userSees(user, key)).toBe(true);
 
-    const deleteRes = await call(admin, 'DELETE', `/roles/${roleId}`);
+    const deleteRes = await call(admin, {
+      method: 'DELETE',
+      path: `/roles/${roleId}`
+    });
     expect(deleteRes.status).toBe(200);
 
     expect(roleNamesOf(flagId)).toEqual([['staff'], []]);
@@ -131,8 +144,12 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
     const { admin, roleId, flagId } = await setUp([['staff']]);
     const versionBefore = versionOf(flagId);
 
-    await call(admin, 'PATCH', `/roles/${roleId}`, { name: 'beta-2' });
-    await call(admin, 'DELETE', `/roles/${roleId}`);
+    await call(admin, {
+      method: 'PATCH',
+      path: `/roles/${roleId}`,
+      body: { name: 'beta-2' }
+    });
+    await call(admin, { method: 'DELETE', path: `/roles/${roleId}` });
 
     expect(roleNamesOf(flagId)).toEqual([['staff']]);
     expect(versionOf(flagId)).toBe(versionBefore);

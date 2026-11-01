@@ -81,8 +81,7 @@ const wait = (ms: number): Promise<void> =>
 async function call(
   method: string,
   path: string,
-  token: string,
-  body?: unknown
+  { token, body }: { token: string; body?: unknown }
 ): Promise<number> {
   const res = await fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -109,8 +108,11 @@ describe('permissions_updated after a resource write', () => {
   it('is sent once for a narrowing of the users resource', async () => {
     expect(
       await pushesAfter((token) =>
-        call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, token, {
-          allowedActionNames: ['read', 'search']
+        call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, {
+          token,
+          body: {
+            allowedActionNames: ['read', 'search']
+          }
         })
       )
     ).toBe(1);
@@ -121,11 +123,17 @@ describe('permissions_updated after a resource write', () => {
     expect(
       await pushesAfter(async (token) => {
         const statuses = [
-          await call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, token, {
-            displayName: 'Members'
+          await call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, {
+            token,
+            body: {
+              displayName: 'Members'
+            }
           }),
-          await call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, token, {
-            allowedActionNames: [...declared].reverse()
+          await call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, {
+            token,
+            body: {
+              allowedActionNames: [...declared].reverse()
+            }
           })
         ];
         return statuses.every((status) => status === 200) ? 200 : 500;
@@ -137,7 +145,7 @@ describe('permissions_updated after a resource write', () => {
     getState().resources.get(USERS_RESOURCE_ID)!.isOrphaned = true;
     expect(
       await pushesAfter((token) =>
-        call('POST', `/rbac/resources/${USERS_RESOURCE_ID}/restore`, token)
+        call('POST', `/rbac/resources/${USERS_RESOURCE_ID}/restore`, { token })
       )
     ).toBe(1);
   });
@@ -148,7 +156,7 @@ describe('permissions_updated after a resource write', () => {
         const status = await call(
           'POST',
           `/rbac/resources/${USERS_RESOURCE_ID}/restore`,
-          token
+          { token }
         );
         return status === 409 ? 200 : 500;
       })

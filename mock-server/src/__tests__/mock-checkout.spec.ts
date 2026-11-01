@@ -37,9 +37,11 @@ async function login(): Promise<{ token: string; userId: string }> {
 
 async function call(
   token: string,
-  method: 'POST' | 'PUT',
-  path: string,
-  body: unknown = {}
+  {
+    method,
+    path,
+    body = {}
+  }: { method: 'POST' | 'PUT'; path: string; body?: unknown }
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/billing${path}`, {
     method,
@@ -56,7 +58,7 @@ async function openSession(
   path: string,
   body: unknown
 ): Promise<CheckoutSessionResponse> {
-  const res = await call(token, 'POST', path, body);
+  const res = await call(token, { method: 'POST', path, body });
   expect(res.status).toBe(200);
   const session = (await res.json()) as CheckoutSessionResponse;
   expect(session.url).toBe(`/api/__mock-checkout/${session.sessionRef}`);
@@ -97,9 +99,15 @@ describe('mock checkout page', () => {
 
   it('settles on the provider of the checkout after a region override', async () => {
     const { token } = await login();
-    expect((await call(token, 'PUT', '/region', { region: 'ru' })).status).toBe(
-      200
-    );
+    expect(
+      (
+        await call(token, {
+          method: 'PUT',
+          path: '/region',
+          body: { region: 'ru' }
+        })
+      ).status
+    ).toBe(200);
     const session = await openSession(token, '/checkout', { planKey: 'pro' });
     expect(session.provider).toBe('yookassa');
 
@@ -127,7 +135,11 @@ describe('mock checkout page', () => {
 
     it('when a second tab pays the same plan', async () => {
       const { token } = await login();
-      await call(token, 'PUT', '/region', { region: 'ru' });
+      await call(token, {
+        method: 'PUT',
+        path: '/region',
+        body: { region: 'ru' }
+      });
       const tabA = await ruSession(token, 'pro');
       const tabB = await ruSession(token, 'pro');
 
@@ -142,7 +154,11 @@ describe('mock checkout page', () => {
 
     it('when a later checkout moved the row to another plan', async () => {
       const { token } = await login();
-      await call(token, 'PUT', '/region', { region: 'ru' });
+      await call(token, {
+        method: 'PUT',
+        path: '/region',
+        body: { region: 'ru' }
+      });
       const tabA = await ruSession(token, 'pro');
       await ruSession(token, 'business');
 
@@ -161,7 +177,11 @@ describe('mock checkout page', () => {
 
     it('when the row was cancelled first', async () => {
       const { token } = await login();
-      await call(token, 'PUT', '/region', { region: 'ru' });
+      await call(token, {
+        method: 'PUT',
+        path: '/region',
+        body: { region: 'ru' }
+      });
       const session = await ruSession(token, 'pro');
       for (const sub of getState().billingSubscriptions.values()) {
         sub.status = 'canceled';
@@ -181,7 +201,11 @@ describe('mock checkout page', () => {
     for (const plan of getState().plans.values()) {
       if (plan.key === 'pro') plan.trialDays = 14;
     }
-    await call(token, 'PUT', '/region', { region: 'ru' });
+    await call(token, {
+      method: 'PUT',
+      path: '/region',
+      body: { region: 'ru' }
+    });
 
     const first = await openSession(token, '/checkout', { planKey: 'pro' });
     expect((await pay(first.url)).status).toBe(200);
@@ -191,8 +215,12 @@ describe('mock checkout page', () => {
     const [customer] = getState().billingCustomers.values();
     expect(customer.trialUsedAt).toEqual(expect.any(String));
 
-    const cancel = await call(token, 'POST', '/subscription/cancel', {
-      mode: 'immediate'
+    const cancel = await call(token, {
+      method: 'POST',
+      path: '/subscription/cancel',
+      body: {
+        mode: 'immediate'
+      }
     });
     expect(cancel.status).toBe(200);
 

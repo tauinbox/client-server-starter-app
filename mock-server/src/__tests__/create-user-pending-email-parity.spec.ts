@@ -38,8 +38,7 @@ async function login(email: string): Promise<string> {
 async function send(
   method: string,
   path: string,
-  body: unknown,
-  token?: string
+  { body, token }: { body: unknown; token?: string }
 ): Promise<{ status: number; body: { message: string; errorKey?: string } }> {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
@@ -58,12 +57,10 @@ async function send(
 /** Parks `CLAIMED_EMAIL` as the seeded user's pending address. */
 async function claimAsPendingEmail(): Promise<void> {
   const token = await login('user@example.com');
-  const { status } = await send(
-    'POST',
-    '/api/v1/auth/profile/email/initiate',
-    { newEmail: CLAIMED_EMAIL, currentPassword: 'Password1' },
+  const { status } = await send('POST', '/api/v1/auth/profile/email/initiate', {
+    body: { newEmail: CLAIMED_EMAIL, currentPassword: 'Password1' },
     token
-  );
+  });
   expect(status).toBe(200);
 }
 
@@ -81,11 +78,9 @@ describe('create-user pending-email conflict parity with server', () => {
   it('rejects registration for an address held as a pending email', async () => {
     await claimAsPendingEmail();
 
-    const { status, body } = await send(
-      'POST',
-      '/api/v1/auth/register',
-      createBody
-    );
+    const { status, body } = await send('POST', '/api/v1/auth/register', {
+      body: createBody
+    });
 
     expect(status).toBe(409);
     expect(body.errorKey).toBe(ErrorKeys.USERS.EMAIL_EXISTS);
@@ -95,12 +90,10 @@ describe('create-user pending-email conflict parity with server', () => {
     await claimAsPendingEmail();
     const adminToken = await login('admin@example.com');
 
-    const { status, body } = await send(
-      'POST',
-      '/api/v1/users',
-      createBody,
-      adminToken
-    );
+    const { status, body } = await send('POST', '/api/v1/users', {
+      body: createBody,
+      token: adminToken
+    });
 
     expect(status).toBe(409);
     expect(body.errorKey).toBe(ErrorKeys.USERS.EMAIL_EXISTS);
@@ -108,18 +101,18 @@ describe('create-user pending-email conflict parity with server', () => {
 
   it('still creates the user on both paths when nothing holds the address', async () => {
     const registered = await send('POST', '/api/v1/auth/register', {
-      ...createBody,
-      email: 'fresh-register@example.com'
+      body: {
+        ...createBody,
+        email: 'fresh-register@example.com'
+      }
     });
     expect(registered.status).toBe(201);
 
     const adminToken = await login('admin@example.com');
-    const created = await send(
-      'POST',
-      '/api/v1/users',
-      { ...createBody, email: 'fresh-admin@example.com' },
-      adminToken
-    );
+    const created = await send('POST', '/api/v1/users', {
+      body: { ...createBody, email: 'fresh-admin@example.com' },
+      token: adminToken
+    });
     expect(created.status).toBe(201);
   });
 });

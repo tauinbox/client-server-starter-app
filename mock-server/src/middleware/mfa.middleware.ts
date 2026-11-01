@@ -121,7 +121,7 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
 
 /** The sign-in the password alone did not buy. */
 function issueSession(req: Request, res: Response, user: MockUser): void {
-  completeSignIn(req, res, user, { factor: 'mfa' });
+  completeSignIn({ req, res }, user, { factor: 'mfa' });
 }
 
 // POST /api/v1/auth/mfa/setup
@@ -139,13 +139,10 @@ router.post('/setup', authGuard, (req, res) => {
     return;
   }
 
-  const stepUp = stepUpError(
-    req,
-    user,
+  const stepUp = stepUpError(req, user, {
     currentPassword,
-    undefined,
-    STEP_UP_OPERATION.MFA_SETUP
-  );
+    operation: STEP_UP_OPERATION.MFA_SETUP
+  });
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
     return;
@@ -253,13 +250,11 @@ router.post('/disable', authGuard, (req, res) => {
     return;
   }
 
-  const stepUp = stepUpError(
-    req,
-    user,
+  const stepUp = stepUpError(req, user, {
     currentPassword,
     code,
-    STEP_UP_OPERATION.MFA_DISABLE
-  );
+    operation: STEP_UP_OPERATION.MFA_DISABLE
+  });
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
     return;
@@ -305,13 +300,11 @@ router.post('/recovery-codes', authGuard, (req, res) => {
     return;
   }
 
-  const stepUp = stepUpError(
-    req,
-    user,
+  const stepUp = stepUpError(req, user, {
     currentPassword,
     code,
-    STEP_UP_OPERATION.MFA_RECOVERY_CODES
-  );
+    operation: STEP_UP_OPERATION.MFA_RECOVERY_CODES
+  });
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
     return;

@@ -164,8 +164,7 @@ export function stringErrors(
 export function fixedLengthStringErrors(
   field: string,
   value: unknown,
-  length: number,
-  optional?: OptionalMode
+  { length, optional }: { length: number; optional?: OptionalMode }
 ): string[] {
   if (isSkipped(value, optional)) return [];
   if (typeof value === 'string' && value.length === length) return [];
@@ -409,12 +408,19 @@ export function isUuidV4(value: unknown): boolean {
  * the nested ones.
  */
 export function nestedErrors(
-  parentPath: string,
   field: string,
   value: unknown,
-  own: string[],
-  validate: (path: string, value: object) => string[],
-  each = false
+  {
+    parentPath,
+    own,
+    validate,
+    each = false
+  }: {
+    parentPath: string;
+    own: string[];
+    validate: (path: string, value: object) => string[];
+    each?: boolean;
+  }
 ): string[] {
   const path = parentPath ? `${parentPath}.${field}` : field;
   const nestedMessage = `${each ? 'each value in ' : ''}nested property ${field} must be either object or array`;
@@ -459,8 +465,7 @@ export function iso8601Errors(field: string, value: unknown): string[] {
 export function oneOfErrors(
   field: string,
   value: unknown,
-  values: readonly string[],
-  optional?: OptionalMode
+  { values, optional }: { values: readonly string[]; optional?: OptionalMode }
 ): string[] {
   if (isSkipped(value, optional)) return [];
   return values.includes(value as string)

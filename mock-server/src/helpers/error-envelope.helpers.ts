@@ -28,11 +28,10 @@ function isErrorKey(value: unknown): value is ErrorKey {
 export function sendError(
   res: Response,
   errorKey: ErrorKey,
-  message: string,
-  extra: Record<string, unknown> = {}
+  message: string
 ): void {
   // eslint-disable-next-line no-restricted-syntax -- the one place that pairs a key with its status
-  res.status(ERROR_STATUS[errorKey]).json({ ...extra, message, errorKey });
+  res.status(ERROR_STATUS[errorKey]).json({ message, errorKey });
 }
 
 /**
@@ -94,6 +93,7 @@ export const routeNotFound: RequestHandler = (req, res) => {
  * URI encoding are a 400, an exposed http-errors 4xx (a body over the size
  * limit) keeps its status, and anything else is a 500 with no detail.
  */
+// eslint-disable-next-line no-restricted-syntax -- Express detects an error handler by its four parameters
 export const unhandledError: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof SyntaxError || err instanceof URIError) {
     // eslint-disable-next-line no-restricted-syntax -- Nest sends this 400 with no key

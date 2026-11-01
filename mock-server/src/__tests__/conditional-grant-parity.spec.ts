@@ -88,8 +88,10 @@ async function login(): Promise<string> {
 async function call(
   method: string,
   path: string,
-  body?: unknown,
-  headers: Record<string, string> = {}
+  {
+    body,
+    headers = {}
+  }: { body?: unknown; headers?: Record<string, string> } = {}
 ): Promise<{ status: number; json: unknown }> {
   const res = await fetch(`${baseUrl}/api/v1${path}`, {
     method,
@@ -183,10 +185,16 @@ describe('conditional grants on FeatureFlag', () => {
     ]);
     const outside = `/admin/feature-flags/${BETA_EXPORT_ID}`;
     expect((await call('GET', outside)).status).toBe(403);
-    expect((await call('POST', `${outside}/preview`, {})).status).toBe(403);
     expect(
-      (await call('PATCH', outside, { enabled: false }, { 'if-match': '"1"' }))
-        .status
+      (await call('POST', `${outside}/preview`, { body: {} })).status
+    ).toBe(403);
+    expect(
+      (
+        await call('PATCH', outside, {
+          body: { enabled: false },
+          headers: { 'if-match': '"1"' }
+        })
+      ).status
     ).toBe(403);
     expect((await call('DELETE', outside)).status).toBe(403);
     expect(getState().featureFlags.get(BETA_EXPORT_ID)?.enabled).toBe(true);
@@ -198,7 +206,9 @@ describe('conditional grants on FeatureFlag', () => {
   it('refuses a create outside the condition', async () => {
     grant([['feature-flags', 'create', onlyNewDashboard]]);
     const res = await call('POST', '/admin/feature-flags', {
-      key: 'another-flag'
+      body: {
+        key: 'another-flag'
+      }
     });
     expect(res.status).toBe(403);
   });
@@ -207,12 +217,20 @@ describe('conditional grants on FeatureFlag', () => {
     grant([['feature-flags', 'update', { fieldMatch: { enabled: [false] } }]]);
     const path = `/admin/feature-flags/${NEW_DASHBOARD_ID}`;
     expect(
-      (await call('PATCH', path, { enabled: true }, { 'if-match': '"1"' }))
-        .status
+      (
+        await call('PATCH', path, {
+          body: { enabled: true },
+          headers: { 'if-match': '"1"' }
+        })
+      ).status
     ).toBe(403);
     expect(
-      (await call('PATCH', path, { description: 'x' }, { 'if-match': '"1"' }))
-        .status
+      (
+        await call('PATCH', path, {
+          body: { description: 'x' },
+          headers: { 'if-match': '"1"' }
+        })
+      ).status
     ).toBe(200);
   });
 });
@@ -237,27 +255,37 @@ describe('conditional update checks the record after the write', () => {
 
   it('refuses a user write that leaves the condition', async () => {
     const path = `/users/${johnId()}`;
-    expect((await call('PATCH', path, { name: 'Moved' })).status).toBe(403);
+    expect(
+      (await call('PATCH', path, { body: { name: 'Moved' } })).status
+    ).toBe(403);
     expect(getState().users.get(johnId())?.name).toBe('John Smith');
-    expect((await call('PATCH', path, { locale: 'ru' })).status).toBe(200);
+    expect((await call('PATCH', path, { body: { locale: 'ru' } })).status).toBe(
+      200
+    );
   });
 
   it('refuses a role write that leaves the condition', async () => {
     const path = `/roles/${SCOPED_ROLE_ID}`;
-    expect((await call('PATCH', path, { name: 'moved' })).status).toBe(403);
+    expect(
+      (await call('PATCH', path, { body: { name: 'moved' } })).status
+    ).toBe(403);
     expect(getState().roles.get(SCOPED_ROLE_ID)?.name).toBe('scoped');
-    expect((await call('PATCH', path, { description: 'x' })).status).toBe(200);
+    expect(
+      (await call('PATCH', path, { body: { description: 'x' } })).status
+    ).toBe(200);
   });
 
   it('refuses a resource write that leaves the condition', async () => {
     expect(
-      (await call('PATCH', flagsResource, { displayName: 'Moved' })).status
+      (await call('PATCH', flagsResource, { body: { displayName: 'Moved' } }))
+        .status
     ).toBe(403);
     expect(
       getState().resources.get(mockId('res-feature-flags'))?.displayName
     ).toBe('Feature Flags');
     expect(
-      (await call('PATCH', flagsResource, { description: 'x' })).status
+      (await call('PATCH', flagsResource, { body: { description: 'x' } }))
+        .status
     ).toBe(200);
   });
 });
@@ -278,7 +306,9 @@ describe('conditional assign:Role', () => {
     expect(
       (
         await call('POST', `/roles/assign/${johnId()}`, {
-          roleId: OTHER_ROLE_ID
+          body: {
+            roleId: OTHER_ROLE_ID
+          }
         })
       ).status
     ).toBe(403);
@@ -291,7 +321,9 @@ describe('conditional assign:Role', () => {
 
   it('assigns a role inside the condition', async () => {
     const res = await call('POST', `/roles/assign/${johnId()}`, {
-      roleId: SCOPED_ROLE_ID
+      body: {
+        roleId: SCOPED_ROLE_ID
+      }
     });
     expect(res.status).toBe(201);
   });
