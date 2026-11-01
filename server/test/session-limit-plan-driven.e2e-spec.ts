@@ -13,6 +13,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
+import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { GeoIpService } from '../src/modules/auth/services/geo-ip.service';
 import { SessionIssuerService } from '../src/modules/auth/services/session-issuer.service';
@@ -183,6 +184,8 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
         },
         AuthService,
         PurposeTokenService,
+        // No suite here resets a password, so no provider row is removed.
+        { provide: OAuthAccountService, useValue: {} },
         {
           // These suites never present a second factor. The mock answers the two
           // members AuthService and AuthController read, so the branch is simply

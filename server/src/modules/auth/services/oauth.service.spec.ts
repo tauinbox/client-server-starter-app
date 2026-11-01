@@ -30,6 +30,7 @@ describe('OAuthService', () => {
   let mockManager: {
     findOne: jest.Mock;
     save: jest.Mock;
+    insert: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
   let mockDataSource: {
@@ -41,7 +42,6 @@ describe('OAuthService', () => {
   };
   let mockOAuthAccountService: {
     findByProviderAndProviderId: jest.Mock;
-    createOAuthAccount: jest.Mock;
   };
   let mockRoleService: {
     findRoleByName: jest.Mock;
@@ -96,6 +96,7 @@ describe('OAuthService', () => {
     mockManager = {
       findOne: jest.fn().mockResolvedValue(null),
       save: jest.fn(),
+      insert: jest.fn().mockResolvedValue(undefined),
       createQueryBuilder: jest.fn().mockReturnValue(mockRelationQb)
     };
 
@@ -114,8 +115,7 @@ describe('OAuthService', () => {
     };
 
     mockOAuthAccountService = {
-      findByProviderAndProviderId: jest.fn(),
-      createOAuthAccount: jest.fn().mockResolvedValue(undefined)
+      findByProviderAndProviderId: jest.fn()
     };
 
     mockRoleService = {
@@ -481,7 +481,7 @@ describe('OAuthService', () => {
       });
 
       // Side-effect assertion: NO OAuth account row created.
-      expect(mockOAuthAccountService.createOAuthAccount).not.toHaveBeenCalled();
+      expect(mockManager.insert).not.toHaveBeenCalled();
       expect(mockManager.save).not.toHaveBeenCalled();
     });
 
@@ -817,23 +817,31 @@ describe('OAuthService', () => {
       new Date('2026-01-01T00:00:00Z').getTime() / 1000
     );
 
-    it('should link OAuth account to active user', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+    const LINK_ROW = {
+      userId: 'user-1',
+      provider: 'google',
+      providerId: 'google-123'
+    };
+    const uniqueViolation = { code: '23505' };
 
+    beforeEach(() => {
+      mockManager.findOne.mockResolvedValue(mockUser);
+    });
+
+    it('should link OAuth account to active user', async () => {
       await service.linkOAuthToUser(
         'user-1',
         { provider: 'google', providerId: 'google-123' },
         { linkTokenIssuedAt: LINK_TOKEN_IAT }
       );
 
-      expect(mockUsersService.findOne).toHaveBeenCalledWith(
-        'user-1',
-        SYSTEM_ABILITY
-      );
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
-        'user-1',
-        'google',
-        'google-123'
+      expect(mockManager.findOne).toHaveBeenCalledWith(User, {
+        where: { id: 'user-1' },
+        lock: { mode: 'pessimistic_read' }
+      });
+      expect(mockManager.insert).toHaveBeenCalledWith(
+        expect.anything(),
+        LINK_ROW
       );
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -847,8 +855,6 @@ describe('OAuthService', () => {
     // A linked provider is a permanent extra credential on the account, so
     // the owner is told which provider was added and when.
     it('should notify the account owner that a provider was linked', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-
       await service.linkOAuthToUser(
         'user-1',
         { provider: 'google', providerId: 'google-123' },
@@ -872,7 +878,6 @@ describe('OAuthService', () => {
       mockMailService.sendOAuthLinkedNotification.mockRejectedValueOnce(
         new Error('smtp down')
       );
-      mockUsersService.findOne.mockResolvedValue(mockUser);
 
       await service.linkOAuthToUser(
         'user-1',
@@ -881,13 +886,13 @@ describe('OAuthService', () => {
       );
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalled();
+      expect(mockManager.insert).toHaveBeenCalled();
       expect(loggerError).toHaveBeenCalled();
     });
 
     it('should throw when user is deactivated', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
-      mockUsersService.findOne.mockResolvedValue(inactiveUser);
+      mockManager.findOne.mockResolvedValue(inactiveUser);
 
       await expect(
         service.linkOAuthToUser(
@@ -896,13 +901,26 @@ describe('OAuthService', () => {
           { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toThrow(HttpException);
+      expect(mockManager.insert).not.toHaveBeenCalled();
+    });
+
+    it('should refuse a link for an account that no longer exists', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.linkOAuthToUser(
+          'user-1',
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+        )
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+      });
+      expect(mockManager.insert).not.toHaveBeenCalled();
     });
 
     it('should throw HttpException when OAuth account linked to another user', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
-        code: '23505'
-      });
+      mockManager.insert.mockRejectedValue(uniqueViolation);
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         userId: 'other-user-id',
         provider: 'google',
@@ -920,14 +938,10 @@ describe('OAuthService', () => {
 
     it('should silently succeed when OAuth account already linked to same user', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
-        code: '23505'
-      });
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
-        userId: 'user-1',
-        provider: 'google',
-        providerId: 'google-123'
-      });
+      mockManager.insert.mockRejectedValue(uniqueViolation);
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        LINK_ROW
+      );
 
       await expect(
         service.linkOAuthToUser(
@@ -939,10 +953,7 @@ describe('OAuthService', () => {
     });
 
     it('should refuse a second identity of a provider the user already linked', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
-        code: '23505'
-      });
+      mockManager.insert.mockRejectedValue(uniqueViolation);
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -962,14 +973,10 @@ describe('OAuthService', () => {
 
     it('should recognise the unique violation when TypeORM wraps the driver error', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue({
-        driverError: { code: '23505' }
-      });
-      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
-        userId: 'user-1',
-        provider: 'google',
-        providerId: 'google-123'
-      });
+      mockManager.insert.mockRejectedValue({ driverError: uniqueViolation });
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
+        LINK_ROW
+      );
 
       await expect(
         service.linkOAuthToUser(
@@ -983,7 +990,7 @@ describe('OAuthService', () => {
     // Regression: the link cookie can outlive the session that minted it, so a
     // token older than the last revocation must link nothing.
     it('should refuse a link token issued before the last session revocation', async () => {
-      mockUsersService.findOne.mockResolvedValue({
+      mockManager.findOne.mockResolvedValue({
         ...mockUser,
         tokenRevokedAt: new Date((LINK_TOKEN_IAT + 60) * 1000)
       });
@@ -995,11 +1002,11 @@ describe('OAuthService', () => {
           { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toThrow(HttpException);
-      expect(mockOAuthAccountService.createOAuthAccount).not.toHaveBeenCalled();
+      expect(mockManager.insert).not.toHaveBeenCalled();
     });
 
     it('should link when the token was issued in the second of the last revocation', async () => {
-      mockUsersService.findOne.mockResolvedValue({
+      mockManager.findOne.mockResolvedValue({
         ...mockUser,
         tokenRevokedAt: new Date(LINK_TOKEN_IAT * 1000 + 700)
       });
@@ -1010,11 +1017,11 @@ describe('OAuthService', () => {
         { linkTokenIssuedAt: LINK_TOKEN_IAT }
       );
 
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalled();
+      expect(mockManager.insert).toHaveBeenCalled();
     });
 
     it('should link when the token was issued after the last revocation', async () => {
-      mockUsersService.findOne.mockResolvedValue({
+      mockManager.findOne.mockResolvedValue({
         ...mockUser,
         tokenRevokedAt: new Date((LINK_TOKEN_IAT - 60) * 1000)
       });
@@ -1025,17 +1032,15 @@ describe('OAuthService', () => {
         { linkTokenIssuedAt: LINK_TOKEN_IAT }
       );
 
-      expect(mockOAuthAccountService.createOAuthAccount).toHaveBeenCalledWith(
-        'user-1',
-        'google',
-        'google-123'
+      expect(mockManager.insert).toHaveBeenCalledWith(
+        expect.anything(),
+        LINK_ROW
       );
     });
 
     it('should rethrow non-unique-violation errors', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
       const dbError = new Error('Connection lost');
-      mockOAuthAccountService.createOAuthAccount.mockRejectedValue(dbError);
+      mockManager.insert.mockRejectedValue(dbError);
 
       await expect(
         service.linkOAuthToUser(

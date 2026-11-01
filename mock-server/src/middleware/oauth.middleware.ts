@@ -189,7 +189,7 @@ router.post('/exchange', (req, res) => {
 // POST /api/v1/auth/oauth/link-init The real server mints an intent cookie its
 // provider callback consumes. Both provider halves are Not Implemented here, so
 // only the step-up the route now demands is reproduced: a linked provider is a
-// credential no recovery path removes.
+// credential that outlives every session.
 router.post('/link-init', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;

@@ -68,7 +68,10 @@ describe('UsersController', () => {
     sendPasswordChangedNotification: jest.Mock;
     sendEmailChangeCompletedNotification: jest.Mock;
   };
-  let authServiceMock: { assertStepUp: jest.Mock };
+  let authServiceMock: {
+    assertStepUp: jest.Mock;
+    removeLinkedProviders: jest.Mock;
+  };
   let mfaServiceMock: { resetByAdmin: jest.Mock };
 
   beforeEach(async () => {
@@ -107,7 +110,10 @@ describe('UsersController', () => {
         .mockResolvedValue(undefined)
     };
 
-    authServiceMock = { assertStepUp: jest.fn().mockResolvedValue(undefined) };
+    authServiceMock = {
+      assertStepUp: jest.fn().mockResolvedValue(undefined),
+      removeLinkedProviders: jest.fn().mockResolvedValue(undefined)
+    };
 
     mfaServiceMock = { resetByAdmin: jest.fn().mockResolvedValue(undefined) };
 
@@ -742,6 +748,86 @@ describe('UsersController', () => {
       await controller.update('user-5', dto, req, mockAbility);
 
       expect(eventEmitterMock.emitAsync).toHaveBeenCalledTimes(1);
+      expect(authServiceMock.removeLinkedProviders).toHaveBeenCalledTimes(1);
+    });
+
+    // The recovery takes the account back from whoever held it, so the
+    // providers that holder could have linked go with it.
+    it('removes the linked providers of the target after a password change', async () => {
+      const dto: UpdateUserDto = { password: 'NewPass1' };
+      const updated = { id: 'user-5', email: 'u@example.com', locale: 'en' };
+      usersServiceMock.update.mockResolvedValue(updated);
+      const req = mockJwtRequest() as JwtAuthRequest;
+
+      await controller.update('user-5', dto, req, mockAbility);
+
+      expect(authServiceMock.removeLinkedProviders).toHaveBeenCalledWith(
+        updated,
+        expect.objectContaining({
+          actor: { actorId: req.user.userId, actorEmail: req.user.email }
+        })
+      );
+      expect(
+        eventEmitterMock.emitAsync.mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        authServiceMock.removeLinkedProviders.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('removes the linked providers of the target after an email change', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'old@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'new@example.com'
+      });
+
+      await controller.update(
+        'user-5',
+        { email: 'new@example.com' },
+        mockJwtRequest() as JwtAuthRequest,
+        mockAbility
+      );
+
+      expect(authServiceMock.removeLinkedProviders).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the linked providers on a deactivation or a resubmitted email', async () => {
+      usersServiceMock.findOne.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+      usersServiceMock.update.mockResolvedValue({
+        id: 'user-5',
+        email: 'same@example.com'
+      });
+
+      await controller.update(
+        'user-5',
+        { isActive: false, email: 'same@example.com' },
+        mockJwtRequest() as JwtAuthRequest,
+        mockAbility
+      );
+
+      expect(authServiceMock.removeLinkedProviders).not.toHaveBeenCalled();
+    });
+
+    it('should fail the request when the provider removal fails', async () => {
+      usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
+      authServiceMock.removeLinkedProviders.mockRejectedValue(
+        new Error('db down')
+      );
+
+      await expect(
+        controller.update(
+          'user-5',
+          { password: 'NewPass1' },
+          mockJwtRequest() as JwtAuthRequest,
+          mockAbility
+        )
+      ).rejects.toThrow('db down');
     });
 
     it('should log only the fields that differ from the stored user', async () => {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { ApiError } from '../../../common/errors/api-error';
 import { OAuthAccount } from '../entities/oauth-account.entity';
@@ -21,17 +21,28 @@ export class OAuthAccountService {
     return this.repository.findOne({ where: { provider, providerId } });
   }
 
-  async createOAuthAccount(
-    userId: string,
-    provider: string,
-    providerId: string
-  ): Promise<OAuthAccount> {
-    const account = this.repository.create({ userId, provider, providerId });
-    return this.repository.save(account);
-  }
-
   async findByUserId(userId: string): Promise<OAuthAccount[]> {
     return this.repository.find({ where: { userId } });
+  }
+
+  /**
+   * Deletes every provider linked to the account and returns the provider
+   * names. One statement, so a row that a concurrent link commits cannot be
+   * deleted without being reported.
+   */
+  async removeAllForUser(
+    userId: string,
+    manager: EntityManager = this.repository.manager
+  ): Promise<string[]> {
+    const result = await manager
+      .createQueryBuilder()
+      .delete()
+      .from(OAuthAccount)
+      .where({ userId })
+      .returning(['provider'])
+      .execute();
+    const rows = result.raw as Pick<OAuthAccount, 'provider'>[];
+    return rows.map((row) => row.provider);
   }
 
   /**

@@ -1744,7 +1744,8 @@ OAuth asserts, or another account has that address as its `pendingEmail`, the ca
 `OAuthAuthenticationFailedException(email_already_registered)`. A unique violation on the user insert gives the same
 refusal. It redirects to `/login?oauth_error=email_already_registered`. The user must log in with their password and then link
 the provider with `POST /auth/oauth/link-init`, which asks for their password first: a linked
-provider signs the account in and no recovery path removes it.
+provider signs the account in and outlives every session. An account recovery (a password reset, or an
+administrator who sets a new password or address) removes every linked provider.
 
 **A linked account signs in without an email.** `resolveUserForOAuth` finds a returning user by the
 provider and the `providerId`, and it does not read the address there. Facebook and VK send no address

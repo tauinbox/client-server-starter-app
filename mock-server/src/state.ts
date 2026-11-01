@@ -503,6 +503,40 @@ export function addOAuthAccounts(
   state.oauthAccounts.set(userId, merged);
 }
 
+/**
+ * Account recovery (a password reset, or an administrator who sets a new
+ * password or address) removes every linked provider, as the server does: a
+ * provider that the previous holder linked must not keep signing in.
+ */
+export function removeLinkedProviders(
+  user: Pick<MockUser, 'id' | 'email'>,
+  {
+    actor,
+    source,
+    ip
+  }: {
+    actor: { id: string; email: string };
+    source: 'password_reset' | 'admin';
+    ip?: string;
+  }
+): void {
+  const removed = state.oauthAccounts.get(user.id) ?? [];
+  state.oauthAccounts.delete(user.id);
+  for (const { provider } of removed) {
+    logAudit('OAUTH_UNLINK', {
+      actorId: actor.id,
+      actorEmail: actor.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { provider, source },
+      ip
+    });
+    console.log(
+      `[PROVIDER UNLINKED] To: ${user.email}\n  Provider: ${provider} | IP: ${ip}`
+    );
+  }
+}
+
 // Mirrors AUDIT_FIELD_MAX_LENGTH in the server AuditService: the audit columns
 // are unbounded, so every string field is capped at write time.
 const AUDIT_FIELD_MAX_LENGTH = 255;

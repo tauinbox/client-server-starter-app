@@ -43,6 +43,7 @@ import {
   isMfaMandatoryFor,
   logAudit,
   registerSession,
+  removeLinkedProviders,
   revokeUserSessions,
   sessionAgeMs,
   toUserResponse
@@ -587,6 +588,11 @@ router.post('/reset-password', (req, res) => {
   console.log(
     `[PASSWORD CHANGED] To: ${user.email}\n  Source: reset link | IP: ${req.ip}`
   );
+  removeLinkedProviders(user, {
+    actor: user,
+    source: 'password_reset',
+    ip: req.ip
+  });
 
   res.json({ message: 'Password has been reset successfully' });
 });

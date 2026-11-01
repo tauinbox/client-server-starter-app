@@ -238,40 +238,59 @@ export class OAuthService {
     return !!asserted && asserted === normalizeEmail(user.email);
   }
 
-  private async safeCreateOAuthAccount(
+  /**
+   * Inserts the link in one transaction with the intent check. The user row is
+   * read `FOR SHARE`, and a password reset or an administrator recovery updates
+   * that row: if the recovery comes first, this check sees its revocation time;
+   * if this link comes first, the recovery waits and then deletes the new row.
+   */
+  private async insertLink(
     userId: string,
-    provider: string,
-    providerId: string
-  ): Promise<void> {
+    { provider, providerId }: ProviderIdentity,
+    linkTokenIssuedAt: number
+  ): Promise<User> {
     try {
-      await this.oauthAccountService.createOAuthAccount(
-        userId,
-        provider,
-        providerId
-      );
-    } catch (error: unknown) {
-      if (isUniqueViolation(error)) {
-        const existing =
-          await this.oauthAccountService.findByProviderAndProviderId(
-            provider,
-            providerId
-          );
-        if (existing && existing.userId !== userId) {
+      return await withTransaction(this.dataSource, async (manager) => {
+        const user = await manager.findOne(User, {
+          where: { id: userId },
+          lock: { mode: 'pessimistic_read' }
+        });
+        if (!user) {
           throw new ApiError(
-            ErrorKeys.AUTH.OAUTH_ALREADY_LINKED,
-            'This OAuth account is already linked to another user'
+            ErrorKeys.USERS.NOT_FOUND,
+            `User with ID ${userId} not found`
           );
         }
-        // Already linked to this user — safe to ignore
-        if (existing) return;
-        // The identity is free, so the user already holds another identity of
-        // this provider: the API addresses a linked provider by name only.
+        this.assertIntentValid(user, linkTokenIssuedAt);
+        await manager.insert(OAuthAccount, { userId, provider, providerId });
+        return user;
+      });
+    } catch (error: unknown) {
+      if (!isUniqueViolation(error)) {
+        throw error;
+      }
+      // Read after the rollback: the failed insert aborted the transaction.
+      const existing =
+        await this.oauthAccountService.findByProviderAndProviderId(
+          provider,
+          providerId
+        );
+      if (existing && existing.userId !== userId) {
         throw new ApiError(
-          ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED,
-          'A provider account of this kind is already linked'
+          ErrorKeys.AUTH.OAUTH_ALREADY_LINKED,
+          'This OAuth account is already linked to another user'
         );
       }
-      throw error;
+      // Already linked to this user — safe to ignore
+      if (existing) {
+        return this.intentHolder(userId, linkTokenIssuedAt);
+      }
+      // The identity is free, so the user already holds another identity of
+      // this provider: the API addresses a linked provider by name only.
+      throw new ApiError(
+        ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED,
+        'A provider account of this kind is already linked'
+      );
     }
   }
 
@@ -318,8 +337,11 @@ export class OAuthService {
       auditContext
     }: { linkTokenIssuedAt: number; auditContext?: AuditContext }
   ): Promise<void> {
-    const user = await this.intentHolder(userId, linkTokenIssuedAt);
-    await this.safeCreateOAuthAccount(userId, provider, providerId);
+    const user = await this.insertLink(
+      userId,
+      { provider, providerId },
+      linkTokenIssuedAt
+    );
 
     this.auditService.logFireAndForget({
       action: AuditAction.OAUTH_LINK,
@@ -353,6 +375,11 @@ export class OAuthService {
     intentIssuedAt: number
   ): Promise<User> {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
+    this.assertIntentValid(user, intentIssuedAt);
+    return user;
+  }
+
+  private assertIntentValid(user: User, intentIssuedAt: number): void {
     if (!user.isActive) {
       throw new ApiError(
         ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED,
@@ -365,6 +392,5 @@ export class OAuthService {
         'Token has been revoked'
       );
     }
-    return user;
   }
 }

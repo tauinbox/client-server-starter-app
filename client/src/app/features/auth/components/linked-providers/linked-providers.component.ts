@@ -169,8 +169,8 @@ export class LinkedProvidersComponent {
   }
 
   /**
-   * A link plants a credential the account owner cannot revoke by changing
-   * their password, so it asks for a factor first. An account that holds a
+   * A link plants a credential that outlives every session, so it asks for a
+   * factor first. An account that holds a
    * password or an authenticator types it here; an account with neither proves
    * itself at its provider, which is a round trip of its own before the one
    * that does the linking.
@@ -190,8 +190,8 @@ export class LinkedProvidersComponent {
   }
 
   /**
-   * The row an unlink deletes is a sign-in credential that a password change
-   * does not revoke, so removing one costs the factor that adding one costs.
+   * The row an unlink deletes is a sign-in credential that outlives every
+   * session, so removing one costs the factor that adding one costs.
    * An account with neither a password nor an authenticator proves itself at a
    * provider it still holds.
    */

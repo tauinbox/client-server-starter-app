@@ -30,6 +30,7 @@ import {
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { MfaService } from './mfa.service';
+import { OAuthAccountService } from './oauth-account.service';
 import { FailedAttemptCounter } from '../../../common/utils/failed-attempt-counter';
 import { hashToken } from '../../../common/utils/hash-token';
 import { lockedException } from '../../../common/utils/locked-exception';
@@ -179,6 +180,7 @@ export class AuthService {
     private purposeTokens: PurposeTokenService,
     private breachedPasswordService: BreachedPasswordService,
     private mfaService: MfaService,
+    private oauthAccountService: OAuthAccountService,
     private eventEmitter: EventEmitter2,
     @Inject(CACHE_MANAGER) cache: Cache
   ) {
@@ -575,42 +577,48 @@ export class AuthService {
     // Update password, clear reset token, and invalidate all sessions atomically.
     // Without a transaction, a failure between steps could leave the account in an
     // inconsistent state (e.g. password changed but old sessions still active).
-    await withTransaction(this.dataSource, async (manager) => {
-      // Keyed on the token too: a password change or an ownership change that
-      // lands between the lookup above and this write clears the token, and
-      // the stale reset must then lose instead of overwriting it. The throw
-      // stays inside the transaction so the session delete rolls back with it.
-      const consumed = await manager.update(
-        User,
-        { id: user.id, passwordResetToken: hashedToken },
-        {
-          password: hashedPassword,
-          passwordHashVersion,
-          passwordResetToken: null,
-          passwordResetExpiresAt: null,
-          // Reset also cancels any in-flight self-service email change — proof
-          // of email ownership is invalidated when password ownership changes.
-          pendingEmail: null,
-          pendingEmailToken: null,
-          pendingEmailExpiresAt: null,
-          // Proving mailbox ownership outranks the failed-guess counter: without
-          // this the reset succeeds and the new password is still locked out.
-          failedLoginAttempts: 0,
-          lockedUntil: null,
-          // Redeeming the token is the same proof of mailbox control that the
-          // verification link carries: it is only ever mailed to user.email.
-          isEmailVerified: true,
-          tokenRevokedAt: new Date()
-        }
-      );
-      if (consumed.affected === 0) {
-        throw new ApiError(
-          ErrorKeys.AUTH.INVALID_RESET_TOKEN,
-          'Invalid or expired password reset token'
+    const removedProviders = await withTransaction(
+      this.dataSource,
+      async (manager) => {
+        // Keyed on the token too: a password change or an ownership change that
+        // lands between the lookup above and this write clears the token, and
+        // the stale reset must then lose instead of overwriting it. The throw
+        // stays inside the transaction so the session delete rolls back with it.
+        const consumed = await manager.update(
+          User,
+          { id: user.id, passwordResetToken: hashedToken },
+          {
+            password: hashedPassword,
+            passwordHashVersion,
+            passwordResetToken: null,
+            passwordResetExpiresAt: null,
+            // Reset also cancels any in-flight self-service email change — proof
+            // of email ownership is invalidated when password ownership changes.
+            pendingEmail: null,
+            pendingEmailToken: null,
+            pendingEmailExpiresAt: null,
+            // Proving mailbox ownership outranks the failed-guess counter: without
+            // this the reset succeeds and the new password is still locked out.
+            failedLoginAttempts: 0,
+            lockedUntil: null,
+            // Redeeming the token is the same proof of mailbox control that the
+            // verification link carries: it is only ever mailed to user.email.
+            isEmailVerified: true,
+            tokenRevokedAt: new Date()
+          }
         );
+        if (consumed.affected === 0) {
+          throw new ApiError(
+            ErrorKeys.AUTH.INVALID_RESET_TOKEN,
+            'Invalid or expired password reset token'
+          );
+        }
+        await manager.delete(RefreshToken, { userId: user.id });
+        // A provider that an intruder linked while holding the password would
+        // otherwise keep signing in after the owner takes the account back.
+        return this.oauthAccountService.removeAllForUser(user.id, manager);
       }
-      await manager.delete(RefreshToken, { userId: user.id });
-    });
+    );
 
     this.auditService.logFireAndForget({
       action: AuditAction.PASSWORD_RESET_COMPLETE,
@@ -619,6 +627,11 @@ export class AuthService {
       targetId: user.id,
       targetType: 'User',
       context: auditContext
+    });
+    this.reportRemovedProviders(user, removedProviders, {
+      source: 'password_reset',
+      actor: { actorId: user.id, actorEmail: user.email },
+      auditContext
     });
 
     this.mailService
@@ -631,6 +644,66 @@ export class AuthService {
       );
 
     return { message: 'Password has been reset successfully' };
+  }
+
+  /**
+   * An administrator recovery (a new password or a new address) takes the
+   * account back from whoever held it, so the providers that holder could
+   * have linked go too. The password reset removes them in its own
+   * transaction.
+   */
+  async removeLinkedProviders(
+    account: Pick<User, 'id' | 'email' | 'locale'>,
+    {
+      actor,
+      auditContext
+    }: {
+      actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>;
+      auditContext?: AuditContext;
+    }
+  ): Promise<void> {
+    const removed = await this.oauthAccountService.removeAllForUser(account.id);
+    this.reportRemovedProviders(account, removed, {
+      source: 'admin',
+      actor,
+      auditContext
+    });
+  }
+
+  private reportRemovedProviders(
+    account: Pick<User, 'id' | 'email' | 'locale'>,
+    providers: string[],
+    {
+      source,
+      actor,
+      auditContext
+    }: {
+      source: 'password_reset' | 'admin';
+      actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>;
+      auditContext?: AuditContext;
+    }
+  ): void {
+    for (const provider of providers) {
+      this.auditService.logFireAndForget({
+        action: AuditAction.OAUTH_UNLINK,
+        ...actor,
+        targetId: account.id,
+        targetType: 'User',
+        details: { provider, source },
+        context: auditContext
+      });
+      this.mailService
+        .sendOAuthUnlinkedNotification(account.email, provider, {
+          locale: account.locale,
+          ip: auditContext?.ip
+        })
+        .catch((err) =>
+          this.logger.error(
+            'Failed to send provider-unlinked notification',
+            err
+          )
+        );
+    }
   }
 
   async refreshTokens(refreshToken: string, ipAddress: string | null) {
