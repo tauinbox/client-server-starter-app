@@ -4,7 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { RegisterDto } from '../dtos/register.dto';
 import { User } from '../../users/entities/user.entity';
@@ -447,11 +447,17 @@ export class AuthService {
       VERIFICATION_TOKEN_EXPIRY_MS
     );
 
-    await this.usersService.setEmailVerificationToken(
+    const issued = await this.usersService.setEmailVerificationToken(
       user.id,
+      user.email,
       hashedToken,
       expiresAt
     );
+    // The row changed after the read: the address moved, was verified, or the
+    // account was deactivated. The same answer as for any of those states.
+    if (!issued) {
+      return ENUMERATION_SAFE_RESEND_RESPONSE;
+    }
 
     this.auditService.logFireAndForget({
       action: AuditAction.EMAIL_VERIFICATION_RESEND,
@@ -485,11 +491,17 @@ export class AuthService {
       RESET_TOKEN_EXPIRY_MS
     );
 
-    await this.usersService.setPasswordResetToken(
+    const issued = await this.usersService.setPasswordResetToken(
       user.id,
+      user.email,
       hashedToken,
       expiresAt
     );
+    // The address moved or the account was deactivated after the read: the
+    // mailbox that asked no longer owns the account.
+    if (!issued) {
+      return ENUMERATION_SAFE_FORGOT_RESPONSE;
+    }
 
     this.auditService.logFireAndForget({
       action: AuditAction.PASSWORD_RESET_REQUEST,
@@ -838,11 +850,30 @@ export class AuthService {
 
         if (existing) return true;
 
-        await manager.update(User, userId, {
-          pendingEmail: dto.newEmail,
-          pendingEmailToken: hashedToken,
-          pendingEmailExpiresAt: expiresAt
-        });
+        // Keyed on the credential and the address that the step-up read: a
+        // reset, a password change, an administrator email change or a
+        // deactivation in between voids the change, and it also ended the
+        // session that sent this request.
+        const { affected } = await manager.update(
+          User,
+          {
+            id: userId,
+            email: user.email,
+            password: user.password ?? IsNull(),
+            isActive: true
+          },
+          {
+            pendingEmail: dto.newEmail,
+            pendingEmailToken: hashedToken,
+            pendingEmailExpiresAt: expiresAt
+          }
+        );
+        if (affected === 0) {
+          throw new ApiError(
+            ErrorKeys.AUTH.TOKEN_REVOKED,
+            'Token has been revoked'
+          );
+        }
         return false;
       });
     } catch (error: unknown) {
@@ -988,7 +1019,10 @@ export class AuthService {
       // Outside the transaction on purpose: dropping the pending change and
       // then throwing inside it would roll the cleanup back, leaving the dead
       // token in place forever.
-      await this.usersService.clearPendingEmailChange(outcome.userId);
+      await this.usersService.clearPendingEmailChange(
+        outcome.userId,
+        hashedToken
+      );
 
       throw outcome.kind === 'expired'
         ? new ApiError(
@@ -1169,7 +1203,13 @@ export class AuthService {
 
     await this.stepUpPasswordFailures.clear(user.id);
     if (verdict.upgrade) {
-      await this.usersService.upgradePasswordHash(user, currentPassword);
+      // The caller keys its write on the hash that this check verified, so
+      // the copy must carry the hash that is now on the row.
+      const upgraded = await this.usersService.upgradePasswordHash(
+        user,
+        currentPassword
+      );
+      if (upgraded) Object.assign(user, upgraded);
     }
     return { factor: null };
   }
@@ -1238,6 +1278,8 @@ export class AuthService {
    * Step-up for a caller known only by id. Loads the row and applies the same
    * rule as `assertStepUp`, so a self-service route that already holds a user
    * id does not have to fetch the user only to pass it straight back.
+   * Returns the row that the step-up verified, so that the caller can key its
+   * write on it.
    */
   async assertStepUpForUser(
     userId: string,
@@ -1246,7 +1288,7 @@ export class AuthService {
     operation: StepUpOperation,
     totpCode?: string,
     auditContext?: AuditContext
-  ): Promise<void> {
+  ): Promise<User> {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
 
     await this.assertStepUp(
@@ -1257,6 +1299,7 @@ export class AuthService {
       totpCode,
       auditContext
     );
+    return user;
   }
 
   /**

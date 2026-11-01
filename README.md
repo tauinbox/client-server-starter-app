@@ -2012,7 +2012,10 @@ a second request to the registry for a verdict that gates nothing.
   administrator change both clear `passwordResetToken`, `passwordResetExpiresAt` and the
   `pendingEmail` trio in the same write. Thus a reset link kept from before the change, and a
   confirmation link for an email change in progress, are both dead after the change. The reset path
-  has cleared the same five columns since it was written.
+  has cleared the same five columns since it was written. A request that read the account before
+  such a change and writes after it loses: a reset link or a verification token is not mailed to an
+  address that an administrator moved, and an email change or a self-service password change whose
+  step-up ran before a reset answers 401 `errors.auth.tokenRevoked` and writes nothing.
 - An **administrator email change** does the same. The endpoint exists to recover an account whose
   address an attacker controls. Thus the previous holder must not continue to authenticate with the
   tokens from before the change. A resubmitted address that does not change revokes nothing.

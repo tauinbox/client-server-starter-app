@@ -372,7 +372,9 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
   });
 
   it('PATCH /auth/profile with a new password clears the prefixed cookies with Secure', async () => {
-    jest.spyOn(authService, 'assertStepUpForUser').mockResolvedValue();
+    jest
+      .spyOn(authService, 'assertStepUpForUser')
+      .mockResolvedValue(createUserEntity());
     jest.spyOn(authService, 'revokeAllUserSessions').mockResolvedValue();
 
     const res = await request(server)
@@ -410,7 +412,9 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
   });
 
   it('POST /auth/oauth/link-init sets the prefixed link intent', async () => {
-    jest.spyOn(authService, 'assertStepUpForUser').mockResolvedValue();
+    jest
+      .spyOn(authService, 'assertStepUpForUser')
+      .mockResolvedValue(createUserEntity());
 
     const res = await request(server)
       .post('/api/v1/auth/oauth/link-init')

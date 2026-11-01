@@ -56,10 +56,13 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     );
   };
 
-  const issueResetToken = async (userId: string): Promise<string> => {
+  const issueResetToken = async (
+    user: Pick<User, 'id' | 'email'>
+  ): Promise<string> => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     await usersService.setPasswordResetToken(
-      userId,
+      user.id,
+      user.email,
       hashToken(rawToken),
       new Date(Date.now() + 30 * 60 * 1000)
     );
@@ -90,7 +93,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
 
   it('lets a never-verified account log in right after a reset', async () => {
     const user = await createUnverifiedUser('login');
-    const rawToken = await issueResetToken(user.id);
+    const rawToken = await issueResetToken(user);
 
     await authService.resetPassword(rawToken, newPassword);
 
@@ -112,7 +115,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
       pendingEmailToken: hashToken(crypto.randomBytes(32).toString('hex')),
       pendingEmailExpiresAt: new Date(Date.now() + 30 * 60 * 1000)
     });
-    const rawToken = await issueResetToken(user.id);
+    const rawToken = await issueResetToken(user);
 
     await authService.resetPassword(rawToken, newPassword);
 

@@ -266,6 +266,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const rawToken = `${prefix}-reset-token`;
     await usersService.setPasswordResetToken(
       user.id,
+      user.email,
       hashToken(rawToken),
       new Date(Date.now() + 60 * 60 * 1000)
     );

@@ -647,18 +647,69 @@ describe('UsersService', () => {
       const audit = jest.fn().mockReturnValue([]);
 
       await expect(
-        service.update(
-          'user-1',
-          { name: 'Updated' },
-          SYSTEM_ABILITY,
-          undefined,
-          audit
-        )
+        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, { audit })
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
       });
       expect(audit).not.toHaveBeenCalled();
       expect(manager.findOneOrFail).not.toHaveBeenCalled();
+    });
+
+    it('keys the write on the expected credential', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+
+      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
+        expected: { password: 'verified-hash' }
+      });
+
+      expect(manager.update).toHaveBeenCalledWith(
+        User,
+        { ...live, password: 'verified-hash' },
+        { name: 'Updated' }
+      );
+    });
+
+    it('keys an account with no password on a null credential', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+
+      await service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
+        expected: { password: null }
+      });
+
+      expect(manager.update).toHaveBeenCalledWith(
+        User,
+        { ...live, password: IsNull() },
+        { name: 'Updated' }
+      );
+    });
+
+    it('answers a revoked token when the credential changed after the step-up', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      manager.update.mockResolvedValue({ affected: 0 });
+      manager.exists.mockResolvedValue(true);
+
+      await expect(
+        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
+          expected: { password: 'verified-hash' }
+        })
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
+      });
+      expect(manager.exists).toHaveBeenCalledWith(User, { where: live });
+    });
+
+    it('answers not found when the row is gone and a credential is expected', async () => {
+      mockRepository.findOne.mockResolvedValue(mockUser);
+      manager.update.mockResolvedValue({ affected: 0 });
+      manager.exists.mockResolvedValue(false);
+
+      await expect(
+        service.update('user-1', { name: 'Updated' }, SYSTEM_ABILITY, {
+          expected: { password: 'verified-hash' }
+        })
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+      });
     });
 
     it('checks only the match when the body changes no column', async () => {
@@ -890,7 +941,9 @@ describe('UsersService', () => {
       const ability: AppAbility = { can: jest.fn().mockReturnValue(false) };
 
       await expect(
-        service.update('user-1', { name: 'Updated' }, ability, 'actor-1')
+        service.update('user-1', { name: 'Updated' }, ability, {
+          actorId: 'actor-1'
+        })
       ).rejects.toThrow(ApiError);
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -1401,10 +1454,23 @@ describe('UsersService', () => {
   });
 
   describe('upgradePasswordHash', () => {
+    it('reports null when a password change landed first', async () => {
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
+      mockRepository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.upgradePasswordHash(
+          { id: 'user-1', password: 'legacy-hash' },
+          'Password1'
+        )
+      ).resolves.toBeNull();
+    });
+
     it('rewrites the row keyed on the old hash', async () => {
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
+      mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
-      await service.upgradePasswordHash(
+      const upgraded = await service.upgradePasswordHash(
         { id: 'user-1', password: 'legacy-hash' },
         'Password1'
       );
@@ -1420,6 +1486,10 @@ describe('UsersService', () => {
           passwordHashVersion: PasswordHashVersion.PREHASHED
         }
       );
+      expect(upgraded).toEqual({
+        password: 'new-hashed',
+        passwordHashVersion: PasswordHashVersion.PREHASHED
+      });
     });
 
     it('does nothing for an account without a password', async () => {
@@ -1433,19 +1503,43 @@ describe('UsersService', () => {
   });
 
   describe('setEmailVerificationToken', () => {
-    it('should store hashed token and expiry', async () => {
+    it('keys the write on the address it mails to', async () => {
       const expiresAt = new Date('2025-06-01');
+      mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
-      await service.setEmailVerificationToken(
+      const issued = await service.setEmailVerificationToken(
         'user-1',
+        'old@example.com',
         'hashed-token',
         expiresAt
       );
 
-      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
-        emailVerificationToken: 'hashed-token',
-        emailVerificationExpiresAt: expiresAt
-      });
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        {
+          id: 'user-1',
+          email: 'old@example.com',
+          isEmailVerified: false,
+          isActive: true
+        },
+        {
+          emailVerificationToken: 'hashed-token',
+          emailVerificationExpiresAt: expiresAt
+        }
+      );
+      expect(issued).toBe(true);
+    });
+
+    it('reports false when the row changed after the read', async () => {
+      mockRepository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.setEmailVerificationToken(
+          'user-1',
+          'old@example.com',
+          'hashed-token',
+          new Date()
+        )
+      ).resolves.toBe(false);
     });
   });
 
@@ -1504,15 +1598,38 @@ describe('UsersService', () => {
   });
 
   describe('setPasswordResetToken', () => {
-    it('should store hashed token and expiry', async () => {
+    it('keys the write on the address it mails to', async () => {
       const expiresAt = new Date('2025-06-01');
+      mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
-      await service.setPasswordResetToken('user-1', 'hashed-token', expiresAt);
+      const issued = await service.setPasswordResetToken(
+        'user-1',
+        'old@example.com',
+        'hashed-token',
+        expiresAt
+      );
 
-      expect(mockRepository.update).toHaveBeenCalledWith('user-1', {
-        passwordResetToken: 'hashed-token',
-        passwordResetExpiresAt: expiresAt
-      });
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: 'user-1', email: 'old@example.com', isActive: true },
+        {
+          passwordResetToken: 'hashed-token',
+          passwordResetExpiresAt: expiresAt
+        }
+      );
+      expect(issued).toBe(true);
+    });
+
+    it('reports false when the address moved after the read', async () => {
+      mockRepository.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.setPasswordResetToken(
+          'user-1',
+          'old@example.com',
+          'hashed-token',
+          new Date()
+        )
+      ).resolves.toBe(false);
     });
   });
 
@@ -1612,12 +1729,9 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(superUser);
 
       await expectSuperTargetRefusal(
-        service.update(
-          'super-1',
-          { password: 'Copper-Meadow-83' },
-          delegated,
-          'actor-1'
-        ),
+        service.update('super-1', { password: 'Copper-Meadow-83' }, delegated, {
+          actorId: 'actor-1'
+        }),
         'update'
       );
       expect(
@@ -1630,7 +1744,9 @@ describe('UsersService', () => {
       mockRepository.findOne.mockResolvedValue(superUser);
 
       await expectSuperTargetRefusal(
-        service.update('super-1', { isActive: false }, delegated, 'actor-1'),
+        service.update('super-1', { isActive: false }, delegated, {
+          actorId: 'actor-1'
+        }),
         'update'
       );
       expect(mockRepository.update).not.toHaveBeenCalled();
@@ -1664,7 +1780,9 @@ describe('UsersService', () => {
       mockRepository.findOneOrFail.mockResolvedValue(superUser);
 
       await expect(
-        service.update('super-1', { name: 'Kept' }, superActor, 'actor-1')
+        service.update('super-1', { name: 'Kept' }, superActor, {
+          actorId: 'actor-1'
+        })
       ).resolves.toBeDefined();
       expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });
@@ -1676,7 +1794,9 @@ describe('UsersService', () => {
       });
 
       await expect(
-        service.update('user-1', { name: 'Kept' }, delegated, 'actor-1')
+        service.update('user-1', { name: 'Kept' }, delegated, {
+          actorId: 'actor-1'
+        })
       ).rejects.toThrow('assertNotSuperTarget needs the roles of the target');
       expect(mockRepository.update).not.toHaveBeenCalled();
     });
@@ -1689,7 +1809,9 @@ describe('UsersService', () => {
       mockRepository.findOneOrFail.mockResolvedValue(mockUser);
 
       await expect(
-        service.update('user-1', { name: 'Kept' }, delegated, 'actor-1')
+        service.update('user-1', { name: 'Kept' }, delegated, {
+          actorId: 'actor-1'
+        })
       ).resolves.toBeDefined();
       expect(mockMetricsService.recordPermissionDenied).not.toHaveBeenCalled();
     });

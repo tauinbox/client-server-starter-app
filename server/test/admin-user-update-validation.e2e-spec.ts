@@ -109,8 +109,11 @@ describe('Admin user update DTO validation (e2e)', () => {
       TARGET_ID,
       payload,
       undefined,
-      'admin-1',
-      expect.any(Function)
+      {
+        actorId: 'admin-1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        audit: expect.any(Function)
+      }
     );
   });
 

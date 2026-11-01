@@ -193,7 +193,9 @@ describe('AuthController', () => {
       resendVerificationEmail: jest.fn().mockResolvedValue({ message: 'sent' }),
       forgotPassword: jest.fn().mockResolvedValue({ message: 'sent' }),
       resetPassword: jest.fn().mockResolvedValue({ message: 'reset' }),
-      assertStepUpForUser: jest.fn().mockResolvedValue(undefined)
+      assertStepUpForUser: jest
+        .fn()
+        .mockResolvedValue({ id: 'user-1', password: 'verified-hash' })
     };
 
     mfaServiceMock = {
@@ -721,7 +723,8 @@ describe('AuthController', () => {
       expect(userServiceMock.update).toHaveBeenCalledWith(
         'user-1',
         dto,
-        SYSTEM_ABILITY
+        SYSTEM_ABILITY,
+        { expected: undefined }
       );
       expect(authServiceMock.assertStepUpForUser).not.toHaveBeenCalled();
       expect(authServiceMock.revokeAllUserSessions).not.toHaveBeenCalled();
@@ -876,7 +879,8 @@ describe('AuthController', () => {
       expect(userServiceMock.update).toHaveBeenCalledWith(
         'user-1',
         { password: 'NewPassword1' },
-        SYSTEM_ABILITY
+        SYSTEM_ABILITY,
+        { expected: { password: 'verified-hash' } }
       );
     });
 
@@ -901,7 +905,8 @@ describe('AuthController', () => {
       expect(userServiceMock.update).toHaveBeenCalledWith(
         'user-1',
         { password: 'NewPassword1' },
-        SYSTEM_ABILITY
+        SYSTEM_ABILITY,
+        { expected: { password: 'verified-hash' } }
       );
     });
 

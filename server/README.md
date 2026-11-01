@@ -1895,6 +1895,13 @@ self-service confirmation. Thus a reset link mailed to the previous address, or 
 or a delete, does not take the account. `resetPassword` keys its write on the token hash, thus a
 concurrent password change that clears the token wins, and the reset answers 422.
 
+The writers of a proof are keyed on the state that they read, so a change that commits between the
+read and the write wins over them. `forgotPassword` and `resendVerificationEmail` write the token
+keyed on the address they mail it to, and mail nothing when an administrator moved it. The
+initiation writes the pending change keyed on the address and the credential that its step-up read,
+and answers 401 `errors.auth.tokenRevoked` after a reset in between. The cleanup of an expired
+confirmation is keyed on its token, so a newer change that the owner started stays.
+
 A partial unique index on `LOWER(pending_email)`, plus the dual-email checks in `register`,
 `users.create`, `users.update` and the OAuth sign-up, keep the set of `{email}` and `{pendingEmail}` globally unique
 under a concurrent write.

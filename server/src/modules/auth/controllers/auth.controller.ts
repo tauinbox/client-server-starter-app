@@ -257,10 +257,11 @@ export class AuthController {
   ) {
     const reauthProof = this.cookies.readReauthProof(req);
 
+    let verified: User | undefined;
     if (updateProfileDto.password) {
       // A first password binds a credential that outlives the session, so it
       // needs the same fresh proof of identity an email change needs.
-      await this.authService.assertStepUpForUser(
+      verified = await this.authService.assertStepUpForUser(
         req.user.userId,
         updateProfileDto.currentPassword,
         reauthProof,
@@ -282,10 +283,13 @@ export class AuthController {
     // Self-service route: the target is pinned to the authenticated caller and
     // the route is already gated by @Authorize(['update', 'Profile']), so no
     // instance-level check on another user's record can apply here.
+    // A new password is written only over the credential that the step-up
+    // verified, so a reset that lands in between wins.
     const updatedUser = await this.userService.update(
       req.user.userId,
       updatePayload,
-      SYSTEM_ABILITY
+      SYSTEM_ABILITY,
+      { expected: verified && { password: verified.password } }
     );
     if (previous && previous.name !== updatedUser.name) {
       this.eventEmitter.emit(

@@ -308,12 +308,9 @@ export class UsersController {
       targetType: 'User',
       context: extractAuditContext(req)
     };
-    const updatedUser = await this.usersService.update(
-      id,
-      changes,
-      ability,
-      req.user.userId,
-      (user) => [
+    const updatedUser = await this.usersService.update(id, changes, ability, {
+      actorId: req.user.userId,
+      audit: (user) => [
         {
           ...rowFields,
           action: AuditAction.USER_UPDATE,
@@ -346,7 +343,7 @@ export class UsersController {
             ]
           : [])
       ]
-    );
+    });
     const emailChanged =
       previousEmail !== undefined && updatedUser.email !== previousEmail;
 

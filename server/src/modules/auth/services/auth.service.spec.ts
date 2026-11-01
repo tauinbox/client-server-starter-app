@@ -3,7 +3,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { instanceToPlain } from 'class-transformer';
 import bcrypt from 'bcrypt';
 import {
@@ -213,11 +213,11 @@ describe('AuthService', () => {
         lockedUntil: null
       }),
       resetLoginAttempts: jest.fn().mockResolvedValue(undefined),
-      upgradePasswordHash: jest.fn().mockResolvedValue(undefined),
-      setEmailVerificationToken: jest.fn().mockResolvedValue(undefined),
+      upgradePasswordHash: jest.fn().mockResolvedValue(null),
+      setEmailVerificationToken: jest.fn().mockResolvedValue(true),
       findByEmailVerificationToken: jest.fn(),
       markEmailVerified: jest.fn().mockResolvedValue(true),
-      setPasswordResetToken: jest.fn().mockResolvedValue(undefined),
+      setPasswordResetToken: jest.fn().mockResolvedValue(true),
       findByPasswordResetToken: jest.fn(),
       clearPendingEmailChange: jest.fn().mockResolvedValue(undefined),
       update: jest.fn().mockResolvedValue(mockUser)
@@ -1214,11 +1214,26 @@ describe('AuthService', () => {
 
       expect(mockUsersService.setEmailVerificationToken).toHaveBeenCalledWith(
         'user-1',
+        'test@example.com',
         expect.any(String),
         expect.any(Date)
       );
       expect(mockMailService.sendEmailVerification).toHaveBeenCalled();
       expect(result.message).toBeDefined();
+    });
+
+    it('mails and audits nothing when the row changed after the read', async () => {
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false
+      });
+      mockUsersService.setEmailVerificationToken.mockResolvedValueOnce(false);
+
+      const result = await service.resendVerificationEmail('test@example.com');
+
+      expect(result.message).toMatch(/verification email has been sent/);
+      expect(mockMailService.sendEmailVerification).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
     });
 
     it('audits a resend for an unverified active account', async () => {
@@ -1314,6 +1329,7 @@ describe('AuthService', () => {
 
       expect(mockUsersService.setPasswordResetToken).toHaveBeenCalledWith(
         'user-1',
+        'test@example.com',
         expect.any(String),
         expect.any(Date)
       );
@@ -1323,6 +1339,17 @@ describe('AuthService', () => {
         'en'
       );
       expect(result.message).toBeDefined();
+    });
+
+    it('mails and audits nothing when the address moved after the read', async () => {
+      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      mockUsersService.setPasswordResetToken.mockResolvedValueOnce(false);
+
+      const result = await service.forgotPassword('test@example.com');
+
+      expect(result.message).toMatch(/password reset link has been sent/);
+      expect(mockMailService.sendPasswordReset).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
     });
 
     it('should return success even when user not found (prevent enumeration)', async () => {
@@ -2134,6 +2161,48 @@ describe('AuthService', () => {
   });
 
   describe('assertStepUpForUser', () => {
+    it('returns the hash that the upgrade wrote, so a write keyed on it matches', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHashVersion: PasswordHashVersion.LEGACY
+      });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      mockUsersService.upgradePasswordHash.mockResolvedValueOnce({
+        password: 'upgraded-hash',
+        passwordHashVersion: PasswordHashVersion.PREHASHED
+      });
+
+      await expect(
+        service.assertStepUpForUser(
+          mockUser.id,
+          'CurrentPass1',
+          undefined,
+          STEP_UP_OPERATION.PASSWORD_SET
+        )
+      ).resolves.toMatchObject({
+        password: 'upgraded-hash',
+        passwordHashVersion: PasswordHashVersion.PREHASHED
+      });
+    });
+
+    it('keeps the verified hash when the upgrade lost to a password change', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHashVersion: PasswordHashVersion.LEGACY
+      });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      mockUsersService.upgradePasswordHash.mockResolvedValueOnce(null);
+
+      await expect(
+        service.assertStepUpForUser(
+          mockUser.id,
+          'CurrentPass1',
+          undefined,
+          STEP_UP_OPERATION.PASSWORD_SET
+        )
+      ).resolves.toMatchObject({ password: mockUser.password });
+    });
+
     it('upgrades a legacy row after a correct current password', async () => {
       const legacyUser = {
         ...mockUser,
@@ -2166,7 +2235,7 @@ describe('AuthService', () => {
           undefined,
           STEP_UP_OPERATION.PASSWORD_SET
         )
-      ).resolves.toBeUndefined();
+      ).resolves.toMatchObject({ id: mockUser.id });
     });
 
     it('should throw 403 with INVALID_CURRENT_PASSWORD when bcrypt.compare fails', async () => {
@@ -2239,7 +2308,7 @@ describe('AuthService', () => {
           'proof',
           STEP_UP_OPERATION.PASSWORD_SET
         )
-      ).resolves.toBeUndefined();
+      ).resolves.toMatchObject({ id: mockUser.id });
     });
 
     it('refuses the same proof a second time', async () => {
@@ -2260,7 +2329,7 @@ describe('AuthService', () => {
           'proof',
           STEP_UP_OPERATION.PASSWORD_SET
         )
-      ).resolves.toBeUndefined();
+      ).resolves.toMatchObject({ id: mockUser.id });
 
       // The account holds no password, so a refused proof must not fall
       // through to the password branch.
@@ -2328,7 +2397,7 @@ describe('AuthService', () => {
           'proof',
           STEP_UP_OPERATION.PASSWORD_SET
         )
-      ).resolves.toBeUndefined();
+      ).resolves.toMatchObject({ id: mockUser.id });
     });
 
     it('refuses a proof minted for another operation', async () => {
@@ -2392,7 +2461,7 @@ describe('AuthService', () => {
           STEP_UP_OPERATION.OAUTH_LINK,
           '123456'
         )
-      ).resolves.toBeUndefined();
+      ).resolves.toMatchObject({ id: mockUser.id });
       expect(mockMfaService.isValidStepUpCode).toHaveBeenCalledWith(
         oauthOnlyUser,
         '123456',
@@ -2913,7 +2982,12 @@ describe('AuthService', () => {
 
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(),
-        'user-1',
+        {
+          id: 'user-1',
+          email: 'test@example.com',
+          password: mockUser.password,
+          isActive: true
+        },
         expect.objectContaining({
           pendingEmail: 'new@example.com',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -2939,6 +3013,32 @@ describe('AuthService', () => {
       expect(result.message).toMatch(/confirmation link/);
     });
 
+    it('answers a revoked token, with no row and no mail, when the credential changed after the step-up', async () => {
+      mockUsersService.findOne.mockResolvedValue({ ...mockUser });
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      mockManager.update.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.initiateEmailChange('user-1', {
+          newEmail: 'new@example.com',
+          currentPassword: 'CorrectPassword1'
+        })
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
+      });
+      expect(
+        mockMailService.sendEmailChangeConfirmation
+      ).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendEmailChangeNotificationOld
+      ).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_EMAIL_CHANGE_REQUEST
+        })
+      );
+    });
+
     it('accepts an authenticator code from an account with no password', async () => {
       mockUsersService.findOne.mockResolvedValue({
         ...mockUser,
@@ -2958,7 +3058,7 @@ describe('AuthService', () => {
 
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(),
-        'user-1',
+        expect.objectContaining({ id: 'user-1', password: IsNull() }),
         expect.objectContaining({ pendingEmail: 'new@example.com' })
       );
     });
@@ -3356,7 +3456,8 @@ describe('AuthService', () => {
       // throw would be rolled back and the dead token would survive.
       expect(mockManager.update).not.toHaveBeenCalled();
       expect(mockUsersService.clearPendingEmailChange).toHaveBeenCalledWith(
-        'user-1'
+        'user-1',
+        hashToken('raw-token')
       );
     });
 
@@ -3382,7 +3483,8 @@ describe('AuthService', () => {
       // and outside the transaction so the throw cannot roll the clear back.
       expect(mockManager.update).not.toHaveBeenCalled();
       expect(mockUsersService.clearPendingEmailChange).toHaveBeenCalledWith(
-        'user-1'
+        'user-1',
+        hashToken('raw-token')
       );
     });
 
@@ -3410,7 +3512,8 @@ describe('AuthService', () => {
         );
       }
       expect(mockUsersService.clearPendingEmailChange).toHaveBeenCalledWith(
-        'user-1'
+        'user-1',
+        hashToken('raw-token')
       );
     });
 

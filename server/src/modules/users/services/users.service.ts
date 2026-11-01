@@ -70,6 +70,17 @@ const USER_LIST_COLUMNS: ListColumns<typeof USER_LIST_QUERY> = {
  */
 export type UserAuditRows = (user: User) => AuditLogParams[];
 
+export interface UserUpdateOptions {
+  actorId?: string;
+  audit?: UserAuditRows;
+  /**
+   * The credential that the step-up of the caller verified (`null` for an
+   * account with no password). The write is keyed on it, so a password change
+   * that lands after the step-up wins.
+   */
+  expected?: Pick<User, 'password'>;
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -277,8 +288,7 @@ export class UsersService {
     id: string,
     updateUserDto: UpdateUserDto,
     ability: AbilityOrSystem,
-    actorId?: string,
-    audit?: UserAuditRows
+    { actorId, audit, expected }: UserUpdateOptions = {}
   ): Promise<User> {
     const user = await this.loadUser(id);
     const { unlockAccount, ...rest } = updateUserDto;
@@ -378,7 +388,18 @@ export class UsersService {
         // found, and a concurrent write to another column (a password reset)
         // is kept.
         const live = { id: user.id, deletedAt: IsNull() };
-        if (!(await keyedUpdate(manager, User, live, changes))) {
+        // A reset or another password change that lands after the step-up
+        // also ended the session that sent this request.
+        const where = expected
+          ? { ...live, password: expected.password ?? IsNull() }
+          : live;
+        if (!(await keyedUpdate(manager, User, where, changes))) {
+          if (expected && (await manager.exists(User, { where: live }))) {
+            throw new ApiError(
+              ErrorKeys.AUTH.TOKEN_REVOKED,
+              'Token has been revoked'
+            );
+          }
           throw userNotFound(id);
         }
         const written = await manager.findOneOrFail(User, {
@@ -462,13 +483,16 @@ export class UsersService {
   async upgradePasswordHash(
     user: Pick<User, 'id' | 'password'>,
     password: string
-  ): Promise<void> {
-    if (user.password === null) return;
+  ): Promise<Pick<User, 'password' | 'passwordHashVersion'> | null> {
+    if (user.password === null) return null;
     const { hash, version } = await hashPassword(password);
-    await this.userRepository.update(
+    const { affected } = await this.userRepository.update(
       { id: user.id, password: user.password },
       { password: hash, passwordHashVersion: version }
     );
+    return affected === 0
+      ? null
+      : { password: hash, passwordHashVersion: version };
   }
 
   async resetLoginAttempts(userId: string): Promise<void> {
@@ -478,15 +502,25 @@ export class UsersService {
     });
   }
 
+  /**
+   * Keyed on the address the caller mails the token to: when an administrator
+   * moves the address in between, the write misses and returns false, so the
+   * old mailbox gets no token that verifies the new address.
+   */
   async setEmailVerificationToken(
     userId: string,
+    email: string,
     hashedToken: string,
     expiresAt: Date
-  ): Promise<void> {
-    await this.userRepository.update(userId, {
-      emailVerificationToken: hashedToken,
-      emailVerificationExpiresAt: expiresAt
-    });
+  ): Promise<boolean> {
+    const { affected } = await this.userRepository.update(
+      { id: userId, email, isEmailVerified: false, isActive: true },
+      {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpiresAt: expiresAt
+      }
+    );
+    return affected !== 0;
   }
 
   async findByEmailVerificationToken(
@@ -516,15 +550,25 @@ export class UsersService {
     return result.affected !== 0;
   }
 
+  /**
+   * Keyed on the address the caller mails the link to: when an administrator
+   * moves the address to take the account back, the write misses and returns
+   * false, so the old mailbox gets no working link.
+   */
   async setPasswordResetToken(
     userId: string,
+    email: string,
     hashedToken: string,
     expiresAt: Date
-  ): Promise<void> {
-    await this.userRepository.update(userId, {
-      passwordResetToken: hashedToken,
-      passwordResetExpiresAt: expiresAt
-    });
+  ): Promise<boolean> {
+    const { affected } = await this.userRepository.update(
+      { id: userId, email, isActive: true },
+      {
+        passwordResetToken: hashedToken,
+        passwordResetExpiresAt: expiresAt
+      }
+    );
+    return affected !== 0;
   }
 
   async findByPasswordResetToken(hashedToken: string): Promise<User | null> {
@@ -533,12 +577,22 @@ export class UsersService {
     });
   }
 
-  async clearPendingEmailChange(userId: string): Promise<void> {
-    await this.userRepository.update(userId, {
-      pendingEmail: null,
-      pendingEmailToken: null,
-      pendingEmailExpiresAt: null
-    });
+  /**
+   * Keyed on the token the caller read, so a newer change that the owner
+   * started in between is kept.
+   */
+  async clearPendingEmailChange(
+    userId: string,
+    pendingEmailToken: string
+  ): Promise<void> {
+    await this.userRepository.update(
+      { id: userId, pendingEmailToken },
+      {
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpiresAt: null
+      }
+    );
   }
 
   async remove(
