@@ -400,6 +400,11 @@ export class MfaService {
       LOCKOUT_DURATION_MS
     );
     if (count > MAX_FAILED_ATTEMPTS) {
+      // The code is not checked, but the attempt is still a refused one.
+      this.recordChallengeFailure(user, 'challenge', {
+        context,
+        attempt: count
+      });
       throw this.challengeLockedException(remainingMs);
     }
 
@@ -498,8 +503,11 @@ export class MfaService {
       user.id,
       LOCKOUT_DURATION_MS
     );
+    // A refusal is returned, not thrown, so the caller writes the step-up row
+    // for an attempt on a barred account too.
     if (count > MAX_FAILED_ATTEMPTS) {
-      throw this.stepUpLockedException(remainingMs);
+      this.recordChallengeFailure(user, 'step_up', { context, attempt: count });
+      return { kind: 'refused', lockedMs: remainingMs };
     }
 
     if (!(await this.consumeTotp(user, code))) {

@@ -281,6 +281,13 @@ export class AuthService {
 
     // Check email verification
     if (!user.isEmailVerified) {
+      this.auditService.logFireAndForget({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        actorEmail: email,
+        targetId: user.id,
+        targetType: 'User',
+        details: { reason: 'email_not_verified' }
+      });
       this.metricsService.recordAuthEvent('login_failure');
       throw new ApiError(
         ErrorKeys.AUTH.EMAIL_NOT_VERIFIED,
@@ -1282,8 +1289,9 @@ export class AuthService {
       user.id,
       LOCKOUT_DURATION_MS
     );
+    // Returned, not thrown, so assertStepUp writes the row for this attempt.
     if (count > MAX_FAILED_ATTEMPTS) {
-      throw this.stepUpPasswordLockedException(remainingMs);
+      return { factor: 'password', lockedMs: remainingMs };
     }
 
     const verdict = await verifyPassword(

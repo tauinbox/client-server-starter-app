@@ -761,6 +761,25 @@ describe('MfaService', () => {
       });
     });
 
+    it('audits each attempt on a barred account with its number', async () => {
+      const { secret } = await guessable();
+      await guessWrong(MAX_FAILED_ATTEMPTS + 1);
+      await expect(
+        service.verifyChallenge('token', generateSync({ secret }))
+      ).rejects.toMatchObject({ status: 423 });
+
+      const attempts = auditService.logFireAndForget.mock.calls
+        .map(([entry]) => entry as { action: AuditAction; details: unknown })
+        .filter(({ action }) => action === AuditAction.MFA_CHALLENGE_FAILURE)
+        .map(({ details }) => details);
+      expect(attempts).toEqual(
+        Array.from({ length: MAX_FAILED_ATTEMPTS + 2 }, (_, i) => ({
+          stage: 'challenge',
+          attempt: i + 1
+        }))
+      );
+    });
+
     it('counts a new address into the same window', async () => {
       await guessable();
 
@@ -1030,14 +1049,13 @@ describe('MfaService', () => {
           kind: 'refused',
           lockedMs: expect.any(Number) as unknown
         });
+        // An attempt on the barred account answers the same way, so the
+        // caller writes a row for it too.
         await expect(
           service.isValidStepUpCode(user, '000000')
-        ).rejects.toMatchObject({
-          status: 423,
-          response: {
-            errorKey: ErrorKeys.AUTH.MFA_STEP_UP_LOCKED,
-            retryAfter: expect.any(Number) as unknown
-          }
+        ).resolves.toEqual({
+          kind: 'refused',
+          lockedMs: expect.any(Number) as unknown
         });
       });
 
@@ -1051,7 +1069,16 @@ describe('MfaService', () => {
 
         await expect(
           service.isValidStepUpCode(user, generateSync({ secret }))
-        ).rejects.toMatchObject({ status: 423 });
+        ).resolves.toEqual({
+          kind: 'refused',
+          lockedMs: expect.any(Number) as unknown
+        });
+        expect(auditService.logFireAndForget).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            action: AuditAction.MFA_CHALLENGE_FAILURE,
+            details: { stage: 'step_up', attempt: MAX_FAILED_ATTEMPTS + 1 }
+          })
+        );
       });
 
       it('leaves the sign-in challenge open while the step-up is barred', async () => {

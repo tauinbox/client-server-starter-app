@@ -289,6 +289,13 @@ router.post('/login', (req, res) => {
 
   // Check email verification
   if (!user.isEmailVerified) {
+    logAudit('USER_LOGIN_FAILURE', {
+      actorEmail: email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { reason: 'email_not_verified' },
+      ip: req.ip
+    });
     sendError(
       res,
       ErrorKeys.AUTH.EMAIL_NOT_VERIFIED,

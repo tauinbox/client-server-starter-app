@@ -1361,7 +1361,9 @@ never touches the counter: every step-up reaches that method, `PATCH /auth/profi
 `POST /auth/oauth/link-init` included, and counting those would let an ordinary password step-up
 burn the budget of an account that never offered a code. The wrong code that spends the last of the
 budget does not throw: it returns `{ kind: 'refused', lockedMs }`, so `assertStepUp` writes its
-`STEP_UP_FAILURE` row with `factor: code` before it answers 423, as it does for the password.
+`STEP_UP_FAILURE` row with `factor: code` before it answers 423, as it does for the password. An
+attempt on an account that is already barred is not checked, but it gets the same rows as the
+attempt that set the bar, so the audit log holds every refused attempt (ASVS 16.3.1).
 
 **The step-up password carries the third brake.** `AuthService.stepUpFailure` counts refused
 passwords against the account on a `FailedAttemptCounter` keyed `step-up:password-failures:`, with
@@ -1370,7 +1372,8 @@ the same threshold, the same window and the same 423 envelope, under the key
 whole ceiling was four guesses per address per route, repeated on each of the nine routes that take
 a step-up, and the account never locked however many were wrong. The counter reports the bar to
 `assertStepUp` through the `lockedMs` field of the verdict rather than throwing past it, so the
-attempt that spends the last of the budget still writes its `STEP_UP_FAILURE` row.
+attempt that spends the last of the budget still writes its `STEP_UP_FAILURE` row, and so does each
+attempt on the barred account.
 
 This namespace is separate from `users.failed_login_attempts` as well. A caller that holds only a
 stolen session can spend this budget and bar the owner's step-up for the window, and the sign-in

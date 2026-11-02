@@ -93,6 +93,16 @@ describe('the step-up password carries a per-account brake', () => {
     expect(JSON.stringify(failureRows())).not.toContain(WRONG_PASSWORD);
   });
 
+  it('audits each attempt on a barred account', async () => {
+    const token = await accessToken();
+    await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+    for (let i = 0; i < 3; i += 1) {
+      expect((await setup(token, WRONG_PASSWORD)).status).toBe(423);
+    }
+
+    expect(failureRows()).toHaveLength(MAX_FAILED_ATTEMPTS + 2);
+  });
+
   it('refuses a correct password while the account is barred', async () => {
     const token = await accessToken();
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);

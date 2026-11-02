@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { randomBytes } from 'crypto';
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import bcrypt from 'bcrypt';
 import {
   MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION,
@@ -16,9 +16,8 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { User } from '../src/modules/users/entities/user.entity';
 
-// A checked-and-refused secret is the only thing that makes the counted audit
-// call. The services are driven directly because over HTTP the per-IP
-// throttles refuse most of a burst and hide the result.
+// The services are driven directly because over HTTP the per-IP throttles
+// refuse most of a burst and hide the result.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 const BURST = 15;
@@ -120,21 +119,24 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
     expect(row.lockedUntil).toBeInstanceOf(Date);
   }, 60000);
 
+  // Every refused attempt is audited, so the checks are counted by the
+  // secret decryption and by bcrypt instead.
   it('checks at most the budget of codes on the sign-in challenge', async () => {
     const user = await createAccount('challenge');
     const { mfaToken } = mfaService.issuePendingToken(user);
     const audit = jest.spyOn(auditService, 'log');
+    const decrypt = jest.spyOn(app.get(SecretEncryptionService), 'decrypt');
 
     await burst(() => mfaService.verifyChallenge(mfaToken, WRONG_CODE));
 
-    expect(countCodeFailures(audit, user.id, 'challenge')).toBe(
-      MAX_FAILED_ATTEMPTS
-    );
+    expect(decrypt).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
+    expect(countCodeFailures(audit, user.id, 'challenge')).toBe(BURST);
   }, 60000);
 
   it('checks at most the budget of codes on a step-up', async () => {
     const user = await createAccount('step-up-code');
     const audit = jest.spyOn(auditService, 'log');
+    const decrypt = jest.spyOn(app.get(SecretEncryptionService), 'decrypt');
 
     await burst(async () => {
       if (
@@ -145,14 +147,14 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
       }
     });
 
-    expect(countCodeFailures(audit, user.id, 'step_up')).toBe(
-      MAX_FAILED_ATTEMPTS
-    );
+    expect(decrypt).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
+    expect(countCodeFailures(audit, user.id, 'step_up')).toBe(BURST);
   }, 60000);
 
   it('checks at most the budget of passwords on a step-up', async () => {
     const user = await createAccount('step-up-password');
     const audit = jest.spyOn(auditService, 'logFireAndForget');
+    const compare = jest.spyOn(bcrypt, 'compare');
 
     await burst(() =>
       authService.assertStepUp(user, {
@@ -161,12 +163,13 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
       })
     );
 
-    const checked = audit.mock.calls.filter(
+    expect(compare).toHaveBeenCalledTimes(MAX_FAILED_ATTEMPTS);
+    const rows = audit.mock.calls.filter(
       ([entry]) =>
         entry.action === AuditAction.STEP_UP_FAILURE &&
         entry.targetId === user.id
     );
-    expect(checked).toHaveLength(MAX_FAILED_ATTEMPTS);
+    expect(rows).toHaveLength(BURST);
   }, 60000);
 
   function countCodeFailures(
