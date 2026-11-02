@@ -251,12 +251,11 @@ function stepUpCodeError(
   }
 
   const windows = getState().mfaStepUpFailures;
-  const open = readFailures(windows, user.id);
-  if (open.count >= MAX_FAILED_ATTEMPTS) {
-    return stepUpLockedEnvelope(open.remainingMs);
-  }
+  // As on the server: an attempt on a barred account is counted and gets
+  // the same two rows as the attempt that set the bar.
+  const barred = readFailures(windows, user.id).count >= MAX_FAILED_ATTEMPTS;
 
-  if (!consumeTotpCode(user, code)) {
+  if (barred || !consumeTotpCode(user, code)) {
     const { count, remainingMs } = recordFailure(windows, user.id);
     logAudit('MFA_CHALLENGE_FAILURE', {
       actorId: user.id,
@@ -445,13 +444,10 @@ function stepUpPasswordError(
   }
 
   const windows = getState().stepUpPasswordFailures;
-  const open = readFailures(windows, user.id);
-  if (open.count >= MAX_FAILED_ATTEMPTS) {
-    return stepUpPasswordLockedEnvelope(open.remainingMs);
-  }
+  const barred = readFailures(windows, user.id).count >= MAX_FAILED_ATTEMPTS;
 
   // Plaintext comparison - mock only. Real server uses bcrypt.compare().
-  if (user.password === currentPassword) {
+  if (!barred && user.password === currentPassword) {
     clearFailures(windows, user.id);
     return null;
   }

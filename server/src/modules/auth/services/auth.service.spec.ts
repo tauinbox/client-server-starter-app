@@ -737,6 +737,13 @@ describe('AuthService', () => {
           ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
         );
       }
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        actorEmail: 'test@example.com',
+        targetId: unverifiedUser.id,
+        targetType: 'User',
+        details: { reason: 'email_not_verified' }
+      });
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
         'login_failure'
@@ -2894,6 +2901,27 @@ describe('AuthService', () => {
           status: HttpStatus.LOCKED,
           response: { errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED }
         });
+      });
+
+      it('audits an attempt on the barred account', async () => {
+        await exhaustBudget();
+        mockAuditService.logFireAndForget.mockClear();
+
+        await expect(
+          service.assertStepUp(passwordUser, {
+            currentPassword: 'WrongPass1',
+            operation: STEP_UP_OPERATION.PASSWORD_SET
+          })
+        ).rejects.toMatchObject({ status: HttpStatus.LOCKED });
+
+        expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: AuditAction.STEP_UP_FAILURE,
+            details: expect.objectContaining({
+              factor: 'password'
+            }) as unknown
+          })
+        );
       });
 
       it('leaves the sign-in lockout counter alone', async () => {

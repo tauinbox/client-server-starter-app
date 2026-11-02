@@ -407,6 +407,23 @@ describe('the brake on the authenticator challenge', () => {
       { stage: 'challenge', attempt: 2 }
     ]);
   });
+
+  it('audits each attempt on a barred account with its number', async () => {
+    await enrol();
+    const { mfaToken } = (await login()) as { mfaToken: string };
+
+    await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS + 2);
+
+    const failures = getState().auditLogs.filter(
+      ({ action }) => action === 'MFA_CHALLENGE_FAILURE'
+    );
+    expect(failures.map(({ details }) => details)).toEqual(
+      Array.from({ length: MAX_FAILED_ATTEMPTS + 2 }, (_, i) => ({
+        stage: 'challenge',
+        attempt: i + 1
+      }))
+    );
+  });
 });
 
 describe('recovery codes', () => {
@@ -706,6 +723,28 @@ describe('the brake on the step-up code', () => {
 
     expect(res.status).toBe(423);
     expect(await login()).toHaveProperty('mfaRequired');
+  });
+
+  it('audits each attempt on a barred account', async () => {
+    const token = await enrol();
+    await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+    for (let i = 0; i < 3; i += 1) {
+      expect(
+        (await post('/auth/mfa/disable', { code: '000000' }, token)).status
+      ).toBe(423);
+    }
+
+    const rows = (wanted: string): unknown[] =>
+      getState()
+        .auditLogs.filter(({ action }) => action === wanted)
+        .map(({ details }) => details);
+    expect(rows('MFA_CHALLENGE_FAILURE')).toEqual(
+      Array.from({ length: MAX_FAILED_ATTEMPTS + 2 }, (_, i) => ({
+        stage: 'step_up',
+        attempt: i + 1
+      }))
+    );
+    expect(rows('STEP_UP_FAILURE')).toHaveLength(MAX_FAILED_ATTEMPTS + 2);
   });
 
   it('leaves the sign-in challenge open while the step-up is barred', async () => {

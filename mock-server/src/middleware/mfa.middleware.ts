@@ -356,13 +356,10 @@ router.post('/verify', (req, res) => {
     return;
   }
 
-  const open = readChallengeFailures(user.id);
-  if (open.count >= MAX_FAILED_ATTEMPTS) {
-    sendWithRetryAfter(res, challengeLockedEnvelope(open.remainingMs));
-    return;
-  }
+  // As on the server: an attempt on a barred account is counted and audited.
+  const barred = readChallengeFailures(user.id).count >= MAX_FAILED_ATTEMPTS;
 
-  if (!consumeTotpCode(user, code)) {
+  if (barred || !consumeTotpCode(user, code)) {
     const { count, remainingMs } = recordChallengeFailure(user.id);
     logAudit('MFA_CHALLENGE_FAILURE', {
       actorId: user.id,
