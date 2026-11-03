@@ -573,6 +573,7 @@ router.post('/reset-password', (req, res) => {
 
   // Redeeming the token is the same proof of mailbox control that the
   // verification link carries: it is only ever mailed to the address on the row.
+  const verified = !user.isEmailVerified;
   user.isEmailVerified = true;
 
   // Cancel any in-flight self-service email change — proof of email ownership
@@ -597,6 +598,16 @@ router.post('/reset-password', (req, res) => {
     targetType: 'User',
     ip: req.ip
   });
+  if (verified) {
+    logAudit('EMAIL_VERIFIED', {
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { source: 'reset' },
+      ip: req.ip
+    });
+  }
 
   console.log(
     `[PASSWORD CHANGED] To: ${user.email}\n  Source: reset link | IP: ${req.ip}`
@@ -1107,6 +1118,7 @@ router.post('/profile/email/confirm', (req, res) => {
   const previous = { ...user };
 
   user.email = newEmail;
+  const verified = !user.isEmailVerified;
   user.isEmailVerified = true;
   // A reset link mailed to the old address dies with the move.
   clearMailedProofs(user);
@@ -1124,6 +1136,16 @@ router.post('/profile/email/confirm', (req, res) => {
     details: { oldEmail, newEmail },
     ip: req.ip
   });
+  if (verified) {
+    logAudit('EMAIL_VERIFIED', {
+      actorId: user.id,
+      actorEmail: newEmail,
+      targetId: user.id,
+      targetType: 'User',
+      details: { source: 'email_change' },
+      ip: req.ip
+    });
+  }
   pushUserCrudEvent('updated', user.id, previous);
 
   console.log(
