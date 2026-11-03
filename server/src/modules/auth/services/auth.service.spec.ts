@@ -1584,8 +1584,58 @@ describe('AuthService', () => {
 
       expect(mockManager.update).toHaveBeenCalledWith(
         expect.anything(),
-        { id: 'user-1', passwordResetToken: hashToken('valid-token') },
-        expect.objectContaining({ isEmailVerified: true })
+        { id: 'user-1', isEmailVerified: false },
+        { isEmailVerified: true }
+      );
+    });
+
+    it('writes one EMAIL_VERIFIED row when the reset verifies the address', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+
+      await service.resetPassword('valid-token', 'NewPassword1', {
+        ip: '198.51.100.7'
+      });
+
+      const rows = mockAuditService.logFireAndForget.mock.calls.filter(
+        ([entry]: [{ action: AuditAction }]) =>
+          entry.action === AuditAction.EMAIL_VERIFIED
+      );
+      expect(rows).toEqual([
+        [
+          {
+            action: AuditAction.EMAIL_VERIFIED,
+            actorId: 'user-1',
+            actorEmail: 'test@example.com',
+            targetId: 'user-1',
+            targetType: 'User',
+            details: { source: 'reset' },
+            context: { ip: '198.51.100.7' }
+          }
+        ]
+      ]);
+    });
+
+    it('writes no EMAIL_VERIFIED row when the address was already verified', async () => {
+      mockUsersService.findByPasswordResetToken.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: true,
+        passwordResetExpiresAt: new Date(Date.now() + 3600000)
+      });
+      mockManager.update.mockImplementation(
+        (_entity: unknown, criteria: { isEmailVerified?: boolean }) =>
+          Promise.resolve({
+            affected: criteria.isEmailVerified === false ? 0 : 1
+          })
+      );
+
+      await service.resetPassword('valid-token', 'NewPassword1');
+
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.EMAIL_VERIFIED })
       );
     });
 
@@ -3406,7 +3456,6 @@ describe('AuthService', () => {
         { id: 'user-1', pendingEmailToken: hashToken('raw-token') },
         expect.objectContaining({
           email: 'new@example.com',
-          isEmailVerified: true,
           pendingEmail: null,
           pendingEmailToken: null,
           pendingEmailExpiresAt: null,
@@ -3431,6 +3480,68 @@ describe('AuthService', () => {
         expect.objectContaining({ userId: 'user-1', previous: pendingUser })
       );
       expect(result.message).toMatch(/sign in again/);
+    });
+
+    it('verifies an unverified account with a keyed write and one EMAIL_VERIFIED row', async () => {
+      mockManager.findOne.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      });
+
+      await service.confirmEmailChange('raw-token', { ip: '198.51.100.7' });
+
+      expect(mockManager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        { id: 'user-1', isEmailVerified: false },
+        { isEmailVerified: true }
+      );
+      const rows = mockAuditService.logFireAndForget.mock.calls.filter(
+        ([entry]: [{ action: AuditAction }]) =>
+          entry.action === AuditAction.EMAIL_VERIFIED
+      );
+      expect(rows).toEqual([
+        [
+          {
+            action: AuditAction.EMAIL_VERIFIED,
+            actorId: 'user-1',
+            actorEmail: 'new@example.com',
+            targetId: 'user-1',
+            targetType: 'User',
+            details: { source: 'email_change' },
+            context: { ip: '198.51.100.7' }
+          }
+        ]
+      ]);
+    });
+
+    it('writes no EMAIL_VERIFIED row when the account was already verified', async () => {
+      mockManager.findOne.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: true,
+        pendingEmail: 'new@example.com',
+        pendingEmailToken: 'hashed-token',
+        pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      });
+      mockManager.update.mockImplementation(
+        (_entity: unknown, criteria: { isEmailVerified?: boolean }) =>
+          Promise.resolve({
+            affected: criteria.isEmailVerified === false ? 0 : 1
+          })
+      );
+
+      await service.confirmEmailChange('raw-token');
+
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_EMAIL_CHANGE_COMPLETE
+        })
+      );
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: AuditAction.EMAIL_VERIFIED })
+      );
     });
 
     it('throws 422 when token not found', async () => {

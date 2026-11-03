@@ -79,6 +79,7 @@ type ConfirmEmailChangeOutcome =
       oldEmail: string;
       newEmail: string;
       locale: string;
+      verified: boolean;
     }
   | { kind: 'expired'; userId: string }
   | { kind: 'conflict'; userId: string };
@@ -584,7 +585,7 @@ export class AuthService {
     // Update password, clear reset token, and invalidate all sessions atomically.
     // Without a transaction, a failure between steps could leave the account in an
     // inconsistent state (e.g. password changed but old sessions still active).
-    const removedProviders = await withTransaction(
+    const { removedProviders, verified } = await withTransaction(
       this.dataSource,
       async (manager) => {
         // Keyed on the token too: a password change or an ownership change that
@@ -608,9 +609,6 @@ export class AuthService {
             // this the reset succeeds and the new password is still locked out.
             failedLoginAttempts: 0,
             lockedUntil: null,
-            // Redeeming the token is the same proof of mailbox control that the
-            // verification link carries: it is only ever mailed to user.email.
-            isEmailVerified: true,
             tokenRevokedAt: new Date()
           }
         );
@@ -620,10 +618,23 @@ export class AuthService {
             'Invalid or expired password reset token'
           );
         }
+        // Redeeming the token is the same proof of mailbox control that the
+        // verification link carries: it is only ever mailed to user.email.
+        const flipped = await manager.update(
+          User,
+          { id: user.id, isEmailVerified: false },
+          { isEmailVerified: true }
+        );
         await manager.delete(RefreshToken, { userId: user.id });
         // A provider that an intruder linked while holding the password would
         // otherwise keep signing in after the owner takes the account back.
-        return this.oauthAccountService.removeAllForUser(user.id, manager);
+        return {
+          removedProviders: await this.oauthAccountService.removeAllForUser(
+            user.id,
+            manager
+          ),
+          verified: flipped.affected === 1
+        };
       }
     );
 
@@ -635,6 +646,17 @@ export class AuthService {
       targetType: 'User',
       context: auditContext
     });
+    if (verified) {
+      this.auditService.logFireAndForget({
+        action: AuditAction.EMAIL_VERIFIED,
+        actorId: user.id,
+        actorEmail: user.email,
+        targetId: user.id,
+        targetType: 'User',
+        details: { source: 'reset' },
+        context: auditContext
+      });
+    }
     this.reportRemovedProviders(user, removedProviders, {
       source: 'password_reset',
       actor: { actorId: user.id, actorEmail: user.email },
@@ -1094,7 +1116,6 @@ export class AuthService {
             { id: user.id, pendingEmailToken: hashedToken },
             {
               email: newEmail,
-              isEmailVerified: true,
               pendingEmail: null,
               pendingEmailToken: null,
               pendingEmailExpiresAt: null,
@@ -1111,6 +1132,13 @@ export class AuthService {
               'Invalid or expired email-change token'
             );
           }
+          // The confirmation link went to the new address, so following it
+          // proves control of that mailbox.
+          const flipped = await manager.update(
+            User,
+            { id: user.id, isEmailVerified: false },
+            { isEmailVerified: true }
+          );
           await manager.delete(RefreshToken, { userId: user.id });
 
           return {
@@ -1119,7 +1147,8 @@ export class AuthService {
             previous: user,
             oldEmail,
             newEmail,
-            locale: user.locale
+            locale: user.locale,
+            verified: flipped.affected === 1
           };
         }
       );
@@ -1157,6 +1186,17 @@ export class AuthService {
       details: { oldEmail: result.oldEmail, newEmail: result.newEmail },
       context: auditContext
     });
+    if (result.verified) {
+      this.auditService.logFireAndForget({
+        action: AuditAction.EMAIL_VERIFIED,
+        actorId: result.userId,
+        actorEmail: result.newEmail,
+        targetId: result.userId,
+        targetType: 'User',
+        details: { source: 'email_change' },
+        context: auditContext
+      });
+    }
     this.eventEmitter.emit(
       UserUpdatedEvent.name,
       new UserUpdatedEvent(result.userId, result.previous)

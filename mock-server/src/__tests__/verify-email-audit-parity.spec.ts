@@ -23,23 +23,48 @@ beforeEach(() => {
   resetState();
 });
 
-function verify(token: string): Promise<Response> {
-  return fetch(`${baseUrl}/api/v1/auth/verify-email`, {
+function postJson(path: string, body: unknown): Promise<Response> {
+  return fetch(`${baseUrl}/api/v1/auth/${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ token })
+    body: JSON.stringify(body)
   });
 }
 
-function issueToken(token: string, expiresInMs: number): string {
+function verify(token: string): Promise<Response> {
+  return postJson('verify-email', { token });
+}
+
+async function reset(): Promise<Response> {
+  expect((await postJson('forgot-password', { email })).status).toBe(200);
+  const [token] = [...getState().passwordResetTokens.keys()];
+  return postJson('reset-password', { token, password: 'Quartz-Meadow-77' });
+}
+
+function confirmEmailChange(newEmail: string): Promise<Response> {
+  const user = findUserByEmail(email)!;
+  const token = 'pending-token-audit';
+  user.pendingEmail = newEmail;
+  user.pendingEmailToken = token;
+  user.pendingEmailExpiresAt = new Date(Date.now() + 60_000).toISOString();
+  getState().pendingEmailTokens.set(token, user.id);
+  return postJson('profile/email/confirm', { token });
+}
+
+function setVerified(isEmailVerified: boolean): string {
   const user = findUserByEmail(email);
   expect(user).toBeDefined();
-  user!.isEmailVerified = false;
+  user!.isEmailVerified = isEmailVerified;
+  return user!.id;
+}
+
+function issueToken(token: string, expiresInMs: number): string {
+  const userId = setVerified(false);
   getState().emailVerificationTokens.set(token, {
-    userId: user!.id,
+    userId,
     expiresAt: new Date(Date.now() + expiresInMs).toISOString()
   });
-  return user!.id;
+  return userId;
 }
 
 function verifiedRows() {
@@ -69,6 +94,53 @@ describe('verify-email audit row', () => {
 
     expect((await verify('unknown-token')).status).toBe(422);
     expect((await verify('expired-token')).status).toBe(422);
+    expect(verifiedRows()).toEqual([]);
+  });
+
+  it('writes one row with source reset when a reset verifies the address', async () => {
+    const userId = setVerified(false);
+
+    expect((await reset()).status).toBe(200);
+    expect(verifiedRows()).toEqual([
+      expect.objectContaining({
+        actorId: userId,
+        actorEmail: email,
+        targetId: userId,
+        targetType: 'User',
+        details: { source: 'reset' }
+      })
+    ]);
+  });
+
+  it('writes no row when a reset finds the address already verified', async () => {
+    setVerified(true);
+
+    expect((await reset()).status).toBe(200);
+    expect(verifiedRows()).toEqual([]);
+  });
+
+  it('writes one row with source email_change when a confirmation verifies the address', async () => {
+    const userId = setVerified(false);
+    const newEmail = 'audit-moved@example.com';
+
+    expect((await confirmEmailChange(newEmail)).status).toBe(200);
+    expect(verifiedRows()).toEqual([
+      expect.objectContaining({
+        actorId: userId,
+        actorEmail: newEmail,
+        targetId: userId,
+        targetType: 'User',
+        details: { source: 'email_change' }
+      })
+    ]);
+  });
+
+  it('writes no row when a confirmation finds the account already verified', async () => {
+    setVerified(true);
+
+    expect((await confirmEmailChange('audit-moved@example.com')).status).toBe(
+      200
+    );
     expect(verifiedRows()).toEqual([]);
   });
 });

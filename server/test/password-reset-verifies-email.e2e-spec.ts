@@ -2,11 +2,14 @@ import { HttpException, HttpStatus, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { hashToken } from '../src/common/utils/hash-token';
+import { eventually } from './eventually';
 
 // Redeeming a reset token is the same proof of mailbox control as the
 // verification link, so the row must come out verified - only a real Postgres
@@ -100,6 +103,12 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
     expect(afterReset.isEmailVerified).toBe(true);
+
+    const audit = dataSource.getRepository(AuditLog);
+    const where = { action: AuditAction.EMAIL_VERIFIED, targetId: user.id };
+    const row = await eventually(() => audit.findOne({ where }));
+    expect(row?.details).toEqual({ source: 'reset' });
+    expect(await audit.count({ where })).toBe(1);
 
     // Pre-fix this was 403 EMAIL_NOT_VERIFIED.
     expect(
