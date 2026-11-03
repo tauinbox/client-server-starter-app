@@ -52,6 +52,7 @@ import {
   TOKEN_PURPOSE
 } from '@app/shared/constants';
 import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
+import { OAuthFailureAudit } from '../src/modules/auth/utils/oauth-failure-audit';
 import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
@@ -147,6 +148,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         RESPONSE_SERIALIZER,
         AuthCookies,
+        OAuthFailureAudit,
         SignInCompletionService,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {

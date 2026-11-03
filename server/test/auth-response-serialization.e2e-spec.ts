@@ -46,6 +46,7 @@ import { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { CLIENT_URL } from '../src/modules/auth/providers/client-url.provider';
 import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
 import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
+import { OAuthFailureAudit } from '../src/modules/auth/utils/oauth-failure-audit';
 import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
@@ -178,6 +179,7 @@ describe('Auth response serialization (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         RESPONSE_SERIALIZER,
         AuthCookies,
+        OAuthFailureAudit,
         SignInCompletionService,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {

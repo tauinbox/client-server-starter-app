@@ -38,7 +38,6 @@ import { JwtAuthRequest } from '../types/auth.request';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
-import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import {
@@ -59,6 +58,10 @@ import {
 } from '../constants/oauth.constants';
 import { AuthCookies } from '../utils/auth-cookies';
 import { readIntentForFlow } from '../utils/oauth-flow-intent';
+import {
+  OAuthFailureAudit,
+  type OAuthIntentAccount
+} from '../utils/oauth-failure-audit';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
 import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
@@ -82,6 +85,9 @@ function invalidOAuthData(): ApiError {
     'Invalid or expired OAuth data'
   );
 }
+
+/** The `reason` of a row whose intent cookie did not verify. */
+const INTENT_INVALID_REASON = 'intent_invalid';
 
 /** The `reason` of an audit row for a refused provider callback. */
 function oauthFailureReason(error: unknown): string {
@@ -117,7 +123,7 @@ export class OAuthController {
     private readonly purposeTokens: PurposeTokenService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
-    private readonly metricsService: MetricsService,
+    private readonly failureAudit: OAuthFailureAudit,
     private readonly usersService: UsersService,
     private readonly signIn: SignInCompletionService,
     @Inject(CLIENT_URL) private readonly clientUrl: string,
@@ -503,7 +509,11 @@ export class OAuthController {
 
       res.redirect(`${this.clientUrl}/oauth/callback`);
     } catch (error) {
-      this.auditOAuthLoginFailure(profile, error, req);
+      this.failureAudit.loginFailure({
+        provider: profile.provider,
+        reason: oauthFailureReason(error),
+        context: extractAuditContext(req)
+      });
       if (error instanceof OAuthAuthenticationFailedException) {
         this.logger.warn(`${error.message} via ${profile.provider}`);
         res.redirect(`${this.clientUrl}/login?oauth_error=${error.oauthError}`);
@@ -514,27 +524,6 @@ export class OAuthController {
         `${this.clientUrl}/login?oauth_error=${OAUTH_ERROR.AUTH_FAILED}`
       );
     }
-  }
-
-  /**
-   * No field of the provider profile beyond its name enters the row: the
-   * address is the provider's claim, not an identity this server verified.
-   */
-  private auditOAuthLoginFailure(
-    profile: OAuthUserProfile,
-    error: unknown,
-    req: ExpressRequest
-  ): void {
-    this.auditService.logFireAndForget({
-      action: AuditAction.USER_LOGIN_FAILURE,
-      details: {
-        method: 'oauth',
-        provider: profile.provider,
-        reason: oauthFailureReason(error)
-      },
-      context: extractAuditContext(req)
-    });
-    this.metricsService.recordAuthEvent('login_failure');
   }
 
   /**
@@ -601,24 +590,14 @@ export class OAuthController {
 
       res.redirect(`${this.clientUrl}/profile?reauth=ok`);
     } catch (error) {
-      // An intent that does not verify names no account, so only the log
-      // records it, as a refused provider round trip does.
-      if (payload) {
-        this.auditService.logFireAndForget({
-          action: AuditAction.STEP_UP_FAILURE,
-          actorId: payload.sub,
-          actorEmail: payload.email,
-          targetId: payload.sub,
-          targetType: 'User',
-          details: {
-            operation: payload.operation,
-            factor: 'reauth_proof',
-            provider: profile.provider,
-            reason: oauthFailureReason(error)
-          },
+      this.failureAudit.stepUpFailure(
+        {
+          provider: profile.provider,
+          reason: payload ? oauthFailureReason(error) : INTENT_INVALID_REASON,
           context: extractAuditContext(req)
-        });
-      }
+        },
+        payload ?? undefined
+      );
       this.logger.error('OAuth re-authentication error', error);
       res.redirect(
         `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.REAUTH_FAILED}`
@@ -633,8 +612,7 @@ export class OAuthController {
   ): Promise<void> {
     this.cookies.clear(res, OAUTH_LINK_COOKIE);
 
-    let userId: string | null = null;
-    let userEmail: string | undefined;
+    let account: OAuthIntentAccount | undefined;
     try {
       const payload = this.purposeTokens.verify<{
         sub: string;
@@ -643,11 +621,10 @@ export class OAuthController {
       if (!payload) {
         throw new Error('Invalid link token');
       }
-      userId = payload.sub;
-      userEmail = payload.email;
+      account = { sub: payload.sub, email: payload.email };
 
       await this.oauthService.linkOAuthToUser(
-        userId,
+        account.sub,
         { provider: profile.provider, providerId: profile.providerId },
         {
           linkTokenIssuedAt: payload.iat,
@@ -659,20 +636,14 @@ export class OAuthController {
         `${this.clientUrl}/profile?oauth_linked=${profile.provider}`
       );
     } catch (error) {
-      if (userId) {
-        this.auditService.logFireAndForget({
-          action: AuditAction.OAUTH_LINK_FAILURE,
-          actorId: userId,
-          actorEmail: userEmail,
-          targetId: userId,
-          targetType: 'User',
-          details: {
-            provider: profile.provider,
-            reason: oauthFailureReason(error)
-          },
+      this.failureAudit.linkFailure(
+        {
+          provider: profile.provider,
+          reason: account ? oauthFailureReason(error) : INTENT_INVALID_REASON,
           context: extractAuditContext(req)
-        });
-      }
+        },
+        account
+      );
       this.logger.error('OAuth link error', error);
       res.redirect(
         `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.LINK_FAILED}`

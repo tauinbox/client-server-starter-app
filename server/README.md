@@ -1767,7 +1767,10 @@ failed code exchange. Thus the handler that redirects back to the client never r
 `createOAuthProviderGuard` overrides `handleRequest`. It raises
 `OAuthAuthenticationFailedException` instead of `UnauthorizedException`. The controller-scoped
 `OAuthAuthenticationExceptionFilter` answers with `302 CLIENT_URL/login?oauth_error=auth_failed`. The
-browser is in the middle of a navigation here, and it is not calling an API.
+browser is in the middle of a navigation here, and it is not calling an API. The filter also writes
+the audit row of the failure through `OAuthFailureAudit`, the class that the callback handler uses:
+`STEP_UP_FAILURE` or `OAUTH_LINK_FAILURE` for the account of an intent that this flow claimed and
+that verifies, else `USER_LOGIN_FAILURE` with no actor.
 
 The guard selects the two halves of that redirect from a fixed set, and never from the request. The
 query `?error=access_denied`, which is how each provider reports a declined consent screen, becomes

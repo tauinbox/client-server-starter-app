@@ -24,6 +24,7 @@ import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authenticat
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { CookieStateStore } from '../utils/cookie-state-store';
 import { AuthCookies } from '../utils/auth-cookies';
+import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 
 const CLIENT = 'http://localhost:4200';
@@ -84,7 +85,10 @@ function startProvider(): Promise<{ server: Server; url: string }> {
   });
 }
 
-const PkceGuard = createOAuthProviderGuard(STRATEGY, 'Test');
+const PkceGuard = createOAuthProviderGuard(STRATEGY, {
+  provider: OAuthProvider.GOOGLE,
+  displayName: 'Test'
+});
 
 @Controller('oauth')
 @UseFilters(OAuthAuthenticationExceptionFilter)
@@ -156,6 +160,7 @@ describe('OAuth PKCE (real passport-oauth2 against an enforcing provider)', () =
       controllers: [PkceOAuthController],
       providers: [
         OAuthAuthenticationExceptionFilter,
+        { provide: OAuthFailureAudit, useValue: { guardFailure: jest.fn() } },
         AuthCookies,
         { provide: CLIENT_URL, useValue: CLIENT },
         { provide: ConfigService, useValue: { get: () => 'production' } }

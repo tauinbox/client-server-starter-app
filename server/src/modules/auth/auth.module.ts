@@ -47,6 +47,7 @@ import { UserRoleChangedListener } from './listeners/user-role-changed.listener'
 import { SessionRevocationListener } from './listeners/session-revocation.listener';
 import { clientUrlProvider } from './providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from './filters/oauth-authentication-exception.filter';
+import { OAuthFailureAudit } from './utils/oauth-failure-audit';
 
 function conditionalProvider(
   envVar: string,
@@ -123,6 +124,7 @@ function conditionalProvider(
     UserRoleChangedListener,
     SessionRevocationListener,
     clientUrlProvider,
+    OAuthFailureAudit,
     OAuthAuthenticationExceptionFilter
   ],
   exports: [

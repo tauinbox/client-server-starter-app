@@ -1,4 +1,5 @@
 import type { OAuthError } from '@app/shared/constants';
+import type { OAuthProvider } from '../enums/oauth-provider.enum';
 
 /**
  * Where the browser is sent after a failure. A cancelled or failed link flow
@@ -8,6 +9,13 @@ import type { OAuthError } from '@app/shared/constants';
  */
 export type OAuthFailureRedirect = '/login' | '/profile';
 
+export interface OAuthFailureOptions {
+  reason?: unknown;
+  redirectPath?: OAuthFailureRedirect;
+  /** Set by the provider guard, so the filter can name the provider in its audit row. */
+  provider?: OAuthProvider;
+}
+
 /**
  * Raised when Passport rejects an OAuth request - a denied consent screen, an
  * expired state cookie, a failed code exchange. It exists so the failure can be
@@ -15,12 +23,18 @@ export type OAuthFailureRedirect = '/login' | '/profile';
  * API origin: the browser is mid-navigation here, not calling an API.
  */
 export class OAuthAuthenticationFailedException extends Error {
+  readonly reason?: unknown;
+  readonly redirectPath: OAuthFailureRedirect;
+  readonly provider?: OAuthProvider;
+
   constructor(
     readonly oauthError: OAuthError,
-    readonly reason?: unknown,
-    readonly redirectPath: OAuthFailureRedirect = '/login'
+    { reason, redirectPath = '/login', provider }: OAuthFailureOptions = {}
   ) {
     super(`OAuth authentication failed (${oauthError})`);
     this.name = 'OAuthAuthenticationFailedException';
+    this.reason = reason;
+    this.redirectPath = redirectPath;
+    this.provider = provider;
   }
 }

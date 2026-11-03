@@ -29,6 +29,7 @@ import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthProvider } from '../enums/oauth-provider.enum';
 import { STEP_UP_OPERATION, TOKEN_PURPOSE } from '@app/shared/constants';
 import { AuthCookies } from '../utils/auth-cookies';
+import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 const CLIENT = 'http://localhost:4200';
@@ -161,6 +162,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
         PurposeTokenService,
         RESPONSE_SERIALIZER,
         AuthCookies,
+        OAuthFailureAudit,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: OAuthService,

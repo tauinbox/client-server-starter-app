@@ -1,6 +1,6 @@
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 import { Catch, Inject, Injectable, Logger } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import {
@@ -8,6 +8,7 @@ import {
   OAUTH_REAUTH_COOKIE
 } from '../constants/oauth.constants';
 import { AuthCookies } from '../utils/auth-cookies';
+import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
 
 @Injectable()
 @Catch(OAuthAuthenticationFailedException)
@@ -16,7 +17,8 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
 
   constructor(
     @Inject(CLIENT_URL) private readonly clientUrl: string,
-    private readonly cookies: AuthCookies
+    private readonly cookies: AuthCookies,
+    private readonly failureAudit: OAuthFailureAudit
   ) {}
 
   catch(
@@ -27,7 +29,10 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
       exception.reason instanceof Error ? `: ${exception.reason.message}` : '';
     this.logger.warn(`${exception.message}${reason}`);
 
-    const response = host.switchToHttp().getResponse<Response>();
+    const http = host.switchToHttp();
+    const response = http.getResponse<Response>();
+
+    this.failureAudit.guardFailure(http.getRequest<Request>(), exception);
 
     // The attempt is over, so neither intent cookie must survive to turn the
     // user's next plain OAuth login into another link or step-up attempt. The
