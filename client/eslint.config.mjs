@@ -99,6 +99,18 @@ export default tseslint.config(
         // Flat config replaces this rule's options, so the base selectors are
         // re-added here.
         ...baseRules['no-restricted-syntax'].slice(1),
+        // RegExp modifiers are ES2025 syntax that Safari before 26 cannot
+        // parse, and no other gate sees them: TypeScript accepts them at any
+        // target, and the build copies the literal as it is.
+        ...[
+          'Literal[regex.pattern=/(?<!\\\\)\\(\\?(?:[ims]+-?[ims]*|-[ims]+):/]',
+          "NewExpression[callee.name='RegExp'] > Literal.arguments[value=/(?<!\\\\)\\(\\?(?:[ims]+-?[ims]*|-[ims]+):/]",
+          "CallExpression[callee.name='RegExp'] > Literal.arguments[value=/(?<!\\\\)\\(\\?(?:[ims]+-?[ims]*|-[ims]+):/]"
+        ].map((selector) => ({
+          selector,
+          message:
+            'Do not use RegExp modifiers such as (?i:...). Safari before 26 throws a SyntaxError on them, and client/.browserslistrc supports Safari 18.4. Use a flag on the whole pattern or a character class.'
+        })),
         {
           // A server errorKey is only a translation key when a translation for
           // it exists; rendering it directly puts a raw dot-path on screen the
