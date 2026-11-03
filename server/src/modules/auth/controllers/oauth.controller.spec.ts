@@ -30,6 +30,7 @@ import { bindIntent } from '../utils/oauth-flow-intent';
 import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { AuthCookies } from '../utils/auth-cookies';
+import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 // Seconds, as a JWT `iat` is.
@@ -195,6 +196,7 @@ describe('OAuthController', () => {
       providers: [
         PurposeTokenService,
         AuthCookies,
+        OAuthFailureAudit,
         SignInCompletionService,
         { provide: UsersService, useValue: usersServiceMock },
         { provide: CLIENT_URL, useValue: configValues['CLIENT_URL'] },
@@ -913,7 +915,7 @@ describe('OAuthController', () => {
       );
     });
 
-    it('should redirect to profile with error when link token is invalid', async () => {
+    it('should redirect to profile with an actor-less row when link token is invalid', async () => {
       jwtServiceMock.verify.mockImplementation(() => {
         throw new Error('invalid token');
       });
@@ -936,7 +938,12 @@ describe('OAuthController', () => {
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/profile?oauth_error=link_failed'
       );
-      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.OAUTH_LINK_FAILURE,
+        details: { provider: OAuthProvider.GOOGLE, reason: 'intent_invalid' },
+        context: { ip: '127.0.0.1', requestId: undefined }
+      });
     });
 
     it('should audit a link that the service refuses', async () => {
@@ -1033,7 +1040,7 @@ describe('OAuthController', () => {
         });
       });
 
-      it('should write no audit row when the intent does not verify', async () => {
+      it('should write an actor-less row when the intent does not verify', async () => {
         jwtServiceMock.verify.mockImplementation(() => {
           throw new Error('invalid token');
         });
@@ -1047,7 +1054,16 @@ describe('OAuthController', () => {
         expect(res.redirect).toHaveBeenCalledWith(
           'http://localhost:4200/profile?oauth_error=reauth_failed'
         );
-        expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+          action: AuditAction.STEP_UP_FAILURE,
+          details: {
+            factor: 'reauth_proof',
+            provider: OAuthProvider.GOOGLE,
+            reason: 'intent_invalid'
+          },
+          context: { ip: '127.0.0.1', requestId: undefined }
+        });
       });
 
       it('should write no audit row when the re-authentication succeeds', async () => {

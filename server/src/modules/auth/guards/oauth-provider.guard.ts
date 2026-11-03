@@ -12,6 +12,7 @@ import {
   OAUTH_REAUTH_COOKIE
 } from '../constants/oauth.constants';
 import { AuthCookies } from '../utils/auth-cookies';
+import type { OAuthProvider } from '../enums/oauth-provider.enum';
 
 // Passport rejects with this message only when the provider's credentials
 // are absent and conditionalProvider skipped registering the strategy.
@@ -22,9 +23,14 @@ const MISSING_STRATEGY_MESSAGE = 'Unknown authentication strategy';
 // expired state cookie - so the intent has to be read off the request.
 const PROVIDER_CANCELLED_ERROR = 'access_denied';
 
+export interface OAuthProviderGuardOptions {
+  provider: OAuthProvider;
+  displayName: string;
+}
+
 export function createOAuthProviderGuard(
   strategy: string,
-  providerName: string
+  { provider, displayName }: OAuthProviderGuardOptions
 ): Type<IAuthGuard> {
   @Injectable()
   class OAuthProviderGuard extends AuthGuard(strategy) {
@@ -42,9 +48,7 @@ export function createOAuthProviderGuard(
           error.message.startsWith(MISSING_STRATEGY_MESSAGE)
         ) {
           // eslint-disable-next-line no-restricted-syntax -- a browser navigation, never read by the client error funnel
-          throw new NotFoundException(
-            `${providerName} OAuth is not configured`
-          );
+          throw new NotFoundException(`${displayName} OAuth is not configured`);
         }
         throw error;
       }
@@ -74,8 +78,11 @@ export function createOAuthProviderGuard(
         const intents = intentCookies(request, this.cookies);
         throw new OAuthAuthenticationFailedException(
           resolveErrorKey(request, intents),
-          err,
-          resolveRedirectPath(intents)
+          {
+            reason: err,
+            redirectPath: resolveRedirectPath(intents),
+            provider
+          }
         );
       }
       return user as TUser;

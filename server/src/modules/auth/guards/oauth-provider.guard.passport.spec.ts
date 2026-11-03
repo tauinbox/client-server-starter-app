@@ -19,6 +19,12 @@ import { createOAuthProviderGuard } from './oauth-provider.guard';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { AuthCookies } from '../utils/auth-cookies';
+import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
+import { OAuthProvider } from '../enums/oauth-provider.enum';
+import { AuditService } from '../../audit/audit.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
+import { PurposeTokenService } from '../services/purpose-token.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
 const CLIENT = 'http://localhost:4200';
 
@@ -51,10 +57,17 @@ class ScriptedStrategy implements passport.Strategy {
   }
 }
 
-const FailingGuard = createOAuthProviderGuard('scripted-fail', 'Test');
-const ErroringGuard = createOAuthProviderGuard('scripted-error', 'Test');
-const SucceedingGuard = createOAuthProviderGuard('scripted-success', 'Test');
-const UnregisteredGuard = createOAuthProviderGuard('scripted-absent', 'Test');
+const TEST_PROVIDER = { provider: OAuthProvider.GOOGLE, displayName: 'Test' };
+const FailingGuard = createOAuthProviderGuard('scripted-fail', TEST_PROVIDER);
+const ErroringGuard = createOAuthProviderGuard('scripted-error', TEST_PROVIDER);
+const SucceedingGuard = createOAuthProviderGuard(
+  'scripted-success',
+  TEST_PROVIDER
+);
+const UnregisteredGuard = createOAuthProviderGuard(
+  'scripted-absent',
+  TEST_PROVIDER
+);
 
 @Controller('oauth')
 @UseFilters(OAuthAuthenticationExceptionFilter)
@@ -87,6 +100,7 @@ class ScriptedOAuthController {
 describe('createOAuthProviderGuard (real Passport pipeline)', () => {
   let app: INestApplication;
   let server: Server;
+  const auditService = { logFireAndForget: jest.fn() };
 
   beforeAll(async () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -100,6 +114,10 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
       controllers: [ScriptedOAuthController],
       providers: [
         OAuthAuthenticationExceptionFilter,
+        OAuthFailureAudit,
+        { provide: AuditService, useValue: auditService },
+        { provide: MetricsService, useValue: { recordAuthEvent: jest.fn() } },
+        { provide: PurposeTokenService, useValue: { verify: () => null } },
         AuthCookies,
         { provide: CLIENT_URL, useValue: CLIENT },
         { provide: ConfigService, useValue: { get: () => 'production' } }
@@ -129,6 +147,20 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
       `${CLIENT}/login?oauth_error=auth_failed`
     );
     expect(response.body).toEqual({});
+  });
+
+  it('writes a refused sign-in row that names the provider of the guard', async () => {
+    auditService.logFireAndForget.mockClear();
+
+    await request(server).get('/oauth/fail/callback');
+
+    expect(auditService.logFireAndForget).toHaveBeenCalledTimes(1);
+    expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        details: { method: 'oauth', provider: 'google', reason: 'auth_failed' }
+      })
+    );
   });
 
   it('redirects to the client login page when the strategy errors', async () => {

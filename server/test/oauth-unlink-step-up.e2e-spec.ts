@@ -28,6 +28,7 @@ import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { CLIENT_URL } from '../src/modules/auth/providers/client-url.provider';
 import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
+import { OAuthFailureAudit } from '../src/modules/auth/utils/oauth-failure-audit';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 import type { StepUpRequest } from '../src/modules/auth/services/auth.service';
 
@@ -54,6 +55,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
         PurposeTokenService,
         RESPONSE_SERIALIZER,
         AuthCookies,
+        OAuthFailureAudit,
         {
           provide: AuthService,
           useValue: {
