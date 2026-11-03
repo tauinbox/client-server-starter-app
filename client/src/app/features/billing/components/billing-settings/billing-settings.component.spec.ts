@@ -254,6 +254,8 @@ describe('BillingSettingsComponent', () => {
   });
 
   it('renders billing-boundary dates in UTC regardless of the browser timezone', async () => {
+    const systemTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const systemOffset = new Date('2025-01-01T00:00:00Z').getTimezoneOffset();
     vi.stubEnv('TZ', 'America/Los_Angeles');
     try {
       await setup(true, { usage: usageSummary });
@@ -264,8 +266,14 @@ describe('BillingSettingsComponent', () => {
       expect(text).toContain('Jul 1, 2026');
       expect(text).not.toContain('Jun 30, 2026');
     } finally {
+      // Node keeps the last zone when TZ is deleted, and the workers are not
+      // isolated, so set the old zone back before the stub is removed.
+      vi.stubEnv('TZ', systemTimeZone);
       vi.unstubAllEnvs();
     }
+    expect(new Date('2025-01-01T00:00:00Z').getTimezoneOffset()).toBe(
+      systemOffset
+    );
   });
 
   it('renders the usage meter when a usage summary is present', async () => {
