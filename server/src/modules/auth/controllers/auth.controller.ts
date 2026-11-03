@@ -233,8 +233,7 @@ export class AuthController {
 
   @Authorize(['update', 'Profile'])
   // The two-factor gate shuts the administration surface, never the account's
-  // own credentials: an account with no password sets one here before it can
-  // satisfy the step-up that enrolment needs.
+  // own credentials, so an account that owes its enrolment keeps this route.
   @SkipMfaEnrolmentGate()
   // The step-up in this handler verifies a secret, so a refused attempt must
   // cost the caller the same budget a refused sign-in costs. A name or locale
