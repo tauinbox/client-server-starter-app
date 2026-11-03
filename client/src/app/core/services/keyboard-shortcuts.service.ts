@@ -40,12 +40,10 @@ export class KeyboardShortcutsService {
     this.#revision();
     const result: ShortcutDef[] = [];
     for (const stack of this.#stacks.values()) {
-      if (stack.length > 0) {
-        const top = stack[stack.length - 1].def;
-        // Entries with an empty label are blocking no-ops — exclude from help.
-        if (top.label) {
-          result.push(top);
-        }
+      const top = stack.at(-1)?.def;
+      // Entries with an empty label are blocking no-ops; exclude them from help.
+      if (top?.label) {
+        result.push(top);
       }
     }
     return result;
@@ -105,11 +103,11 @@ export class KeyboardShortcutsService {
       return;
     }
 
-    const stack = this.#stacks.get(key);
-    if (!stack || stack.length === 0) return;
+    const top = this.#stacks.get(key)?.at(-1);
+    if (!top) return;
 
     event.preventDefault();
-    stack[stack.length - 1].handler();
+    top.handler();
   }
 
   #normalise(event: KeyboardEvent): string {

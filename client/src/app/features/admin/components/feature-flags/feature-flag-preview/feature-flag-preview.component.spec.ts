@@ -254,6 +254,9 @@ describe('FeatureFlagPreviewComponent', () => {
       { value: 'u-2', label: 'Bob' }
     ]);
     expect(cmp['selectedUser']()).toEqual([{ value: 'u-2', label: 'Bob' }]);
+
+    cmp.onUserChipsChange([]);
+    expect(cmp['selectedUser']()).toEqual([]);
   });
 
   it('omits empty fields from the structured context', async () => {

@@ -4,7 +4,7 @@
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
     "types": ["vitest/globals"],
-    "lib": ["ES2022", "esnext.disposable", "dom"]
+    "lib": ["ES2025", "esnext.disposable", "dom"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

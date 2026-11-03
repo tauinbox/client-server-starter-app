@@ -156,7 +156,7 @@ export function cursorPaginate<T extends { id: string }>(
   const slice = sorted.slice(startIndex, startIndex + limit + 1);
   const hasMore = slice.length > limit;
   const data = hasMore ? slice.slice(0, limit) : slice;
-  const lastItem = data[data.length - 1];
+  const lastItem = data.at(-1);
 
   return {
     data,

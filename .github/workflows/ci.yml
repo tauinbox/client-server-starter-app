@@ -63,6 +63,8 @@ jobs:
       - run: npm run check:error-status
       - run: npm run check:race -- --self-test
       - run: npm run check:race
+      - run: npm run check:regex-modifiers -- --self-test
+      - run: npm run check:regex-modifiers
       - run: npm run check:status-comments -- --self-test
       - run: npm run check:status-comments
       # Repo-wide, not server-scoped: it walks all four source roots, and

@@ -217,7 +217,7 @@ describe('OAuthCallbackComponent', () => {
       const buttons: HTMLButtonElement[] = Array.from(
         fixture.nativeElement.querySelectorAll('.mfa-links button')
       );
-      buttons[buttons.length - 1].click();
+      buttons.at(-1)!.click();
       await fixture.whenStable();
 
       expect(router.navigate).toHaveBeenCalledWith(['/login'], {

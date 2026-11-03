@@ -1351,3 +1351,7 @@ name that gets past the hook. It does this during the changelog generation, and 
 | Stylelint | 17.16.0 |
 | commitlint | 21.2.3 |
 | commit-and-tag-version | 13.2.1 |
+
+**Supported browsers** (`.browserslistrc`): Chrome and Edge 136, Firefox 134, Safari and iOS Safari
+18.4, and later versions. These are the first versions that implement ES2025 in full. The TypeScript
+`lib` is ES2025, and Angular adds no polyfill for library APIs, so older browsers are not supported.

@@ -128,7 +128,7 @@ describe('ChangePlanDialogComponent', () => {
         'mat-dialog-actions button'
       )
     );
-    return buttons[buttons.length - 1];
+    return buttons.at(-1)!;
   }
 
   beforeEach(() => {

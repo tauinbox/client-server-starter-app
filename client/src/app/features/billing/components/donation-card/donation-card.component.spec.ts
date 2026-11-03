@@ -45,7 +45,7 @@ describe('DonationCardComponent', () => {
     const toggles = fixture.nativeElement.querySelectorAll(
       'mat-button-toggle button'
     ) as NodeListOf<HTMLButtonElement>;
-    toggles[toggles.length - 1].click();
+    [...toggles].at(-1)!.click();
     fixture.detectChanges();
   }
 

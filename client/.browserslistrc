@@ -1,0 +1,9 @@
+# The client supports only the browser versions that implement ES2025 in full
+# (iterator helpers, Promise.try, RegExp.escape, Float16Array, Set methods),
+# because tsconfig "lib" is ES2025 and Angular adds no polyfill for these APIs.
+# First versions are from @mdn/browser-compat-data 8.1.7. Old Safari is not supported.
+Chrome >= 136
+Edge >= 136
+Firefox >= 134
+Safari >= 18.4
+iOS >= 18.4

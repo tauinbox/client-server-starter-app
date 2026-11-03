@@ -168,7 +168,7 @@ runWithInfra(
     // evicted the oldest device, and the exchange then ended the replaced one.
     it('keeps every other device when the quota is full and the browser signs in again', async () => {
       const devices = await fillQuota();
-      const newest = devices[devices.length - 1];
+      const newest = devices.at(-1)!;
 
       const oauthData = await callback();
       expect(await liveRows()).toBe(devices.length);

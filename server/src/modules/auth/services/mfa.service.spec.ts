@@ -178,8 +178,8 @@ describe('MfaService', () => {
 
   /** The changes of the last `update` call, which is the one under test. */
   function lastUpdate(): Partial<User> {
-    const { calls } = repository.update.mock;
-    return calls[calls.length - 1][1];
+    const [, changes] = repository.update.mock.lastCall!;
+    return changes;
   }
 
   /**
@@ -274,8 +274,7 @@ describe('MfaService', () => {
       expect(result.recoveryCodes).toHaveLength(10);
       const stored = lastUpdate();
       expect(stored.totpEnabledAt).toBeInstanceOf(Date);
-      const { calls } = repository.update.mock;
-      expect(calls[calls.length - 1][0]).toEqual({
+      expect(repository.update.mock.lastCall?.[0]).toEqual({
         id: 'user-1',
         totpEnabledAt: IsNull(),
         totpSecret: user.totpSecret

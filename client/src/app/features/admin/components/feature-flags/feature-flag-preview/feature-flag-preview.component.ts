@@ -126,11 +126,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   // dropped to keep the picker a single-selection control without changing
   // the shared NxsChipsAutocompleteComponent API.
   onUserChipsChange(chips: ChipOption[]): void {
-    if (chips.length <= 1) {
-      this.selectedUser.set(chips);
-      return;
-    }
-    this.selectedUser.set([chips[chips.length - 1]]);
+    this.selectedUser.set(chips.slice(-1));
   }
 
   onUserSearchTerm(term: string): void {

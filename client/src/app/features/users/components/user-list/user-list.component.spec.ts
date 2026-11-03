@@ -310,7 +310,7 @@ describe('UserListComponent', () => {
     it('offers the catalog roles as literal options, then the account-state selects and the deleted toggle', () => {
       const controls = component.filterControls();
       const [role, status] = controls;
-      const deleted = controls[controls.length - 1];
+      const deleted = controls.at(-1);
 
       expect(controls.map((control) => control.key)).toEqual([
         'role',
