@@ -21,7 +21,8 @@ import { describeChecks, requiredLabels } from './permissions.guard';
  * enrolment. It runs in front of PermissionsGuard, so it covers every route
  * that `@Authorize` carries: sign-in, the profile read and the enrolment
  * routes stay open, because an administrator who cannot sign in cannot enrol
- * either. `@SkipMfaEnrolmentGate()` opens one more route for the same reason.
+ * either. `@SkipMfaEnrolmentGate()` also opens the two profile writes, which
+ * manage the caller's own credentials.
  */
 @Injectable()
 export class MfaRequiredGuard implements CanActivate {

@@ -816,7 +816,7 @@ router.get('/permissions', authGuard, (req, res) => {
 
 // PATCH /api/v1/auth/profile
 // The server route carries `@SkipMfaEnrolmentGate()`: an account that owes an
-// enrolment may still set the password that the enrolment step-up needs.
+// enrolment keeps the routes that manage its own credentials.
 router.patch(
   '/profile',
   permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
