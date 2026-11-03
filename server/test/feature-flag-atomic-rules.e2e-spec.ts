@@ -34,7 +34,7 @@ const version = (v: number): IfMatchCondition => ({
 
 runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   const tag = `ff-atomic-${Date.now()}`;
-  const trigger = tag.replace(/-/g, '_');
+  const trigger = tag.replaceAll('-', '_');
 
   let app: INestApplication;
   let dataSource: DataSource;

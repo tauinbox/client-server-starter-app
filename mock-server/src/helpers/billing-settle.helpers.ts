@@ -46,9 +46,9 @@ export function activateSubscription(
   const periodEnd = addInterval(now, plan.interval);
 
   const isRu = (user.locale ?? 'en').toLowerCase().startsWith('ru');
-  let customer = [...state.billingCustomers.values()].find(
-    (c) => c.userId === user.id
-  );
+  let customer = state.billingCustomers
+    .values()
+    .find((c) => c.userId === user.id);
   if (!customer) {
     customer = {
       id: randomUUID(),
@@ -163,9 +163,9 @@ export function settleSelfManagedCheckout(
   { customerId, trial }: { customerId: string; trial: boolean }
 ): void {
   const state = getState();
-  const open = [...state.billingSubscriptions.values()].find(
-    (s) => s.customerId === customerId && s.status !== 'canceled'
-  );
+  const open = state.billingSubscriptions
+    .values()
+    .find((s) => s.customerId === customerId && s.status !== 'canceled');
   if (open?.status === 'incomplete' && open.planKey === plan.key) {
     const trialing =
       open.trialEnd !== null && Date.parse(open.trialEnd) > Date.now();

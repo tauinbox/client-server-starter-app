@@ -26,11 +26,14 @@ function orphanUsersResource(): void {
 
 function grantUsersReadToEditor(deny = false): void {
   const state = getState();
-  const readAction = [...state.actions.values()].find((a) => a.name === 'read');
+  const readAction = state.actions.values().find((a) => a.name === 'read');
   if (!readAction) throw new Error('seed action read missing');
-  const usersRead = [...state.permissions.values()].find(
-    (p) => p.resourceId === mockId('res-users') && p.actionId === readAction.id
-  );
+  const usersRead = state.permissions
+    .values()
+    .find(
+      (p) =>
+        p.resourceId === mockId('res-users') && p.actionId === readAction.id
+    );
   if (!usersRead) throw new Error('seed permission users/read missing');
 
   state.rolePermissions.push({

@@ -2,9 +2,9 @@ import { mockId } from './ids';
 
 export function base64url(obj: Record<string, unknown>): string {
   return btoa(JSON.stringify(obj))
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+    .replaceAll('=', '')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_');
 }
 
 export function createMockJwt(): string {

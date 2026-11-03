@@ -76,11 +76,13 @@ describe('condition shape parity with server', () => {
     // perm-1 is create:User, where ownership/userAttr are rejected as
     // unsatisfiable; shape parity for those branches needs another action.
     function updateUserPermissionId(): string {
-      const permission = [...getState().permissions.values()].find(
-        (p) =>
-          p.resourceId === mockId('res-users') &&
-          p.actionId === mockId('act-update')
-      );
+      const permission = getState()
+        .permissions.values()
+        .find(
+          (p) =>
+            p.resourceId === mockId('res-users') &&
+            p.actionId === mockId('act-update')
+        );
       if (!permission)
         throw new Error('Seed permission users/update is missing');
       return permission.id;

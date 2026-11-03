@@ -120,10 +120,8 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
   } {
     let held = false;
     let release: () => void = () => undefined;
-    let markArrived: () => void = () => undefined;
-    const arrived = new Promise<void>((resolve) => {
-      markArrived = resolve;
-    });
+    const { promise: arrived, resolve: markArrived } =
+      Promise.withResolvers<void>();
     const gate = new Promise<void>((resolve) => {
       release = resolve;
       setTimeout(resolve, 10000).unref();

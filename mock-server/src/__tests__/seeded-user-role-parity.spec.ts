@@ -69,7 +69,7 @@ describe('seeded user role parity with the server RBAC seeder', () => {
   it('packs exactly the two seeded rules and no more', async () => {
     const body = await permissionsOf(await loginAsUser());
 
-    const sorted = [...body.rules].sort((a, b) =>
+    const sorted = body.rules.toSorted((a, b) =>
       JSON.stringify(a).localeCompare(JSON.stringify(b))
     );
 

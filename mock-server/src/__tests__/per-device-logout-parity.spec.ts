@@ -100,7 +100,9 @@ describe('per-device logout', () => {
 
     await logout(phone);
 
-    const user = [...getState().users.values()].find((u) => u.email === EMAIL);
+    const user = getState()
+      .users.values()
+      .find((u) => u.email === EMAIL);
     expect(user?.tokenRevokedAt ?? null).toBeNull();
   });
 

@@ -186,7 +186,7 @@ async function signIn(user: MockUser) {
 }
 
 function tokenOf(tokens: Map<string, MockIssuedToken>, userId: string) {
-  const found = [...tokens.entries()].find(([, t]) => t.userId === userId);
+  const found = tokens.entries().find(([, t]) => t.userId === userId);
   if (!found) throw new Error(`no mailed token for ${userId}`);
   return found[0];
 }
@@ -259,9 +259,9 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
         }
       })
     );
-    const found = [...getState().pendingEmailTokens.entries()].find(
-      ([, userId]) => userId === ctx.actor!.id
-    );
+    const found = getState()
+      .pendingEmailTokens.entries()
+      .find(([, userId]) => userId === ctx.actor!.id);
     ctx.values.$emailChangeToken = found![0];
   },
   'mfa-setup': async (ctx) => {
@@ -520,11 +520,13 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 /** The id of the `read:Role` permission. */
 function readRolePermissionId(): string {
   const state = getState();
-  const found = [...state.permissions.values()].find(
-    (p) =>
-      state.resources.get(p.resourceId)?.name === 'roles' &&
-      state.actions.get(p.actionId)?.name === 'read'
-  );
+  const found = state.permissions
+    .values()
+    .find(
+      (p) =>
+        state.resources.get(p.resourceId)?.name === 'roles' &&
+        state.actions.get(p.actionId)?.name === 'read'
+    );
   if (!found) throw new Error('the seed has no read:Role permission');
   return found.id;
 }
@@ -608,7 +610,7 @@ async function run(scenario: RequestScenario) {
 }
 
 it('builds every actor fixture', () => {
-  expect(Object.keys(ACTORS).sort()).toEqual([...ACTOR_FIXTURES].sort());
+  expect(Object.keys(ACTORS).sort()).toEqual(ACTOR_FIXTURES.toSorted());
 });
 
 for (const { file, scenarios } of loadScenarioFiles()) {
@@ -618,9 +620,9 @@ for (const { file, scenarios } of loadScenarioFiles()) {
       async (_name, scenario) => {
         const { answers, audit } = await run(scenario);
         // The server writes some rows fire-and-forget, so the order is free.
-        expect({ answers, audit: [...audit].sort() }).toEqual({
+        expect({ answers, audit: audit.toSorted() }).toEqual({
           answers: expectedAnswers(scenario),
-          audit: [...scenario.expect.audit].sort()
+          audit: scenario.expect.audit.toSorted()
         });
       }
     );

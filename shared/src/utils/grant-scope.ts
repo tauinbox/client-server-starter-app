@@ -57,9 +57,7 @@ function deepEquals(a: unknown, b: unknown): boolean {
     const aKeys = Object.keys(aObj);
     if (aKeys.length !== Object.keys(bObj).length) return false;
     return aKeys.every(
-      (key) =>
-        Object.prototype.hasOwnProperty.call(bObj, key) &&
-        deepEquals(aObj[key], bObj[key])
+      (key) => Object.hasOwn(bObj, key) && deepEquals(aObj[key], bObj[key])
     );
   }
 
@@ -131,7 +129,7 @@ function grantIsContained(
 ): boolean {
   return Object.keys(callerQuery).every(
     (key) =>
-      Object.prototype.hasOwnProperty.call(grantQuery, key) &&
+      Object.hasOwn(grantQuery, key) &&
       predicateIsAtLeastAsNarrow(callerQuery[key], grantQuery[key])
   );
 }

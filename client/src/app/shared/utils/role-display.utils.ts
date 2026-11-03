@@ -27,7 +27,7 @@ export function isAdminRole(role: RoleLike): boolean {
 export function sortRolesForDisplay<T extends RoleLike>(
   roles: readonly T[]
 ): T[] {
-  return [...roles].sort(
+  return roles.toSorted(
     (a, b) => Number(!isAdminRole(a)) - Number(!isAdminRole(b))
   );
 }

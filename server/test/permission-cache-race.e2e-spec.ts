@@ -38,10 +38,9 @@ function holdNextCall<T extends object>(
   target: T,
   method: keyof T & string
 ): { reached: Promise<void>; release: () => void; restore: () => void } {
-  let onReached!: () => void;
-  let release!: () => void;
-  const reached = new Promise<void>((resolve) => (onReached = resolve));
-  const gate = new Promise<void>((resolve) => (release = resolve));
+  const { promise: reached, resolve: onReached } =
+    Promise.withResolvers<void>();
+  const { promise: gate, resolve: release } = Promise.withResolvers<void>();
   const original = target[method] as (...args: unknown[]) => Promise<unknown>;
   const spy = jest
     .spyOn(target, method as never)

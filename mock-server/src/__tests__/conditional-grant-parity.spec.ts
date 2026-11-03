@@ -29,11 +29,13 @@ afterAll((done) => {
 });
 
 function permissionId(resource: string, action: string): string {
-  const permission = [...getState().permissions.values()].find(
-    (p) =>
-      p.resourceId === mockId(`res-${resource}`) &&
-      p.actionId === mockId(`act-${action}`)
-  );
+  const permission = getState()
+    .permissions.values()
+    .find(
+      (p) =>
+        p.resourceId === mockId(`res-${resource}`) &&
+        p.actionId === mockId(`act-${action}`)
+    );
   if (!permission) throw new Error(`Seed permission ${resource}/${action}`);
   return permission.id;
 }
@@ -237,8 +239,9 @@ describe('conditional grants on FeatureFlag', () => {
 
 describe('conditional update checks the record after the write', () => {
   const johnId = (): string =>
-    [...getState().users.values()].find((u) => u.email === 'john@example.com')!
-      .id;
+    getState()
+      .users.values()
+      .find((u) => u.email === 'john@example.com')!.id;
   const flagsResource = `/rbac/resources/${mockId('res-feature-flags')}`;
 
   beforeEach(() => {
@@ -292,8 +295,9 @@ describe('conditional update checks the record after the write', () => {
 
 describe('conditional assign:Role', () => {
   const johnId = (): string =>
-    [...getState().users.values()].find((u) => u.email === 'john@example.com')!
-      .id;
+    getState()
+      .users.values()
+      .find((u) => u.email === 'john@example.com')!.id;
 
   beforeEach(() => {
     grant([

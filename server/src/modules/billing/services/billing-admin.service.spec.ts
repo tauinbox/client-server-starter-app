@@ -665,10 +665,9 @@ describe('BillingAdminService', () => {
         grant: { credits: 500 }
       });
       const yoo = providerStub('yookassa');
-      let releaseFirst!: () => void;
-      yoo.refund.mockImplementationOnce(
-        () => new Promise<void>((resolve) => (releaseFirst = resolve))
-      );
+      const { promise: firstRefund, resolve: releaseFirst } =
+        Promise.withResolvers<void>();
+      yoo.refund.mockImplementationOnce(() => firstRefund);
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       // The first refund parks inside the provider call, so the row lock is

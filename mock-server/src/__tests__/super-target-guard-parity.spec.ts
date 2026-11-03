@@ -33,10 +33,13 @@ beforeEach(() => {
 });
 
 function permissionId(actionSlug: string, resourceSlug = 'res-users'): string {
-  const permission = [...getState().permissions.values()].find(
-    (p) =>
-      p.resourceId === mockId(resourceSlug) && p.actionId === mockId(actionSlug)
-  );
+  const permission = getState()
+    .permissions.values()
+    .find(
+      (p) =>
+        p.resourceId === mockId(resourceSlug) &&
+        p.actionId === mockId(actionSlug)
+    );
   if (!permission) {
     throw new Error(`Seed permission ${resourceSlug}/${actionSlug} missing`);
   }

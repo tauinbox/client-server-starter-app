@@ -143,9 +143,9 @@ describe('signed-in rollout id issuance', () => {
   });
 
   it('buckets a device rule by the cookie the guest already held', async () => {
-    const user = [...getState().users.values()].find(
-      (u) => u.email === 'user@example.com'
-    );
+    const user = getState()
+      .users.values()
+      .find((u) => u.email === 'user@example.com');
     // Pick a cookie on the other side of the split from the user id, so a
     // user-keyed bucket would give the opposite result.
     const userIsIn = percentageBucket(user?.id ?? '', 'public-rollout') < 50;

@@ -393,7 +393,7 @@ runWithInfra('Request scenarios (e2e)', () => {
   };
 
   it('builds every actor fixture', () => {
-    expect(Object.keys(ACTORS).sort()).toEqual([...ACTOR_FIXTURES].sort());
+    expect(Object.keys(ACTORS).sort()).toEqual(ACTOR_FIXTURES.toSorted());
   });
 
   async function createAccount(fixture: ActorFixture): Promise<Account> {
@@ -851,9 +851,9 @@ runWithInfra('Request scenarios (e2e)', () => {
         async (_name, scenario) => {
           const { answers, audit } = await run(scenario);
           // Fire-and-forget writes land in any order.
-          expect({ answers, audit: [...audit].sort() }).toEqual({
+          expect({ answers, audit: audit.toSorted() }).toEqual({
             answers: expectedAnswers(scenario),
-            audit: [...scenario.expect.audit].sort()
+            audit: scenario.expect.audit.toSorted()
           });
         },
         30000

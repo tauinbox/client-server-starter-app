@@ -1031,14 +1031,9 @@ describe('RenewalService', () => {
     // second finds that row, sees no charge at the provider, and fails it;
     // then the first charge declines too. Both scans read the row at dunning
     // rung 0, so only the CAS keeps the second rung from being consumed.
-    let charging: () => void = () => undefined;
-    const charged = new Promise<void>((resolve) => {
-      charging = resolve;
-    });
-    let openGate: () => void = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      openGate = resolve;
-    });
+    const { promise: charged, resolve: charging } =
+      Promise.withResolvers<void>();
+    const { promise: gate, resolve: openGate } = Promise.withResolvers<void>();
     const charge = jest.fn(() => {
       charging();
       return gate.then<never>(() => Promise.reject(new Error('declined')));

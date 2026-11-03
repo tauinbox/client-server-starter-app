@@ -56,9 +56,9 @@ const auditCount = (action: string, targetId: string): number =>
   ).length;
 
 const regularUser = () => {
-  const user = [...getState().users.values()].find(
-    (u) => u.email === 'user@example.com'
-  );
+  const user = getState()
+    .users.values()
+    .find((u) => u.email === 'user@example.com');
   if (!user) throw new Error('Seed user user@example.com');
   return user;
 };

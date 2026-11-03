@@ -247,7 +247,7 @@ function findSourceFiles(dir: string): string[] {
 
 function scanCodeChecks(filePath: string): CodeCheck[] {
   const source = fs.readFileSync(filePath, 'utf-8');
-  const relPath = path.relative(REPO_ROOT, filePath).replace(/\\/g, '/');
+  const relPath = path.relative(REPO_ROOT, filePath).replaceAll('\\', '/');
   const checks: CodeCheck[] = [];
   for (const pattern of CHECK_PATTERNS) {
     for (const match of source.matchAll(pattern)) {

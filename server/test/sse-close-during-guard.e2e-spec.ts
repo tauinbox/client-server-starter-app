@@ -90,10 +90,9 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
   it('does not register the stream, so it holds no slot of the user', async () => {
     const sessionCheck = app.get(RefreshTokenService);
     const original = sessionCheck.hasLiveSession.bind(sessionCheck);
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    let reached!: () => void;
-    const guardReached = new Promise<void>((resolve) => (reached = resolve));
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+    const { promise: guardReached, resolve: reached } =
+      Promise.withResolvers<void>();
     jest
       .spyOn(sessionCheck, 'hasLiveSession')
       .mockImplementationOnce(async (sessionId) => {

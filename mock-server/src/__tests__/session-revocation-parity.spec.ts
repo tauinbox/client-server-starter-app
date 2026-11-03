@@ -64,7 +64,9 @@ function iatOf(accessToken: string): number {
 }
 
 function supportRoleId(): string {
-  const role = [...getState().roles.values()].find((r) => r.name === 'support');
+  const role = getState()
+    .roles.values()
+    .find((r) => r.name === 'support');
   return role!.id;
 }
 

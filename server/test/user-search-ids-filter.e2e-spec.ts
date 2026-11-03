@@ -117,7 +117,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
     const all = await search(`ids=${list}&includeDeleted=true`).expect(200);
 
     expect(returnedIds(live.body)).toEqual([ids[0], ids[1]].sort());
-    expect(returnedIds(all.body)).toEqual([...ids].sort());
+    expect(returnedIds(all.body)).toEqual(ids.toSorted());
   });
 
   it(`answers 400 for ${MAX_PAGE_SIZE + 1} ids`, async () => {

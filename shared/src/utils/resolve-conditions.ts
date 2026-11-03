@@ -98,7 +98,7 @@ export function resolveConditions(
     const userContext: Record<string, unknown> = { id: ctx.userId };
     for (const [field, attrName] of Object.entries(userAttr)) {
       const attr = attrName as string;
-      if (!Object.prototype.hasOwnProperty.call(userContext, attr)) {
+      if (!Object.hasOwn(userContext, attr)) {
         return veto(
           `userAttr references unknown attribute "${attr}" in field "${field}"`
         );
@@ -134,10 +134,7 @@ export function resolveConditions(
     if (keyError) {
       return veto(`${keyError} in custom condition`);
     }
-    if (
-      ownershipField !== undefined &&
-      Object.prototype.hasOwnProperty.call(parsed, ownershipField)
-    ) {
+    if (ownershipField !== undefined && Object.hasOwn(parsed, ownershipField)) {
       return veto(
         `custom condition key "${ownershipField}" collides with ownership.userField`
       );

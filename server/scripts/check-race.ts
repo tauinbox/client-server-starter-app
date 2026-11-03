@@ -676,7 +676,7 @@ function main(): void {
   );
   const problems = files.flatMap((file) =>
     scanSource(
-      path.relative(path.dirname(SRC_DIR), file).replace(/\\/g, '/'),
+      path.relative(path.dirname(SRC_DIR), file).replaceAll('\\', '/'),
       fs.readFileSync(file, 'utf-8'),
       exported
     )

@@ -318,7 +318,7 @@ export function parseMockRoutes(
             method: node.expression.name.text.toUpperCase(),
             segments: pathSegments(`${mount.prefix}/${routePath}`),
             gate: gateOf(node.arguments.slice(1, -1)),
-            site: `${path.relative(REPO_ROOT, target.file).replace(/\\/g, '/')}:${line + 1}`
+            site: `${path.relative(REPO_ROOT, target.file).replaceAll('\\', '/')}:${line + 1}`
           });
         }
       }
@@ -356,7 +356,7 @@ function segmentMatches(mock: string, sample: string): boolean {
   if (!mock.includes('*')) return mock === sample;
   const pattern = mock
     .split('*')
-    .map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .map((s) => RegExp.escape(s))
     .join('.+');
   return new RegExp(`^${pattern}$`).test(sample);
 }

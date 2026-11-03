@@ -578,10 +578,8 @@ export class RoleService {
     },
     audit?: AuditLogParams
   ): Promise<T> {
-    let markCommitted: () => void = () => undefined;
-    const committed = new Promise<void>((resolve) => {
-      markCommitted = resolve;
-    });
+    const { promise: committed, resolve: markCommitted } =
+      Promise.withResolvers<void>();
     const result = await this.writeAudited(
       this.roleRepository.manager,
       async (em) => {

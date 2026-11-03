@@ -253,9 +253,9 @@ describe('validation-error envelope parity with server', () => {
         }
       );
       expect(res.status).toBe(200);
-      const invoice = [...getState().billingInvoices.values()].find(
-        (i) => i.status === 'paid'
-      );
+      const invoice = getState()
+        .billingInvoices.values()
+        .find((i) => i.status === 'paid');
       if (!invoice) throw new Error('Activation produced no paid invoice');
       return invoice.id;
     }

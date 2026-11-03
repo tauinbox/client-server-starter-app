@@ -8,9 +8,9 @@ import type { MockUser } from './types';
 function base64url(obj: Record<string, unknown>): string {
   return Buffer.from(JSON.stringify(obj))
     .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+    .replaceAll('=', '')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_');
 }
 
 export function generateAccessToken(

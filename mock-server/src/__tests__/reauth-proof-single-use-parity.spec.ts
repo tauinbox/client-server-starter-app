@@ -34,9 +34,9 @@ afterAll((done) => {
 beforeEach(() => {
   resetState();
   getState().users.set(OAUTH_ONLY_ID, {
-    ...([...getState().users.values()].find(
-      (u) => u.email === PASSWORD_USER_EMAIL
-    ) as MockUser),
+    ...(getState()
+      .users.values()
+      .find((u) => u.email === PASSWORD_USER_EMAIL) as MockUser),
     id: OAUTH_ONLY_ID,
     email: OAUTH_ONLY_EMAIL,
     password: null

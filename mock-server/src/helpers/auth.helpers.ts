@@ -269,9 +269,9 @@ export function isActorSuper(req: unknown): boolean {
 }
 
 function roleNamesAreSuper(roleNames: string[]): boolean {
-  return Array.from(getState().roles.values()).some(
-    (r) => r.isSuper && roleNames.includes(r.name)
-  );
+  return getState()
+    .roles.values()
+    .some((r) => r.isSuper && roleNames.includes(r.name));
 }
 
 /**

@@ -33,8 +33,8 @@ const user: UserResponse = {
 
 function encode(payload: Record<string, unknown>): string {
   return btoa(JSON.stringify(payload))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
     .replace(/=+$/, '');
 }
 

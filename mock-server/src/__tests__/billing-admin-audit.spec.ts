@@ -194,9 +194,9 @@ describe('admin billing mutations write audit entries', () => {
   it('audits a refund with the requested amount', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);
-    const invoice = [...getState().billingInvoices.values()].find(
-      (i) => i.customerId === customerId
-    );
+    const invoice = getState()
+      .billingInvoices.values()
+      .find((i) => i.customerId === customerId);
     expect(invoice).toBeDefined();
 
     const res = await post(
@@ -218,9 +218,9 @@ describe('admin billing mutations write audit entries', () => {
   it('audits a full refund with a null amount', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);
-    const invoice = [...getState().billingInvoices.values()].find(
-      (i) => i.customerId === customerId
-    );
+    const invoice = getState()
+      .billingInvoices.values()
+      .find((i) => i.customerId === customerId);
 
     await post(token, `/admin/billing/invoices/${invoice?.id}/refund`, {});
 

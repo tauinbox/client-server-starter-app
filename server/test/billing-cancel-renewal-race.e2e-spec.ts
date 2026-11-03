@@ -200,14 +200,10 @@ runWithInfra(
      * at once: holding them too would deadlock once both paths share a key.
      */
     function gatedProvider() {
-      let release!: () => void;
-      const released = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      let entered!: () => void;
-      const firstChargeEntered = new Promise<void>((resolve) => {
-        entered = resolve;
-      });
+      const { promise: released, resolve: release } =
+        Promise.withResolvers<void>();
+      const { promise: firstChargeEntered, resolve: entered } =
+        Promise.withResolvers<void>();
       const keys: string[] = [];
       const provider = {
         id: 'yookassa' as const,

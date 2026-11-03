@@ -31,11 +31,13 @@ afterAll((done) => {
 });
 
 function permissionId(resource: string, action: string): string {
-  const permission = [...getState().permissions.values()].find(
-    (p) =>
-      p.resourceId === mockId(`res-${resource}`) &&
-      p.actionId === mockId(`act-${action}`)
-  );
+  const permission = getState()
+    .permissions.values()
+    .find(
+      (p) =>
+        p.resourceId === mockId(`res-${resource}`) &&
+        p.actionId === mockId(`act-${action}`)
+    );
   if (!permission) throw new Error(`Seed permission ${resource}/${action}`);
   return permission.id;
 }
@@ -103,9 +105,9 @@ async function call(
 }
 
 const callerId = (): string => {
-  const user = [...getState().users.values()].find(
-    (u) => u.email === CALLER_EMAIL
-  );
+  const user = getState()
+    .users.values()
+    .find((u) => u.email === CALLER_EMAIL);
   if (!user) throw new Error(`Seed user ${CALLER_EMAIL}`);
   return user.id;
 };

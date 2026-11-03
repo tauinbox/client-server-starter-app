@@ -41,11 +41,13 @@ beforeEach(() => {
 });
 
 function updateUserPermissionId(): string {
-  const permission = [...getState().permissions.values()].find(
-    (p) =>
-      p.resourceId === mockId('res-users') &&
-      p.actionId === mockId('act-update')
-  );
+  const permission = getState()
+    .permissions.values()
+    .find(
+      (p) =>
+        p.resourceId === mockId('res-users') &&
+        p.actionId === mockId('act-update')
+    );
   if (!permission) throw new Error('Seed permission users/update is missing');
   return permission.id;
 }

@@ -52,9 +52,9 @@ describe('POST /api/v1/auth/login length caps', () => {
   });
 
   it(`refuses the right password when it is over ${MAX_PASSWORD_LENGTH} characters`, async () => {
-    const user = [...getState().users.values()].find(
-      (u) => u.email === 'user@example.com'
-    );
+    const user = getState()
+      .users.values()
+      .find((u) => u.email === 'user@example.com');
     if (!user) throw new Error('seed user missing');
     const longPassword = 'a'.repeat(MAX_PASSWORD_LENGTH + 1);
     user.password = longPassword;
@@ -68,9 +68,9 @@ describe('POST /api/v1/auth/login length caps', () => {
   });
 
   it(`accepts a stored password of ${MAX_PASSWORD_LENGTH} astral characters`, async () => {
-    const user = [...getState().users.values()].find(
-      (u) => u.email === 'user@example.com'
-    );
+    const user = getState()
+      .users.values()
+      .find((u) => u.email === 'user@example.com');
     if (!user) throw new Error('seed user missing');
     const password = '\u{1F600}'.repeat(MAX_PASSWORD_LENGTH);
     user.password = password;

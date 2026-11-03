@@ -452,7 +452,7 @@ export function toUserResponse(user: MockUser): UserResponse {
     ...rest
   } = user;
   const roles = roleNames.flatMap((name) => {
-    const role = Array.from(state.roles.values()).find((r) => r.name === name);
+    const role = state.roles.values().find((r) => r.name === name);
     return role ? [toRolePublicResponse(role)] : [];
   });
   return {
@@ -479,7 +479,7 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
     ...rest
   } = user;
   const roles = roleNames.flatMap((name) => {
-    const role = Array.from(state.roles.values()).find((r) => r.name === name);
+    const role = state.roles.values().find((r) => r.name === name);
     return role ? [toRoleAdminResponse(role)] : [];
   });
   return {
@@ -834,9 +834,7 @@ function pricedByCurrentPlan(record: MockUsageRecord): boolean {
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (!subscription) return false;
-  const plan = [...state.plans.values()].find(
-    (p) => p.key === subscription.planKey
-  );
+  const plan = state.plans.values().find((p) => p.key === subscription.planKey);
   return plan?.meterKey === record.meterKey;
 }
 

@@ -130,10 +130,8 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
       | 'clearPendingEmailChange'
   ): { arrived: Promise<void>; release: () => void } {
     const { wait, release } = gate();
-    let markArrived: () => void = () => undefined;
-    const arrived = new Promise<void>((resolve) => {
-      markArrived = resolve;
-    });
+    const { promise: arrived, resolve: markArrived } =
+      Promise.withResolvers<void>();
     const original = UsersService.prototype[method];
     jest.spyOn(usersService, method).mockImplementation(async function (
       this: UsersService,
@@ -156,10 +154,8 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
   } {
     const { wait, release } = gate();
     let held = false;
-    let markArrived: () => void = () => undefined;
-    const arrived = new Promise<void>((resolve) => {
-      markArrived = resolve;
-    });
+    const { promise: arrived, resolve: markArrived } =
+      Promise.withResolvers<void>();
     const original = EntityManager.prototype.transaction;
     jest
       .spyOn(EntityManager.prototype, 'transaction')
