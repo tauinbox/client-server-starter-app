@@ -53,15 +53,17 @@ async function activate(): Promise<MockSubscription> {
 }
 
 function planByKey(key: string): MockPlan {
-  const plan = [...getState().plans.values()].find((p) => p.key === key);
+  const plan = getState()
+    .plans.values()
+    .find((p) => p.key === key);
   if (!plan) throw new Error(`plan ${key} not seeded`);
   return plan;
 }
 
 function productByKey(key: string): MockProduct {
-  const product = [...getState().billingProducts.values()].find(
-    (p) => p.key === key
-  );
+  const product = getState()
+    .billingProducts.values()
+    .find((p) => p.key === key);
   if (!product) throw new Error(`product ${key} not seeded`);
   return product;
 }

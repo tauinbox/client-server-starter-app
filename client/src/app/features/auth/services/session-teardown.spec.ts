@@ -54,8 +54,8 @@ const legacyCatalog = {
 function createExpiredAuthResponse(): AuthResponse {
   const encode = (obj: Record<string, unknown>) =>
     btoa(JSON.stringify(obj))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
       .replace(/=+$/, '');
   const header = encode({ alg: 'HS256', typ: 'JWT' });
   const payload = encode({

@@ -118,11 +118,13 @@ describe('POST /api/v1/users/:id/sessions/revoke parity', () => {
 
   it('refuses a super target for a non-super caller', async () => {
     const state = getState();
-    const updateUser = [...state.permissions.values()].find(
-      (p) =>
-        p.resourceId === mockId('res-users') &&
-        p.actionId === mockId('act-update')
-    )!;
+    const updateUser = state.permissions
+      .values()
+      .find(
+        (p) =>
+          p.resourceId === mockId('res-users') &&
+          p.actionId === mockId('act-update')
+      )!;
     state.rolePermissions = [
       ...state.rolePermissions.filter((rp) => rp.roleId !== EDITOR_ROLE_ID),
       {

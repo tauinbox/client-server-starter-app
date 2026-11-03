@@ -63,7 +63,7 @@ function addReservedSubjectResource(): string {
     lastSyncedAt: NOW,
     createdAt: NOW
   });
-  const readAction = [...state.actions.values()].find((a) => a.name === 'read');
+  const readAction = state.actions.values().find((a) => a.name === 'read');
   if (!readAction) throw new Error('seed action read missing');
   state.permissions.set('perm-wildcard-read', {
     id: 'perm-wildcard-read',
@@ -103,13 +103,13 @@ describe('reserved CASL keyword parity with server', () => {
 
   it('leaves the rest of the permission set untouched', () => {
     const state = getState();
-    const readAction = [...state.actions.values()].find(
-      (a) => a.name === 'read'
-    );
-    const usersRead = [...state.permissions.values()].find(
-      (p) =>
-        p.resourceId === mockId('res-users') && p.actionId === readAction?.id
-    );
+    const readAction = state.actions.values().find((a) => a.name === 'read');
+    const usersRead = state.permissions
+      .values()
+      .find(
+        (p) =>
+          p.resourceId === mockId('res-users') && p.actionId === readAction?.id
+      );
     if (!usersRead) throw new Error('seed permission users/read missing');
 
     grantToEditor(addReservedAction());

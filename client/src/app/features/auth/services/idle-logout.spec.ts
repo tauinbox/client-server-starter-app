@@ -22,8 +22,8 @@ import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloc
 function createAuthResponse(): AuthResponse {
   const encode = (obj: Record<string, unknown>) =>
     btoa(JSON.stringify(obj))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
       .replace(/=+$/, '');
   const payload = encode({
     sub: '1',

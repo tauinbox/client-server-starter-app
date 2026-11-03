@@ -351,9 +351,11 @@ router.patch(
     let previousEmail: string | undefined;
     if (email !== undefined) {
       const existing = findUserByEmail(email);
-      const pendingConflict = Array.from(getState().users.values()).find(
-        (u) => !u.deletedAt && u.pendingEmail === email && u.id !== user.id
-      );
+      const pendingConflict = getState()
+        .users.values()
+        .find(
+          (u) => !u.deletedAt && u.pendingEmail === email && u.id !== user.id
+        );
       if ((existing && existing.id !== user.id) || pendingConflict) {
         sendError(
           res,

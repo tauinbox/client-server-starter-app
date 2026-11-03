@@ -222,14 +222,10 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
    * of each. `held` makes the first charge wait until `release` is called.
    */
   function fakeProvider(id: BillingProviderId, answers: ChargeAnswer[]) {
-    let release!: () => void;
-    const released = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let entered!: () => void;
-    const firstChargeEntered = new Promise<void>((resolve) => {
-      entered = resolve;
-    });
+    const { promise: released, resolve: release } =
+      Promise.withResolvers<void>();
+    const { promise: firstChargeEntered, resolve: entered } =
+      Promise.withResolvers<void>();
     const keys: string[] = [];
     const state = { held: false };
     const provider = {

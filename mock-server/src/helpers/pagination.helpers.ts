@@ -132,7 +132,7 @@ export function cursorPaginate<T extends { id: string }>(
 ): CursorPaginatedBody<T> {
   const direction = sortOrder === 'asc' ? 1 : -1;
 
-  const sorted = [...items].sort((a, b) => {
+  const sorted = items.toSorted((a, b) => {
     const cmp =
       compareValues(readField(a, sortBy), readField(b, sortBy)) * direction;
     if (cmp !== 0) return cmp;

@@ -57,9 +57,9 @@ async function accessToken(): Promise<string> {
 }
 
 function seedOAuthOnlyUser(): void {
-  const template = [...getState().users.values()].find(
-    (u) => u.email === CREDENTIALS.email
-  ) as MockUser;
+  const template = getState()
+    .users.values()
+    .find((u) => u.email === CREDENTIALS.email) as MockUser;
 
   getState().users.set(OAUTH_ONLY_ID, {
     ...template,
@@ -133,9 +133,9 @@ describe('a refused step-up is audited', () => {
   it('audits every wrong code, including the one that bars the authenticator', async () => {
     const token = await accessToken();
     // Enrolled after the sign-in, which would otherwise answer with a challenge.
-    const user = [...getState().users.values()].find(
-      (u) => u.email === CREDENTIALS.email
-    ) as MockUser;
+    const user = getState()
+      .users.values()
+      .find((u) => u.email === CREDENTIALS.email) as MockUser;
     user.totpEnabledAt = '2025-01-01T00:00:00.000Z';
 
     const statuses: number[] = [];

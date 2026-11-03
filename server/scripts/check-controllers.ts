@@ -85,7 +85,7 @@ function checkTestHarnesses(): string[] {
       if (mounted.length > 0 && !module.includes('RESPONSE_SERIALIZER')) {
         const rel = path
           .relative(path.dirname(TEST_DIR), file)
-          .replace(/\\/g, '/');
+          .replaceAll('\\', '/');
         errors.push(
           `${rel}: test module ${i + 1} mounts ${mounted.join(', ')}; add RESPONSE_SERIALIZER to its providers`
         );
@@ -103,7 +103,7 @@ function main(): void {
   for (const dir of listDirs(SRC_DIR)) {
     const files = controllersIn(dir);
     count += files.length;
-    const rel = path.relative(SRC_DIR, dir).replace(/\\/g, '/');
+    const rel = path.relative(SRC_DIR, dir).replaceAll('\\', '/');
 
     for (const file of files) {
       if (

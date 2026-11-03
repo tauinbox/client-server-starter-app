@@ -192,7 +192,7 @@ export class BillingAdminListComponent implements OnInit {
 
   // CSS-safe status class (enum values like `past_due` → `status-past-due`).
   statusClass(status: string): string {
-    return `status-${status.replace(/_/g, '-')}`;
+    return `status-${status.replaceAll('_', '-')}`;
   }
 
   // A canceled subscription has no further lifecycle action.

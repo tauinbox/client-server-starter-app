@@ -29,9 +29,9 @@ beforeEach(() => {
 });
 
 function passwordUser(): MockUser {
-  return [...getState().users.values()].find(
-    (u) => u.email === PASSWORD_USER_EMAIL
-  ) as MockUser;
+  return getState()
+    .users.values()
+    .find((u) => u.email === PASSWORD_USER_EMAIL) as MockUser;
 }
 
 function seedOAuthOnlyUser(): void {

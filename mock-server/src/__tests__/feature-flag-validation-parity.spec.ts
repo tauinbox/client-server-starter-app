@@ -320,9 +320,9 @@ describe('feature-flag validation parity with server', () => {
     }
 
     function userCreatedAt(): string {
-      const user = [...getState().users.values()].find(
-        (u) => u.email === 'user@example.com'
-      );
+      const user = getState()
+        .users.values()
+        .find((u) => u.email === 'user@example.com');
       if (!user) throw new Error('seed user missing');
       return user.createdAt;
     }

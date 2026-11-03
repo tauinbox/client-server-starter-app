@@ -77,8 +77,7 @@ test.describe('Sign-out on a role change', () => {
 
     // Hold the profile chunk, so the first navigation of the reload stays
     // in progress while the stream delivers the sign-out.
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => (release = resolve));
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
     await page.route(/\.js$/, async (route) => {
       const response = await route.fetch();
       const body = await response.text();
@@ -107,8 +106,7 @@ test.describe('Sign-out on a role change', () => {
 
     // Hold the permissions response, so the bootstrap initializer is still
     // running and the router has not started its first navigation.
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => (release = resolve));
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
     await page.route(/\/api\/v1\/auth\/permissions$/, async (route) => {
       await held;
       await route.continue();

@@ -28,9 +28,9 @@ beforeEach(() => {
 });
 
 function seedOAuthOnlyUser(): void {
-  const template = [...getState().users.values()].find(
-    (u) => u.email === 'user@example.com'
-  ) as MockUser;
+  const template = getState()
+    .users.values()
+    .find((u) => u.email === 'user@example.com') as MockUser;
 
   getState().users.set(OAUTH_ONLY_ID, {
     ...template,
@@ -171,9 +171,9 @@ describe('PATCH /api/v1/auth/profile demands a step-up for a first password', ()
 
   it('leaves an account that holds a password on the current-password rule', async () => {
     const token = await accessToken(
-      [...getState().users.values()].find(
-        (u) => u.email === 'user@example.com'
-      )!.id
+      getState()
+        .users.values()
+        .find((u) => u.email === 'user@example.com')!.id
     );
 
     const res = await patchProfile(token, { password: NEW_PASSWORD });

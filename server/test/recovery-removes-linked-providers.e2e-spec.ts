@@ -210,14 +210,10 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
   }, 30000);
 
   it('a link callback held before its insert makes the reset wait, and the reset removes its row', async () => {
-    let releaseInsert!: () => void;
-    const insertGate = new Promise<void>((resolve) => {
-      releaseInsert = resolve;
-    });
-    let insertReached!: () => void;
-    const reachedInsert = new Promise<void>((resolve) => {
-      insertReached = resolve;
-    });
+    const { promise: insertGate, resolve: releaseInsert } =
+      Promise.withResolvers<void>();
+    const { promise: reachedInsert, resolve: insertReached } =
+      Promise.withResolvers<void>();
     const original = EntityManager.prototype.insert;
     jest
       .spyOn(EntityManager.prototype, 'insert')

@@ -171,9 +171,9 @@ describe('explicit null parity with server DTOs', () => {
       });
 
       expect(res.status).toBe(422);
-      const admin = Array.from(getState().users.values()).find(
-        (u) => u.email === 'admin@example.com'
-      );
+      const admin = getState()
+        .users.values()
+        .find((u) => u.email === 'admin@example.com');
       expect(admin?.password).toBe('Password1');
     });
   });

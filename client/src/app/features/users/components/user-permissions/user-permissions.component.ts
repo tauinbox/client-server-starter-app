@@ -127,7 +127,7 @@ export class UserPermissionsComponent implements OnInit {
         allowCount,
         denyCount,
         hasDeny: denyCount > 0,
-        permissions: [...perms].sort((a, b) => a.action.localeCompare(b.action))
+        permissions: perms.toSorted((a, b) => a.action.localeCompare(b.action))
       });
     }
     return groups.sort((a, b) => a.displayName.localeCompare(b.displayName));

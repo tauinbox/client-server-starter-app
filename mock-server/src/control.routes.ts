@@ -458,9 +458,7 @@ router.post('/change-role-permissions', (req, res) => {
     return;
   }
   const state = getState();
-  const role = Array.from(state.roles.values()).find(
-    (r) => r.name === roleName
-  );
+  const role = state.roles.values().find((r) => r.name === roleName);
   if (!role) {
     res.status(404).json({ message: 'role not found' });
     return;
@@ -567,7 +565,7 @@ router.post('/billing/activate-subscription', (req, res) => {
     return;
   }
 
-  const plan = [...state.plans.values()].find((p) => p.key === planKey);
+  const plan = state.plans.values().find((p) => p.key === planKey);
   if (!plan) {
     res.status(404).json({ message: `plan "${planKey}" not found` });
     return;
@@ -605,9 +603,8 @@ router.post('/billing/seed-usage', (req, res) => {
   const state = getState();
   const subId =
     subscriptionId ??
-    [...state.billingSubscriptions.values()].find(
-      (s) => s.customerId === customerId
-    )?.id;
+    state.billingSubscriptions.values().find((s) => s.customerId === customerId)
+      ?.id;
   if (!subId) {
     res.status(404).json({ message: 'no subscription for customer' });
     return;
@@ -651,9 +648,9 @@ router.post('/billing/complete-purchase', (req, res) => {
     ? state.billingPurchaseSessions.get(sessionRef)
     : undefined;
   if (!session && userId) {
-    const customer = [...state.billingCustomers.values()].find(
-      (c) => c.userId === userId
-    );
+    const customer = state.billingCustomers
+      .values()
+      .find((c) => c.userId === userId);
     session = customer
       ? [...state.billingPurchaseSessions.values()]
           .filter((s) => s.customerId === customer.id)
@@ -706,9 +703,9 @@ router.post('/billing/advance-renewal', (req, res) => {
       ? byId
       : undefined;
   if (!subscription && userId) {
-    const customer = [...state.billingCustomers.values()].find(
-      (c) => c.userId === userId
-    );
+    const customer = state.billingCustomers
+      .values()
+      .find((c) => c.userId === userId);
     subscription = customer
       ? [...state.billingSubscriptions.values()]
           .filter(
@@ -746,9 +743,7 @@ router.post('/billing/advance-renewal', (req, res) => {
     return;
   }
 
-  const plan = [...state.plans.values()].find(
-    (p) => p.key === subscription.planKey
-  );
+  const plan = state.plans.values().find((p) => p.key === subscription.planKey);
   const price = plan?.prices[subscription.provider];
   if (!plan || !price) {
     res.status(404).json({ message: 'plan or price not found' });

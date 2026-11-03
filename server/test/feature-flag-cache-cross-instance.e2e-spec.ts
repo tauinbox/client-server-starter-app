@@ -87,10 +87,8 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     reachedWrite: Promise<void>;
   } {
     const cache = app.get<Cache>(CACHE_MANAGER);
-    let markReached: () => void = () => undefined;
-    const reachedWrite = new Promise<void>((resolve) => {
-      markReached = resolve;
-    });
+    const { promise: reachedWrite, resolve: markReached } =
+      Promise.withResolvers<void>();
     const gatedCache = {
       stores: cache.stores,
       get: cache.get.bind(cache),
@@ -151,10 +149,8 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     const resolver = app.get(FeatureFlagResolverService);
     await resolver.invalidateAll();
 
-    let release: () => void = () => undefined;
-    const released = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: released, resolve: release } =
+      Promise.withResolvers<void>();
     const other = secondInstance(released);
     const otherLoad = other.resolver.evaluateForUser(
       await other.resolver.buildResolverUser(holder.id),

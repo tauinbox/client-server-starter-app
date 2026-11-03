@@ -26,9 +26,9 @@ beforeEach(() => {
 });
 
 function seededUser(): MockUser {
-  return [...getState().users.values()].find(
-    (u) => u.email === 'user@example.com'
-  ) as MockUser;
+  return getState()
+    .users.values()
+    .find((u) => u.email === 'user@example.com') as MockUser;
 }
 
 function seedUserWithNoRole(): void {

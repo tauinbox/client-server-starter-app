@@ -186,9 +186,7 @@ describe('NotificationsListener', () => {
     let committed: Promise<void>;
 
     beforeEach(() => {
-      committed = new Promise<void>((resolve) => {
-        commit = resolve;
-      });
+      ({ promise: committed, resolve: commit } = Promise.withResolvers<void>());
     });
 
     async function expectPushAfterCommit(handle: () => void): Promise<void> {

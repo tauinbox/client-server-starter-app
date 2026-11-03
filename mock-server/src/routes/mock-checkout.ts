@@ -64,7 +64,7 @@ function describe(open: OpenSession): { title: string; amount: string } {
   if (session.kind === 'method') {
     return { title: 'Update the payment method', amount: '' };
   }
-  const plan = [...state.plans.values()].find((p) => p.key === session.planKey);
+  const plan = state.plans.values().find((p) => p.key === session.planKey);
   const price = plan?.prices[session.provider];
   return {
     title: `Plan: ${plan?.name ?? session.planKey}`,
@@ -161,7 +161,7 @@ router.post('/:sessionRef/pay', (req, res) => {
   }
   const userId = state.billingCustomers.get(session.customerId)?.userId;
   const user = userId ? state.users.get(userId) : undefined;
-  const plan = [...state.plans.values()].find((p) => p.key === session.planKey);
+  const plan = state.plans.values().find((p) => p.key === session.planKey);
   if (!user || !plan) {
     sessionNotFound(res);
     return;

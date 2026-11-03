@@ -91,8 +91,7 @@ test.describe('Accessibility (axe-core)', () => {
   }) => {
     await loginViaUi(page, _mockServer.url);
 
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => (release = resolve));
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
     await page.route('**/api/v1/auth/sessions', async (route) => {
       if (route.request().method() !== 'GET') return route.fallback();
       await held;

@@ -225,9 +225,9 @@ describe('mock checkout page', () => {
     expect(cancel.status).toBe(200);
 
     const second = await openSession(token, '/checkout', { planKey: 'pro' });
-    const open = [...getState().billingSubscriptions.values()].find(
-      (s) => s.status === 'incomplete'
-    );
+    const open = getState()
+      .billingSubscriptions.values()
+      .find((s) => s.status === 'incomplete');
     expect(open?.trialEnd).toBeNull();
     expect((await pay(second.url)).status).toBe(200);
 

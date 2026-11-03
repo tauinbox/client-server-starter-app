@@ -42,9 +42,7 @@ export function billClosingUsagePeriod(
   if (subscription.billingMode !== 'usage') return null;
 
   const state = getState();
-  const plan = [...state.plans.values()].find(
-    (p) => p.key === subscription.planKey
-  );
+  const plan = state.plans.values().find((p) => p.key === subscription.planKey);
   const price = plan?.prices[subscription.provider];
   if (!plan || !price) return null;
 

@@ -627,9 +627,9 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   const productKey = (body?.['productKey'] as string).trim();
   const requestedMinor = body?.['amountMinor'] as number | undefined;
 
-  const product = [...getState().billingProducts.values()].find(
-    (p) => p.key === productKey
-  );
+  const product = getState()
+    .billingProducts.values()
+    .find((p) => p.key === productKey);
   if (!product || !product.active) {
     sendError(
       res,
@@ -748,11 +748,13 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
 
   const customer = getOrCreateCustomer(user.id, user.locale);
 
-  const hasActive = [...getState().billingSubscriptions.values()].some(
-    (s) =>
-      s.customerId === customer.id &&
-      ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
-  );
+  const hasActive = getState()
+    .billingSubscriptions.values()
+    .some(
+      (s) =>
+        s.customerId === customer.id &&
+        ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
+    );
   if (hasActive) {
     sendError(
       res,
@@ -768,9 +770,9 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
   // stack a second open subscription (the server enforces this with a partial
   // unique index; mirror the observable single-open-subscription behavior here).
-  const pending = [...getState().billingSubscriptions.values()].find(
-    (s) => s.customerId === customer.id && s.status === 'incomplete'
-  );
+  const pending = getState()
+    .billingSubscriptions.values()
+    .find((s) => s.customerId === customer.id && s.status === 'incomplete');
 
   // One trial for each customer.
   const trial = plan.trialDays > 0 && !customer.trialUsedAt;
@@ -1552,9 +1554,12 @@ billingAdminRouter.post(
     // Idempotent replay: this customer already has a record for the key — return
     // it as-is. Scoped to the customer, like the server's unique constraint: the
     // same key from another customer is a distinct event, not a replay.
-    const existing = [...state.billingUsageRecords.values()].find(
-      (r) => r.customerId === customerId && r.idempotencyKey === idempotencyKey
-    );
+    const existing = state.billingUsageRecords
+      .values()
+      .find(
+        (r) =>
+          r.customerId === customerId && r.idempotencyKey === idempotencyKey
+      );
     if (existing) {
       // The server audits by response, so an idempotent replay is recorded too,
       // pointing at the original record's id.
@@ -1606,7 +1611,7 @@ billingAdminRouter.post(
     // A record is an observation, so the customer's current plan does not gate it
     // — rating decides at period close. Only a meter no plan declares is refused:
     // it can never become chargeable and is a producer typo.
-    if (![...state.plans.values()].some((p) => p.meterKey === meterKey)) {
+    if (!state.plans.values().some((p) => p.meterKey === meterKey)) {
       sendError(
         res,
         ErrorKeys.BILLING.METER_NOT_DECLARED,

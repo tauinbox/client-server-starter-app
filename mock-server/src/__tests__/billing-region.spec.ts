@@ -151,9 +151,9 @@ describe('PUT /billing/region with an unpaid checkout (server parity)', () => {
     expect((await region('PUT', token, { region: 'ru' })).status).toBe(200);
     const before = new Set(getState().billingSubscriptions.keys());
     await checkout(token);
-    const created = [...getState().billingSubscriptions.values()].find(
-      (s) => !before.has(s.id)
-    );
+    const created = getState()
+      .billingSubscriptions.values()
+      .find((s) => !before.has(s.id));
     expect(created).toMatchObject({
       status: 'incomplete',
       provider: 'yookassa',

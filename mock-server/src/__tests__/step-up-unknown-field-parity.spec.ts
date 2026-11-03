@@ -25,7 +25,9 @@ beforeEach(() => {
 
 function userId(email: string): string {
   return (
-    [...getState().users.values()].find((u) => u.email === email) as MockUser
+    getState()
+      .users.values()
+      .find((u) => u.email === email) as MockUser
   ).id;
 }
 

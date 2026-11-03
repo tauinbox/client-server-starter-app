@@ -119,9 +119,9 @@ describe('audit changedFields parity', () => {
   });
 
   it('resource: a resubmit logs [] and a description edit logs ["description"]', async () => {
-    const resource = Array.from(getState().resources.values()).find(
-      (r) => r.name === 'users'
-    )!;
+    const resource = getState()
+      .resources.values()
+      .find((r) => r.name === 'users')!;
     const form = {
       displayName: resource.displayName,
       description: resource.description,

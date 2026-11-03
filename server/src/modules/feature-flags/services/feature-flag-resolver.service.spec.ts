@@ -448,12 +448,9 @@ describe('FeatureFlagResolverService', () => {
   });
 
   it('concurrent evaluations share one DB load (single-flight)', async () => {
-    let resolveFind!: (flags: Partial<FeatureFlag>[]) => void;
-    flagRepo.find.mockReturnValue(
-      new Promise<Partial<FeatureFlag>[]>((resolve) => {
-        resolveFind = resolve;
-      })
-    );
+    const { promise: found, resolve: resolveFind } =
+      Promise.withResolvers<Partial<FeatureFlag>[]>();
+    flagRepo.find.mockReturnValue(found);
     ruleRepo.find.mockResolvedValue([]);
 
     const first = service.evaluateAnonymous('anon-1', fakeReq);
@@ -469,12 +466,9 @@ describe('FeatureFlagResolverService', () => {
   });
 
   it('a load overlapped by invalidateAll does not repopulate the all-flags cache', async () => {
-    let resolveFind!: (flags: Partial<FeatureFlag>[]) => void;
-    flagRepo.find.mockReturnValueOnce(
-      new Promise<Partial<FeatureFlag>[]>((resolve) => {
-        resolveFind = resolve;
-      })
-    );
+    const { promise: found, resolve: resolveFind } =
+      Promise.withResolvers<Partial<FeatureFlag>[]>();
+    flagRepo.find.mockReturnValueOnce(found);
     ruleRepo.find.mockResolvedValue([]);
 
     const inFlight = service.evaluateAnonymous('anon-1', fakeReq);

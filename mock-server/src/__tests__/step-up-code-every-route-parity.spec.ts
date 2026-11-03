@@ -29,9 +29,9 @@ beforeEach(() => {
 });
 
 async function oauthOnlyEnrolledToken(): Promise<string> {
-  const template = [...getState().users.values()].find(
-    (u) => u.email === 'user@example.com'
-  ) as MockUser;
+  const template = getState()
+    .users.values()
+    .find((u) => u.email === 'user@example.com') as MockUser;
   getState().users.set(OAUTH_ONLY_ID, {
     ...template,
     id: OAUTH_ONLY_ID,

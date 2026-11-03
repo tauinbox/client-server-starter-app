@@ -107,8 +107,8 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
   function byAttempt(rows: AuditLog[]): unknown[] {
     const attemptOf = ({ details }: AuditLog): number =>
       (details as { attempt: number }).attempt;
-    return [...rows]
-      .sort((a, b) => attemptOf(a) - attemptOf(b))
+    return rows
+      .toSorted((a, b) => attemptOf(a) - attemptOf(b))
       .map(({ details }) => details);
   }
 

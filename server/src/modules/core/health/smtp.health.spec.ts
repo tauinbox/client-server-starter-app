@@ -191,12 +191,9 @@ describe('SmtpHealthIndicator', () => {
     });
 
     it('should issue a single verify for concurrent probes', async () => {
-      let releaseVerify!: () => void;
-      mockMailService.verifySmtp.mockReturnValue(
-        new Promise<void>((resolve) => {
-          releaseVerify = resolve;
-        })
-      );
+      const { promise: verify, resolve: releaseVerify } =
+        Promise.withResolvers<void>();
+      mockMailService.verifySmtp.mockReturnValue(verify);
 
       const probes = Promise.all([
         indicator.isHealthy('smtp'),

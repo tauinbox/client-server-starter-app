@@ -44,10 +44,13 @@ async function login(email: string): Promise<string> {
 }
 
 function permissionId(resourceSlug: string, actionSlug: string): string {
-  const permission = [...getState().permissions.values()].find(
-    (p) =>
-      p.resourceId === mockId(resourceSlug) && p.actionId === mockId(actionSlug)
-  );
+  const permission = getState()
+    .permissions.values()
+    .find(
+      (p) =>
+        p.resourceId === mockId(resourceSlug) &&
+        p.actionId === mockId(actionSlug)
+    );
   if (!permission) {
     throw new Error(`Seed permission ${resourceSlug}/${actionSlug} is missing`);
   }

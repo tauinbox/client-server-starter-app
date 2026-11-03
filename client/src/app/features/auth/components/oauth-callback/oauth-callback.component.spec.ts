@@ -308,8 +308,8 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
   function createJwt(payload: Record<string, unknown>): string {
     const encode = (obj: Record<string, unknown>) =>
       btoa(JSON.stringify(obj))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
         .replace(/=+$/, '');
     return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.sig`;
   }

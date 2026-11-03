@@ -61,9 +61,9 @@ function useRussianLocale(): void {
 
 /** The paid invoice that the activation records for the period. */
 function periodInvoice(subId: string): MockInvoice {
-  const source = [...getState().billingInvoices.values()].find(
-    (i) => i.subscriptionId === subId && i.status === 'paid'
-  );
+  const source = getState()
+    .billingInvoices.values()
+    .find((i) => i.subscriptionId === subId && i.status === 'paid');
   if (!source) throw new Error('period invoice not seeded');
   return source;
 }
@@ -357,9 +357,9 @@ describe('POST /billing/subscription/change/preview', () => {
     user.locale = 'ru';
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
-    const source = [...getState().billingInvoices.values()].find(
-      (i) => i.subscriptionId === subId && i.status === 'paid'
-    );
+    const source = getState()
+      .billingInvoices.values()
+      .find((i) => i.subscriptionId === subId && i.status === 'paid');
     if (!source) throw new Error('period invoice not seeded');
     expect(source.amountMinor).toBe(99000);
     source.refundedMinor = 90000;
@@ -378,12 +378,14 @@ describe('POST /billing/subscription/change/preview', () => {
       planKey: 'business'
     });
     expect(change.status).toBe(200);
-    const refund = [...getState().billingInvoices.values()].find(
-      (i) =>
-        i.subscriptionId === subId &&
-        i.status === 'refunded' &&
-        i.id !== source.id
-    );
+    const refund = getState()
+      .billingInvoices.values()
+      .find(
+        (i) =>
+          i.subscriptionId === subId &&
+          i.status === 'refunded' &&
+          i.id !== source.id
+      );
     expect(refund?.amountMinor).toBe(preview.creditMinor);
     // The earlier refund and this leg add up to the whole invoice.
     expect(source.status).toBe('refunded');
@@ -410,7 +412,9 @@ describe('a plan with no Paddle price id (server parity)', () => {
   };
 
   function removePaddlePriceId(planKey: string): void {
-    const plan = [...getState().plans.values()].find((p) => p.key === planKey);
+    const plan = getState()
+      .plans.values()
+      .find((p) => p.key === planKey);
     if (!plan?.prices.paddle) throw new Error('plan not seeded');
     delete plan.prices.paddle.providerPriceId;
   }

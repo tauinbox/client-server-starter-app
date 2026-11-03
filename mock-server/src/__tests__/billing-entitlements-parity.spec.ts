@@ -63,17 +63,17 @@ function activateSubscription(
 }
 
 function currentUserId(): string {
-  const user = [...getState().users.values()].find(
-    (u) => u.email === 'user@example.com'
-  );
+  const user = getState()
+    .users.values()
+    .find((u) => u.email === 'user@example.com');
   expect(user).toBeDefined();
   return user!.id;
 }
 
 function customerIdOf(userId: string): string {
-  const customer = [...getState().billingCustomers.values()].find(
-    (c) => c.userId === userId
-  );
+  const customer = getState()
+    .billingCustomers.values()
+    .find((c) => c.userId === userId);
   expect(customer).toBeDefined();
   return customer!.id;
 }

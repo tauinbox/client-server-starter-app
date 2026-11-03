@@ -141,14 +141,9 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
   });
 
   function gate() {
-    let release!: () => void;
-    const released = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let enter!: () => void;
-    const entered = new Promise<void>((resolve) => {
-      enter = resolve;
-    });
+    const { promise: released, resolve: release } =
+      Promise.withResolvers<void>();
+    const { promise: entered, resolve: enter } = Promise.withResolvers<void>();
     return { release, released, enter, entered };
   }
 

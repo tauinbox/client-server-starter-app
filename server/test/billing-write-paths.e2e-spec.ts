@@ -814,14 +814,10 @@ runWithInfra('billing write paths (e2e)', () => {
       // The second scan fails the row the first one recorded while that charge
       // waits, then the first declines too: both read rung 0, so the loser's
       // guarded UPDATE must match nothing in Postgres.
-      let charging: () => void = () => undefined;
-      const charged = new Promise<void>((resolve) => {
-        charging = resolve;
-      });
-      let openGate: () => void = () => undefined;
-      const gate = new Promise<void>((resolve) => {
-        openGate = resolve;
-      });
+      const { promise: charged, resolve: charging } =
+        Promise.withResolvers<void>();
+      const { promise: gate, resolve: openGate } =
+        Promise.withResolvers<void>();
       provider.chargeOffSession.mockImplementationOnce(() => {
         charging();
         return gate.then<never>(() =>

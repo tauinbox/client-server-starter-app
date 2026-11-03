@@ -60,7 +60,9 @@ function send(
 }
 
 function userIdOf(email: string): string {
-  const user = [...getState().users.values()].find((u) => u.email === email);
+  const user = getState()
+    .users.values()
+    .find((u) => u.email === email);
   if (!user) throw new Error(`Seed user ${email} is missing`);
   return user.id;
 }
@@ -133,11 +135,13 @@ describe('PATCH /auth/profile', () => {
 
   it('refuses a caller without update:Profile', async () => {
     const state = getState();
-    const updateProfile = [...state.permissions.values()].find(
-      (p) =>
-        p.resourceId === mockId('res-profile') &&
-        p.actionId === mockId('act-update')
-    );
+    const updateProfile = state.permissions
+      .values()
+      .find(
+        (p) =>
+          p.resourceId === mockId('res-profile') &&
+          p.actionId === mockId('act-update')
+      );
     expect(updateProfile).toBeDefined();
     state.rolePermissions = state.rolePermissions.filter(
       (rp) =>

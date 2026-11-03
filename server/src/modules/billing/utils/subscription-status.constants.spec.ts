@@ -13,7 +13,7 @@ import {
  */
 describe('subscription status sets', () => {
   it('ENTITLED_SUBSCRIPTION_STATUSES holds exactly trialing, active, past_due', () => {
-    expect([...ENTITLED_SUBSCRIPTION_STATUSES].sort()).toEqual([
+    expect(ENTITLED_SUBSCRIPTION_STATUSES.toSorted()).toEqual([
       'active',
       'past_due',
       'trialing'
@@ -21,7 +21,7 @@ describe('subscription status sets', () => {
   });
 
   it('OPEN_SUBSCRIPTION_STATUSES holds exactly the non-canceled statuses', () => {
-    expect([...OPEN_SUBSCRIPTION_STATUSES].sort()).toEqual([
+    expect(OPEN_SUBSCRIPTION_STATUSES.toSorted()).toEqual([
       'active',
       'incomplete',
       'past_due',
@@ -30,7 +30,7 @@ describe('subscription status sets', () => {
   });
 
   it('CHANGEABLE_SUBSCRIPTION_STATUSES holds exactly trialing, active', () => {
-    expect([...CHANGEABLE_SUBSCRIPTION_STATUSES].sort()).toEqual([
+    expect(CHANGEABLE_SUBSCRIPTION_STATUSES.toSorted()).toEqual([
       'active',
       'trialing'
     ]);

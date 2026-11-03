@@ -20,9 +20,7 @@ describe('RoleRulesListener', () => {
 
   beforeEach(async () => {
     flagService = { rewriteRoleName: jest.fn().mockResolvedValue([]) };
-    committed = new Promise<void>((resolve) => {
-      commit = resolve;
-    });
+    ({ promise: committed, resolve: commit } = Promise.withResolvers<void>());
 
     module = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],

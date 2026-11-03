@@ -55,9 +55,9 @@ function editorPermissionIds(): string[] {
 // Permission ids are positional in the seed, so resolve them by resource and
 // action instead of hardcoding.
 function permissionIdFor(resourceId: string, actionId: string): string {
-  const permission = [...getState().permissions.values()].find(
-    (p) => p.resourceId === resourceId && p.actionId === actionId
-  );
+  const permission = getState()
+    .permissions.values()
+    .find((p) => p.resourceId === resourceId && p.actionId === actionId);
   if (!permission) {
     throw new Error(`Seed permission ${resourceId}/${actionId} is missing`);
   }

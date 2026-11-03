@@ -150,7 +150,7 @@ describe('UsageService', () => {
       (options: FindOneOptions<Subscription>) =>
         Promise.resolve(
           options.order?.createdAt === 'DESC'
-            ? [...rows].sort(
+            ? rows.toSorted(
                 (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
               )[0]
             : rows[0]

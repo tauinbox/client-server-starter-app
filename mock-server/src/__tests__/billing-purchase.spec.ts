@@ -133,9 +133,9 @@ describe('POST /billing/purchase', () => {
   it('treats a zero lower bound as configured, not as missing bounds', async () => {
     // Mirrors the server: `!minAmountMinor` answered a configuration error for a legitimate 0
     // lower bound, so no donation to such a product could ever be started.
-    const donation = [...getState().billingProducts.values()].find(
-      (p) => p.key === 'donation'
-    )!;
+    const donation = getState()
+      .billingProducts.values()
+      .find((p) => p.key === 'donation')!;
     donation.prices.paddle = {
       currency: 'USD',
       minAmountMinor: 0,
@@ -166,9 +166,9 @@ describe('POST /billing/purchase', () => {
   it.each(['report-pack', 'credits-500'])(
     'rejects a Paddle %s price with no catalog price id with 500',
     async (productKey) => {
-      const product = [...getState().billingProducts.values()].find(
-        (p) => p.key === productKey
-      )!;
+      const product = getState()
+        .billingProducts.values()
+        .find((p) => p.key === productKey)!;
       product.prices.paddle = { currency: 'USD', amountMinor: 500 };
 
       const token = await login();

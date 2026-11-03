@@ -210,13 +210,11 @@ describe('SSE user_crud_events scoping', () => {
 
 function searchUserPermission() {
   const state = getState();
-  const resourceId = [...state.resources.values()].find(
-    (r) => r.subject === 'User'
-  )!.id;
-  const actionId = [...state.actions.values()].find(
-    (a) => a.name === 'search'
-  )!.id;
-  return [...state.permissions.values()].find(
-    (p) => p.resourceId === resourceId && p.actionId === actionId
-  )!;
+  const resourceId = state.resources
+    .values()
+    .find((r) => r.subject === 'User')!.id;
+  const actionId = state.actions.values().find((a) => a.name === 'search')!.id;
+  return state.permissions
+    .values()
+    .find((p) => p.resourceId === resourceId && p.actionId === actionId)!;
 }

@@ -125,7 +125,9 @@ describe('POST /__control/billing/advance-renewal', () => {
   it('rates a usage plan that names no meter to zero', async () => {
     const { token, id } = await login('user@example.com');
     const { customerId } = await activate(id, 'usage');
-    const plan = [...getState().plans.values()].find((p) => p.key === 'usage')!;
+    const plan = getState()
+      .plans.values()
+      .find((p) => p.key === 'usage')!;
     plan.meterKey = null;
     await control('seed-usage', { customerId, quantity: 30 });
 

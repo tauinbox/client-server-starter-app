@@ -77,9 +77,9 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
     expect(roleRes.status).toBe(201);
     const roleId = ((await roleRes.json()) as { id: string }).id;
 
-    const holder = [...getState().users.values()].find(
-      (u) => u.email === 'user@example.com'
-    );
+    const holder = getState()
+      .users.values()
+      .find((u) => u.email === 'user@example.com');
     if (!holder) throw new Error('Seed user is missing');
     holder.roles.push('beta');
     const user = await login('user@example.com');

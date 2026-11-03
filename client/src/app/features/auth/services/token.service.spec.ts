@@ -25,8 +25,8 @@ function createJwt(payload: Record<string, unknown>): string {
   const header = { alg: 'HS256', typ: 'JWT' };
   const encode = (obj: Record<string, unknown>) =>
     btoa(JSON.stringify(obj))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
       .replace(/=+$/, '');
   return `${encode(header)}.${encode(payload)}.fake-signature`;
 }

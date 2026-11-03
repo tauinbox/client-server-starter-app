@@ -25,7 +25,7 @@ test('fonts load from the bundle and icons render as glyphs', async ({
     await document.fonts.ready;
     return [...document.fonts]
       .filter((face) => face.status === 'loaded')
-      .map((face) => face.family.replace(/"/g, ''));
+      .map((face) => face.family.replaceAll('"', ''));
   });
   expect(faces).toContain('Roboto');
   expect(faces).toContain('Material Icons');

@@ -210,7 +210,7 @@ function conditionFieldNames(conditions: Record<string, unknown>): string[] {
 
 /** The fields a condition on the subject may name; none for an unlisted one. */
 export function conditionFieldsOf(subject: string): readonly string[] {
-  return Object.prototype.hasOwnProperty.call(CONDITION_FIELDS, subject)
+  return Object.hasOwn(CONDITION_FIELDS, subject)
     ? CONDITION_FIELDS[subject as keyof typeof CONDITION_FIELDS]
     : [];
 }

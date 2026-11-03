@@ -125,7 +125,7 @@ runWithInfra('List search and filters (e2e)', () => {
   }
 
   function sorted(values: string[]): string[] {
-    return [...values].sort();
+    return values.toSorted();
   }
 
   describe('feature flags', () => {
