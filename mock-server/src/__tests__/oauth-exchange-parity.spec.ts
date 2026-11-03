@@ -187,11 +187,9 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
       );
     }
     expect(liveTokensOf(admin!.id)).toBe(MAX_CONCURRENT_SESSIONS);
+    const newest = devices.at(-1)!;
 
-    const res = await exchange(
-      await issueOAuthData(admin!.id),
-      devices[devices.length - 1]
-    );
+    const res = await exchange(await issueOAuthData(admin!.id), newest);
 
     expect(res.status).toBe(201);
     expect(liveTokensOf(admin!.id)).toBe(MAX_CONCURRENT_SESSIONS);
@@ -200,7 +198,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
         method: 'POST',
         headers: { cookie }
       }).then((r) => r.status);
-    expect(await refresh(devices[devices.length - 1])).toBe(401);
+    expect(await refresh(newest)).toBe(401);
     expect(await refresh(devices[0])).toBe(200);
   });
 

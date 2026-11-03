@@ -136,7 +136,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
       );
     }
 
-    expect(keys[keys.length - 1]).toBe(ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED);
+    expect(keys.at(-1)).toBe(ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED);
     const rows = await waitForRows(
       user.id,
       AuditAction.MFA_CHALLENGE_FAILURE,
@@ -168,7 +168,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
       );
     }
 
-    expect(keys[keys.length - 1]).toBe(ErrorKeys.AUTH.STEP_UP_LOCKED);
+    expect(keys.at(-1)).toBe(ErrorKeys.AUTH.STEP_UP_LOCKED);
     const rows = await waitForRows(
       user.id,
       AuditAction.STEP_UP_FAILURE,
@@ -195,7 +195,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
       );
     }
 
-    expect(keys[keys.length - 1]).toBe(ErrorKeys.AUTH.MFA_STEP_UP_LOCKED);
+    expect(keys.at(-1)).toBe(ErrorKeys.AUTH.MFA_STEP_UP_LOCKED);
     const stepUpRows = await waitForRows(
       user.id,
       AuditAction.STEP_UP_FAILURE,

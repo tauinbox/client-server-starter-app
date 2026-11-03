@@ -91,7 +91,7 @@ function repositoryOf(rows: Rows, write: jest.Mock) {
     manager: {
       transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
         work({
-          save: (...args: unknown[]): unknown => write(args[args.length - 1]),
+          save: (...args: unknown[]): unknown => write(args.at(-1)),
           // A keyed update is recorded as the row key with the written columns.
           update: (
             _target: unknown,
