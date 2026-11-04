@@ -34,7 +34,7 @@ export type Actions = string;
  * `any`'s bivariance).
  */
 type SubjectInstanceMap = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- an entity class has no index signature, so `unknown` refuses it
   [K in KnownSubjects]: ForcedSubject<K> & Record<PropertyKey, any>;
 };
 export type SubjectInstance = SubjectInstanceMap[KnownSubjects];

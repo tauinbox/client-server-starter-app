@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { HttpException, HttpStatus } from '@nestjs/common';
@@ -903,7 +904,7 @@ describe('UsersService', () => {
 
       expect(written).toMatchObject({
         isActive: false,
-        tokenRevokedAt: expect.any(Date) as Date
+        tokenRevokedAt: expect.any(Date)
       });
     });
 

@@ -5,15 +5,10 @@ import prettierConfig from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
-// @ts-expect-error TS7016: .mjs has no type declarations under classic node resolution
 import baseRules from '../eslint.base.config.mjs';
 
 // Flat config replaces rule options, so the base selectors are re-added.
-const [, ...baseRestrictedSyntax] = (
-  baseRules as {
-    'no-restricted-syntax': ['error', ...{ selector: string }[]];
-  }
-)['no-restricted-syntax'];
+const [, ...baseRestrictedSyntax] = baseRules['no-restricted-syntax'];
 
 const KEYLESS_BODY_MESSAGE =
   'Send an error body with an errorKey, as the server does. If the server sends this body with no key, disable this line and give the reason.';

@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -127,7 +128,6 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
         details: {
           reason: 'lost_response_replay',
           sessionId: deviceA.sessionId,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           replayAgeMs: expect.any(Number),
           sameIp: true
         }

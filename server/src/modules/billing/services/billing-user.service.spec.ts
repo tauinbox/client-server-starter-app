@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -422,7 +423,7 @@ describe('BillingUserService', () => {
 
       expect(result).toEqual([priced, donation]);
       expect(ctx.products.find).toHaveBeenCalledWith({
-        where: expect.objectContaining({ active: true }) as unknown,
+        where: expect.objectContaining({ active: true }),
         order: { createdAt: 'ASC' }
       });
     });
@@ -557,12 +558,11 @@ describe('BillingUserService', () => {
       await ctx.service.checkout('user-1', 'pro');
 
       expect(ctx.subscriptions.save).toHaveBeenCalledWith(
-        expect.objectContaining({ trialEnd: expect.any(Date) as Date })
+        expect.objectContaining({ trialEnd: expect.any(Date) })
       );
       expect(yoo.startCheckout).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         { urls: expect.anything(), trial: true }
       );
     });
@@ -588,7 +588,6 @@ describe('BillingUserService', () => {
       expect(yoo.startCheckout).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         { urls: expect.anything(), trial: false }
       );
     });
@@ -958,7 +957,6 @@ describe('BillingUserService', () => {
       expect(paddle.updatePaymentMethod).toHaveBeenCalledWith(
         'sub_ext',
         expect.objectContaining({ id: 'cust-1' }),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         { currency: 'USD', urls: expect.anything() }
       );
     });

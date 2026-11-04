@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { EntitlementService } from '../../entitlements/entitlement.service';
@@ -160,7 +161,6 @@ describe('SessionIssuerService', () => {
       'user-1',
       {
         token: 'mock-refresh-token',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         sessionId: expect.any(String),
         client: { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
       }

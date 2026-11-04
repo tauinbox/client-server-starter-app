@@ -2,6 +2,7 @@
 // decorators, so the forbidNonWhitelisted pipe refused every admin
 // deactivate/unlock request. Pipe options mirror main.ts.
 
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
@@ -109,7 +110,6 @@ describe('Admin user update DTO validation (e2e)', () => {
 
     expect(usersService.update).toHaveBeenCalledWith(TARGET_ID, payload, {
       actorId: 'admin-1',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       audit: expect.any(Function)
     });
   });

@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { RbacController } from './rbac.controller';
@@ -121,7 +122,6 @@ describe('RbacController', () => {
       expect(resourceServiceMock.update).toHaveBeenCalledWith('res-1', dto, {
         ability: mockAbility,
         actorId: 'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
       expect(result).toBe(updated);
@@ -170,7 +170,6 @@ describe('RbacController', () => {
       expect(resourceServiceMock.restore).toHaveBeenCalledWith('res-1', {
         ability: mockAbility,
         actorId: 'user-99',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.objectContaining({
           action: AuditAction.RESOURCE_RESTORE,
           actorId: 'user-99',

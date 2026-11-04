@@ -5,17 +5,12 @@ import prettierConfig from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
-// @ts-expect-error TS7016: .mjs has no type declarations under classic node resolution
 import baseRules from '../eslint.base.config.mjs';
 
 type RestrictedSyntax = { selector: string; message: string };
 
 // Flat config replaces rule options, so the base selectors are re-added.
-const [, ...baseRestrictedSyntax] = (
-  baseRules as {
-    'no-restricted-syntax': ['error', ...RestrictedSyntax[]];
-  }
-)['no-restricted-syntax'];
+const [, ...baseRestrictedSyntax] = baseRules['no-restricted-syntax'];
 const restrictedSyntax: RestrictedSyntax[] = [
   ...baseRestrictedSyntax,
   {
@@ -116,7 +111,6 @@ export default defineConfig(
   },
   {
     plugins: { unicorn },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     rules: {
       ...baseRules,
       '@typescript-eslint/interface-name-prefix': 'off',

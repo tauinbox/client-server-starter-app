@@ -3,8 +3,7 @@ export const MAX_USER_AGENT_LENGTH = 512;
 
 // C0 controls, DEL and the C1 range. None of them is valid in a header value,
 // and a stray one would reach the session list verbatim.
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/g;
+const CONTROL_CHARACTERS = /\p{Cc}/gu;
 
 /**
  * The User-Agent as the session list stores it. The header is written by the

@@ -20,8 +20,7 @@ export type WireType<T> = T extends Date
   ? string
   : T extends ReadonlyArray<infer U>
     ? Array<WireType<U>>
-    : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      T extends (...args: any[]) => any
+    : T extends (...args: never[]) => unknown
       ? T
       : T extends object
         ? { [K in keyof T]: WireType<T[K]> }

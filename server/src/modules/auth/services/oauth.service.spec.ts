@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -757,9 +758,7 @@ describe('OAuthService', () => {
         expect.objectContaining({
           email: 'oauth@example.com',
           isEmailVerified: false,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           emailVerificationToken: expect.any(String),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           emailVerificationExpiresAt: expect.any(Date)
         })
       );

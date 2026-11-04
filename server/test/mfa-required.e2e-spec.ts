@@ -3,6 +3,7 @@
 // which is the whole mechanism: the protected surface is defined as "every
 // route the decorator carries", so the decorator is what has to be exercised.
 
+import { expect } from '@jest/globals';
 import {
   CanActivate,
   Controller,
@@ -150,7 +151,7 @@ describe('Two-factor requirement on the @Authorize surface (e2e)', () => {
         actorId: 'admin-1',
         details: { required: ['read:Role'], mfaEnrolmentRequired: true },
         context: expect.objectContaining({
-          ip: expect.any(String) as string
+          ip: expect.any(String)
         }) as Record<string, unknown>
       })
     );

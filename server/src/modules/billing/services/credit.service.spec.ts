@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, IsNull } from 'typeorm';
@@ -222,7 +223,7 @@ describe('CreditService', () => {
           status: In(['pending', 'failed']),
           creditsReleasedAt: IsNull()
         },
-        { creditsReleasedAt: expect.any(Function) as unknown }
+        { creditsReleasedAt: expect.any(Function) }
       );
     });
   });

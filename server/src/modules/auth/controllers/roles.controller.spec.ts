@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { RolesController } from './roles.controller';
@@ -187,7 +188,6 @@ describe('RolesController', () => {
       expect(roleServiceMock.create).toHaveBeenCalledWith(dto, {
         ability: mockAbility,
         actorId: 'actor-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
       expect(result).toBe(role);
@@ -211,7 +211,6 @@ describe('RolesController', () => {
       expect(roleServiceMock.update).toHaveBeenCalledWith('role-1', dto, {
         ability: mockAbility,
         actorId: 'actor-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
       expect(result).toBe(updated);
@@ -228,7 +227,6 @@ describe('RolesController', () => {
       expect(roleServiceMock.delete).toHaveBeenCalledWith('role-1', {
         ability: mockAbility,
         actorId: 'actor-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
       expect(result).toBeUndefined();
@@ -248,7 +246,6 @@ describe('RolesController', () => {
         {
           ability: mockAbility,
           actorId: 'actor-1',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           audit: expect.objectContaining({
             action: AuditAction.PERMISSION_ASSIGN
           })
@@ -272,7 +269,6 @@ describe('RolesController', () => {
         {
           ability: mockAbility,
           actorId: 'actor-1',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           audit: expect.objectContaining({
             action: AuditAction.PERMISSION_ASSIGN
           })
@@ -296,7 +292,6 @@ describe('RolesController', () => {
         {
           ability: mockAbility,
           actorId: 'actor-1',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           audit: expect.objectContaining({
             action: AuditAction.PERMISSION_UNASSIGN
           })
@@ -317,7 +312,6 @@ describe('RolesController', () => {
         {
           ability: mockAbility,
           actorId: 'actor-1',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           audit: expect.objectContaining({ action: AuditAction.ROLE_ASSIGN })
         }
       );
@@ -366,7 +360,6 @@ describe('RolesController', () => {
         {
           ability: mockAbility,
           actorId: 'actor-1',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           audit: expect.objectContaining({ action: AuditAction.ROLE_UNASSIGN })
         }
       );

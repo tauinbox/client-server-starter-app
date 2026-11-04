@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
@@ -856,9 +857,7 @@ describe('AuthService', () => {
       expect(mockRefreshTokenService.createRefreshToken).toHaveBeenCalledWith(
         'user-1',
         {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           token: expect.any(String),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           sessionId: expect.any(String),
           client: { userAgent: 'Mozilla/5.0 Test', ipAddress: null }
         }
@@ -945,9 +944,7 @@ describe('AuthService', () => {
         expect.anything(), // User entity class
         expect.objectContaining({
           email: 'new@example.com',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           emailVerificationToken: expect.any(String),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           emailVerificationExpiresAt: expect.any(Date)
         })
       );
@@ -1236,9 +1233,7 @@ describe('AuthService', () => {
         'user-1',
         {
           email: 'test@example.com',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           hashedToken: expect.any(String),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           expiresAt: expect.any(Date)
         }
       );
@@ -1355,9 +1350,7 @@ describe('AuthService', () => {
         'user-1',
         {
           email: 'test@example.com',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           hashedToken: expect.any(String),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           expiresAt: expect.any(Date)
         }
       );
@@ -1530,7 +1523,6 @@ describe('AuthService', () => {
         expect.anything(), // User entity class
         { id: 'user-1', passwordResetToken: hashToken('valid-token') },
         expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           password: expect.any(String), // bcrypt hash
           passwordResetToken: null,
           passwordResetExpiresAt: null,
@@ -1539,7 +1531,6 @@ describe('AuthService', () => {
           pendingEmailExpiresAt: null,
           failedLoginAttempts: 0,
           lockedUntil: null,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           tokenRevokedAt: expect.any(Date)
         })
       );
@@ -1863,7 +1854,6 @@ describe('AuthService', () => {
       );
       expect(mockUserRepository.update).toHaveBeenCalledWith(
         'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
       );
     });
@@ -1985,7 +1975,6 @@ describe('AuthService', () => {
         );
         expect(mockUserRepository.update).toHaveBeenCalledWith(
           'user-1',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           expect.objectContaining({ tokenRevokedAt: expect.any(Date) })
         );
         expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -2077,7 +2066,6 @@ describe('AuthService', () => {
 
           expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
             expect.objectContaining({
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               details: expect.objectContaining({ sameIp })
             })
           );
@@ -2909,8 +2897,8 @@ describe('AuthService', () => {
           status: HttpStatus.LOCKED,
           response: {
             errorKey: ErrorKeys.AUTH.STEP_UP_LOCKED,
-            retryAfter: expect.any(Number) as unknown,
-            lockedUntil: expect.any(String) as unknown
+            retryAfter: expect.any(Number),
+            lockedUntil: expect.any(String)
           }
         });
       });
@@ -3093,9 +3081,7 @@ describe('AuthService', () => {
         },
         expect.objectContaining({
           pendingEmail: 'new@example.com',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           pendingEmailToken: expect.any(String),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           pendingEmailExpiresAt: expect.any(Date)
         })
       );
@@ -3459,7 +3445,6 @@ describe('AuthService', () => {
           pendingEmail: null,
           pendingEmailToken: null,
           pendingEmailExpiresAt: null,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           tokenRevokedAt: expect.any(Date)
         })
       );

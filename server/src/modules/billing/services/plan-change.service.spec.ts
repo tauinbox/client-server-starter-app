@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
@@ -89,7 +90,7 @@ function makeInsertStore(invoices: RepoMock) {
     update: jest.fn(
       (
         target: unknown,
-        criteria: InvoiceCriteria,
+        criteria: InvoiceCriteria & Record<string, unknown>,
         patch: Record<string, unknown>
       ) =>
         Promise.resolve(
@@ -419,7 +420,6 @@ describe('PlanChangeService', () => {
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(customer, {
         amountMinor: 116000,
         currency: 'RUB',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         receiptItems: expect.arrayContaining([
           expect.objectContaining({ amountMinor: 116000 })
         ]),
@@ -528,9 +528,7 @@ describe('PlanChangeService', () => {
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(customer, {
         amountMinor: 39600,
         currency: 'RUB',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         receiptItems: expect.any(Array),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         idempotencyKey: expect.any(String)
       });
     });
@@ -566,9 +564,7 @@ describe('PlanChangeService', () => {
         {
           amountMinor: 116000,
           currency: 'RUB',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           receiptItems: expect.any(Array),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           idempotencyKey: expect.any(String)
         }
       );
@@ -643,7 +639,7 @@ describe('PlanChangeService', () => {
         {
           planKey: 'usage',
           billingMode: 'usage',
-          planChangeSeq: expect.any(Function) as unknown,
+          planChangeSeq: expect.any(Function),
           meteredFrom: frozenNow
         }
       );
@@ -754,7 +750,7 @@ describe('PlanChangeService', () => {
         {
           planKey: 'business',
           billingMode: 'fixed',
-          planChangeSeq: expect.any(Function) as unknown,
+          planChangeSeq: expect.any(Function),
           meteredFrom: frozenNow
         }
       );
@@ -781,7 +777,7 @@ describe('PlanChangeService', () => {
         {
           planKey: 'business',
           billingMode: 'fixed',
-          planChangeSeq: expect.any(Function) as unknown
+          planChangeSeq: expect.any(Function)
         }
       );
       expect(ctx.emit).not.toHaveBeenCalledWith(
@@ -1140,7 +1136,6 @@ describe('PlanChangeService', () => {
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(customer, {
         amountMinor: 116000,
         currency: 'RUB',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         receiptItems: expect.any(Array),
         idempotencyKey: 'change-charge:sub-1:2:business'
       });
@@ -1219,7 +1214,7 @@ describe('PlanChangeService', () => {
         {
           planKey: 'business',
           billingMode: 'fixed',
-          planChangeSeq: expect.any(Function) as unknown
+          planChangeSeq: expect.any(Function)
         }
       );
     });

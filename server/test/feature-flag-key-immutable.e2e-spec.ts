@@ -1,6 +1,7 @@
 // The percentage bucket hashes the flag key, so a rename would move users in
 // and out of every rollout of the flag. Pipe options mirror main.ts.
 
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
@@ -108,9 +109,7 @@ describe('Feature flag key is immutable after create (e2e)', () => {
       { enabled: true },
       {
         ifMatch: { any: false, versions: [1] },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         ability: expect.anything(),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         actor: expect.objectContaining({ actorId: 'admin-1' })
       }
     );
