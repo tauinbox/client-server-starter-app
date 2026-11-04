@@ -34,7 +34,7 @@ export type ListUrlBinding<S extends ListQuerySpec> = {
   setFilters(filters: Partial<ListFilters<S>>): void;
   /** Writes a sort to the URL; an empty column or direction is the default. */
   setSort(sortBy: string, direction: SortDirection): void;
-  readonly sort: Signal<ListSortView>;
+  readonly sortView: Signal<ListSortView>;
 };
 
 function onlySearchChanged(
@@ -118,7 +118,7 @@ export function bindListToUrl<S extends ListQuerySpec>(
       );
     },
 
-    sort: computed(() =>
+    sortView: computed(() =>
       store.sortBy() === DEFAULT_SORT_BY &&
       store.sortOrder() === DEFAULT_SORT_ORDER
         ? { active: '', direction: '' }

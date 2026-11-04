@@ -89,8 +89,8 @@ export class UserListComponent implements OnInit {
   readonly hasActiveFilters = this.#usersStore.hasActiveFilters;
 
   /** The table marks a sort only when it is not the default one. */
-  readonly sort = computed(() => {
-    const { active, direction } = this.#list.sort();
+  readonly sortView = computed(() => {
+    const { active, direction } = this.#list.sortView();
     return { active: SORT_TO_COLUMN_MAP[active] ?? '', direction };
   });
 
