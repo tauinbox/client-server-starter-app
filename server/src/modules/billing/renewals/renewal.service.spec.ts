@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -493,10 +494,11 @@ describe('RenewalService', () => {
         currency: 'USD',
         providerOverride: 'yookassa'
       });
-      const charge = jest.fn(() =>
-        outcome === 'declined'
-          ? Promise.reject(new Error('declined'))
-          : Promise.resolve({ providerInvoiceRef: 'pay_1', status: outcome })
+      const charge = jest.fn(
+        (..._args: Parameters<PaymentProvider['chargeOffSession']>) =>
+          outcome === 'declined'
+            ? Promise.reject(new Error('declined'))
+            : Promise.resolve({ providerInvoiceRef: 'pay_1', status: outcome })
       );
       const { service } = await build(store, charge);
 
@@ -507,9 +509,7 @@ describe('RenewalService', () => {
         {
           amountMinor: 99000,
           currency: 'RUB',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           receiptItems: expect.any(Array),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           idempotencyKey: expect.any(String)
         }
       );
@@ -551,9 +551,7 @@ describe('RenewalService', () => {
       {
         amountMinor: 600,
         currency: 'RUB',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         receiptItems: expect.any(Array),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         idempotencyKey: expect.any(String)
       }
     );
@@ -1329,7 +1327,6 @@ describe('RenewalService', () => {
               quantity: 1
             }
           ],
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           idempotencyKey: expect.any(String)
         }
       );
@@ -1442,7 +1439,6 @@ describe('RenewalService', () => {
           {
             amountMinor: 8400,
             currency: 'RUB',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             receiptItems: expect.anything(),
             idempotencyKey:
               'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
@@ -1545,7 +1541,6 @@ describe('RenewalService', () => {
           {
             amountMinor: 8400,
             currency: 'RUB',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             receiptItems: expect.anything(),
             idempotencyKey:
               'cancel:sub-1:' + new Date('2026-05-01T00:00:00Z').getTime()
@@ -1608,7 +1603,6 @@ describe('RenewalService', () => {
         expect(charge).toHaveBeenCalledWith(expect.anything(), {
           amountMinor: 8400,
           currency: 'RUB',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           receiptItems: expect.anything(),
           idempotencyKey: `cancel:sub-1:${switchedAt.getTime()}`
         });
@@ -1721,7 +1715,6 @@ describe('RenewalService', () => {
         expect(charge).toHaveBeenCalledWith(expect.anything(), {
           amountMinor: 8400,
           currency: 'RUB',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           receiptItems: expect.anything(),
           idempotencyKey: `cancel:sub-1:${anchorMs}`
         });
@@ -1750,7 +1743,6 @@ describe('RenewalService', () => {
         expect(charge).toHaveBeenCalledWith(expect.anything(), {
           amountMinor: 8400,
           currency: 'RUB',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           receiptItems: expect.anything(),
           idempotencyKey:
             'cancel:sub-1:' + new Date('2026-05-01T00:00:00Z').getTime()

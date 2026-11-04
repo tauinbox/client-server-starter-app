@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
@@ -900,7 +901,7 @@ describe('BillingAdminService', () => {
         expect(saved.status).toBe('refunded');
         expect(ctx.grants.update).toHaveBeenCalledWith(
           { sourceInvoiceId: 'inv-1', revokedAt: IsNull() },
-          { revokedAt: expect.any(Date) as Date }
+          { revokedAt: expect.any(Date) }
         );
         expect(ctx.emit).toHaveBeenCalledWith(
           InvoiceRefundedEvent.name,

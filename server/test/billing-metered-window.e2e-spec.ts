@@ -2,6 +2,7 @@
 // switch. Real services on a real PostgreSQL; only the provider is a fake that
 // records its calls.
 
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -462,9 +463,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     expect(provider.chargeUsage).toHaveBeenCalledWith(providerSubscriptionRef, {
       amountMinor: 200,
       currency: 'USD',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       description: expect.any(String),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       chargeKey: expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
     });
     const invoices = await usageInvoices();
@@ -503,9 +502,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     expect(provider.chargeUsage).toHaveBeenCalledWith(providerSubscriptionRef, {
       amountMinor: 200,
       currency: 'USD',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       description: expect.any(String),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       chargeKey: expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
     });
     const invoices = await usageInvoices();

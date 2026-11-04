@@ -1,8 +1,7 @@
 // Mirrors `normalizeUserAgent` in server/src/common/utils/user-agent.util.ts.
 const MAX_USER_AGENT_LENGTH = 512;
 
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/g;
+const CONTROL_CHARACTERS = /\p{Cc}/gu;
 
 export function normalizeUserAgent(
   header: string | string[] | undefined

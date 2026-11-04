@@ -5,6 +5,7 @@
 // entitlement-changed listener — proving the emitted event names match what the
 // listener subscribes to. Runs without PostgreSQL, Redis, or real YooKassa.
 
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
@@ -383,7 +384,6 @@ describe('Billing renewal scheduler (e2e)', () => {
             quantity: 1
           }
         ],
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         idempotencyKey: expect.stringMatching(/^renewal:sub-1:/)
       }
     );

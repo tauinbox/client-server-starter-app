@@ -2,6 +2,7 @@
 // webhook and an immediate cancel against a real PostgreSQL, then check out
 // again: the second checkout must charge the full price.
 
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -206,7 +207,6 @@ runWithInfra('One trial for each customer (e2e)', () => {
       expect(startCheckout).toHaveBeenLastCalledWith(
         expect.anything(),
         expect.anything(),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         { urls: expect.anything(), trial: true }
       );
       await firstPayment(`pay_trial_${String(converted)}`, 0);
@@ -230,7 +230,6 @@ runWithInfra('One trial for each customer (e2e)', () => {
       expect(startCheckout).toHaveBeenLastCalledWith(
         expect.anything(),
         expect.anything(),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         { urls: expect.anything(), trial: false }
       );
       const second = await openRow();

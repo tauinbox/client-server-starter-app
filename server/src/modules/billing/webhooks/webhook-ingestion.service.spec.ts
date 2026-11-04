@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -218,7 +219,7 @@ describe('WebhookIngestionService', () => {
     expect(add).toHaveBeenCalledWith(
       BILLING_WEBHOOK_REDUCE_JOB,
       { webhookEventId: 'wh-1', event },
-      expect.objectContaining({ attempts: expect.any(Number) as unknown })
+      expect.objectContaining({ attempts: expect.any(Number) })
     );
     // With a queue the reduction is deferred to the worker, not run inline.
     expect(reduce).not.toHaveBeenCalled();

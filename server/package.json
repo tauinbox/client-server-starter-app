@@ -7,8 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../*.mts\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../*.mts\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -101,6 +101,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@jest/globals": "^30.5.2",
     "@nestjs/cli": "^12.0.8",
     "@nestjs/schematics": "^12.0.6",
     "@nestjs/testing": "^12.1.2",

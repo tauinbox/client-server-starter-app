@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { HttpException, Logger } from '@nestjs/common';
@@ -448,10 +449,10 @@ describe('AuthController', () => {
       const [role] = result.user.roles;
       expect(role).toEqual(
         expect.objectContaining({
-          id: expect.any(String) as unknown,
+          id: expect.any(String),
           name: 'admin',
-          isSystem: expect.any(Boolean) as unknown,
-          isSuper: expect.any(Boolean) as unknown
+          isSystem: expect.any(Boolean),
+          isSuper: expect.any(Boolean)
         })
       );
       // Must not regress to the legacy string[] shape.
@@ -1029,7 +1030,6 @@ describe('AuthController', () => {
         {
           operation: STEP_UP_OPERATION.PASSWORD_SET,
           totpCode: '123456',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           auditContext: expect.anything()
         }
       );

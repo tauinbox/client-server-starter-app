@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -263,7 +264,7 @@ describe('BillingEventReducer', () => {
       expect(manager.update).toHaveBeenCalledWith(
         Customer,
         { id: 'cust-1', trialUsedAt: IsNull() },
-        { trialUsedAt: expect.any(Date) as Date }
+        { trialUsedAt: expect.any(Date) }
       );
     });
 
@@ -289,7 +290,7 @@ describe('BillingEventReducer', () => {
       expect(manager.update).toHaveBeenCalledWith(
         Customer,
         { id: 'cust-1', trialUsedAt: IsNull() },
-        { trialUsedAt: expect.any(Date) as Date }
+        { trialUsedAt: expect.any(Date) }
       );
     });
 
@@ -993,7 +994,7 @@ describe('BillingEventReducer', () => {
       expect(manager.update).not.toHaveBeenCalledWith(
         Customer,
         expect.anything(),
-        { trialUsedAt: expect.any(Date) as Date }
+        { trialUsedAt: expect.any(Date) }
       );
     });
 
@@ -1027,7 +1028,7 @@ describe('BillingEventReducer', () => {
       expect(manager.update).toHaveBeenCalledWith(
         Customer,
         { id: 'cust-1', trialUsedAt: IsNull() },
-        { trialUsedAt: expect.any(Date) as Date }
+        { trialUsedAt: expect.any(Date) }
       );
     });
 
@@ -1426,7 +1427,7 @@ describe('BillingEventReducer', () => {
       expect(manager.save).toHaveBeenCalledWith(
         expect.objectContaining({
           entitlement: 'reports',
-          expiresAt: expect.any(Date) as Date
+          expiresAt: expect.any(Date)
         })
       );
     });

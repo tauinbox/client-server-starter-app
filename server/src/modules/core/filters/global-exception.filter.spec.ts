@@ -20,7 +20,7 @@ describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
   let mockHttpAdapter: {
     getRequestUrl: jest.Mock;
-    reply: jest.Mock;
+    reply: jest.Mock<void, [unknown, ErrorResponse, number]>;
     setHeader: jest.Mock;
   };
   let mockHost: ArgumentsHost;
@@ -30,7 +30,7 @@ describe('GlobalExceptionFilter', () => {
   beforeEach(() => {
     mockHttpAdapter = {
       getRequestUrl: jest.fn().mockReturnValue('/api/v1/test'),
-      reply: jest.fn(),
+      reply: jest.fn<void, [unknown, ErrorResponse, number]>(),
       setHeader: jest.fn()
     };
 
@@ -61,13 +61,11 @@ describe('GlobalExceptionFilter', () => {
   });
 
   function getResponseBody(): ErrorResponse {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    return mockHttpAdapter.reply.mock.calls[0][1] as ErrorResponse;
+    return mockHttpAdapter.reply.mock.calls[0][1];
   }
 
   function getResponseStatus(): number {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    return mockHttpAdapter.reply.mock.calls[0][2] as number;
+    return mockHttpAdapter.reply.mock.calls[0][2];
   }
 
   // --- Response shape ---

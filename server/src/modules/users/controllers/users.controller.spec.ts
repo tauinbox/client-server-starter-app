@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
 import { UsersController } from './users.controller';
@@ -202,7 +203,6 @@ describe('UsersController', () => {
       expect(usersServiceMock.create).toHaveBeenCalledWith(dto, {
         ability: mockAbility,
         actorId: 'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
       expect(result).toBe(createdUser);
@@ -333,7 +333,6 @@ describe('UsersController', () => {
           currentPassword: 'ActorPassword1',
           operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
           totpCode: '123456',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           auditContext: expect.anything()
         });
       });
@@ -460,7 +459,6 @@ describe('UsersController', () => {
           mockAbility,
           {
             action: 'update',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             target: expect.objectContaining({ id: 'user-5' }),
             actorId: 'user-1'
           }
@@ -485,7 +483,6 @@ describe('UsersController', () => {
           {
             ability: mockAbility,
             actorId: 'user-1',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             audit: expect.any(Function)
           }
         );
@@ -509,7 +506,6 @@ describe('UsersController', () => {
       expect(usersServiceMock.update).toHaveBeenCalledWith('user-5', dto, {
         ability: mockAbility,
         actorId: 'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
       expect(result).toBe(updatedUser);
@@ -535,9 +531,7 @@ describe('UsersController', () => {
           actorEmail: 'admin@example.com',
           targetId: 'user-5',
           targetType: 'User',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           details: expect.objectContaining({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             changedFields: expect.arrayContaining(['name', 'isActive'])
           })
         })
@@ -925,9 +919,7 @@ describe('UsersController', () => {
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_UPDATE,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           details: expect.objectContaining({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             changedFields: expect.not.arrayContaining(['password'])
           })
         })
@@ -935,9 +927,7 @@ describe('UsersController', () => {
       expect(auditServiceMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: AuditAction.USER_UPDATE,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           details: expect.objectContaining({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             changedFields: expect.arrayContaining(['name'])
           })
         })
@@ -1207,7 +1197,6 @@ describe('UsersController', () => {
           {
             ability: mockAbility,
             actorId: 'user-1',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             audit: expect.any(Function)
           }
         );
@@ -1229,7 +1218,6 @@ describe('UsersController', () => {
       expect(usersServiceMock.remove).toHaveBeenCalledWith('user-7', {
         ability: mockAbility,
         actorId: 'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
     });
@@ -1348,7 +1336,6 @@ describe('UsersController', () => {
       expect(usersServiceMock.restore).toHaveBeenCalledWith('user-8', {
         ability: mockAbility,
         actorId: 'user-1',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         audit: expect.any(Function)
       });
       expect(result).toBe(restoredUser);
@@ -1415,7 +1402,6 @@ describe('UsersController', () => {
         {
           operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
           totpCode: '123456',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           auditContext: expect.anything()
         }
       );

@@ -4,6 +4,7 @@
 // stand-in so the full login → rotate → reuse flow runs end-to-end (token
 // hashing, transactional revoke + rotate, full session purge on reuse).
 
+import { expect } from '@jest/globals';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -403,7 +404,6 @@ describe('Refresh token reuse detection (e2e)', () => {
     expect(auditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.TOKEN_REFRESH_FAILURE,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         details: expect.objectContaining({ reason: 'lost_response_replay' })
       })
     );

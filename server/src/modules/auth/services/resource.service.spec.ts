@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
@@ -823,7 +824,7 @@ describe('ResourceService', () => {
           subject: 'UpdatedUser',
           actionNames: ['read'],
           conditionalActionNames: [],
-          lastSyncedAt: expect.any(Date) as Date
+          lastSyncedAt: expect.any(Date)
         }
       ]);
       expect(mockResourceRepo.findOne).toHaveBeenCalledWith({

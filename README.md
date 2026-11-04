@@ -1900,7 +1900,7 @@ commit. It applies auto-fix linting to the staged files only:
 | `server/{*.ts,scripts/*.ts}` | Prettier |
 | `mock-server/*.ts` | Prettier |
 | `shared/src/**/*.ts` | Prettier |
-| `{.lintstagedrc.mjs,eslint.base.config.mjs}` | Prettier |
+| `{.lintstagedrc.mjs,eslint.base.config.mjs,eslint.base.config.d.mts}` | Prettier |
 
 A commit-msg hook (`client/.husky/commit-msg`) also runs **commitlint**. It enforces the
 [Conventional Commits](https://www.conventionalcommits.org/) format. It also rejects a bare `@name`
@@ -1917,7 +1917,7 @@ activates the git hooks through the `prepare` script.
 | Server E2E tests | Jest | A separate configuration in `test/` | 880 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 858 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1639 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 345 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1400 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1405 tests pass |
 
 ## CI/CD
 

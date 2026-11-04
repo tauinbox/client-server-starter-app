@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
@@ -379,7 +380,6 @@ describe('OAuthController', () => {
           currentPassword: 'CurrentPassword123',
           reauthProof: 'proof-token',
           operation: STEP_UP_OPERATION.OAUTH_UNLINK,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           auditContext: expect.anything()
         }
       );
@@ -531,7 +531,6 @@ describe('OAuthController', () => {
           currentPassword: 'CurrentPassword123',
           reauthProof: 'proof-token',
           operation: STEP_UP_OPERATION.OAUTH_LINK,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           auditContext: expect.anything()
         }
       );
@@ -846,7 +845,6 @@ describe('OAuthController', () => {
         { provider: OAuthProvider.GOOGLE, providerId: '456' },
         {
           linkTokenIssuedAt: LINK_TOKEN_IAT,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           auditContext: expect.objectContaining({ ip: '127.0.0.1' })
         }
       );

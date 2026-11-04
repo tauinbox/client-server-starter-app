@@ -586,7 +586,7 @@ export type SubjectNames = KnownSubjects;
  * name so CASL resolves the matching brand for `subject('Role', record)`.
  */
 type SubjectInstanceMap = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- an interface such as MockUser has no index signature, so `unknown` refuses it
   [K in SubjectNames]: ForcedSubject<K> & Record<PropertyKey, any>;
 };
 export type SubjectInstance = SubjectInstanceMap[SubjectNames];

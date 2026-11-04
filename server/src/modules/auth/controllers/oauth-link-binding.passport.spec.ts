@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Logger, VersioningType } from '@nestjs/common';
 import type { Server } from 'http';
@@ -263,9 +264,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
       OWNER_ID,
       { provider: OAuthProvider.GOOGLE, providerId: 'google-id-of-the-signer' },
       {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         linkTokenIssuedAt: expect.any(Number),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         auditContext: expect.anything()
       }
     );

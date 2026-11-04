@@ -2,6 +2,7 @@
 // issue a fresh verification token, dispatch the email, and revoke every
 // session of the target.
 
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { HttpStatus, HttpException } from '@nestjs/common';
@@ -391,7 +392,7 @@ describe('Admin email change - session revocation through the real event bus', (
     expect(store.rows.get('user-1')?.email).toBe('after@example.com');
     expect(refreshTokenService.deleteByUserId).toHaveBeenCalledWith('user-1');
     expect(userUpdate).toHaveBeenCalledWith('user-1', {
-      tokenRevokedAt: expect.any(Date) as Date
+      tokenRevokedAt: expect.any(Date)
     });
     expect(store.rows.get('user-1')?.tokenRevokedAt).toBeInstanceOf(Date);
   });

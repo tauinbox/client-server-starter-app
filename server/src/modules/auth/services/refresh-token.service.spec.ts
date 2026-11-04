@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -113,7 +114,7 @@ describe('RefreshTokenService', () => {
       expect(row).toEqual({
         ...fields,
         token: hashToken('raw-token'),
-        expiresAt: expect.any(Date) as Date
+        expiresAt: expect.any(Date)
       });
       const expiresAt = (row.expiresAt as Date).getTime();
       expect(expiresAt).toBeGreaterThanOrEqual(before + 7200 * 1000);
@@ -132,7 +133,7 @@ describe('RefreshTokenService', () => {
         where: {
           sessionId: 'session-1',
           revoked: false,
-          expiresAt: expect.any(Object) as object
+          expiresAt: expect.any(Object)
         }
       });
     });
@@ -169,7 +170,7 @@ describe('RefreshTokenService', () => {
         id: 'token-1',
         userId: 'user-1',
         token: hashToken('raw-token'),
-        expiresAt: expect.any(Date) as Date,
+        expiresAt: expect.any(Date),
         revoked: false
       };
       mockRepository.create.mockReturnValue(mockToken);
@@ -184,13 +185,13 @@ describe('RefreshTokenService', () => {
       expect(mockRepository.create).toHaveBeenCalledWith({
         userId: 'user-1',
         sessionId: 'session-1',
-        sessionStartedAt: expect.any(Date) as Date,
+        sessionStartedAt: expect.any(Date),
         userAgent: null,
         ipAddress: null,
         countryCode: null,
         city: null,
         token: hashToken('raw-token'),
-        expiresAt: expect.any(Date) as Date
+        expiresAt: expect.any(Date)
       });
       expect(mockRepository.save).toHaveBeenCalledWith(mockToken);
       expect(result).toEqual(mockToken);
@@ -377,7 +378,7 @@ describe('RefreshTokenService', () => {
       expect(mockQueryBuilder.delete).toHaveBeenCalled();
       expect(mockQueryBuilder.from).toHaveBeenCalledWith(RefreshToken);
       expect(mockQueryBuilder.where).toHaveBeenCalledWith('expires_at < :now', {
-        now: expect.any(Date) as Date
+        now: expect.any(Date)
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
       expect(result).toBe(7);
@@ -459,7 +460,7 @@ describe('RefreshTokenService', () => {
         where: {
           userId: 'user-1',
           revoked: false,
-          expiresAt: expect.anything() as unknown
+          expiresAt: expect.anything()
         },
         order: { createdAt: 'DESC' }
       });

@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
@@ -813,7 +814,7 @@ describe('MfaService', () => {
       await expect(
         service.verifyChallenge('token', '000000')
       ).rejects.toMatchObject({
-        response: { retryAfter: expect.any(Number) as unknown }
+        response: { retryAfter: expect.any(Number) }
       });
     });
   });
@@ -1046,7 +1047,7 @@ describe('MfaService', () => {
           service.isValidStepUpCode(user, '000000')
         ).resolves.toEqual({
           kind: 'refused',
-          lockedMs: expect.any(Number) as unknown
+          lockedMs: expect.any(Number)
         });
         // An attempt on the barred account answers the same way, so the
         // caller writes a row for it too.
@@ -1054,7 +1055,7 @@ describe('MfaService', () => {
           service.isValidStepUpCode(user, '000000')
         ).resolves.toEqual({
           kind: 'refused',
-          lockedMs: expect.any(Number) as unknown
+          lockedMs: expect.any(Number)
         });
       });
 
@@ -1064,13 +1065,13 @@ describe('MfaService', () => {
         await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
         await expect(
           service.isValidStepUpCode(user, '000000')
-        ).resolves.toMatchObject({ lockedMs: expect.any(Number) as unknown });
+        ).resolves.toMatchObject({ lockedMs: expect.any(Number) });
 
         await expect(
           service.isValidStepUpCode(user, generateSync({ secret }))
         ).resolves.toEqual({
           kind: 'refused',
-          lockedMs: expect.any(Number) as unknown
+          lockedMs: expect.any(Number)
         });
         expect(auditService.logFireAndForget).toHaveBeenLastCalledWith(
           expect.objectContaining({
@@ -1091,7 +1092,7 @@ describe('MfaService', () => {
         await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
         await expect(
           service.isValidStepUpCode(user, '000000')
-        ).resolves.toMatchObject({ lockedMs: expect.any(Number) as unknown });
+        ).resolves.toMatchObject({ lockedMs: expect.any(Number) });
 
         // The two counters hold separate namespaces on purpose: a caller who
         // holds a stolen session must not be able to shut the owner out of the
