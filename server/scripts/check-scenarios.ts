@@ -42,7 +42,7 @@ function loadRouteFiles(): RouteFile[] {
   return fs
     .readdirSync(ROUTES_DIR)
     .filter((f) => f.endsWith('.json'))
-    .sort()
+    .toSorted()
     .map((file) => ({
       file,
       routes: (

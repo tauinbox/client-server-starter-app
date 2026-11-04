@@ -279,12 +279,15 @@ describe('UserListComponent', () => {
     });
 
     it('marks the sorted column in the table, and none for the default sort', () => {
-      expect(component.sort()).toEqual({ active: '', direction: '' });
+      expect(component.sortView()).toEqual({ active: '', direction: '' });
 
       usersStoreMock.sortBy.set('name');
       usersStoreMock.sortOrder.set('asc');
 
-      expect(component.sort()).toEqual({ active: 'name', direction: 'asc' });
+      expect(component.sortView()).toEqual({
+        active: 'name',
+        direction: 'asc'
+      });
     });
   });
 

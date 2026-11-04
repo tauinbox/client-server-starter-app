@@ -87,7 +87,7 @@ export function activateSubscription(
   const customerId = customer.id;
   const existing = [...state.billingSubscriptions.values()]
     .filter((s) => s.customerId === customerId && s.status !== 'canceled')
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
   const subscription: MockSubscription = existing ?? {
     id: randomUUID(),

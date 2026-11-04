@@ -681,8 +681,8 @@ describe('operator whitelist drift-guard', () => {
       ...LOGICAL_OPERATORS
     ]);
 
-    expect([...translatorOperators].sort()).toEqual(
-      [...ALLOWED_MONGO_OPERATORS].sort()
+    expect([...translatorOperators].toSorted()).toEqual(
+      [...ALLOWED_MONGO_OPERATORS].toSorted()
     );
   });
 });

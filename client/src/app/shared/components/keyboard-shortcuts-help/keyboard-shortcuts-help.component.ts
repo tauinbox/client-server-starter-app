@@ -30,7 +30,7 @@ function groupShortcuts(shortcuts: ShortcutDef[]): ShortcutGroup[] {
   }
   return Array.from(map.entries())
     .map(([group, items]) => ({ group, shortcuts: items }))
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       const aOrder = GROUP_ORDER[a.group] ?? 99;
       const bOrder = GROUP_ORDER[b.group] ?? 99;
       if (aOrder !== bOrder) return aOrder - bOrder;

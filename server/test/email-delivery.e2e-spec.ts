@@ -104,7 +104,7 @@ runWithInfra('Email delivery (e2e)', () => {
     const html = await waitForEmailHtml(email);
     // Handlebars HTML-escapes `=` to `&#x3D;` inside the href (email clients
     // decode it on click); decode it before extracting the token.
-    const decoded = html.replace(/&#x3d;/gi, '=').replaceAll('&#61;', '=');
+    const decoded = html.replaceAll(/&#x3d;/gi, '=').replaceAll('&#61;', '=');
     const match = decoded.match(/verify-email\?token=([A-Fa-f0-9]+)/);
     if (!match) {
       throw new Error('Verification email did not contain a token link');
@@ -140,7 +140,7 @@ runWithInfra('Email delivery (e2e)', () => {
 
     const verificationHtml = await waitForEmailHtml(email);
     const decoded = verificationHtml
-      .replace(/&#x3d;/gi, '=')
+      .replaceAll(/&#x3d;/gi, '=')
       .replaceAll('&#61;', '=');
     const match = decoded.match(/verify-email\?token=([A-Fa-f0-9]+)/);
     if (!match) {

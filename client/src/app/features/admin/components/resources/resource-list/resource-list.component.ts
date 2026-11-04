@@ -134,7 +134,7 @@ export class ResourceListComponent {
   ];
 
   readonly #list = bindListToUrl(this.#resourcesStore);
-  readonly sort = this.#list.sort;
+  readonly sortView = this.#list.sortView;
 
   applyFilters(filters: ResourceListQuery): void {
     this.#list.setFilters(filters);

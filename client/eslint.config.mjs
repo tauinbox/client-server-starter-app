@@ -6,6 +6,7 @@ import prettier from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
+import unicorn from 'eslint-plugin-unicorn';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import baseRules from '../eslint.base.config.mjs';
 
@@ -33,6 +34,7 @@ export default tseslint.config(
     plugins: {
       prettier: prettierPlugin,
       'import-x': importX,
+      unicorn,
       'unused-imports': unusedImportsPlugin
     },
     processor: angular.processInlineTemplates,

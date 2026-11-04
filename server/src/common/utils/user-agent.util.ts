@@ -18,7 +18,7 @@ export function normalizeUserAgent(
   if (typeof raw !== 'string') return null;
 
   const clean = raw
-    .replace(CONTROL_CHARACTERS, '')
+    .replaceAll(CONTROL_CHARACTERS, '')
     .trim()
     .slice(0, MAX_USER_AGENT_LENGTH);
   return clean === '' ? null : clean;

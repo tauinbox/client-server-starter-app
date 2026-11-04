@@ -218,7 +218,7 @@ class MethodScan {
         );
       })
       .map((c) => c.getStart())
-      .sort((a, b) => a - b)[0];
+      .toSorted((a, b) => a - b)[0];
   }
 
   private unguardedDelete(read: number): string | undefined {

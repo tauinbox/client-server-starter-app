@@ -120,7 +120,7 @@ function substituteParams(
   routePath: string,
   params: Record<string, string>
 ): string {
-  return routePath.replace(/:(\w+)/g, (_, name: string) => {
+  return routePath.replaceAll(/:(\w+)/g, (_, name: string) => {
     return params[`:${name}`] ?? name;
   });
 }

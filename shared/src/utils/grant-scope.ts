@@ -163,6 +163,7 @@ export function sameConditions(
   b: PermissionCondition | null | undefined
 ): boolean {
   const normalise = (value: PermissionCondition | null | undefined): unknown =>
+    // eslint-disable-next-line unicorn/prefer-structured-clone -- structuredClone keeps the undefined keys
     JSON.parse(JSON.stringify(value ?? null)) as unknown;
   return deepEquals(normalise(a), normalise(b));
 }

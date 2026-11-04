@@ -53,7 +53,7 @@ function makeRefreshTokenRepoMock(store: Map<string, RefreshToken>): {
   function activeTokensOf(userId: string): RefreshToken[] {
     return [...store.values()]
       .filter((t) => t.userId === userId && !t.revoked)
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
   const repo = {
@@ -281,7 +281,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
   it('never rejects a sign-in past the allowance - it evicts the oldest device', async () => {
     onPlan('pro', { sessions: 10 });
     await signIn(10);
-    const oldest = [...tokens.values()].sort(
+    const oldest = [...tokens.values()].toSorted(
       (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
     )[0];
 

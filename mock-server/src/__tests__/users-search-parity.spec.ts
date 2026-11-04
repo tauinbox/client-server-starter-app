@@ -171,7 +171,9 @@ describe('User list/search filter-param validation parity with server', () => {
     }
 
     function returnedIds(body: unknown): string[] {
-      return (body as { data: { id: string }[] }).data.map((u) => u.id).sort();
+      return (body as { data: { id: string }[] }).data
+        .map((u) => u.id)
+        .toSorted();
     }
 
     it.each(['/cursor', '/search/cursor'])(
@@ -183,7 +185,9 @@ describe('User list/search filter-param validation parity with server', () => {
         const res = await getUsers(token, `${path}?ids=${first},${second}`);
 
         expect(res.status).toBe(200);
-        expect(returnedIds(await res.json())).toEqual([first, second].sort());
+        expect(returnedIds(await res.json())).toEqual(
+          [first, second].toSorted()
+        );
       }
     );
 
@@ -204,7 +208,7 @@ describe('User list/search filter-param validation parity with server', () => {
       );
 
       expect(returnedIds(await live.json())).toEqual([first]);
-      expect(returnedIds(await all.json())).toEqual([first, second].sort());
+      expect(returnedIds(await all.json())).toEqual([first, second].toSorted());
     });
 
     it.each([

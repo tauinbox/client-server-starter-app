@@ -113,7 +113,7 @@ export class FeatureFlagService {
    */
   getAttributeCustomKeys(): FeatureFlagAttributeKeysResponse {
     return {
-      customKeys: [...this.attributeRegistry.getKnownCustomKeys()].sort()
+      customKeys: [...this.attributeRegistry.getKnownCustomKeys()].toSorted()
     };
   }
 

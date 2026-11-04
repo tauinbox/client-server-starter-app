@@ -547,7 +547,7 @@ adminRouter.get(
   permissionGuard('search', 'FeatureFlag'),
   (_req, res) => {
     const body: FeatureFlagAttributeKeysResponse = {
-      customKeys: Array.from(KNOWN_CUSTOM_KEYS).sort()
+      customKeys: Array.from(KNOWN_CUSTOM_KEYS).toSorted()
     };
     res.json(body);
   }

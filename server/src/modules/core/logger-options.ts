@@ -11,7 +11,7 @@ const EMAIL_IN_TEXT =
 
 export function maskEmailsInText(text: string): string {
   return text.includes('@')
-    ? text.replace(EMAIL_IN_TEXT, (email) => maskEmail(email))
+    ? text.replaceAll(EMAIL_IN_TEXT, (email) => maskEmail(email))
     : text;
 }
 

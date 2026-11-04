@@ -143,14 +143,16 @@ const oauthProfile: OAuthUserProfile = {
 };
 
 function expectPublicUserShape(user: Record<string, unknown>): void {
-  expect(Object.keys(user).sort()).toEqual(PUBLIC_USER_FIELDS.toSorted());
+  expect(Object.keys(user).toSorted()).toEqual(PUBLIC_USER_FIELDS.toSorted());
   for (const field of HIDDEN_USER_FIELDS) {
     expect(user).not.toHaveProperty(field);
   }
 
   const roles = user['roles'] as Record<string, unknown>[];
   expect(roles).toHaveLength(1);
-  expect(Object.keys(roles[0]).sort()).toEqual(PUBLIC_ROLE_FIELDS.toSorted());
+  expect(Object.keys(roles[0]).toSorted()).toEqual(
+    PUBLIC_ROLE_FIELDS.toSorted()
+  );
 }
 
 describe('Auth response serialization (e2e)', () => {

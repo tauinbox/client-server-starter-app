@@ -101,13 +101,13 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
   function returnedIds(body: unknown): string[] {
     return (body as { data: Array<{ id: string }> }).data
       .map((user) => user.id)
-      .sort();
+      .toSorted();
   }
 
   it('returns exactly the listed users', async () => {
     const res = await search(`ids=${ids[0]},${ids[1]}`).expect(200);
 
-    expect(returnedIds(res.body)).toEqual([ids[0], ids[1]].sort());
+    expect(returnedIds(res.body)).toEqual([ids[0], ids[1]].toSorted());
   });
 
   it('leaves out a soft-deleted user unless includeDeleted is set', async () => {
@@ -116,7 +116,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
     const live = await search(`ids=${list}`).expect(200);
     const all = await search(`ids=${list}&includeDeleted=true`).expect(200);
 
-    expect(returnedIds(live.body)).toEqual([ids[0], ids[1]].sort());
+    expect(returnedIds(live.body)).toEqual([ids[0], ids[1]].toSorted());
     expect(returnedIds(all.body)).toEqual(ids.toSorted());
   });
 

@@ -171,7 +171,7 @@ export class FeatureFlagListComponent {
     ];
 
   readonly #list = bindListToUrl(this.#store);
-  readonly sort = this.#list.sort;
+  readonly sortView = this.#list.sortView;
 
   applyFilters(filters: FeatureFlagListQuery): void {
     this.#list.setFilters(filters);

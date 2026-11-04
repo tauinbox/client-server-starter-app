@@ -598,7 +598,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const charges = rows.filter((row) =>
       row.providerEventId?.startsWith('change-charge:')
     );
-    expect(charges.map((row) => row.providerInvoiceRef).sort()).toEqual([
+    expect(charges.map((row) => row.providerInvoiceRef).toSorted()).toEqual([
       'pay_1',
       'pay_2',
       'pay_3'

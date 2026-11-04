@@ -113,7 +113,7 @@ async function userEmails(): Promise<string[]> {
   expect(res.status).toBe(200);
   return (res.json as { data: { email: string }[] }).data
     .map((u) => u.email)
-    .sort();
+    .toSorted();
 }
 
 async function flagKeys(): Promise<string[]> {
@@ -121,7 +121,7 @@ async function flagKeys(): Promise<string[]> {
   expect(res.status).toBe(200);
   return (res.json as { data: { key: string }[] }).data
     .map((f) => f.key)
-    .sort();
+    .toSorted();
 }
 
 describe('conditional search:User on the user list', () => {

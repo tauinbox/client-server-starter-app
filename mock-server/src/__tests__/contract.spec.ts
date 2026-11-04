@@ -18,7 +18,7 @@ function loadManifestRoutes(): Route[] {
   return fs
     .readdirSync(ROUTES_DIR)
     .filter((f) => f.endsWith('.json'))
-    .sort()
+    .toSorted()
     .flatMap((f) => {
       const { routes } = JSON.parse(
         fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')

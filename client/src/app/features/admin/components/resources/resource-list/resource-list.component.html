@@ -25,8 +25,8 @@
           [dataSource]="resources()"
           class="resources-table"
           matSort
-          [matSortActive]="sort().active"
-          [matSortDirection]="sort().direction"
+          [matSortActive]="sortView().active"
+          [matSortDirection]="sortView().direction"
           (matSortChange)="sortData($event)"
         >
           <!-- Display Name Column -->

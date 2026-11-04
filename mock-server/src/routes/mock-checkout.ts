@@ -36,7 +36,7 @@ function findSession(sessionRef: string): OpenSession | undefined {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(
+  return value.replaceAll(
     /[&<>"']/g,
     (char) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[

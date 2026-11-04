@@ -370,7 +370,7 @@ router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
 router.get('/', permissionGuard('read', 'Role'), (_req, res) => {
   const roles = Array.from(getState().roles.values());
 
-  res.json(roles.sort((a, b) => a.name.localeCompare(b.name)));
+  res.json(roles.toSorted((a, b) => a.name.localeCompare(b.name)));
 });
 
 // GET /api/v1/roles/permissions

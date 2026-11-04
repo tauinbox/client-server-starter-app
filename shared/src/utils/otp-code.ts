@@ -4,5 +4,5 @@
  * and the mock server both compare codes in this form.
  */
 export function normalizeOtpCode(value: string): string {
-  return value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase();
+  return value.replaceAll(/[^0-9a-zA-Z]/g, '').toUpperCase();
 }

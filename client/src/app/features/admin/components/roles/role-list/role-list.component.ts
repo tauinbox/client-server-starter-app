@@ -134,7 +134,7 @@ export class RoleListComponent {
   ];
 
   readonly #list = bindListToUrl(this.#rolesStore);
-  readonly sort = this.#list.sort;
+  readonly sortView = this.#list.sortView;
 
   applyFilters(filters: RoleListQuery): void {
     this.#list.setFilters(filters);

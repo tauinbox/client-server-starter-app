@@ -171,7 +171,7 @@ export function derivePolicy(
         : (constants.get('CHALLENGE_THROTTLE') ?? []);
       fromStepUp.forEach((n) => names.add(n));
     }
-    if (names.size > 0) throttle = [...names].sort();
+    if (names.size > 0) throttle = [...names].toSorted();
   }
 
   return {
@@ -491,7 +491,7 @@ function loadContract(): ContractEntry[] {
   return fs
     .readdirSync(ROUTES_DIR)
     .filter((f) => f.endsWith('.json'))
-    .sort()
+    .toSorted()
     .flatMap((f) => {
       const { routes } = JSON.parse(
         fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')

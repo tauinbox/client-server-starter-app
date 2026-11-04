@@ -556,7 +556,7 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
     // pending invoices hold the 30 credits once, and nothing is spent until a
     // charge is paid.
     expect(
-      invoices.map((i) => i.creditUnitsApplied).sort((a, b) => b - a)
+      invoices.map((i) => i.creditUnitsApplied).toSorted((a, b) => b - a)
     ).toEqual([STARTING_CREDITS, 0]);
     expect(ledger).toEqual([]);
     expect(state.balance).toBe(STARTING_CREDITS);

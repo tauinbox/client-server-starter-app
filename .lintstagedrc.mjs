@@ -12,6 +12,7 @@ const mockServerBin = (cmd) =>
 const clientEslintConfig = path.join(clientDir, 'eslint.config.mjs');
 const serverEslintConfig = path.join(serverDir, 'eslint.config.ts');
 const mockServerEslintConfig = path.join(mockServerDir, 'eslint.config.ts');
+const sharedEslintConfig = path.join(serverDir, 'eslint.shared.config.ts');
 const stylelintConfig = path.join(clientDir, '.stylelintrc.json');
 
 export default {
@@ -43,7 +44,10 @@ export default {
     return `${mockServerBin('prettier')} --write ${files.join(' ')}`;
   },
   'shared/src/**/*.ts': (files) => {
-    return `${serverBin('prettier')} --write ${files.join(' ')}`;
+    return [
+      `${serverBin('prettier')} --write ${files.join(' ')}`,
+      `${serverBin('eslint')} --fix -c ${sharedEslintConfig} ${files.join(' ')}`
+    ];
   },
   // Repo-root configs. lint-staged enables picomatch's `matchBase`, so a
   // slash-free glob such as `*.mjs` would also match every nested .mjs file -

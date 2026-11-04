@@ -78,9 +78,9 @@ function checkTestHarnesses(): string[] {
       ) {
         return;
       }
-      const mounted = [...module.matchAll(/controllers:\s*\[([^\]]*)\]/g)]
-        .slice(0, 1)
-        .flatMap((m) => m[1].split(',').map((n) => n.trim()))
+      const mounted = (module.match(/controllers:\s*\[([^\]]*)\]/)?.[1] ?? '')
+        .split(',')
+        .map((n) => n.trim())
         .filter((n) => production.has(n));
       if (mounted.length > 0 && !module.includes('RESPONSE_SERIALIZER')) {
         const rel = path

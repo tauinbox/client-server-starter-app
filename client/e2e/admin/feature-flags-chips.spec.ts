@@ -92,7 +92,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
       rules: { payload: { type: string; roleNames?: string[] } }[];
     };
     expect(created.key).toBe('chips-rollout');
-    expect(created.environments.sort()).toEqual(['production', 'staging']);
+    expect(created.environments.toSorted()).toEqual(['production', 'staging']);
 
     const createBody = response.request().postDataJSON() as {
       rules: {
@@ -101,7 +101,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
       }[];
     };
     expect(createBody.rules).toHaveLength(1);
-    expect(Object.keys(createBody.rules[0]).sort()).toEqual([
+    expect(Object.keys(createBody.rules[0]).toSorted()).toEqual([
       'effect',
       'payload'
     ]);

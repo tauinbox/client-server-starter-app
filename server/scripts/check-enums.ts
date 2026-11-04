@@ -51,7 +51,7 @@ function readMigrationCoverage(
   const files = fs
     .readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.ts'))
-    .sort();
+    .toSorted();
 
   for (const file of files) {
     const content = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
@@ -64,20 +64,18 @@ function readMigrationCoverage(
       )
     );
     if (createMatch) {
-      [...createMatch[1].matchAll(/'(\w+)'/g)].forEach((m) =>
-        covered.add(m[1])
-      );
+      createMatch[1].matchAll(/'(\w+)'/g).forEach((m) => covered.add(m[1]));
     }
 
     // ALTER TYPE "pgType" ADD VALUE [IF NOT EXISTS] 'VAL'
-    [
-      ...content.matchAll(
+    content
+      .matchAll(
         new RegExp(
           `ALTER\\s+TYPE\\s+"?${pgType}"?\\s+ADD\\s+VALUE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?'(\\w+)'`,
           'gi'
         )
       )
-    ].forEach((m) => covered.add(m[1]));
+      .forEach((m) => covered.add(m[1]));
   }
 
   return covered;

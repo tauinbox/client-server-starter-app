@@ -4,6 +4,7 @@ import tseslint from 'typescript-eslint';
 import prettierConfig from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
+import unicorn from 'eslint-plugin-unicorn';
 // @ts-expect-error TS7016: .mjs has no type declarations under classic node resolution
 import baseRules from '../eslint.base.config.mjs';
 
@@ -36,6 +37,7 @@ export default defineConfig(
     rules: { 'import-x/no-cycle': 'error' }
   },
   {
+    plugins: { unicorn },
     rules: baseRules
   },
   // `basePath` keeps `src/**` relative to this workspace. The pre-commit hook
