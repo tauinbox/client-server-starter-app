@@ -39,7 +39,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Dev server | `npm run start:dev` (port 3000, watch mode) |
 | Production start | `npm run start:prod` |
 | Build | `npm run build` |
-| Typecheck | `npm run typecheck` runs `tsc --noEmit` over the full `tsconfig.json`. Thus it covers `test/`, `*.spec.ts`, each `testing/` directory and `eslint.config.ts`. `tsconfig.build.json` excludes those files from `npm run build` |
+| Typecheck | `npm run typecheck` runs `tsc --noEmit` over the full `tsconfig.json`. Thus it covers `test/`, `*.spec.ts`, each `testing/` directory and the `eslint*.config.ts` files. `tsconfig.build.json` excludes those files from `npm run build` |
 | Lint | `npm run lint` covers `src/`, `test/` and `scripts/` |
 | Lint fix | `npm run lint:fix` |
 | Lint `shared/` | `npm run lint:shared` runs the base rules of `eslint.base.config.mjs` over `shared/src/` from the repository root, with `eslint.shared.config.ts` |

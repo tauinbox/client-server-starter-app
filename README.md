@@ -1921,7 +1921,7 @@ activates the git hooks through the `prepare` script.
 
 ## CI/CD
 
-GitHub Actions runs on each push to `master` and on each pull request into `master`. It has 5 jobs:
+GitHub Actions runs on each push to `master` and on each pull request into `master`. It has 6 jobs:
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
@@ -1930,6 +1930,10 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
 | **Client E2E** | mock-server | typecheck:e2e (after the mock-server install), ng build, then serve the static output, then Playwright Chromium | HTML report, test results |
+| **Docker Images** | - | Build the server image and the client image as the Deploy workflow does, with no push | - |
+
+The `Docker Images` job exists because the Dockerfiles copy only some directories. A build input
+outside them is present in the other jobs and absent in the image, so only an image build finds it.
 
 In the `Server - Checks` job, `check:i18n` validates that each `ErrorKeys` value exists in each client
 i18n JSON file. `check:imports` runs repo-wide, after its own `--self-test`.
@@ -1938,7 +1942,7 @@ Concurrency groups cancel a stale run when the pushes are rapid. The tests need 
 `.env` file, because each test runs against a mock.
 
 Each job sets an explicit `timeout-minutes` value. The two check jobs use 10. `Client` uses 15.
-`Server - Tests & Build` and `Client E2E` use 20.
+`Server - Tests & Build`, `Client E2E` and `Docker Images` use 20.
 
 Without such a value a job takes the default of six hours. A hung step then uses six hours of runner
 time before it fails. Each bound is several times the normal duration of its job, thus only a hang
