@@ -682,13 +682,12 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
   }
 
   return createMongoAbility<MockAbility>(
-    compileAbilityRules<Actions, SubjectNames | 'all'>(
-      user.id,
-      hasSuperRole(user),
-      getResolvedPermissionsForUser(user),
+    compileAbilityRules<Actions, SubjectNames | 'all'>(user.id, {
+      isSuper: hasSuperRole(user),
+      permissions: getResolvedPermissionsForUser(user),
       subjectMaps,
-      SILENT_RESOLVER_LOGGER
-    )
+      logger: SILENT_RESOLVER_LOGGER
+    })
   );
 }
 

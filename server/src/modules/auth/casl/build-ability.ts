@@ -28,12 +28,11 @@ export function buildAbility(
   logger: AbilityLogger
 ): AppAbility {
   return createMongoAbility<AppAbility>(
-    compileAbilityRules<Actions, Extract<Subjects, string>>(
-      userId,
+    compileAbilityRules<Actions, Extract<Subjects, string>>(userId, {
       isSuper,
       permissions,
       subjectMaps,
       logger
-    )
+    })
   );
 }

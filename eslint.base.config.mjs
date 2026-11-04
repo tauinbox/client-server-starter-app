@@ -14,7 +14,7 @@ const maxParamsSyntax = [
 
 // The ES2025 forms (doc/architecture.md). The `unicorn` rules need the
 // plugin registered in the config block that spreads these rules.
-export const es2025Rules = {
+const es2025Rules = {
   'prefer-object-has-own': 'error',
   'unicorn/prefer-at': 'error',
   'unicorn/prefer-regexp-escape': 'error',
@@ -27,7 +27,7 @@ export const es2025Rules = {
 
 // `unicorn/prefer-promise-with-resolvers` sees only an executor with a block
 // body, so this catches the arrow form `(resolve) => (release = resolve)`.
-export const promiseResolverSyntax = {
+const promiseResolverSyntax = {
   selector:
     "NewExpression[callee.name='Promise'] > ArrowFunctionExpression.arguments[params.length=1][body.type='AssignmentExpression'][body.right.type='Identifier']",
   message:
