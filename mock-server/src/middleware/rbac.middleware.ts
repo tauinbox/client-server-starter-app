@@ -58,7 +58,7 @@ router.get(
 // GET /api/v1/rbac/resources
 router.get('/resources', permissionGuard('read', 'Permission'), (_req, res) => {
   const resources = Array.from(getState().resources.values())
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .toSorted((a, b) => a.name.localeCompare(b.name))
     .map(toResourceResponse);
   res.json(resources);
 });

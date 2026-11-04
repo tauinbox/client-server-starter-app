@@ -75,7 +75,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
       id: admin!.id,
       email: 'admin@example.com'
     });
-    expect(Object.keys(body.tokens).sort()).toEqual([
+    expect(Object.keys(body.tokens).toSorted()).toEqual([
       'access_token',
       'expires_in'
     ]);

@@ -342,10 +342,10 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       'User'
     );
 
-    expect(holders.sort()).toEqual(
+    expect(holders.toSorted()).toEqual(
       [users.scoped, users.wide, users.activeOnly, users.superUser]
         .map((user) => user.id)
-        .sort()
+        .toSorted()
     );
   });
 

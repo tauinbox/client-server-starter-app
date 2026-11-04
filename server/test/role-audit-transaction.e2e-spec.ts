@@ -199,7 +199,7 @@ runWithInfra(
       const rows = await dataSource
         .getRepository(RolePermission)
         .findBy({ roleId });
-      return rows.map((row) => row.permissionId).sort();
+      return rows.map((row) => row.permissionId).toSorted();
     }
 
     async function holds(userId: string, roleId: string): Promise<boolean> {

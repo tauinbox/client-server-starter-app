@@ -349,7 +349,7 @@ function main(): void {
     const checked = checkedActions.get(r.subject) ?? new Set<string>();
     if (!sameSet(declared, checked)) {
       errors.push(
-        `  ${r.file}: @RegisterResource "${r.name}" declares actions [${[...declared].sort().join(', ')}], but @Authorize checks "${r.subject}" with [${[...checked].sort().join(', ')}]`
+        `  ${r.file}: @RegisterResource "${r.name}" declares actions [${[...declared].toSorted().join(', ')}], but @Authorize checks "${r.subject}" with [${[...checked].toSorted().join(', ')}]`
       );
     }
   }

@@ -87,13 +87,13 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
     return flags
       .filter((f) => ability.can('search', subject('FeatureFlag', { ...f })))
       .map((f) => f.key)
-      .sort();
+      .toSorted();
   }
 
   it('lists every flag for an unconditional grant', async () => {
     const ability = abilityOf((b) => b.can('search', 'FeatureFlag'));
     expect(await listedKeys(ability)).toEqual(
-      [keys.off, keys.on, keys.publicOff].sort()
+      [keys.off, keys.on, keys.publicOff].toSorted()
     );
   });
 
@@ -102,7 +102,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
       b.can('search', 'FeatureFlag', { key: { $in: [keys.on, keys.off] } })
     );
     const listed = await listedKeys(ability);
-    expect(listed).toEqual([keys.off, keys.on].sort());
+    expect(listed).toEqual([keys.off, keys.on].toSorted());
     expect(listed).toEqual(allowedKeys(ability));
   });
 

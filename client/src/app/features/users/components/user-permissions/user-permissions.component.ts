@@ -130,7 +130,9 @@ export class UserPermissionsComponent implements OnInit {
         permissions: perms.toSorted((a, b) => a.action.localeCompare(b.action))
       });
     }
-    return groups.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    return groups.toSorted((a, b) =>
+      a.displayName.localeCompare(b.displayName)
+    );
   });
 
   readonly summary = computed(() => {

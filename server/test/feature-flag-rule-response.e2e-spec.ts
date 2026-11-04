@@ -111,14 +111,14 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
       .send({ key: flagKey, rules: [roleRule] })
       .expect(201);
     const createdBody = created.body as FlagBody;
-    expect(Object.keys(createdBody.rules[0]).sort()).toEqual(RULE_KEYS);
+    expect(Object.keys(createdBody.rules[0]).toSorted()).toEqual(RULE_KEYS);
     expect(createdBody.rules[0].payload).toEqual(roleRule.payload);
 
     const read = await request(http())
       .get(`/api/v1/admin/feature-flags/${createdBody.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(Object.keys((read.body as FlagBody).rules[0]).sort()).toEqual(
+    expect(Object.keys((read.body as FlagBody).rules[0]).toSorted()).toEqual(
       RULE_KEYS
     );
   });

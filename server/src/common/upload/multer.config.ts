@@ -57,7 +57,7 @@ export function createDiskStorageOptions(options: {
         file: Express.Multer.File,
         callback: (error: Error | null, filename: string) => void
       ) {
-        const sanitized = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const sanitized = file.originalname.replaceAll(/[^a-zA-Z0-9._-]/g, '_');
         callback(
           null,
           `${Date.now()}-${Math.round(Math.random() * 1e9)}-${sanitized}`

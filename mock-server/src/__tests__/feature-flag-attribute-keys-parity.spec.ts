@@ -50,7 +50,7 @@ describe('GET /admin/feature-flags/attribute-keys', () => {
       ...OAUTH_PROVIDER_FLAGS.map((p) => p.attributeKey),
       ...BILLING_PROVIDER_FLAGS.map((p) => p.configuredAttribute),
       BILLING_CONFIGURED_ATTRIBUTE
-    ].sort();
+    ].toSorted();
 
     expect(body.customKeys).toEqual(expected);
   });

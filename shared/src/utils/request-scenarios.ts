@@ -282,7 +282,7 @@ export function scenarioErrors(scenario: RequestScenario): string[] {
 export function loadScenarioFiles(): ScenarioFile[] {
   return readdirSync(SCENARIOS_DIR)
     .filter((f) => f.endsWith('.json'))
-    .sort()
+    .toSorted()
     .map((file) => {
       const { scenarios } = JSON.parse(
         readFileSync(join(SCENARIOS_DIR, file), 'utf-8')

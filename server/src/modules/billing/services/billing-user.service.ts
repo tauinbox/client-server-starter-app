@@ -84,9 +84,9 @@ const LISTED_PRODUCT_TYPES = ['sku', 'credits', 'custom'] as const;
 function sanitizeReceiptText(text: string): string {
   return (
     text
-      .replace(/\s+/g, ' ')
+      .replaceAll(/\s+/g, ' ')
       // eslint-disable-next-line no-control-regex
-      .replace(/[<>\u0000-\u001f\u007f]/g, '')
+      .replaceAll(/[<>\u0000-\u001f\u007f]/g, '')
       .trim()
   );
 }

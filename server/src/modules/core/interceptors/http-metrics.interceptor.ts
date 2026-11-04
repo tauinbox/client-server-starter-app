@@ -43,10 +43,10 @@ export class HttpMetricsInterceptor implements NestInterceptor {
 
   private normalizeRoute(path: string): string {
     return path
-      .replace(
+      .replaceAll(
         /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
         '/:id'
       )
-      .replace(/\/\d+/g, '/:id');
+      .replaceAll(/\/\d+/g, '/:id');
   }
 }

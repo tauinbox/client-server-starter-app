@@ -393,7 +393,7 @@ runWithInfra('Request scenarios (e2e)', () => {
   };
 
   it('builds every actor fixture', () => {
-    expect(Object.keys(ACTORS).sort()).toEqual(ACTOR_FIXTURES.toSorted());
+    expect(Object.keys(ACTORS).toSorted()).toEqual(ACTOR_FIXTURES.toSorted());
   });
 
   async function createAccount(fixture: ActorFixture): Promise<Account> {
@@ -582,7 +582,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       const name = `${emailPrefix}resource-${sequence}`;
       const resource = await dataSource.getRepository(Resource).save({
         name,
-        subject: `Scenario${stamp.replace(/\W/g, '')}R${sequence}`,
+        subject: `Scenario${stamp.replaceAll(/\W/g, '')}R${sequence}`,
         displayName: 'Scenario resource',
         description: null,
         actionNames: ['read', 'update'],

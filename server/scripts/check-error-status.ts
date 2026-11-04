@@ -206,7 +206,7 @@ function namedKeys(): { name: string; value: string }[] {
   return Object.entries(ErrorKeys).flatMap(([group, keys]) =>
     Object.entries(keys).map(([key, value]) => ({
       name: `${group}.${key}`,
-      value: value as string
+      value: value
     }))
   );
 }

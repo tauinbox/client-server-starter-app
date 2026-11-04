@@ -654,7 +654,7 @@ router.post('/billing/complete-purchase', (req, res) => {
     session = customer
       ? [...state.billingPurchaseSessions.values()]
           .filter((s) => s.customerId === customer.id)
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+          .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
       : undefined;
   }
   if (!session) {
@@ -713,7 +713,7 @@ router.post('/billing/advance-renewal', (req, res) => {
               s.customerId === customer.id &&
               ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
           )
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+          .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
       : undefined;
   }
   if (!subscription) {

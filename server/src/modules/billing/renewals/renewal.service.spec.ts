@@ -277,7 +277,7 @@ function subscriptionsRepo(store: Store) {
                 !store.deletedUserIds.has(customer.userId)
               );
             })
-            .sort(
+            .toSorted(
               (a, b) =>
                 a.currentPeriodEnd.getTime() - b.currentPeriodEnd.getTime()
             );

@@ -136,7 +136,7 @@ describe('buildLoggerOptions', () => {
       new Logger('Probe').error('Operation failed', build());
 
       const written = JSON.stringify(lines[0]);
-      expect(Object.keys(lines[0].err ?? {}).sort()).toEqual([
+      expect(Object.keys(lines[0].err ?? {}).toSorted()).toEqual([
         'code',
         'message',
         'stack',
@@ -176,7 +176,7 @@ describe('buildLoggerOptions inside a request', () => {
 
     logger.error({ err: buildQueryFailedError() }, 'Operation failed');
 
-    expect(Object.keys(lines[0].err ?? {}).sort()).toEqual([
+    expect(Object.keys(lines[0].err ?? {}).toSorted()).toEqual([
       'code',
       'message',
       'stack',
@@ -211,7 +211,7 @@ describe('buildLoggerOptions inside a request', () => {
     ]) {
       expect(written).not.toContain(secret);
     }
-    expect(Object.keys(lines[0].req ?? {}).sort()).toEqual([
+    expect(Object.keys(lines[0].req ?? {}).toSorted()).toEqual([
       'headers',
       'id',
       'method',
@@ -236,7 +236,7 @@ describe('serializeLoggedError with a raw Error', () => {
       unknown
     >;
 
-    expect(Object.keys(written).sort()).toEqual([
+    expect(Object.keys(written).toSorted()).toEqual([
       'code',
       'message',
       'stack',

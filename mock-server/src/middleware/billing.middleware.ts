@@ -315,7 +315,7 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
         s.customerId === customer.id &&
         ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const plan = subscription ? findPlanByKey(subscription.planKey) : undefined;
   const base = plan ? toResolvedEntitlements(plan) : free;
 
@@ -400,7 +400,7 @@ function findCurrentSubscription(
         s.customerId === customerId &&
         OPEN_SUBSCRIPTION_STATUSES.includes(s.status)
     )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
   return subs[0];
 }
 
@@ -570,7 +570,7 @@ billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
 
   const products = [...getState().billingProducts.values()]
     .filter((product) => product.active && product.prices[provider])
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map(toProductResponse);
   res.json(products);
 });
@@ -948,7 +948,7 @@ function prorationRefund(
         i.billingMode === 'fixed' &&
         i.amountMinor > 0
     )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const refundMinor = source
     ? Math.min(quotedMinor, source.amountMinor - (source.refundedMinor ?? 0))
     : 0;
@@ -1598,7 +1598,7 @@ billingAdminRouter.post(
           s.customerId === customerId &&
           ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
       )
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     if (!subscription) {
       sendError(
         res,

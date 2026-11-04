@@ -335,7 +335,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const responses = await Promise.all([remove(), remove()]);
 
     expect(barrier.held()).toBe(2);
-    expect(responses.map((r) => r.status).sort()).toEqual([200, 404]);
+    expect(responses.map((r) => r.status).toSorted()).toEqual([200, 404]);
     const loser = responses.find((r) => r.status === 404);
     expect(loser && errorKey(loser)).toBe(ErrorKeys.USERS.NOT_FOUND);
     expect(await auditRows(AuditAction.USER_DELETE, user.id)).toBe(1);

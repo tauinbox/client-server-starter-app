@@ -610,7 +610,7 @@ async function run(scenario: RequestScenario) {
 }
 
 it('builds every actor fixture', () => {
-  expect(Object.keys(ACTORS).sort()).toEqual(ACTOR_FIXTURES.toSorted());
+  expect(Object.keys(ACTORS).toSorted()).toEqual(ACTOR_FIXTURES.toSorted());
 });
 
 for (const { file, scenarios } of loadScenarioFiles()) {

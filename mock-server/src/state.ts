@@ -245,7 +245,7 @@ export function liveSessionIdsOf(userId: string): string[] {
     const sid = state.refreshSessions.get(token);
     if (sid !== undefined) ids.add(sid);
   }
-  return [...ids].sort(
+  return [...ids].toSorted(
     (a, b) =>
       (state.sessionLastActive.get(b) ?? 0) -
       (state.sessionLastActive.get(a) ?? 0)
@@ -714,7 +714,7 @@ export function toFeatureFlagResponse(
 ): FeatureFlagResponse {
   const rules = state.featureFlagRules
     .filter((r) => r.flagId === flag.id)
-    .sort((a, b) =>
+    .toSorted((a, b) =>
       a.createdAt === b.createdAt
         ? a.id.localeCompare(b.id)
         : a.createdAt.localeCompare(b.createdAt)
@@ -832,7 +832,7 @@ function pricedByCurrentPlan(record: MockUsageRecord): boolean {
         s.customerId === record.customerId &&
         ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (!subscription) return false;
   const plan = state.plans.values().find((p) => p.key === subscription.planKey);
   return plan?.meterKey === record.meterKey;

@@ -746,7 +746,7 @@ describe('permission-based route authorization', () => {
 
       expect(res.status).toBe(200);
       const resources = (await res.json()) as { name: string }[];
-      expect(resources.map((r) => r.name).sort()).toEqual([
+      expect(resources.map((r) => r.name).toSorted()).toEqual([
         'billing',
         'feature-flags',
         'permissions',

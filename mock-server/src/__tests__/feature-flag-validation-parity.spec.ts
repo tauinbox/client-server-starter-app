@@ -1099,7 +1099,7 @@ describe('feature-flag validation parity with server', () => {
         id: string;
         rules: Record<string, unknown>[];
       };
-      expect(Object.keys(created.rules[0]).sort()).toEqual(ruleKeys);
+      expect(Object.keys(created.rules[0]).toSorted()).toEqual(ruleKeys);
 
       const token = await loginAsAdmin();
       const read = await fetch(
@@ -1107,7 +1107,7 @@ describe('feature-flag validation parity with server', () => {
         { headers: { authorization: `Bearer ${token}` } }
       );
       const body = (await read.json()) as { rules: Record<string, unknown>[] };
-      expect(Object.keys(body.rules[0]).sort()).toEqual(ruleKeys);
+      expect(Object.keys(body.rules[0]).toSorted()).toEqual(ruleKeys);
     });
 
     it('creates no flag when a rule payload is rejected', async () => {

@@ -94,13 +94,13 @@ describe('list search and filters', () => {
             (f.description ?? '').toLowerCase().includes(needle.toLowerCase())
         )
         .map((f) => f.id)
-        .sort();
+        .toSorted();
 
       const found = await allPages<{ id: string }>(
         `/admin/feature-flags/cursor?q=${needle}`
       );
 
-      expect(found.map((f) => f.id).sort()).toEqual(expected);
+      expect(found.map((f) => f.id).toSorted()).toEqual(expected);
       expect(expected).toContain(target.id);
     });
 
@@ -109,13 +109,13 @@ describe('list search and filters', () => {
       const expected = flags
         .filter((f) => !f.enabled && !f.public)
         .map((f) => f.id)
-        .sort();
+        .toSorted();
 
       const found = await allPages<{ id: string }>(
         '/admin/feature-flags/cursor?enabled=false&public=false'
       );
 
-      expect(found.map((f) => f.id).sort()).toEqual(expected);
+      expect(found.map((f) => f.id).toSorted()).toEqual(expected);
     });
 
     it('filters on environment: an empty list applies everywhere', async () => {
@@ -129,13 +129,13 @@ describe('list search and filters', () => {
             f.environments.length === 0 || f.environments.includes('production')
         )
         .map((f) => f.id)
-        .sort();
+        .toSorted();
 
       const found = await allPages<{ id: string }>(
         '/admin/feature-flags/cursor?environment=production'
       );
 
-      expect(found.map((f) => f.id).sort()).toEqual(expected);
+      expect(found.map((f) => f.id).toSorted()).toEqual(expected);
       expect(expected).toContain(flags[0].id);
       expect(expected).not.toContain(flags[2].id);
     });
@@ -171,7 +171,9 @@ describe('list search and filters', () => {
         `/roles/cursor?q=${system[0].name.toUpperCase()}&isSystem=true`
       );
 
-      expect(foundCustom.map((r) => r.id).sort()).toEqual(custom.sort());
+      expect(foundCustom.map((r) => r.id).toSorted()).toEqual(
+        custom.toSorted()
+      );
       expect(foundByName.map((r) => r.id)).toContain(system[0].id);
     });
   });
@@ -190,7 +192,9 @@ describe('list search and filters', () => {
         `/rbac/resources/cursor?q=${target.subject.toLowerCase()}&isOrphaned=true&isSystem=${String(target.isSystem)}`
       );
 
-      expect(foundOrphaned.map((r) => r.id).sort()).toEqual(orphaned.sort());
+      expect(foundOrphaned.map((r) => r.id).toSorted()).toEqual(
+        orphaned.toSorted()
+      );
       expect(foundBySubject.map((r) => r.id)).toEqual([target.id]);
     });
 
@@ -204,7 +208,7 @@ describe('list search and filters', () => {
 
   describe('users account state', () => {
     function emails(users: { email: string }[]): string[] {
-      return users.map((u) => u.email).sort();
+      return users.map((u) => u.email).toSorted();
     }
 
     it.each([
@@ -234,7 +238,7 @@ describe('list search and filters', () => {
         .filter((u) => !u.deletedAt)
         .filter(predicate)
         .map((u) => u.email)
-        .sort();
+        .toSorted();
 
       const found = await allPages<{ email: string }>(
         `/users/search/cursor?${filter}`

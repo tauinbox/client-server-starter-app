@@ -141,7 +141,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     const responses = await Promise.all([remove(), remove()]);
 
     expect(barrier.held()).toBe(2);
-    expect(responses.map((r) => r.status).sort()).toEqual([200, 404]);
+    expect(responses.map((r) => r.status).toSorted()).toEqual([200, 404]);
     const loser = responses.find((r) => r.status === 404);
     expect((loser?.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.ROLES.NOT_FOUND
@@ -165,7 +165,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     const responses = await Promise.all([remove(), remove()]);
 
     expect(barrier.held()).toBe(2);
-    expect(responses.map((r) => r.status).sort()).toEqual([204, 404]);
+    expect(responses.map((r) => r.status).toSorted()).toEqual([204, 404]);
     const loser = responses.find((r) => r.status === 404);
     expect((loser?.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.FEATURE_FLAGS.NOT_FOUND

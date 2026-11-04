@@ -147,7 +147,7 @@ function extractFromFile(filePath: string): {
 
 function buildUnion(items: string[]): string {
   return [...new Set(items)]
-    .sort()
+    .toSorted()
     .map((s) => `  | '${s}'`)
     .join('\n');
 }
@@ -193,8 +193,8 @@ function main(): void {
 
   fs.writeFileSync(OUTPUT_FILE, content, 'utf-8');
 
-  const sortedSubjects = [...new Set(allSubjects)].sort();
-  const sortedActions = [...new Set(allActions)].sort();
+  const sortedSubjects = [...new Set(allSubjects)].toSorted();
+  const sortedActions = [...new Set(allActions)].toSorted();
   console.log(
     `✓ generate:subjects: wrote ${sortedSubjects.length} subjects + ${sortedActions.length} actions to ${path.relative(process.cwd(), OUTPUT_FILE)}`
   );

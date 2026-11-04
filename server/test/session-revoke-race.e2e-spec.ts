@@ -138,7 +138,7 @@ runWithInfra('Session revoke race (e2e)', () => {
     const responses = await Promise.all([revoke(), revoke()]);
 
     expect(barrier.held()).toBe(2);
-    expect(responses.map((r) => r.status).sort()).toEqual([200, 404]);
+    expect(responses.map((r) => r.status).toSorted()).toEqual([200, 404]);
     const loser = responses.find((r) => r.status === 404);
     expect((loser?.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.SESSION_NOT_FOUND

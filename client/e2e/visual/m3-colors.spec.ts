@@ -57,7 +57,7 @@ const computedProp = async (
 
 // Browsers normalise colour values to `rgb(r, g, b)` form. Strip whitespace
 // so the comparison is format-agnostic.
-const normalise = (raw: string): string => raw.replace(/\s+/g, '');
+const normalise = (raw: string): string => raw.replaceAll(/\s+/g, '');
 
 for (const theme of ['light', 'dark'] as const) {
   test.describe(`M3 destructive utilities — ${theme} theme`, () => {

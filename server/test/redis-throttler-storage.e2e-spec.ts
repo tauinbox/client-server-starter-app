@@ -86,7 +86,7 @@ runWithRedis('Redis throttler storage (real Redis)', () => {
       )
     );
 
-    const hits = records.map((r) => r.totalHits).sort((a, b) => a - b);
+    const hits = records.map((r) => r.totalHits).toSorted((a, b) => a - b);
     expect(hits).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
     expect(records.filter((r) => r.isBlocked)).toHaveLength(15);
   });
