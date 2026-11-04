@@ -40,8 +40,9 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Production start | `npm run start:prod` |
 | Build | `npm run build` |
 | Typecheck | `npm run typecheck` runs `tsc --noEmit` over the full `tsconfig.json`. Thus it covers `test/`, `*.spec.ts`, each `testing/` directory and `eslint.config.ts`. `tsconfig.build.json` excludes those files from `npm run build` |
-| Lint | `npm run lint` |
+| Lint | `npm run lint` covers `src/`, `test/` and `scripts/` |
 | Lint fix | `npm run lint:fix` |
+| Lint `shared/` | `npm run lint:shared` runs the rules for the modern ECMAScript forms over `shared/src/` from the repository root, with `eslint.shared.config.ts` |
 | Format check | `npm run format:check` covers `src/`, `test/`, `scripts/` and the root configuration files. It also covers `shared/src/` and the root-level `*.mjs` configuration files |
 | Format | `npm run format` uses the same scope and writes the corrections |
 | Unit tests | `npm test`. It starts Jest with `--experimental-vm-modules`, because Jest can `require()` the ESM-only NestJS 12 packages only with that flag. Do not start `jest` directly |

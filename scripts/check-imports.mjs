@@ -1,7 +1,7 @@
 /**
  * Repo-wide import-hygiene check. Zero dependencies — runs on plain Node from
- * any workspace, because `shared/` has no package.json of its own and ESLint
- * cannot lint files outside the directory holding its config.
+ * any workspace, because `shared/` has no package.json of its own and no
+ * ESLint import rule reaches files outside the workspace that runs it.
  *
  * Enforces four rules:
  *   1. No dependency cycles between modules.

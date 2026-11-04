@@ -1704,6 +1704,7 @@ npm run build              # Production build
 npm run typecheck          # tsc --noEmit incl. test/ and specs (excluded from build)
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix
+npm run lint:shared        # Lint shared/src (modern ECMAScript forms)
 npm run format:check       # Prettier check
 npm run format             # Prettier format
 npm test                   # Unit tests (Jest)
@@ -1866,9 +1867,10 @@ This was a convention only, until rule 4 was added. By that time, 25 sites had m
 `shared/src/utils/` and `shared/src/enums/` have no barrel, and a full path still imports from them.
 Rule 4 says nothing about a directory with no barrel.
 
-The check is written in Node with no dependency, and it is not an ESLint rule. ESLint cannot lint a
-file outside the directory that holds its configuration. Thus **no workspace lints `shared/`**, and
-that is exactly where the two largest barrels are.
+The check is written in Node with no dependency, and it is not an ESLint rule. ESLint ignores a file
+outside the directory it runs in, so the import rule of a workspace never sees `shared/`, and that
+is exactly where the two largest barrels are. `npm run lint:shared` lints `shared/src` from the
+repository root, but only with the rules for the modern ECMAScript forms.
 
 The script carries a `--self-test` option. That option builds synthetic fixtures and fails if a
 detector stops working. CI runs the self-test before the check itself.
@@ -1923,7 +1925,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server - Checks** | - | audit (high), lint, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:imports | - |
+| **Server - Checks** | - | audit (high), lint, lint:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:imports | - |
 | **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |

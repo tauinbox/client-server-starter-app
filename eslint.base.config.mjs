@@ -12,7 +12,30 @@ const maxParamsSyntax = [
   'TSEmptyBodyFunctionExpression[params.length>3]'
 ].map((selector) => ({ selector, message: MAX_PARAMS_MESSAGE }));
 
+// The ES2025 forms (doc/architecture.md). The `unicorn` rules need the
+// plugin registered in the config block that spreads these rules.
+export const es2025Rules = {
+  'prefer-object-has-own': 'error',
+  'unicorn/prefer-at': 'error',
+  'unicorn/prefer-regexp-escape': 'error',
+  'unicorn/prefer-promise-with-resolvers': 'error',
+  'unicorn/prefer-iterator-helpers': 'error',
+  'unicorn/prefer-structured-clone': 'error',
+  'unicorn/prefer-string-replace-all': 'error',
+  'unicorn/no-array-sort': 'error'
+};
+
+// `unicorn/prefer-promise-with-resolvers` sees only an executor with a block
+// body, so this catches the arrow form `(resolve) => (release = resolve)`.
+export const promiseResolverSyntax = {
+  selector:
+    "NewExpression[callee.name='Promise'] > ArrowFunctionExpression.arguments[params.length=1][body.type='AssignmentExpression'][body.right.type='Identifier']",
+  message:
+    'Do not take the resolve function out of a Promise executor. Use Promise.withResolvers().'
+};
+
 export default {
+  ...es2025Rules,
   '@typescript-eslint/explicit-function-return-type': 'off',
   '@typescript-eslint/explicit-module-boundary-types': 'off',
   '@typescript-eslint/no-explicit-any': 'warn',
@@ -35,6 +58,7 @@ export default {
       message:
         'Do not use `as unknown as T` double casts. Fix the type at its root (widen the parameter, use a typed partial mock), or use `// @ts-expect-error` in tests.'
     },
+    promiseResolverSyntax,
     ...maxParamsSyntax
   ]
 };
