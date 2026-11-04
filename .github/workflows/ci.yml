@@ -356,3 +356,40 @@ jobs:
           name: playwright-test-results
           path: client/test-results/
           retention-days: 7
+
+  # The other jobs build from the full checkout. The Dockerfiles copy only
+  # some directories, so a file outside them is visible to `npm run build`
+  # here and absent in the image. Without this job the Deploy workflow was
+  # the first to build the images, after the merge.
+  docker-images:
+    name: Docker Images
+    runs-on: ubuntu-latest
+    # Typical Deploy build of both images: ~4 min.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      # The same Docker Hub mirror as the Deploy workflow, for the same reason.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
+
+      # Read the cache that Deploy writes; do not write it from here.
+      - name: Build server image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: server/Dockerfile
+          push: false
+          cache-from: type=gha,scope=server
+
+      - name: Build client image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: client/Dockerfile
+          push: false
+          build-args: COMMIT_HASH=${{ github.sha }}
+          cache-from: type=gha,scope=client

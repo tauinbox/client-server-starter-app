@@ -6,6 +6,6 @@
     "dist",
     "**/*spec.ts",
     "**/testing/**",
-    "eslint.config.ts"
+    "eslint*.config.ts"
   ]
 }
