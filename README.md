@@ -1704,7 +1704,7 @@ npm run build              # Production build
 npm run typecheck          # tsc --noEmit incl. test/ and specs (excluded from build)
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix
-npm run lint:shared        # Lint shared/src (modern ECMAScript forms)
+npm run lint:shared        # Lint shared/src (base rules)
 npm run format:check       # Prettier check
 npm run format             # Prettier format
 npm test                   # Unit tests (Jest)
@@ -1870,7 +1870,7 @@ Rule 4 says nothing about a directory with no barrel.
 The check is written in Node with no dependency, and it is not an ESLint rule. ESLint ignores a file
 outside the directory it runs in, so the import rule of a workspace never sees `shared/`, and that
 is exactly where the two largest barrels are. `npm run lint:shared` lints `shared/src` from the
-repository root, but only with the rules for the modern ECMAScript forms.
+repository root, but only with the base rules of `eslint.base.config.mjs`, which have no import rule.
 
 The script carries a `--self-test` option. That option builds synthetic fixtures and fails if a
 detector stops working. CI runs the self-test before the check itself.

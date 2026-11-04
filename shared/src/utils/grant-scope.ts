@@ -170,9 +170,11 @@ export function sameConditions(
 
 function refusal(
   item: GrantScopeItem,
-  message: string,
-  errorKey: ErrorKey,
-  reason?: string
+  {
+    message,
+    errorKey,
+    reason
+  }: { message: string; errorKey: ErrorKey; reason?: string }
 ): GrantRefusal {
   return {
     message,
@@ -199,11 +201,10 @@ function grantItemRefusal(
   const permissionLabel = `${item.actionName}:${item.subject}`;
 
   if (!ability.can(item.actionName, item.subject)) {
-    return refusal(
-      item,
-      `Cannot grant ${permissionLabel} - caller lacks this permission`,
-      ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION
-    );
+    return refusal(item, {
+      message: `Cannot grant ${permissionLabel} - caller lacks this permission`,
+      errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION
+    });
   }
 
   const allRules = ability.rulesFor(item.actionName, item.subject);
@@ -212,12 +213,11 @@ function grantItemRefusal(
   // allow they hand out carries no copy of that deny, so the grantee would
   // reach exactly the rows the caller is barred from.
   if (allRules.some((r) => r.inverted)) {
-    return refusal(
-      item,
-      `Cannot grant ${permissionLabel} - caller holds it under a restriction`,
-      ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION,
-      'caller-restricted'
-    );
+    return refusal(item, {
+      message: `Cannot grant ${permissionLabel} - caller holds it under a restriction`,
+      errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION,
+      reason: 'caller-restricted'
+    });
   }
 
   const rules = allRules.filter((r) => !r.inverted);
@@ -227,12 +227,11 @@ function grantItemRefusal(
   }
 
   if (!item.bodyConditions) {
-    return refusal(
-      item,
-      `Cannot grant ${permissionLabel} unconditionally - caller holds it only with conditions`,
-      ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION,
-      'condition-escalation'
-    );
+    return refusal(item, {
+      message: `Cannot grant ${permissionLabel} unconditionally - caller holds it only with conditions`,
+      errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION,
+      reason: 'condition-escalation'
+    });
   }
 
   if (!ctx.actorId) {
@@ -251,12 +250,11 @@ function grantItemRefusal(
   if (resolved.skipPermission) {
     // A vetoed condition restricts nothing at runtime, so treating it as
     // "conditions were supplied" would grant the permission unrestricted.
-    return refusal(
-      item,
-      `Cannot grant ${permissionLabel} - the supplied condition cannot be applied as written`,
-      ErrorKeys.ROLES.CONDITION_UNRESOLVABLE,
-      'condition-unresolvable'
-    );
+    return refusal(item, {
+      message: `Cannot grant ${permissionLabel} - the supplied condition cannot be applied as written`,
+      errorKey: ErrorKeys.ROLES.CONDITION_UNRESOLVABLE,
+      reason: 'condition-unresolvable'
+    });
   }
 
   const contained = rules.some(
@@ -264,12 +262,11 @@ function grantItemRefusal(
   );
 
   if (!contained) {
-    return refusal(
-      item,
-      `Cannot grant ${permissionLabel} - the supplied condition is broader than the caller's own`,
-      ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER,
-      'condition-broader-than-caller'
-    );
+    return refusal(item, {
+      message: `Cannot grant ${permissionLabel} - the supplied condition is broader than the caller's own`,
+      errorKey: ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER,
+      reason: 'condition-broader-than-caller'
+    });
   }
 
   return null;
@@ -335,12 +332,11 @@ export function findLiftRefusal(
       !rules.some((r) => r.inverted);
 
     if (!unrestricted) {
-      return refusal(
-        item,
-        `Cannot lift the ${item.actionName}:${item.subject} restriction - caller does not hold it without restriction`,
-        ErrorKeys.ROLES.CANNOT_LIFT_DENY,
-        'deny-lift'
-      );
+      return refusal(item, {
+        message: `Cannot lift the ${item.actionName}:${item.subject} restriction - caller does not hold it without restriction`,
+        errorKey: ErrorKeys.ROLES.CANNOT_LIFT_DENY,
+        reason: 'deny-lift'
+      });
     }
   }
   return null;

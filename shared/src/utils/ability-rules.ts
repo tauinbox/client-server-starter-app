@@ -62,6 +62,13 @@ export function dedupPermissions(
   return Array.from(permissionMap.values());
 }
 
+export interface CompileAbilityOptions {
+  isSuper: boolean;
+  permissions: ResolvedPermission[];
+  subjectMaps: SubjectMaps;
+  logger: AbilityLogger;
+}
+
 /**
  * Compiles the CASL rules of a user from already-loaded permissions and
  * resource maps. The server and the mock build their ability from this list.
@@ -74,10 +81,7 @@ export function compileAbilityRules<
   S extends string = string
 >(
   userId: string,
-  isSuper: boolean,
-  permissions: ResolvedPermission[],
-  subjectMaps: SubjectMaps,
-  logger: AbilityLogger
+  { isSuper, permissions, subjectMaps, logger }: CompileAbilityOptions
 ): AbilityRule<A, S>[] {
   if (isSuper) {
     return [{ action: 'manage' as A, subject: 'all' as S }];

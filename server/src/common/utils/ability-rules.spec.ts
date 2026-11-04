@@ -55,7 +55,12 @@ describe('compileAbilityRules', () => {
     maps: SubjectMaps = DEFAULT_MAPS
   ) =>
     createMongoAbility(
-      compileAbilityRules('user-1', false, permissions, maps, logger)
+      compileAbilityRules('user-1', {
+        isSuper: false,
+        permissions,
+        subjectMaps: maps,
+        logger
+      })
     );
 
   beforeEach(() => {
@@ -64,13 +69,12 @@ describe('compileAbilityRules', () => {
   });
 
   it('should grant full access to a super user, whatever the permissions', () => {
-    const rules = compileAbilityRules(
-      'user-1',
-      true,
-      [grant('users', 'read', { conditions: { effect: 'deny' } })],
-      DEFAULT_MAPS,
+    const rules = compileAbilityRules('user-1', {
+      isSuper: true,
+      permissions: [grant('users', 'read', { conditions: { effect: 'deny' } })],
+      subjectMaps: DEFAULT_MAPS,
       logger
-    );
+    });
 
     expect(rules).toEqual([{ action: 'manage', subject: 'all' }]);
   });
