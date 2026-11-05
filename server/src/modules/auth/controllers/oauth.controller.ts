@@ -332,7 +332,7 @@ export class OAuthController {
       );
     }
 
-    const userId = req.user.userId;
+    const { userId } = req.user;
 
     const reauthProof = this.cookies.readReauthProof(req);
 

@@ -51,7 +51,7 @@ export function createApp() {
     const logLevel = (process.env['REQUEST_LOG_LEVEL'] || 'all').toLowerCase();
 
     res.on('finish', () => {
-      const statusCode = res.statusCode;
+      const { statusCode } = res;
 
       if (logLevel === 'error' && statusCode < 500) return;
       if (logLevel === 'warn' && statusCode < 400) return;

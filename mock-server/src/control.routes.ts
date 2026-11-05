@@ -776,7 +776,7 @@ router.post('/billing/advance-renewal', (req, res) => {
         );
   const newEnd = nextPeriodEnd(billingAnchor, now, plan.interval);
 
-  let amountMinor = price.amountMinor;
+  let { amountMinor } = price;
   let periodStart = nowIso;
   let periodEnd = newEnd.toISOString();
   if (subscription.billingMode === 'usage') {

@@ -40,7 +40,7 @@ async function adminToken(): Promise<string> {
 }
 
 const anyRoleId = (): string => {
-  const role = [...getState().roles.values()][0];
+  const [role] = [...getState().roles.values()];
   if (!role) throw new Error('Seed roles');
   return role.id;
 };

@@ -53,7 +53,7 @@ function parseRegisterResource(d: ts.Decorator): string | undefined {
   const args = decoratorArgs(d);
   if (!args?.length) return undefined;
 
-  const arg = args[0];
+  const [arg] = args;
   if (!ts.isObjectLiteralExpression(arg)) return undefined;
 
   for (const prop of arg.properties) {

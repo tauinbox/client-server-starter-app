@@ -44,7 +44,7 @@ describe('PermissionsGuard', () => {
     const rules: RawRuleOf<AppAbility>[] = permissionStrings.map((p) => {
       const [resource, action] = p.split(':');
       return {
-        action: action,
+        action,
         subject: (subjectMap[resource] ?? resource) as Extract<Subjects, string>
       };
     });

@@ -220,7 +220,7 @@ function permissionItemErrors(path: string, value: object): string[] {
 // @ArrayMaxSize(MAX_PERMISSION_ITEMS) @ArrayUniqueWithin(MAX_PERMISSION_ITEMS,
 // permissionIdOf) @IsObject({ each: true }) @ValidateNested({ each: true })`.
 function setPermissionsErrors(body: Record<string, unknown>): string[] {
-  const items = body['items'];
+  const { items } = body;
   const isArray = Array.isArray(items);
   const isPlainObject = (value: unknown): boolean =>
     typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -473,7 +473,7 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
     sendValidationError(res, 'body', errors);
     return;
   }
-  const name = normalized.name;
+  const { name } = normalized;
 
   // CreateRoleDto carries `name` and `description`; the service raises every
   // check below, so the instance check sits between the pipe and the service.

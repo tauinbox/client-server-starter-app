@@ -152,7 +152,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   protected readonly userOptions = signal<ChipOption[]>([]);
 
   protected readonly userChips = computed<ChipOption[]>(() => {
-    const payload = this.rule().payload;
+    const { payload } = this.rule();
     if (payload.type !== 'user') return [];
     const cache = this.#userLabelCache();
     return payload.userIds.map(
@@ -161,7 +161,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   });
 
   protected readonly roleChips = computed<ChipOption[]>(() => {
-    const payload = this.rule().payload;
+    const { payload } = this.rule();
     if (payload.type !== 'role') return [];
     const labels = this.#roleLabels();
     return payload.roleNames.map(
@@ -170,7 +170,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   });
 
   protected readonly attrValueChips = computed<ChipOption[]>(() => {
-    const payload = this.rule().payload;
+    const { payload } = this.rule();
     if (payload.type !== 'attribute' || payload.op !== 'in') return [];
     const v = payload.value;
     const arr = Array.isArray(v) ? v : [];
@@ -269,7 +269,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
   }
 
   #preloadUserLabelsFromExistingRule(): void {
-    const payload = this.rule().payload;
+    const { payload } = this.rule();
     if (payload.type !== 'user' || payload.userIds.length === 0) return;
     const cache = this.#userLabelCache();
     const missing = payload.userIds.filter((id) => !cache.has(id));

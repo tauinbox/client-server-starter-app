@@ -87,7 +87,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
     // The second setup starts when the enable write arrives. Under the row
     // lock of the code check it waits; with no lock it lands first.
     let racing: Promise<unknown> | undefined;
-    const update = EntityManager.prototype.update;
+    const { update } = EntityManager.prototype;
     jest
       .spyOn(EntityManager.prototype, 'update')
       .mockImplementation(async function (

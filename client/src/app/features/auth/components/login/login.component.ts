@@ -186,7 +186,7 @@ export class LoginComponent implements OnInit, OnDestroy {
         .subscribe((value) => this.error.set(value));
     }
 
-    const registered = this.#route.snapshot.queryParams['registered'];
+    const { registered } = this.#route.snapshot.queryParams;
     if (registered === 'pending-verification') {
       this.pendingVerification.set(true);
     }
@@ -283,7 +283,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   resendVerification(): void {
-    const email = this.loginModel().email;
+    const { email } = this.loginModel();
     if (!email || !this.canResend()) return;
 
     this.resendingVerification.set(true);

@@ -75,7 +75,7 @@ describe('NotificationsController', () => {
       string,
       string
     ];
-    const connectionId = firstCall[2];
+    const [, , connectionId] = firstCall;
     res.emitter.emit('close');
 
     expect(service.closeStream).toHaveBeenCalledWith('user-2', connectionId);

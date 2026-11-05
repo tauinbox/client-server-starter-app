@@ -110,13 +110,13 @@ function oneTimeFromMetadata(
   if (data['purpose'] !== ONE_TIME_PURPOSE) {
     return null;
   }
-  const productId = data['productId'];
+  const { productId } = data;
   return { productId: typeof productId === 'string' ? productId : null };
 }
 
 function planKeyFrom(metadata: unknown): string | null {
   const data = (metadata ?? {}) as Record<string, unknown>;
-  const planKey = data['planKey'];
+  const { planKey } = data;
   return typeof planKey === 'string' ? planKey : null;
 }
 
@@ -151,8 +151,7 @@ function confirmationSession(payment: {
 /** Reads our `customerId`/`userId` echoed back through YooKassa metadata. */
 function refFromMetadata(metadata: unknown): NormalizedCustomerRef {
   const data = (metadata ?? {}) as Record<string, unknown>;
-  const customerId = data['customerId'];
-  const userId = data['userId'];
+  const { customerId, userId } = data;
   return {
     customerId: typeof customerId === 'string' ? customerId : undefined,
     userId: typeof userId === 'string' ? userId : undefined
@@ -518,7 +517,7 @@ export class YooKassaProvider implements PaymentProvider {
     const currency = payment.amount?.currency ?? 'RUB';
     const refundMinor =
       amountMinor > 0 ? amountMinor : toMinor(payment.amount.value, currency);
-    const userId = refFromMetadata(payment.metadata).userId;
+    const { userId } = refFromMetadata(payment.metadata);
 
     const payload: ICreateRefund = {
       payment_id: providerInvoiceRef,
@@ -595,7 +594,7 @@ export class YooKassaProvider implements PaymentProvider {
       return null;
     }
 
-    const event = notification.event;
+    const { event } = notification;
     const objectId = notification.object?.id;
     if (!event || !objectId) {
       return null;

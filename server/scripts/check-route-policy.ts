@@ -423,7 +423,7 @@ export function evaluate(input: Input): string[] {
       problems.push(`[rule 1] ${where}: no valid "policy" field`);
       continue;
     }
-    const policy = entry.policy;
+    const { policy } = entry;
     const actual = derivePolicy(route, input.throttleConstants);
     for (const field of POLICY_FIELDS) {
       if (show(policy[field]) !== show(actual[field])) {
@@ -447,7 +447,7 @@ export function evaluate(input: Input): string[] {
     if (!mock) {
       problems.push(`[rule 4] ${where}: no mock-server route`);
     } else {
-      const gate = mock.gate;
+      const { gate } = mock;
       const ok =
         policy.access === 'public' || policy.access === 'optional'
           ? gate.kind === 'public'

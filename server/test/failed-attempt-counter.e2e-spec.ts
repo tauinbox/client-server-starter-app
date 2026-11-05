@@ -6,7 +6,7 @@ import { createClient } from '@keyv/redis';
 import { buildCacheOptions } from '../src/modules/core/redis-cache.store';
 import { FailedAttemptCounter } from '../src/common/utils/failed-attempt-counter';
 
-const REDIS_URL = process.env['REDIS_URL'];
+const { REDIS_URL } = process.env;
 const KEY_PREFIX = 'e2e-counter:failures:';
 const SUBJECT_ID = 'user-id';
 const KEY = `${KEY_PREFIX}${SUBJECT_ID}`;

@@ -1818,7 +1818,7 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
 | ESLint | Server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
 | ESLint | Mock server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
 | - | The three configurations use ESLint 10 with `eslint-plugin-import-x`. They need `settings['import-x/parsers']` to map `.ts` to `@typescript-eslint/parser`, and `settings['import-x/resolver-next']` with the TypeScript and Node resolvers. Without the parser map, `import-x/no-cycle` passes on everything silently | - |
-| ESLint | Shared rules for the workspaces. They include a `no-restricted-syntax` ban on an `as unknown as T` double cast. The client configuration adds two selectors: one bans the `'admin'` role literal, and one bans the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
+| ESLint | Shared rules for the workspaces. They include a `no-restricted-syntax` ban on an `as unknown as T` double cast, `prefer-destructuring` for declarations and `object-shorthand`. The client configuration adds two selectors: one bans the `'admin'` role literal, and one bans the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
 | Prettier | All workspaces (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order, no `px` unit outside a breakpoint, no `!important`, no `--mat-dialog-*` token outside `_dialogs.scss`) | `.stylelintrc.json` |
 | Husky + lint-staged | Pre-commit hook (auto-fix the staged files) | `.lintstagedrc.mjs` |

@@ -73,7 +73,7 @@ export function serializeLoggedError(value: unknown): unknown {
   if (typeof source['stack'] === 'string') {
     result.stack = maskEmailsInText(source['stack']);
   }
-  const code = source['code'];
+  const { code } = source;
   if (typeof code === 'string' || typeof code === 'number') result.code = code;
   return result;
 }
@@ -114,7 +114,7 @@ export function serializeLoggedRequest(value: unknown): unknown {
   if (typeof source['remoteAddress'] === 'string') {
     result.remoteAddress = source['remoteAddress'];
   }
-  const headers = source['headers'];
+  const { headers } = source;
   if (typeof headers === 'object' && headers !== null) {
     for (const name of LOGGED_REQUEST_HEADERS) {
       const header = (headers as Record<string, unknown>)[name];

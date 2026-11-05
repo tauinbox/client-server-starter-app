@@ -121,7 +121,7 @@ function makeManager(stores: Stores) {
   let invoiceSeq = 0;
   return {
     findOne: (entity: unknown, opts: { where: Record<string, unknown> }) => {
-      const where = opts.where;
+      const { where } = opts;
       if (entity === Subscription) {
         if (typeof where['id'] === 'string') {
           return Promise.resolve(

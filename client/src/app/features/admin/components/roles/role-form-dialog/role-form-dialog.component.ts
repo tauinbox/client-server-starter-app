@@ -85,7 +85,7 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
 
   protected get formChanged(): boolean {
     const current = this.roleModel();
-    const role = this.data.role;
+    const { role } = this.data;
     if (!role) return true;
     return (
       current.name !== role.name ||
@@ -119,7 +119,7 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
       name: name.trim(),
       description: description.trim() || null
     };
-    const role = this.data.role;
+    const { role } = this.data;
     const save$ = role
       ? this.#rolesStore.updateRole(role.id, dto)
       : this.#rolesStore.createRole(dto);

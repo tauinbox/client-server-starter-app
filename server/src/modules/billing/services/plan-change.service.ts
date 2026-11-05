@@ -137,7 +137,7 @@ export class PlanChangeService {
     const now = new Date();
 
     if (provider.managesLifecycle) {
-      const providerSubscriptionId = subscription.providerSubscriptionId;
+      const { providerSubscriptionId } = subscription;
       if (!providerSubscriptionId) {
         throw subscriptionNotLinked();
       }

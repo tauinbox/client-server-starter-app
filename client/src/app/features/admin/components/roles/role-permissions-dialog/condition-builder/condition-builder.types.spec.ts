@@ -56,12 +56,10 @@ describe('condition-builder types', () => {
       expect(group!.children).toHaveLength(1);
       expect(group!.children[0].type).toBe('rule');
 
-      const rule = (
-        group!.children[0] as {
-          type: 'rule';
-          rule: { field: string; operator: string; value: string };
-        }
-      ).rule;
+      const { rule } = group!.children[0] as {
+        type: 'rule';
+        rule: { field: string; operator: string; value: string };
+      };
       expect(rule.field).toBe('status');
       expect(rule.operator).toBe('$eq');
       expect(rule.value).toBe('active');
@@ -71,12 +69,10 @@ describe('condition-builder types', () => {
       const group = jsonToModel({ age: { $gt: 18 } });
       expect(group).not.toBeNull();
 
-      const rule = (
-        group!.children[0] as {
-          type: 'rule';
-          rule: { field: string; operator: string; value: string };
-        }
-      ).rule;
+      const { rule } = group!.children[0] as {
+        type: 'rule';
+        rule: { field: string; operator: string; value: string };
+      };
       expect(rule.field).toBe('age');
       expect(rule.operator).toBe('$gt');
       expect(rule.value).toBe('18');
@@ -84,12 +80,10 @@ describe('condition-builder types', () => {
 
     it('parses $in operator: { "role": { "$in": ["admin", "editor"] } }', () => {
       const group = jsonToModel({ role: { $in: ['admin', 'editor'] } });
-      const rule = (
-        group!.children[0] as {
-          type: 'rule';
-          rule: { field: string; operator: string; value: string };
-        }
-      ).rule;
+      const { rule } = group!.children[0] as {
+        type: 'rule';
+        rule: { field: string; operator: string; value: string };
+      };
       expect(rule.operator).toBe('$in');
       expect(rule.value).toBe('admin, editor');
     });

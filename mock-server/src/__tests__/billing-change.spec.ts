@@ -460,7 +460,7 @@ describe('POST /billing/payment-method', () => {
   it('refuses the re-bind when the plan of the subscription is missing from the catalog', async () => {
     const token = await login('user@example.com');
     await activateSubscription('pro');
-    const plans = getState().plans;
+    const { plans } = getState();
     for (const [id, plan] of plans) {
       if (plan.key === 'pro') plans.delete(id);
     }

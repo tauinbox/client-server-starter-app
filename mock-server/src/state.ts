@@ -825,13 +825,13 @@ export function toInvoiceResponse(invoice: MockInvoice): InvoiceResponse {
 // not anything stored on the record, so it is resolved at serialization time.
 function pricedByCurrentPlan(record: MockUsageRecord): boolean {
   const state = getState();
-  const subscription = [...state.billingSubscriptions.values()]
+  const [subscription] = [...state.billingSubscriptions.values()]
     .filter(
       (s) =>
         s.customerId === record.customerId &&
         ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
-    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (!subscription) return false;
   const plan = state.plans.values().find((p) => p.key === subscription.planKey);
   return plan?.meterKey === record.meterKey;

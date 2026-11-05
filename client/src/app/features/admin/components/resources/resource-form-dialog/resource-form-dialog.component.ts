@@ -111,7 +111,7 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
 
   get isDirty(): boolean {
     const current = this.resourceModel();
-    const resource = this.data.resource;
+    const { resource } = this.data;
     if (
       current.displayName !== resource.displayName ||
       current.description !== (resource.description ?? '')

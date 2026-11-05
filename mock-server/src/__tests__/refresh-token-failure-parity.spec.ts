@@ -303,7 +303,7 @@ describe('refresh-token failure parity', () => {
 
       expect((await refresh(phone)).status).toBe(401);
       expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
-      const details = auditRows('TOKEN_REFRESH_FAILURE')[0].details;
+      const [{ details }] = auditRows('TOKEN_REFRESH_FAILURE');
       expect(details).toMatchObject({
         reason: 'lost_response_replay',
         sameIp: true

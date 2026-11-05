@@ -57,7 +57,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
       );
 
       if (!meta) {
-        const name = metatype.name;
+        const { name } = metatype;
         if (
           !name.includes('Health') &&
           !name.includes('Auth') &&

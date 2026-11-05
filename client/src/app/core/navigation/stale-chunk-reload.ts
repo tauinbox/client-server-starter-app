@@ -37,7 +37,7 @@ export function reloadOnStaleChunk(navigationError: NavigationError): void {
   if (!window) return;
 
   // The router serializes an app path; anything else must not leave the origin.
-  const url = navigationError.url;
+  const { url } = navigationError;
   if (!url.startsWith('/') || url.startsWith('//')) return;
 
   const storage = inject(SessionStorageService);

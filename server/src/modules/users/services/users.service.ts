@@ -460,12 +460,10 @@ export class UsersService {
       .returning(['failedLoginAttempts', 'lockedUntil'])
       .execute();
 
-    const raw = (
-      result.raw as {
-        failed_login_attempts: number;
-        locked_until: string | null;
-      }[]
-    )[0];
+    const [raw] = result.raw as {
+      failed_login_attempts: number;
+      locked_until: string | null;
+    }[];
 
     if (!raw) {
       throw new Error(

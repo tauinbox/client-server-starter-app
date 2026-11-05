@@ -11,7 +11,7 @@ import { Subscription } from '../src/modules/billing/entities/subscription.entit
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 
-const REDIS_URL = process.env['REDIS_URL'];
+const { REDIS_URL } = process.env;
 const COUNTER_KEY = 'entitlements:user-version:counter:u1';
 
 // The atomicity claim of CacheVersionCounter is about a Redis command - a

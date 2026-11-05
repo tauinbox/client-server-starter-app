@@ -85,7 +85,7 @@ describe('list search and filters', () => {
   describe('feature flags', () => {
     it('matches q on key or description, case-insensitive', async () => {
       const flags = Array.from(getState().featureFlags.values());
-      const target = flags[0];
+      const [target] = flags;
       const needle = target.key.slice(1, 5).toUpperCase();
       const expected = flags
         .filter(
@@ -181,7 +181,7 @@ describe('list search and filters', () => {
   describe('resources', () => {
     it('filters on isOrphaned and isSystem and searches the subject', async () => {
       const resources = Array.from(getState().resources.values());
-      const target = resources[0];
+      const [target] = resources;
       target.isOrphaned = true;
       const orphaned = resources.filter((r) => r.isOrphaned).map((r) => r.id);
 

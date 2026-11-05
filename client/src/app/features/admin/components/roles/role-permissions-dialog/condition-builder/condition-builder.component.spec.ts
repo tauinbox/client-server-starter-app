@@ -122,46 +122,40 @@ describe('ConditionBuilderComponent', () => {
 
     it('updates a rule field', () => {
       const { component } = setup('{"status": "active"}');
-      const child = component.rootGroup().children[0];
+      const [child] = component.rootGroup().children;
 
       component.setField(child, 'role');
 
-      const rule = (
-        component.rootGroup().children[0] as {
-          type: 'rule';
-          rule: { field: string };
-        }
-      ).rule;
+      const { rule } = component.rootGroup().children[0] as {
+        type: 'rule';
+        rule: { field: string };
+      };
       expect(rule.field).toBe('role');
     });
 
     it('updates a rule operator', () => {
       const { component } = setup('{"age": 18}');
-      const child = component.rootGroup().children[0];
+      const [child] = component.rootGroup().children;
 
       component.setOperator(child, '$gt');
 
-      const rule = (
-        component.rootGroup().children[0] as {
-          type: 'rule';
-          rule: { operator: string };
-        }
-      ).rule;
+      const { rule } = component.rootGroup().children[0] as {
+        type: 'rule';
+        rule: { operator: string };
+      };
       expect(rule.operator).toBe('$gt');
     });
 
     it('updates a rule value', () => {
       const { component } = setup('{"status": "active"}');
-      const child = component.rootGroup().children[0];
+      const [child] = component.rootGroup().children;
 
       component.setValue(child, 'inactive');
 
-      const rule = (
-        component.rootGroup().children[0] as {
-          type: 'rule';
-          rule: { value: string };
-        }
-      ).rule;
+      const { rule } = component.rootGroup().children[0] as {
+        type: 'rule';
+        rule: { value: string };
+      };
       expect(rule.value).toBe('inactive');
     });
   });
@@ -296,7 +290,7 @@ describe('ConditionBuilderComponent', () => {
 
     it('preview updates when rule changes', () => {
       const { component } = setup('{"status": "active"}');
-      const child = component.rootGroup().children[0];
+      const [child] = component.rootGroup().children;
 
       component.setValue(child, 'inactive');
 

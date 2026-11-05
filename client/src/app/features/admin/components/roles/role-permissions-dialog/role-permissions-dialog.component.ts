@@ -352,7 +352,7 @@ export class RolePermissionsDialogComponent implements OnInit {
   }
 
   setOwnershipField(permissionId: string, event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
+    const { value } = event.target as HTMLInputElement;
     this.#patchCondition(permissionId, { ownership: { userField: value } });
     if (findOwnershipShapeError({ userField: value })) {
       this.#setJsonError(

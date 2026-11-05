@@ -171,7 +171,7 @@ describe('MfaService', () => {
    */
   async function enrol(): Promise<{ user: User; secret: string }> {
     const setup = await service.beginEnrolment(buildUser());
-    const stored = repository.update.mock.calls[0][1];
+    const [[, stored]] = repository.update.mock.calls;
     const user = buildUser({ totpSecret: stored.totpSecret });
     repository.findOne.mockResolvedValue(user);
     return { user, secret: setup.secret };
@@ -197,7 +197,7 @@ describe('MfaService', () => {
       const user = buildUser();
 
       const setup = await service.beginEnrolment(user);
-      const stored = repository.update.mock.calls[0][1];
+      const [[, stored]] = repository.update.mock.calls;
 
       expect(stored.totpSecret).not.toBe(setup.secret);
       expect(stored.totpSecret).not.toContain(setup.secret);
@@ -434,7 +434,7 @@ describe('MfaService', () => {
 
       await service.resetByAdmin(enrolled(), actor);
 
-      const [criteria, changes] = repository.update.mock.calls[0];
+      const [[criteria, changes]] = repository.update.mock.calls;
       expect(criteria).toEqual({ id: 'user-1', totpEnabledAt: Not(IsNull()) });
       expect(changes).toEqual({
         totpSecret: null,
