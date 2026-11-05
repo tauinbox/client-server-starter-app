@@ -134,7 +134,7 @@ test.describe('OAuth-only account changes its email', () => {
     expect(state.users.find((u) => u.id === userId)?.email).toBe(email);
 
     const tokens = await _mockServer.getTokens();
-    const confirmToken = Object.keys(tokens.pendingEmailTokens)[0];
+    const [confirmToken] = Object.keys(tokens.pendingEmailTokens);
     expect(confirmToken).toBeTruthy();
 
     await page.goto(`/confirm-email-change?token=${confirmToken}`);

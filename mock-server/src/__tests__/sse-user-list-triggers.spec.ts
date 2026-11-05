@@ -135,7 +135,7 @@ describe('SSE user list events outside the admin user routes', () => {
     await wait(100);
     admin.close();
     plain.close();
-    const id = findUserByEmail('sse-registered@example.com')!.id;
+    const { id } = findUserByEmail('sse-registered@example.com')!;
     expect(admin.events()).toEqual([crud('created', id)]);
     expect(plain.events()).toEqual([]);
   });

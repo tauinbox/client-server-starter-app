@@ -82,7 +82,7 @@ function parseControllerArgs(d: ts.Decorator): {
   const args = decoratorArgs(d);
   if (!args?.length) return { controllerPath: '', version: null };
 
-  const arg = args[0];
+  const [arg] = args;
 
   // @Controller('path')
   if (ts.isStringLiteral(arg)) {

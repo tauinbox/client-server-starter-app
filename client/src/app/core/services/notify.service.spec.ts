@@ -42,7 +42,7 @@ describe('NotifyService', () => {
     it('opens the snackbar without an explicit config (relies on defaults)', () => {
       service.warn('common.cancel');
 
-      const config = snackBarMock.open.mock.calls[0][2];
+      const [[, , config]] = snackBarMock.open.mock.calls;
       expect(config).toBeUndefined();
     });
   });
@@ -101,7 +101,7 @@ describe('NotifyService', () => {
 
       service.error(httpError);
 
-      const [message] = snackBarMock.open.mock.calls[0];
+      const [[message]] = snackBarMock.open.mock.calls;
       expect(message).toBe(
         'Some of the submitted values are invalid. Please check the form and try again.'
       );
@@ -117,7 +117,7 @@ describe('NotifyService', () => {
 
       service.error(httpError);
 
-      const [message] = snackBarMock.open.mock.calls[0];
+      const [[message]] = snackBarMock.open.mock.calls;
       expect(message).toContain('500');
     });
 

@@ -146,7 +146,7 @@ describe('cancelling a usage subscription bills the period it closes', () => {
 
     await cancel(token, 'immediate');
 
-    const invoice = invoicesAddedSince(subscriptionId, before)[0];
+    const [invoice] = invoicesAddedSince(subscriptionId, before);
     // 42 billable − 10 credits = 32 × 200 minor.
     expect(invoice?.amountMinor).toBe(6400);
     expect(getState().billingCreditBalances.get(customerId)?.balanceUnits).toBe(

@@ -163,7 +163,7 @@ describe('AuthService', () => {
             sessionInvalidated$,
             permissionsUpdated$,
             featureFlagsUpdated$,
-            entitlementsUpdated$: entitlementsUpdated$,
+            entitlementsUpdated$,
             reconnected$
           }
         },

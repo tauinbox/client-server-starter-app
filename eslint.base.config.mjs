@@ -36,6 +36,16 @@ const promiseResolverSyntax = {
 
 export default {
   ...es2025Rules,
+  'object-shorthand': ['error', 'always'],
+  // Declarations only: the assignment form `({ x } = obj);` reads worse than
+  // `x = obj.x`.
+  'prefer-destructuring': [
+    'error',
+    {
+      VariableDeclarator: { array: true, object: true },
+      AssignmentExpression: { array: false, object: false }
+    }
+  ],
   '@typescript-eslint/explicit-function-return-type': 'off',
   '@typescript-eslint/explicit-module-boundary-types': 'off',
   '@typescript-eslint/no-explicit-any': 'warn',

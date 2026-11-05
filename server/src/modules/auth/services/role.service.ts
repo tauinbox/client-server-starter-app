@@ -439,7 +439,7 @@ export class RoleService {
     for (const record of [role, withChanges(role, data)]) {
       this.assertCanRole(ability, {
         action: 'update',
-        record: record,
+        record,
         actorId
       });
     }

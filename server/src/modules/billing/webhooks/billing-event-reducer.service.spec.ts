@@ -678,7 +678,7 @@ describe('BillingEventReducer', () => {
 
         await reducer.reduce(inPeriod());
 
-        const [, where, fields] = manager.update.mock.calls[0];
+        const [[, where, fields]] = manager.update.mock.calls;
         expect(where).toEqual({ id: 'sub-1' });
         expect(fields).toMatchObject({ planKey: 'pro', billingMode: 'fixed' });
         const switchedAt = fields['meteredFrom'];
@@ -707,7 +707,7 @@ describe('BillingEventReducer', () => {
 
         await reducer.reduce(inPeriod());
 
-        const [, where, fields] = manager.update.mock.calls[0];
+        const [[, where, fields]] = manager.update.mock.calls;
         expect(where).toEqual({ id: 'sub-1' });
         expect(fields).toMatchObject({ billingMode: 'usage' });
         expect(fields['meteredFrom']).toBeInstanceOf(Date);
@@ -725,7 +725,7 @@ describe('BillingEventReducer', () => {
 
         await reducer.reduce(inPeriod());
 
-        const fields = manager.update.mock.calls[0][2];
+        const [[, , fields]] = manager.update.mock.calls;
         expect(fields).not.toHaveProperty('billingMode');
         expect(fields).not.toHaveProperty('meteredFrom');
         expect(emit).not.toHaveBeenCalledWith(
@@ -742,7 +742,7 @@ describe('BillingEventReducer', () => {
 
         await reducer.reduce(inPeriod());
 
-        const fields = manager.update.mock.calls[0][2];
+        const [[, , fields]] = manager.update.mock.calls;
         expect(fields).not.toHaveProperty('planKey');
         expect(fields).not.toHaveProperty('billingMode');
       });

@@ -86,7 +86,7 @@ export class NxsFormFieldComponent {
     const errs = state.errors();
     if (errs.length === 0) return null;
 
-    const err = errs[0];
+    const [err] = errs;
     const overrides = this.errors();
     const key =
       err.message ||

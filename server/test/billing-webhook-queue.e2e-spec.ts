@@ -40,7 +40,7 @@ import { WebhookRetentionService } from '../src/modules/billing/webhooks/webhook
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { eventually } from './eventually';
 
-const REDIS_URL = process.env['REDIS_URL'];
+const { REDIS_URL } = process.env;
 
 // Skipped without Redis or PostgreSQL. CI runs it in the Redis-backed step.
 const runWithRedis =

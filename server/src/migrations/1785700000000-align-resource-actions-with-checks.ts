@@ -89,8 +89,7 @@ export class AlignResourceActionsWithChecks1785700000000 implements MigrationInt
        WHERE (cardinality(r."action_names") > 0
               AND NOT (a."name" = ANY(r."action_names")))
           OR NOT (a."name" = ANY($1::text[]))`;
-    const knownActions =
-      AlignResourceActionsWithChecks1785700000000.knownActions;
+    const { knownActions } = AlignResourceActionsWithChecks1785700000000;
     await queryRunner.query(
       `DELETE FROM "role_permissions"
         WHERE "permission_id" IN (${undeclaredPermissions})`,

@@ -47,7 +47,7 @@ export class SmtpHealthIndicator {
   }
 
   private verify(): Promise<boolean> {
-    const cached = this.cached;
+    const { cached } = this;
     if (cached && Date.now() - cached.at < VERIFY_CACHE_TTL_MS) {
       return Promise.resolve(cached.ok);
     }

@@ -219,7 +219,7 @@ function parseFieldNode(field: string, val: unknown): ConditionNode {
         `Value of field "${field}" cannot be represented in the visual builder`
       );
     }
-    const [op, opVal] = opEntries[0];
+    const [[op, opVal]] = opEntries;
     const value = Array.isArray(opVal)
       ? opVal.map(valueToString).join(', ')
       : valueToString(opVal);
@@ -250,7 +250,7 @@ export function modelToJson(group: ConditionGroup): Record<string, unknown> {
     if (!hasDuplicates) {
       const obj: Record<string, unknown> = {};
       for (const child of group.children) {
-        const rule = (child as { rule: ConditionRule }).rule;
+        const { rule } = child as { rule: ConditionRule };
         obj[rule.field] = ruleToValue(rule);
       }
       return obj;
@@ -266,7 +266,7 @@ function nodeToJson(node: ConditionNode): Record<string, unknown> {
   if (node.type === 'group') {
     return modelToJson(node.group);
   }
-  const rule = node.rule;
+  const { rule } = node;
   return { [rule.field]: ruleToValue(rule) };
 }
 

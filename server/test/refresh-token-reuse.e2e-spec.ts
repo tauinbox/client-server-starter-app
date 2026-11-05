@@ -422,7 +422,7 @@ describe('Refresh token reuse detection (e2e)', () => {
   it('returns plain 401 (no panic-revoke) for revoked-AND-expired tokens', async () => {
     await auth.login(userRecord, { userAgent: null, ipAddress: null });
     const allRows = Array.from(store.tokens.values());
-    const row = allRows[0];
+    const [row] = allRows;
     row.revoked = true;
     // Expire the row in the past so isExpired() returns true.
     row.expiresAt = new Date(Date.now() - 60_000);
@@ -489,7 +489,7 @@ describe('Refresh token reuse detection (e2e)', () => {
         userAgent: null,
         ipAddress: null
       });
-      const sessionId = Array.from(store.tokens.values())[0].sessionId;
+      const [{ sessionId }] = Array.from(store.tokens.values());
 
       const firstRefresh = await auth.refreshTokens(
         loginResult.tokens.refresh_token,

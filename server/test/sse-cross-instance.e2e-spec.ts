@@ -19,7 +19,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { eventually } from './eventually';
 
-const REDIS_URL = process.env['REDIS_URL'];
+const { REDIS_URL } = process.env;
 
 // Two app instances on one database and one Redis: a push raised on one
 // instance must reach the streams held by the other. Real Redis pub/sub,
@@ -143,8 +143,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
         userAgent: 'sse-cross-instance-e2e',
         ipAddress: '203.0.113.12'
       });
-    const port = ((app.getHttpServer() as Server).address() as AddressInfo)
-      .port;
+    const { port } = (app.getHttpServer() as Server).address() as AddressInfo;
     return new Promise((resolve, reject) => {
       const req = get(
         {

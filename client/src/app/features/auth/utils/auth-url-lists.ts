@@ -27,6 +27,6 @@ export function matchesAnyPath(
   request: HttpRequest<unknown>,
   paths: readonly string[]
 ): boolean {
-  const urlPath = request.url.split('?')[0];
+  const [urlPath] = request.url.split('?');
   return paths.some((path) => urlPath.endsWith(path));
 }

@@ -227,7 +227,7 @@ describe('FeatureFlagRuleRowComponent', () => {
   it('switching type rebuilds the payload with a default for the new type', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
-    const rowDebug = fixture.debugElement.children[0];
+    const [rowDebug] = fixture.debugElement.children;
     const rowInstance =
       rowDebug.componentInstance as FeatureFlagRuleRowComponent;
 
@@ -747,9 +747,9 @@ describe('FeatureFlagRuleRowComponent', () => {
       payload: { type: 'attribute', field: 'createdAt', op: 'after', value: '' }
     });
     fixture.detectChanges();
-    const opSelect = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      '.rule-attribute mat-select'
-    )[1];
+    const [, opSelect] = (
+      fixture.nativeElement as HTMLElement
+    ).querySelectorAll('.rule-attribute mat-select');
     opSelect?.querySelector<HTMLElement>('.mat-mdc-select-trigger')?.click();
     fixture.detectChanges();
     expect(document.querySelectorAll('mat-option')).toHaveLength(2);

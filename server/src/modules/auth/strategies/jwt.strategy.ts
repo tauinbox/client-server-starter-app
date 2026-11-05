@@ -58,7 +58,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
-    const iat = payload.iat;
+    const { iat } = payload;
     // Fail closed: without a trusted issue time the key-rotation and
     // token-revocation checks below cannot be enforced
     if (typeof iat !== 'number' || !Number.isFinite(iat)) {

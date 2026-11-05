@@ -309,13 +309,13 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
 
   if (!customer) return free;
 
-  const subscription = [...getState().billingSubscriptions.values()]
+  const [subscription] = [...getState().billingSubscriptions.values()]
     .filter(
       (s) =>
         s.customerId === customer.id &&
         ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
-    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
   const plan = subscription ? findPlanByKey(subscription.planKey) : undefined;
   const base = plan ? toResolvedEntitlements(plan) : free;
 
@@ -940,7 +940,7 @@ function prorationRefund(
   sub: MockSubscription,
   quotedMinor: number
 ): { source: MockInvoice | undefined; refundMinor: number } {
-  const source = [...getState().billingInvoices.values()]
+  const [source] = [...getState().billingInvoices.values()]
     .filter(
       (i) =>
         i.subscriptionId === sub.id &&
@@ -948,7 +948,7 @@ function prorationRefund(
         i.billingMode === 'fixed' &&
         i.amountMinor > 0
     )
-    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
   const refundMinor = source
     ? Math.min(quotedMinor, source.amountMinor - (source.refundedMinor ?? 0))
     : 0;
@@ -1592,13 +1592,13 @@ billingAdminRouter.post(
 
     // Newest-first like the server, so usage is billed to the same subscription
     // the entitlement resolver reports.
-    const subscription = [...state.billingSubscriptions.values()]
+    const [subscription] = [...state.billingSubscriptions.values()]
       .filter(
         (s) =>
           s.customerId === customerId &&
           ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
       )
-      .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
     if (!subscription) {
       sendError(
         res,

@@ -98,7 +98,7 @@ export function compileAbilityRules<
   ];
 
   for (const p of ordered) {
-    const action = p.action;
+    const { action } = p;
     const isDeny = isDenyCondition(p.conditions);
 
     // Fail closed in both directions, as the condition veto below does: an

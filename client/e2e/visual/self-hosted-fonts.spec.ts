@@ -36,7 +36,7 @@ test('fonts load from the bundle and icons render as glyphs', async ({
     icon.className = 'material-icons';
     icon.textContent = 'account_circle';
     document.body.appendChild(icon);
-    const width = icon.getBoundingClientRect().width;
+    const { width } = icon.getBoundingClientRect();
     icon.remove();
     return width;
   });

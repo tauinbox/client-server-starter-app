@@ -23,7 +23,7 @@ test.describe('Email verification', () => {
     // Get the verification token from the control endpoint
     const tokens = await _mockServer.getTokens();
     const verificationTokens = tokens.emailVerificationTokens;
-    const token = Object.keys(verificationTokens)[0];
+    const [token] = Object.keys(verificationTokens);
     expect(token).toBeTruthy();
 
     // Visit the verify-email page with the token
@@ -144,7 +144,7 @@ test.describe('Email verification', () => {
     await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);
 
     const tokens = await _mockServer.getTokens();
-    const token = Object.keys(tokens.emailVerificationTokens)[0];
+    const [token] = Object.keys(tokens.emailVerificationTokens);
     expect(token).toBeTruthy();
 
     // The token lives 24 hours, so the test ages it instead of waiting.
@@ -193,7 +193,7 @@ test.describe('Email verification', () => {
       ([, userId]) => userId === mockId('user-302')
     );
     expect(tokenEntry).toBeTruthy();
-    const token = tokenEntry![0];
+    const [token] = tokenEntry!;
 
     // Verify email
     await page.goto(`/verify-email?token=${token}`);

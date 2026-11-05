@@ -67,7 +67,7 @@ test.describe('Post-login admin badge', () => {
 
     expect(Array.isArray(storedRoles)).toBe(true);
     expect(storedRoles).not.toHaveLength(0);
-    const first = (storedRoles as Record<string, unknown>[])[0];
+    const [first] = storedRoles as Record<string, unknown>[];
     expect(typeof first).toBe('object');
     expect(first).not.toBeNull();
     expect(first).toHaveProperty('id');

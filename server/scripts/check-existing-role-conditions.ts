@@ -198,7 +198,7 @@ async function main(): Promise<void> {
     const cond = row.conditions as Record<string, unknown> | null;
     if (!cond) continue;
 
-    const custom = cond['custom'];
+    const { custom } = cond;
     if (typeof custom === 'string' && custom.trim().length > 0) {
       let parsed: unknown;
       try {

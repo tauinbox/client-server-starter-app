@@ -119,7 +119,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
         ? verifierOrMetaOrCallback
         : undefined;
 
-    const res = (req as Request & { res?: Response }).res;
+    const { res } = req as Request & { res?: Response };
     if (!res) {
       // Without a response the state is never persisted and the callback would
       // fail verification later with nothing pointing back here.

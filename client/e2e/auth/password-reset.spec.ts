@@ -70,7 +70,7 @@ test.describe('Password reset', () => {
       ([, userId]) => userId === mockId('user-2')
     );
     expect(tokenEntry).toBeTruthy();
-    const token = tokenEntry![0];
+    const [token] = tokenEntry!;
 
     // Navigate to reset-password with the token
     await page.goto(`/reset-password?token=${token}`);
@@ -133,7 +133,7 @@ test.describe('Password reset', () => {
       ([, userId]) => userId === mockId('user-2')
     );
     expect(tokenEntry).toBeTruthy();
-    const token = tokenEntry![0];
+    const [token] = tokenEntry!;
 
     // The token lives 30 minutes, so the test ages it instead of waiting.
     await _mockServer.expireToken(token);
@@ -206,7 +206,7 @@ test.describe('Password reset', () => {
     const tokenEntry = Object.entries(tokens.passwordResetTokens).find(
       ([, userId]) => userId === mockId('user-2')
     );
-    const token = tokenEntry![0];
+    const [token] = tokenEntry!;
 
     // Reset password via API
     await fetch(`${_mockServer.url}/api/v1/auth/reset-password`, {

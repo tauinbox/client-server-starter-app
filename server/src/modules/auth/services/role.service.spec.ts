@@ -2204,10 +2204,10 @@ describe('RoleService', () => {
       expectFannedOutTo(['u-1', 'u-2']);
       // The remove cascades to user_roles, so the holders are read before it;
       // the refetch the event triggers must see the role gone.
-      const queryOrder =
-        mockUserQueryBuilder.getMany.mock.invocationCallOrder[0];
-      const removeOrder = mockRoleRepo.delete.mock.invocationCallOrder[0];
-      const emitOrder = mockEventEmitter.emit.mock.invocationCallOrder[0];
+      const [queryOrder] =
+        mockUserQueryBuilder.getMany.mock.invocationCallOrder;
+      const [removeOrder] = mockRoleRepo.delete.mock.invocationCallOrder;
+      const [emitOrder] = mockEventEmitter.emit.mock.invocationCallOrder;
       expect(queryOrder).toBeLessThan(removeOrder);
       expect(emitOrder).toBeGreaterThan(removeOrder);
     });

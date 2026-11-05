@@ -8,7 +8,7 @@ import { AuthStore } from '@features/auth/store/auth.store';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
 
 function getRootRedirect(): RedirectFunction {
-  const root = routes[0];
+  const [root] = routes;
   if (typeof root?.redirectTo !== 'function') {
     throw new Error(
       'Root route is expected to define redirectTo as a function'

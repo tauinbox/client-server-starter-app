@@ -544,7 +544,7 @@ describe('UsersService', () => {
 
       const andWhereCalls = mockQueryBuilder.andWhere.mock.calls as unknown[][];
       const bracketsCall = andWhereCalls.find((call) => {
-        const first = call[0];
+        const [first] = call;
         return (
           typeof first === 'object' &&
           first !== null &&
@@ -1457,9 +1457,9 @@ describe('UsersService', () => {
     it('should bind the lockout threshold instead of inlining it', async () => {
       await service.incrementFailedAttemptsAndLockIfNeeded('user-1', 7, 900000);
 
-      const updateSet = (
-        mockUpdateQb.set.mock.calls[0] as [{ lockedUntil: () => string }]
-      )[0];
+      const [updateSet] = mockUpdateQb.set.mock.calls[0] as [
+        { lockedUntil: () => string }
+      ];
       const lockedUntilSql = updateSet.lockedUntil();
 
       expect(lockedUntilSql).toContain(':maxAttempts::int');

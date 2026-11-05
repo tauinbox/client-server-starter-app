@@ -457,7 +457,7 @@ export class BillingEventReducer {
       );
       return;
     }
-    const customerId = payload.ref.customerId;
+    const { customerId } = payload.ref;
     const selfManaged = lifecycleOwnerFor(provider) === 'self';
 
     // The core already recorded this off-session charge's invoice: settle an
@@ -812,7 +812,7 @@ export class BillingEventReducer {
     provider: BillingProviderId,
     payload: NormalizedPaymentMethodPayload
   ): Promise<void> {
-    const customerId = payload.ref.customerId;
+    const { customerId } = payload.ref;
     const saved = payload.savedPaymentMethod;
     if (!customerId || !saved) {
       this.logger.warn(

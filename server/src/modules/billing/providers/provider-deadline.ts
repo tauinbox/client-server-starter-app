@@ -217,7 +217,7 @@ export class DeadlineBoundProvider implements PaymentProvider {
     try {
       const calls: Promise<T>[] = [call()];
       if (this.timeoutMs !== null) {
-        const timeoutMs = this.timeoutMs;
+        const { timeoutMs } = this;
         calls.push(
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(

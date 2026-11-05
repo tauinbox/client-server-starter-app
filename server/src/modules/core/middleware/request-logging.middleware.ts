@@ -6,7 +6,7 @@ import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 // Health probes (docker healthcheck, every 30s) and Prometheus scrapes
 // (every 15s) would dominate the request log; keep them out of it.
 function isObservabilityPoll(originalUrl: string): boolean {
-  const path = originalUrl.split('?')[0];
+  const [path] = originalUrl.split('?');
   return path.startsWith('/api/health/') || path === '/metrics';
 }
 
@@ -24,7 +24,7 @@ export class RequestLoggingMiddleware implements NestMiddleware {
     const logLevel = (process.env['REQUEST_LOG_LEVEL'] || 'all').toLowerCase();
 
     res.on('finish', () => {
-      const statusCode = res.statusCode;
+      const { statusCode } = res;
 
       if (logLevel === 'error' && statusCode < 500) return;
       if (logLevel === 'warn' && statusCode < 400) return;

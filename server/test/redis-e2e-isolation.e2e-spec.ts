@@ -8,7 +8,7 @@ import {
   withRedisDatabase
 } from './redis-e2e-isolation';
 
-const REDIS_URL = process.env['REDIS_URL'];
+const { REDIS_URL } = process.env;
 const runWithRedis = REDIS_URL ? describe : describe.skip;
 
 function writeEnvFile(contents: string): string {

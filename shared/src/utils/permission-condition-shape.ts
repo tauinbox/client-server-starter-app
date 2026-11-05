@@ -58,7 +58,7 @@ export function findOwnershipShapeError(value: unknown): string | null {
   if (keys.length !== 1 || keys[0] !== 'userField') {
     return 'ownership must have exactly one key "userField"';
   }
-  const userField = value['userField'];
+  const { userField } = value;
   if (typeof userField !== 'string' || userField.trim().length === 0) {
     return 'ownership.userField must be a non-empty string';
   }

@@ -181,7 +181,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
 
   #buildStructuredContext(): PreviewFlagContext | null {
     const ctx: PreviewFlagContext = {};
-    const user = this.selectedUser()[0];
+    const [user] = this.selectedUser();
     if (user) ctx.userId = user.value;
     const roles = this.selectedRoles().map((c) => c.value);
     if (roles.length > 0) ctx.roles = roles;

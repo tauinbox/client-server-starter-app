@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import { RedisThrottlerStorage } from '../src/modules/core/redis-throttler.storage';
 
-const REDIS_URL = process.env['REDIS_URL'];
+const { REDIS_URL } = process.env;
 const KEY = 'e2e-throttler:login:203.0.113.7';
 const BLOCK_KEY = `${KEY}:block`;
 

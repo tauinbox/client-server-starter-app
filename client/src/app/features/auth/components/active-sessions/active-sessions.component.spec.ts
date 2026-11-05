@@ -191,7 +191,7 @@ describe('ActiveSessionsComponent', () => {
   it('renders a user agent as text, never as markup', async () => {
     const host = await create();
 
-    const device = host.querySelectorAll('.sessions-device')[1];
+    const [, device] = host.querySelectorAll('.sessions-device');
     expect(device.querySelector('img')).toBeNull();
     expect(device.textContent).toContain('<img src=x onerror=alert(1)>');
   });

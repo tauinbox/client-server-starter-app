@@ -74,7 +74,7 @@ export class MfaChallengeComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    const mfaToken = this.challenge().mfaToken;
+    const { mfaToken } = this.challenge();
     const code = this.codeModel().code.trim();
     const request$ = this.usingRecoveryCode()
       ? this.#authService.verifyMfaRecoveryCode(mfaToken, code)

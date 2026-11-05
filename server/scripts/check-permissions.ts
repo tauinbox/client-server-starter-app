@@ -114,7 +114,7 @@ function parseRegisterResource(
   const args = decoratorArgs(d);
   if (!args?.length) return undefined;
 
-  const arg = args[0];
+  const [arg] = args;
   if (!ts.isObjectLiteralExpression(arg)) return undefined;
 
   let name: string | undefined;

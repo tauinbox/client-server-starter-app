@@ -85,9 +85,9 @@ export function activateSubscription(
 
   // Reuse the latest open subscription if present, else create one.
   const customerId = customer.id;
-  const existing = [...state.billingSubscriptions.values()]
+  const [existing] = [...state.billingSubscriptions.values()]
     .filter((s) => s.customerId === customerId && s.status !== 'canceled')
-    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const subscription: MockSubscription = existing ?? {
     id: randomUUID(),

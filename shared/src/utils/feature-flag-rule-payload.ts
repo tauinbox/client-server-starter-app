@@ -49,7 +49,7 @@ export function parseFeatureFlagRulePayload(
     return fail('Rule payload must be an object');
   }
   const p = payload as Record<string, unknown>;
-  const type = p['type'];
+  const { type } = p;
 
   if (!FEATURE_FLAG_RULE_TYPES.includes(type as FeatureFlagRuleType)) {
     return fail(
@@ -59,7 +59,7 @@ export function parseFeatureFlagRulePayload(
 
   switch (type as FeatureFlagRuleType) {
     case 'user': {
-      const userIds = p['userIds'];
+      const { userIds } = p;
       if (!isBoundedArray(userIds, FEATURE_FLAG_USER_IDS_MAX_ITEMS, isUserId)) {
         return fail(
           `user rule requires userIds: an array of up to ${FEATURE_FLAG_USER_IDS_MAX_ITEMS} UUIDs`
@@ -68,7 +68,7 @@ export function parseFeatureFlagRulePayload(
       return { ok: true, payload: { type: 'user', userIds } };
     }
     case 'role': {
-      const roleNames = p['roleNames'];
+      const { roleNames } = p;
       if (
         !isBoundedArray(
           roleNames,
@@ -83,7 +83,7 @@ export function parseFeatureFlagRulePayload(
       return { ok: true, payload: { type: 'role', roleNames } };
     }
     case 'percentage': {
-      const percent = p['percent'];
+      const { percent } = p;
       // The bucket is an integer 0-99, so a fraction rounds the share up.
       if (
         typeof percent !== 'number' ||
@@ -93,7 +93,7 @@ export function parseFeatureFlagRulePayload(
       ) {
         return fail('percentage rule requires percent: an integer in [0, 100]');
       }
-      const bucketBy = p['bucketBy'];
+      const { bucketBy } = p;
       if (
         bucketBy !== undefined &&
         !FEATURE_FLAG_BUCKET_BY.includes(bucketBy as FeatureFlagBucketBy)
@@ -114,10 +114,7 @@ export function parseFeatureFlagRulePayload(
       };
     }
     case 'attribute': {
-      const field = p['field'];
-      const op = p['op'];
-      const value = p['value'];
-      const customKey = p['customKey'];
+      const { field, op, value, customKey } = p;
       if (
         typeof field !== 'string' ||
         !FEATURE_FLAG_ATTRIBUTE_FIELDS.includes(

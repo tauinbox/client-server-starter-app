@@ -318,7 +318,7 @@ runWithInfra(
 
       const name = `${prefix}-working`;
       const created = await api().post('/roles').send({ name }).expect(201);
-      const id = (created.body as { id: string }).id;
+      const { id } = created.body as { id: string };
       await api()
         .patch(`/roles/${id}`)
         .send({ description: 'working' })

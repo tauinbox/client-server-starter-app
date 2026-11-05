@@ -206,7 +206,7 @@ function namedKeys(): { name: string; value: string }[] {
   return Object.entries(ErrorKeys).flatMap(([group, keys]) =>
     Object.entries(keys).map(([key, value]) => ({
       name: `${group}.${key}`,
-      value: value
+      value
     }))
   );
 }
@@ -229,7 +229,7 @@ export function findProblems(
       }
       continue;
     }
-    const keyName = name.split('.')[1];
+    const [, keyName] = name.split('.');
     const rule = RULES.find((r) => r.pattern.test(keyName));
     if (!rule) {
       problems.push(

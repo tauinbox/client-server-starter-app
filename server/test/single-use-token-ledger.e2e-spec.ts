@@ -6,7 +6,7 @@ import { createClient } from '@keyv/redis';
 import { buildCacheOptions } from '../src/modules/core/redis-cache.store';
 import { SingleUseTokenLedger } from '../src/common/utils/single-use-token-ledger';
 
-const REDIS_URL = process.env['REDIS_URL'];
+const { REDIS_URL } = process.env;
 const KEY_PREFIX = 'e2e-ledger:spent:';
 const CLAIM_ID = 'token-id';
 
