@@ -60,9 +60,9 @@ function findDrift(workspaces) {
     if (entries.length < 2) continue;
 
     const ranges = new Set(entries.map(({ range }) => range));
-    const locked = new Set(entries.map((entry) => entry.locked));
+    const versions = new Set(entries.map(({ locked }) => locked));
 
-    if (ranges.size > 1 || locked.size > 1) drift.push({ dep, entries });
+    if (ranges.size > 1 || versions.size > 1) drift.push({ dep, entries });
   }
 
   return drift;
