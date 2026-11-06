@@ -12,7 +12,11 @@ import cookieParser from 'cookie-parser';
 import * as crypto from 'crypto';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { generateSync } from 'otplib';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { normalizeOtpCode } from '@app/shared/utils/otp-code';
+import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.service';
+import { hashToken } from '../src/common/utils/hash-token';
 import { ErrorKeys, requiresSecureCookies } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard';
@@ -26,7 +30,11 @@ import { withPrivateThrottlerStorage } from './private-throttler';
 // all. Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
+const TOTP_SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+const RECOVERY_CODE = 'ABCDEFGH-IJKLMNOP';
+
 runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
+  const previousKey = process.env['MFA_ENCRYPTION_KEY'];
   let app: INestApplication;
   let dataSource: DataSource;
   let oauthDataCookieName: string;
@@ -68,7 +76,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
   const exchange = async (
     callbackResponse: request.Response,
     requestId: string
-  ): Promise<void> => {
+  ): Promise<request.Response> => {
     const header = callbackResponse.headers['set-cookie'] as
       string[] | string | undefined;
     const lines = Array.isArray(header) ? header : [header ?? ''];
@@ -78,7 +86,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
 
     if (!oauthData) throw new Error('the callback set no oauth_data cookie');
 
-    await request(app.getHttpServer() as Server)
+    return request(app.getHttpServer() as Server)
       .post('/api/v1/auth/oauth/exchange')
       .set('X-Request-Id', requestId)
       .set('Cookie', oauthData)
@@ -131,6 +139,9 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
   };
 
   beforeAll(async () => {
+    process.env['MFA_ENCRYPTION_KEY'] = crypto
+      .randomBytes(32)
+      .toString('base64');
     const moduleRef: TestingModule = await withPrivateThrottlerStorage(
       Test.createTestingModule({ imports: [CoreModule.forRoot()] })
     )
@@ -154,6 +165,9 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
   }, 60000);
 
   afterAll(async () => {
+    if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
+    else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+
     if (emails.length) {
       const users = await dataSource
         ?.getRepository(User)
@@ -232,6 +246,62 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
 
     expect(await settledRows(requestId, 0)).toEqual([]);
   });
+
+  // The pending token carries the provider, so the row of the finished
+  // sign-in names it as the exchange row of an account with no factor does.
+  it.each([
+    {
+      route: 'verify',
+      body: (mfaToken: string) => ({
+        mfaToken,
+        code: generateSync({ secret: TOTP_SECRET })
+      })
+    },
+    {
+      route: 'recovery',
+      body: (mfaToken: string) => ({ mfaToken, recoveryCode: RECOVERY_CODE })
+    }
+  ])(
+    'records the provider in the sign-in row that POST /auth/mfa/$route writes',
+    async ({ route, body }) => {
+      currentProfile = newProfile();
+      await linkedAccount(currentProfile, {
+        totpSecret: app.get(SecretEncryptionService).encrypt(TOTP_SECRET),
+        totpEnabledAt: new Date(),
+        totpRecoveryCodes: [hashToken(normalizeOtpCode(RECOVERY_CODE))]
+      });
+      const exchangeId = `oauth-audit-mfa-exchange-${crypto.randomUUID()}`;
+      const verifyId = `oauth-audit-mfa-${route}-${crypto.randomUUID()}`;
+
+      const challenge = await exchange(
+        await callback(`oauth-audit-mfa-cb-${crypto.randomUUID()}`),
+        exchangeId
+      );
+      const { mfaRequired, mfaToken } = challenge.body as {
+        mfaRequired: boolean;
+        mfaToken: string;
+      };
+
+      expect(mfaRequired).toBe(true);
+
+      await request(app.getHttpServer() as Server)
+        .post(`/api/v1/auth/mfa/${route}`)
+        .set('X-Request-Id', verifyId)
+        .send(body(mfaToken))
+        .expect(200);
+
+      const rows = (await settledRows(verifyId, 1)).filter(
+        ({ action }) => action === AuditAction.USER_LOGIN_SUCCESS
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].details).toEqual({
+        factor: 'mfa',
+        method: 'oauth',
+        provider: 'google'
+      });
+    }
+  );
 
   it('records a failure with its reason for a deactivated account', async () => {
     currentProfile = newProfile();

@@ -241,6 +241,10 @@ describe('OAuthService', () => {
         mfaToken: 'mock-mfa-token',
         expiresIn: 300
       });
+      expect(mockMfaService.issuePendingToken).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'oauth-user-1' }),
+        { provider: 'google' }
+      );
     });
 
     it('should return the User entity instance so @Exclude() fields can be stripped downstream', async () => {

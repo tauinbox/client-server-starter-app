@@ -20,11 +20,10 @@ import { Throttle } from '@nestjs/throttler';
 import { Request as ExpressRequest, Response } from 'express';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuthService } from '../services/auth.service';
-import { MfaService } from '../services/mfa.service';
+import { MfaService, PendingSignIn } from '../services/mfa.service';
 import { UsersService } from '../../users/services/users.service';
 import { Public } from '../decorators/public.decorator';
 import { JwtAuthRequest } from '../types/auth.request';
-import { User } from '../../users/entities/user.entity';
 import { AuthResponseDto } from '../dtos/auth-response.dto';
 import {
   MfaEnableDto,
@@ -202,13 +201,13 @@ export class MfaController {
     @Body() dto: MfaVerifyDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const user = await this.mfaService.verifyChallenge(
+    const pending = await this.mfaService.verifyChallenge(
       dto.mfaToken,
       dto.code,
       extractAuditContext(req)
     );
 
-    return await this.issueSession(user, req, res);
+    return await this.issueSession(pending, req, res);
   }
 
   @Public()
@@ -227,21 +226,31 @@ export class MfaController {
     @Body() dto: MfaRecoveryDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const user = await this.mfaService.consumeRecoveryCode(
+    const pending = await this.mfaService.consumeRecoveryCode(
       dto.mfaToken,
       dto.recoveryCode,
       extractAuditContext(req)
     );
 
-    return await this.issueSession(user, req, res);
+    return await this.issueSession(pending, req, res);
   }
 
   /**
    * The second factor is the last gate, so the sign-in is only complete here.
    * The audit entry and the metric belong to this point rather than to the
-   * password check that preceded it.
+   * password check that preceded it. A provider round trip keeps its method
+   * and provider in the row, as the exchange row of an account with no factor
+   * does.
    */
-  private issueSession(user: User, req: ExpressRequest, res: Response) {
-    return this.signIn.complete(user, { req, res }, { factor: 'mfa' });
+  private issueSession(
+    { user, provider }: PendingSignIn,
+    req: ExpressRequest,
+    res: Response
+  ) {
+    return this.signIn.complete(
+      user,
+      { req, res },
+      { factor: 'mfa', ...(provider && { method: 'oauth', provider }) }
+    );
   }
 }

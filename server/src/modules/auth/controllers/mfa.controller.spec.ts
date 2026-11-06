@@ -92,8 +92,8 @@ describe('MfaController', () => {
       regenerateRecoveryCodes: jest
         .fn()
         .mockResolvedValue({ recoveryCodes: ['QRSTUVWX-YZ234567'] }),
-      verifyChallenge: jest.fn().mockResolvedValue(mockUser),
-      consumeRecoveryCode: jest.fn().mockResolvedValue(mockUser)
+      verifyChallenge: jest.fn().mockResolvedValue({ user: mockUser }),
+      consumeRecoveryCode: jest.fn().mockResolvedValue({ user: mockUser })
     };
     auditService = { logFireAndForget: jest.fn() };
     metricsService = { recordAuthEvent: jest.fn() };
@@ -353,6 +353,26 @@ describe('MfaController', () => {
       );
     });
 
+    it('names the provider when a provider round trip started the sign-in', async () => {
+      mfaService.verifyChallenge.mockResolvedValue({
+        user: mockUser,
+        provider: 'google'
+      });
+
+      await controller.verify(
+        publicRequest(),
+        { mfaToken: 'pending', code: '123456' },
+        res
+      );
+
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGIN_SUCCESS,
+          details: { factor: 'mfa', method: 'oauth', provider: 'google' }
+        })
+      );
+    });
+
     it('issues no session when the code is refused', async () => {
       mfaService.verifyChallenge.mockRejectedValue(
         new HttpException(
@@ -404,6 +424,26 @@ describe('MfaController', () => {
       );
       expect(result.user).toBe(mockUser);
       expect(res.cookie).toHaveBeenCalled();
+    });
+
+    it('names the provider when a provider round trip started the sign-in', async () => {
+      mfaService.consumeRecoveryCode.mockResolvedValue({
+        user: mockUser,
+        provider: 'github'
+      });
+
+      await controller.recovery(
+        publicRequest(),
+        { mfaToken: 'pending', recoveryCode: 'ABCDEFGH-IJKLMNOP' },
+        res
+      );
+
+      expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGIN_SUCCESS,
+          details: { factor: 'mfa', method: 'oauth', provider: 'github' }
+        })
+      );
     });
 
     it('ends the session of the refresh cookie the browser presented', async () => {

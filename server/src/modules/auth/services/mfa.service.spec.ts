@@ -638,10 +638,46 @@ describe('MfaService', () => {
         }),
         expect.objectContaining({ expiresIn: 300 })
       );
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.not.objectContaining({ provider: expect.anything() }),
+        expect.anything()
+      );
+    });
+
+    it('signs the provider of a provider round trip', () => {
+      service.issuePendingToken(buildUser(), { provider: 'google' });
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          purpose: TOKEN_PURPOSE.MFA_PENDING,
+          provider: 'google'
+        }),
+        expect.anything()
+      );
     });
   });
 
   describe('verifyChallenge', () => {
+    it('returns the provider that the pending token carries', async () => {
+      const { user, secret } = await enrol();
+      const enabled = buildUser({
+        totpSecret: user.totpSecret,
+        totpEnabledAt: new Date()
+      });
+
+      jwtService.verify.mockReturnValue({
+        sub: 'user-1',
+        purpose: TOKEN_PURPOSE.MFA_PENDING,
+        provider: 'google',
+        iat: Math.floor(Date.now() / 1000)
+      });
+      repository.findOne.mockResolvedValue(enabled);
+
+      await expect(
+        service.verifyChallenge('token', generateSync({ secret }))
+      ).resolves.toEqual({ user: enabled, provider: 'google' });
+    });
+
     it('returns the account for a correct code', async () => {
       const { user, secret } = await enrol();
       const enabled = buildUser({
@@ -658,7 +694,7 @@ describe('MfaService', () => {
 
       await expect(
         service.verifyChallenge('token', generateSync({ secret }))
-      ).resolves.toBe(enabled);
+      ).resolves.toEqual({ user: enabled });
     });
 
     it('refuses a wrong code and records the failure', async () => {
@@ -1253,9 +1289,9 @@ describe('MfaService', () => {
       repository.findOne.mockResolvedValue(enabled);
       const code = generateSync({ secret });
 
-      await expect(service.verifyChallenge('token', code)).resolves.toBe(
-        enabled
-      );
+      await expect(service.verifyChallenge('token', code)).resolves.toEqual({
+        user: enabled
+      });
       persistLedger(enabled);
 
       // The pending token outlives the code by minutes, so the whole replay

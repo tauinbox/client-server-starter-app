@@ -96,8 +96,14 @@ function challengeLockedEnvelope(remainingMs: number): StepUpErrorEnvelope {
   );
 }
 
-/** Resolves the account behind an mfa-pending token, or null. */
-function userFromPendingToken(mfaToken: unknown): MockUser | null {
+/** The account a second-factor step signs in, and its provider if any. */
+interface PendingSignIn {
+  user: MockUser;
+  provider?: string;
+}
+
+/** Resolves the sign-in behind an mfa-pending token, or null. */
+function signInFromPendingToken(mfaToken: unknown): PendingSignIn | null {
   if (typeof mfaToken !== 'string') return null;
 
   const decoded = decodeToken(mfaToken);
@@ -120,12 +126,23 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
   // A sign-out everywhere since the password check must end this attempt too.
   if (issuedBeforeRevocation(decoded.iat, user.tokenRevokedAt)) return null;
 
-  return user;
+  const { provider } = decoded;
+
+  return typeof provider === 'string' && provider !== ''
+    ? { user, provider }
+    : { user };
 }
 
 /** The sign-in the password alone did not buy. */
-function issueSession(req: Request, res: Response, user: MockUser): void {
-  completeSignIn({ req, res }, user, { factor: 'mfa' });
+function issueSession(
+  req: Request,
+  res: Response,
+  { user, provider }: PendingSignIn
+): void {
+  completeSignIn({ req, res }, user, {
+    factor: 'mfa',
+    ...(provider && { method: 'oauth', provider })
+  });
 }
 
 // POST /api/v1/auth/mfa/setup
@@ -360,13 +377,15 @@ router.post('/verify', (req, res) => {
     return;
   }
 
-  const user = userFromPendingToken(mfaToken);
+  const pending = signInFromPendingToken(mfaToken);
 
-  if (!user) {
+  if (!pending) {
     sendInvalidPendingToken(res);
 
     return;
   }
+
+  const { user } = pending;
 
   // As on the server: an attempt on a barred account is counted and audited.
   const barred = readChallengeFailures(user.id).count >= MAX_FAILED_ATTEMPTS;
@@ -399,7 +418,7 @@ router.post('/verify', (req, res) => {
   }
 
   clearChallengeFailures(user.id);
-  issueSession(req, res, user);
+  issueSession(req, res, pending);
 });
 
 /** Mirrors `RECOVERY_CODE_PATTERN` in the server DTO, legacy two-group form included. */
@@ -422,14 +441,15 @@ router.post('/recovery', (req, res) => {
     return;
   }
 
-  const user = userFromPendingToken(mfaToken);
+  const pending = signInFromPendingToken(mfaToken);
 
-  if (!user) {
+  if (!pending) {
     sendInvalidPendingToken(res);
 
     return;
   }
 
+  const { user } = pending;
   const target = normalizeOtpCode(recoveryCode);
   const remaining = (user.totpRecoveryCodes ?? []).filter(
     (stored) => normalizeOtpCode(stored) !== target
@@ -465,7 +485,7 @@ router.post('/recovery', (req, res) => {
   });
 
   clearChallengeFailures(user.id);
-  issueSession(req, res, user);
+  issueSession(req, res, pending);
 });
 
 export default router;

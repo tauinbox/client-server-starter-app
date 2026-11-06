@@ -187,7 +187,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
 
       await expect(
         mfaService.consumeRecoveryCode(mfaToken, recoveryCodes[0])
-      ).resolves.toMatchObject({ id: ownerId });
+      ).resolves.toMatchObject({ user: { id: ownerId } });
     });
 
     it('a wrong recovery code answers 401, not 500, and counts the lost row', async () => {
