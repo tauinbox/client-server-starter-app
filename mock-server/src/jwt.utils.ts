@@ -34,19 +34,21 @@ export function generateAccessToken(
 /**
  * What a correct password buys on an account that carries a second factor. It
  * carries the mfa-pending purpose, so authenticateRequest refuses it as a
- * bearer credential exactly as JwtStrategy does.
+ * bearer credential exactly as JwtStrategy does. A provider round trip signs
+ * its provider in, as the server does.
  */
 export function generateMfaPendingToken(
   user: MockUser,
-  expiresInSeconds = MFA_PENDING_TOKEN_EXPIRY_SECONDS
+  { provider }: { provider?: string } = {}
 ): string {
   const header = base64url({ alg: 'HS256', typ: 'JWT' });
   const payload = base64url({
     sub: user.id,
     email: user.email,
     purpose: TOKEN_PURPOSE.MFA_PENDING,
+    ...(provider && { provider }),
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + expiresInSeconds
+    exp: Math.floor(Date.now() / 1000) + MFA_PENDING_TOKEN_EXPIRY_SECONDS
   });
 
   return `${header}.${payload}.mock-signature`;
@@ -82,6 +84,7 @@ export interface DecodedToken {
   email: string;
   purpose?: string;
   sid?: string;
+  provider?: unknown;
   iat: number;
   exp: number;
 }

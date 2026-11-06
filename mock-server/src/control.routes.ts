@@ -239,7 +239,7 @@ router.post('/oauth-data', (req, res) => {
       userId: user.id,
       challenge: {
         mfaRequired: true,
-        mfaToken: generateMfaPendingToken(user),
+        mfaToken: generateMfaPendingToken(user, { provider }),
         expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
       },
       issuedAt,

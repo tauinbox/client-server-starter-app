@@ -28,11 +28,14 @@ beforeEach(() => {
   resetState();
 });
 
-async function issueOAuthData(userId: string): Promise<string> {
+async function issueOAuthData(
+  userId: string,
+  { provider }: { provider?: string } = {}
+): Promise<string> {
   const res = await fetch(`${baseUrl}/__control/oauth-data`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ userId })
+    body: JSON.stringify({ userId, provider })
   });
 
   expect(res.status).toBe(200);
@@ -130,6 +133,42 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     expect(verified.status).toBe(200);
     expect(verified.headers.get('set-cookie')).toContain('refresh_token=');
   });
+
+  it.each([
+    { route: 'verify', body: { code: MOCK_TOTP_CODE } },
+    { route: 'recovery', body: { recoveryCode: 'ABCDEFGH-IJKLMNOP' } }
+  ])(
+    'records the provider in the sign-in row that POST /auth/mfa/$route writes',
+    async ({ route, body }) => {
+      const admin = findUserByEmail('admin@example.com');
+
+      admin!.totpEnabledAt = new Date().toISOString();
+      admin!.totpRecoveryCodes = ['ABCDEFGH-IJKLMNOP'];
+
+      const token = await issueOAuthData(admin!.id, { provider: 'github' });
+      const { mfaToken } = (await (await exchange(token)).json()) as {
+        mfaToken: string;
+      };
+
+      const res = await fetch(`${baseUrl}/api/v1/auth/mfa/${route}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mfaToken, ...body })
+      });
+
+      expect(res.status).toBe(200);
+      const rows = getState().auditLogs.filter(
+        (l) => l.action === 'USER_LOGIN_SUCCESS'
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].details).toEqual({
+        factor: 'mfa',
+        method: 'oauth',
+        provider: 'github'
+      });
+    }
+  );
 
   it('401swithout the cookie', async () => {
     const res = await exchange();

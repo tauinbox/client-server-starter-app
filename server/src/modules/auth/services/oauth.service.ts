@@ -64,7 +64,12 @@ export class OAuthService {
     const user = await this.resolveUserForOAuth(profile, auditContext);
 
     if (user.totpEnabledAt) {
-      return { mfaRequired: true, ...this.mfaService.issuePendingToken(user) };
+      return {
+        mfaRequired: true,
+        ...this.mfaService.issuePendingToken(user, {
+          provider: profile.provider
+        })
+      };
     }
 
     return user;

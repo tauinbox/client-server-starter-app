@@ -73,6 +73,15 @@ export type StepUpCodeVerdict =
   | { kind: 'not_offered' }
   | { kind: 'refused'; lockedMs?: number };
 
+/**
+ * The account a second-factor step signs in, and the provider of the round
+ * trip that started it. A password sign-in has no provider.
+ */
+export interface PendingSignIn {
+  user: User;
+  provider?: string;
+}
+
 @Injectable()
 export class MfaService {
   private readonly logger = new Logger(MfaService.name);
@@ -396,25 +405,35 @@ export class MfaService {
   /**
    * What a correct password buys on an account that carries the factor. The
    * `mfa_pending` purpose is what stops it being usable as a bearer token:
-   * JwtStrategy accepts the access purpose only.
+   * JwtStrategy accepts the access purpose only. A provider round trip signs
+   * its provider in, so the audit row of the finished sign-in can name it.
    */
-  issuePendingToken(user: User): { mfaToken: string; expiresIn: number } {
+  issuePendingToken(
+    user: User,
+    { provider }: { provider?: string } = {}
+  ): { mfaToken: string; expiresIn: number } {
     return {
       mfaToken: this.jwtService.sign(
-        { sub: user.id, email: user.email, purpose: TOKEN_PURPOSE.MFA_PENDING },
+        {
+          sub: user.id,
+          email: user.email,
+          purpose: TOKEN_PURPOSE.MFA_PENDING,
+          ...(provider && { provider })
+        },
         { expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS }
       ),
       expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
     };
   }
 
-  /** Exchanges a pending token plus a code for the user behind it. */
+  /** Exchanges a pending token plus a code for the sign-in behind it. */
   async verifyChallenge(
     mfaToken: string,
     code: string,
     context?: AuditContext
-  ): Promise<User> {
-    const user = await this.userFromPendingToken(mfaToken);
+  ): Promise<PendingSignIn> {
+    const pending = await this.signInFromPendingToken(mfaToken);
+    const { user } = pending;
 
     // The attempt takes its slot before the code is checked. Reading the count
     // first lets every request of a concurrent burst see the same open budget,
@@ -449,7 +468,7 @@ export class MfaService {
 
     await this.#challengeFailures.clear(user.id);
 
-    return user;
+    return pending;
   }
 
   /**
@@ -460,8 +479,9 @@ export class MfaService {
     mfaToken: string,
     recoveryCode: string,
     context?: AuditContext
-  ): Promise<User> {
-    const user = await this.userFromPendingToken(mfaToken);
+  ): Promise<PendingSignIn> {
+    const pending = await this.signInFromPendingToken(mfaToken);
+    const { user } = pending;
     const digest = hashToken(normalizeOtpCode(recoveryCode));
 
     // Read and write under one lock. A plain read-then-write lets two requests
@@ -507,7 +527,7 @@ export class MfaService {
     // its job and must not keep them out of it for the rest of the window.
     await this.#challengeFailures.clear(user.id);
 
-    return user;
+    return pending;
   }
 
   /**
@@ -558,16 +578,18 @@ export class MfaService {
     return { kind: 'accepted' };
   }
 
-  private async userFromPendingToken(mfaToken: string): Promise<User> {
+  private async signInFromPendingToken(
+    mfaToken: string
+  ): Promise<PendingSignIn> {
     const invalidTokenError = new ApiError(
       ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN,
       'Two-factor sign-in is invalid or has expired'
     );
 
-    const payload = this.purposeTokens.verify<{ sub?: string }>(
-      mfaToken,
-      TOKEN_PURPOSE.MFA_PENDING
-    );
+    const payload = this.purposeTokens.verify<{
+      sub?: string;
+      provider?: unknown;
+    }>(mfaToken, TOKEN_PURPOSE.MFA_PENDING);
 
     if (
       payload === null ||
@@ -593,7 +615,11 @@ export class MfaService {
       throw invalidTokenError;
     }
 
-    return user;
+    const { provider } = payload;
+
+    return typeof provider === 'string' && provider !== ''
+      ? { user, provider }
+      : { user };
   }
 
   /**
