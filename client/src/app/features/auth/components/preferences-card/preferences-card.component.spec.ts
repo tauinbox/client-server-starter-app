@@ -88,6 +88,7 @@ describe('PreferencesCardComponent', () => {
     expect(component['locale']()).toBe('en');
     const toggles: NodeListOf<HTMLButtonElement> =
       fixture.nativeElement.querySelectorAll('mat-button-toggle button');
+
     expect([...toggles].every((b) => b.disabled)).toBe(true);
   });
 
@@ -99,6 +100,7 @@ describe('PreferencesCardComponent', () => {
 
   it('saves a new locale, switches the UI language and hands back the user', () => {
     const updates: UserResponse[] = [];
+
     component.userUpdated.subscribe((user) => updates.push(user));
 
     component.onLocaleChange('ru');
@@ -122,6 +124,7 @@ describe('PreferencesCardComponent', () => {
 
   it('puts the previous locale back when the save fails', () => {
     const httpError = new HttpErrorResponse({ status: 500 });
+
     authServiceMock.updateProfile.mockReturnValue(throwError(() => httpError));
 
     component.onLocaleChange('ru');

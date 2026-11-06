@@ -126,6 +126,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit } }
       ]
     }).compile();
+
     service = module.get(BillingUserService);
     reducer = module.get(BillingEventReducer);
 
@@ -137,6 +138,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
     const customer = await ds.getRepository(Customer).save(
       ds.getRepository(Customer).create({
@@ -149,6 +151,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
   });
 
@@ -159,6 +162,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -189,6 +193,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
     const customer = await ds
       .getRepository(Customer)
       .findOneByOrFail({ id: customerId });
+
     expect(customer.providerOverride).toBe('paddle');
   });
 

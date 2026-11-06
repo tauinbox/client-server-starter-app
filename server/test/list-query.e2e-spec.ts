@@ -43,6 +43,7 @@ runWithInfra('List search and filters (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -58,6 +59,7 @@ runWithInfra('List search and filters (e2e)', () => {
       .findOneByOrFail({ isSuper: true });
     const usersService = app.get(UsersService);
     const adminId = await userId(adminEmail);
+
     await app
       .get(RoleService)
       .assignRoleToUser(adminId, superRole.id, { ability: SYSTEM_ABILITY });
@@ -67,6 +69,7 @@ runWithInfra('List search and filters (e2e)', () => {
         userAgent: 'list-query-e2e',
         ipAddress: null
       });
+
     token = tokens.access_token;
   }, 60000);
 
@@ -97,6 +100,7 @@ runWithInfra('List search and filters (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return found.id;
   }
 
@@ -105,6 +109,7 @@ runWithInfra('List search and filters (e2e)', () => {
     const rows: T[] = [];
     let cursor: string | null = null;
     let guard = 0;
+
     do {
       const res = await request(http())
         .get(`/api/v1/${path}`)
@@ -117,10 +122,12 @@ runWithInfra('List search and filters (e2e)', () => {
         data: T[];
         meta: { nextCursor: string | null };
       };
+
       rows.push(...body.data);
       cursor = body.meta.nextCursor;
       guard += 1;
     } while (cursor && guard < 50);
+
     return rows;
   }
 
@@ -151,6 +158,7 @@ runWithInfra('List search and filters (e2e)', () => {
         },
         { key: keys.staging, enabled: false, environments: ['staging'] }
       ];
+
       for (const body of bodies) {
         await request(http())
           .post('/api/v1/admin/feature-flags')
@@ -165,6 +173,7 @@ runWithInfra('List search and filters (e2e)', () => {
         'admin/feature-flags/cursor',
         query
       );
+
       return sorted(rows.map((row) => row.key));
     }
 
@@ -256,6 +265,7 @@ runWithInfra('List search and filters (e2e)', () => {
         'rbac/resources/cursor',
         query
       );
+
       return sorted(rows.map((row) => row.name));
     }
 
@@ -288,6 +298,7 @@ runWithInfra('List search and filters (e2e)', () => {
         'roles',
         'users'
       ];
+
       expect(names.filter((name) => registered.includes(name))).toEqual(
         registered
       );
@@ -308,7 +319,9 @@ runWithInfra('List search and filters (e2e)', () => {
 
     beforeAll(async () => {
       for (const email of Object.values(emails)) await register(email);
+
       const users = dataSource.getRepository(User);
+
       await users.update(
         { email: emails.mfa },
         { totpEnabledAt: new Date(), isEmailVerified: true }
@@ -328,6 +341,7 @@ runWithInfra('List search and filters (e2e)', () => {
         'users/search/cursor',
         `q=${stamp}-&${query}`
       );
+
       return sorted(rows.map((row) => row.email));
     }
 

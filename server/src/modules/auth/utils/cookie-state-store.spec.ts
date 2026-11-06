@@ -11,10 +11,12 @@ import type OAuth2Strategy from 'passport-oauth2';
 function mockReqRes(cookies: Record<string, string> = {}) {
   const cookieFn = jest.fn((name: string, value: string) => {
     cookies[name] = value;
+
     return res;
   });
   const clearCookieFn = jest.fn((name: string) => {
     delete cookies[name];
+
     return res;
   });
 
@@ -35,15 +37,18 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 /** Builds the cookie value the store writes: `<state>-<expiresAt>` entries. */
 function pendingCookie(...states: string[]): string {
   const expiresAt = Date.now() + FIVE_MINUTES_MS;
+
   return states.map((state) => `${state}-${expiresAt}`).join('.');
 }
 
 function storeSync(store: CookieStateStore, req: Request): string {
   let captured: string | undefined;
+
   store.store(req, (err, state) => {
     expect(err).toBeNull();
     captured = state as string;
   });
+
   return captured!;
 }
 
@@ -53,10 +58,12 @@ function verifySync(
   providedState: string
 ): boolean | string {
   let captured: boolean | string | undefined;
+
   store.verify(req, providedState, (err, ok) => {
     expect(err).toBeNull();
     captured = ok;
   });
+
   return captured!;
 }
 
@@ -128,6 +135,7 @@ describe('CookieStateStore', () => {
       });
 
       const state = storeSync(store, req);
+
       expect(readIntentForFlow(cookies['__Host-oauth_link'], state)).toBe(
         'link-token'
       );
@@ -146,6 +154,7 @@ describe('CookieStateStore', () => {
       const collectState = (err: Error | null, state?: string) => {
         expect(err).toBeNull();
         states.push(state!);
+
         if (states.length === 2) {
           expect(states[0]).not.toBe(states[1]);
           done();
@@ -351,10 +360,12 @@ describe('CookieStateStore', () => {
     function storeWithVerifier(req: Request, verifier: string): string {
       const store = new CookieStateStore(OAuthProvider.GOOGLE, false);
       let captured: string | undefined;
+
       store.store(req, verifier, undefined, META, (err, state) => {
         expect(err).toBeNull();
         captured = state as string;
       });
+
       return captured!;
     }
 
@@ -417,6 +428,7 @@ describe('CookieStateStore', () => {
       const vk = new CookieStateStore(OAuthProvider.VK, false);
 
       const googleState = storeSync(google, mockReqRes(jar).req);
+
       storeSync(vk, mockReqRes(jar).req);
 
       expect(verifySync(vk, mockReqRes(jar).req, googleState)).toBe(false);

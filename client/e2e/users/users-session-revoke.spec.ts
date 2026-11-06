@@ -24,8 +24,10 @@ async function signInTarget(mockServerUrl: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: TARGET_EMAIL, password: PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -36,6 +38,7 @@ async function profileStatus(
   const res = await fetch(`${mockServerUrl}/api/v1/auth/profile`, {
     headers: { authorization: `Bearer ${token}` }
   });
+
   return res.status;
 }
 
@@ -46,6 +49,7 @@ test.describe('Sign out everywhere by an administrator', () => {
   }) => {
     await _mockServer.seedUsers([target]);
     const token = await signInTarget(_mockServer.url);
+
     expect(await profileStatus(_mockServer.url, token)).toBe(200);
 
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
@@ -53,6 +57,7 @@ test.describe('Sign out everywhere by an administrator', () => {
     await page.getByRole('button', { name: 'Sign out everywhere' }).click();
 
     const dialog = page.getByRole('dialog');
+
     await expect(dialog.getByText('John Smith')).toBeVisible();
     await dialog.getByRole('button', { name: 'Sign out', exact: true }).click();
 

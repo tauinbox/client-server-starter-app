@@ -62,11 +62,13 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
   describe('navLinks', () => {
     it('is empty when user has no admin permissions', () => {
       const service = setup();
+
       expect(service.navLinks()).toEqual([]);
     });
 
     it('contains the admin link when user can access the admin panel', () => {
       const service = setup();
+
       adminAccessSignal.set(true);
 
       expect(service.navLinks()).toHaveLength(1);
@@ -79,6 +81,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
 
     it('reactively updates when permissions change', () => {
       const service = setup();
+
       expect(service.navLinks()).toEqual([]);
 
       adminAccessSignal.set(true);
@@ -90,6 +93,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
 
     it('contains the billing link only when the billing flag is enabled', () => {
       const service = setup();
+
       expect(service.navLinks()).toEqual([]);
 
       billingSignal.set(true);
@@ -103,6 +107,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
 
     it('orders admin before billing when both are visible', () => {
       const service = setup();
+
       adminAccessSignal.set(true);
       billingSignal.set(true);
 
@@ -116,17 +121,20 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
   describe('defaultRoute', () => {
     it('falls back to /profile when no nav links are accessible', () => {
       const service = setup();
+
       expect(service.defaultRoute()).toBe('/profile');
     });
 
     it('returns the first accessible nav link route', () => {
       const service = setup();
+
       adminAccessSignal.set(true);
       expect(service.defaultRoute()).toBe('/admin');
     });
 
     it('flips between first nav link and /profile as permissions change', () => {
       const service = setup();
+
       expect(service.defaultRoute()).toBe('/profile');
 
       adminAccessSignal.set(true);
@@ -138,6 +146,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
 
     it('never lands on billing — falls back to /profile when only billing is visible', () => {
       const service = setup();
+
       billingSignal.set(true);
       expect(service.navLinks()).toHaveLength(1);
       expect(service.defaultRoute()).toBe('/profile');
@@ -146,6 +155,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
   describe('isWide (persisted, user-writable)', () => {
     it('restores a stored true', () => {
       const service = setup(true);
+
       userSignal.set({ id: 'u1' });
       TestBed.tick();
 
@@ -154,6 +164,7 @@ describe('SidenavStateService — nav-link source and defaultRoute', () => {
 
     it('ignores a stored value that is not a boolean', () => {
       const service = setup('yes');
+
       userSignal.set({ id: 'u1' });
       TestBed.tick();
 

@@ -110,6 +110,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
         .update({ id: customerId }, { defaultPaymentMethodId: null });
       await ds.getRepository(PaymentMethod).delete({ customerId });
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -135,6 +136,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -148,10 +150,12 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     const periodStart = new Date(Date.now() - 31 * DAY_MS);
     const anchor = new Date(Date.now() - DAY_MS);
+
     subscription = await ds.getRepository(Subscription).save(
       ds.getRepository(Subscription).create({
         customerId: customer.id,
@@ -208,6 +212,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
         receiptRef: null
       })
     );
+
     await ds.transaction((m) =>
       new CreditService(ds.getRepository(CreditBalance)).addPurchase(
         m,
@@ -237,11 +242,15 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
           { idempotencyKey: key = '' }: OffSessionCharge
         ) => {
           keys.push(key);
+
           if (keys.length === 1) {
             entered();
+
             if (state.held) await released;
           }
+
           const answer = answers[keys.length - 1];
+
           return answer
             ? answer()
             : { providerInvoiceRef: `pay_${keys.length}`, status: 'captured' };
@@ -252,18 +261,22 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
       getOffSessionCharge: jest.fn(() => Promise.resolve(null)),
       cancel: jest.fn(() => Promise.resolve(undefined))
     };
+
     return { provider, keys, state, release, firstChargeEntered };
   }
 
   /** The renewal scan must see only the row this test owns. */
   function scopedSubscriptions() {
     const subscriptions = ds.getRepository(Subscription);
+
     return subscriptions.extend({
       createQueryBuilder(alias: string) {
         const qb = subscriptions.createQueryBuilder(alias);
         const getMany = qb.getMany.bind(qb);
+
         qb.getMany = async () =>
           (await getMany()).filter((s) => s.id === subscription.id);
+
         return qb;
       }
     });
@@ -311,6 +324,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
         { provide: EventEmitter2, useValue: events }
       ]
     }).compile();
+
     return {
       renewals: module.get(RenewalService),
       admin: module.get(BillingAdminService),
@@ -325,6 +339,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
     const row = await ds
       .getRepository(CreditBalance)
       .findOneOrFail({ where: { customerId } });
+
     return row.balanceUnits.toNumber();
   }
 
@@ -332,6 +347,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
     const rows = await ds
       .getRepository(CreditLedger)
       .find({ where: { customerId, reason: 'usage' } });
+
     return rows.map((r) => r.delta.toNumber());
   }
 
@@ -388,6 +404,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
 
       await admin.cancelSubscription(subscription.id, 'immediate');
       const tail = await invoiceOf(tailKey);
+
       expect(tail).toMatchObject({ status: 'paid', creditUnitsApplied: 0 });
       expect(tail.amountMinor.toNumber()).toBe(100 * UNIT_PRICE);
 
@@ -400,6 +417,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
 
     it('rates a cancel that runs during the renewal charge against the units that charge holds', async () => {
       const fake = fakeProvider('yookassa', []);
+
       fake.state.held = true;
       const { renewals, admin } = await build(fake.provider);
       const anchorMs = subscription.currentPeriodEnd.getTime();
@@ -407,6 +425,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
       const tailKey = `cancel:${subscription.id}:${anchorMs}`;
 
       const scan = renewals.runDueRenewals(new Date());
+
       await fake.firstChargeEntered;
       await admin.cancelSubscription(subscription.id, 'immediate');
       fake.release();
@@ -418,6 +437,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
         creditUnitsApplied: CREDITS
       });
       const tail = await invoiceOf(tailKey);
+
       expect(tail).toMatchObject({ status: 'paid', creditUnitsApplied: 0 });
       expect(tail.amountMinor.toNumber()).toBe(100 * UNIT_PRICE);
       expect(await balance()).toBe(0);
@@ -450,6 +470,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
       const fake = fakeProvider('yookassa', [
         () => Promise.reject(new Error('deadline'))
       ]);
+
       // Not yet due: the immediate cancel bills the open window under a cancel key.
       await ds
         .getRepository(Subscription)
@@ -462,6 +483,7 @@ runWithInfra('Credit holds of unpaid invoices (e2e)', () => {
 
       await admin.cancelSubscription(subscription.id, 'immediate');
       const booked = await invoiceOf(closingKey);
+
       expect(booked).toMatchObject({
         status: 'failed',
         creditUnitsApplied: CREDITS

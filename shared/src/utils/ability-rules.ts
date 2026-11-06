@@ -47,9 +47,11 @@ export function dedupPermissions(
   grants: Iterable<GrantRow>
 ): ResolvedPermission[] {
   const permissionMap = new Map<string, ResolvedPermission>();
+
   for (const { resource, action, conditions } of grants) {
     const effect = isDenyCondition(conditions) ? 'deny' : 'allow';
     const key = `${effect}:${resource}:${action}:${JSON.stringify(conditions ?? null)}`;
+
     if (!permissionMap.has(key)) {
       permissionMap.set(key, {
         resource,
@@ -59,6 +61,7 @@ export function dedupPermissions(
       });
     }
   }
+
   return Array.from(permissionMap.values());
 }
 
@@ -118,6 +121,7 @@ export function compileAbilityRules<
           `Unknown resource "${p.resource}" in permissions for user ${userId} — skipping`
         );
       }
+
       continue;
     }
 
@@ -143,9 +147,11 @@ export function compileAbilityRules<
           isDeny ? 'registered as a blanket deny' : 'not registered'
         }`
       );
+
       if (isDeny) {
         register();
       }
+
       continue;
     }
 
@@ -179,9 +185,11 @@ export function compileAbilityRules<
           isDeny ? 'registered as a blanket deny' : 'not registered'
         }`
       );
+
       if (isDeny) {
         register();
       }
+
       continue;
     }
 
@@ -196,6 +204,7 @@ export function compileAbilityRules<
     const fieldError = queryResult.skipPermission
       ? null
       : findConditionFieldError(subject, p.conditions);
+
     if (fieldError) {
       logger.error(
         `Permission "${p.permission}" for user ${userId} carries a condition on "${subject}" that cannot apply (${fieldError}) - ${
@@ -210,6 +219,7 @@ export function compileAbilityRules<
       if (isDeny) {
         register();
       }
+
       continue;
     }
 

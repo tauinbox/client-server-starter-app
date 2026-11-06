@@ -23,7 +23,9 @@ class TestJwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: (req: { headers?: Record<string, string> }) => {
         const auth = req.headers?.['authorization'];
+
         if (!auth?.startsWith('Bearer ')) return null;
+
         return auth.substring(7);
       },
       ignoreExpiration: false,
@@ -141,6 +143,7 @@ describe('Global JwtAuthGuard (e2e)', () => {
 
     beforeAll(() => {
       const jwt = app.get(JwtService);
+
       token = jwt.sign({ sub: 'user-1' });
     });
 

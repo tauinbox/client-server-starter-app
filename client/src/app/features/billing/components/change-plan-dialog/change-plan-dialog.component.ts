@@ -87,6 +87,7 @@ export class ChangePlanDialogComponent {
   readonly #dialogRef = inject(
     MatDialogRef<ChangePlanDialogComponent, ChangePlanDialogResult>
   );
+
   readonly #billing = inject(BillingService);
   readonly #transloco = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
@@ -99,6 +100,7 @@ export class ChangePlanDialogComponent {
   protected readonly mode = signal<BillingMode>(
     this.data.subscription.billingMode
   );
+
   protected readonly selectedKey = signal<string | null>(null);
   protected readonly preview = signal<ProrationPreviewResponse | null>(null);
   protected readonly previewLoading = signal(false);
@@ -114,6 +116,7 @@ export class ChangePlanDialogComponent {
   protected readonly options = computed<PlanOption[]>(() => {
     const lang = this.#lang();
     const { provider, planKey } = this.data.subscription;
+
     return this.data.plans
       .filter(
         (plan) =>
@@ -128,6 +131,7 @@ export class ChangePlanDialogComponent {
         const amountMinor = isUsage
           ? (price?.unitPriceMinor ?? 0)
           : (price?.amountMinor ?? 0);
+
         return {
           key: plan.key,
           name: plan.name,
@@ -142,6 +146,7 @@ export class ChangePlanDialogComponent {
 
   protected readonly selectedPlan = computed(() => {
     const key = this.selectedKey();
+
     return this.data.plans.find((plan) => plan.key === key) ?? null;
   });
 
@@ -153,10 +158,13 @@ export class ChangePlanDialogComponent {
    */
   protected readonly ledger = computed<ProrationLedger | null>(() => {
     const preview = this.preview();
+
     if (!preview) return null;
+
     const lang = this.#lang();
     const split = preview.creditMinor !== null && preview.chargeMinor !== null;
     const refundDue = preview.dueNowMinor < 0;
+
     return {
       split,
       credit: split
@@ -184,34 +192,40 @@ export class ChangePlanDialogComponent {
 
   setMode(mode: BillingMode): void {
     if (mode === this.mode()) return;
+
     this.mode.set(mode);
     this.selectedKey.set(null);
     this.preview.set(null);
     this.previewError.set(null);
     // A single target (the pay-as-you-go plan) needs no extra click.
     const options = this.options();
+
     if (options.length === 1) this.select(options[0].key);
   }
 
   select(planKey: string): void {
     if (planKey === this.selectedKey() && this.previewError() === null) return;
+
     this.selectedKey.set(planKey);
     this.preview.set(null);
     this.previewError.set(null);
     this.previewLoading.set(true);
 
     const seq = ++this.#previewSeq;
+
     this.#billing
       .previewChange(planKey)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: (preview) => {
           if (seq !== this.#previewSeq) return;
+
           this.preview.set(preview);
           this.previewLoading.set(false);
         },
         error: (error: HttpErrorResponse) => {
           if (seq !== this.#previewSeq) return;
+
           this.previewError.set(
             parseHttpErrorMessage(
               error,
@@ -226,7 +240,9 @@ export class ChangePlanDialogComponent {
 
   confirm(): void {
     const planKey = this.selectedKey();
+
     if (!planKey || !this.canConfirm()) return;
+
     this.#dialogRef.close({ planKey });
   }
 

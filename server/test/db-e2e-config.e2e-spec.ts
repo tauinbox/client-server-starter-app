@@ -6,7 +6,9 @@ import { assertDatabaseReachable, resolveE2eEnv } from './db-e2e-config';
 function writeEnvFile(contents: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'e2e-db-'));
   const path = join(dir, '.env');
+
   writeFileSync(path, contents);
+
   return path;
 }
 

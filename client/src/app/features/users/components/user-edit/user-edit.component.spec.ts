@@ -189,6 +189,7 @@ describe('UserEditComponent', () => {
         error: { errorKey: 'errors.users.notFound', message: 'Not found' },
         status: 404
       });
+
       userServiceMock.getById.mockReturnValue(throwError(() => httpError));
 
       fixture.detectChanges();
@@ -196,6 +197,7 @@ describe('UserEditComponent', () => {
       expect(component.loading()).toBe(false);
       expect(component.loadFailed()).toBe(false);
       const text = (fixture.nativeElement as HTMLElement).textContent;
+
       expect(text).toContain('User not found');
       expect(text).not.toContain('Retry');
     });
@@ -223,6 +225,7 @@ describe('UserEditComponent', () => {
 
         expect(component.loadFailed()).toBe(true);
         const text = (fixture.nativeElement as HTMLElement).textContent;
+
         expect(text).toContain(
           'Failed to load user details. Please try again.'
         );
@@ -240,6 +243,7 @@ describe('UserEditComponent', () => {
       const retry = Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll('button')
       ).find((button) => button.textContent?.trim() === 'Retry');
+
       expect(retry).toBeDefined();
       retry?.click();
       fixture.detectChanges();
@@ -267,6 +271,7 @@ describe('UserEditComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.userForm.email().errors();
+
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -278,6 +283,7 @@ describe('UserEditComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.userForm.email().errors();
+
       expect(errors.some((e) => e.kind === 'email')).toBe(true);
     });
 
@@ -289,6 +295,7 @@ describe('UserEditComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.userForm.name().errors();
+
       expect(errors.map((e) => [e.kind, e.message])).toContainEqual([
         'required',
         'users.edit.nameRequired'
@@ -313,6 +320,7 @@ describe('UserEditComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.userForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
@@ -325,6 +333,7 @@ describe('UserEditComponent', () => {
       await fixture.whenStable();
 
       const errors = component.userForm.password().errors();
+
       expect(errors.find((e) => e.kind === 'minLength')?.message).toBe(
         'users.edit.passwordMinLength'
       );
@@ -351,6 +360,7 @@ describe('UserEditComponent', () => {
       await fixture.whenStable();
 
       const errors = component.userForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
       expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
         'users.edit.passwordMaxLength'
@@ -447,6 +457,7 @@ describe('UserEditComponent', () => {
 
     it('sends a load that the server refuses to the forbidden page', () => {
       const navigateSpy = vi.spyOn(router, 'navigate');
+
       userServiceMock.getById.mockReturnValue(
         throwError(() => new HttpErrorResponse({ status: 403 }))
       );
@@ -464,6 +475,7 @@ describe('UserEditComponent', () => {
   describe('canAssignRole (instance-level)', () => {
     it('passes the role as the instance', () => {
       const role = { id: 'role-2', name: 'editor' };
+
       // @ts-expect-error a partial role is enough for the permission check
       component.canAssignRole(role);
       expect(authStoreMock.hasPermissions).toHaveBeenCalledWith({
@@ -494,6 +506,7 @@ describe('UserEditComponent', () => {
 
     function hint(): string | undefined {
       fixture.detectChanges();
+
       return (fixture.nativeElement as HTMLElement)
         .querySelector('mat-hint')
         ?.textContent?.trim();
@@ -536,7 +549,9 @@ describe('UserEditComponent', () => {
       const updateChecks = authStoreMock.hasPermissions.mock.calls
         .map(([check]) => check)
         .filter((check) => check.action === 'update');
+
       expect(updateChecks.length).toBeGreaterThan(1);
+
       for (const check of updateChecks) {
         expect(check).toEqual({
           action: 'update',
@@ -666,6 +681,7 @@ describe('UserEditComponent', () => {
 
     it('should show snackbar and navigate to user detail on success', async () => {
       const navigateSpy = vi.spyOn(router, 'navigate');
+
       component.userModel.set({
         email: 'test@example.com',
         name: 'Changed User',
@@ -683,6 +699,7 @@ describe('UserEditComponent', () => {
     it('should call updateCurrentUser when editing own account', async () => {
       currentUserSignal.set({ id: 'user-1' });
       const updatedUser = { ...mockUser, name: 'Updated' };
+
       usersStoreMock.updateUser.mockReturnValue(of(updatedUser));
 
       component.userModel.set({
@@ -728,6 +745,7 @@ describe('UserEditComponent', () => {
         error: { message: 'Update failed' },
         status: 400
       });
+
       usersStoreMock.updateUser.mockReturnValue(throwError(() => httpError));
 
       component.userModel.set({
@@ -746,6 +764,7 @@ describe('UserEditComponent', () => {
 
     it('should show fallback error when no server message on failure', async () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
+
       usersStoreMock.updateUser.mockReturnValue(throwError(() => httpError));
 
       component.userModel.set({
@@ -777,6 +796,7 @@ describe('UserEditComponent', () => {
 
     it('should update user signal and show success snackbar', () => {
       const unlockedUser = { ...mockUser, lockedUntil: null };
+
       usersStoreMock.updateUser.mockReturnValue(of(unlockedUser));
 
       component.unlockAccount();
@@ -793,6 +813,7 @@ describe('UserEditComponent', () => {
         error: { message: 'Unlock failed' },
         status: 400
       });
+
       usersStoreMock.updateUser.mockReturnValue(throwError(() => httpError));
 
       component.unlockAccount();
@@ -806,6 +827,7 @@ describe('UserEditComponent', () => {
 
     it('should show fallback message when no server error message', () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
+
       usersStoreMock.updateUser.mockReturnValue(throwError(() => httpError));
 
       component.unlockAccount();
@@ -858,6 +880,7 @@ describe('UserEditComponent', () => {
         mfaEnabled: true
       });
       const resetUser = { ...enrolledUser, mfaEnabled: false };
+
       dialogMock.open.mockReturnValue({ afterClosed: () => of(resetUser) });
       fixture.detectChanges();
 
@@ -917,6 +940,7 @@ describe('UserEditComponent', () => {
       component.confirmRevokeSessions();
 
       const dialogData = dialogMock.open.mock.calls[0][1]['data'];
+
       expect(dialogData['message']).toContain('Test User');
       expect(userServiceMock.revokeSessions).toHaveBeenCalledWith('user-1');
       expect(notifyMock.success).toHaveBeenCalledWith(
@@ -936,6 +960,7 @@ describe('UserEditComponent', () => {
 
     it('reports a failure with the fallback key', () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
+
       userServiceMock.revokeSessions.mockReturnValue(
         throwError(() => httpError)
       );
@@ -1031,6 +1056,7 @@ describe('UserEditComponent', () => {
       const block = host().querySelector(
         '[data-testid="credentials-on-profile"]'
       );
+
       expect(block?.textContent).toContain('test@example.com');
       expect(block?.querySelector('a')?.getAttribute('href')).toBe('/profile');
     });
@@ -1146,6 +1172,7 @@ describe('UserEditComponent', () => {
 
     function rendered(): string {
       fixture.detectChanges();
+
       return (fixture.nativeElement as HTMLElement).textContent ?? '';
     }
 
@@ -1193,6 +1220,7 @@ describe('UserEditComponent', () => {
         string,
         unknown
       >;
+
       expect(sent['code']).toBe('123456');
       expect(sent).not.toHaveProperty('currentPassword');
     });
@@ -1242,6 +1270,7 @@ describe('UserEditComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.userModel.set({
@@ -1255,6 +1284,7 @@ describe('UserEditComponent', () => {
 
       expect(dialogMock.open).toHaveBeenCalled();
       const dialogData = dialogMock.open.mock.calls[0][1]['data'];
+
       expect(dialogData['message']).toContain('new@example.com');
       expect(dialogData['message']).toContain('Test User');
     });
@@ -1263,6 +1293,7 @@ describe('UserEditComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.userModel.set({
@@ -1281,6 +1312,7 @@ describe('UserEditComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.userModel.set({
@@ -1328,12 +1360,14 @@ describe('UserEditComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete();
 
       expect(dialogMock.open).toHaveBeenCalled();
       const dialogData = dialogMock.open.mock.calls[0][1]['data'];
+
       expect(dialogData['message']).toContain('Test User');
     });
 
@@ -1342,6 +1376,7 @@ describe('UserEditComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete();
@@ -1357,6 +1392,7 @@ describe('UserEditComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete();
@@ -1369,10 +1405,12 @@ describe('UserEditComponent', () => {
         error: { message: 'Delete failed' },
         status: 500
       });
+
       usersStoreMock.deleteUser.mockReturnValue(throwError(() => httpError));
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete();
@@ -1385,10 +1423,12 @@ describe('UserEditComponent', () => {
 
     it('should show fallback message when delete fails without server message', () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
+
       usersStoreMock.deleteUser.mockReturnValue(throwError(() => httpError));
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete();

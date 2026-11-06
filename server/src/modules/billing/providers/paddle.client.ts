@@ -23,12 +23,15 @@ export function paddleEnvironment(
  */
 export function createPaddleClient(config: ConfigService): Paddle | null {
   const apiKey = config.get<string>('PADDLE_API_KEY');
+
   if (!apiKey) {
     return null;
   }
+
   const environment =
     paddleEnvironment(config) === 'production'
       ? Environment.production
       : Environment.sandbox;
+
   return new Paddle(apiKey, { environment });
 }

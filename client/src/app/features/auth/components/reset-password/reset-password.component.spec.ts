@@ -96,6 +96,7 @@ describe('ResetPasswordComponent', () => {
 
     it('should require password', () => {
       const errors = component.resetPasswordForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -106,6 +107,7 @@ describe('ResetPasswordComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.resetPasswordForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
@@ -131,6 +133,7 @@ describe('ResetPasswordComponent', () => {
 
     it('rejects a password longer than the server ceiling', async () => {
       const tooLong = `Aa1${'x'.repeat(126)}`;
+
       component.resetPasswordModel.set({
         password: tooLong,
         confirmPassword: tooLong
@@ -138,6 +141,7 @@ describe('ResetPasswordComponent', () => {
       await fixture.whenStable();
 
       const errors = component.resetPasswordForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
       expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
         'auth.resetPassword.passwordMaxLength'
@@ -146,6 +150,7 @@ describe('ResetPasswordComponent', () => {
 
     it('should require confirmPassword', () => {
       const errors = component.resetPasswordForm.confirmPassword().errors();
+
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -156,6 +161,7 @@ describe('ResetPasswordComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.resetPasswordForm.confirmPassword().errors();
+
       expect(errors.some((e) => e.kind === 'passwordMismatch')).toBe(true);
     });
 
@@ -198,6 +204,7 @@ describe('ResetPasswordComponent', () => {
     it('should navigate to /login with the password-changed marker on success', async () => {
       authServiceMock.resetPassword.mockReturnValue(of(void 0));
       const navigateSpy = vi.spyOn(router, 'navigate');
+
       component.resetPasswordModel.set({
         password: 'NewPassword1',
         confirmPassword: 'NewPassword1'
@@ -220,6 +227,7 @@ describe('ResetPasswordComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.resetPassword.mockReturnValue(
         throwError(() => httpError)
       );
@@ -239,6 +247,7 @@ describe('ResetPasswordComponent', () => {
 
     it('should show fallback error when no server message', async () => {
       const httpError = new HttpErrorResponse({ error: null, status: 500 });
+
       authServiceMock.resetPassword.mockReturnValue(
         throwError(() => httpError)
       );

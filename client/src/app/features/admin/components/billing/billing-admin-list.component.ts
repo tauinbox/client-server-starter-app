@@ -112,9 +112,11 @@ export class BillingAdminListComponent implements OnInit {
       this.#subscriptionsStore.loading() ||
       this.#subscriptionsStore.isLoadingMore()
   );
+
   readonly invoicesBusy = computed(
     () => this.#invoicesStore.loading() || this.#invoicesStore.isLoadingMore()
   );
+
   readonly subscriptionsHasMore = this.#subscriptionsStore.hasMore;
   readonly invoicesHasMore = this.#invoicesStore.hasMore;
   readonly subscriptionsLoadingMore = this.#subscriptionsStore.isLoadingMore;
@@ -148,6 +150,7 @@ export class BillingAdminListComponent implements OnInit {
     'renews',
     'actions'
   ];
+
   readonly invoiceSkeletonCells: readonly ListSkeletonCell[] = [
     'medium',
     'wide',
@@ -169,6 +172,7 @@ export class BillingAdminListComponent implements OnInit {
   readonly hasCancelAccess = computed(() =>
     this.authStore.hasPermissions({ action: 'update', subject: 'Billing' })
   );
+
   readonly hasRefundAccess = computed(() =>
     this.authStore.hasPermissions({ action: 'refund', subject: 'Billing' })
   );

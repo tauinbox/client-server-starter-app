@@ -36,12 +36,14 @@ describe('TokenGeneratorService', () => {
 
   it('generates a refresh token of 80 hex chars (40 random bytes)', () => {
     const { refresh_token } = service.generateTokens('u', 'e', 's');
+
     expect(refresh_token).toMatch(/^[a-f0-9]{80}$/);
   });
 
   it('produces a unique refresh token on each call', () => {
     const a = service.generateTokens('u', 'e', 's').refresh_token;
     const b = service.generateTokens('u', 'e', 's').refresh_token;
+
     expect(a).not.toBe(b);
   });
 });

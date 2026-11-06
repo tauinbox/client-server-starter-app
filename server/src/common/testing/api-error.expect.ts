@@ -19,5 +19,6 @@ export async function expectApiRejection(
     },
     (caught: unknown) => caught
   );
+
   expectApiError(error, errorKey);
 }

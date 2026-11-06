@@ -30,6 +30,7 @@ import { createMockCache } from '../../../common/testing/cache.mock';
 const mockToDataUrl = jest
   .fn<Promise<string>, [string]>()
   .mockResolvedValue('data:image/png;base64,');
+
 jest.mock('qrcode', () => ({
   toDataURL: (text: string) => mockToDataUrl(text)
 }));
@@ -175,13 +176,16 @@ describe('MfaService', () => {
     const setup = await service.beginEnrolment(buildUser());
     const [[, stored]] = repository.update.mock.calls;
     const user = buildUser({ totpSecret: stored.totpSecret });
+
     repository.findOne.mockResolvedValue(user);
+
     return { user, secret: setup.secret };
   }
 
   /** The changes of the last `update` call, which is the one under test. */
   function lastUpdate(): Partial<User> {
     const [, changes] = repository.update.mock.lastCall!;
+
     return changes;
   }
 
@@ -221,6 +225,7 @@ describe('MfaService', () => {
 
     it('returns a URI and a QR image the authenticator can read', async () => {
       const qrcode = jest.requireActual<typeof import('qrcode')>('qrcode');
+
       mockToDataUrl.mockImplementationOnce((text) => qrcode.toDataURL(text));
 
       const setup = await service.beginEnrolment(buildUser());
@@ -267,6 +272,7 @@ describe('MfaService', () => {
   describe('completeEnrolment', () => {
     it('turns the factor on and issues recovery codes for a correct code', async () => {
       const { user, secret } = await enrol();
+
       repository.update.mockClear();
 
       const result = await service.completeEnrolment(
@@ -276,6 +282,7 @@ describe('MfaService', () => {
 
       expect(result.recoveryCodes).toHaveLength(10);
       const stored = lastUpdate();
+
       expect(stored.totpEnabledAt).toBeInstanceOf(Date);
       expect(repository.update.mock.lastCall?.[0]).toEqual({
         id: 'user-1',
@@ -290,6 +297,7 @@ describe('MfaService', () => {
 
     it('stores recovery codes hashed, never as the codes it hands back', async () => {
       const { user, secret } = await enrol();
+
       repository.update.mockClear();
 
       const { recoveryCodes } = await service.completeEnrolment(
@@ -319,13 +327,16 @@ describe('MfaService', () => {
         const bytes = new ScureBase32Plugin().decode(
           recoveryCode.replaceAll('-', '')
         );
+
         expect(bytes).toHaveLength(MFA_RECOVERY_CODE_BYTES);
       }
+
       expect(MFA_RECOVERY_CODE_BYTES * 8).toBeGreaterThanOrEqual(112);
     });
 
     it('does not turn the factor on for a wrong code', async () => {
       const { user } = await enrol();
+
       repository.update.mockClear();
 
       await expect(
@@ -345,6 +356,7 @@ describe('MfaService', () => {
 
     it('refuses, and neither audits nor mails, when the checked secret was replaced before the enable', async () => {
       const { user, secret } = await enrol();
+
       // The step write succeeds; the conditional enable finds no row.
       repository.update
         .mockResolvedValueOnce({ affected: 1 })
@@ -445,6 +457,7 @@ describe('MfaService', () => {
       await service.resetByAdmin(enrolled(), options);
 
       const [[criteria, changes]] = repository.update.mock.calls;
+
       expect(criteria).toEqual({ id: 'user-1', totpEnabledAt: Not(IsNull()) });
       expect(changes).toEqual({
         totpSecret: null,
@@ -479,6 +492,7 @@ describe('MfaService', () => {
 
     it('runs the check of the caller on the row locked in the transaction', async () => {
       const locked = enrolled();
+
       repository.findOne.mockResolvedValue(locked);
 
       await service.resetByAdmin(enrolled(), options);
@@ -634,6 +648,7 @@ describe('MfaService', () => {
         totpSecret: user.totpSecret,
         totpEnabledAt: new Date()
       });
+
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
@@ -648,6 +663,7 @@ describe('MfaService', () => {
 
     it('refuses a wrong code and records the failure', async () => {
       const { user } = await enrol();
+
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
@@ -689,6 +705,7 @@ describe('MfaService', () => {
 
     it('refuses a token minted before the account signed out everywhere', async () => {
       const issuedAt = Math.floor(Date.now() / 1000) - 60;
+
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
@@ -716,6 +733,7 @@ describe('MfaService', () => {
       // which is the ordinary "sign out, sign back in" path.
       const { user, secret } = await enrol();
       const issuedAt = Math.floor(Date.now() / 1000);
+
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
@@ -766,12 +784,14 @@ describe('MfaService', () => {
         totpSecret: enrolment.user.totpSecret,
         totpEnabledAt: new Date()
       });
+
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
         iat: Math.floor(Date.now() / 1000)
       });
       repository.findOne.mockResolvedValue(enabled);
+
       return { user: enabled, secret: enrolment.secret };
     }
 
@@ -810,6 +830,7 @@ describe('MfaService', () => {
 
     it('audits each attempt on a barred account with its number', async () => {
       const { secret } = await guessable();
+
       await guessWrong(MAX_FAILED_ATTEMPTS + 1);
       await expect(
         service.verifyChallenge('token', generateSync({ secret }))
@@ -819,6 +840,7 @@ describe('MfaService', () => {
         .map(([entry]) => entry as { action: AuditAction; details: unknown })
         .filter(({ action }) => action === AuditAction.MFA_CHALLENGE_FAILURE)
         .map(({ details }) => details);
+
       expect(attempts).toEqual(
         Array.from({ length: MAX_FAILED_ATTEMPTS + 2 }, (_, i) => ({
           stage: 'challenge',
@@ -959,6 +981,7 @@ describe('MfaService', () => {
     // decision forbids. This is the escape hatch that keeps it open.
     it('stays open while the authenticator challenge is barred', async () => {
       const enabled = enabledWithCode();
+
       enabled.totpSecret = null;
       repository.findOne.mockResolvedValue(enabled);
 
@@ -967,6 +990,7 @@ describe('MfaService', () => {
           service.verifyChallenge('token', '000000')
         ).rejects.toBeDefined();
       }
+
       await expect(
         service.verifyChallenge('token', '000000')
       ).rejects.toMatchObject({ status: 423 });
@@ -978,6 +1002,7 @@ describe('MfaService', () => {
 
     it('closes the challenge window once a recovery code lands', async () => {
       const enabled = enabledWithCode();
+
       enabled.totpSecret = null;
       repository.findOne.mockResolvedValue(enabled);
 
@@ -986,6 +1011,7 @@ describe('MfaService', () => {
           service.verifyChallenge('token', '000000')
         ).rejects.toBeDefined();
       }
+
       await service.consumeRecoveryCode('token', code);
 
       // The owner proved possession, so the next wrong code is a first strike.
@@ -1003,7 +1029,9 @@ describe('MfaService', () => {
         totpSecret: user.totpSecret,
         totpEnabledAt: new Date()
       });
+
       repository.findOne.mockResolvedValue(enabled);
+
       return { user: enabled, secret };
     }
 
@@ -1045,6 +1073,7 @@ describe('MfaService', () => {
         totpSecret: 'v1.AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBB.CCCC',
         totpEnabledAt: new Date()
       });
+
       repository.findOne.mockResolvedValue(broken);
 
       await expect(
@@ -1130,6 +1159,7 @@ describe('MfaService', () => {
 
       it('leaves the sign-in challenge open while the step-up is barred', async () => {
         const { user } = await enrolled();
+
         jwtService.verify.mockReturnValue({
           sub: 'user-1',
           purpose: TOKEN_PURPOSE.MFA_PENDING,
@@ -1214,6 +1244,7 @@ describe('MfaService', () => {
         totpSecret: user.totpSecret,
         totpEnabledAt: new Date()
       });
+
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
@@ -1245,6 +1276,7 @@ describe('MfaService', () => {
         totpSecret: user.totpSecret,
         totpEnabledAt: new Date()
       });
+
       repository.findOne.mockResolvedValue(enabled);
       const previous = generateSync({
         secret,
@@ -1269,6 +1301,7 @@ describe('MfaService', () => {
         totpSecret: user.totpSecret,
         totpEnabledAt: new Date()
       });
+
       repository.findOne.mockResolvedValue(enabled);
       jest.useFakeTimers();
       jest.setSystemTime(new Date('2026-09-07T12:00:15Z'));
@@ -1292,6 +1325,7 @@ describe('MfaService', () => {
         totpSecret: user.totpSecret,
         totpEnabledAt: new Date()
       });
+
       repository.findOne.mockResolvedValue(enabled);
       const nowSeconds = Math.floor(Date.now() / 1000);
 

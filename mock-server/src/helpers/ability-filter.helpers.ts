@@ -22,6 +22,7 @@ export function filterByAbility<T extends object>(
   }: { action: Actions; subjectName: AbilityFilterSubject }
 ): T[] {
   const ability = buildAbilityForUser(user);
+
   if (ability.can('manage', 'all') || ability.can(action, 'all')) {
     return records;
   }
@@ -29,6 +30,7 @@ export function filterByAbility<T extends object>(
   const rules = ability.rulesFor(action, subjectName);
   const allowRules = rules.filter((r) => !r.inverted);
   const denyRules = rules.filter((r) => r.inverted);
+
   if (allowRules.length === 0) return [];
 
   const fields: readonly string[] = ABILITY_FILTER_FIELDS[subjectName];
@@ -40,10 +42,12 @@ export function filterByAbility<T extends object>(
     denyRules.length > 0
       ? translateRuleSet(denyRules, paramIdx, columnFor)
       : null;
+
   if (deny && (deny.kind === 'always' || deny.skipped.length > 0)) return [];
 
   return records.filter((record) => {
     const instance = caslSubject(subjectName, record);
+
     return (
       (allow.kind === 'always' ||
         allow.translated.some((rule) => rule.matchesConditions(instance))) &&

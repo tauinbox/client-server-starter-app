@@ -109,6 +109,7 @@ export class TwoFactorComponent {
     passwordRequired: 'auth.twoFactor.passwordRequired',
     codeRequired: 'auth.twoFactor.codeRequired'
   });
+
   readonly passwordModel = this.#stepUp.passwordModel;
   readonly passwordForm = this.#stepUp.passwordForm;
   readonly codeModel = this.#stepUp.codeModel;
@@ -124,6 +125,7 @@ export class TwoFactorComponent {
   constructor() {
     effect(() => {
       if (!this.resumeSetup() || this.#resumed) return;
+
       this.#resumed = true;
       this.#requestSecretWithProof();
     });
@@ -136,6 +138,7 @@ export class TwoFactorComponent {
     // the page owns that round trip.
     if (!this.accountHasPassword()) {
       this.reauthRequested.emit();
+
       return;
     }
 

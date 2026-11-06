@@ -30,6 +30,7 @@ describe('UsageMeterComponent', () => {
     fixture = TestBed.createComponent(UsageMeterComponent);
     fixture.componentRef.setInput('usage', usage);
     fixture.detectChanges();
+
     return fixture.nativeElement as HTMLElement;
   }
 
@@ -58,6 +59,7 @@ describe('UsageMeterComponent', () => {
     expect(el.querySelector('.usage-gauge')).not.toBeNull();
     expect(el.querySelector('.segment.overage')).toBeNull();
     const included = el.querySelector<HTMLElement>('.segment.included');
+
     expect(included?.style.width).toBe('60%');
   });
 

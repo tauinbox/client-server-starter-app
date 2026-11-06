@@ -39,6 +39,7 @@ describe('step-up DTOs accept an absent currentPassword', () => {
     );
 
     expect(error).toBeInstanceOf(BadRequestException);
+
     return (
       (error as BadRequestException).getResponse() as { message: string[] }
     ).message;

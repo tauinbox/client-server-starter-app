@@ -52,7 +52,9 @@ function makeRefreshTokenRepoMock(
   const repo = {
     create: (data: Partial<RefreshToken>) => {
       const t = new RefreshToken();
+
       Object.assign(t, data);
+
       return t;
     },
     save: jest.fn((data: RefreshToken) => {
@@ -62,36 +64,47 @@ function makeRefreshTokenRepoMock(
         data instanceof RefreshToken
           ? data
           : Object.assign(new RefreshToken(), data);
+
       if (!entity.id) entity.id = `rt-${++idSeq}`;
+
       if (!entity.createdAt) entity.createdAt = new Date();
+
       if (entity.revoked === undefined) entity.revoked = false;
+
       store.tokens.set(entity.id, entity);
+
       return Promise.resolve(entity);
     }),
     findOne: jest.fn((opts: { where: { token: string } }) => {
       for (const t of store.tokens.values()) {
         if (t.token === opts.where.token) return Promise.resolve(t);
       }
+
       return Promise.resolve(null);
     }),
     update: jest.fn((id: string, partial: Partial<RefreshToken>) => {
       const existing = store.tokens.get(id);
+
       if (existing) Object.assign(existing, partial);
+
       return Promise.resolve({ affected: existing ? 1 : 0 });
     }),
     delete: jest.fn((criteria: { userId?: string; sessionId?: string }) => {
       let n = 0;
+
       for (const [id, t] of store.tokens.entries()) {
         const matchesUser =
           criteria.userId !== undefined && t.userId === criteria.userId;
         const matchesSession =
           criteria.sessionId !== undefined &&
           t.sessionId === criteria.sessionId;
+
         if (matchesUser || matchesSession) {
           store.tokens.delete(id);
           n++;
         }
       }
+
       return Promise.resolve({ affected: n });
     }),
     count: jest.fn(() => Promise.resolve(0)),
@@ -103,6 +116,7 @@ function makeRefreshTokenRepoMock(
       })
     }))
   };
+
   // @ts-expect-error - partial RefreshToken repository fake: only used methods
   return repo;
 }
@@ -125,14 +139,18 @@ function makeDataSourceMock(
         partial: Partial<RefreshToken>
       ) => {
         const existing = store.tokens.get(criteria.id);
+
         if (!existing) return Promise.resolve({ affected: 0 });
+
         if (
           criteria.revoked !== undefined &&
           existing.revoked !== criteria.revoked
         ) {
           return Promise.resolve({ affected: 0 });
         }
+
         Object.assign(existing, partial);
+
         return Promise.resolve({ affected: 1 });
       }
     ),
@@ -146,6 +164,7 @@ function makeDataSourceMock(
   const userRepo = {
     update: jest.fn((userId: string, partial: { tokenRevokedAt: Date }) => {
       store.userRevokedAt.set(userId, partial.tokenRevokedAt);
+
       return Promise.resolve({ affected: 1 });
     })
   };
@@ -156,9 +175,11 @@ function makeDataSourceMock(
     ),
     getRepository: jest.fn((entity: unknown) => {
       if (entity === User) return userRepo;
+
       return rtRepo;
     })
   };
+
   // @ts-expect-error - partial DataSource fake: only transaction/getRepository
   return dataSource;
 }
@@ -249,7 +270,9 @@ describe('Refresh token reuse detection (e2e)', () => {
             get: jest.fn(),
             getOrThrow: jest.fn((k: string) => {
               if (k === 'JWT_REFRESH_EXPIRATION') return '604800';
+
               if (k === 'SESSION_ABSOLUTE_MAX_MS') return String(absoluteMaxMs);
+
               throw new Error(`unexpected config key ${k}`);
             })
           }
@@ -299,6 +322,7 @@ describe('Refresh token reuse detection (e2e)', () => {
             t.sessionId === token.sessionId &&
             t.createdAt.getTime() > token.createdAt.getTime()
         );
+
         return Promise.resolve(
           later.length === 1 && !later[0].revoked
             ? {
@@ -328,11 +352,13 @@ describe('Refresh token reuse detection (e2e)', () => {
     await nextMillisecond();
     // First refresh — original token rotates out, a fresh pair is issued.
     const firstRefresh = await auth.refreshTokens(originalToken, null);
+
     expect(firstRefresh.tokens.access_token).toBeDefined();
     expect(firstRefresh.tokens.refresh_token).not.toBe(originalToken);
 
     // The store now holds two RefreshToken rows: the original (revoked) and the new one.
     const rows = Array.from(store.tokens.values());
+
     expect(rows).toHaveLength(2);
     expect(rows.find((r) => r.revoked)).toBeDefined();
     expect(rows.find((r) => !r.revoked)).toBeDefined();
@@ -397,6 +423,7 @@ describe('Refresh token reuse detection (e2e)', () => {
 
     // Device A's whole chain is gone; device B is untouched.
     const remaining = Array.from(store.tokens.values());
+
     expect(remaining).toHaveLength(1);
     expect(remaining[0].revoked).toBe(false);
     expect(store.userRevokedAt.has('user-1')).toBe(false);
@@ -416,6 +443,7 @@ describe('Refresh token reuse detection (e2e)', () => {
       deviceB.tokens.refresh_token,
       null
     );
+
     expect(refreshedB.tokens.access_token).toBeDefined();
   });
 
@@ -423,6 +451,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     await auth.login(userRecord, { userAgent: null, ipAddress: null });
     const allRows = Array.from(store.tokens.values());
     const [row] = allRows;
+
     row.revoked = true;
     // Expire the row in the past so isExpired() returns true.
     row.expiresAt = new Date(Date.now() - 60_000);
@@ -432,14 +461,17 @@ describe('Refresh token reuse detection (e2e)', () => {
     // Simpler: insert a fresh revoked-and-expired token tied to a known raw value.
     const { hashToken } = await import('../src/common/utils/hash-token');
     const raw = 'stale-raw-token';
+
     row.token = hashToken(raw);
 
     let caught: unknown;
+
     try {
       await auth.refreshTokens(raw, null);
     } catch (err) {
       caught = err;
     }
+
     expect(caught).toBeInstanceOf(HttpException);
     expect((caught as HttpException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
 
@@ -476,9 +508,11 @@ describe('Refresh token reuse detection (e2e)', () => {
         loginResult.tokens.refresh_token,
         null
       );
+
       expect(refreshed.tokens.access_token).toBeDefined();
 
       const live = Array.from(store.tokens.values()).filter((r) => !r.revoked);
+
       expect(live).toHaveLength(1);
       // Re-stamping here would restore the sliding expiry the cap ends.
       expect(live[0].sessionStartedAt.getTime()).toBe(aged.getTime());
@@ -495,6 +529,7 @@ describe('Refresh token reuse detection (e2e)', () => {
         loginResult.tokens.refresh_token,
         null
       );
+
       expect(store.tokens.size).toBe(2);
 
       ageSession(absoluteMaxMs);
@@ -511,6 +546,7 @@ describe('Refresh token reuse detection (e2e)', () => {
       const remaining = Array.from(store.tokens.values()).filter(
         (r) => r.sessionId === sessionId
       );
+
       expect(remaining).toHaveLength(0);
 
       expect(auditLog).toHaveBeenCalledWith(
@@ -532,6 +568,7 @@ describe('Refresh token reuse detection (e2e)', () => {
         userAgent: null,
         ipAddress: null
       });
+
       ageSession(DEFAULT_SESSION_ABSOLUTE_MAX_MS * 4);
 
       const refreshed = await auth.refreshTokens(

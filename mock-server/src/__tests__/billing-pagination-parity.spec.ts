@@ -12,6 +12,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -30,8 +31,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -65,6 +68,7 @@ function seedInvoices(count: number): void {
       createdAt,
       updatedAt: createdAt
     };
+
     getState().billingInvoices.set(id, invoice);
   }
 }
@@ -80,6 +84,7 @@ describe('GET /admin/billing/invoices — cursor pagination parity', () => {
     const token = await login('admin@example.com');
 
     const res = await get(token, '/api/v1/admin/billing/invoices?limit=10');
+
     expect(res.status).toBe(200);
     const body = (await res.json()) as InvoicePage;
 
@@ -104,6 +109,7 @@ describe('GET /admin/billing/invoices — cursor pagination parity', () => {
         cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
       }`;
       const page = (await (await get(token, path)).json()) as InvoicePage;
+
       seen.push(...page.data.map((i) => i.id));
       cursor = page.meta.nextCursor;
       pages += 1;
@@ -134,8 +140,10 @@ describe('GET /admin/billing/invoices — cursor pagination parity', () => {
       token,
       `/api/v1/admin/billing/invoices?limit=${MAX_PAGE_SIZE + 1}`
     );
+
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toContain(
       `limit must not be greater than ${MAX_PAGE_SIZE}`
     );
@@ -148,8 +156,10 @@ describe('GET /admin/billing/invoices — cursor pagination parity', () => {
       token,
       '/api/v1/admin/billing/invoices?sortBy=amountMinor'
     );
+
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors[0]).toContain('sortBy must be one of');
   });
 
@@ -157,8 +167,10 @@ describe('GET /admin/billing/invoices — cursor pagination parity', () => {
     const token = await login('admin@example.com');
 
     const res = await get(token, '/api/v1/admin/billing/invoices?bogus=1');
+
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toContain('property bogus should not exist');
   });
 
@@ -166,8 +178,10 @@ describe('GET /admin/billing/invoices — cursor pagination parity', () => {
     const token = await login('admin@example.com');
 
     const res = await get(token, '/api/v1/admin/billing/subscriptions');
+
     expect(res.status).toBe(200);
     const body = (await res.json()) as InvoicePage;
+
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.meta.hasMore).toBe(false);
     expect(body.meta.limit).toBe(20);
@@ -179,8 +193,10 @@ describe('GET /billing/invoices — cursor pagination parity', () => {
     const token = await login('user@example.com');
 
     const res = await get(token, '/api/v1/billing/invoices');
+
     expect(res.status).toBe(200);
     const body = (await res.json()) as InvoicePage;
+
     expect(body.data).toEqual([]);
     expect(body.meta.hasMore).toBe(false);
     expect(body.meta.nextCursor).toBeNull();
@@ -190,8 +206,10 @@ describe('GET /billing/invoices — cursor pagination parity', () => {
     const token = await login('user@example.com');
 
     const res = await get(token, '/api/v1/billing/invoices?limit=0');
+
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toContain('limit must not be less than 1');
   });
 });

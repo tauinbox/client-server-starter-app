@@ -27,6 +27,7 @@ describe('CacheVersionCounter without Redis', () => {
   it('a read after a bump sees the new version', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(1000);
     const versions = counter();
+
     await versions.read();
 
     await versions.bump();

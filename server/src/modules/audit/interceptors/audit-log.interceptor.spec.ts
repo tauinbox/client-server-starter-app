@@ -49,6 +49,7 @@ describe('AuditLogInterceptor', () => {
       action: AuditAction.ROLE_DELETE,
       targetType: 'Role'
     };
+
     reflector.get.mockReturnValue(opts);
     const ctx = makeContext({
       user: { userId: 'admin-1', email: 'a@e.com' },
@@ -80,6 +81,7 @@ describe('AuditLogInterceptor', () => {
       targetType: 'User',
       targetIdParam: 'userId'
     };
+
     reflector.get.mockReturnValue(opts);
     const ctx = makeContext({
       user: { userId: 'admin-1', email: 'a@e.com' },
@@ -101,6 +103,7 @@ describe('AuditLogInterceptor', () => {
       targetType: 'Role',
       targetIdFromResponse: (r) => (r as { id: string }).id
     };
+
     reflector.get.mockReturnValue(opts);
     const ctx = makeContext({
       user: { userId: 'admin-1', email: 'a@e.com' },
@@ -126,6 +129,7 @@ describe('AuditLogInterceptor', () => {
         changedFields: Object.keys(body as Record<string, unknown>)
       })
     };
+
     reflector.get.mockReturnValue(opts);
     const ctx = makeContext({
       user: { userId: 'admin-1', email: 'a@e.com' },
@@ -149,6 +153,7 @@ describe('AuditLogInterceptor', () => {
       action: AuditAction.ROLE_DELETE,
       targetType: 'Role'
     };
+
     reflector.get.mockReturnValue(opts);
     const ctx = makeContext({
       user: { userId: 'admin-1' },

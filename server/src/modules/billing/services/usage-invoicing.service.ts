@@ -69,12 +69,15 @@ export class UsageInvoicingService {
     const subscription = await this.subscriptions.findOne({
       where: { id: event.subscriptionId }
     });
+
     if (!subscription?.providerSubscriptionId) {
       this.logger.warn(
         `Skipping usage invoicing for ${event.subscriptionId}: subscription or provider reference missing`
       );
+
       return;
     }
+
     const customer = await this.customers.findOne({
       where: { id: subscription.customerId }
     });
@@ -82,10 +85,12 @@ export class UsageInvoicingService {
       where: { key: event.planKey ?? subscription.planKey }
     });
     const provider = this.providers.find((p) => p.id === subscription.provider);
+
     if (!customer || !plan || !provider) {
       this.logger.warn(
         `Skipping usage invoicing for ${event.subscriptionId}: missing customer, plan or provider`
       );
+
       return;
     }
 
@@ -126,9 +131,11 @@ export class UsageInvoicingService {
         receiptRef: null,
         creditUnitsApplied: summary.creditUnitsApplied
       });
+
       if (!invoiceId) {
         return null;
       }
+
       if (zeroCharge && summary.creditUnitsApplied > 0) {
         await this.credits.spendOnUsage(
           manager,
@@ -136,6 +143,7 @@ export class UsageInvoicingService {
           summary.creditUnitsApplied
         );
       }
+
       return { invoiceId, summary, zeroCharge };
     });
 
@@ -151,11 +159,13 @@ export class UsageInvoicingService {
         InvoicePaidEvent.name,
         new InvoicePaidEvent(event.userId, invoiceId)
       );
+
       return;
     }
 
     const description =
       summary.receiptItems[0]?.description ?? `${plan.name} usage`;
+
     try {
       await provider.chargeUsage(subscription.providerSubscriptionId, {
         amountMinor: summary.amountMinor,

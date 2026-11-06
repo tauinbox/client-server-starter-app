@@ -48,6 +48,7 @@ describe('meteredWindowStart', () => {
 
   it('is the switch moment when a switch moved the window inside the period', () => {
     const switchedAt = utc(2026, 8, 11);
+
     expect(
       meteredWindowStart({
         currentPeriodStart: periodStart,
@@ -90,6 +91,7 @@ describe('usageIngestStart', () => {
 
   it('is the seal when a close sealed the window past its start', () => {
     const sealed = utc(2026, 9, 1);
+
     expect(
       usageIngestStart({
         currentPeriodStart: periodStart,
@@ -101,6 +103,7 @@ describe('usageIngestStart', () => {
 
   it('ignores a seal that an earlier period left behind', () => {
     const switchedAt = utc(2026, 8, 11);
+
     expect(
       usageIngestStart({
         currentPeriodStart: periodStart,
@@ -198,6 +201,7 @@ describe('rateUsage', () => {
       totalUnits: 50_000,
       price: { includedUnits: 0, unitPriceMinor: 50_000 }
     });
+
     expect(rated.amountMinor).toBe(2_500_000_000);
   });
 

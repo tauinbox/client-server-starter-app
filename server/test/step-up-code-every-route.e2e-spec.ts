@@ -50,6 +50,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -90,6 +91,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
   afterAll(async () => {
     if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
     else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+
     await dataSource?.getRepository(User).delete({ email });
     await app?.close();
   });
@@ -104,12 +106,14 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       userAgent: 'step-up-code-e2e',
       ipAddress: null
     });
+
     return tokens.access_token;
   }
 
   // A code is single use, so each step-up gets a fresh one.
   async function freshCode(): Promise<string> {
     await dataSource.getRepository(User).update(id, { totpLastUsedStep: null });
+
     return generateSync({ secret: SECRET });
   }
 
@@ -157,6 +161,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         const providers = await dataSource
           .getRepository(OAuthAccount)
           .find({ where: { userId: id } });
+
         expect(providers.map((p) => p.provider)).toEqual(['google']);
       }
     ],
@@ -181,6 +186,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         [method](path)
         .auth(bearer, { type: 'bearer' })
         .send(body);
+
       expect(refused.status).toBe(403);
       expect((refused.body as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.AUTH.REAUTH_REQUIRED
@@ -191,6 +197,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         [method](path)
         .auth(bearer, { type: 'bearer' })
         .send({ ...body, code: WRONG_CODE });
+
       expect(wrongCode.status).toBe(403);
       expect((wrongCode.body as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE
@@ -200,6 +207,7 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
         [method](path)
         .auth(bearer, { type: 'bearer' })
         .send({ ...body, code: await freshCode() });
+
       expect(accepted.status).toBe(status);
       await applied();
     },

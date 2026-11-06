@@ -29,13 +29,17 @@ runWithInfra('Audit rows carry the sanitised request id (e2e)', () => {
     action: AuditAction
   ): Promise<AuditLog | null> => {
     const repository = dataSource.getRepository(AuditLog);
+
     for (let attempt = 0; attempt < 40; attempt++) {
       const row = await repository.findOne({
         where: { actorEmail: email, action }
       });
+
       if (row) return row;
+
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+
     return null;
   };
 
@@ -69,10 +73,12 @@ runWithInfra('Audit rows carry the sanitised request id (e2e)', () => {
       .expect(201);
 
     const header = response.headers['x-request-id'];
+
     expect(header).not.toBe(malformed);
     expect(header).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
 
     const row = await waitForAuditRow(AuditAction.USER_REGISTER);
+
     expect(row).not.toBeNull();
     expect(row?.requestId).toBe(header);
   });

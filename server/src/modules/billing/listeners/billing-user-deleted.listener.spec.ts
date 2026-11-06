@@ -121,6 +121,7 @@ describe('BillingUserDeletedListener', () => {
       cancelAtPeriodEnd: true,
       nextRenewalAttemptAt: new Date()
     };
+
     subscriptions.find.mockResolvedValue([sub]);
 
     await listener.handleUserDeleted(new UserDeletedEvent('user-1'));
@@ -202,6 +203,7 @@ describe('BillingUserDeletedListener', () => {
     const logSpy = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);
+
     await expect(
       listener.handleUserDeleted(new UserDeletedEvent('user-1'))
     ).resolves.toBeUndefined();

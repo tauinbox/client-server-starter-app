@@ -119,15 +119,18 @@ function makeStores(): Stores {
 function makeManager(stores: Stores) {
   let methodSeq = 0;
   let invoiceSeq = 0;
+
   return {
     findOne: (entity: unknown, opts: { where: Record<string, unknown> }) => {
       const { where } = opts;
+
       if (entity === Subscription) {
         if (typeof where['id'] === 'string') {
           return Promise.resolve(
             stores.subscriptions.find((s) => s.id === where['id']) ?? null
           );
         }
+
         // The reducer looks the open subscription up by customer id with an
         // In(...) status filter — the store keeps one non-canceled row.
         return Promise.resolve(
@@ -137,16 +140,19 @@ function makeManager(stores: Stores) {
           ) ?? null
         );
       }
+
       if (entity === Customer) {
         return Promise.resolve(
           stores.customers.find((c) => c.id === where['id']) ?? null
         );
       }
+
       if (entity === Plan) {
         return Promise.resolve(
           stores.plans.find((p) => p.key === where['key']) ?? null
         );
       }
+
       return Promise.resolve(null);
     },
     update: (
@@ -160,14 +166,20 @@ function makeManager(stores: Stores) {
             m.customerId === where['customerId'] &&
             m.isDefault === where['isDefault']
         );
+
         for (const m of matches) Object.assign(m, set);
+
         return Promise.resolve({ affected: matches.length });
       }
+
       if (entity === Customer) {
         const matches = stores.customers.filter((c) => c.id === where['id']);
+
         for (const c of matches) Object.assign(c, set);
+
         return Promise.resolve({ affected: matches.length });
       }
+
       if (entity === Subscription) {
         // The period advance is a compare-and-swap on the period end read at
         // scan start, so the criterion carries a Date.
@@ -178,9 +190,12 @@ function makeManager(stores: Stores) {
               s.currentPeriodEnd.getTime() ===
                 (where['currentPeriodEnd'] as Date).getTime())
         );
+
         for (const s of matches) Object.assign(s, set);
+
         return Promise.resolve({ affected: matches.length });
       }
+
       return Promise.resolve({ affected: 0 });
     },
     create: (_entity: unknown, data: object) => ({ ...data }),
@@ -190,9 +205,11 @@ function makeManager(stores: Stores) {
           entity['id'] = `pm-new-${++methodSeq}`;
           // @ts-expect-error - partial PaymentMethod fake from the save() payload
           const paymentMethod: PaymentMethod = entity;
+
           stores.paymentMethods.push(paymentMethod);
         }
       }
+
       return Promise.resolve(entity);
     },
     createQueryBuilder: () => {
@@ -202,6 +219,7 @@ function makeManager(stores: Stores) {
         into: () => builder,
         values: (v: Record<string, unknown>) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -211,12 +229,17 @@ function makeManager(stores: Stores) {
           const dup = stores.invoices.some(
             (i) => i['providerEventId'] === v['providerEventId']
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `inv-${++invoiceSeq}`;
+
           stores.invoices.push({ id, ...v });
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     }
   };
@@ -224,6 +247,7 @@ function makeManager(stores: Stores) {
 
 function makeWebhookEventRepo(stores: Stores) {
   let seq = 0;
+
   return {
     createQueryBuilder: () => {
       const captured: {
@@ -243,6 +267,7 @@ function makeWebhookEventRepo(stores: Stores) {
           payload: object;
         }) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -254,8 +279,11 @@ function makeWebhookEventRepo(stores: Stores) {
               e.provider === v.provider &&
               e.providerEventId === v.providerEventId
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `wh-${++seq}`;
+
           stores.webhookEvents.push({
             id,
             provider: v.provider,
@@ -263,9 +291,11 @@ function makeWebhookEventRepo(stores: Stores) {
             status: v.status,
             payload: v.payload
           });
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     },
     findOne: (opts: { where: { provider: string; providerEventId: string } }) =>
@@ -278,7 +308,9 @@ function makeWebhookEventRepo(stores: Stores) {
       ),
     update: (where: { id: string }, set: Record<string, unknown>) => {
       const matches = stores.webhookEvents.filter((e) => e.id === where.id);
+
       for (const row of matches) Object.assign(row, set);
+
       return Promise.resolve({ affected: matches.length });
     }
   };
@@ -301,6 +333,7 @@ function subscriptionsRepo(stores: Stores) {
         orderBy: () => qb,
         limit: (n: number) => {
           take = n;
+
           return qb;
         },
         getMany: () =>
@@ -314,6 +347,7 @@ function subscriptionsRepo(stores: Stores) {
               .slice(0, take)
           )
       };
+
       return qb;
     }
   };
@@ -474,6 +508,7 @@ describe('Billing payment-method update flow (e2e)', () => {
     // The new card became the default; the old one is demoted, not deleted.
     const oldMethod = stores.paymentMethods.find((m) => m.id === 'pm-old')!;
     const newMethod = stores.paymentMethods.find((m) => m.id !== 'pm-old')!;
+
     expect(getPayment).toHaveBeenCalledWith('pay-mu');
     expect(oldMethod.isDefault).toBe(false);
     expect(newMethod).toMatchObject({
@@ -494,6 +529,7 @@ describe('Billing payment-method update flow (e2e)', () => {
 
     expect(createPayment).toHaveBeenCalledTimes(1);
     const [chargePayload] = createPayment.mock.calls[0] as [ICreatePayment];
+
     expect(chargePayload.payment_method_id).toBe('tok-new');
     expect(stores.invoices).toHaveLength(1);
     expect(stores.subscriptions[0].currentPeriodEnd).toEqual(

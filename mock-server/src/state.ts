@@ -149,11 +149,13 @@ export function registerSession(
 ): void {
   state.refreshSessions.set(refreshToken, sessionId);
   state.sessionLastActive.set(sessionId, Date.now());
+
   // Every row records the address it was issued to, so the list shows the
   // latest one. A refresh without an address keeps the previous one.
   if (ipAddress !== null || !state.sessionIps.has(sessionId)) {
     state.sessionIps.set(sessionId, ipAddress);
   }
+
   // Only a session that is new gets a start and a device. Rotation calls this
   // with the id it replaces a token inside, and re-stamping there would restore
   // the sliding expiry the absolute cap ends.
@@ -170,9 +172,11 @@ export function registerSession(
  */
 export function sessionAgeMs(refreshToken: string): number {
   const sessionId = state.refreshSessions.get(refreshToken);
+
   if (sessionId === undefined) return 0;
 
   const startedAt = state.sessionStarts.get(sessionId);
+
   if (startedAt === undefined) return 0;
 
   return Date.now() - startedAt;
@@ -187,6 +191,7 @@ export function isSessionLive(sessionId: string): boolean {
   for (const token of state.refreshTokens.keys()) {
     if (state.refreshSessions.get(token) === sessionId) return true;
   }
+
   return false;
 }
 
@@ -198,11 +203,15 @@ export function findLostResponseSuccessor(
   refreshToken: string
 ): { ageMs: number; ipAddress: string | null } | null {
   const successor = state.rotatedTo.get(refreshToken);
+
   if (successor === undefined || !state.refreshTokens.has(successor)) {
     return null;
   }
+
   const sessionId = state.refreshSessions.get(successor);
+
   if (sessionId === undefined) return null;
+
   // A live successor is the newest row of its session, so the last-active
   // stamp is its issue time and the session address is its address.
   return {
@@ -217,34 +226,45 @@ export function findLostResponseSuccessor(
  */
 export function endSessionOfToken(refreshToken: string): boolean {
   const sessionId = state.refreshSessions.get(refreshToken);
+
   if (sessionId === undefined) return false;
+
   return endSession(sessionId);
 }
 
 function endSession(sessionId: string): boolean {
   let ended = false;
+
   for (const [token, sid] of state.refreshSessions.entries()) {
     if (sid !== sessionId) continue;
+
     if (state.refreshTokens.delete(token)) ended = true;
+
     state.revokedRefreshTokens.delete(token);
     state.rotatedTo.delete(token);
     state.refreshSessions.delete(token);
   }
+
   state.sessionStarts.delete(sessionId);
   state.sessionUserAgents.delete(sessionId);
   state.sessionIps.delete(sessionId);
   state.sessionLastActive.delete(sessionId);
+
   return ended;
 }
 
 /** The live sessions of one account. Mirrors `findLiveSessions`. */
 export function liveSessionIdsOf(userId: string): string[] {
   const ids = new Set<string>();
+
   for (const [token, uid] of state.refreshTokens.entries()) {
     if (uid !== userId) continue;
+
     const sid = state.refreshSessions.get(token);
+
     if (sid !== undefined) ids.add(sid);
   }
+
   return [...ids].toSorted(
     (a, b) =>
       (state.sessionLastActive.get(b) ?? 0) -
@@ -258,6 +278,7 @@ export function liveSessionIdsOf(userId: string): string[] {
  */
 export function endUserSession(userId: string, sessionId: string): boolean {
   if (!liveSessionIdsOf(userId).includes(sessionId)) return false;
+
   return endSession(sessionId);
 }
 
@@ -267,9 +288,11 @@ export function endOtherUserSessions(
   keepSessionId: string
 ): number {
   let ended = 0;
+
   for (const sid of liveSessionIdsOf(userId)) {
     if (sid !== keepSessionId && endSession(sid)) ended += 1;
   }
+
   return ended;
 }
 
@@ -282,16 +305,21 @@ export function revokeUserSessions(userId: string): void {
   for (const [token, uid] of state.refreshTokens.entries()) {
     if (uid === userId) state.refreshTokens.delete(token);
   }
+
   for (const [token, uid] of state.revokedRefreshTokens.entries()) {
     if (uid === userId) state.revokedRefreshTokens.delete(token);
   }
+
   const user = state.users.get(userId);
+
   if (user) user.tokenRevokedAt = new Date().toISOString();
 }
 
 function moveKey<V>(map: Map<string, V>, from: string, to: string): void {
   const value = map.get(from);
+
   if (value === undefined) return;
+
   map.set(to, value);
   map.delete(from);
 }
@@ -304,12 +332,15 @@ function moveKey<V>(map: Map<string, V>, from: string, to: string): void {
  */
 export function rekeyUserSessions(userId: string): void {
   const renamed = new Map<string, string>();
+
   for (const [token, sid] of state.refreshSessions.entries()) {
     const owner =
       state.refreshTokens.get(token) ?? state.revokedRefreshTokens.get(token);
+
     if (owner !== userId) continue;
 
     let next = renamed.get(sid);
+
     if (next === undefined) {
       next = generateSessionId();
       renamed.set(sid, next);
@@ -318,6 +349,7 @@ export function rekeyUserSessions(userId: string): void {
       moveKey(state.sessionIps, sid, next);
       moveKey(state.sessionLastActive, sid, next);
     }
+
     state.refreshSessions.set(token, next);
   }
 }
@@ -326,6 +358,7 @@ export function findUserByEmail(email: string): MockUser | undefined {
   for (const user of state.users.values()) {
     if (user.email === email && !user.deletedAt) return user;
   }
+
   return undefined;
 }
 
@@ -333,11 +366,13 @@ export function findUserByPendingEmail(email: string): MockUser | undefined {
   for (const user of state.users.values()) {
     if (user.pendingEmail === email && !user.deletedAt) return user;
   }
+
   return undefined;
 }
 
 export function findUserById(id: string): MockUser | undefined {
   const user = state.users.get(id);
+
   return user && !user.deletedAt ? user : undefined;
 }
 
@@ -392,6 +427,7 @@ export function toPermissionResponse(
 ): PermissionResponse | null {
   const resource = state.resources.get(perm.resourceId);
   const action = state.actions.get(perm.actionId);
+
   if (!resource || !action) return null;
 
   return {
@@ -453,8 +489,10 @@ export function toUserResponse(user: MockUser): UserResponse {
   } = user;
   const roles = roleNames.flatMap((name) => {
     const role = state.roles.values().find((r) => r.name === name);
+
     return role ? [toRolePublicResponse(role)] : [];
   });
+
   return {
     ...rest,
     roles,
@@ -480,8 +518,10 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
   } = user;
   const roles = roleNames.flatMap((name) => {
     const role = state.roles.values().find((r) => r.name === name);
+
     return role ? [toRoleAdminResponse(role)] : [];
   });
+
   return {
     ...rest,
     roles,
@@ -496,10 +536,12 @@ export function addOAuthAccounts(
 ): void {
   const merged = [...(state.oauthAccounts.get(userId) || []), ...accounts];
   const providers = new Set(merged.map((a) => a.provider));
+
   // The server's unique (user_id, provider) refuses the same state.
   if (providers.size !== merged.length) {
     throw new Error(`User ${userId} would hold two accounts of one provider`);
   }
+
   state.oauthAccounts.set(userId, merged);
 }
 
@@ -522,7 +564,9 @@ export function removeLinkedProviders(
   }
 ): void {
   const removed = state.oauthAccounts.get(user.id) ?? [];
+
   state.oauthAccounts.delete(user.id);
+
   for (const { provider } of removed) {
     logAudit('OAUTH_UNLINK', {
       actorId: actor.id,
@@ -544,6 +588,7 @@ const AUDIT_FIELD_MAX_LENGTH = 255;
 
 function capAuditField(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
+
   return value.slice(0, AUDIT_FIELD_MAX_LENGTH);
 }
 
@@ -571,6 +616,7 @@ export function logAudit(
     requestId: capAuditField(opts.requestId),
     createdAt: new Date().toISOString()
   };
+
   state.auditLogs.push(entry);
 }
 
@@ -600,15 +646,22 @@ export function getResolvedPermissionsForUser(
   const currentState = getState();
 
   const grants: GrantRow[] = [];
+
   for (const [roleId, role] of currentState.roles) {
     if (!user.roles.includes(role.name)) continue;
+
     for (const rp of currentState.rolePermissions) {
       if (rp.roleId !== roleId) continue;
+
       const permission = currentState.permissions.get(rp.permissionId);
+
       if (!permission) continue;
+
       const resource = currentState.resources.get(permission.resourceId);
       const action = currentState.actions.get(permission.actionId);
+
       if (!resource || !action) continue;
+
       grants.push({
         resource: resource.name,
         action: action.name,
@@ -631,6 +684,7 @@ export function hasSuperRole(user: MockUser): boolean {
     for (const role of currentState.roles.values()) {
       if (role.name === roleName && role.isSuper) return true;
     }
+
     return false;
   });
 }
@@ -670,10 +724,12 @@ export function buildAbilityForUser(user: MockUser): MockAbility {
     grantableActions: {},
     conditionalActions: {}
   };
+
   for (const resource of getState().resources.values()) {
     const target = resource.isOrphaned
       ? subjectMaps.orphaned
       : subjectMaps.active;
+
     target[resource.name] = resource.subject;
     subjectMaps.grantableActions[resource.name] =
       grantableActionNames(resource);
@@ -719,6 +775,7 @@ export function toFeatureFlagResponse(
         : a.createdAt.localeCompare(b.createdAt)
     )
     .map(toFeatureFlagRuleResponse);
+
   return {
     id: flag.id,
     key: flag.key,
@@ -832,8 +889,11 @@ function pricedByCurrentPlan(record: MockUsageRecord): boolean {
         ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
     .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
+
   if (!subscription) return false;
+
   const plan = state.plans.values().find((p) => p.key === subscription.planKey);
+
   return plan?.meterKey === record.meterKey;
 }
 

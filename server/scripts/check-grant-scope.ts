@@ -70,6 +70,7 @@ async function main(): Promise<void> {
     synchronize: false,
     logging: false
   });
+
   await ds.initialize();
 
   // `users."isActive"` is camelCase in the schema while everything else is
@@ -119,20 +120,24 @@ async function main(): Promise<void> {
   console.log(
     `A. Inert grants - not applied as authored: ${report.inert.length}`
   );
+
   if (report.inert.length > 0) {
     console.log(
       `   An allow registers nothing and a deny denies everything at runtime; the grant rule rejects them on rewrite.`
     );
+
     for (const row of report.inert) {
       console.log(`   - ${grantLabel(row)}`);
       console.log(`       condition : ${JSON.stringify(row.conditions)}`);
     }
   }
+
   console.log('');
 
   console.log(
     `B. Grants the attributed author could not re-authorize today: ${report.findings.length}`
   );
+
   for (const f of report.findings) {
     console.log(`   - ${grantLabel(f.row)}`);
     console.log(
@@ -144,6 +149,7 @@ async function main(): Promise<void> {
         `${f.verdict.reason ? ` (${f.verdict.reason})` : ''}`
     );
     console.log(`       condition    : ${JSON.stringify(f.row.conditions)}`);
+
     if (f.selfReachable) {
       console.log(
         `       NOTE         : the author currently holds this role, so the grant is ` +
@@ -151,12 +157,14 @@ async function main(): Promise<void> {
       );
     }
   }
+
   console.log('');
 
   console.log(`C. Re-checked and accepted: ${report.accepted}\n`);
 
   const notJudged =
     report.unattributed + report.authorSuper + report.authorGone;
+
   console.log(`D. Not judged: ${notJudged}`);
   console.log(
     `   ${report.unattributed} unattributed (seeded, or the audit row aged out of ` +

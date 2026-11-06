@@ -55,6 +55,7 @@ describe('ifMatchHolds', () => {
 
   it('holds only for a listed version', () => {
     const condition = { any: false, versions: [3, 4] } as const;
+
     expect(ifMatchHolds(condition, 4)).toBe(true);
     expect(ifMatchHolds(condition, 5)).toBe(false);
   });

@@ -93,6 +93,7 @@ describe('ResourcesStore', () => {
   describe('load()', () => {
     it('asks for the first page and fills the collection', async () => {
       const store = createStore();
+
       store.load();
       await vi.waitFor(() => expect(store.loading()).toBe(false));
 
@@ -106,6 +107,7 @@ describe('ResourcesStore', () => {
 
     it('appends the next page instead of replacing the first', async () => {
       const store = createStore();
+
       rbacServiceMock.getResourcesCursor.mockReturnValue(
         of(cursorPage([mockResource], 'cur-1'))
       );
@@ -127,6 +129,7 @@ describe('ResourcesStore', () => {
 
     it('shows a snackbar on error', async () => {
       const store = createStore();
+
       rbacServiceMock.getResourcesCursor.mockReturnValue(
         throwError(() => new Error('boom'))
       );
@@ -144,10 +147,12 @@ describe('ResourcesStore', () => {
   describe('updateResource()', () => {
     it('replaces the row', async () => {
       const store = createStore();
+
       store.load();
       await vi.waitFor(() => expect(store.resources()).toHaveLength(1));
 
       const updated = { ...mockResource, displayName: 'People' };
+
       rbacServiceMock.updateResource.mockReturnValue(of(updated));
 
       await firstValueFrom(
@@ -161,10 +166,12 @@ describe('ResourcesStore', () => {
   describe('restoreResource()', () => {
     it('replaces the row', async () => {
       const store = createStore();
+
       store.load();
       await vi.waitFor(() => expect(store.resources()).toHaveLength(1));
 
       const restored = { ...mockResource, isOrphaned: false };
+
       rbacServiceMock.restoreResource.mockReturnValue(of(restored));
 
       await firstValueFrom(store.restoreResource('res-1'));

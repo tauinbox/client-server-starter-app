@@ -120,7 +120,9 @@ type PendingReauth =
 
 function isSessionRevokeTarget(value: unknown): value is SessionRevokeTarget {
   if (typeof value !== 'object' || value === null) return false;
+
   const target = value as Record<string, unknown>;
+
   return (
     target['scope'] === 'others' ||
     (target['scope'] === 'one' && typeof target['sessionId'] === 'string')
@@ -130,7 +132,9 @@ function isSessionRevokeTarget(value: unknown): value is SessionRevokeTarget {
 /** The record is read back from session storage, so its shape is checked. */
 function isPendingReauth(value: unknown): value is PendingReauth {
   if (typeof value !== 'object' || value === null) return false;
+
   const pending = value as Record<string, unknown>;
+
   switch (pending['operation']) {
     case STEP_UP_OPERATION.EMAIL_CHANGE:
       return typeof pending['email'] === 'string' && pending['email'] !== '';
@@ -213,11 +217,14 @@ export class ProfileComponent implements OnInit {
   readonly roleChips = computed(() =>
     sortRolesForDisplay(this.user()?.roles ?? [])
   );
+
   protected readonly roleIcon = roleIcon;
   protected readonly isAdminRole = isAdminRole;
   readonly initials = computed(() => {
     const u = this.user();
+
     if (!u) return '';
+
     return u.name
       .split(/\s+/)
       .filter(Boolean)
@@ -226,6 +233,7 @@ export class ProfileComponent implements OnInit {
       .join('')
       .toUpperCase();
   });
+
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -258,9 +266,11 @@ export class ProfileComponent implements OnInit {
     // Each field is demanded only from the account whose step-up factor it is.
     validate(path.currentPassword, ({ value, valueOf }) => {
       if (this.stepUpFactor() !== 'password') return null;
+
       if (!this.#isSensitive(valueOf(path.password), valueOf(path.email))) {
         return null;
       }
+
       return value().trim()
         ? null
         : {
@@ -270,9 +280,11 @@ export class ProfileComponent implements OnInit {
     });
     validate(path.code, ({ value, valueOf }) => {
       if (this.stepUpFactor() !== 'code') return null;
+
       if (!this.#isSensitive(valueOf(path.password), valueOf(path.email))) {
         return null;
       }
+
       return value().trim()
         ? null
         : { kind: 'codeRequired', message: 'auth.profile.codeRequired' };
@@ -280,13 +292,16 @@ export class ProfileComponent implements OnInit {
     validate(path.confirmPassword, ({ value, valueOf }) => {
       const confirm = value();
       const password = valueOf(path.password);
+
       if (!password) return null;
+
       if (confirm !== password) {
         return {
           kind: 'passwordMismatch',
           message: 'forms.errors.passwordMismatch'
         };
       }
+
       return null;
     });
   });
@@ -327,11 +342,13 @@ export class ProfileComponent implements OnInit {
   /** The provider a step-up round trip can run against. */
   protected readonly reauthProvider = computed(() => {
     const linked = this.oauthAccounts().map((a) => a.provider);
+
     return linked.find(isOAuthProvider) ?? null;
   });
 
   protected readonly reauthProviderLabel = computed(() => {
     const provider = this.reauthProvider();
+
     return provider ? this.#providerLabel(provider) : '';
   });
 
@@ -396,8 +413,10 @@ export class ProfileComponent implements OnInit {
   /** Null when no notice applies, so the template reads one value. */
   protected readonly reauthNoticeKey = computed(() => {
     if (this.emailChangeNeedsReauth()) return 'auth.profile.reauthNotice';
+
     if (this.passwordSetNeedsReauth())
       return 'auth.profile.reauthNoticePassword';
+
     return null;
   });
 
@@ -431,6 +450,7 @@ export class ProfileComponent implements OnInit {
       PENDING_REAUTH_KEY,
       isPendingReauth
     );
+
     this.#sessionStorage.removeItem(PENDING_REAUTH_KEY);
 
     if (reauth !== 'ok') return;
@@ -452,21 +472,26 @@ export class ProfileComponent implements OnInit {
     switch (pending.operation) {
       case STEP_UP_OPERATION.EMAIL_CHANGE:
         this.#resumeEmailChange(pending.email);
+
         return;
       case STEP_UP_OPERATION.PASSWORD_SET:
         this.#notify.info('auth.profile.reauthDonePassword');
+
         return;
       case STEP_UP_OPERATION.OAUTH_LINK:
       case STEP_UP_OPERATION.OAUTH_UNLINK:
         this.resumeProviderChange.set(pending);
+
         return;
       case STEP_UP_OPERATION.SESSION_REVOKE:
         this.resumeSessionRevoke.set(pending.target);
+
         return;
       // The card holds the enrolment, so all it needs is the signal that the
       // proof its request will carry is now there.
       case STEP_UP_OPERATION.MFA_SETUP:
         this.resumeMfaSetup.set(true);
+
         return;
     }
   }
@@ -511,8 +536,10 @@ export class ProfileComponent implements OnInit {
    */
   #startReauth(pending: PendingReauth, busy?: WritableSignal<boolean>): void {
     const trip$ = this.#reauthTrip(pending);
+
     if (!trip$) {
       this.#notify.error('auth.profile.errorReauthNoProvider');
+
       return;
     }
 
@@ -536,6 +563,7 @@ export class ProfileComponent implements OnInit {
     before$: Observable<unknown> = EMPTY
   ): Observable<unknown> | null {
     const provider = this.reauthProvider();
+
     if (!provider) return null;
 
     return concat(
@@ -548,6 +576,7 @@ export class ProfileComponent implements OnInit {
           this.#notify.info('auth.profile.reauthRedirecting', {
             provider: this.reauthProviderLabel()
           });
+
           if (this.#window) {
             this.#window.location.href = OAUTH_URLS[provider];
           }
@@ -599,6 +628,7 @@ export class ProfileComponent implements OnInit {
         });
         this.offerSignOutOthers.set(true);
       }
+
       void this.#router.navigate([], {
         queryParams: { oauth_linked: null },
         queryParamsHandling: 'merge'
@@ -611,6 +641,7 @@ export class ProfileComponent implements OnInit {
       } else {
         this.#notify.error('auth.profile.errorLinkFailed');
       }
+
       void this.#router.navigate([], {
         queryParams: { oauth_error: null },
         queryParamsHandling: 'merge'
@@ -620,6 +651,7 @@ export class ProfileComponent implements OnInit {
 
   #isEmailChange(email: string): boolean {
     const loaded = canonicalEmail(this.user()?.email);
+
     return !!loaded && canonicalEmail(email) !== loaded;
   }
 
@@ -699,6 +731,7 @@ export class ProfileComponent implements OnInit {
 
   onSubmit(): void {
     const u = this.user();
+
     if (this.profileForm().invalid() || !u || !this.canEditProfile()) return;
 
     const newEmail = canonicalEmail(this.profileModel().email);
@@ -706,6 +739,7 @@ export class ProfileComponent implements OnInit {
 
     if (!emailChanged) {
       this.#save(null);
+
       return;
     }
 
@@ -746,6 +780,7 @@ export class ProfileComponent implements OnInit {
 
     if (newEmail !== null && this.stepUpFactor() === 'none') {
       this.#startReauthForEmailChange(newEmail, updateData);
+
       return;
     }
 
@@ -757,11 +792,13 @@ export class ProfileComponent implements OnInit {
       this.error.set(
         this.#transloco.translate('auth.profile.errorPasswordBeforeEmail')
       );
+
       return;
     }
 
     if (this.passwordSetNeedsReauth()) {
       this.#startReauthForPasswordSet();
+
       return;
     }
 
@@ -803,10 +840,13 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         complete: () => {
           this.saving.set(false);
+
           if (savedUser && updateData?.password) {
             this.#endSessionAfterPasswordChange(emailInitiated);
+
             return;
           }
+
           this.#applySavedProfile(savedUser);
           this.#notify.success(
             this.#successKey(newEmail !== null, !!savedUser)
@@ -814,6 +854,7 @@ export class ProfileComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
+
           // A proof that expired between the round trip and this submit leaves
           // the form with nothing to retry against, so the next submit has to
           // start a fresh round trip rather than repeat this failure.
@@ -823,6 +864,7 @@ export class ProfileComponent implements OnInit {
           ) {
             this.#reauthConfirmed.set(false);
           }
+
           this.error.set(
             parseHttpErrorMessage(
               err,
@@ -855,6 +897,7 @@ export class ProfileComponent implements OnInit {
       this.error.set(
         this.#transloco.translate('auth.profile.errorPasswordBeforeEmail')
       );
+
       return;
     }
 
@@ -862,10 +905,12 @@ export class ProfileComponent implements OnInit {
       { operation: STEP_UP_OPERATION.EMAIL_CHANGE, email: newEmail },
       updateData ? this.#saveBeforeLeaving(updateData) : EMPTY
     );
+
     if (!trip$) {
       this.error.set(
         this.#transloco.translate('auth.profile.errorReauthNoProvider')
       );
+
       return;
     }
 
@@ -909,10 +954,12 @@ export class ProfileComponent implements OnInit {
           })
         : EMPTY
     );
+
     if (!trip$) {
       this.error.set(
         this.#transloco.translate('auth.profile.errorReauthNoProvider')
       );
+
       return;
     }
 
@@ -985,6 +1032,7 @@ export class ProfileComponent implements OnInit {
 
   #successKey(emailChanging: boolean, profileSaved: boolean): string {
     if (!emailChanging) return 'auth.profile.successUpdated';
+
     return profileSaved
       ? 'auth.profile.emailChangeInitiatedWithProfile'
       : 'auth.profile.emailChangeInitiated';
@@ -998,6 +1046,7 @@ export class ProfileComponent implements OnInit {
     if (savedUser) this.user.set(savedUser);
 
     const current = this.user();
+
     if (!current) return;
 
     this.profileModel.set({

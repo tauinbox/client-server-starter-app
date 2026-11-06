@@ -41,9 +41,11 @@ function permissionId(actionSlug: string, resourceSlug: string): string {
         p.resourceId === mockId(resourceSlug) &&
         p.actionId === mockId(actionSlug)
     );
+
   if (!permission) {
     throw new Error(`Seed permission ${resourceSlug}/${actionSlug} missing`);
   }
+
   return permission.id;
 }
 
@@ -56,6 +58,7 @@ function delegate(): void {
     { slug: 'act-update', resource: 'res-roles', conditions: null },
     { slug: 'act-assign', resource: 'res-roles', conditions: null }
   ];
+
   state.rolePermissions = [
     ...state.rolePermissions.filter((rp) => rp.roleId !== EDITOR_ROLE_ID),
     ...rows.map((row, index) => ({
@@ -83,8 +86,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -102,12 +107,15 @@ async function call(
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const json = (await res.json()) as { errorKey?: string };
+
   return { status: res.status, errorKey: json.errorKey };
 }
 
 function lastRow() {
   const row = getState().auditLogs.at(-1);
+
   expect(row?.ipAddress).toEqual(expect.any(String));
+
   return row;
 }
 
@@ -130,6 +138,7 @@ describe('audit row of an authorization refusal parity', () => {
         name: 'Changed'
       }
     });
+
     expect(res.errorKey).toBe(ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS);
     expect(lastRow()).toMatchObject({
       action: 'PERMISSION_CHECK_FAILURE',
@@ -146,6 +155,7 @@ describe('audit row of an authorization refusal parity', () => {
         roleId: mockId('role-admin')
       }
     });
+
     expect(res.errorKey).toBe(ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN);
     expect(lastRow()).toMatchObject({
       action: 'PERMISSION_CHECK_FAILURE',
@@ -160,6 +170,7 @@ describe('audit row of an authorization refusal parity', () => {
         items: []
       }
     });
+
     expect(res).toEqual({
       status: 403,
       errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
@@ -181,6 +192,7 @@ describe('audit row of an authorization refusal parity', () => {
         }
       }
     );
+
     expect(res.errorKey).toBe(ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION);
     expect(lastRow()).toMatchObject({
       action: 'PERMISSION_GRANT_DENIED',
@@ -192,6 +204,7 @@ describe('audit row of an authorization refusal parity', () => {
     process.env['MFA_REQUIRED_FOR_ADMINS'] = 'true';
 
     const res = await call('GET', '/roles', { email: 'admin@example.com' });
+
     expect(res.errorKey).toBe(ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED);
     expect(lastRow()).toMatchObject({
       action: 'PERMISSION_CHECK_FAILURE',

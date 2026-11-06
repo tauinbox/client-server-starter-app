@@ -73,6 +73,7 @@ runWithInfra(
 
     const saveUser = (email: string, extra: Partial<User> = {}) => {
       const repository = dataSource.getRepository(User);
+
       return repository.save(
         repository.create({
           email,
@@ -109,11 +110,14 @@ runWithInfra(
       const notifications = app.get(NotificationsService);
       const pushToAuthorized =
         notifications.pushToAuthorized.bind(notifications);
+
       jest
         .spyOn(notifications, 'pushToAuthorized')
         .mockImplementation((event, allows, grant) => {
           const push = pushToAuthorized(event, allows, grant);
+
           pushes.push(push);
+
           return push;
         });
 
@@ -121,6 +125,7 @@ runWithInfra(
         where: { action: { name: 'search' }, resource: { subject: 'User' } },
         relations: { action: true, resource: true }
       });
+
       if (!searchUser) throw new Error('Permission search:User missing');
 
       viewer = await saveUser(emails.viewer);
@@ -130,6 +135,7 @@ runWithInfra(
         { name: `${tag}-viewer` },
         { ability: SYSTEM_ABILITY }
       );
+
       await roleService.setPermissionsForRole(
         viewerRole.id,
         [{ permissionId: searchUser.id }],
@@ -142,12 +148,14 @@ runWithInfra(
 
     afterAll(async () => {
       for (const req of requests) req.destroy();
+
       if (dataSource) {
         await dataSource.getRepository(Role).delete({ name: In(roleNames) });
         await dataSource
           .getRepository(User)
           .delete({ email: In(Object.values(emails)) });
       }
+
       await app?.close();
     });
 
@@ -156,6 +164,7 @@ runWithInfra(
         await usersService.findOne(user.id, SYSTEM_ABILITY),
         { userAgent: 'crud-events-triggers-e2e', ipAddress: '203.0.113.11' }
       );
+
       return new Promise((resolve, reject) => {
         const req = get(
           {
@@ -166,9 +175,12 @@ runWithInfra(
           (res: IncomingMessage) => {
             if (res.statusCode !== 200) {
               reject(new Error(`stream status ${res.statusCode}`));
+
               return;
             }
+
             let body = '';
+
             res.setEncoding('utf8');
             res.on('data', (chunk: string) => {
               body += chunk;
@@ -187,6 +199,7 @@ runWithInfra(
             );
           }
         );
+
         req.on('error', () => undefined);
         requests.push(req);
       });
@@ -194,7 +207,9 @@ runWithInfra(
 
     const superAbility = (): AppAbility => {
       const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
       can('manage', 'all');
+
       return build();
     };
 
@@ -210,6 +225,7 @@ runWithInfra(
         headers: {},
         cookies: {}
       };
+
       // @ts-expect-error partial request: the handlers read only these fields
       return req;
     };
@@ -247,6 +263,7 @@ runWithInfra(
 
       const registered = await usersService.findByEmail(emails.registered);
       const provider = await usersService.findByEmail(emails.provider);
+
       await settle(stream, 2);
       // Each push resolves the abilities of its viewers on its own, so the
       // two frames can arrive in either order.
@@ -282,6 +299,7 @@ runWithInfra(
 
       await settle(stream, 2);
       const updated = crud('updated', target.id);
+
       expect(stream()).toEqual([updated, updated]);
     }, 30000);
 
@@ -339,6 +357,7 @@ runWithInfra(
       await rolesController.remove(renamed.id, req, superAbility());
 
       const stale: ListEvent = { type: 'user_list_stale' };
+
       await settle(stream, 2);
       expect(stream()).toEqual([stale, stale]);
       expect(plainStream()).toEqual([]);

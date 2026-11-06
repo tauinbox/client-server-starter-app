@@ -30,6 +30,7 @@ describe('NotificationsController', () => {
         sessionId: `session-of-${userId}`
       }
     };
+
     // @ts-expect-error partial mock
     return req;
   };
@@ -44,9 +45,11 @@ describe('NotificationsController', () => {
       emitter,
       on: (event, listener) => {
         emitter.on(event, listener);
+
         return res;
       }
     };
+
     return res;
   };
 
@@ -67,6 +70,7 @@ describe('NotificationsController', () => {
   it('closes the stream on response close using the same connectionId', () => {
     const req = buildReq('user-2');
     const res = buildRes();
+
     // @ts-expect-error partial Response mock
     controller.stream(req, res);
 
@@ -76,6 +80,7 @@ describe('NotificationsController', () => {
       string
     ];
     const [, , connectionId] = firstCall;
+
     res.emitter.emit('close');
 
     expect(service.closeStream).toHaveBeenCalledWith('user-2', connectionId);

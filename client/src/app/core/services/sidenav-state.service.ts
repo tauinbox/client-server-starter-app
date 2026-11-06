@@ -46,6 +46,7 @@ export class SidenavStateService {
 
   readonly sidenavOpened = computed(() => {
     if (this.isMobile()) return this.#mobileOpen();
+
     return true;
   });
 
@@ -80,12 +81,14 @@ export class SidenavStateService {
   readonly defaultRoute = computed(() => {
     const billingRoute = `/${AppRouteSegmentEnum.Billing}`;
     const target = this.navLinks().find((link) => link.route !== billingRoute);
+
     return target?.route ?? `/${AppRouteSegmentEnum.Profile}`;
   });
 
   constructor() {
     effect(() => {
       const userId = this.#authStore.user()?.id;
+
       if (userId) {
         this.#isWide.set(
           this.#storage.getItem<boolean>(WIDE_KEY(userId)) === true
@@ -98,8 +101,10 @@ export class SidenavStateService {
 
   toggleWide(): void {
     const next = !this.#isWide();
+
     this.#isWide.set(next);
     const userId = this.#authStore.user()?.id;
+
     if (userId) {
       this.#storage.setItem(WIDE_KEY(userId), next);
     }

@@ -76,6 +76,7 @@ describe('OAuthAccountService', () => {
         providerId: '12345',
         userId: 'user-1'
       };
+
       mockRepository.findOne.mockResolvedValue(mockAccount);
 
       const result = await service.findByProviderAndProviderId(
@@ -96,6 +97,7 @@ describe('OAuthAccountService', () => {
         'google',
         'unknown'
       );
+
       expect(result).toBeNull();
     });
   });
@@ -106,6 +108,7 @@ describe('OAuthAccountService', () => {
         { id: '1', provider: 'google', providerId: '123', userId: 'user-1' },
         { id: '2', provider: 'facebook', providerId: '456', userId: 'user-1' }
       ];
+
       mockRepository.find.mockResolvedValue(mockAccounts);
 
       const result = await service.findByUserId('user-1');

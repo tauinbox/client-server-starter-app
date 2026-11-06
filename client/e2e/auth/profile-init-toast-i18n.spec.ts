@@ -50,6 +50,7 @@ test.describe('Profile init notifications wait for their translations', () => {
       userId,
       STEP_UP_OPERATION.EMAIL_CHANGE
     );
+
     await page.context().addCookies([
       {
         name: 'reauth_proof',

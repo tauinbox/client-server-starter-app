@@ -34,19 +34,24 @@ describe('WebhookRetentionService', () => {
       const chain = {
         set(values: Partial<WebhookEvent>) {
           statement.set = values;
+
           return chain;
         },
         where(where: string, params: { cutoff: Date; limit: number }) {
           statement.where = where;
           statement.params = params;
+
           return chain;
         },
         execute() {
           const captured = statement as CapturedStatement;
+
           statements.push(captured);
+
           return Promise.resolve({ affected: affected(captured) });
         }
       };
+
       return chain;
     };
 
@@ -57,6 +62,7 @@ describe('WebhookRetentionService', () => {
         delete: () => builder('delete')
       })
     };
+
     // @ts-expect-error stand-in for the repository: the service only reads
     // metadata.tableName and drives the update/delete builder chain.
     return repo;
@@ -76,6 +82,7 @@ describe('WebhookRetentionService', () => {
     await service.sweep(new Date('2026-08-10T00:00:00Z'));
 
     expect(statements).toHaveLength(2);
+
     for (const statement of statements) {
       expect(statement.where).toContain(`status = 'processed'`);
       expect(statement.where).toContain('received_at < :cutoff');
@@ -89,6 +96,7 @@ describe('WebhookRetentionService', () => {
     await service.sweep(now);
 
     const [redact, prune] = statements;
+
     expect(redact.kind).toBe('update');
     expect(redact.set).toEqual({ payload: null });
     expect(redact.params.cutoff).toEqual(
@@ -102,6 +110,7 @@ describe('WebhookRetentionService', () => {
 
   it('honours the env-configured windows', async () => {
     const now = new Date('2026-08-10T00:00:00Z');
+
     service = build({
       BILLING_WEBHOOK_RETENTION_DAYS: '30',
       BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS: '2'
@@ -126,16 +135,21 @@ describe('WebhookRetentionService', () => {
 
   it('keeps batching while a statement fills its batch', async () => {
     let deletes = 0;
+
     affected = (statement) => {
       if (statement.kind === 'update') return 0;
+
       deletes++;
+
       return deletes < 3 ? statement.params.limit : 4;
     };
 
     await service.sweep();
 
     const deleteStatements = statements.filter((s) => s.kind === 'delete');
+
     expect(deleteStatements).toHaveLength(3);
+
     for (const statement of deleteStatements) {
       expect(statement.params.limit).toBe(WEBHOOK_RETENTION_BATCH_SIZE);
     }
@@ -143,6 +157,7 @@ describe('WebhookRetentionService', () => {
 
   it('stops at the per-sweep ceiling instead of deleting a whole backlog at once', async () => {
     const warn = jest.spyOn(service['logger'], 'warn').mockImplementation();
+
     affected = (statement) =>
       statement.kind === 'delete' ? statement.params.limit : 0;
 
@@ -151,6 +166,7 @@ describe('WebhookRetentionService', () => {
     const deleted = statements
       .filter((s) => s.kind === 'delete')
       .reduce((sum, s) => sum + s.params.limit, 0);
+
     expect(deleted).toBe(WEBHOOK_RETENTION_MAX_ROWS_PER_SWEEP);
     expect(warn).toHaveBeenCalledTimes(1);
   });

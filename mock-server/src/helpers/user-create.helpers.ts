@@ -69,6 +69,7 @@ function createUserDtoResult(
     ...newPasswordErrors(password),
     ...(localeError ? [localeError] : [])
   ];
+
   if (errors.length > 0) {
     return {
       ok: false,
@@ -111,6 +112,7 @@ export function findCreateUserConflict(
   fields: CreateUserFields
 ): CreateUserConflict | null {
   const passwordRefusal = newPasswordRefusal(fields.password, fields);
+
   if (passwordRefusal) {
     return {
       status: ERROR_STATUS[passwordRefusal.errorKey],
@@ -146,9 +148,11 @@ export function validateCreateUserBody(
       optional: 'nullable'
     })
   ]);
+
   if (!validated.ok) return validated;
 
   const conflict = findCreateUserConflict(validated.fields);
+
   if (conflict) {
     return { ok: false, status: conflict.status, body: conflict.body };
   }
@@ -165,6 +169,7 @@ export function buildMockUser(
   options: { isEmailVerified: boolean }
 ): MockUser {
   const now = new Date().toISOString();
+
   return {
     id: randomUUID(),
     email: fields.email,

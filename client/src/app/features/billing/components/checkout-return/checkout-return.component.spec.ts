@@ -102,11 +102,13 @@ describe('CheckoutReturnComponent', () => {
     }).compileComponents();
 
     router = TestBed.inject(Router);
+
     if (transactionId) {
       await router.navigateByUrl(
         `/?${PADDLE_TRANSACTION_PARAM}=${transactionId}`
       );
     }
+
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(CheckoutReturnComponent);
     fixture.componentRef.setInput('mode', mode);
@@ -119,6 +121,7 @@ describe('CheckoutReturnComponent', () => {
     await setup('success', true);
     expect(storeMock.refreshSubscription).toHaveBeenCalled();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain('Pro');
   });
 
@@ -126,6 +129,7 @@ describe('CheckoutReturnComponent', () => {
     await setup('cancel', false);
     expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain('Checkout canceled');
   });
 
@@ -142,6 +146,7 @@ describe('CheckoutReturnComponent', () => {
     expect(storeMock.refreshInvoices).toHaveBeenCalled();
     expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain('Thank you for your purchase!');
     expect(text).toContain('Report pack');
     expect(text).toContain('$5.00');
@@ -177,6 +182,7 @@ describe('CheckoutReturnComponent', () => {
       expect(paddleOpen).toHaveBeenCalledWith('txn_01abc');
       expect(storeMock.refreshSubscription).not.toHaveBeenCalled();
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
       expect(text).toContain('Opening the payment form');
     });
 
@@ -195,6 +201,7 @@ describe('CheckoutReturnComponent', () => {
       });
       expect(storeMock.refreshSubscription).toHaveBeenCalled();
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
       expect(text).toContain('Pro');
     });
 
@@ -227,6 +234,7 @@ describe('CheckoutReturnComponent', () => {
       });
 
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
       expect(text).toContain('Payment form unavailable');
       expect(storeMock.refreshInvoices).not.toHaveBeenCalled();
       expect(readPendingPurchase()).toBeNull();

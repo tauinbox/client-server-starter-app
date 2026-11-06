@@ -81,6 +81,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
        VALUES ($1, 'Link Twice', 'hashed') RETURNING id`,
       [`oauth-one-per-provider-${stamp}@example.com`]
     );
+
     userId = id;
   });
 
@@ -103,6 +104,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
 
   it('refuses a second identity of a linked provider, and the unlink removes one row', async () => {
     const id = userId;
+
     await link(id, `google-a-${stamp}`);
 
     await expect(link(id, `google-b-${stamp}`)).rejects.toMatchObject({
@@ -111,6 +113,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
     });
 
     const linked = await accounts.findByUserId(id);
+
     expect(linked.map((a) => a.providerId)).toEqual([`google-a-${stamp}`]);
 
     await accounts.unlinkProvider(id, 'google');
@@ -119,6 +122,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
 
   it('keeps a repeated link of the same identity a no-op', async () => {
     const id = userId;
+
     await link(id, `google-a-${stamp}`);
 
     await expect(link(id, `google-a-${stamp}`)).resolves.toBeUndefined();
@@ -128,6 +132,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
   it('lets one of two concurrent links of different identities win', async () => {
     const id = userId;
     const runners = [ds.createQueryRunner(), ds.createQueryRunner()];
+
     await Promise.all(runners.map((r) => r.connect()));
     await Promise.all(runners.map((r) => r.release()));
 
@@ -138,6 +143,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
 
     expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
     const rejected = outcomes.filter((o) => o.status === 'rejected');
+
     expect(rejected).toHaveLength(1);
     expect(rejected[0].reason).toMatchObject({
       status: 409,

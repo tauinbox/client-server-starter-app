@@ -47,6 +47,7 @@ describe('POST /api/v1/auth/login length caps', () => {
 
     expect(res.status).toBe(401);
     const rows = loginFailures();
+
     expect(rows).toHaveLength(1);
     expect(rows[0].actorEmail).toBe('');
   });
@@ -55,8 +56,11 @@ describe('POST /api/v1/auth/login length caps', () => {
     const user = getState()
       .users.values()
       .find((u) => u.email === 'user@example.com');
+
     if (!user) throw new Error('seed user missing');
+
     const longPassword = 'a'.repeat(MAX_PASSWORD_LENGTH + 1);
+
     user.password = longPassword;
 
     const res = await postLogin({
@@ -71,8 +75,11 @@ describe('POST /api/v1/auth/login length caps', () => {
     const user = getState()
       .users.values()
       .find((u) => u.email === 'user@example.com');
+
     if (!user) throw new Error('seed user missing');
+
     const password = '\u{1F600}'.repeat(MAX_PASSWORD_LENGTH);
+
     user.password = password;
 
     const res = await postLogin({ email: 'user@example.com', password });
@@ -85,6 +92,7 @@ describe('POST /api/v1/auth/login length caps', () => {
 describe('logAudit field caps', () => {
   it('stores at most 255 characters in each string field', () => {
     const long = 'x'.repeat(1000);
+
     logAudit('USER_LOGIN_FAILURE', {
       actorEmail: long,
       targetId: long,
@@ -94,6 +102,7 @@ describe('logAudit field caps', () => {
     });
 
     const row = getState().auditLogs.at(-1);
+
     expect(row?.actorEmail).toHaveLength(255);
     expect(row?.targetId).toHaveLength(255);
     expect(row?.targetType).toHaveLength(255);

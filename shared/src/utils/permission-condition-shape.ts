@@ -33,12 +33,15 @@ function findKeyError(branch: string, key: string): string | null {
   if (key.trim().length === 0) {
     return `${branch} keys must be non-empty strings`;
   }
+
   if (key.length > CONDITION_MAX_KEY_LENGTH) {
     return `${branch} keys must be at most ${CONDITION_MAX_KEY_LENGTH} characters`;
   }
+
   if (PROTOTYPE_KEYS.has(key)) {
     return `Prototype pollution key "${key}" in ${branch}`;
   }
+
   // The structured branches write their keys into field position of the
   // MongoQuery, where a leading "$" turns the key into an operator. CASL then
   // builds a rule that matches no record while the SQL translator drops it, so
@@ -46,6 +49,7 @@ function findKeyError(branch: string, key: string): string | null {
   if (key.startsWith('$')) {
     return `MongoQuery operator key "${key}" is not allowed in ${branch}`;
   }
+
   return null;
 }
 
@@ -54,14 +58,19 @@ export function findOwnershipShapeError(value: unknown): string | null {
   if (!isPlainObject(value)) {
     return 'ownership must be an object';
   }
+
   const keys = Object.keys(value);
+
   if (keys.length !== 1 || keys[0] !== 'userField') {
     return 'ownership must have exactly one key "userField"';
   }
+
   const { userField } = value;
+
   if (typeof userField !== 'string' || userField.trim().length === 0) {
     return 'ownership.userField must be a non-empty string';
   }
+
   return findKeyError('ownership.userField', userField);
 }
 
@@ -70,28 +79,37 @@ export function findFieldMatchShapeError(value: unknown): string | null {
   if (!isPlainObject(value)) {
     return 'fieldMatch must be an object';
   }
+
   const entries = Object.entries(value);
+
   if (entries.length === 0) {
     return 'fieldMatch must have at least one field';
   }
+
   if (entries.length > CONDITION_MAX_FIELDS) {
     return `fieldMatch must have at most ${CONDITION_MAX_FIELDS} fields`;
   }
+
   for (const [key, values] of entries) {
     const keyError = findKeyError('fieldMatch', key);
+
     if (keyError) {
       return keyError;
     }
+
     if (!Array.isArray(values) || values.length === 0) {
       return `fieldMatch.${key} must be a non-empty array of values`;
     }
+
     if (values.length > CONDITION_MAX_FIELD_MATCH_VALUES) {
       return `fieldMatch.${key} must have at most ${CONDITION_MAX_FIELD_MATCH_VALUES} values`;
     }
+
     if (!values.every(isJsonScalar)) {
       return `fieldMatch.${key} values must be strings, numbers, booleans or null`;
     }
   }
+
   return null;
 }
 
@@ -100,26 +118,35 @@ export function findUserAttrShapeError(value: unknown): string | null {
   if (!isPlainObject(value)) {
     return 'userAttr must be an object';
   }
+
   const entries = Object.entries(value);
+
   if (entries.length === 0) {
     return 'userAttr must have at least one field';
   }
+
   if (entries.length > CONDITION_MAX_FIELDS) {
     return `userAttr must have at most ${CONDITION_MAX_FIELDS} fields`;
   }
+
   for (const [key, attrName] of entries) {
     const keyError = findKeyError('userAttr', key);
+
     if (keyError) {
       return keyError;
     }
+
     if (typeof attrName !== 'string' || attrName.trim().length === 0) {
       return `userAttr.${key} must be a non-empty attribute name string`;
     }
+
     const attrError = findKeyError(`userAttr.${key}`, attrName);
+
     if (attrError) {
       return attrError;
     }
   }
+
   return null;
 }
 
@@ -143,6 +170,7 @@ export function findRestrictionBranch(value: unknown): string | null {
   if (!isPlainObject(value)) {
     return null;
   }
+
   return (
     RESTRICTION_CONDITION_BRANCHES.find(
       (branch) => value[branch] !== undefined && value[branch] !== null
@@ -164,9 +192,11 @@ export function findConditionSupportError(
   conditions: unknown
 ): string | null {
   const branch = findRestrictionBranch(conditions);
+
   if (!branch || conditionalActionNames.includes(actionName)) {
     return null;
   }
+
   return `conditions.${branch} cannot apply to "${actionName}": no check of this action reads the record`;
 }
 
@@ -176,11 +206,15 @@ export function findConditionSupportError(
  */
 function collectQueryFields(query: unknown, fields: string[], depth = 0): void {
   if (depth >= MAX_MONGO_QUERY_DEPTH) return;
+
   if (Array.isArray(query)) {
     for (const item of query) collectQueryFields(item, fields, depth + 1);
+
     return;
   }
+
   if (!isPlainObject(query)) return;
+
   for (const [key, value] of Object.entries(query)) {
     if (key.startsWith('$')) {
       collectQueryFields(value, fields, depth + 1);
@@ -193,11 +227,15 @@ function collectQueryFields(query: unknown, fields: string[], depth = 0): void {
 function conditionFieldNames(conditions: Record<string, unknown>): string[] {
   const fields: string[] = [];
   const { ownership, fieldMatch, userAttr, custom } = conditions;
+
   if (isPlainObject(ownership) && typeof ownership['userField'] === 'string') {
     fields.push(ownership['userField']);
   }
+
   if (isPlainObject(fieldMatch)) fields.push(...Object.keys(fieldMatch));
+
   if (isPlainObject(userAttr)) fields.push(...Object.keys(userAttr));
+
   if (typeof custom === 'string') {
     try {
       collectQueryFields(JSON.parse(custom), fields);
@@ -205,6 +243,7 @@ function conditionFieldNames(conditions: Record<string, unknown>): string[] {
       // Invalid JSON is the concern of the shape checks.
     }
   }
+
   return fields;
 }
 
@@ -221,11 +260,14 @@ export function findConditionFieldError(
   conditions: unknown
 ): string | null {
   if (!isPlainObject(conditions)) return null;
+
   const allowed = conditionFieldsOf(subject);
   const unknown = conditionFieldNames(conditions).find(
     (field) => !allowed.includes(field)
   );
+
   if (unknown === undefined) return null;
+
   return `conditions name the field "${unknown}", which a condition on ${subject} cannot use`;
 }
 
@@ -241,6 +283,7 @@ export function findIdentityBoundBranch(value: unknown): string | null {
   if (!isPlainObject(value)) {
     return null;
   }
+
   return (
     IDENTITY_BOUND_CONDITION_BRANCHES.find(
       (branch) => value[branch] !== undefined && value[branch] !== null
@@ -263,9 +306,12 @@ export function findConditionActionError(
   if (actionName !== 'create') {
     return null;
   }
+
   const branch = findIdentityBoundBranch(conditions);
+
   if (!branch) {
     return null;
   }
+
   return `conditions.${branch} matches the acting user's id, which a record that does not exist yet can never carry`;
 }

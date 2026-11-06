@@ -71,6 +71,7 @@ describe('FeatureFlagsAdminStore', () => {
 
   it('load() populates entities and clears loading', async () => {
     const store = TestBed.inject(FeatureFlagsAdminStore);
+
     store.load();
     await vi.waitFor(() => expect(store.loading()).toBe(false));
 
@@ -84,6 +85,7 @@ describe('FeatureFlagsAdminStore', () => {
 
   it('load() sends the filters set before it', async () => {
     const store = TestBed.inject(FeatureFlagsAdminStore);
+
     store.setFilters({ q: 'beta', enabled: false });
     store.load();
     await vi.waitFor(() => expect(store.loading()).toBe(false));
@@ -98,6 +100,7 @@ describe('FeatureFlagsAdminStore', () => {
   it('load() notifies on failure and leaves the list empty', async () => {
     service.getAllCursor.mockReturnValue(throwError(() => new Error('boom')));
     const store = TestBed.inject(FeatureFlagsAdminStore);
+
     store.load();
     await vi.waitFor(() => expect(store.loading()).toBe(false));
 
@@ -110,13 +113,16 @@ describe('FeatureFlagsAdminStore', () => {
 
   it('updateFlag() pushes the new entity into the store on 200', async () => {
     const updated = sampleFlag({ enabled: true, version: 2 });
+
     service.update.mockReturnValue(of(updated));
     const store = TestBed.inject(FeatureFlagsAdminStore);
+
     store.load();
     await vi.waitFor(() => expect(store.entities().length).toBe(1));
     const result = await firstValueFrom(
       store.updateFlag('flag-1', { enabled: true }, 1)
     );
+
     expect(result.version).toBe(2);
     expect(store.entities()[0].enabled).toBe(true);
     expect(service.update).toHaveBeenCalledWith('flag-1', { enabled: true }, 1);
@@ -133,8 +139,10 @@ describe('FeatureFlagsAdminStore', () => {
 
     async function loadedStore() {
       const store = TestBed.inject(FeatureFlagsAdminStore);
+
       store.load();
       await vi.waitFor(() => expect(store.entities().length).toBe(1));
+
       return store;
     }
 
@@ -170,6 +178,7 @@ describe('FeatureFlagsAdminStore', () => {
 
     it('does not reload the row after another error', async () => {
       const error = new HttpErrorResponse({ status: 500 });
+
       service.update.mockReturnValue(throwError(() => error));
       const store = await loadedStore();
 
@@ -183,6 +192,7 @@ describe('FeatureFlagsAdminStore', () => {
   it('deleteFlag() removes the entity from the store', async () => {
     service.delete.mockReturnValue(of(undefined));
     const store = TestBed.inject(FeatureFlagsAdminStore);
+
     store.load();
     await vi.waitFor(() => expect(store.entities().length).toBe(1));
     await firstValueFrom(store.deleteFlag('flag-1'));

@@ -24,6 +24,7 @@ test.describe('Keyboard navigation', () => {
     await page.keyboard.press('Tab');
 
     const skipLink = page.locator('a.skip-link');
+
     await expect(skipLink).toBeFocused();
     await expect(skipLink).toHaveAttribute('href', '#main');
     await expect(skipLink).toHaveText('Skip to main content');
@@ -43,6 +44,7 @@ test.describe('Keyboard navigation', () => {
 
     // Focus the email field directly (skip-link and toolbar precede it in tab order)
     const emailInput = page.getByLabel('Email');
+
     await emailInput.focus();
     await expect(emailInput).toBeFocused();
     await emailInput.fill('user@example.com');
@@ -50,6 +52,7 @@ test.describe('Keyboard navigation', () => {
     // Tab to password field
     await page.keyboard.press('Tab');
     const passwordInput = page.getByLabel('Password', { exact: true });
+
     await expect(passwordInput).toBeFocused();
     await passwordInput.fill('Password1');
 
@@ -60,10 +63,12 @@ test.describe('Keyboard navigation', () => {
 
     for (let i = 0; i < 5; i++) {
       await page.keyboard.press('Tab');
+
       if (await loginButton.evaluate((el) => el === document.activeElement)) {
         break;
       }
     }
+
     await expect(loginButton).toBeFocused();
     await page.keyboard.press('Enter');
 
@@ -78,6 +83,7 @@ test.describe('Keyboard navigation', () => {
 
     // Focus the Admin panel link in the sidenav and activate it
     const adminLink = page.getByRole('link', { name: 'Admin panel' });
+
     await adminLink.focus();
     await expect(adminLink).toBeFocused();
     await page.keyboard.press('Enter');
@@ -86,6 +92,7 @@ test.describe('Keyboard navigation', () => {
 
     // Navigate to Profile via keyboard
     const profileLink = page.getByRole('link', { name: 'Profile' });
+
     await profileLink.focus();
     await expect(profileLink).toBeFocused();
     await page.keyboard.press('Enter');
@@ -105,12 +112,14 @@ test.describe('Keyboard navigation', () => {
 
     // Focus the name, change it, then tab through remaining fields
     const nameInput = page.getByLabel('Full name');
+
     await nameInput.focus();
     await expect(nameInput).toBeFocused();
     await nameInput.fill('Updated');
 
     // Tab forward to reach the Save button
     const saveButton = page.getByRole('button', { name: 'Save', exact: true });
+
     await saveButton.focus();
     await expect(saveButton).toBeFocused();
     await page.keyboard.press('Enter');
@@ -135,11 +144,14 @@ test.describe('Keyboard navigation', () => {
     // Tab through dialog — both buttons should receive focus
     // CDK focus trap redirects Tab back into the dialog after the last element
     const focusedButtons = new Set<string>();
+
     for (let i = 0; i < 10; i++) {
       await page.keyboard.press('Tab');
+
       if (await cancelButton.evaluate((el) => el === document.activeElement)) {
         focusedButtons.add('Cancel');
       }
+
       if (await deleteButton.evaluate((el) => el === document.activeElement)) {
         focusedButtons.add('Delete');
       }

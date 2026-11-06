@@ -43,11 +43,13 @@ export class WebhookReconciliationService {
     const stuck = await this.webhookEvents.find({
       where: { status: 'received', receivedAt: LessThan(cutoff) }
     });
+
     if (stuck.length === 0) {
       return;
     }
 
     this.logger.warn(`Replaying ${stuck.length} stuck webhook delivery(ies)`);
+
     for (const row of stuck) {
       if (!row.payload) {
         // Pre-migration rows never stored the event and cannot be replayed
@@ -57,6 +59,7 @@ export class WebhookReconciliationService {
         );
         continue;
       }
+
       try {
         await this.ingestion.processEvent({
           webhookEventId: row.id,

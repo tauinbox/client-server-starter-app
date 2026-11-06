@@ -109,6 +109,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
       await ds.getRepository(PaymentMethod).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -128,12 +129,14 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
    */
   async function warmPool(): Promise<void> {
     const runners = [ds.createQueryRunner(), ds.createQueryRunner()];
+
     await Promise.all(runners.map((r) => r.connect()));
     await Promise.all(runners.map((r) => r.release()));
   }
 
   async function seed(): Promise<void> {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     providerSubscriptionRef = `sub_${stamp}`;
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
@@ -142,6 +145,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -155,6 +159,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     const subscription = await ds.getRepository(Subscription).save(
@@ -177,6 +182,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         nextRenewalAttemptAt: null
       })
     );
+
     subscriptionId = subscription.id;
   }
 
@@ -197,6 +203,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
   ): EntityManager {
     const read = manager.findOne.bind(manager);
     let fired = false;
+
     // Patching the instance, not a proxy: the manager is created per
     // transaction, so nothing outside this call sees the hook.
     manager.findOne = async <T extends ObjectLiteral>(
@@ -204,12 +211,15 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
       options: FindOneOptions<T>
     ): Promise<T | null> => {
       const found = await read(entity, options);
+
       if (!fired && entity === Subscription && found) {
         fired = true;
         await duringWindow();
       }
+
       return found;
     };
+
     return manager;
   }
 
@@ -241,6 +251,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit } }
       ]
     }).compile();
+
     return module.get(BillingEventReducer);
   }
 
@@ -254,7 +265,9 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     const racingSubscriptions = {
       findOne: async (options: FindOneOptions<Subscription>) => {
         const found = await subscriptions.findOne(options);
+
         await duringWindow();
+
         return found;
       }
     };
@@ -312,11 +325,13 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit } }
       ]
     }).compile();
+
     return module.get(BillingUserService);
   }
 
   async function seedPaymentMethod(ref: string): Promise<PaymentMethod> {
     const repo = ds.getRepository(PaymentMethod);
+
     return repo.save(
       repo.create({
         customerId: customerId as string,
@@ -379,6 +394,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
 
   it('does not resurrect a subscription cancelled while a card re-bind is in flight', async () => {
     const oldMethod = await seedPaymentMethod('tok-old');
+
     await ds
       .getRepository(Subscription)
       .update({ id: subscriptionId }, { paymentMethodId: oldMethod.id });
@@ -413,6 +429,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     const customer = await ds
       .getRepository(Customer)
       .findOneOrFail({ where: { id: customerId } });
+
     expect(customer.defaultPaymentMethodId).not.toBe(oldMethod.id);
   }, 30000);
 
@@ -475,6 +492,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     const customer = await ds
       .getRepository(Customer)
       .findOneOrFail({ where: { id: customerId } });
+
     expect(customer).toMatchObject({
       providerOverride: 'yookassa',
       defaultPaymentMethodId: method.id

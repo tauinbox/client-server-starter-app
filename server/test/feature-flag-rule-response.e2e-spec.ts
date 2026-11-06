@@ -55,6 +55,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -78,6 +79,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
     const admin = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email: adminEmail } });
+
     await app
       .get(RoleService)
       .assignRoleToUser(admin.id, superRole.id, { ability: SYSTEM_ABILITY });
@@ -87,6 +89,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
         userAgent: 'flag-rule-shape-e2e',
         ipAddress: null
       });
+
     token = tokens.access_token;
   }, 60000);
 
@@ -111,6 +114,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
       .send({ key: flagKey, rules: [roleRule] })
       .expect(201);
     const createdBody = created.body as FlagBody;
+
     expect(Object.keys(createdBody.rules[0]).toSorted()).toEqual(RULE_KEYS);
     expect(createdBody.rules[0].payload).toEqual(roleRule.payload);
 
@@ -118,6 +122,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
       .get(`/api/v1/admin/feature-flags/${createdBody.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+
     expect(Object.keys((read.body as FlagBody).rules[0]).toSorted()).toEqual(
       RULE_KEYS
     );
@@ -129,6 +134,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ key: `${flagKey}-typed`, rules: [{ ...roleRule, type: 'role' }] })
       .expect(422);
+
     expect(res.body).toMatchObject({
       message: 'rules.0.property type should not exist',
       errors: ['rules.0.property type should not exist']

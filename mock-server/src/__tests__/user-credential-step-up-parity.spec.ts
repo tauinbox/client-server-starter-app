@@ -34,8 +34,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -174,6 +176,7 @@ describe('PATCH /api/v1/users/:id credential step-up parity', () => {
     const update = getState()
       .auditLogs.filter((row) => row.action === 'USER_UPDATE')
       .at(-1);
+
     expect(update?.details).toEqual({ changedFields: [] });
   });
 });

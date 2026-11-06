@@ -16,8 +16,10 @@ export class IsSafeMongoQueryConstraint implements ValidatorConstraintInterface 
     }
 
     const error = findCustomQueryError(value);
+
     if (error) {
       this.lastError = error;
+
       return false;
     }
 

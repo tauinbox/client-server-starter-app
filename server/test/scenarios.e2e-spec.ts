@@ -145,8 +145,10 @@ runWithInfra('Request scenarios (e2e)', () => {
   const stubGoogleGuard: CanActivate = {
     canActivate: (context: ExecutionContext): boolean => {
       if (!oauthProfile) return false;
+
       context.switchToHttp().getRequest<{ user: OAuthUserProfile }>().user =
         oauthProfile;
+
       return true;
     }
   };
@@ -190,6 +192,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.use(cookieParser());
@@ -202,9 +205,11 @@ runWithInfra('Request scenarios (e2e)', () => {
     const secure = requiresSecureCookies(
       app.get(ConfigService).get<string>('ENVIRONMENT')
     );
+
     refreshCookieName = secure ? '__Host-refresh_token' : 'refresh_token';
     oauthDataCookieName = secure ? '__Host-oauth_data' : 'oauth_data';
     const roles = dataSource.getRepository(Role);
+
     userRole = await roles.findOneByOrFail({ name: 'user' });
     superRole = await roles.findOneByOrFail({ isSuper: true });
     // The resource sync of the bootstrap creates it, also on CI.
@@ -215,6 +220,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     ).id;
     const registry = app.get(ResourceRegistryService);
     const isRegistered = registry.isRegistered.bind(registry);
+
     jest
       .spyOn(registry, 'isRegistered')
       .mockImplementation(
@@ -231,6 +237,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     const providerFlags = new Set<string>(
       BILLING_PROVIDER_FLAGS.map((p) => p.enabledFlagKey)
     );
+
     jest
       .spyOn(resolver, 'isEnabledForUserId')
       .mockImplementation((userId, key) =>
@@ -246,6 +253,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       url: 'https://provider.invalid/session',
       sessionRef: 'scenario-session'
     };
+
     jest.spyOn(yookassa, 'refund').mockResolvedValue(undefined);
     jest.spyOn(yookassa, 'startCheckout').mockResolvedValue(session);
     jest.spyOn(yookassa, 'createOneTimePayment').mockResolvedValue(session);
@@ -261,11 +269,13 @@ runWithInfra('Request scenarios (e2e)', () => {
   afterAll(async () => {
     if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
     else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+
     if (previousPaddleSecret === undefined) {
       delete process.env['PADDLE_WEBHOOK_SECRET'];
     } else {
       process.env['PADDLE_WEBHOOK_SECRET'] = previousPaddleSecret;
     }
+
     if (dataSource) {
       const ids = (
         await dataSource
@@ -275,19 +285,23 @@ runWithInfra('Request scenarios (e2e)', () => {
           .where('u.email LIKE :prefix', { prefix: `${emailPrefix}%` })
           .getMany()
       ).map((u) => u.id);
+
       if (ids.length > 0) {
         await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
         // An invoice keeps its customer (RESTRICT); the rest cascades.
         const customerIds = (
           await dataSource.getRepository(Customer).findBy({ userId: In(ids) })
         ).map((c) => c.id);
+
         if (customerIds.length > 0) {
           await dataSource
             .getRepository(Invoice)
             .delete({ customerId: In(customerIds) });
         }
+
         await dataSource.getRepository(User).delete({ id: In(ids) });
       }
+
       for (const [entity, column] of [
         [Plan, 'key'],
         [Product, 'key'],
@@ -300,6 +314,7 @@ runWithInfra('Request scenarios (e2e)', () => {
           .where(`${column} LIKE :prefix`, { prefix: `${emailPrefix}%` })
           .execute();
       }
+
       await dataSource
         .getRepository(Role)
         .createQueryBuilder()
@@ -319,6 +334,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         .where('key LIKE :prefix', { prefix: `${emailPrefix}%` })
         .execute();
     }
+
     await app?.close();
   });
 
@@ -328,21 +344,25 @@ runWithInfra('Request scenarios (e2e)', () => {
 
   function freshEmail(): string {
     sequence += 1;
+
     return `${emailPrefix}${sequence}@example.com`;
   }
 
   function freshRoleName(): string {
     sequence += 1;
+
     return `${emailPrefix}role-${sequence}`;
   }
 
   function freshFlagKey(): string {
     sequence += 1;
+
     return `${emailPrefix}flag-${sequence}`;
   }
 
   function freshKey(kind: string): string {
     sequence += 1;
+
     return `${emailPrefix}${kind}-${sequence}`;
   }
 
@@ -408,8 +428,10 @@ runWithInfra('Request scenarios (e2e)', () => {
       isEmailVerified: true,
       roles: [userRole]
     };
+
     ACTORS[fixture](draft);
     const user = await users.save(users.create(draft));
+
     if (fixture === 'oauth-only') {
       await dataSource.getRepository(OAuthAccount).save({
         userId: user.id,
@@ -417,6 +439,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         providerId: `google-${user.id}`
       });
     }
+
     return { user, email };
   }
 
@@ -429,6 +452,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       userAgent: `scenario-${sequence}`,
       ipAddress: null
     });
+
     return {
       bearer: tokens.access_token,
       cookie: `${refreshCookieName}=${tokens.refresh_token}`
@@ -446,9 +470,11 @@ runWithInfra('Request scenarios (e2e)', () => {
     const spy = jest
       .spyOn(app.get(MailService), method)
       .mockResolvedValue(undefined);
+
     try {
       await trigger();
       expect(spy).toHaveBeenCalledTimes(1);
+
       return spy.mock.calls[0][1];
     } finally {
       spy.mockRestore();
@@ -459,7 +485,9 @@ runWithInfra('Request scenarios (e2e)', () => {
     const header = res.headers['set-cookie'] as string[] | string | undefined;
     const lines = Array.isArray(header) ? header : [header ?? ''];
     const line = lines.find((l) => l.startsWith(`${name}=`));
+
     if (!line) throw new Error(`the response set no ${name} cookie`);
+
     return line.split(';')[0];
   }
 
@@ -475,6 +503,7 @@ runWithInfra('Request scenarios (e2e)', () => {
   const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     'refresh-cookie': async (ctx) => {
       const session = await signIn(ctx.actor!);
+
       ctx.bearer = session.bearer;
       ctx.cookies.push(session.cookie);
     },
@@ -485,6 +514,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         .auth(ctx.bearer!, { type: 'bearer' })
         .expect(200);
       const sessions = res.body as Array<{ id: string; current: boolean }>;
+
       ctx.values.$otherSessionId = sessions.find((s) => !s.current)!.id;
       ctx.values.$currentSessionId = sessions.find((s) => s.current)!.id;
     },
@@ -515,6 +545,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         .auth(ctx.bearer!, { type: 'bearer' })
         .send({ currentPassword: SCENARIO_PASSWORD })
         .expect(200);
+
       ctx.values.$setupCode = generateSync({
         secret: (res.body as { secret: string }).secret
       });
@@ -523,6 +554,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       const user = await dataSource
         .getRepository(User)
         .findOneByOrFail({ id: ctx.actor!.user.id });
+
       ctx.values.$mfaToken = app
         .get(MfaService)
         .issuePendingToken(user).mfaToken;
@@ -538,6 +570,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       const res = await request(http())
         .get('/api/v1/auth/oauth/google/callback')
         .expect(302);
+
       oauthProfile = undefined;
       ctx.cookies.push(cookieOf(res, oauthDataCookieName));
     },
@@ -545,6 +578,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       const user = await dataSource
         .getRepository(User)
         .findOneByOrFail({ id: ctx.actor!.user.id });
+
       for (let i = 1; i < MAX_FAILED_ATTEMPTS; i++) {
         await app.get(MfaService).isValidStepUpCode(user, WRONG_CODE);
       }
@@ -560,6 +594,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       const role = await dataSource
         .getRepository(Role)
         .save({ name: ctx.values.$roleName!, description: null });
+
       ctx.values.$roleId = role.id;
     },
     'role-permission': async (ctx) => {
@@ -588,6 +623,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         conditionalActionNames: [],
         allowedActionNames: null
       });
+
       registeredResources.add(name);
       ctx.resourceName = name;
       ctx.values.$resourceId = resource.id;
@@ -599,6 +635,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     },
     'unregistered-resource': (ctx) => {
       registeredResources.delete(ctx.resourceName!);
+
       return Promise.resolve();
     },
     'deleted-target': async (ctx) => {
@@ -614,6 +651,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         version: 1,
         updatedByUserId: null
       });
+
       ctx.values.$flagId = flag.id;
     },
     customer: async (ctx) => {
@@ -626,10 +664,12 @@ runWithInfra('Request scenarios (e2e)', () => {
         currency: 'RUB',
         defaultPaymentMethodId: null
       });
+
       ctx.values.$customerId = customer.id;
     },
     subscription: async (ctx) => {
       if (!ctx.values.$customerId) await STATES.customer(ctx);
+
       const now = Date.now();
       const subscription = await dataSource.getRepository(Subscription).save({
         customerId: ctx.values.$customerId!,
@@ -643,6 +683,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         cancelAtPeriodEnd: false,
         providerSubscriptionId: null
       });
+
       ctx.values.$subscriptionId = subscription.id;
     },
     'paid-invoice': async (ctx) => {
@@ -664,6 +705,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         periodEnd: new Date(now + 29 * DAY_MS),
         paidAt: new Date(now)
       });
+
       ctx.values.$invoiceId = invoice.id;
     },
     'metered-plan': async (ctx) => {
@@ -704,6 +746,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     },
     'providers-disabled': () => {
       providersEnabled = false;
+
       return Promise.resolve();
     },
     'dead-letter-webhook-event': async (ctx) => {
@@ -716,6 +759,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         lastError: 'scenario',
         payload: null
       });
+
       ctx.values.$webhookEventId = event.id;
     }
   };
@@ -723,6 +767,7 @@ runWithInfra('Request scenarios (e2e)', () => {
   /** The audit rows that name one of the accounts, oldest first. */
   async function auditRows(ids: string[], emails: string[]) {
     if (ids.length === 0) ids = ['00000000-0000-0000-0000-000000000000'];
+
     return dataSource
       .getRepository(AuditLog)
       .createQueryBuilder('a')
@@ -737,6 +782,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     const rows = await dataSource
       .getRepository(User)
       .find({ where: { email: In(emails) }, withDeleted: true });
+
     return rows.map((r) => r.id);
   }
 
@@ -747,15 +793,19 @@ runWithInfra('Request scenarios (e2e)', () => {
   ): Promise<string[]> {
     const read = async () => {
       const rows = await auditRows(await idsOf(emails), emails);
+
       return rows.filter((r) => !seen.has(r.id)).map((r) => r.action);
     };
     const deadline = Date.now() + AUDIT_WAIT_MS;
     let actions = await read();
+
     while (actions.length < expected && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 50));
       actions = await read();
     }
+
     await new Promise((r) => setTimeout(r, AUDIT_SETTLE_MS));
+
     return read();
   }
 
@@ -763,11 +813,13 @@ runWithInfra('Request scenarios (e2e)', () => {
   async function settledAuditIds(emails: string[]): Promise<Set<string>> {
     let before = -1;
     let rows = await auditRows(await idsOf(emails), emails);
+
     while (rows.length !== before) {
       before = rows.length;
       await new Promise((r) => setTimeout(r, AUDIT_SETTLE_MS));
       rows = await auditRows(await idsOf(emails), emails);
     }
+
     return new Set(rows.map((r) => r.id));
   }
 
@@ -775,6 +827,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     throttlerStorage.reset();
     const ctx: Context = { cookies: [], values: {} };
     const emails: string[] = [];
+
     ctx.values.$password = SCENARIO_PASSWORD;
     ctx.values.$newPassword = SCENARIO_NEW_PASSWORD;
     ctx.values.$recoveryCode = SCENARIO_RECOVERY_CODE;
@@ -794,18 +847,23 @@ runWithInfra('Request scenarios (e2e)', () => {
       ctx.values.$actorId = ctx.actor.user.id;
       emails.push(ctx.actor.email);
     }
+
     if (scenario.target) {
       ctx.target = await createAccount(scenario.target);
       ctx.values.$targetId = ctx.target.user.id;
       emails.push(ctx.target.email);
     }
+
     const states = scenario.state ?? [];
+
     if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {
       ctx.bearer = (await signIn(ctx.actor!)).bearer;
     }
+
     for (const state of states) {
       await STATES[state](ctx);
     }
+
     if (ctx.actor && scenario.actor === 'user-mfa') {
       // A code is single use: the fixtures above may have spent this step.
       await dataSource
@@ -822,13 +880,18 @@ runWithInfra('Request scenarios (e2e)', () => {
     const body = resolvePlaceholders(scenario.body ?? {}, ctx.values);
     const headers = resolvePlaceholders(scenario.headers ?? {}, ctx.values);
     const answers: Answer[] = [];
+
     for (let i = 0; i < (scenario.repeat ?? 1); i++) {
       let req = request(http())[method](path).set(headers);
+
       if (scenario.auth === 'bearer') {
         req = req.auth(ctx.bearer!, { type: 'bearer' });
       }
+
       if (ctx.cookies.length > 0) req = req.set('Cookie', ctx.cookies);
+
       const res = await req.send(body);
+
       answers.push({
         status: res.status,
         errorKey: (res.body as { errorKey?: string }).errorKey ?? null
@@ -840,6 +903,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       seen,
       scenario.expect.audit.length
     );
+
     return { answers, audit };
   }
 
@@ -849,6 +913,7 @@ runWithInfra('Request scenarios (e2e)', () => {
         '%s',
         async (_name, scenario) => {
           const { answers, audit } = await run(scenario);
+
           // Fire-and-forget writes land in any order.
           expect({ answers, audit: audit.toSorted() }).toEqual({
             answers: expectedAnswers(scenario),

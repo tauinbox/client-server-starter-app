@@ -28,6 +28,7 @@ class HostComponent {
     this.lastEmitted = next;
     this.selected.set(next);
   }
+
   onTerm(term: string): void {
     this.lastTerm = term;
   }
@@ -35,7 +36,9 @@ class HostComponent {
 
 function getInput(fixture: ComponentFixture<HostComponent>): HTMLInputElement {
   const el = (fixture.nativeElement as HTMLElement).querySelector('input');
+
   if (!el) throw new Error('chip input not found');
+
   return el as HTMLInputElement;
 }
 
@@ -55,6 +58,7 @@ describe('NxsChipsAutocompleteComponent', () => {
 
   it('renders the chips passed via [selected]', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.selected.set([
       { value: 'production', label: 'production' },
       { value: 'staging', label: 'staging' }
@@ -65,11 +69,13 @@ describe('NxsChipsAutocompleteComponent', () => {
 
   it('emits selectedChange with a new chip on free-text Enter when allowFreeText=true', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.allowFreeText = true;
     fixture.detectChanges();
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as NxsChipsAutocompleteComponent;
+
     cmp['addFromTokenEnd'](
       // @ts-expect-error testing mock — minimal MatChipInputEvent with value
       { value: 'qa-eu', input: null, chipInput: null }
@@ -82,11 +88,13 @@ describe('NxsChipsAutocompleteComponent', () => {
 
   it('ignores free-text Enter when allowFreeText=false', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.allowFreeText = false;
     fixture.detectChanges();
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as NxsChipsAutocompleteComponent;
+
     cmp['addFromTokenEnd'](
       // @ts-expect-error testing mock — minimal MatChipInputEvent with value
       { value: 'qa-eu', input: null, chipInput: null }
@@ -97,6 +105,7 @@ describe('NxsChipsAutocompleteComponent', () => {
 
   it('does not add a duplicate chip', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.allowFreeText = true;
     fixture.componentInstance.selected.set([
       { value: 'production', label: 'production' }
@@ -105,6 +114,7 @@ describe('NxsChipsAutocompleteComponent', () => {
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as NxsChipsAutocompleteComponent;
+
     cmp['addFromTokenEnd'](
       // @ts-expect-error testing mock — minimal MatChipInputEvent with value
       { value: 'production', input: null, chipInput: null }
@@ -116,6 +126,7 @@ describe('NxsChipsAutocompleteComponent', () => {
   it('emits selectedChange without the removed chip', () => {
     const fixture = TestBed.createComponent(HostComponent);
     const chip: ChipOption = { value: 'production', label: 'production' };
+
     fixture.componentInstance.selected.set([
       chip,
       { value: 'staging', label: 'staging' }
@@ -124,6 +135,7 @@ describe('NxsChipsAutocompleteComponent', () => {
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as NxsChipsAutocompleteComponent;
+
     cmp['removeChip'](chip);
 
     expect(fixture.componentInstance.lastEmitted).toEqual([
@@ -133,6 +145,7 @@ describe('NxsChipsAutocompleteComponent', () => {
 
   it('filters autocomplete options by typed term and excludes already-selected', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.options.set([
       { value: 'production', label: 'production' },
       { value: 'staging', label: 'staging' },
@@ -145,6 +158,7 @@ describe('NxsChipsAutocompleteComponent', () => {
 
     const cmp = fixture.debugElement.children[0]
       .componentInstance as NxsChipsAutocompleteComponent;
+
     cmp['inputValue'].set('prod');
     expect(cmp['filteredOptions']().map((o) => o.value)).toEqual([
       'production'
@@ -159,8 +173,10 @@ describe('NxsChipsAutocompleteComponent', () => {
 
   it('emits searchTermChange when the user types', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const input = getInput(fixture);
+
     input.value = 'jo';
     input.dispatchEvent(new Event('input'));
     expect(fixture.componentInstance.lastTerm).toBe('jo');

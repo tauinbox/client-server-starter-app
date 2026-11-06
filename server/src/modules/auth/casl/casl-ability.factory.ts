@@ -26,6 +26,7 @@ export class CaslAbilityFactory {
       this.permissionService.getPermissionsForUser(userId)
     ]);
     const ability = await this.createForUser(userId, roles, permissions);
+
     return { ability, roles, permissions };
   }
 
@@ -44,6 +45,7 @@ export class CaslAbilityFactory {
           conditionalActions: {}
         }
       : await this.resourceService.getSubjectMaps();
+
     return buildAbility(
       { userId, isSuper, permissions },
       subjectMaps,

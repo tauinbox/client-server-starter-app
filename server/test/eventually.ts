@@ -9,9 +9,12 @@ export async function eventually<T>(
   intervalMs = 50
 ): Promise<T | null> {
   const deadline = Date.now() + timeoutMs;
+
   for (;;) {
     const value = await read();
+
     if (value !== null || Date.now() >= deadline) return value;
+
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }

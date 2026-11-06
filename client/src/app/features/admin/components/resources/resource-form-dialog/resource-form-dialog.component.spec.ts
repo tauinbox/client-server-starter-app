@@ -85,6 +85,7 @@ describe('ResourceFormDialogComponent', () => {
   it('renders "Edit resource" title', () => {
     createComponent();
     const title = fixture.nativeElement.querySelector('[mat-dialog-title]');
+
     expect(title?.textContent?.trim()).toBe('Edit resource');
   });
 
@@ -104,6 +105,7 @@ describe('ResourceFormDialogComponent', () => {
     const saveBtn = fixture.nativeElement.querySelector(
       'button[matButton="filled"]'
     );
+
     expect(saveBtn?.disabled).toBe(true);
   });
 
@@ -118,6 +120,7 @@ describe('ResourceFormDialogComponent', () => {
     const saveBtn = fixture.nativeElement.querySelector(
       'button[matButton="filled"]'
     );
+
     expect(saveBtn?.disabled).toBe(false);
   });
 
@@ -132,6 +135,7 @@ describe('ResourceFormDialogComponent', () => {
     const saveBtn = fixture.nativeElement.querySelector(
       'button[matButton="filled"]'
     );
+
     expect(saveBtn?.disabled).toBe(true);
   });
 
@@ -183,6 +187,7 @@ describe('ResourceFormDialogComponent', () => {
     const saveBtn = fixture.nativeElement.querySelector(
       'button[matButton="filled"]'
     );
+
     expect(saveBtn?.disabled).toBe(true);
   });
 
@@ -242,6 +247,7 @@ describe('ResourceFormDialogComponent', () => {
           'mat-checkbox'
         ) as NodeListOf<Element>
       ).map((el) => el.textContent?.trim());
+
       expect(labels).toEqual(['Create', 'Read', 'Update', 'Delete', 'Search']);
     });
 

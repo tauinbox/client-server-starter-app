@@ -24,6 +24,7 @@ describe('FeatureFlagService', () => {
   it('GETs /api/v1/feature-flags without the credentials flag', async () => {
     const promise = firstValueFrom(service.getEvaluatedFlags());
     const req = http.expectOne('/api/v1/feature-flags');
+
     expect(req.request.method).toBe('GET');
     expect(req.request.withCredentials).toBe(false);
     req.flush({
@@ -31,6 +32,7 @@ describe('FeatureFlagService', () => {
       evaluatedAt: '2026-05-19T10:00:00Z'
     });
     const result = await promise;
+
     expect(result.flags['new-dashboard']).toBe(false);
     expect(result.flags['beta-export']).toBe(true);
   });

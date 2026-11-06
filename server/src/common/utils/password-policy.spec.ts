@@ -14,6 +14,7 @@ describe('localPasswordRefusal', () => {
   describe('common list', () => {
     it('holds at least the 3000 entries ASVS 6.2.4 asks for, all policy-length', () => {
       expect(COMMON_PASSWORDS.size).toBeGreaterThanOrEqual(3000);
+
       for (const entry of COMMON_PASSWORDS) {
         expect(entry.length).toBeGreaterThanOrEqual(MIN_PASSWORD_LENGTH);
         expect(entry).toBe(entry.toLowerCase());

@@ -45,10 +45,13 @@ export class WebhookIpAllowlistGuard implements CanActivate {
     if (this.allowed.length === 0) {
       return true;
     }
+
     const req = context.switchToHttp().getRequest<Request>();
+
     if (req.ip && this.isAllowed(req.ip)) {
       return true;
     }
+
     this.logger.warn(
       `Rejected webhook from non-allowlisted IP ${req.ip ?? '<unknown>'} on ${req.method} ${redactSensitiveQuery(req.originalUrl)}`
     );
@@ -60,9 +63,11 @@ export class WebhookIpAllowlistGuard implements CanActivate {
     if (!ipaddr.isValid(ip)) {
       return false;
     }
+
     // process() unwraps IPv4-mapped IPv6 (::ffff:a.b.c.d) so IPv4 entries
     // match regardless of the socket family the request arrived on.
     const addr = ipaddr.process(ip);
+
     return (
       ipaddr.subnetMatch(addr, { allowed: this.allowed }, 'denied') ===
       'allowed'
@@ -80,7 +85,9 @@ function parseAllowlist(raw: string | undefined): AllowedRange[] {
         if (entry.includes('/')) {
           return ipaddr.parseCIDR(entry);
         }
+
         const addr = ipaddr.parse(entry);
+
         return [addr, addr.kind() === 'ipv4' ? 32 : 128] as AllowedRange;
       } catch {
         throw new Error(

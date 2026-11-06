@@ -23,6 +23,7 @@ const TOO_COMMON = {
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -57,8 +58,10 @@ async function login(email: string): Promise<string> {
       password: 'Password1'
     }
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -112,6 +115,7 @@ describe('the local common-password check mirrors the server verdict', () => {
 
   it('refuses a password that contains the account name on reset', async () => {
     const email = 'user@example.com';
+
     expect(
       (await send('POST', 'auth/forgot-password', { body: { email } })).status
     ).toBe(200);

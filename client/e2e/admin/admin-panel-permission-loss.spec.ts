@@ -14,6 +14,7 @@ test.describe('Admin panel — auto-redirect on permission loss (BKL-013)', () =
     await page.unroute(/\/api\/.*\/notifications\/stream/);
 
     const userId = '100';
+
     await loginViaUiKeepSse(page, _mockServer.url, {
       id: userId,
       roles: ['admin']

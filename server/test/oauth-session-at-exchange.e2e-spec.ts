@@ -55,6 +55,7 @@ runWithInfra(
       canActivate: (context: ExecutionContext): boolean => {
         context.switchToHttp().getRequest<{ user: OAuthUserProfile }>().user =
           profile;
+
         return true;
       }
     };
@@ -80,6 +81,7 @@ runWithInfra(
       const secure = requiresSecureCookies(
         app.get(ConfigService).get<string>('ENVIRONMENT')
       );
+
       refreshCookieName = secure ? '__Host-refresh_token' : 'refresh_token';
       oauthDataCookieName = secure ? '__Host-oauth_data' : 'oauth_data';
 
@@ -110,6 +112,7 @@ runWithInfra(
         // refresh_tokens.user_id and oauth_accounts.user_id cascade on delete.
         await dataSource.getRepository(User).delete({ id: user.id });
       }
+
       await app?.close();
     });
 
@@ -122,7 +125,9 @@ runWithInfra(
       const header = res.headers['set-cookie'] as string[] | string | undefined;
       const lines = Array.isArray(header) ? header : [header ?? ''];
       const line = lines.find((l) => l.startsWith(`${name}=`));
+
       if (!line) throw new Error(`the response set no ${name} cookie`);
+
       return line.split(';')[0];
     }
 
@@ -130,13 +135,16 @@ runWithInfra(
     async function fillQuota(): Promise<string[]> {
       const limit = await app.get(SessionLimitService).maxSessionsFor(user.id);
       const cookies: string[] = [];
+
       for (let i = 0; i < limit; i++) {
         const { tokens } = await authService.login(
           await usersService.findOne(user.id, SYSTEM_ABILITY),
           { userAgent: `Device-${i}`, ipAddress: null }
         );
+
         cookies.push(`${refreshCookieName}=${tokens.refresh_token}`);
       }
+
       return cookies;
     }
 
@@ -144,7 +152,9 @@ runWithInfra(
       const res = await request(http())
         .get('/api/v1/auth/oauth/google/callback')
         .expect(302);
+
       expect(res.headers['location']).toMatch(/\/oauth\/callback$/);
+
       return cookieOf(res, oauthDataCookieName);
     }
 
@@ -154,6 +164,7 @@ runWithInfra(
        WHERE user_id = $1 AND revoked = false`,
         [user.id]
       );
+
       return count;
     }
 
@@ -161,6 +172,7 @@ runWithInfra(
       const res = await request(http())
         .post('/api/v1/auth/refresh-token')
         .set('Cookie', cookie);
+
       return res.status;
     }
 
@@ -171,6 +183,7 @@ runWithInfra(
       const newest = devices.at(-1)!;
 
       const oauthData = await callback();
+
       expect(await liveRows()).toBe(devices.length);
 
       const exchange = await request(http())
@@ -201,6 +214,7 @@ runWithInfra(
     // just before it still turned into a fresh session.
     it('refuses an oauth_data cookie issued before a session revocation', async () => {
       const oauthData = await callback();
+
       // iat has one-second resolution and the revocation is floored to it.
       await new Promise((resolve) => setTimeout(resolve, 1100));
       await authService.revokeAllUserSessions(user.id);

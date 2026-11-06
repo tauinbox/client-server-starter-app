@@ -29,10 +29,12 @@ describe('PreviewFlagContextDto draft fields', () => {
       () => null,
       (e: unknown) => e
     );
+
     expect(error).toBeInstanceOf(BadRequestException);
     const response = (error as BadRequestException).getResponse() as {
       message: string[];
     };
+
     return response.message.join(' ');
   }
 
@@ -46,6 +48,7 @@ describe('PreviewFlagContextDto draft fields', () => {
       { roles: ['beta'] },
       PreviewFlagContextDto
     );
+
     expect(dto.rules).toBeUndefined();
   });
 
@@ -54,6 +57,7 @@ describe('PreviewFlagContextDto draft fields', () => {
       { roles: ['r'.repeat(100)] },
       PreviewFlagContextDto
     );
+
     expect(dto.roles).toEqual(['r'.repeat(100)]);
   });
 
@@ -68,6 +72,7 @@ describe('PreviewFlagContextDto draft fields', () => {
       { rules: [validRule] },
       PreviewFlagContextDto
     );
+
     expect(dto.rules).toHaveLength(1);
     expect(dto.rules?.[0].effect).toBe('include');
   });
@@ -75,6 +80,7 @@ describe('PreviewFlagContextDto draft fields', () => {
   it('rejects a non-array rule set with the same message as the save path', async () => {
     const preview = await messagesFor({ rules: 'nope' });
     const save = await messagesFor({ rules: 'nope' }, UpdateFeatureFlagDto);
+
     expect(preview).toBe(save);
   });
 
@@ -82,11 +88,13 @@ describe('PreviewFlagContextDto draft fields', () => {
     const bad = { ...validRule, effect: 'maybe' };
     const preview = await messagesFor({ rules: [bad] });
     const save = await messagesFor({ rules: [bad] }, UpdateFeatureFlagDto);
+
     expect(preview).toBe(save);
   });
 
   it('rejects a rule-level type, because payload.type is the one source', async () => {
     const bad = { ...validRule, type: 'role' };
+
     await expect(messagesFor({ rules: [bad] })).resolves.toBe(
       'rules.0.property type should not exist'
     );
@@ -106,6 +114,7 @@ describe('PreviewFlagContextDto draft fields', () => {
       () => null,
       (e: unknown) => (e as BadRequestException).getResponse()
     );
+
     expect(response).toMatchObject({
       message: [
         'rules.0.property zeta should not exist',
@@ -118,6 +127,7 @@ describe('PreviewFlagContextDto draft fields', () => {
 
   it('rejects more than 64 rules', async () => {
     const rules = Array.from({ length: 65 }, () => validRule);
+
     await expect(messagesFor({ rules })).resolves.toContain(
       'rules must contain no more than 64 elements'
     );
@@ -131,6 +141,7 @@ describe('PreviewFlagContextDto draft fields', () => {
 
   it('rejects an env that no server can run as, like a save does', async () => {
     const preview = await messagesFor({ env: 'prod' });
+
     expect(preview).toBe(
       'env must be one of the following values: local, development, staging, production'
     );
@@ -145,6 +156,7 @@ describe('PreviewFlagContextDto draft fields', () => {
         { env },
         PreviewFlagContextDto
       );
+
       expect(dto.env).toBe(env);
     }
   });
@@ -171,22 +183,28 @@ describe('PreviewFlagContextDto draft fields', () => {
       { anonId },
       PreviewFlagContextDto
     );
+
     expect(dto.anonId).toBe(anonId);
   });
 
   it('accepts 32 attribute keys of up to 64 characters', async () => {
     const attributes: Record<string, unknown> = { ['k'.repeat(64)]: 1 };
+
     for (let i = 1; i < 32; i++) attributes[`k${i}`] = i;
+
     const dto = await transform<PreviewFlagContextDto>(
       { attributes },
       PreviewFlagContextDto
     );
+
     expect(dto.attributes).toEqual(attributes);
   });
 
   it('rejects 33 attribute keys instead of dropping the extra one', async () => {
     const attributes: Record<string, unknown> = {};
+
     for (let i = 0; i < 33; i++) attributes[`k${i}`] = i;
+
     await expect(messagesFor({ attributes })).resolves.toBe(
       'attributes must contain no more than 32 keys'
     );
@@ -195,6 +213,7 @@ describe('PreviewFlagContextDto draft fields', () => {
   it('rejects an empty or over-long attribute key instead of dropping it', async () => {
     const message =
       'each key in attributes must be from 1 to 64 characters long';
+
     await expect(messagesFor({ attributes: { '': 1 } })).resolves.toBe(message);
     await expect(
       messagesFor({ attributes: { ['k'.repeat(65)]: 1 } })
@@ -206,6 +225,7 @@ describe('PreviewFlagContextDto draft fields', () => {
       { environments: [' Production ', 'production'] },
       PreviewFlagContextDto
     );
+
     expect(dto.environments).toEqual(['production']);
     await expect(messagesFor({ environments: ['mars'] })).resolves.toContain(
       'each value in environments must be one of the following values'

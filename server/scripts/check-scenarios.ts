@@ -65,6 +65,7 @@ function routesWithoutScenario(
           .filter((s) => s.expect.status < 400)
           .map((s) => s.route)
       );
+
       return routes
         .filter((r) => STATE_CHANGING.has(r.method))
         .filter((r) => r.noSuccessScenario === undefined)
@@ -101,6 +102,7 @@ function routesWithoutScenarioAt(ref: string): Set<string> {
     ref,
     'contracts/scenarios'
   ).map(([file, { scenarios }]) => ({ file, scenarios }));
+
   return routesWithoutScenario(routeFiles, scenarioFiles);
 }
 
@@ -130,10 +132,12 @@ export function scenarioCoverageErrors(
 
   for (const { file, scenarios } of scenarioFiles) {
     const routes = routesByFile.get(file);
+
     if (!routes) {
       errors.push(`scenarios/${file} has no routes/${file}`);
       continue;
     }
+
     for (const s of scenarios) {
       if (!routes.has(s.route)) {
         errors.push(
@@ -144,6 +148,7 @@ export function scenarioCoverageErrors(
   }
 
   const missing = routesWithoutScenario(routeFiles, scenarioFiles);
+
   for (const route of pending) {
     if (!allRoutes.has(route)) {
       errors.push(
@@ -157,11 +162,13 @@ export function scenarioCoverageErrors(
       );
     }
   }
+
   for (const route of missing) {
     if (!pending.has(route)) {
       errors.push(`${route} has no scenario with a status below 400`);
     }
   }
+
   return errors;
 }
 
@@ -237,31 +244,39 @@ function selfTest(): void {
   const missing = expected.filter(
     (text) => !problems.some((p) => p.includes(text))
   );
+
   if (missing.length > 0 || problems.length !== expected.length) {
     console.error('check-scenarios self-test failed. Reported:');
     problems.forEach((p) => console.error(`    ${p}`));
     missing.forEach((text) => console.error(`  not reported: ${text}`));
     process.exit(1);
   }
+
   console.log('check-scenarios self-test: all five rules report');
 }
 
 function main(): void {
   const i = process.argv.indexOf('--base');
   const ref = i === -1 ? undefined : process.argv[i + 1];
+
   if (i !== -1 && !ref) {
     console.error('--base needs a git ref, for example origin/master');
     process.exit(1);
   }
+
   const errors = scenarioCoverageErrors(loadRouteFiles(), loadScenarioFiles(), {
     pending: PENDING_ROUTES,
     base: ref ? routesWithoutScenarioAt(ref) : undefined
   });
+
   if (errors.length > 0) {
     console.error('Request scenario coverage failed:');
+
     for (const e of errors) console.error(`  - ${e}`);
+
     process.exit(1);
   }
+
   console.log('Request scenario coverage OK');
 }
 

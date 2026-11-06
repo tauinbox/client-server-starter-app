@@ -117,8 +117,10 @@ export class AuthCookies {
     const state: unknown = req.query?.['state'];
     const claim = (base: string): string | null => {
       const intent = this.read(req, base);
+
       return intent ? readIntentForFlow(intent, state) : null;
     };
+
     return {
       link: claim(OAUTH_LINK_COOKIE),
       reauth: claim(OAUTH_REAUTH_COOKIE)

@@ -9,6 +9,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -29,8 +30,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -47,6 +50,7 @@ async function send(
     },
     body: JSON.stringify(body)
   });
+
   return { status: res.status, body: (await res.json()) as ErrorBody };
 }
 

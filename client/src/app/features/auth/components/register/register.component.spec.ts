@@ -93,6 +93,7 @@ describe('RegisterComponent', () => {
 
     it('should require email', () => {
       const emailErrors = component.registerForm.email().errors();
+
       expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -104,6 +105,7 @@ describe('RegisterComponent', () => {
       });
       await fixture.whenStable();
       const emailErrors = component.registerForm.email().errors();
+
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
 
       component.registerModel.set({
@@ -117,6 +119,7 @@ describe('RegisterComponent', () => {
 
     it('should require name', () => {
       const errors = component.registerForm.name().errors();
+
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -124,6 +127,7 @@ describe('RegisterComponent', () => {
       component.registerModel.update((m) => ({ ...m, name: '   ' }));
       await fixture.whenStable();
       const errors = component.registerForm.name().errors();
+
       expect(errors.map((e) => [e.kind, e.message])).toContainEqual([
         'required',
         'auth.register.nameRequired'
@@ -132,6 +136,7 @@ describe('RegisterComponent', () => {
 
     it('should require password', () => {
       const errors = component.registerForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -143,6 +148,7 @@ describe('RegisterComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.registerForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
 
       component.registerModel.set({
@@ -175,6 +181,7 @@ describe('RegisterComponent', () => {
       await fixture.whenStable();
 
       const errors = component.registerForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
       expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
         'auth.register.passwordMaxLength'
@@ -234,6 +241,7 @@ describe('RegisterComponent', () => {
         error: { message: 'Conflict' },
         status: 409
       });
+
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
@@ -249,6 +257,7 @@ describe('RegisterComponent', () => {
         error: { message: 'Validation failed' },
         status: 400
       });
+
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
@@ -268,6 +277,7 @@ describe('RegisterComponent', () => {
         },
         status: 500
       });
+
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
@@ -285,6 +295,7 @@ describe('RegisterComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
@@ -301,6 +312,7 @@ describe('RegisterComponent', () => {
         error: null,
         status: 500
       });
+
       authServiceMock.register.mockReturnValue(throwError(() => httpError));
 
       component.registerModel.set(validForm);
@@ -328,6 +340,7 @@ describe('RegisterComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.register.mockReturnValueOnce(throwError(() => httpError));
 
       component.registerModel.set(validForm);
@@ -350,6 +363,7 @@ describe('RegisterComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.register
         .mockReturnValueOnce(throwError(() => httpError))
         .mockReturnValueOnce(of(mockRegisterResponse));
@@ -379,6 +393,7 @@ describe('RegisterComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.register.mockReturnValue(throwError(() => invalidErr));
 
       component.registerModel.set(validForm);
@@ -402,6 +417,7 @@ describe('RegisterComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.register.mockReturnValueOnce(throwError(() => httpError));
 
       component.registerModel.set(validForm);
@@ -426,6 +442,7 @@ describe('RegisterComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.register.mockReturnValueOnce(throwError(() => httpError));
 
       component.registerModel.set(validForm);

@@ -43,7 +43,9 @@ export class OAuthIntentService {
   /** The return URL when this tab started the round trip, else null. Once only. */
   take(): string | null {
     const returnUrl = this.#returnUrl;
+
     this.#returnUrl = null;
+
     return returnUrl;
   }
 }

@@ -51,6 +51,7 @@ function columnEquals(actual: unknown, expected: unknown): boolean {
   if (expected instanceof FindOperator) {
     return (expected.value as unknown[]).includes(actual);
   }
+
   return actual instanceof Date && expected instanceof Date
     ? actual.getTime() === expected.getTime()
     : actual === expected;
@@ -68,16 +69,21 @@ function findWhere<T extends object>(rows: T[], where: Partial<T>): T | null {
 
 function makeManager(store: Store) {
   let seq = 0;
+
   return {
     findOne: (entity: unknown, opts: { where: Record<string, unknown> }) => {
       if (entity === Subscription)
         return Promise.resolve(findWhere(store.subscriptions, opts.where));
+
       if (entity === Customer)
         return Promise.resolve(findWhere(store.customers, opts.where));
+
       if (entity === Plan)
         return Promise.resolve(findWhere(store.plans, opts.where));
+
       if (entity === Invoice)
         return Promise.resolve(findWhere(store.invoices, opts.where));
+
       return Promise.resolve(null);
     },
     update: (
@@ -92,7 +98,9 @@ function makeManager(store: Store) {
             ? store.subscriptions
             : store.paymentMethods;
       const matches = rows.filter((row) => rowMatches(row, where));
+
       for (const row of matches) Object.assign(row, set);
+
       return Promise.resolve({ affected: matches.length });
     },
     save: (entity: { id?: string }) => Promise.resolve(entity),
@@ -103,12 +111,14 @@ function makeManager(store: Store) {
         into: () => builder,
         values: (v: Record<string, unknown>) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
         returning: () => builder,
         execute: () => {
           const v = captured.values ?? {};
+
           if (
             store.invoices.some(
               (i) => i.providerEventId === v['providerEventId']
@@ -116,11 +126,15 @@ function makeManager(store: Store) {
           ) {
             return Promise.resolve({ raw: [] });
           }
+
           const id = `inv-${++seq}`;
+
           store.invoices.push(Object.assign(new Invoice(), { id }, v));
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     }
   };
@@ -192,6 +206,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
     createPayment = jest.fn(
       (payload: { metadata?: Record<string, unknown> }) => {
         capturedMetadata = payload.metadata;
+
         return Promise.resolve({ id: 'pay-1', status: 'succeeded' });
       }
     );
@@ -204,6 +219,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         metadata: capturedMetadata
       })
     );
+
     getPaymentList = jest.fn(() =>
       Promise.resolve({
         items: [
@@ -218,6 +234,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
       })
     );
     const yoo = { createPayment, getPayment, getPaymentList };
+
     emit = jest.fn();
     const manager = makeManager(store);
 
@@ -301,6 +318,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
                 orderBy: () => qb,
                 limit: (n: number) => {
                   take = n;
+
                   return qb;
                 },
                 getMany: () =>
@@ -314,6 +332,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
                       .slice(0, take)
                   )
               };
+
               return qb;
             }
           }
@@ -345,6 +364,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
     // invoice key, so the confirming webhook is recognizable.
     expect(createPayment).toHaveBeenCalledTimes(1);
     const renewalKey = `renewal:sub-1:${new Date('2026-06-01T00:00:00Z').getTime()}`;
+
     expect(capturedMetadata).toMatchObject({
       purpose: 'off_session',
       chargeKey: renewalKey
@@ -357,9 +377,11 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         JSON.stringify({ event: 'payment.succeeded', object: { id: 'pay-1' } })
       )
     );
+
     if (event === null || event === WEBHOOK_IGNORED) {
       throw new Error(`Expected a reducible event, got ${String(event)}`);
     }
+
     await reducer.reduce(event);
 
     // The webhook reconciled onto the scheduler's invoice: no duplicate row, no
@@ -369,6 +391,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
     expect(store.paymentMethods.filter((m) => m.isDefault)).toHaveLength(1);
     expect(emit).toHaveBeenCalledTimes(2);
     const events = emit.mock.calls.map((c: unknown[]) => c[0]);
+
     expect(events).toContain(InvoicePaidEvent.name);
     expect(events).not.toContain(SubscriptionActivatedEvent.name);
   });
@@ -381,6 +404,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
     createPayment.mockImplementationOnce(
       (payload: { metadata?: Record<string, unknown> }) => {
         capturedMetadata = payload.metadata;
+
         return Promise.reject(new Error('deadline exceeded'));
       }
     );
@@ -400,9 +424,11 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         JSON.stringify({ event: 'payment.succeeded', object: { id: 'pay-1' } })
       )
     );
+
     if (event === null || event === WEBHOOK_IGNORED) {
       throw new Error(`Expected a reducible event, got ${String(event)}`);
     }
+
     await reducer.reduce(event);
 
     expect(store.invoices).toHaveLength(1);

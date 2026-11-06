@@ -171,6 +171,7 @@ describe('RoleService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockRoleRepoQB)
     };
     const roleRepo = mockRoleRepo;
+
     roleRepo.manager.transaction.mockImplementation(
       (cb: (em: unknown) => Promise<unknown>) =>
         cb({
@@ -218,6 +219,7 @@ describe('RoleService', () => {
       manager: { transaction: jest.fn() }
     };
     const rolePermissionRepo = mockRolePermissionRepo;
+
     // As for roles: the writes inside the transaction land on the repository
     // mocks.
     rolePermissionRepo.manager.transaction.mockImplementation(
@@ -284,6 +286,7 @@ describe('RoleService', () => {
     it('should return all roles', async () => {
       mockRoleRepo.find.mockResolvedValue([systemRole, customRole]);
       const result = await service.findAll();
+
       expect(result).toHaveLength(2);
     });
   });
@@ -292,6 +295,7 @@ describe('RoleService', () => {
     it('should return a role by id', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
       const result = await service.findOne('role-1', SYSTEM_ABILITY);
+
       expect(result.name).toBe('admin');
     });
 
@@ -310,6 +314,7 @@ describe('RoleService', () => {
         { name: 'viewer', description: 'View only' },
         { ability: SYSTEM_ABILITY }
       );
+
       expect(result.name).toBe('viewer');
     });
 
@@ -340,6 +345,7 @@ describe('RoleService', () => {
     it('should pass on a save error that is not a unique violation', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
       const failure = new Error('db down');
+
       mockRoleRepo.save.mockRejectedValueOnce(failure);
 
       await expect(
@@ -377,6 +383,7 @@ describe('RoleService', () => {
         { description: 'Updated' },
         { ability: SYSTEM_ABILITY }
       );
+
       expect(result.description).toBe('Updated');
       expect(mockRoleRepo.update).toHaveBeenCalledWith(
         { id: 'role-2' },
@@ -414,12 +421,15 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
       mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
       let committedInside: boolean | undefined;
+
       mockEventEmitter.emitAsync.mockImplementation(
         async (_name: string, event: RoleRenamedEvent) => {
           let settled = false;
+
           void event.committed.then(() => (settled = true));
           await Promise.resolve();
           committedInside = settled;
+
           return [];
         }
       );
@@ -440,6 +450,7 @@ describe('RoleService', () => {
       const [emit] = mockEventEmitter.emitAsync.mock.invocationCallOrder;
       const [invalidate] =
         mockPermissionService.invalidateUserCache.mock.invocationCallOrder;
+
       expect(save).toBeLessThan(emit);
       expect(emit).toBeLessThan(invalidate);
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -486,6 +497,7 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
       const failure = { code: '23505' };
+
       mockEventEmitter.emitAsync.mockRejectedValueOnce(failure);
 
       await expect(
@@ -682,6 +694,7 @@ describe('RoleService', () => {
       const [remove] = mockRoleRepo.delete.mock.invocationCallOrder;
       const [invalidate] =
         mockPermissionService.invalidateUserCache.mock.invocationCallOrder;
+
       expect(read).toBeLessThan(remove);
       expect(remove).toBeLessThan(invalidate);
     });
@@ -718,6 +731,7 @@ describe('RoleService', () => {
       );
       const [remove] = mockRoleRepo.delete.mock.invocationCallOrder;
       const [emit] = mockEventEmitter.emitAsync.mock.invocationCallOrder;
+
       expect(remove).toBeLessThan(emit);
     });
 
@@ -824,8 +838,10 @@ describe('RoleService', () => {
 
   function assignAbility(roleName: string): AppAbility {
     const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     builder.can('update', 'User');
     builder.can('assign', 'Role', { name: roleName });
+
     return builder.build();
   }
 
@@ -903,6 +919,7 @@ describe('RoleService', () => {
         ability,
         actorId: 'actor-1'
       });
+
       await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: {
@@ -924,6 +941,7 @@ describe('RoleService', () => {
     it('should throw ApiError when ability denies update on target user', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       const targetUser = { id: 'user-99' } as User;
+
       mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
       const canSpy = jest.fn().mockReturnValue(false);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
@@ -938,6 +956,7 @@ describe('RoleService', () => {
     it('should proceed when ability allows update on target user', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       const targetUser = { id: 'user-1' } as User;
+
       mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
       mockRolePermissionRepo.find.mockResolvedValue([]);
       const canSpy = jest.fn().mockReturnValue(true);
@@ -1056,6 +1075,7 @@ describe('RoleService', () => {
       const refusal = service.removeRoleFromUser('user-1', 'role-1', {
         ability
       });
+
       await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: {
@@ -1068,6 +1088,7 @@ describe('RoleService', () => {
     it('should throw ApiError when ability denies update on target user', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       const targetUser = { id: 'user-99' } as User;
+
       mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
       const canSpy = jest.fn().mockReturnValue(false);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
@@ -1105,6 +1126,7 @@ describe('RoleService', () => {
     it('should proceed when ability allows update on target user', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       const targetUser = { id: 'user-1' } as User;
+
       mockRoleRepo.manager.findOne.mockResolvedValue(targetUser);
       const canSpy = jest.fn().mockReturnValue(true);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
@@ -1155,8 +1177,10 @@ describe('RoleService', () => {
   describe('findAllPermissions', () => {
     it('should return all permissions', async () => {
       const permissions = [{ id: 'p1', resource: 'users', action: 'read' }];
+
       mockPermissionRepo.find.mockResolvedValue(permissions);
       const result = await service.findAllPermissions();
+
       expect(result).toEqual(permissions);
     });
   });
@@ -1168,6 +1192,7 @@ describe('RoleService', () => {
         id: 'role-99',
         name: 'viewer'
       };
+
       mockRoleRepo.findOne
         .mockResolvedValueOnce(customRole) // findOne(id) call
         .mockResolvedValueOnce(conflictRole); // findOne({ name }) conflict check
@@ -1189,6 +1214,7 @@ describe('RoleService', () => {
         { name: 'editor' },
         { ability: SYSTEM_ABILITY }
       );
+
       expect(result.name).toBe('editor');
     });
   });
@@ -1196,6 +1222,7 @@ describe('RoleService', () => {
   describe('getPermissionsForRole', () => {
     it('should return permissions for a role', async () => {
       const perms = [{ id: 'rp-1', roleId: 'role-2', permissionId: 'perm-1' }];
+
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.find.mockResolvedValue(perms);
 
@@ -1247,6 +1274,7 @@ describe('RoleService', () => {
       });
       const [lock] = mockRolePermissionRepo.lockRole.mock.invocationCallOrder;
       const [remove] = mockRolePermissionRepo.delete.mock.invocationCallOrder;
+
       expect(lock).toBeLessThan(remove);
     });
 
@@ -1294,6 +1322,7 @@ describe('RoleService', () => {
     it('should return role when found by name', async () => {
       mockRoleRepo.findOne.mockResolvedValue(systemRole);
       const result = await service.findRoleByName('admin');
+
       expect(result).toBe(systemRole);
       expect(mockRoleRepo.findOne).toHaveBeenCalledWith({
         where: { name: 'admin' }
@@ -1480,20 +1509,26 @@ describe('RoleService', () => {
       const can = jest.fn((action: string, subject: unknown) => {
         if (opts.manageAll && action === 'manage' && subject === 'all')
           return true;
+
         if (opts.manageAll) return true;
+
         if (typeof subject === 'object' && subject !== null) {
           // entity-instance check (ability.can('update', userEntity))
           return opts.canMatrix?.[`${action}:*`] ?? false;
         }
+
         const key = `${action}:${String(subject)}`;
+
         return opts.canMatrix?.[key] ?? false;
       });
       const rulesFor = jest.fn((action: string, subject: unknown) => {
         const key = `${action}:${String(subject)}`;
+
         return opts.rulesMatrix?.[key] ?? [];
       });
       // @ts-expect-error partial mock — only can/rulesFor are exercised
       const ability: AppAbility = { can, rulesFor };
+
       return { ability, can, rulesFor };
     }
 
@@ -1753,7 +1788,9 @@ describe('RoleService', () => {
     // grant is scoped to a different role.
     function abilityForRoleNamed(name: string): AppAbility {
       const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
       builder.can('update', 'Role', { name });
+
       return builder.build();
     }
 
@@ -1863,6 +1900,7 @@ describe('RoleService', () => {
       );
       // @ts-expect-error partial mock — only `can` is exercised
       const ability: AppAbility = { can };
+
       return ability;
     }
 
@@ -1972,10 +2010,12 @@ describe('RoleService', () => {
       define: (b: AbilityBuilder<AppAbility>) => void
     ): AppAbility {
       const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
       builder.can('update', 'Role');
       builder.can('assign', 'Role');
       builder.can('delete', 'Role');
       define(builder);
+
       return builder.build();
     }
 
@@ -2221,6 +2261,7 @@ describe('RoleService', () => {
         mockUserQueryBuilder.getMany.mock.invocationCallOrder;
       const [removeOrder] = mockRoleRepo.delete.mock.invocationCallOrder;
       const [emitOrder] = mockEventEmitter.emit.mock.invocationCallOrder;
+
       expect(queryOrder).toBeLessThan(removeOrder);
       expect(emitOrder).toBeGreaterThan(removeOrder);
     });
@@ -2268,8 +2309,10 @@ describe('RoleService', () => {
       write: Promise<unknown>
     ): Promise<void> {
       const error: unknown = await write.catch((e: unknown) => e);
+
       expect(error).toBeInstanceOf(HttpException);
       const http = error as HttpException;
+
       expect(http.getStatus()).toBe(403);
       expect(http.getResponse()).toMatchObject({
         errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
@@ -2351,6 +2394,7 @@ describe('RoleService', () => {
     }
 
     const write = { ability: scoped, actorId: 'actor-1' };
+
     it.each<[string, (s: RoleService) => Promise<unknown>]>([
       ['update', (s) => s.update('role-2', { description: 'x' }, write)],
       ['delete', (s) => s.delete('role-2', write)],
@@ -2466,6 +2510,7 @@ describe('RoleService', () => {
         action: AuditAction.ROLE_UPDATE,
         details: { name: before.name }
       }));
+
       await service.update(
         'role-2',
         { description: 'New' },
@@ -2479,6 +2524,7 @@ describe('RoleService', () => {
         action: AuditAction.ROLE_DELETE,
         details: { name: role.name }
       }));
+
       await service.delete('role-2', {
         ability: SYSTEM_ABILITY,
         audit: deleteRow
@@ -2518,9 +2564,11 @@ describe('RoleService', () => {
         // @ts-expect-error the ability is required
         () => service.removePermissionFromRole('role-2', 'perm-1', {})
       ];
+
       for (const call of calls) {
         await expect(call()).rejects.toThrow(TypeError);
       }
+
       expect(mockRoleRepo.save).not.toHaveBeenCalled();
       expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();

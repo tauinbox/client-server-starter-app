@@ -34,14 +34,18 @@ async function adminToken(): Promise<string> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
 const anyRoleId = (): string => {
   const [role] = [...getState().roles.values()];
+
   if (!role) throw new Error('Seed roles');
+
   return role.id;
 };
 

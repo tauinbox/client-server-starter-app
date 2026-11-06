@@ -109,6 +109,7 @@ export default class FeatureFlagsSeeder extends Seeder {
 
     const existingKeys = new Set((await flagRepo.find()).map((f) => f.key));
     const missing = FLAGS.filter((seed) => !existingKeys.has(seed.key));
+
     if (missing.length === 0) return;
 
     const created = await flagRepo.save(
@@ -127,9 +128,12 @@ export default class FeatureFlagsSeeder extends Seeder {
     const idByKey = new Map(created.map((flag) => [flag.key, flag.id]));
     const rules = missing.flatMap((seed) => {
       const flagId = idByKey.get(seed.key);
+
       if (!seed.rule || !flagId) return [];
+
       return [ruleRepo.create({ ...seed.rule, flagId })];
     });
+
     if (rules.length === 0) return;
 
     await ruleRepo.save(rules);

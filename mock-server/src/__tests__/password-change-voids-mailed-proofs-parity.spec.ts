@@ -17,6 +17,7 @@ const PENDING_TOKEN = 'pending-token-voids-parity';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -39,21 +40,27 @@ function postAuth(path: string, body: unknown): Promise<Response> {
 
 async function login(email: string): Promise<string> {
   const res = await postAuth('login', { email, password: SEED_PASSWORD });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
 async function issueResetToken(email: string): Promise<string> {
   const res = await postAuth('forgot-password', { email });
+
   expect(res.status).toBe(200);
   const [token] = [...getState().passwordResetTokens.keys()];
+
   expect(token).toBeDefined();
+
   return token;
 }
 
 function seedPendingEmailChange(email: string): void {
   const user = findUserByEmail(email);
+
   expect(user).toBeDefined();
   user!.pendingEmail = PENDING_EMAIL;
   user!.pendingEmailToken = PENDING_TOKEN;
@@ -63,6 +70,7 @@ function seedPendingEmailChange(email: string): void {
 
 async function expectProofsDead(email: string, resetToken: string) {
   const user = findUserByEmail(email);
+
   expect(user!.pendingEmail).toBeNull();
   expect(user!.pendingEmailToken).toBeNull();
   expect(user!.pendingEmailExpiresAt).toBeNull();
@@ -74,6 +82,7 @@ async function expectProofsDead(email: string, resetToken: string) {
     token: resetToken,
     password: 'Amber-Signal-42'
   });
+
   expect(reset.status).toBe(422);
   expect(await reset.json()).toMatchObject({
     errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
@@ -83,6 +92,7 @@ async function expectProofsDead(email: string, resetToken: string) {
   const confirm = await postAuth('profile/email/confirm', {
     token: PENDING_TOKEN
   });
+
   expect(confirm.status).toBe(422);
   expect(await confirm.json()).toMatchObject({
     errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
@@ -93,6 +103,7 @@ async function expectProofsDead(email: string, resetToken: string) {
 describe('a password change voids the mailed proofs', () => {
   it('drops both proofs on PATCH /auth/profile', async () => {
     const accessToken = await login(USER_EMAIL);
+
     seedPendingEmailChange(USER_EMAIL);
     const resetToken = await issueResetToken(USER_EMAIL);
 
@@ -107,6 +118,7 @@ describe('a password change voids the mailed proofs', () => {
         currentPassword: SEED_PASSWORD
       })
     });
+
     expect(res.status).toBe(200);
 
     await expectProofsDead(USER_EMAIL, resetToken);
@@ -114,6 +126,7 @@ describe('a password change voids the mailed proofs', () => {
 
   it('drops both proofs on PATCH /users/:id', async () => {
     const adminToken = await login(ADMIN_EMAIL);
+
     seedPendingEmailChange(USER_EMAIL);
     const resetToken = await issueResetToken(USER_EMAIL);
     const targetId = findUserByEmail(USER_EMAIL)!.id;
@@ -130,6 +143,7 @@ describe('a password change voids the mailed proofs', () => {
         currentPassword: SEED_PASSWORD
       })
     });
+
     expect(res.status).toBe(200);
 
     await expectProofsDead(USER_EMAIL, resetToken);
@@ -137,6 +151,7 @@ describe('a password change voids the mailed proofs', () => {
 
   it('keeps both proofs when the patch carries no password', async () => {
     const accessToken = await login(USER_EMAIL);
+
     seedPendingEmailChange(USER_EMAIL);
     const resetToken = await issueResetToken(USER_EMAIL);
 
@@ -148,6 +163,7 @@ describe('a password change voids the mailed proofs', () => {
       },
       body: JSON.stringify({ name: 'Renamed' })
     });
+
     expect(res.status).toBe(200);
 
     expect(getState().passwordResetTokens.has(resetToken)).toBe(true);

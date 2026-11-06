@@ -26,7 +26,12 @@
   background: linear-gradient(
     90deg,
     var(--mat-sys-surface-variant) 25%,
-    color-mix(in srgb, var(--mat-sys-surface-variant) 50%, var(--mat-sys-surface)) 50%,
+    color-mix(
+        in srgb,
+        var(--mat-sys-surface-variant) 50%,
+        var(--mat-sys-surface)
+      )
+      50%,
     var(--mat-sys-surface-variant) 75%
   );
   background-size: 200% 100%;

@@ -9,6 +9,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -27,8 +28,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -43,16 +46,20 @@ async function openStream(token: string): Promise<OpenStream> {
     headers: { authorization: `Bearer ${token}` },
     signal: controller.signal
   });
+
   expect(res.status).toBe(200);
 
   const frames: string[] = [];
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
+
   void (async () => {
     try {
       for (;;) {
         const { done, value } = await reader.read();
+
         if (done) break;
+
         frames.push(decoder.decode(value));
       }
     } catch {
@@ -86,6 +93,7 @@ describe('SSE user_crud_events scoping', () => {
         password: 'Sunrise-Kettle-19'
       })
     });
+
     expect(res.status).toBe(201);
 
     await wait(100);
@@ -101,6 +109,7 @@ describe('SSE user_crud_events scoping', () => {
     const viewer = findUserByEmail('user@example.com')!;
     const other = findUserByEmail('admin@example.com')!;
     const permission = searchUserPermission();
+
     state.roles.set('role-own-search', {
       id: 'role-own-search',
       name: 'own-search',
@@ -130,6 +139,7 @@ describe('SSE user_crud_events scoping', () => {
         },
         body: JSON.stringify({ name: 'Changed' })
       });
+
     expect((await patch(other.id)).status).toBe(200);
     expect((await patch(viewer.id)).status).toBe(200);
 
@@ -137,6 +147,7 @@ describe('SSE user_crud_events scoping', () => {
     viewerStream.close();
 
     const frames = viewerStream.frames.join('');
+
     expect(frames).toContain(
       JSON.stringify({
         type: 'user_crud_events',
@@ -152,6 +163,7 @@ describe('SSE user_crud_events scoping', () => {
     const viewer = findUserByEmail('user@example.com')!;
     const target = findUserByEmail('admin@example.com')!;
     const permission = searchUserPermission();
+
     state.roles.set('role-active-search', {
       id: 'role-active-search',
       name: 'active-search',
@@ -180,6 +192,7 @@ describe('SSE user_crud_events scoping', () => {
         password: 'Sunrise-Kettle-19'
       })
     });
+
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
 
@@ -193,6 +206,7 @@ describe('SSE user_crud_events scoping', () => {
       },
       body: JSON.stringify({ isActive: false })
     });
+
     expect(res.status).toBe(200);
 
     await wait(100);
@@ -214,6 +228,7 @@ function searchUserPermission() {
     .values()
     .find((r) => r.subject === 'User')!.id;
   const actionId = state.actions.values().find((a) => a.name === 'search')!.id;
+
   return state.permissions
     .values()
     .find((p) => p.resourceId === resourceId && p.actionId === actionId)!;

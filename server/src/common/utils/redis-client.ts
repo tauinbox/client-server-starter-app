@@ -13,6 +13,7 @@ const ERROR_LOG_THROTTLE_MS = 30_000;
  */
 export function redisClientOf(cache: Cache): RedisClientConnectionType | null {
   const store: unknown = cache.stores?.[0]?.store;
+
   return store instanceof KeyvRedis ? store.client : null;
 }
 
@@ -33,7 +34,9 @@ export class ThrottledFailureLog {
 
   log(error: unknown): void {
     const now = Date.now();
+
     if (now - this.#loggedAt < ERROR_LOG_THROTTLE_MS) return;
+
     this.#loggedAt = now;
     this.#logger.warn(
       `${this.#message}: ${error instanceof Error ? error.message : String(error)}`

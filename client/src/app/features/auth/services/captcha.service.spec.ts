@@ -36,6 +36,7 @@ describe('CaptchaService', () => {
     it('GETs /captcha-config and caches the response', async () => {
       const promise = service.loadConfig();
       const req = httpMock.expectOne(AuthApiEnum.CaptchaConfig);
+
       expect(req.request.method).toBe('GET');
       req.flush({
         enabled: true,
@@ -51,6 +52,7 @@ describe('CaptchaService', () => {
 
       // Cached — no second HTTP call
       const second = await service.loadConfig();
+
       expect(second.siteKey).toBe('site-1');
       httpMock.expectNone(AuthApiEnum.CaptchaConfig);
     });
@@ -60,6 +62,7 @@ describe('CaptchaService', () => {
       const b = service.loadConfig();
 
       const req = httpMock.expectOne(AuthApiEnum.CaptchaConfig);
+
       req.flush({ enabled: false, provider: 'turnstile', siteKey: null });
 
       await expect(a).resolves.toEqual(await b);
@@ -67,6 +70,7 @@ describe('CaptchaService', () => {
 
     it('retries after a failed fetch instead of latching the captcha off', async () => {
       const first = service.loadConfig();
+
       httpMock
         .expectOne(AuthApiEnum.CaptchaConfig)
         .flush('boom', { status: 500, statusText: 'Server Error' });
@@ -74,6 +78,7 @@ describe('CaptchaService', () => {
       await expect(first).rejects.toBeDefined();
 
       const second = service.loadConfig();
+
       httpMock.expectOne(AuthApiEnum.CaptchaConfig).flush({
         enabled: true,
         provider: 'turnstile',
@@ -105,6 +110,7 @@ describe('CaptchaService', () => {
       const script = document.getElementById(
         'cf-turnstile-script'
       ) as HTMLScriptElement | null;
+
       expect(script).toBeTruthy();
       expect(script?.src).toContain(
         'https://challenges.cloudflare.com/turnstile/v0/api.js'
@@ -120,26 +126,31 @@ describe('CaptchaService', () => {
     it('returns the same promise on repeated calls', () => {
       const a = service.loadScript();
       const b = service.loadScript();
+
       expect(a).toBe(b);
     });
 
     it('starts a fresh attempt after a failed load on a pre-existing tag', async () => {
       const stale = document.createElement('script');
+
       stale.id = 'cf-turnstile-script';
       document.head.appendChild(stale);
 
       const first = service.loadScript();
+
       stale.dispatchEvent(new Event('error'));
 
       await expect(first).rejects.toThrow('Failed to load Turnstile script');
       expect(document.getElementById('cf-turnstile-script')).toBeNull();
 
       const second = service.loadScript();
+
       expect(second).not.toBe(first);
 
       const fresh = document.getElementById(
         'cf-turnstile-script'
       ) as HTMLScriptElement | null;
+
       expect(fresh).toBeTruthy();
       expect(fresh).not.toBe(stale);
 
@@ -149,6 +160,7 @@ describe('CaptchaService', () => {
         remove: vi.fn(),
         getResponse: vi.fn()
       };
+
       (window as { turnstile?: unknown }).turnstile = fakeApi;
       fresh?.dispatchEvent(new Event('load'));
 

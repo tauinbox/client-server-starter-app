@@ -40,11 +40,13 @@ runWithRedis('Redis throttler storage (real Redis)', () => {
     for (let i = 0; i < 3; i++) {
       await storage.increment(KEY, 60_000, 3, 5_000, 'login');
     }
+
     const record = await storage.increment(KEY, 60_000, 3, 5_000, 'login');
 
     expect(record).toMatchObject({ totalHits: 4, isBlocked: true });
     expect(record.timeToBlockExpire).toBe(5);
     const blockTtl = await redis.pttl(BLOCK_KEY);
+
     expect(blockTtl).toBeGreaterThan(0);
     expect(blockTtl).toBeLessThanOrEqual(5_000);
   });
@@ -53,6 +55,7 @@ runWithRedis('Redis throttler storage (real Redis)', () => {
     for (let i = 0; i < 2; i++) {
       await storage.increment(KEY, 50, 1, 60_000, 'login');
     }
+
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const record = await storage.increment(KEY, 50, 1, 60_000, 'login');
@@ -87,6 +90,7 @@ runWithRedis('Redis throttler storage (real Redis)', () => {
     );
 
     const hits = records.map((r) => r.totalHits).toSorted((a, b) => a - b);
+
     expect(hits).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
     expect(records.filter((r) => r.isBlocked)).toHaveLength(15);
   });

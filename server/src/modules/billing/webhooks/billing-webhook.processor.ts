@@ -54,6 +54,7 @@ export class BillingWebhookProcessor
     if (process.env['NODE_ENV'] === 'test') {
       return;
     }
+
     await this.queue.upsertJobScheduler(
       BILLING_WEBHOOK_RECONCILE_SCHEDULER_ID,
       { every: WEBHOOK_RECONCILE_INTERVAL_MS },
@@ -69,12 +70,16 @@ export class BillingWebhookProcessor
   async process(job: Job<BillingWebhookJobData>): Promise<void> {
     if (job.name === BILLING_WEBHOOK_RECONCILE_JOB) {
       await this.reconciliation.sweep();
+
       return;
     }
+
     if (job.name === BILLING_WEBHOOK_RETENTION_JOB) {
       await this.retention.sweep();
+
       return;
     }
+
     await this.ingestion.processEvent(job.data);
   }
 

@@ -21,6 +21,7 @@ type Session = { userId: string; refreshCookie: string };
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -36,7 +37,9 @@ beforeEach(() => {
 function refreshCookieOf(res: Response): string {
   const raw = res.headers.get('set-cookie') ?? '';
   const match = /refresh_token=([^;]+)/.exec(raw);
+
   expect(match).not.toBeNull();
+
   return `refresh_token=${match?.[1] ?? ''}`;
 }
 
@@ -46,8 +49,10 @@ async function signIn(): Promise<Session> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { user: { id: string } };
+
   return { userId: body.user.id, refreshCookie: refreshCookieOf(res) };
 }
 
@@ -60,6 +65,7 @@ function refresh(session: Session): Promise<Response> {
 
 function setActive(userId: string, isActive: boolean): void {
   const user = getState().users.get(userId);
+
   expect(user).toBeDefined();
   user!.isActive = isActive;
 }
@@ -70,6 +76,7 @@ async function ageSession(userId: string, ageMs: number): Promise<void> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId, ageMs })
   });
+
   expect(res.status).toBe(200);
 }
 
@@ -82,6 +89,7 @@ describe('refresh-token failure parity', () => {
     const res = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
       method: 'POST'
     });
+
     expect(res.status).toBe(401);
     expect(await readErrorBody(res)).toEqual({
       message: 'Refresh token is required',
@@ -93,9 +101,11 @@ describe('refresh-token failure parity', () => {
 
   it('answers a deactivated account with the deactivated envelope', async () => {
     const session = await signIn();
+
     setActive(session.userId, false);
 
     const res = await refresh(session);
+
     expect(res.status).toBe(401);
     expect(await readErrorBody(res)).toEqual({
       message: 'User account is deactivated',
@@ -104,6 +114,7 @@ describe('refresh-token failure parity', () => {
     });
 
     const rows = auditRows('TOKEN_REFRESH_FAILURE');
+
     expect(rows).toHaveLength(1);
     expect(rows[0].details).toEqual({ reason: 'user_deactivated' });
     expect(rows[0].actorEmail).toBe(EMAIL);
@@ -112,10 +123,12 @@ describe('refresh-token failure parity', () => {
   it('answers a missing account with the not-found envelope', async () => {
     const session = await signIn();
     const user = getState().users.get(session.userId);
+
     expect(user).toBeDefined();
     user!.deletedAt = new Date().toISOString();
 
     const res = await refresh(session);
+
     expect(res.status).toBe(401);
     expect(await readErrorBody(res)).toEqual({
       message: 'User not found',
@@ -124,6 +137,7 @@ describe('refresh-token failure parity', () => {
     });
 
     const rows = auditRows('TOKEN_REFRESH_FAILURE');
+
     expect(rows).toHaveLength(1);
     expect(rows[0].details).toEqual({ reason: 'user_not_found' });
   });
@@ -131,12 +145,14 @@ describe('refresh-token failure parity', () => {
   it('ends the session at the not-found refusal, so a replay is not read as reuse', async () => {
     const session = await signIn();
     const user = getState().users.get(session.userId);
+
     expect(user).toBeDefined();
     user!.deletedAt = new Date().toISOString();
 
     expect((await refresh(session)).status).toBe(401);
 
     const replay = await refresh(session);
+
     expect(replay.status).toBe(401);
     expect(await readErrorBody(replay)).toEqual({
       message: 'Invalid refresh token',
@@ -149,11 +165,13 @@ describe('refresh-token failure parity', () => {
   it('ends the session at the deactivated refusal, so a replay is not read as reuse', async () => {
     const phone = await signIn();
     const desktop = await signIn();
+
     setActive(phone.userId, false);
 
     expect((await refresh(phone)).status).toBe(401);
 
     const replay = await refresh(phone);
+
     expect(replay.status).toBe(401);
     expect(await readErrorBody(replay)).toEqual({
       message: 'Invalid refresh token',
@@ -169,6 +187,7 @@ describe('refresh-token failure parity', () => {
   it('leaves the other device alone when the token is not replayed', async () => {
     const phone = await signIn();
     const desktop = await signIn();
+
     setActive(phone.userId, false);
 
     expect((await refresh(phone)).status).toBe(401);
@@ -180,9 +199,11 @@ describe('refresh-token failure parity', () => {
 
   it('refuses a refresh past the absolute session lifetime', async () => {
     const session = await signIn();
+
     await ageSession(session.userId, DEFAULT_SESSION_ABSOLUTE_MAX_MS);
 
     const res = await refresh(session);
+
     expect(res.status).toBe(401);
     expect(await readErrorBody(res)).toEqual({
       message: 'Session has reached its maximum duration. Please log in again.',
@@ -191,6 +212,7 @@ describe('refresh-token failure parity', () => {
     });
 
     const rows = auditRows('TOKEN_REFRESH_FAILURE');
+
     expect(rows).toHaveLength(1);
     expect(rows[0].details).toEqual({
       reason: 'session_absolute_lifetime_exceeded'
@@ -199,11 +221,13 @@ describe('refresh-token failure parity', () => {
 
   it('ends the whole session at the cap, so a replay is not read as reuse', async () => {
     const session = await signIn();
+
     await ageSession(session.userId, DEFAULT_SESSION_ABSOLUTE_MAX_MS);
 
     expect((await refresh(session)).status).toBe(401);
 
     const replay = await refresh(session);
+
     expect(replay.status).toBe(401);
     expect(await readErrorBody(replay)).toEqual({
       message: 'Invalid refresh token',
@@ -219,6 +243,7 @@ describe('refresh-token failure parity', () => {
 
     await ageSession(session.userId, half);
     const rotated = await refresh(session);
+
     expect(rotated.status).toBe(200);
 
     const next: Session = {
@@ -230,6 +255,7 @@ describe('refresh-token failure parity', () => {
     // the original start. A re-stamped start would answer 200 here.
     await ageSession(session.userId, half);
     const res = await refresh(next);
+
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.SESSION_EXPIRED
@@ -240,14 +266,17 @@ describe('refresh-token failure parity', () => {
     const session = await signIn();
 
     const rotated = await refresh(session);
+
     expect(rotated.status).toBe(200);
     const next: Session = {
       userId: session.userId,
       refreshCookie: refreshCookieOf(rotated)
     };
+
     expect((await refresh(next)).status).toBe(200);
 
     const replay = await refresh(session);
+
     expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(1);
     expect(replay.status).toBe(401);
     // Named, so that no other cookie on the response can satisfy it.
@@ -259,6 +288,7 @@ describe('refresh-token failure parity', () => {
   describe('lost rotation response', () => {
     function shiftLastActive(ms: number): void {
       const lastActive = getState().sessionLastActive;
+
       for (const [sid, at] of lastActive.entries())
         lastActive.set(sid, at - ms);
     }
@@ -270,6 +300,7 @@ describe('refresh-token failure parity', () => {
       expect((await refresh(phone)).status).toBe(200);
 
       const replay = await refresh(phone);
+
       expect(replay.status).toBe(401);
       expect(await readErrorBody(replay)).toEqual({
         message: 'Invalid refresh token',
@@ -278,6 +309,7 @@ describe('refresh-token failure parity', () => {
       });
       expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
       const rows = auditRows('TOKEN_REFRESH_FAILURE');
+
       expect(rows).toHaveLength(1);
       expect(rows[0].details).toEqual({
         reason: 'lost_response_replay',
@@ -304,11 +336,13 @@ describe('refresh-token failure parity', () => {
       expect((await refresh(phone)).status).toBe(401);
       expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
       const [{ details }] = auditRows('TOKEN_REFRESH_FAILURE');
+
       expect(details).toMatchObject({
         reason: 'lost_response_replay',
         sameIp: true
       });
       const dayMs = 24 * 60 * 60 * 1000;
+
       expect(details?.['replayAgeMs']).toBeGreaterThanOrEqual(dayMs);
       expect(details?.['replayAgeMs']).toBeLessThan(dayMs + 60_000);
       expect((await refresh(desktop)).status).toBe(200);
@@ -316,14 +350,17 @@ describe('refresh-token failure parity', () => {
 
     it('ends only the evicted session when its replay comes after the session limit', async () => {
       const phone = await signIn();
+
       expect((await refresh(phone)).status).toBe(200);
 
       const others: Session[] = [];
+
       for (let i = 0; i < MAX_CONCURRENT_SESSIONS; i++) {
         others.push(await signIn());
       }
 
       const replay = await refresh(phone);
+
       expect(replay.status).toBe(401);
       expect(await readErrorBody(replay)).toEqual({
         message: 'Invalid refresh token',
@@ -331,6 +368,7 @@ describe('refresh-token failure parity', () => {
         errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
       });
       expect(auditRows('TOKEN_REUSE_DETECTED')).toHaveLength(0);
+
       for (const other of others) {
         expect((await refresh(other)).status).toBe(200);
       }
@@ -341,11 +379,13 @@ describe('refresh-token failure parity', () => {
       const desktop = await signIn();
 
       const rotated = await refresh(phone);
+
       expect(rotated.status).toBe(200);
       const next: Session = {
         userId: phone.userId,
         refreshCookie: refreshCookieOf(rotated)
       };
+
       expect((await refresh(next)).status).toBe(200);
       const sessionId = getState().refreshSessions.get(
         phone.refreshCookie.replace('refresh_token=', '')
@@ -353,6 +393,7 @@ describe('refresh-token failure parity', () => {
 
       expect((await refresh(phone)).status).toBe(401);
       const reuse = auditRows('TOKEN_REUSE_DETECTED');
+
       expect(reuse).toHaveLength(1);
       expect(sessionId).toBeDefined();
       expect(reuse[0].details).toEqual({ sessionId });

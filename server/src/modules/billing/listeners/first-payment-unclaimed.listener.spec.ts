@@ -18,6 +18,7 @@ describe('FirstPaymentUnclaimedListener', () => {
         { provide: BillingAdminService, useValue: { refundInvoice } }
       ]
     }).compile();
+
     listener = module.get(FirstPaymentUnclaimedListener);
   });
 

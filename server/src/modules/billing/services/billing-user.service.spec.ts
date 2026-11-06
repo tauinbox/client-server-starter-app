@@ -43,6 +43,7 @@ async function build() {
   const subscriptions = repo();
   // The cancel write runs in a transaction on the manager of the repository.
   const cancelManager = { withRepository: () => subscriptions };
+
   Object.assign(subscriptions, {
     manager: {
       transaction: (cb: (m: typeof cancelManager) => unknown) =>
@@ -168,7 +169,9 @@ describe('BillingUserService', () => {
         ctx.products.findOne.mockResolvedValue(product);
         ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
         const yoo = provider('yookassa', false);
+
         ctx.billing.resolveProvider.mockResolvedValue(yoo);
+
         return { ctx, yoo };
       });
     }
@@ -202,6 +205,7 @@ describe('BillingUserService', () => {
 
     it('returns a null url when the provider completes client-side (Paddle.js)', async () => {
       const { ctx, yoo } = await setupPurchase(makeProduct());
+
       yoo.createOneTimePayment.mockResolvedValue({ sessionRef: 'txn-1' });
 
       const result = await ctx.service.purchase('user-1', {
@@ -217,6 +221,7 @@ describe('BillingUserService', () => {
 
     it('rejects an unknown product with 404', async () => {
       const ctx = await build();
+
       ctx.products.findOne.mockResolvedValue(null);
 
       await expectRefusal(
@@ -264,7 +269,9 @@ describe('BillingUserService', () => {
           ctx.products.findOne.mockResolvedValue(product);
           ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
           const paddle = provider('paddle', true);
+
           ctx.billing.resolveProvider.mockResolvedValue(paddle);
+
           return { ctx, paddle };
         });
       }
@@ -409,6 +416,7 @@ describe('BillingUserService', () => {
   describe('listProducts', () => {
     it('lists active products carrying a price entry for the effective provider, including custom bounds', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
       const priced = makeProduct();
       const donation = makeDonation();
@@ -417,6 +425,7 @@ describe('BillingUserService', () => {
         key: 'paddle-only',
         prices: { paddle: { currency: 'USD', amountMinor: 500 } }
       });
+
       ctx.products.find.mockResolvedValue([priced, donation, unpriced]);
 
       const result = await ctx.service.listProducts('user-1');
@@ -430,10 +439,12 @@ describe('BillingUserService', () => {
 
     it('falls back to the geo-default provider for a user without a customer', async () => {
       const ctx = await build();
+
       ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'en-US' });
       const usdProduct = makeProduct({
         prices: { paddle: { currency: 'USD', amountMinor: 500 } }
       });
+
       ctx.products.find.mockResolvedValue([usdProduct]);
 
       const result = await ctx.service.listProducts('user-1');
@@ -446,6 +457,7 @@ describe('BillingUserService', () => {
   describe('getCredits', () => {
     it('returns null for a user with no billing customer', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(null);
 
       await expect(ctx.service.getCredits('user-1')).resolves.toBeNull();
@@ -454,12 +466,14 @@ describe('BillingUserService', () => {
 
     it("returns the customer's balance", async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
       const balance = {
         customerId: RU_CUSTOMER.id,
         balanceUnits: 1240,
         updatedAt: new Date()
       };
+
       ctx.credits.getBalance.mockResolvedValue(balance);
 
       await expect(ctx.service.getCredits('user-1')).resolves.toBe(balance);
@@ -470,6 +484,7 @@ describe('BillingUserService', () => {
   describe('checkout', () => {
     it('creates a local incomplete subscription for a self-managed provider', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.save.mockResolvedValue({
         id: 'cust-1',
@@ -479,6 +494,7 @@ describe('BillingUserService', () => {
       });
       ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'ru' });
       const yoo = provider('yookassa', false);
+
       ctx.billing.resolveProvider.mockResolvedValue(yoo);
 
       const result = await ctx.service.checkout('user-1', 'pro');
@@ -501,6 +517,7 @@ describe('BillingUserService', () => {
 
     it('does not create a local subscription for a provider-managed provider', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -517,6 +534,7 @@ describe('BillingUserService', () => {
 
     it('returns to the client checkout-return routes (/billing/success|cancel)', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -525,6 +543,7 @@ describe('BillingUserService', () => {
         providerOverride: null
       });
       const paddle = provider('paddle', true);
+
       ctx.billing.resolveProvider.mockResolvedValue(paddle);
 
       await ctx.service.checkout('user-1', 'pro');
@@ -544,6 +563,7 @@ describe('BillingUserService', () => {
 
     it('gives a trial when the plan has one and the customer never used one', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan({ trialDays: 14 }));
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -553,6 +573,7 @@ describe('BillingUserService', () => {
         trialUsedAt: null
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.resolveProvider.mockResolvedValue(yoo);
 
       await ctx.service.checkout('user-1', 'pro');
@@ -569,6 +590,7 @@ describe('BillingUserService', () => {
 
     it('gives no second trial to a customer who used one', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan({ trialDays: 14 }));
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -578,6 +600,7 @@ describe('BillingUserService', () => {
         trialUsedAt: new Date('2026-09-01T00:00:00Z')
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.resolveProvider.mockResolvedValue(yoo);
 
       await ctx.service.checkout('user-1', 'pro');
@@ -594,6 +617,7 @@ describe('BillingUserService', () => {
 
     it('rejects checkout when the plan is unknown', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(null);
 
       await expectRefusal(
@@ -604,6 +628,7 @@ describe('BillingUserService', () => {
 
     it('rejects checkout when an active subscription already exists', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -622,6 +647,7 @@ describe('BillingUserService', () => {
 
     it('reuses an existing incomplete row on a repeat self-managed checkout', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -649,6 +675,7 @@ describe('BillingUserService', () => {
 
     it('returns 409 without rewriting the row when the incomplete row was activated mid-checkout', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -675,6 +702,7 @@ describe('BillingUserService', () => {
 
     it('returns 409 when a concurrent checkout wins the insert race', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -696,6 +724,7 @@ describe('BillingUserService', () => {
 
     it('releases a stale self incomplete row when the provider is provider-managed', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -719,6 +748,7 @@ describe('BillingUserService', () => {
 
     it('returns 409 rather than canceling a self row that was activated mid-checkout', async () => {
       const ctx = await build();
+
       ctx.plans.findOne.mockResolvedValue(makePlan());
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
@@ -727,6 +757,7 @@ describe('BillingUserService', () => {
         providerOverride: null
       });
       const paddle = provider('paddle', true);
+
       ctx.billing.resolveProvider.mockResolvedValue(paddle);
       ctx.subscriptions.findOne
         .mockResolvedValueOnce(null)
@@ -744,6 +775,7 @@ describe('BillingUserService', () => {
   describe('cancelSubscription', () => {
     it('flags cancel-at-period-end by default and asks the provider to cancel', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       const sub = {
         id: 'sub-1',
@@ -752,8 +784,10 @@ describe('BillingUserService', () => {
         status: 'active',
         cancelAtPeriodEnd: false
       };
+
       ctx.subscriptions.findOne.mockResolvedValue(sub);
       const paddle = provider('paddle', true);
+
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
       const result = await ctx.service.cancelSubscription('user-1');
@@ -777,6 +811,7 @@ describe('BillingUserService', () => {
 
     it('cancels immediately and emits SubscriptionCanceled', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
@@ -810,6 +845,7 @@ describe('BillingUserService', () => {
       'ends the credit holds of the subscription on a %s cancel: %s',
       async (mode, released) => {
         const ctx = await build();
+
         ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
         ctx.subscriptions.findOne.mockResolvedValue({
           id: 'sub-1',
@@ -830,6 +866,7 @@ describe('BillingUserService', () => {
 
     it('bills the closing metered period before an immediate cancel', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       const sub = {
         id: 'sub-1',
@@ -838,6 +875,7 @@ describe('BillingUserService', () => {
         status: 'active',
         cancelAtPeriodEnd: false
       };
+
       ctx.subscriptions.findOne.mockResolvedValue(sub);
 
       await ctx.service.cancelSubscription('user-1', 'immediate');
@@ -851,6 +889,7 @@ describe('BillingUserService', () => {
 
     it('leaves a period-end cancel to the renewal scan at the boundary', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
@@ -867,6 +906,7 @@ describe('BillingUserService', () => {
 
     it('answers 409 and emits nothing when a concurrent writer cancelled first', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
@@ -886,6 +926,7 @@ describe('BillingUserService', () => {
 
     it('throws when there is no subscription to cancel', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue(null);
 
@@ -901,6 +942,7 @@ describe('BillingUserService', () => {
       const ctx = await build();
       // A locale currency unlike the RUB price: the re-bind takes the price's.
       const customer = { id: 'cust-1', userId: 'user-1', currency: 'USD' };
+
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
@@ -911,6 +953,7 @@ describe('BillingUserService', () => {
       });
       ctx.plans.findOne.mockResolvedValue(makePlan());
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const result = await ctx.service.startPaymentMethodUpdate('user-1');
@@ -935,6 +978,7 @@ describe('BillingUserService', () => {
 
     it('passes the provider subscription reference for a provider-managed subscription', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1'
@@ -950,6 +994,7 @@ describe('BillingUserService', () => {
         makePlan({ prices: { paddle: { currency: 'USD', amountMinor: 1200 } } })
       );
       const paddle = provider('paddle', true);
+
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
       await ctx.service.startPaymentMethodUpdate('user-1');
@@ -963,6 +1008,7 @@ describe('BillingUserService', () => {
 
     it('refuses the re-bind when the plan of the subscription has no price for its provider', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1'
@@ -976,6 +1022,7 @@ describe('BillingUserService', () => {
       });
       ctx.plans.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await expectRefusal(
@@ -987,6 +1034,7 @@ describe('BillingUserService', () => {
 
     it('throws when there is no subscription to update the method for', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue(null);
 
@@ -998,6 +1046,7 @@ describe('BillingUserService', () => {
 
     it('rejects a provider-managed subscription not yet linked to the provider', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
@@ -1006,6 +1055,7 @@ describe('BillingUserService', () => {
         status: 'active'
       });
       const paddle = provider('paddle', true);
+
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
       await expectRefusal(
@@ -1017,6 +1067,7 @@ describe('BillingUserService', () => {
 
     it('throws when the subscription provider is not registered', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue({
         id: 'sub-1',
@@ -1038,10 +1089,12 @@ describe('BillingUserService', () => {
   describe('reads scope to the caller', () => {
     it('returns null subscription and an empty page when the user has no customer', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(null);
 
       expect(await ctx.service.getCurrentSubscription('user-1')).toBeNull();
       const invoices = await ctx.service.listInvoices('user-1', cursorQuery());
+
       expect(invoices.data).toEqual([]);
       expect(invoices.meta).toEqual({
         nextCursor: null,
@@ -1055,6 +1108,7 @@ describe('BillingUserService', () => {
 
     it('scopes the invoice page to the resolved customer id', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
 
       await ctx.service.listInvoices('user-1', cursorQuery());
@@ -1074,6 +1128,7 @@ describe('BillingUserService', () => {
 
     it('mints a cursor only while another page exists', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
       ctx.invoices.qb.getMany.mockResolvedValue([
         { id: 'inv-1', createdAt: new Date('2026-06-02T00:00:00Z') },
@@ -1096,12 +1151,14 @@ describe('BillingUserService', () => {
         'user-1',
         cursorQuery({ limit: 1 })
       );
+
       expect(last.meta.hasMore).toBe(false);
       expect(last.meta.nextCursor).toBeNull();
     });
 
     it('carries the caller scope into the cursor page too', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-9' });
       const cursor = encodeCursor({
         sortValue: '2026-06-01T00:00:00.000Z',
@@ -1137,6 +1194,7 @@ describe('BillingUserService', () => {
 
     it('returns null without a customer, subscription, or usage mode', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(null);
       expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
 
@@ -1154,6 +1212,7 @@ describe('BillingUserService', () => {
 
     it('returns null instead of a 500 when the plan row is gone', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue(usageSub);
       ctx.plans.findOne.mockResolvedValue(null);
@@ -1163,6 +1222,7 @@ describe('BillingUserService', () => {
 
     it('rates the current period of the caller’s usage subscription', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue(usageSub);
       const plan = makePlan({
@@ -1170,6 +1230,7 @@ describe('BillingUserService', () => {
         billingMode: 'usage',
         meterKey: 'api_calls'
       });
+
       ctx.plans.findOne.mockResolvedValue(plan);
       ctx.usageRating.summarizeForPeriod.mockResolvedValue({
         totalUnits: 142,
@@ -1212,9 +1273,11 @@ describe('BillingUserService', () => {
       const ctx = await build();
       const switchedAt = new Date('2026-06-11T00:00:00Z');
       const sub = { ...usageSub, meteredFrom: switchedAt };
+
       ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
       ctx.subscriptions.findOne.mockResolvedValue(sub);
       const plan = makePlan({ key: 'usage', billingMode: 'usage' });
+
       ctx.plans.findOne.mockResolvedValue(plan);
       ctx.usageRating.summarizeForPeriod.mockResolvedValue({
         totalUnits: 0,
@@ -1240,6 +1303,7 @@ describe('BillingUserService', () => {
   describe('region', () => {
     it('reports the geo default derived from locale when no customer exists', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(null);
       ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'ru' });
 
@@ -1255,6 +1319,7 @@ describe('BillingUserService', () => {
 
     it('lists only the providers that a checkout can use now', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1',
@@ -1278,6 +1343,7 @@ describe('BillingUserService', () => {
         country: 'US',
         providerOverride: null
       };
+
       ctx.customers.findOne
         .mockResolvedValueOnce(stored)
         .mockResolvedValueOnce({ ...stored, providerOverride: 'yookassa' });
@@ -1297,6 +1363,7 @@ describe('BillingUserService', () => {
 
     it('rejects a region change that would orphan a live subscription on another provider', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1',
@@ -1318,6 +1385,7 @@ describe('BillingUserService', () => {
 
     it('releases an unpaid self-managed checkout on another provider and changes the region', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1',
@@ -1345,6 +1413,7 @@ describe('BillingUserService', () => {
 
     it('rejects a region change when the unpaid checkout was paid before the release', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1',
@@ -1368,6 +1437,7 @@ describe('BillingUserService', () => {
 
     it('keeps blocking a provider-owned incomplete subscription', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1',
@@ -1391,6 +1461,7 @@ describe('BillingUserService', () => {
 
     it('rejects a region whose provider is unavailable before the subscription guard', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1',
@@ -1415,6 +1486,7 @@ describe('BillingUserService', () => {
 
     it('checks the geo default provider when the region is auto', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue({
         id: 'cust-1',
         userId: 'user-1',
@@ -1442,6 +1514,7 @@ describe('BillingUserService', () => {
         country: 'RU',
         providerOverride: null
       };
+
       // First lookup: no customer yet -> proceed to insert. Insert hits the
       // unique constraint on user_id, so the post-violation lookup returns
       // the concurrent winner.
@@ -1470,6 +1543,7 @@ describe('BillingUserService', () => {
         country: 'RU',
         providerOverride: null
       };
+
       ctx.customers.findOne
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(winner);
@@ -1486,6 +1560,7 @@ describe('BillingUserService', () => {
 
     it('answers 404 when the user of the first billing action is gone', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(null);
       ctx.users.findOne.mockResolvedValue(null);
 
@@ -1498,6 +1573,7 @@ describe('BillingUserService', () => {
 
     it('rethrows non-unique-violation errors from customer creation', async () => {
       const ctx = await build();
+
       ctx.customers.findOne.mockResolvedValue(null);
       ctx.users.findOne.mockResolvedValue({ id: 'user-1', locale: 'ru' });
       ctx.customers.save.mockRejectedValue(new Error('connection lost'));

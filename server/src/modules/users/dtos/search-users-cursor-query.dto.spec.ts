@@ -30,6 +30,7 @@ describe('SearchUsersCursorQueryDto filters', () => {
     const response = (error as BadRequestException).getResponse() as {
       message: string[];
     };
+
     return response.message.join(' ');
   }
 

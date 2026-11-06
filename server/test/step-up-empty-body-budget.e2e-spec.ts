@@ -50,6 +50,7 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -67,7 +68,9 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
         .send({ email, password: 'Lantern-Orchard-47', name: 'Step Up' })
         .expect(201);
     }
+
     const users = dataSource.getRepository(User);
+
     actorId = (await users.findOneByOrFail({ email: actorEmail })).id;
     targetId = (await users.findOneByOrFail({ email: targetEmail })).id;
 
@@ -76,6 +79,7 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await app
       .get(RoleService)
       .assignRoleToUser(actorId, superRole.id, { ability: SYSTEM_ABILITY });
@@ -99,6 +103,7 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
   afterAll(async () => {
     if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
     else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+
     await dataSource
       ?.getRepository(User)
       .delete([{ email: actorEmail }, { email: targetEmail }]);
@@ -115,6 +120,7 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
       userAgent: 'step-up-budget-e2e',
       ipAddress: null
     });
+
     return tokens.access_token;
   }
 
@@ -143,6 +149,7 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
           [method](path())
           .auth(bearer, { type: 'bearer' })
           .send({});
+
         answers.push([
           res.status,
           (res.body as { errorKey?: string }).errorKey

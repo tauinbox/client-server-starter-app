@@ -21,7 +21,9 @@ import type {
  */
 export function notifyEntitlementsChanged(customerId: string): void {
   const userId = getState().billingCustomers.get(customerId)?.userId;
+
   if (!userId) return;
+
   pushToUser(userId, { type: 'entitlements_updated' });
 }
 
@@ -49,6 +51,7 @@ export function activateSubscription(
   let customer = state.billingCustomers
     .values()
     .find((c) => c.userId === user.id);
+
   if (!customer) {
     customer = {
       id: randomUUID(),
@@ -64,6 +67,7 @@ export function activateSubscription(
     } satisfies MockCustomer;
     state.billingCustomers.set(customer.id, customer);
   }
+
   const paidWith = provider ?? customer.provider;
 
   // Default payment method (created once).
@@ -79,6 +83,7 @@ export function activateSubscription(
       createdAt: nowIso,
       updatedAt: nowIso
     };
+
     state.billingPaymentMethods.set(method.id, method);
     customer.defaultPaymentMethodId = method.id;
   }
@@ -106,17 +111,21 @@ export function activateSubscription(
     createdAt: nowIso,
     updatedAt: nowIso
   };
+
   subscription.planKey = plan.key;
   subscription.billingMode = plan.billingMode;
   subscription.status = status;
   subscription.paymentMethodId = customer.defaultPaymentMethodId;
   subscription.currentPeriodEnd = periodEnd.toISOString();
+
   // The seeded boundary is re-derived from now, so the billing day is too.
   if (subscription.lifecycleOwner === 'self') {
     subscription.billingAnchorAt = nowIso;
   }
+
   subscription.updatedAt = nowIso;
   state.billingSubscriptions.set(subscription.id, subscription);
+
   if (status === 'trialing') {
     customer.trialUsedAt ??= nowIso;
   }
@@ -144,9 +153,11 @@ export function activateSubscription(
     createdAt: nowIso,
     updatedAt: nowIso
   };
+
   state.billingInvoices.set(invoice.id, invoice);
 
   notifyEntitlementsChanged(customerId);
+
   return subscription;
 }
 
@@ -166,13 +177,16 @@ export function settleSelfManagedCheckout(
   const open = state.billingSubscriptions
     .values()
     .find((s) => s.customerId === customerId && s.status !== 'canceled');
+
   if (open?.status === 'incomplete' && open.planKey === plan.key) {
     const trialing =
       open.trialEnd !== null && Date.parse(open.trialEnd) > Date.now();
+
     activateSubscription(user, plan, {
       status: trialing ? 'trialing' : 'active',
       provider: 'yookassa'
     });
+
     return;
   }
 
@@ -199,6 +213,7 @@ export function settleSelfManagedCheckout(
     createdAt: nowIso,
     updatedAt: nowIso
   };
+
   state.billingInvoices.set(invoice.id, invoice);
 }
 
@@ -231,9 +246,11 @@ export function settlePurchase(session: MockPurchaseSession): MockInvoice {
     createdAt: nowIso,
     updatedAt: nowIso
   };
+
   state.billingInvoices.set(invoice.id, invoice);
 
   const product = state.billingProducts.get(session.productId);
+
   if (product?.type === 'sku' && product.grant?.entitlement) {
     const grant: MockCustomerGrant = {
       id: randomUUID(),
@@ -248,11 +265,13 @@ export function settlePurchase(session: MockPurchaseSession): MockInvoice {
       revokedAt: null,
       createdAt: nowIso
     };
+
     state.billingCustomerGrants.set(grant.id, grant);
   }
 
   if (product?.type === 'credits' && product.grant?.credits) {
     const balance = state.billingCreditBalances.get(session.customerId);
+
     if (balance) {
       balance.balanceUnits += product.grant.credits;
       balance.updatedAt = nowIso;
@@ -267,5 +286,6 @@ export function settlePurchase(session: MockPurchaseSession): MockInvoice {
 
   state.billingPurchaseSessions.delete(session.sessionRef);
   notifyEntitlementsChanged(session.customerId);
+
   return invoice;
 }

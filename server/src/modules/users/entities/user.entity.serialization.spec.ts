@@ -52,16 +52,19 @@ describe('User entity serialization', () => {
   describe('public form (AuthController — no groups)', () => {
     it('hides failedLoginAttempts (always @Exclude()d)', () => {
       const plain = instanceToPlain(createUser());
+
       expect(plain).not.toHaveProperty('failedLoginAttempts');
     });
 
     it('hides lockedUntil (gated by privileged group)', () => {
       const plain = instanceToPlain(createUser());
+
       expect(plain).not.toHaveProperty('lockedUntil');
     });
 
     it('hides password and other @Exclude()d secrets', () => {
       const plain = instanceToPlain(createUser());
+
       expect(plain).not.toHaveProperty('password');
       expect(plain).not.toHaveProperty('emailVerificationToken');
       expect(plain).not.toHaveProperty('emailVerificationExpiresAt');
@@ -81,6 +84,7 @@ describe('User entity serialization', () => {
 
     it('hides Role.isSystem and Role.isSuper on nested roles', () => {
       const plain = instanceToPlain(createUser()) as { roles: object[] };
+
       expect(plain.roles).toHaveLength(1);
       expect(plain.roles[0]).not.toHaveProperty('isSystem');
       expect(plain.roles[0]).not.toHaveProperty('isSuper');
@@ -90,6 +94,7 @@ describe('User entity serialization', () => {
       const plain = instanceToPlain(createUser()) as {
         roles: { id: string; name: string; description: string | null }[];
       };
+
       expect(plain.roles[0]).toMatchObject({
         id: 'role-1',
         name: 'admin',
@@ -103,11 +108,13 @@ describe('User entity serialization', () => {
 
     it('exposes lockedUntil', () => {
       const plain = instanceToPlain(createUser(), opts);
+
       expect(plain).toHaveProperty('lockedUntil');
     });
 
     it('still hides failedLoginAttempts (always @Exclude()d)', () => {
       const plain = instanceToPlain(createUser(), opts);
+
       expect(plain).not.toHaveProperty('failedLoginAttempts');
     });
 
@@ -115,6 +122,7 @@ describe('User entity serialization', () => {
       const plain = instanceToPlain(createUser(), opts) as {
         roles: { isSystem: boolean; isSuper: boolean }[];
       };
+
       expect(plain.roles[0].isSystem).toBe(true);
       expect(plain.roles[0].isSuper).toBe(true);
     });

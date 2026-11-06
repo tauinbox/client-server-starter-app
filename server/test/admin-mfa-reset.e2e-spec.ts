@@ -50,6 +50,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -72,11 +73,14 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const updateUser = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'update' && p.resource.subject === 'User'
     );
+
     if (!updateUser) throw new Error('Permission update:User missing');
+
     const support = await roleService.create(
       { name: supportRoleName },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       support.id,
       [{ permissionId: updateUser.id, conditions: null }],
@@ -89,6 +93,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await roleService.assignRoleToUser(await userId(superEmail), superRole.id, {
       ability: SYSTEM_ABILITY
     });
@@ -116,6 +121,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return found.id;
   }
 
@@ -130,18 +136,21 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
       userAgent: 'mfa-reset-e2e',
       ipAddress: null
     });
+
     return tokens.access_token;
   }
 
   // The reset never reads the secret, so a stored enrolment is enough.
   async function enrol(email: string): Promise<string> {
     const id = await userId(email);
+
     await dataSource.getRepository(User).update(id, {
       totpSecret: 'v1.not.a.real.secret',
       totpEnabledAt: new Date(),
       totpRecoveryCodes: ['spent-hash'],
       totpLastUsedStep: 1
     });
+
     return id;
   }
 
@@ -166,6 +175,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const id = await enrol(ownerEmail);
 
     const refused = await reset(await tokenFor(supportEmail), id, {});
+
     expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
@@ -181,6 +191,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
         order: { createdAt: 'DESC' }
       })
     );
+
     expect(failure?.details).toMatchObject({
       operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE
     });
@@ -192,6 +203,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const refused = await reset(await tokenFor(supportEmail), id, {
       currentPassword: password
     });
+
     expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.USERS.MFA_RESET_SELF
@@ -212,12 +224,14 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const refused = await reset(await tokenFor(supportEmail), id, {
       currentPassword: password
     });
+
     expect(refused.status).toBe(403);
     expect((await row(id)).totpEnabledAt).not.toBeNull();
   }, 30000);
 
   it('clears the factor, ends the sessions of the target, audits and lets the owner in with the password alone', async () => {
     const id = await enrol(ownerEmail);
+
     await tokenFor(ownerEmail);
     expect(
       await dataSource
@@ -228,10 +242,12 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const res = await reset(await tokenFor(supportEmail), id, {
       currentPassword: password
     });
+
     expect(res.status).toBe(200);
     expect((res.body as { mfaEnabled: boolean }).mfaEnabled).toBe(false);
 
     const after = await row(id);
+
     expect(after.totpSecret).toBeNull();
     expect(after.totpEnabledAt).toBeNull();
     expect(after.totpRecoveryCodes).toBeNull();
@@ -246,6 +262,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const audit = await dataSource.getRepository(AuditLog).findOne({
       where: { action: AuditAction.MFA_RESET_BY_ADMIN, targetId: id }
     });
+
     expect(audit?.actorEmail).toBe(supportEmail);
 
     // Registration leaves the address unverified, and that gate answers first.
@@ -253,6 +270,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const login = await request(http())
       .post('/api/v1/auth/login')
       .send({ email: ownerEmail, password });
+
     expect(login.status).toBe(200);
     expect(login.body).not.toHaveProperty('mfaRequired');
   }, 30000);
@@ -264,6 +282,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     const refused = await reset(await tokenFor(supportEmail), id, {
       currentPassword: 'Wrong-Password-00'
     });
+
     expect(refused.status).toBe(409);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.MFA_NOT_ENABLED

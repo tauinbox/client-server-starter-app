@@ -10,7 +10,9 @@ describe('requiresSecureCookies', () => {
   // without Secure.
   it('is true for every other accepted environment', () => {
     const others = APP_ENVIRONMENTS.filter((name) => name !== 'local');
+
     expect(others).toEqual(['development', 'staging', 'production']);
+
     for (const name of others) {
       expect(requiresSecureCookies(name)).toBe(true);
     }

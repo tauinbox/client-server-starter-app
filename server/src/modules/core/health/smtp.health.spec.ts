@@ -112,6 +112,7 @@ describe('SmtpHealthIndicator', () => {
       mockMailService.verifySmtp.mockReturnValue(new Promise<void>(() => {}));
 
       const probe = indicator.isHealthy('smtp');
+
       await jest.advanceTimersByTimeAsync(3000);
 
       await expect(probe).resolves.toEqual({
@@ -133,6 +134,7 @@ describe('SmtpHealthIndicator', () => {
       );
 
       const probe = indicator.isHealthy('smtp');
+
       await jest.advanceTimersByTimeAsync(2999);
 
       await expect(probe).resolves.toEqual({ smtp: { status: 'up' } });
@@ -163,6 +165,7 @@ describe('SmtpHealthIndicator', () => {
       );
 
       const first = await indicator.isHealthy('smtp');
+
       jest.advanceTimersByTime(HEALTHCHECK_INTERVAL_MS);
       const second = await indicator.isHealthy('smtp');
 
@@ -179,6 +182,7 @@ describe('SmtpHealthIndicator', () => {
       mockMailService.verifySmtp.mockRejectedValueOnce(new Error('EAUTH'));
 
       const failed = await indicator.isHealthy('smtp');
+
       jest.advanceTimersByTime(TTL_MS);
       const recovered = await indicator.isHealthy('smtp');
 
@@ -193,6 +197,7 @@ describe('SmtpHealthIndicator', () => {
     it('should issue a single verify for concurrent probes', async () => {
       const { promise: verify, resolve: releaseVerify } =
         Promise.withResolvers<void>();
+
       mockMailService.verifySmtp.mockReturnValue(verify);
 
       const probes = Promise.all([
@@ -201,6 +206,7 @@ describe('SmtpHealthIndicator', () => {
         indicator.isHealthy('smtp'),
         indicator.isHealthy('smtp')
       ]);
+
       releaseVerify();
       const results = await probes;
 

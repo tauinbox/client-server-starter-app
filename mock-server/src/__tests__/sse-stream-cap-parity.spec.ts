@@ -29,14 +29,18 @@ async function signIn(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'user@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
 async function requestStream(token: string): Promise<Response> {
   const controller = new AbortController();
+
   controllers.push(controller);
+
   return fetch(`${baseUrl}/api/v1/notifications/stream`, {
     headers: { authorization: `Bearer ${token}` },
     signal: controller.signal
@@ -56,6 +60,7 @@ describe('the open SSE streams of one user are limited', () => {
     }
 
     const refused = await requestStream(token);
+
     expect(refused.status).toBe(429);
     expect(await refused.json()).toMatchObject({
       statusCode: 429,
@@ -64,10 +69,13 @@ describe('the open SSE streams of one user are limited', () => {
     });
 
     controllers[0].abort();
+
     for (let i = 0; i < 50; i++) {
       if (countSseConnections(userId) < MAX_SSE_STREAMS_PER_USER) break;
+
       await wait(20);
     }
+
     expect((await requestStream(token)).status).toBe(200);
   });
 });

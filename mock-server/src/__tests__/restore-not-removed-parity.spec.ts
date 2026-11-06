@@ -34,8 +34,10 @@ async function adminToken(): Promise<string> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -47,6 +49,7 @@ async function restore(
     headers: { authorization: `Bearer ${await adminToken()}` }
   });
   const body = (await res.json()) as { errorKey?: string };
+
   return { status: res.status, errorKey: body.errorKey };
 }
 
@@ -59,7 +62,9 @@ const regularUser = () => {
   const user = getState()
     .users.values()
     .find((u) => u.email === 'user@example.com');
+
   if (!user) throw new Error('Seed user user@example.com');
+
   return user;
 };
 
@@ -84,6 +89,7 @@ describe('restore of a record that is not removed', () => {
 
   it('restores a deleted user once, then refuses the second restore', async () => {
     const user = regularUser();
+
     user.deletedAt = '2025-01-01T00:00:00.000Z';
 
     expect((await restore(`users/${user.id}`)).status).toBe(200);

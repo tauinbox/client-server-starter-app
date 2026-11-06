@@ -45,6 +45,7 @@ describe('evaluateFeatureFlag — short-circuits', () => {
 
   it('returns false when environments is non-empty and env does not match', () => {
     const flag = baseFlag({ environments: ['production', 'staging'] });
+
     expect(evaluateFeatureFlag(flag, [], baseCtx({ env: 'development' }))).toBe(
       false
     );
@@ -52,6 +53,7 @@ describe('evaluateFeatureFlag — short-circuits', () => {
 
   it('returns true when environments is non-empty and env matches', () => {
     const flag = baseFlag({ environments: ['production'] });
+
     expect(evaluateFeatureFlag(flag, [], baseCtx({ env: 'production' }))).toBe(
       true
     );
@@ -67,6 +69,7 @@ describe('evaluateFeatureFlag — rule types', () => {
     const rules = [
       rule('include', { type: 'user', userIds: ['alice', 'bob'] })
     ];
+
     expect(
       evaluateFeatureFlag(baseFlag(), rules, baseCtx({ userId: 'alice' }))
     ).toBe(true);
@@ -77,6 +80,7 @@ describe('evaluateFeatureFlag — rule types', () => {
 
   it('user rule does not match for guest (userId null)', () => {
     const rules = [rule('include', { type: 'user', userIds: ['alice'] })];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -90,6 +94,7 @@ describe('evaluateFeatureFlag — rule types', () => {
     const rules = [
       rule('include', { type: 'role', roleNames: ['admin', 'editor'] })
     ];
+
     expect(
       evaluateFeatureFlag(baseFlag(), rules, baseCtx({ roles: ['editor'] }))
     ).toBe(true);
@@ -105,12 +110,14 @@ describe('evaluateFeatureFlag — rule types', () => {
     const all = [rule('include', { type: 'percentage', percent: 100 })];
     const none = [rule('include', { type: 'percentage', percent: 0 })];
     const ctx = baseCtx({ userId: 'x' });
+
     expect(evaluateFeatureFlag(baseFlag(), all, ctx)).toBe(true);
     expect(evaluateFeatureFlag(baseFlag(), none, ctx)).toBe(false);
   });
 
   it('percentage rule uses anonId when userId is null', () => {
     const rules = [rule('include', { type: 'percentage', percent: 100 })];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -122,6 +129,7 @@ describe('evaluateFeatureFlag — rule types', () => {
 
   it('percentage rule does not match when both ids are null', () => {
     const rules = [rule('include', { type: 'percentage', percent: 100 })];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -151,6 +159,7 @@ describe('evaluateFeatureFlag — rule types', () => {
 
     it('device keys on anonId and ignores userId', () => {
       const ctx = baseCtx({ userId: idOut, anonId: idIn });
+
       expect(evaluateFeatureFlag(baseFlag(), half('device'), ctx)).toBe(true);
     });
 
@@ -162,6 +171,7 @@ describe('evaluateFeatureFlag — rule types', () => {
           bucketBy: 'device'
         })
       ];
+
       expect(
         evaluateFeatureFlag(baseFlag(), all, baseCtx({ anonId: null }))
       ).toBe(false);
@@ -169,6 +179,7 @@ describe('evaluateFeatureFlag — rule types', () => {
 
     it('user keys on userId before anonId', () => {
       const ctx = baseCtx({ userId: idOut, anonId: idIn });
+
       expect(evaluateFeatureFlag(baseFlag(), half('user'), ctx)).toBe(false);
     });
 
@@ -194,6 +205,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         value: 'a@b.com'
       })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -219,6 +231,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         value: ['example.com', 'acme.org']
       })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -244,6 +257,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         value: 'example.com'
       })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -262,6 +276,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         value: '@acme.org'
       })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -294,6 +309,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         value: '2025-01-01T00:00:00Z'
       })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -317,6 +333,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         value: Date.parse('2025-01-01T00:00:00Z')
       })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -350,6 +367,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         customKey: 'tier'
       })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -375,6 +393,7 @@ describe('evaluateFeatureFlag — rule types', () => {
         value: 'x'
       })
     ];
+
     expect(evaluateFeatureFlag(baseFlag(), rules, baseCtx())).toBe(false);
   });
 
@@ -465,6 +484,7 @@ describe('evaluateFeatureFlag — rule types', () => {
           value: ['acme.org']
         })
       ];
+
       for (const ctx of [
         baseCtx({ attributes: { email: 'BOB@Acme.org' } }),
         baseCtx({ attributes: { emailDomain: 'ACME.ORG' } })
@@ -483,6 +503,7 @@ describe('evaluateFeatureFlag — rule types', () => {
           customKey: 'tier'
         })
       ];
+
       expect(
         evaluateFeatureFlag(
           baseFlag(),
@@ -501,6 +522,7 @@ describe('evaluateFeatureFlag — rule types', () => {
           value: [42]
         })
       ];
+
       expect(
         evaluateFeatureFlag(
           baseFlag(),
@@ -519,11 +541,13 @@ describe('evaluateFeatureFlag — composition', () => {
       rule('exclude', { type: 'role', roleNames: ['banned'] })
     ];
     const ctx = baseCtx({ userId: 'alice', roles: ['banned'] });
+
     expect(evaluateFeatureFlag(baseFlag(), rules, ctx)).toBe(false);
   });
 
   it('returns true when only excludes are present and none match', () => {
     const rules = [rule('exclude', { type: 'role', roleNames: ['banned'] })];
+
     expect(
       evaluateFeatureFlag(baseFlag(), rules, baseCtx({ roles: ['member'] }))
     ).toBe(true);
@@ -531,6 +555,7 @@ describe('evaluateFeatureFlag — composition', () => {
 
   it('returns false when includes exist but none match', () => {
     const rules = [rule('include', { type: 'user', userIds: ['alice'] })];
+
     expect(
       evaluateFeatureFlag(baseFlag(), rules, baseCtx({ userId: 'carol' }))
     ).toBe(false);
@@ -541,6 +566,7 @@ describe('evaluateFeatureFlag — composition', () => {
       rule('include', { type: 'user', userIds: ['alice'] }),
       rule('include', { type: 'role', roleNames: ['admin'] })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -559,6 +585,7 @@ describe('evaluateFeatureFlag — composition', () => {
       rule('exclude', { type: 'user', userIds: ['alice'] }),
       rule('include', { type: 'user', userIds: ['alice'] })
     ];
+
     expect(
       evaluateFeatureFlag(
         baseFlag(),
@@ -583,6 +610,7 @@ describe('previewFeatureFlag — reasons', () => {
       [],
       baseCtx()
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'disabled',
@@ -593,6 +621,7 @@ describe('previewFeatureFlag — reasons', () => {
   it('reason "env-mismatch" when environments is non-empty and env does not match', () => {
     const flag = baseFlag({ environments: ['production'] });
     const result = previewFeatureFlag(flag, [], baseCtx({ env: 'staging' }));
+
     expect(result).toEqual({
       result: false,
       reason: 'env-mismatch',
@@ -609,6 +638,7 @@ describe('previewFeatureFlag — reasons', () => {
     const onlyExcludes = [
       rule('exclude', { type: 'role', roleNames: ['banned'] })
     ];
+
     expect(
       previewFeatureFlag(baseFlag(), onlyExcludes, baseCtx({ roles: ['ok'] }))
     ).toEqual({
@@ -628,6 +658,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ userId: 'alice' })
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'excluded',
@@ -645,6 +676,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ roles: ['beta', 'banned'] })
     );
+
     expect(result.result).toBe(false);
     expect(result.reason).toBe('excluded');
     expect(result.matchedRule).toEqual({
@@ -668,6 +700,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ attributes: { email: 'bob@contractor.com' } })
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'excluded',
@@ -682,6 +715,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ userId: 'x' })
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'excluded',
@@ -699,6 +733,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ userId: 'alice' })
     );
+
     expect(result).toEqual({
       result: true,
       reason: 'included-by-rule',
@@ -713,6 +748,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ userId: 'carol' })
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'not-included',
@@ -730,6 +766,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ roles: ['plain'] })
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'not-included',
@@ -748,6 +785,7 @@ describe('previewFeatureFlag — reasons', () => {
       rules,
       baseCtx({ userId: 'alice', roles: ['banned'] })
     );
+
     expect(result.matchedRule?.index).toBe(1);
     expect(result.reason).toBe('excluded');
   });
@@ -786,9 +824,11 @@ describe('previewFeatureFlag — reasons', () => {
       },
       { flag: baseFlag(), rules: [], ctx: baseCtx() }
     ];
+
     for (const c of cases) {
       const previewResult = previewFeatureFlag(c.flag, c.rules, c.ctx).result;
       const evalResult = evaluateFeatureFlag(c.flag, c.rules, c.ctx);
+
       expect(previewResult).toBe(evalResult);
     }
   });
@@ -804,17 +844,20 @@ describe('percentageBucket — stability and distribution', () => {
   it('returns different buckets for the same id across different flag keys (mostly)', () => {
     const ids = Array.from({ length: 100 }, (_, i) => `user-${i}`);
     let diffs = 0;
+
     for (const id of ids) {
       if (percentageBucket(id, 'flag-a') !== percentageBucket(id, 'flag-b')) {
         diffs++;
       }
     }
+
     expect(diffs).toBeGreaterThanOrEqual(90);
   });
 
   it('returns a value in [0, 100)', () => {
     for (let i = 0; i < 50; i++) {
       const b = percentageBucket(`id-${i}`, 'demo');
+
       expect(b).toBeGreaterThanOrEqual(0);
       expect(b).toBeLessThan(100);
     }
@@ -822,10 +865,13 @@ describe('percentageBucket — stability and distribution', () => {
 
   it('distributes 10 000 synthetic ids roughly uniformly', () => {
     const counts = new Array<number>(10).fill(0);
+
     for (let i = 0; i < 10_000; i++) {
       const bucket = percentageBucket(`user-${i}`, 'uniformity-flag');
+
       counts[Math.floor(bucket / 10)]++;
     }
+
     for (const count of counts) {
       expect(count).toBeGreaterThan(800);
       expect(count).toBeLessThan(1200);
@@ -835,6 +881,7 @@ describe('percentageBucket — stability and distribution', () => {
   it('integrates with evaluator: 10% percentage rule selects ~10% of users', () => {
     const rules = [rule('include', { type: 'percentage', percent: 10 })];
     let hits = 0;
+
     for (let i = 0; i < 10_000; i++) {
       if (
         evaluateFeatureFlag(baseFlag(), rules, baseCtx({ userId: `user-${i}` }))
@@ -842,6 +889,7 @@ describe('percentageBucket — stability and distribution', () => {
         hits++;
       }
     }
+
     expect(hits).toBeGreaterThan(900);
     expect(hits).toBeLessThan(1100);
   });

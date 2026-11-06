@@ -4,6 +4,7 @@ import { InternalNetworkGuard } from './internal-network.guard';
 
 function contextWithIp(ip: string | undefined): ExecutionContext {
   const req = { ip, method: 'GET', originalUrl: '/metrics' };
+
   // @ts-expect-error partial mock: the guard only calls switchToHttp().getRequest()
   return { switchToHttp: () => ({ getRequest: () => req }) };
 }

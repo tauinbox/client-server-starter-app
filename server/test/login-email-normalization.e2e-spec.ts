@@ -62,6 +62,7 @@ runWithInfra('Login email normalization (e2e)', () => {
       .expect(200);
 
     const body = response.body as { tokens?: { access_token?: string } };
+
     expect(body.tokens?.access_token).toBeTruthy();
   }, 30000);
 
@@ -78,6 +79,7 @@ runWithInfra('Login email normalization (e2e)', () => {
   it('rejects an over-long address as invalid credentials without passing it on', async () => {
     const lookup = jest.spyOn(app.get(UsersService), 'findByEmail');
     const audit = jest.spyOn(app.get(AuditService), 'logFireAndForget');
+
     try {
       await request(http())
         .post('/api/v1/auth/login')

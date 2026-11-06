@@ -11,6 +11,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -34,6 +35,7 @@ async function send(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   });
+
   return { status: res.status, body: (await res.json()) as ErrorBody };
 }
 

@@ -25,9 +25,11 @@ export function requireUuid(...params: string[]): RequestHandler {
           statusCode: 400,
           error: 'Bad Request'
         });
+
         return;
       }
     }
+
     next();
   };
 }
@@ -49,6 +51,7 @@ export function requireStepUpBody(
   options: StepUpBodyOptions = {}
 ): RequestHandler {
   const { fields = [], fieldErrors } = options;
+
   return (req, res, next) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const errors = stepUpFactorsBodyErrors(
@@ -56,10 +59,13 @@ export function requireStepUpBody(
       fields,
       fieldErrors?.(body) ?? []
     );
+
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
+
       return;
     }
+
     next();
   };
 }
@@ -76,6 +82,7 @@ export function validationError(message: string | string[]): {
   errors: string[];
 } {
   const errors = Array.isArray(message) ? message : [message];
+
   return { message: errors.join('. '), errors };
 }
 

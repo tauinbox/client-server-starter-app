@@ -9,6 +9,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -27,8 +28,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -64,9 +67,11 @@ describe('email and emailDomain rules compare case-insensitively (parity)', () =
         rules: [{ effect, payload }]
       }
     });
+
     expect(createRes.status).toBe(201);
     const res = await call(admin, { method: 'GET', path: '/feature-flags' });
     const body = (await res.json()) as { flags: Record<string, boolean> };
+
     return body.flags[key] === true;
   }
 

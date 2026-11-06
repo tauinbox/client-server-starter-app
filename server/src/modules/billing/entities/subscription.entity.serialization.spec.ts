@@ -31,27 +31,32 @@ function createSubscription(
 describe('Subscription entity serialization', () => {
   it('hides providerSubscriptionId (provider reference)', () => {
     const plain = instanceToPlain(createSubscription());
+
     expect(plain).not.toHaveProperty('providerSubscriptionId');
   });
 
   it('hides internal dunning state', () => {
     const plain = instanceToPlain(createSubscription());
+
     expect(plain).not.toHaveProperty('dunningAttempts');
     expect(plain).not.toHaveProperty('nextRenewalAttemptAt');
   });
 
   it('hides the billing anchor', () => {
     const plain = instanceToPlain(createSubscription());
+
     expect(plain).not.toHaveProperty('billingAnchorAt');
   });
 
   it('hides the concurrency token', () => {
     const plain = instanceToPlain(createSubscription());
+
     expect(plain).not.toHaveProperty('version');
   });
 
   it('keeps the public wire fields', () => {
     const plain = instanceToPlain(createSubscription());
+
     expect(plain).toMatchObject({ planKey: 'pro', status: 'active' });
   });
 });

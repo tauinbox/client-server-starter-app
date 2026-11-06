@@ -21,10 +21,12 @@ export async function seedAdmin(): Promise<void> {
 
   if (!email || !password) {
     console.log('ADMIN_EMAIL or ADMIN_PASSWORD not set, skipping admin seed');
+
     return;
   }
 
   const dataSource = new DataSource(postgresConfig());
+
   await dataSource.initialize();
 
   try {
@@ -41,18 +43,23 @@ export async function seedAdmin(): Promise<void> {
         console.log(
           `Admin user ${email} already exists with admin role, skipping`
         );
+
         return;
       }
+
       const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
+
       if (adminRole) {
         existing.roles = [...existing.roles, adminRole];
         await userRepo.save(existing);
         console.log(`Admin role assigned to existing user ${email}`);
       }
+
       return;
     }
 
     const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
+
     if (!adminRole) {
       console.error('Admin role not found — ensure migrations have run first');
       process.exit(1);
@@ -70,6 +77,7 @@ export async function seedAdmin(): Promise<void> {
           `Breached-password lookup ${reason} - ADMIN_PASSWORD seeded unchecked`
         )
     });
+
     if (breachOutcome === 'breached') {
       console.warn(
         'WARNING: ADMIN_PASSWORD appears in a public data breach. The admin ' +
@@ -77,6 +85,7 @@ export async function seedAdmin(): Promise<void> {
           'first sign-in and rotate the ADMIN_PASSWORD secret.'
       );
     }
+
     if (localPasswordRefusal(password, { email, name })) {
       console.warn(
         'WARNING: ADMIN_PASSWORD is a common password, or it contains the ' +

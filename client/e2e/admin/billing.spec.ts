@@ -80,12 +80,14 @@ test.describe('Admin billing console', () => {
         userId: ADMIN_ID,
         planKey: 'pro'
       });
+
     // One invoice per renewal: 25 in total, so the default page size splits it.
     for (let i = 0; i < 24; i += 1) {
       await _mockServer.advanceBillingRenewal({ subscriptionId });
     }
 
     const invoiceRequests: string[] = [];
+
     page.on('request', (request) => {
       if (request.url().includes('/admin/billing/invoices')) {
         invoiceRequests.push(request.url());
@@ -95,6 +97,7 @@ test.describe('Admin billing console', () => {
     await page.goto('/admin/billing');
 
     const invoiceTable = page.locator('table').nth(1);
+
     // The sentinel keeps pulling pages while it stays in view, so the list
     // fills the viewport on open and settles once the server stops handing out
     // cursors - all 25 rows, never in one request.

@@ -72,11 +72,13 @@ describe('featureFlagGuard', () => {
     // Flags are not loaded yet: isEnabled flips to true only once load()
     // resolves — pre-fix the guard evaluated immediately and bounced.
     let flags: Record<string, boolean> = {};
+
     load.mockImplementation(async () => {
       flags = { 'new-dashboard': true };
     });
     isEnabled.mockImplementation((key: string) => () => flags[key] === true);
     const router = TestBed.inject(Router);
+
     vi.spyOn(router, 'navigate');
 
     expect(await resolve(run())).toBe(true);
@@ -87,6 +89,7 @@ describe('featureFlagGuard', () => {
   it('redirects to /forbidden when the flag is off', async () => {
     isEnabled.mockReturnValue(() => false);
     const router = TestBed.inject(Router);
+
     vi.spyOn(router, 'navigate');
     expect(String(await resolve(run()))).toBe('/forbidden');
     expect(router.navigate).not.toHaveBeenCalled();

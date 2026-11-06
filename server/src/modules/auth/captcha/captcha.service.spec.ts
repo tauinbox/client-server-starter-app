@@ -16,6 +16,7 @@ describe('CaptchaService', () => {
         { provide: ConfigService, useValue: mockConfigService }
       ]
     }).compile();
+
     return module.get(CaptchaService);
   }
 
@@ -33,14 +34,17 @@ describe('CaptchaService', () => {
   describe('isEnabled / getSiteKey', () => {
     it('disabled when both keys are missing', async () => {
       const service = await buildService({});
+
       expect(service.isEnabled()).toBe(false);
       expect(service.getSiteKey()).toBeNull();
     });
 
     it('disabled when only one key is set', async () => {
       const a = await buildService({ TURNSTILE_SITE_KEY: 'site' });
+
       expect(a.isEnabled()).toBe(false);
       const b = await buildService({ TURNSTILE_SECRET_KEY: 'secret' });
+
       expect(b.isEnabled()).toBe(false);
     });
 
@@ -49,6 +53,7 @@ describe('CaptchaService', () => {
         TURNSTILE_SITE_KEY: 'site-123',
         TURNSTILE_SECRET_KEY: 'secret-456'
       });
+
       expect(service.isEnabled()).toBe(true);
       expect(service.getSiteKey()).toBe('site-123');
     });
@@ -57,6 +62,7 @@ describe('CaptchaService', () => {
   describe('verify', () => {
     it('returns true without calling Turnstile when service is disabled', async () => {
       const service = await buildService({});
+
       await expect(service.verify('any-token')).resolves.toBe(true);
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -66,6 +72,7 @@ describe('CaptchaService', () => {
         TURNSTILE_SITE_KEY: 'site',
         TURNSTILE_SECRET_KEY: 'secret'
       });
+
       await expect(service.verify('')).resolves.toBe(false);
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -75,6 +82,7 @@ describe('CaptchaService', () => {
         TURNSTILE_SITE_KEY: 'site',
         TURNSTILE_SECRET_KEY: 'secret-123'
       });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ success: true })
@@ -88,11 +96,13 @@ describe('CaptchaService', () => {
         string,
         { body: string; method: string }
       ];
+
       expect(url).toBe(
         'https://challenges.cloudflare.com/turnstile/v0/siteverify'
       );
       expect(init.method).toBe('POST');
       const params = new URLSearchParams(init.body);
+
       expect(params.get('secret')).toBe('secret-123');
       expect(params.get('response')).toBe('user-token');
       expect(params.get('remoteip')).toBe('203.0.113.5');
@@ -103,6 +113,7 @@ describe('CaptchaService', () => {
         TURNSTILE_SITE_KEY: 'site',
         TURNSTILE_SECRET_KEY: 'secret'
       });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -119,6 +130,7 @@ describe('CaptchaService', () => {
         TURNSTILE_SITE_KEY: 'site',
         TURNSTILE_SECRET_KEY: 'secret'
       });
+
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -133,6 +145,7 @@ describe('CaptchaService', () => {
         TURNSTILE_SITE_KEY: 'site',
         TURNSTILE_SECRET_KEY: 'secret'
       });
+
       mockFetch.mockRejectedValueOnce(new Error('ECONNRESET'));
       await expect(service.verify('token')).resolves.toBe(false);
     });
@@ -145,8 +158,10 @@ describe('CaptchaService', () => {
       // The signal is read after the call, not inside the stub: an assertion
       // that throws inside `fetch` is swallowed by the fail-closed catch.
       let init: RequestInit | undefined;
+
       mockFetch.mockImplementation((_url: string, options: RequestInit) => {
         init = options;
+
         return Promise.reject(new DOMException('timed out', 'TimeoutError'));
       });
 

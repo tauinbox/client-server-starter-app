@@ -129,11 +129,13 @@ const CREATE_BODY_KEYS = ['key', ...UPDATE_BODY_KEYS] as const;
 function keyErrors(value: unknown): string[] {
   const key = typeof value === 'string' ? value.trim() : value;
   const errors: string[] = [];
+
   if (typeof key !== 'string' || !FEATURE_FLAG_KEY_PATTERN.test(key)) {
     errors.push(
       `key must match ${String(FEATURE_FLAG_KEY_PATTERN)} regular expression`
     );
   }
+
   return [
     ...errors,
     ...stringErrors('key', key, {
@@ -154,6 +156,7 @@ const ENVIRONMENTS_ONE_OF = `each value in environments must be one of the follo
 // reported bottom-up. An `each` rule validates a non-array as its one element.
 function environmentErrors(value: unknown): string[] {
   if (value === undefined) return [];
+
   const normalized = Array.isArray(value)
     ? normalizeEnvironmentList(value)
     : value;
@@ -161,16 +164,21 @@ function environmentErrors(value: unknown): string[] {
   const items: unknown[] = isArray ? normalized : [normalized];
   const allowed: readonly unknown[] = APP_ENVIRONMENTS;
   const errors: string[] = [];
+
   if (items.some((e) => !allowed.includes(e))) errors.push(ENVIRONMENTS_ONE_OF);
+
   if (items.some((e) => typeof e !== 'string')) {
     errors.push('each value in environments must be a string');
   }
+
   if (!isArray || items.length > APP_ENVIRONMENTS.length) {
     errors.push(
       `environments must contain no more than ${APP_ENVIRONMENTS.length} elements`
     );
   }
+
   if (!isArray) errors.push('environments must be an array');
+
   return errors;
 }
 
@@ -187,6 +195,7 @@ const RULE_KEYS = ['effect', 'payload'] as const;
 
 function ruleObjectErrors(path: string, rule: object): string[] {
   const r = rule as Record<string, unknown>;
+
   return [
     ...unknownPropertyErrors(r, RULE_KEYS),
     ...oneOfErrors('effect', r['effect'], {
@@ -202,6 +211,7 @@ function rulesErrors(value: unknown, optional: OptionalMode): string[] {
   if (value === undefined || (optional === 'nullable' && value === null)) {
     return [];
   }
+
   const isArray = Array.isArray(value);
   const own = [
     ...(!isArray || value.length > FEATURE_FLAG_RULES_MAX_ITEMS
@@ -211,6 +221,7 @@ function rulesErrors(value: unknown, optional: OptionalMode): string[] {
       : []),
     ...(isArray ? [] : ['rules must be an array'])
   ];
+
   return nestedErrors('rules', value, {
     parentPath: '',
     own,
@@ -250,7 +261,9 @@ function validateCreate(
     ...keyErrors(body.key),
     ...flagFieldErrors(body)
   ];
+
   if (errors.length > 0) return { ok: false, message: errors };
+
   return {
     ok: true,
     data: {
@@ -275,16 +288,23 @@ function validateUpdate(
     ...unknownPropertyErrors(body, UPDATE_BODY_KEYS),
     ...flagFieldErrors(body)
   ];
+
   if (errors.length > 0) return { ok: false, message: errors };
+
   const patch: UpdatePatch = {};
+
   if (body.description !== undefined) {
     patch.description = body.description as string | null;
   }
+
   if (body.enabled !== undefined) patch.enabled = body.enabled as boolean;
+
   if (body.environments !== undefined) {
     patch.environments = normalizedEnvironments(body.environments);
   }
+
   if (body.public !== undefined) patch.isPublic = body.public as boolean;
+
   return { ok: true, patch };
 }
 
@@ -305,19 +325,23 @@ function parseRules(
   value: unknown
 ): { ok: true; rules: ValidatedRule[] } | { ok: false; message: string } {
   const out: ValidatedRule[] = [];
+
   for (const entry of value as IncomingRule[]) {
     const parsed = parseFeatureFlagRulePayload(
       entry.payload,
       KNOWN_CUSTOM_KEYS
     );
+
     if (!parsed.ok) {
       return { ok: false, message: parsed.message };
     }
+
     out.push({
       effect: entry.effect as FeatureFlagRuleEffect,
       payload: parsed.payload
     });
   }
+
   return { ok: true, rules: out };
 }
 
@@ -327,22 +351,27 @@ function readIfMatch(
   header: string | undefined
 ): IfMatchCondition | null {
   const condition = parseIfMatch(header);
+
   if (condition === 'missing') {
     sendError(
       res,
       ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED,
       'If-Match header is required for optimistic locking'
     );
+
     return null;
   }
+
   if (condition === 'invalid') {
     sendError(
       res,
       ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID,
       'If-Match must be "*" or a list of entity tags'
     );
+
     return null;
   }
+
   return condition;
 }
 
@@ -353,6 +382,7 @@ let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
 function broadcastFlagsUpdated(): void {
   if (broadcastTimer) return;
+
   broadcastTimer = setTimeout(() => {
     broadcastTimer = null;
     pushToAll({ type: 'feature_flags_updated' });
@@ -369,24 +399,32 @@ export function rewriteRoleNameInRules(
   const state = getState();
   const updatedAt = nowIso();
   const changedFlagIds = new Set<string>();
+
   for (const rule of state.featureFlagRules) {
     const { payload } = rule;
+
     if (payload.type !== 'role' || !payload.roleNames.includes(oldName)) {
       continue;
     }
+
     const mapped = payload.roleNames
       .map((name) => (name === oldName ? newName : name))
       .filter((name): name is string => name !== null);
+
     rule.payload = { type: 'role', roleNames: [...new Set(mapped)] };
     rule.updatedAt = updatedAt;
     changedFlagIds.add(rule.flagId);
   }
+
   for (const id of changedFlagIds) {
     const flag = state.featureFlags.get(id);
+
     if (!flag) continue;
+
     flag.version += 1;
     flag.updatedAt = updatedAt;
   }
+
   if (changedFlagIds.size > 0) broadcastFlagsUpdated();
 }
 
@@ -394,6 +432,7 @@ function findFlagByKey(key: string): MockFeatureFlag | undefined {
   for (const f of getState().featureFlags.values()) {
     if (f.key === key) return f;
   }
+
   return undefined;
 }
 
@@ -425,9 +464,12 @@ function userContext(
     ...CONFIGURED_ATTRIBUTES,
     email: user.email
   };
+
   if (emailDomain) attributes['emailDomain'] = emailDomain;
+
   // A Date, as the server resolves it: `eq` and `in` must not match it.
   if (user.createdAt) attributes['createdAt'] = new Date(user.createdAt);
+
   // As the server: only a rule bucketed by device reads `anonId` here.
   return {
     userId: user.id,
@@ -447,7 +489,9 @@ function resolveAnonId(
   signedIn: boolean
 ): string | null {
   const held = readAnonId(req);
+
   if (held !== null) return held;
+
   const state = getState();
   const flags = [...state.featureFlags.values()].map((flag) => ({
     key: flag.key,
@@ -459,9 +503,13 @@ function resolveAnonId(
   const needed = signedIn
     ? signedInEvaluationNeedsAnonId(flags, evaluationEnv())
     : anonymousEvaluationNeedsAnonId(flags, evaluationEnv());
+
   if (!needed) return null;
+
   const issued = randomUUID();
+
   writeAnonId(res, issued);
+
   return issued;
 }
 
@@ -471,8 +519,10 @@ function evaluateAll(
 ): { flags: Record<string, boolean>; evaluatedAt: string } {
   const result: Record<string, boolean> = {};
   const state = getState();
+
   for (const flag of state.featureFlags.values()) {
     if (publicOnly && !flag.public) continue;
+
     const rules: EvaluatorRule[] = state.featureFlagRules
       .filter((r) => r.flagId === flag.id)
       .map((r) => ({
@@ -484,11 +534,14 @@ function evaluateAll(
       rules,
       ctx
     );
+
     // Mirror server: omit disabled non-public flags from the authenticated
     // response so internal/unfinished feature keys are not enumerable.
     if (!publicOnly && !value && !flag.public) continue;
+
     result[flag.key] = value;
   }
+
   return { flags: result, evaluatedAt: nowIso() };
 }
 
@@ -510,6 +563,7 @@ publicRouter.get('/', (req, res) => {
         /* publicOnly */ false
       )
     : evaluateAll(anonymousContext(anonId), true);
+
   res.json(response);
 });
 
@@ -522,11 +576,15 @@ adminRouter.get(
   (req, res) => {
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, FEATURE_FLAG_LIST_QUERY);
+
     if (errors.length > 0) {
       sendValidationError(res, 'query', errors);
+
       return;
     }
+
     if (rejectInvalidCursor(res, query)) return;
+
     const page = listPage(
       filterByAbility(
         Array.from(getState().featureFlags.values()),
@@ -536,6 +594,7 @@ adminRouter.get(
       FEATURE_FLAG_LIST_QUERY,
       query
     );
+
     res.json({ data: page.data.map(toFeatureFlagResponse), meta: page.meta });
   }
 );
@@ -549,6 +608,7 @@ adminRouter.get(
     const body: FeatureFlagAttributeKeysResponse = {
       customKeys: Array.from(KNOWN_CUSTOM_KEYS).toSorted()
     };
+
     res.json(body);
   }
 );
@@ -561,14 +621,17 @@ adminRouter.get(
     const flag = getState().featureFlags.get(
       (req.params['id'] as string) ?? ''
     );
+
     if (!flag) {
       sendError(
         res,
         ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
         'Feature flag not found'
       );
+
       return;
     }
+
     if (
       !assertInstancePermission(req, res, {
         action: 'read',
@@ -578,6 +641,7 @@ adminRouter.get(
     ) {
       return;
     }
+
     res.setHeader('ETag', versionEtag(flag.version));
     res.json(toFeatureFlagResponse(flag));
   }
@@ -598,10 +662,12 @@ function writeRules(
   updatedAt: string
 ): void {
   const state = getState();
+
   state.featureFlagRules = state.featureFlagRules.filter(
     (r) => r.flagId !== flagId
   );
   const start = Date.parse(updatedAt);
+
   rules.forEach((r, i) => {
     const rule: MockFeatureFlagRule = {
       id: randomUUID(),
@@ -611,6 +677,7 @@ function writeRules(
       createdAt: new Date(start + i).toISOString(),
       updatedAt
     };
+
     state.featureFlagRules.push(rule);
   });
 }
@@ -618,11 +685,15 @@ function writeRules(
 adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
   const body = req.body as CreateFlagBody;
   const validation = validateCreate(body);
+
   if (!validation.ok) {
     sendValidationError(res, 'body', validation.message);
+
     return;
   }
+
   const rules = rulesOf(body);
+
   // The record as the server writes it, defaults included.
   if (
     !assertInstancePermission(req, res, {
@@ -639,18 +710,23 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
   ) {
     return;
   }
+
   if (findFlagByKey(validation.data.key)) {
     sendError(
       res,
       ErrorKeys.FEATURE_FLAGS.KEY_EXISTS,
       'Feature flag with this key already exists'
     );
+
     return;
   }
+
   if (rules && !rules.ok) {
     sendError(res, ErrorKeys.FEATURE_FLAGS.INVALID_RULE, rules.message);
+
     return;
   }
+
   const now = nowIso();
   const flag: MockFeatureFlag = {
     id: randomUUID(),
@@ -664,8 +740,11 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
     createdAt: now,
     updatedAt: now
   };
+
   getState().featureFlags.set(flag.id, flag);
+
   if (rules) writeRules(flag.id, rules.rules, now);
+
   logAudit('FEATURE_FLAG_CREATE', {
     actorId: actorIdFromReq(req),
     targetId: flag.id,
@@ -690,24 +769,32 @@ adminRouter.patch(
     // before the handler reads If-Match, and both precede the service lookup.
     const body = req.body as UpdateFlagBody;
     const validation = validateUpdate(body);
+
     if (!validation.ok) {
       sendValidationError(res, 'body', validation.message);
+
       return;
     }
+
     const rules = rulesOf(body);
     const ifMatch = readIfMatch(res, req.header('if-match') ?? undefined);
+
     if (!ifMatch) return;
+
     const flag = getState().featureFlags.get(
       (req.params['id'] as string) ?? ''
     );
+
     if (!flag) {
       sendError(
         res,
         ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
         'Feature flag not found'
       );
+
       return;
     }
+
     // The record after the write is checked too, as on the server.
     const after = {
       ...flag,
@@ -724,6 +811,7 @@ adminRouter.patch(
         ? { public: validation.patch.isPublic }
         : {})
     };
+
     if (
       !assertInstancePermission(req, res, {
         action: 'update',
@@ -738,38 +826,50 @@ adminRouter.patch(
     ) {
       return;
     }
+
     if (rules && !rules.ok) {
       sendError(res, ErrorKeys.FEATURE_FLAGS.INVALID_RULE, rules.message);
+
       return;
     }
+
     if (!ifMatchHolds(ifMatch, flag.version)) {
       sendError(
         res,
         ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT,
         'Feature flag was modified by another request — reload and retry'
       );
+
       return;
     }
+
     const changed = changedFields(flag, {
       description: validation.patch.description,
       enabled: validation.patch.enabled,
       environments: validation.patch.environments,
       public: validation.patch.isPublic
     });
+
     if (validation.patch.description !== undefined) {
       flag.description = validation.patch.description;
     }
+
     if (validation.patch.enabled !== undefined)
       flag.enabled = validation.patch.enabled;
+
     if (validation.patch.environments !== undefined) {
       flag.environments = validation.patch.environments;
     }
+
     if (validation.patch.isPublic !== undefined)
       flag.public = validation.patch.isPublic;
+
     flag.version += 1;
     flag.updatedAt = nowIso();
     flag.updatedByUserId = actorIdFromReq(req);
+
     if (rules) writeRules(flag.id, rules.rules, flag.updatedAt);
+
     logAudit('FEATURE_FLAG_UPDATE', {
       actorId: actorIdFromReq(req),
       targetId: flag.id,
@@ -792,14 +892,17 @@ adminRouter.delete(
   (req, res) => {
     const id = (req.params['id'] as string) ?? '';
     const flag = getState().featureFlags.get(id);
+
     if (!flag) {
       sendError(
         res,
         ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
         'Feature flag not found'
       );
+
       return;
     }
+
     if (
       !assertInstancePermission(req, res, {
         action: 'delete',
@@ -809,7 +912,9 @@ adminRouter.delete(
     ) {
       return;
     }
+
     const state = getState();
+
     state.featureFlags.delete(id);
     state.featureFlagRules = state.featureFlagRules.filter(
       (r) => r.flagId !== id
@@ -867,6 +972,7 @@ function previewContextErrors(body: Record<string, unknown>): string[] {
 /** Mirrors `@IsOptional() @IsObject() @Validate(PreviewAttributesConstraint)`. */
 function previewAttributesErrors(value: unknown): string[] {
   const shapeError = findPreviewAttributesError(value);
+
   return [
     ...(shapeError === null ? [] : [shapeError]),
     ...objectErrors('attributes', value, 'nullable')
@@ -876,6 +982,7 @@ function previewAttributesErrors(value: unknown): string[] {
 /** Mirrors `@IsOptional() @Matches(ANON_ID_PATTERN)` with its own message. */
 function anonIdErrors(value: unknown): string[] {
   if (value === undefined || value === null) return [];
+
   return typeof value === 'string' && ANON_ID_PATTERN.test(value)
     ? []
     : ['anonId must be a UUID'];
@@ -897,21 +1004,27 @@ adminRouter.post(
       ...booleanErrors('enabled', body['enabled'], 'definedOnly'),
       ...environmentErrors(body['environments'])
     ];
+
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
+
       return;
     }
+
     const flag = getState().featureFlags.get(
       (req.params['id'] as string) ?? ''
     );
+
     if (!flag) {
       sendError(
         res,
         ErrorKeys.FEATURE_FLAGS.NOT_FOUND,
         'Feature flag not found'
       );
+
       return;
     }
+
     if (
       !assertInstancePermission(req, res, {
         action: 'read',
@@ -921,11 +1034,15 @@ adminRouter.post(
     ) {
       return;
     }
+
     const draftRules = rulesOf(body);
+
     if (draftRules && !draftRules.ok) {
       sendError(res, ErrorKeys.FEATURE_FLAGS.INVALID_RULE, draftRules.message);
+
       return;
     }
+
     const draftEnvironments =
       body['environments'] === undefined
         ? undefined
@@ -954,6 +1071,7 @@ adminRouter.post(
       rules,
       { userId, anonId, roles, attributes, env }
     );
+
     res.json(result);
   }
 );

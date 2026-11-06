@@ -11,6 +11,7 @@ const email = 'user@example.com';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -38,32 +39,39 @@ function verify(token: string): Promise<Response> {
 async function reset(): Promise<Response> {
   expect((await postJson('forgot-password', { email })).status).toBe(200);
   const [token] = [...getState().passwordResetTokens.keys()];
+
   return postJson('reset-password', { token, password: 'Quartz-Meadow-77' });
 }
 
 function confirmEmailChange(newEmail: string): Promise<Response> {
   const user = findUserByEmail(email)!;
   const token = 'pending-token-audit';
+
   user.pendingEmail = newEmail;
   user.pendingEmailToken = token;
   user.pendingEmailExpiresAt = new Date(Date.now() + 60_000).toISOString();
   getState().pendingEmailTokens.set(token, user.id);
+
   return postJson('profile/email/confirm', { token });
 }
 
 function setVerified(isEmailVerified: boolean): string {
   const user = findUserByEmail(email);
+
   expect(user).toBeDefined();
   user!.isEmailVerified = isEmailVerified;
+
   return user!.id;
 }
 
 function issueToken(token: string, expiresInMs: number): string {
   const userId = setVerified(false);
+
   getState().emailVerificationTokens.set(token, {
     userId,
     expiresAt: new Date(Date.now() + expiresInMs).toISOString()
   });
+
   return userId;
 }
 

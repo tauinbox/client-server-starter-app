@@ -7,31 +7,37 @@ describe('shared cursor codec', () => {
   describe('round-trip', () => {
     it('should encode and decode a string sortValue', () => {
       const payload = { sortValue: 'test@example.com', id: 'abc-123' };
+
       expect(parseCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should encode and decode a numeric sortValue', () => {
       const payload = { sortValue: 42, id: 'id-1' };
+
       expect(parseCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should encode and decode a boolean sortValue', () => {
       const payload = { sortValue: false, id: 'id-2' };
+
       expect(parseCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should encode and decode a null sortValue', () => {
       const payload = { sortValue: null, id: 'id-3' };
+
       expect(parseCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should preserve special characters in sort values', () => {
       const payload = { sortValue: 'user+test@exam.com', id: 'uuid-4' };
+
       expect(parseCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should emit a url-safe token with no base64 padding', () => {
       const cursor = encodeCursor({ sortValue: 'a?b/c+d', id: 'id-5' });
+
       expect(cursor).toMatch(/^[A-Za-z0-9_-]+$/);
     });
   });

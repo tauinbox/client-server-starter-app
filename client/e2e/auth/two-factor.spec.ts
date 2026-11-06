@@ -17,6 +17,7 @@ const USER_ID = '100';
 async function expectNoOverflow(page: Page, panel: string): Promise<void> {
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
+
     for (const width of [375, 768, 1366]) {
       await page.setViewportSize({ width, height: 900 });
       const overflow = await page.evaluate(
@@ -24,12 +25,14 @@ async function expectNoOverflow(page: Page, panel: string): Promise<void> {
           document.documentElement.scrollWidth -
           document.documentElement.clientWidth
       );
+
       expect(
         overflow,
         `horizontal overflow on ${panel} at ${width}px in ${colorScheme}`
       ).toBeLessThanOrEqual(0);
     }
   }
+
   await page.setViewportSize({ width: 1366, height: 900 });
 }
 
@@ -51,6 +54,7 @@ test.describe('two-factor authentication', () => {
     await loginViaUi(page, _mockServer.url);
 
     const card = page.locator('nxs-two-factor');
+
     await expect(card).toBeVisible();
     await expect(
       card.getByText('Two-factor authentication is off')
@@ -87,6 +91,7 @@ test.describe('two-factor authentication', () => {
     // The password alone does not sign in any more.
     await expect(page).toHaveURL(/\/login/);
     const codeField = page.getByLabel('Authentication code');
+
     await expect(codeField).toBeVisible();
 
     await codeField.fill('000000');
@@ -201,6 +206,7 @@ test.describe('two-factor authentication', () => {
     await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
 
     const codeField = page.getByLabel('Authentication code');
+
     await expect(codeField).toBeVisible();
 
     for (let attempt = 0; attempt < MAX_FAILED_ATTEMPTS; attempt += 1) {
@@ -240,8 +246,10 @@ test.describe('two-factor authentication', () => {
     await expect(page.locator('.two-factor-qr')).toBeVisible();
 
     const calls: string[] = [];
+
     page.on('request', (request) => {
       const { pathname } = new URL(request.url());
+
       if (
         pathname.endsWith('/auth/mfa/enable') ||
         pathname.endsWith('/auth/refresh-token')
@@ -260,6 +268,7 @@ test.describe('two-factor authentication', () => {
     const failures = (state.auditLogs as MockAuditLog[]).filter(
       (row) => row.action === 'MFA_CHALLENGE_FAILURE'
     );
+
     expect(failures).toHaveLength(1);
 
     // The card stays on the code step, so the correct code still enrols.

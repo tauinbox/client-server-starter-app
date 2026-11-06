@@ -48,15 +48,18 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
         password: null
       })
     );
+
     userId = user.id;
   }, 60000);
 
   afterAll(async () => {
     jest.restoreAllMocks();
+
     if (dataSource) {
       await dataSource.getRepository(FeatureFlag).delete({ key });
       await dataSource.getRepository(User).delete({ id: userId });
     }
+
     await app?.close();
   });
 
@@ -81,6 +84,7 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
       flagAuditActor()
     );
     const resolver = app.get(FeatureFlagResolverService);
+
     await resolver.invalidateAll();
 
     expect(await resolver.isEnabledForUserId(userId, key)).toBe(true);

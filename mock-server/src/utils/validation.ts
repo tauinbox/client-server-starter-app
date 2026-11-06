@@ -36,6 +36,7 @@ export function isValidEmail(email: unknown): boolean {
  */
 export function validateLocale(value: unknown): string | null {
   if (value === undefined) return null;
+
   if (
     typeof value !== 'string' ||
     !(SUPPORTED_LOCALES as readonly string[]).includes(value)
@@ -44,6 +45,7 @@ export function validateLocale(value: unknown): string | null {
       ', '
     )}`;
   }
+
   return null;
 }
 
@@ -61,6 +63,7 @@ export function validateMaxLength(
   if (typeof value !== 'string' || value.length > max) {
     return `${field} must be shorter than or equal to ${max} characters`;
   }
+
   return null;
 }
 
@@ -72,6 +75,7 @@ export function validateMinLength(
   if (typeof value !== 'string' || value.length < min) {
     return `${field} must be longer than or equal to ${min} characters`;
   }
+
   return null;
 }
 
@@ -84,6 +88,7 @@ export function unknownPropertyErrors(
   allowed: readonly string[]
 ): string[] {
   if (typeof body !== 'object' || body === null) return [];
+
   return Object.keys(body)
     .filter((key) => !allowed.includes(key))
     .map((key) => `property ${key} should not exist`);
@@ -103,6 +108,7 @@ function isSkipped(
   optional: OptionalMode | undefined
 ): boolean {
   if (optional === undefined) return false;
+
   return value === undefined || (optional === 'nullable' && value === null);
 }
 
@@ -139,17 +145,22 @@ export function stringErrors(
 
   const errors: string[] = [];
   const tooLong = validateMaxLength(value, rules.max, field);
+
   if (tooLong) errors.push(tooLong);
+
   if (rules.min !== undefined) {
     const tooShort = validateMinLength(value, rules.min, field);
+
     if (tooShort) errors.push(tooShort);
   }
+
   const notString =
     typeof value !== 'string' ? [`${field} must be a string`] : [];
   const empty =
     rules.notEmpty && (value === '' || value === null || value === undefined)
       ? [`${field} should not be empty`]
       : [];
+
   return rules.isStringOnTop
     ? [...errors, ...empty, ...notString]
     : [...errors, ...notString, ...empty];
@@ -167,6 +178,7 @@ export function fixedLengthStringErrors(
   { length, optional }: { length: number; optional?: OptionalMode }
 ): string[] {
   if (isSkipped(value, optional)) return [];
+
   if (typeof value === 'string' && value.length === length) return [];
 
   const size = (value as { length?: unknown } | null | undefined)?.length;
@@ -177,7 +189,9 @@ export function fixedLengthStringErrors(
         ? `${field} must be shorter than or equal to ${length} characters`
         : `${field} must be longer than or equal to ${length} and shorter than or equal to ${length} characters`
   ];
+
   if (typeof value !== 'string') errors.push(`${field} must be a string`);
+
   return errors;
 }
 
@@ -190,10 +204,13 @@ export function matchesErrors(
   pattern: RegExp
 ): string[] {
   const errors: string[] = [];
+
   if (typeof value !== 'string' || !pattern.test(value)) {
     errors.push(`${field} must match ${pattern} regular expression`);
   }
+
   if (typeof value !== 'string') errors.push(`${field} must be a string`);
+
   return errors;
 }
 
@@ -219,8 +236,11 @@ export function emailErrors(
   const transformed = normalizeEmail(value) ?? value;
   const errors: string[] = [];
   const tooLong = validateMaxLength(transformed, MAX_EMAIL_LENGTH, field);
+
   if (tooLong) errors.push(tooLong);
+
   if (!isValidEmail(transformed)) errors.push(`${field} must be an email`);
+
   return errors;
 }
 
@@ -236,12 +256,16 @@ export function trimName(value: unknown): unknown {
  */
 export function nameErrors(value: unknown, optional?: OptionalMode): string[] {
   if (isSkipped(value, optional)) return [];
+
   const errors: string[] = [];
   const tooLong = validateMaxLength(value, MAX_NAME_LENGTH, 'name');
+
   if (tooLong) errors.push(tooLong);
+
   if (value === '' || value === null || value === undefined) {
     errors.push('name should not be empty');
   }
+
   return errors;
 }
 
@@ -278,6 +302,7 @@ export function trimmedStringErrors(
   if (isSkipped(value, rules.optional)) return [];
 
   const trimmed = typeof value === 'string' ? value.trim() : value;
+
   return stringErrors(field, trimmed, {
     min: rules.min,
     max: rules.max,
@@ -309,6 +334,7 @@ export function stringArrayErrors(
   const isArray = Array.isArray(value);
   const items = isArray ? value : [value];
   const errors: string[] = [];
+
   if (
     items.some((item) => validateMaxLength(item, rules.maxItemLength, field))
   ) {
@@ -316,15 +342,19 @@ export function stringArrayErrors(
       `each value in ${field} must be shorter than or equal to ${rules.maxItemLength} characters`
     );
   }
+
   if (items.some((item) => typeof item !== 'string')) {
     errors.push(`each value in ${field} must be a string`);
   }
+
   if (!isArray || value.length > rules.maxItems) {
     errors.push(
       `${field} must contain no more than ${rules.maxItems} elements`
     );
   }
+
   if (!isArray) errors.push(`${field} must be an array`);
+
   return errors;
 }
 
@@ -335,6 +365,7 @@ export function objectErrors(
   optional?: OptionalMode
 ): string[] {
   if (isSkipped(value, optional)) return [];
+
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? []
     : [`${field} must be an object`];
@@ -347,6 +378,7 @@ export function booleanErrors(
   optional?: OptionalMode
 ): string[] {
   if (isSkipped(value, optional)) return [];
+
   return typeof value === 'boolean' ? [] : [`${field} must be a boolean value`];
 }
 
@@ -367,15 +399,19 @@ export function intErrors(
 
   const numeric = typeof value === 'number' ? value : null;
   const errors: string[] = [];
+
   if (rules.max !== undefined && (numeric === null || numeric > rules.max)) {
     errors.push(`${field} must not be greater than ${rules.max}`);
   }
+
   if (numeric === null || numeric < rules.min) {
     errors.push(`${field} must not be less than ${rules.min}`);
   }
+
   if (numeric === null || !Number.isInteger(numeric)) {
     errors.push(`${field} must be an integer number`);
   }
+
   return errors;
 }
 
@@ -386,6 +422,7 @@ export function uuidErrors(
   optional?: OptionalMode
 ): string[] {
   if (isSkipped(value, optional)) return [];
+
   return typeof value === 'string' && UUID_PATTERN.test(value)
     ? []
     : [`${field} must be a UUID`];
@@ -427,9 +464,11 @@ export function nestedErrors(
   const entryErrors = (entryPath: string, entries: unknown[]): string[] =>
     entries.flatMap((entry, i) => {
       if (Array.isArray(entry)) return entryErrors(`${entryPath}.${i}`, entry);
+
       if (typeof entry === 'object' && entry !== null) {
         return validate(`${entryPath}.${i}`, entry);
       }
+
       return [`${entryPath}.${nestedMessage}`];
     });
 
@@ -441,7 +480,9 @@ export function nestedErrors(
       : [];
   const ownMessages =
     value === undefined || isObject ? own : [...own, nestedMessage];
+
   if (!parentPath) return children.length > 0 ? children : ownMessages;
+
   return [...children, ...ownMessages.map((m) => `${parentPath}.${m}`)];
 }
 
@@ -456,6 +497,7 @@ const ISO8601_PATTERN =
 /** Mirrors `@IsOptional() @IsISO8601()`. */
 export function iso8601Errors(field: string, value: unknown): string[] {
   if (value === undefined || value === null) return [];
+
   return typeof value === 'string' && ISO8601_PATTERN.test(value)
     ? []
     : [`${field} must be a valid ISO 8601 date string`];
@@ -468,6 +510,7 @@ export function oneOfErrors(
   { values, optional }: { values: readonly string[]; optional?: OptionalMode }
 ): string[] {
   if (isSkipped(value, optional)) return [];
+
   return values.includes(value as string)
     ? []
     : [`${field} must be one of the following values: ${values.join(', ')}`];

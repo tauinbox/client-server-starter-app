@@ -32,6 +32,7 @@ import type { JwtAuthRequest } from '../types/auth.request';
 export const CurrentAbility = createParamDecorator(
   (_: unknown, ctx: ExecutionContext): AppAbility | undefined => {
     const req = ctx.switchToHttp().getRequest<JwtAuthRequest>();
+
     return req.ability;
   }
 );

@@ -13,6 +13,7 @@ export class RequestIdMiddleware implements NestMiddleware {
     const requestId = REQUEST_ID_PATTERN.test(candidate)
       ? candidate
       : crypto.randomUUID();
+
     (req as Request & { requestId: string }).requestId = requestId;
     res.setHeader('X-Request-Id', requestId);
     next();

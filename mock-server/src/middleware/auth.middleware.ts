@@ -143,6 +143,7 @@ const router = Router();
 // GET /api/v1/auth/captcha-config — public configuration consumed by the client
 router.get('/captcha-config', (_req, res) => {
   const state = getState();
+
   res.json({
     enabled: state.captchaConfig.enabled,
     provider: 'turnstile',
@@ -158,12 +159,15 @@ router.post('/register', (req, res) => {
     res
   );
   const captchaCheck = evaluateCaptcha(remaining, req.body?.captchaToken);
+
   if (!captchaCheck.ok) {
     res.status(captchaCheck.status).json(captchaCheck.body);
+
     return;
   }
 
   const validated = validateCreateUserBody(req.body);
+
   if (!validated.ok) {
     // Registering against a taken address is the cheapest account-existence
     // probe there is, so the conflict is audited even though the request fails.
@@ -174,17 +178,21 @@ router.post('/register', (req, res) => {
         ip: req.ip
       });
     }
+
     res.status(validated.status).json(validated.body);
+
     return;
   }
 
   const user = buildMockUser(validated.fields, { isEmailVerified: false });
 
   const state = getState();
+
   state.users.set(user.id, user);
 
   // Store a verification token (plain UUID — no hashing in mock)
   const verificationToken = randomUUID();
+
   state.emailVerificationTokens.set(verificationToken, {
     userId: user.id,
     expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS).toISOString()
@@ -200,6 +208,7 @@ router.post('/register', (req, res) => {
   pushUserCrudEvent('created', user.id);
 
   const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
+
   console.log(
     `[EMAIL VERIFICATION] To: ${user.email}\n  Verify URL: ${verifyUrl}`
   );
@@ -235,6 +244,7 @@ router.post('/login', (req, res) => {
       failedLoginAttempts: null,
       ip: req.ip
     });
+
     return;
   }
 
@@ -250,8 +260,10 @@ router.post('/login', (req, res) => {
         ip: req.ip
       });
       respondLocked(res, user.lockedUntil);
+
       return;
     }
+
     user.lockedUntil = null;
     user.failedLoginAttempts = 0;
   }
@@ -274,13 +286,16 @@ router.post('/login', (req, res) => {
         ip: req.ip
       });
       respondLocked(res, user.lockedUntil);
+
       return;
     }
+
     respondInvalidCredentials(res, {
       email,
       failedLoginAttempts: user.failedLoginAttempts,
       ip: req.ip
     });
+
     return;
   }
 
@@ -303,6 +318,7 @@ router.post('/login', (req, res) => {
       ErrorKeys.AUTH.EMAIL_NOT_VERIFIED,
       'Please verify your email address before logging in'
     );
+
     return;
   }
 
@@ -315,6 +331,7 @@ router.post('/login', (req, res) => {
       mfaToken: generateMfaPendingToken(user),
       expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
     });
+
     return;
   }
 
@@ -329,8 +346,10 @@ router.post('/verify-email', (req, res) => {
     ...unknownPropertyErrors(req.body, ['token']),
     ...mailedTokenErrors(token)
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 
@@ -343,16 +362,19 @@ router.post('/verify-email', (req, res) => {
       ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN,
       'Invalid or expired verification token'
     );
+
     return;
   }
 
   const user = findUserById(issued.userId);
+
   if (!user || !user.isActive) {
     sendError(
       res,
       ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN,
       'Invalid or expired verification token'
     );
+
     return;
   }
 
@@ -362,6 +384,7 @@ router.post('/verify-email', (req, res) => {
       ErrorKeys.AUTH.VERIFICATION_TOKEN_EXPIRED,
       'Verification token has expired. Please request a new one.'
     );
+
     return;
   }
 
@@ -388,8 +411,10 @@ router.post('/resend-verification', (req, res) => {
     res
   );
   const captchaCheck = evaluateCaptcha(remaining, req.body?.captchaToken);
+
   if (!captchaCheck.ok) {
     res.status(captchaCheck.status).json(captchaCheck.body);
+
     return;
   }
 
@@ -399,8 +424,10 @@ router.post('/resend-verification', (req, res) => {
   // The DTO carries no `@IsOptional()`, so an absent address is a validation
   // error here and never the enumeration-safe success message.
   const bodyEmailErrors = emailErrors('email', req.body?.email);
+
   if (bodyEmailErrors.length > 0) {
     sendValidationError(res, 'body', bodyEmailErrors);
+
     return;
   }
 
@@ -412,6 +439,7 @@ router.post('/resend-verification', (req, res) => {
   // the address it would verify still cannot sign in.
   if (!user || !user.isActive || user.isEmailVerified) {
     res.json({ message: successMessage });
+
     return;
   }
 
@@ -426,6 +454,7 @@ router.post('/resend-verification', (req, res) => {
 
   // Create new verification token
   const verificationToken = randomUUID();
+
   state.emailVerificationTokens.set(verificationToken, {
     userId: user.id,
     expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS).toISOString()
@@ -439,6 +468,7 @@ router.post('/resend-verification', (req, res) => {
   });
 
   const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
+
   console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
 
   res.json({ message: successMessage });
@@ -452,8 +482,10 @@ router.post('/forgot-password', (req, res) => {
     res
   );
   const captchaCheck = evaluateCaptcha(remaining, req.body?.captchaToken);
+
   if (!captchaCheck.ok) {
     res.status(captchaCheck.status).json(captchaCheck.body);
+
     return;
   }
 
@@ -463,8 +495,10 @@ router.post('/forgot-password', (req, res) => {
   // The DTO carries no `@IsOptional()`, so an absent address is a validation
   // error here and never the enumeration-safe success message.
   const bodyEmailErrors = emailErrors('email', req.body?.email);
+
   if (bodyEmailErrors.length > 0) {
     sendValidationError(res, 'body', bodyEmailErrors);
+
     return;
   }
 
@@ -475,6 +509,7 @@ router.post('/forgot-password', (req, res) => {
   // Always return success to prevent email enumeration
   if (!user || !user.isActive) {
     res.json({ message: successMessage });
+
     return;
   }
 
@@ -489,6 +524,7 @@ router.post('/forgot-password', (req, res) => {
 
   // Create new reset token
   const resetToken = randomUUID();
+
   state.passwordResetTokens.set(resetToken, {
     userId: user.id,
     expiresAt: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS).toISOString()
@@ -502,6 +538,7 @@ router.post('/forgot-password', (req, res) => {
   });
 
   const resetUrl = `http://localhost:4200/reset-password?token=${resetToken}`;
+
   console.log(`[PASSWORD RESET] To: ${email}\n  Reset URL: ${resetUrl}`);
 
   res.json({ message: successMessage });
@@ -516,8 +553,10 @@ router.post('/reset-password', (req, res) => {
     ...mailedTokenErrors(token),
     ...newPasswordErrors(password)
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 
@@ -530,6 +569,7 @@ router.post('/reset-password', (req, res) => {
       ErrorKeys.AUTH.INVALID_RESET_TOKEN,
       'Invalid or expired password reset token'
     );
+
     return;
   }
 
@@ -544,6 +584,7 @@ router.post('/reset-password', (req, res) => {
       ErrorKeys.AUTH.INVALID_RESET_TOKEN,
       'Invalid or expired password reset token'
     );
+
     return;
   }
 
@@ -553,14 +594,17 @@ router.post('/reset-password', (req, res) => {
       ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
       'Password reset token has expired. Please request a new one.'
     );
+
     return;
   }
 
   // The server checks the blocklist inside the service, after the token checks
   // that authorise the call: an invalid token must not buy a lookup.
   const passwordRefusal = newPasswordRefusal(password, user);
+
   if (passwordRefusal) {
     sendError(res, passwordRefusal.errorKey, passwordRefusal.message);
+
     return;
   }
 
@@ -576,6 +620,7 @@ router.post('/reset-password', (req, res) => {
   // Redeeming the token is the same proof of mailbox control that the
   // verification link carries: it is only ever mailed to the address on the row.
   const verified = !user.isEmailVerified;
+
   user.isEmailVerified = true;
 
   // Cancel any in-flight self-service email change — proof of email ownership
@@ -583,6 +628,7 @@ router.post('/reset-password', (req, res) => {
   if (user.pendingEmailToken) {
     state.pendingEmailTokens.delete(user.pendingEmailToken);
   }
+
   user.pendingEmail = null;
   user.pendingEmailToken = null;
   user.pendingEmailExpiresAt = null;
@@ -600,6 +646,7 @@ router.post('/reset-password', (req, res) => {
     targetType: 'User',
     ip: req.ip
   });
+
   if (verified) {
     logAudit('EMAIL_VERIFIED', {
       actorId: user.id,
@@ -635,6 +682,7 @@ router.post('/refresh-token', (req, res) => {
       ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED,
       'Refresh token is required'
     );
+
     return;
   }
 
@@ -644,13 +692,16 @@ router.post('/refresh-token', (req, res) => {
   // (moved to revokedRefreshTokens) and is presented again, treat as a
   // possible compromise: revoke ALL sessions for the user.
   const reusedUserId = state.revokedRefreshTokens.get(cookieToken);
+
   if (reusedUserId) {
     // A lost rotation response replays the old cookie. End only this
     // session and issue nothing, so a thief gains no token either.
     const successor = findLostResponseSuccessor(cookieToken);
+
     if (successor) {
       const sessionId = state.refreshSessions.get(cookieToken);
       const ip = normalizeIpAddress(req.ip);
+
       endSessionOfToken(cookieToken);
       logAudit('TOKEN_REFRESH_FAILURE', {
         actorId: reusedUserId,
@@ -670,6 +721,7 @@ router.post('/refresh-token', (req, res) => {
         ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
         'Invalid refresh token'
       );
+
       return;
     }
 
@@ -687,10 +739,12 @@ router.post('/refresh-token', (req, res) => {
       ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
       'Invalid refresh token'
     );
+
     return;
   }
 
   const userId = state.refreshTokens.get(cookieToken);
+
   if (!userId) {
     logAudit('TOKEN_REFRESH_FAILURE', {
       details: { reason: 'invalid_or_expired_token' },
@@ -701,6 +755,7 @@ router.post('/refresh-token', (req, res) => {
       ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
       'Invalid refresh token'
     );
+
     return;
   }
 
@@ -719,10 +774,12 @@ router.post('/refresh-token', (req, res) => {
       ErrorKeys.AUTH.SESSION_EXPIRED,
       'Session has reached its maximum duration. Please log in again.'
     );
+
     return;
   }
 
   const user = findUserById(userId);
+
   if (!user) {
     endSessionOfToken(cookieToken);
     logAudit('TOKEN_REFRESH_FAILURE', {
@@ -731,6 +788,7 @@ router.post('/refresh-token', (req, res) => {
       ip: req.ip
     });
     sendError(res, ErrorKeys.AUTH.USER_NOT_FOUND, 'User not found');
+
     return;
   }
 
@@ -747,6 +805,7 @@ router.post('/refresh-token', (req, res) => {
       ErrorKeys.AUTH.USER_DEACTIVATED,
       'User account is deactivated'
     );
+
     return;
   }
 
@@ -754,12 +813,14 @@ router.post('/refresh-token', (req, res) => {
   // and issue a fresh pair.
   const sessionId =
     state.refreshSessions.get(cookieToken) ?? generateSessionId();
+
   state.refreshTokens.delete(cookieToken);
   state.revokedRefreshTokens.set(cookieToken, user.id);
 
   // Rotation stays inside one session, so the access token another tab of this
   // device still holds keeps working.
   const tokens = generateTokens(user, sessionId);
+
   state.refreshTokens.set(tokens.refresh_token, user.id);
   state.rotatedTo.set(cookieToken, tokens.refresh_token);
   // The binding of the revoked ancestor stays: a session ends as a whole, and
@@ -771,6 +832,7 @@ router.post('/refresh-token', (req, res) => {
   });
 
   const { refresh_token, ...publicTokens } = tokens;
+
   setRefreshTokenCookie(res, refresh_token);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 });
@@ -813,6 +875,7 @@ router.post('/logout', authGuard, (req, res) => {
 // GET /api/v1/auth/profile
 router.get('/profile', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
+
   res.json(toUserResponse(user));
 });
 
@@ -820,6 +883,7 @@ router.get('/profile', authGuard, (req, res) => {
 router.get('/permissions', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const rules = getPackedRulesForUser(user);
+
   res.json({
     roles: user.roles,
     rules,
@@ -868,8 +932,10 @@ router.patch(
         code,
         operation: STEP_UP_OPERATION.PASSWORD_SET
       });
+
       if (stepUp) {
         sendWithRetryAfter(res, stepUp);
+
         return;
       }
 
@@ -880,18 +946,24 @@ router.patch(
         email: user.email,
         name: typeof name === 'string' ? name : user.name
       });
+
       if (passwordRefusal) {
         sendError(res, passwordRefusal.errorKey, passwordRefusal.message);
+
         return;
       }
     }
 
     const previous = { ...user };
+
     if (typeof name === 'string') user.name = name;
+
     if (locale !== undefined) user.locale = locale as string;
+
     if (password !== undefined) {
       // A first password replaces nothing, so it keeps the providers.
       const replacesPassword = user.password !== null;
+
       user.password = password;
       clearMailedProofs(user);
 
@@ -916,6 +988,7 @@ router.patch(
           ip: req.ip
         });
       }
+
       const stillLinked = (getState().oauthAccounts.get(user.id) ?? []).map(
         (a) => a.provider
       );
@@ -927,7 +1000,9 @@ router.patch(
             : '')
       );
     }
+
     user.updatedAt = new Date().toISOString();
+
     if (previous.name !== user.name) {
       pushUserCrudEvent('updated', user.id, previous);
     }
@@ -958,8 +1033,10 @@ router.post(
       code,
       operation: STEP_UP_OPERATION.EMAIL_CHANGE
     });
+
     if (stepUp) {
       sendWithRetryAfter(res, stepUp);
+
       return;
     }
 
@@ -969,6 +1046,7 @@ router.post(
         ErrorKeys.AUTH.SAME_EMAIL,
         'New email is the same as the current email'
       );
+
       return;
     }
 
@@ -980,8 +1058,10 @@ router.post(
 
     // Uniqueness check: primary email OR pending email on any OTHER user.
     let conflict = false;
+
     for (const other of state.users.values()) {
       if (other.id === user.id || other.deletedAt) continue;
+
       if (other.email === newEmail || other.pendingEmail === newEmail) {
         conflict = true;
         break;
@@ -989,6 +1069,7 @@ router.post(
     }
 
     const domain = newEmail.slice(newEmail.indexOf('@') + 1);
+
     logAudit('USER_EMAIL_CHANGE_REQUEST', {
       actorId: user.id,
       actorEmail: user.email,
@@ -1000,6 +1081,7 @@ router.post(
 
     if (conflict) {
       res.json({ message: successMessage });
+
       return;
     }
 
@@ -1010,6 +1092,7 @@ router.post(
 
     // No hashing in the mock — store the raw token directly.
     const token = randomUUID();
+
     user.pendingEmail = newEmail;
     user.pendingEmailToken = token;
     user.pendingEmailExpiresAt = new Date(
@@ -1018,6 +1101,7 @@ router.post(
     state.pendingEmailTokens.set(token, user.id);
 
     const confirmUrl = `http://localhost:4200/confirm-email-change?token=${token}`;
+
     console.log(
       `[EMAIL CHANGE CONFIRMATION] To: ${newEmail}\n  Confirm URL: ${confirmUrl}`
     );
@@ -1037,23 +1121,28 @@ router.post('/profile/email/confirm', (req, res) => {
     ...unknownPropertyErrors(req.body, ['token']),
     ...mailedTokenErrors(token)
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 
   const state = getState();
   const userId = state.pendingEmailTokens.get(token);
+
   if (!userId) {
     sendError(
       res,
       ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
       'Invalid or expired email-change token'
     );
+
     return;
   }
 
   const user = findUserById(userId);
+
   // Deactivation must also void an email-change token issued while the account
   // was still active, matching the isActive gate in reset-password. The
   // response stays identical to the not-found case so it reveals no account
@@ -1065,6 +1154,7 @@ router.post('/profile/email/confirm', (req, res) => {
       ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
       'Invalid or expired email-change token'
     );
+
     return;
   }
 
@@ -1075,6 +1165,7 @@ router.post('/profile/email/confirm', (req, res) => {
       ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
       'Invalid or expired email-change token'
     );
+
     return;
   }
 
@@ -1091,12 +1182,14 @@ router.post('/profile/email/confirm', (req, res) => {
       ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
       'Email-change token has expired. Please request a new one.'
     );
+
     return;
   }
 
   // Race check: another user may have claimed the address since step 1.
   for (const other of state.users.values()) {
     if (other.id === user.id || other.deletedAt) continue;
+
     if (other.email === user.pendingEmail) {
       state.pendingEmailTokens.delete(token);
       user.pendingEmail = null;
@@ -1107,6 +1200,7 @@ router.post('/profile/email/confirm', (req, res) => {
         ErrorKeys.USERS.EMAIL_EXISTS,
         'User with this email already exists'
       );
+
       return;
     }
   }
@@ -1117,6 +1211,7 @@ router.post('/profile/email/confirm', (req, res) => {
 
   user.email = newEmail;
   const verified = !user.isEmailVerified;
+
   user.isEmailVerified = true;
   // A reset link mailed to the old address dies with the move.
   clearMailedProofs(user);
@@ -1134,6 +1229,7 @@ router.post('/profile/email/confirm', (req, res) => {
     details: { oldEmail, newEmail },
     ip: req.ip
   });
+
   if (verified) {
     logAudit('EMAIL_VERIFIED', {
       actorId: user.id,
@@ -1144,6 +1240,7 @@ router.post('/profile/email/confirm', (req, res) => {
       ip: req.ip
     });
   }
+
   pushUserCrudEvent('updated', user.id, previous);
 
   console.log(

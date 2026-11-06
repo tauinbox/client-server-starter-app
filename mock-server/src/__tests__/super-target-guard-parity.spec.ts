@@ -40,9 +40,11 @@ function permissionId(actionSlug: string, resourceSlug = 'res-users'): string {
         p.resourceId === mockId(resourceSlug) &&
         p.actionId === mockId(actionSlug)
     );
+
   if (!permission) {
     throw new Error(`Seed permission ${resourceSlug}/${actionSlug} missing`);
   }
+
   return permission.id;
 }
 
@@ -50,6 +52,7 @@ function permissionId(actionSlug: string, resourceSlug = 'res-users'): string {
 // `update:User`, `delete:User` and `assign:Role`.
 function delegateUserWrites(): void {
   const state = getState();
+
   state.rolePermissions = [
     ...state.rolePermissions.filter((rp) => rp.roleId !== EDITOR_ROLE_ID),
     ...[
@@ -72,8 +75,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -161,6 +166,7 @@ describe('user writes on a super target parity', () => {
   it('refuses a restore of a super account by a delegated role', async () => {
     const token = await login('user@example.com');
     const target = findUserByEmail('admin@example.com')!;
+
     target.deletedAt = new Date().toISOString();
 
     await expectSuperTargetRefusal(
@@ -218,6 +224,7 @@ describe('user writes on a super target parity', () => {
   it('refuses a role removal on a super account by a delegated role', async () => {
     const token = await login('user@example.com');
     const target = findUserByEmail('admin@example.com')!;
+
     target.roles = [...target.roles, 'editor'];
 
     await expectSuperTargetRefusal(

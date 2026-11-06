@@ -16,7 +16,8 @@
 //    Setting the CSS variable on .mat-mdc-dialog-container cascades to the title
 //    inside it through normal CSS inheritance.
 .mat-mdc-dialog-container {
-  --mat-dialog-headline-padding: #{vars.$spacing-sm} #{func.rem(24)} #{vars.$spacing-sm};
+  --mat-dialog-headline-padding: #{vars.$spacing-sm} #{func.rem(24)}
+    #{vars.$spacing-sm};
 }
 
 // 2. Remove Material's ::before { height: 40px } invisible spacer that creates
@@ -34,7 +35,10 @@
 // on dialog content that follows a title (no CSS variable for this specific rule).
 // Specificity (0,3,0) beats Material's (0,2,0) — wins regardless of injection order.
 // See: https://github.com/angular/components/issues/26352
-.mat-mdc-dialog-container .mat-mdc-dialog-surface .mat-mdc-dialog-title + .mat-mdc-dialog-content {
+.mat-mdc-dialog-container
+  .mat-mdc-dialog-surface
+  .mat-mdc-dialog-title
+  + .mat-mdc-dialog-content {
   padding-top: func.rem(12);
 }
 
@@ -106,8 +110,11 @@
 
     // base inset (env() is 0, not the fallback, without a home indicator) + safe-area
     // env() needs a typed zero fallback; rem(0) would not parse inside calc().
-    /* stylelint-disable-next-line unit-disallowed-list */
-    padding-bottom: calc(#{vars.$spacing-md} + env(safe-area-inset-bottom, 0px));
+    /* stylelint-disable unit-disallowed-list */
+    padding-bottom: calc(
+      #{vars.$spacing-md} + env(safe-area-inset-bottom, 0px)
+    );
+    /* stylelint-enable unit-disallowed-list */
     background: var(--mat-sys-surface);
   }
 }

@@ -104,6 +104,7 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
       'no-rules-default-on': 'admin.featureFlagPreview.reason.noRulesDefaultOn',
       'not-included': 'admin.featureFlagPreview.reason.notIncluded'
     };
+
     return map[reason];
   }
 
@@ -135,7 +136,9 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
 
   #searchUsers(term: string) {
     const trimmed = term.trim();
+
     if (!isSearchableTerm(trimmed)) return of([] as User[]);
+
     return searchUsersPage(this.#userService, trimmed);
   }
 
@@ -147,8 +150,10 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
     if (checked) {
       // Project current structured form into raw JSON.
       const ctx = this.#buildStructuredContext();
+
       this.rawJson.set(JSON.stringify(ctx, null, 2));
     }
+
     this.useRawJson.set(checked);
     this.contextError.set(null);
   }
@@ -157,8 +162,11 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
     const ctx = this.useRawJson()
       ? (this.#parseJsonObject(this.rawJson()) as PreviewFlagContext | null)
       : this.#buildStructuredContext();
+
     if (ctx === null) return;
+
     const request: PreviewFlagRequest = { ...ctx, ...(this.draft() ?? {}) };
+
     this.loading.set(true);
     this.contextError.set(null);
     this.#adminService
@@ -182,26 +190,39 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
   #buildStructuredContext(): PreviewFlagContext | null {
     const ctx: PreviewFlagContext = {};
     const [user] = this.selectedUser();
+
     if (user) ctx.userId = user.value;
+
     const roles = this.selectedRoles().map((c) => c.value);
+
     if (roles.length > 0) ctx.roles = roles;
+
     const env = this.env();
+
     if (env) ctx.env = env;
+
     const attrs = this.#parseJsonObject(this.attributesJson());
+
     if (attrs === null) return null;
+
     if (Object.keys(attrs).length > 0) ctx.attributes = attrs;
+
     return ctx;
   }
 
   #parseJsonObject(text: string): Record<string, unknown> | null {
     const trimmed = text.trim();
+
     if (trimmed === '') return {};
+
     let parsed: unknown;
+
     try {
       parsed = JSON.parse(trimmed);
     } catch {
       parsed = null;
     }
+
     if (
       parsed === null ||
       typeof parsed !== 'object' ||
@@ -212,8 +233,10 @@ export class FeatureFlagPreviewComponent implements OnInit, OnDestroy {
           'admin.featureFlagPreview.advancedJsonInvalid'
         )
       );
+
       return null;
     }
+
     return parsed as Record<string, unknown>;
   }
 }

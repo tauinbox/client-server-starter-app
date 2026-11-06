@@ -18,7 +18,9 @@ function reportingPort(server: Server, port: number): Server {
       if (prop === 'address') {
         return () => ({ address: '127.0.0.1', family: 'IPv4', port });
       }
+
       const value = Reflect.get(target, prop, receiver);
+
       return typeof value === 'function' ? value.bind(target) : value;
     }
   });
@@ -34,9 +36,11 @@ function binderYielding(candidates: (number | null)[]): {
   const binder: PortBinder = {
     listen(port, callback) {
       const real = http.createServer();
+
       created.push(real);
       const scripted = queue.length > 0 ? queue.shift() : null;
       const server = real.listen(port, callback);
+
       return scripted == null ? server : reportingPort(server, scripted);
     }
   };
@@ -76,8 +80,10 @@ describe('listenOnUnblockedPort', () => {
 
     const heldDuringRetry: boolean[] = [];
     const listen = binder.listen.bind(binder);
+
     binder.listen = (port, callback) => {
       heldDuringRetry.push(created.every((server) => server.listening));
+
       return listen(port, callback);
     };
 

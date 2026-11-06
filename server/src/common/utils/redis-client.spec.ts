@@ -7,8 +7,10 @@ describe('redisClientOf', () => {
   it('returns the client of a Redis adapter', () => {
     const client = { get: jest.fn() };
     const store = Object.create(KeyvRedis.prototype) as KeyvRedis<unknown>;
+
     Object.defineProperty(store, 'client', { value: client });
     const cache = createMockCache();
+
     Object.defineProperty(cache, 'stores', { value: [{ store }] });
 
     expect(redisClientOf(cache)).toBe(client);
@@ -16,6 +18,7 @@ describe('redisClientOf', () => {
 
   it('returns null for a cache with a store that is not Redis', () => {
     const cache = createMockCache();
+
     Object.defineProperty(cache, 'stores', { value: [{ store: new Map() }] });
 
     expect(redisClientOf(cache)).toBeNull();

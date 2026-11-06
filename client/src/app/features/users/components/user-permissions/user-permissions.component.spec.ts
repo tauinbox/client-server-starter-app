@@ -200,6 +200,7 @@ describe('UserPermissionsComponent', () => {
       });
 
       const groups = component.groups();
+
       expect(groups).toHaveLength(2);
       // Groups are sorted by displayName: "Roles" then "Users"
       expect(groups[0]?.name).toBe('Role');
@@ -231,6 +232,7 @@ describe('UserPermissionsComponent', () => {
         ],
         rules: []
       });
+
       createComponent(response());
       // Angular checks track keys only when it reconciles a rendered list, so
       // a second load is what exposes a duplicate key.
@@ -241,6 +243,7 @@ describe('UserPermissionsComponent', () => {
       const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
         '.permission-row'
       );
+
       expect(rows).toHaveLength(3);
       expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('NG0955'));
       warn.mockRestore();
@@ -257,6 +260,7 @@ describe('UserPermissionsComponent', () => {
       });
 
       const groups = component.groups();
+
       expect(groups[0]?.hasDeny).toBe(true);
       expect(groups[0]?.denyCount).toBe(1);
       expect(groups[0]?.allowCount).toBe(1);
@@ -385,6 +389,7 @@ describe('UserPermissionsComponent', () => {
         effect: 'deny',
         ownership: { userField: 'id' }
       });
+
       expect(result).not.toContain('effect');
       expect(result).toContain('ownership');
       expect(result).toContain('userField');

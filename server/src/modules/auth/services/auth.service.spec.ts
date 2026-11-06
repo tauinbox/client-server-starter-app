@@ -243,6 +243,7 @@ describe('AuthService', () => {
           JWT_REFRESH_EXPIRATION: '604800',
           SESSION_ABSOLUTE_MAX_MS: String(DEFAULT_SESSION_ABSOLUTE_MAX_MS)
         };
+
         return config[key];
       }),
       getOrThrow: jest.fn().mockImplementation((key: string) => {
@@ -252,9 +253,11 @@ describe('AuthService', () => {
           SESSION_ABSOLUTE_MAX_MS: String(DEFAULT_SESSION_ABSOLUTE_MAX_MS)
         };
         const value = config[key];
+
         if (value === undefined) {
           throw new Error(`Configuration key "${key}" does not exist`);
         }
+
         return value;
       })
     };
@@ -419,6 +422,7 @@ describe('AuthService', () => {
         ...mockUser,
         passwordHashVersion: PasswordHashVersion.LEGACY
       };
+
       mockUsersService.findByEmail.mockResolvedValue(legacyUser);
       const compare = jest
         .spyOn(bcrypt, 'compare')
@@ -480,6 +484,7 @@ describe('AuthService', () => {
 
     it('should throw HttpException when user is inactive', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
+
       mockUsersService.findByEmail.mockResolvedValue(inactiveUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
@@ -490,6 +495,7 @@ describe('AuthService', () => {
 
     it('should throw HttpException when user has no password (OAuth-only)', async () => {
       const oauthUser = { ...mockUser, password: null };
+
       mockUsersService.findByEmail.mockResolvedValue(oauthUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
@@ -516,6 +522,7 @@ describe('AuthService', () => {
       // A cost mismatch makes the dummy-compare path measurably faster/slower
       // than the real-hash path, reopening the user-enumeration timing oracle
       const dummyHash = AuthService['DUMMY_HASH'];
+
       expect(bcrypt.getRounds(dummyHash)).toBe(BCRYPT_SALT_ROUNDS);
     });
 
@@ -524,6 +531,7 @@ describe('AuthService', () => {
         ...mockUser,
         lockedUntil: new Date(Date.now() + 600000) // 10 min from now
       };
+
       mockUsersService.findByEmail.mockResolvedValue(lockedUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
@@ -534,6 +542,7 @@ describe('AuthService', () => {
         expect(error).toBeInstanceOf(HttpException);
         expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
         const response = (error as HttpException).getResponse();
+
         expect(response).toHaveProperty('lockedUntil');
         expect(response).toHaveProperty('retryAfter');
       }
@@ -573,6 +582,7 @@ describe('AuthService', () => {
       } catch (error) {
         expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
       }
+
       expect(compareSpy).not.toHaveBeenCalled();
     });
 
@@ -595,6 +605,7 @@ describe('AuthService', () => {
       } catch (error) {
         expect((error as HttpException).getStatus()).toBe(HttpStatus.LOCKED);
       }
+
       expect(compareSpy).not.toHaveBeenCalled();
       expect(mockUsersService.resetLoginAttempts).not.toHaveBeenCalled();
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
@@ -623,6 +634,7 @@ describe('AuthService', () => {
         mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mock
           .invocationCallOrder;
       const [comparedAt] = compareSpy.mock.invocationCallOrder;
+
       expect(reservedAt).toBeLessThan(comparedAt);
     });
 
@@ -694,8 +706,10 @@ describe('AuthService', () => {
 
     it('should lock account after 5 failed attempts', async () => {
       const userNearLockout = { ...mockUser, failedLoginAttempts: 4 };
+
       mockUsersService.findByEmail.mockResolvedValue(userNearLockout);
       const lockedUntil = new Date(Date.now() + 900000);
+
       mockUsersService.incrementFailedAttemptsAndLockIfNeeded.mockResolvedValue(
         {
           failedLoginAttempts: 5,
@@ -723,6 +737,7 @@ describe('AuthService', () => {
 
     it('should throw 403 when email is not verified', async () => {
       const unverifiedUser = { ...mockUser, isEmailVerified: false };
+
       mockUsersService.findByEmail.mockResolvedValue(unverifiedUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
@@ -733,11 +748,13 @@ describe('AuthService', () => {
         expect(error).toBeInstanceOf(HttpException);
         expect((error as HttpException).getStatus()).toBe(HttpStatus.FORBIDDEN);
         const response = (error as HttpException).getResponse();
+
         expect(response).toHaveProperty(
           'errorKey',
           ErrorKeys.AUTH.EMAIL_NOT_VERIFIED
         );
       }
+
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
         action: AuditAction.USER_LOGIN_FAILURE,
         actorEmail: 'test@example.com',
@@ -753,6 +770,7 @@ describe('AuthService', () => {
 
     it('should reset failed attempts on successful login', async () => {
       const userWithAttempts = { ...mockUser, failedLoginAttempts: 3 };
+
       mockUsersService.findByEmail.mockResolvedValue(userWithAttempts);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
@@ -1105,6 +1123,7 @@ describe('AuthService', () => {
         isEmailVerified: false,
         emailVerificationExpiresAt: new Date(Date.now() + 86400000)
       };
+
       mockUsersService.findByEmailVerificationToken.mockResolvedValue(user);
 
       const result = await service.verifyEmail('valid-token');
@@ -1208,6 +1227,7 @@ describe('AuthService', () => {
         ...mockUser,
         emailVerificationExpiresAt: new Date(Date.now() - 1000)
       };
+
       mockUsersService.findByEmailVerificationToken.mockResolvedValue(user);
 
       try {
@@ -1225,6 +1245,7 @@ describe('AuthService', () => {
   describe('resendVerificationEmail', () => {
     it('should resend verification email for unverified user', async () => {
       const unverifiedUser = { ...mockUser, isEmailVerified: false };
+
       mockUsersService.findByEmail.mockResolvedValue(unverifiedUser);
 
       const result = await service.resendVerificationEmail('test@example.com');
@@ -1313,6 +1334,7 @@ describe('AuthService', () => {
         isEmailVerified: false,
         isActive: false
       };
+
       mockUsersService.findByEmail.mockResolvedValue(deactivatedUser);
 
       const result = await service.resendVerificationEmail('test@example.com');
@@ -1455,6 +1477,7 @@ describe('AuthService', () => {
         'user-1',
         mockManager
       );
+
       for (const provider of ['google', 'vk']) {
         expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -1493,6 +1516,7 @@ describe('AuthService', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       mockMailService.sendPasswordChangedNotification.mockRejectedValueOnce(
         new Error('smtp down')
       );
@@ -1502,6 +1526,7 @@ describe('AuthService', () => {
       });
 
       const result = await service.resetPassword('valid-token', 'NewPassword1');
+
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(result.message).toContain('reset successfully');
@@ -1513,6 +1538,7 @@ describe('AuthService', () => {
         ...mockUser,
         passwordResetExpiresAt: new Date(Date.now() + 3600000)
       };
+
       mockUsersService.findByPasswordResetToken.mockResolvedValue(user);
 
       const result = await service.resetPassword('valid-token', 'NewPassword1');
@@ -1595,6 +1621,7 @@ describe('AuthService', () => {
         ([entry]: [{ action: AuditAction }]) =>
           entry.action === AuditAction.EMAIL_VERIFIED
       );
+
       expect(rows).toEqual([
         [
           {
@@ -1683,6 +1710,7 @@ describe('AuthService', () => {
         ...mockUser,
         passwordResetExpiresAt: new Date(Date.now() - 1000)
       };
+
       mockUsersService.findByPasswordResetToken.mockResolvedValue(user);
 
       try {
@@ -1927,6 +1955,7 @@ describe('AuthService', () => {
       const entity = Object.assign(new User(), columns, {
         passwordResetToken: 'hashed-reset-token'
       });
+
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
       mockUsersService.findById.mockResolvedValue(entity);
 
@@ -1948,6 +1977,7 @@ describe('AuthService', () => {
 
     it('should throw HttpException when token is revoked', async () => {
       const revokedToken = { ...mockTokenDoc, revoked: true };
+
       mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
 
       await expect(
@@ -1964,6 +1994,7 @@ describe('AuthService', () => {
           revoked: true,
           isExpired: () => false
         };
+
         mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
 
         await expect(
@@ -1997,6 +2028,7 @@ describe('AuthService', () => {
           revoked: true,
           isExpired: () => false
         };
+
         mockRefreshTokenService.findByToken.mockResolvedValue(revokedToken);
         mockRefreshTokenService.findLostResponseSuccessor.mockResolvedValue({
           ageMs: 3_600_000,
@@ -2080,6 +2112,7 @@ describe('AuthService', () => {
           revoked: true,
           isExpired: () => true
         };
+
         mockRefreshTokenService.findByToken.mockResolvedValue(revokedExpired);
 
         await expect(
@@ -2102,6 +2135,7 @@ describe('AuthService', () => {
         mockUsersService.findById.mockResolvedValue(mockUser);
 
         const first = await service.refreshTokens('original-token', null);
+
         expect(first.tokens.access_token).toBe('mock-access-token');
 
         // Second refresh with the SAME original token — service now sees it as
@@ -2111,6 +2145,7 @@ describe('AuthService', () => {
           revoked: true,
           isExpired: () => false
         };
+
         mockRefreshTokenService.findByToken.mockResolvedValueOnce(revokedNow);
 
         await expect(
@@ -2130,6 +2165,7 @@ describe('AuthService', () => {
 
     it('should throw HttpException when token is expired', async () => {
       const expiredToken = { ...mockTokenDoc, isExpired: () => true };
+
       mockRefreshTokenService.findByToken.mockResolvedValue(expiredToken);
 
       await expect(
@@ -2166,6 +2202,7 @@ describe('AuthService', () => {
 
     it('ends the session and throws when user is deactivated', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
+
       mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
       mockUsersService.findById.mockResolvedValue(inactiveUser);
 
@@ -2199,13 +2236,16 @@ describe('AuthService', () => {
         ...mockTokenDoc,
         createdAt: new Date('2024-01-01T00:00:00Z')
       };
+
       mockRefreshTokenService.findByToken.mockResolvedValue(oldToken);
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'JWT_MIN_IAT') return 1800000000; // 2027, after oldToken.createdAt
+
         const config: Record<string, string> = {
           JWT_EXPIRATION: '3600',
           JWT_REFRESH_EXPIRATION: '604800'
         };
+
         return config[key];
       });
 
@@ -2225,6 +2265,7 @@ describe('AuthService', () => {
           Date.now() - DEFAULT_SESSION_ABSOLUTE_MAX_MS - 1000
         )
       };
+
       mockRefreshTokenService.findByToken.mockResolvedValue(agedToken);
       mockUsersService.findById.mockResolvedValue(mockUser);
 
@@ -2245,6 +2286,7 @@ describe('AuthService', () => {
       const startedAt = new Date(
         Date.now() - DEFAULT_SESSION_ABSOLUTE_MAX_MS / 2
       );
+
       mockRefreshTokenService.findByToken.mockResolvedValue({
         ...mockTokenDoc,
         sessionStartedAt: startedAt,
@@ -2278,9 +2320,11 @@ describe('AuthService', () => {
           SESSION_ABSOLUTE_MAX_MS: '0'
         };
         const value = config[key];
+
         if (value === undefined) {
           throw new Error(`Configuration key "${key}" does not exist`);
         }
+
         return value;
       });
       mockRefreshTokenService.findByToken.mockResolvedValue({
@@ -2300,14 +2344,17 @@ describe('AuthService', () => {
         ...mockTokenDoc,
         createdAt: new Date('2030-01-01T00:00:00Z')
       };
+
       mockRefreshTokenService.findByToken.mockResolvedValue(recentToken);
       mockUsersService.findById.mockResolvedValue(mockUser);
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'JWT_MIN_IAT') return 1800000000; // 2027, before recentToken.createdAt
+
         const config: Record<string, string> = {
           JWT_EXPIRATION: '3600',
           JWT_REFRESH_EXPIRATION: '604800'
         };
+
         return config[key];
       });
 
@@ -2361,6 +2408,7 @@ describe('AuthService', () => {
         ...mockUser,
         passwordHashVersion: PasswordHashVersion.LEGACY
       };
+
       mockUsersService.findOne.mockResolvedValue(legacyUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
@@ -2417,8 +2465,10 @@ describe('AuthService', () => {
 
     it('demands a provider proof when the account holds no password', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       const compareSpy = jest.spyOn(bcrypt, 'compare');
+
       compareSpy.mockClear();
 
       await expect(
@@ -2433,6 +2483,7 @@ describe('AuthService', () => {
 
     it('accepts a proof minted for this operation', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
@@ -2452,6 +2503,7 @@ describe('AuthService', () => {
 
     it('refuses the same proof a second time', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
@@ -2483,6 +2535,7 @@ describe('AuthService', () => {
 
     it('refuses a proof that carries no token id', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
@@ -2503,6 +2556,7 @@ describe('AuthService', () => {
 
     it('does not spend the proof when the operation does not match', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
@@ -2531,6 +2585,7 @@ describe('AuthService', () => {
 
     it('refuses a proof minted for another operation', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
@@ -2551,6 +2606,7 @@ describe('AuthService', () => {
 
     it('refuses a proof that names no operation at all', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
@@ -2570,6 +2626,7 @@ describe('AuthService', () => {
 
     it('accepts an authenticator code in place of the provider proof', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockMfaService.isValidStepUpCode.mockImplementation(
         (_user: User, code: string | undefined) =>
@@ -2597,6 +2654,7 @@ describe('AuthService', () => {
       // An account created through a provider holds no password, so before the
       // second factor existed a provider round trip was its only way to step up.
       const user = { id: 'user-1', password: null } as User;
+
       mockMfaService.isValidStepUpCode.mockImplementation(
         (_user: User, code: string | undefined) =>
           Promise.resolve({
@@ -2618,6 +2676,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: null
       } as User;
+
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
 
       await expect(
@@ -2648,6 +2707,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: '$2b$12$hash'
       } as User;
+
       mockMfaService.isValidStepUpCode.mockResolvedValue({
         kind: 'refused',
         lockedMs: 60_000
@@ -2682,6 +2742,7 @@ describe('AuthService', () => {
     it('names the code when a wrong code is the only factor of an account with a password', async () => {
       const compare = jest.spyOn(bcrypt, 'compare').mockClear();
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
+
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
 
       await expect(
@@ -2698,6 +2759,7 @@ describe('AuthService', () => {
 
     it('still accepts a valid provider proof after a wrong code', async () => {
       const oauthOnlyUser = { ...mockUser, password: null };
+
       mockUsersService.findOne.mockResolvedValue(oauthOnlyUser);
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
       mockJwtService.verify.mockReturnValue({
@@ -2724,6 +2786,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: '$2b$12$hash'
       } as User;
+
       mockMfaService.isValidStepUpCode.mockClear();
       mockMfaService.isValidStepUpCode.mockImplementation(
         (_user: User, code: string | undefined) =>
@@ -2750,6 +2813,7 @@ describe('AuthService', () => {
     it('accepts a valid authenticator code in place of the password', async () => {
       const compare = jest.spyOn(bcrypt, 'compare').mockClear();
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
+
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'accepted' });
 
       await expect(
@@ -2767,6 +2831,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: '$2b$12$hash'
       } as User;
+
       // The code was wrong too, but the password that was offered and checked
       // is the factor that the refusal names.
       mockMfaService.isValidStepUpCode.mockResolvedValue({ kind: 'refused' });
@@ -2807,6 +2872,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: null
       } as User;
+
       mockMfaService.isValidStepUpCode.mockResolvedValue({
         kind: 'not_offered'
       });
@@ -2831,6 +2897,7 @@ describe('AuthService', () => {
 
     it('writes no row when the caller proves itself', async () => {
       const user = { id: 'user-1', password: '$2b$12$hash' } as User;
+
       mockMfaService.isValidStepUpCode.mockResolvedValue({
         kind: 'not_offered'
       });
@@ -2855,6 +2922,7 @@ describe('AuthService', () => {
 
       async function guessWrong(times: number): Promise<void> {
         jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
         for (let i = 0; i < times; i += 1) {
           await expect(
             service.assertStepUp(passwordUser, {
@@ -3168,6 +3236,7 @@ describe('AuthService', () => {
         expect(err).toBeInstanceOf(HttpException);
         expect((err as HttpException).getStatus()).toBe(HttpStatus.FORBIDDEN);
       }
+
       expect(mockManager.update).not.toHaveBeenCalled();
     });
 
@@ -3196,6 +3265,7 @@ describe('AuthService', () => {
       it('proceeds on a valid re-authentication proof and never checks a password', async () => {
         // Earlier cases in this file leave calls on the shared bcrypt spy.
         const compare = jest.spyOn(bcrypt, 'compare').mockClear();
+
         mockJwtService.verify.mockReturnValue(validProof());
 
         const result = await service.initiateEmailChange(
@@ -3255,6 +3325,7 @@ describe('AuthService', () => {
 
       it('refuses a proof older than the last session revocation', async () => {
         const now = Math.floor(Date.now() / 1000);
+
         mockUsersService.findOne.mockResolvedValue({
           ...oauthOnlyUser(),
           tokenRevokedAt: new Date(now * 1000)
@@ -3277,6 +3348,7 @@ describe('AuthService', () => {
 
       it('accepts a proof minted in the second of the last session revocation', async () => {
         const now = Math.floor(Date.now() / 1000);
+
         mockUsersService.findOne.mockResolvedValue({
           ...oauthOnlyUser(),
           tokenRevokedAt: new Date(now * 1000 + 700)
@@ -3433,6 +3505,7 @@ describe('AuthService', () => {
         pendingEmailToken: 'hashed-token',
         pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
       };
+
       mockManager.findOne.mockResolvedValue(pendingUser);
 
       const result = await service.confirmEmailChange('raw-token');
@@ -3487,6 +3560,7 @@ describe('AuthService', () => {
         ([entry]: [{ action: AuditAction }]) =>
           entry.action === AuditAction.EMAIL_VERIFIED
       );
+
       expect(rows).toEqual([
         [
           {
@@ -3547,6 +3621,7 @@ describe('AuthService', () => {
         pendingEmailToken: 'hashed-token',
         pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
       };
+
       mockManager.findOne.mockResolvedValue(pendingUser);
 
       const rejection = await service.confirmEmailChange('raw-token').then(
@@ -3556,6 +3631,7 @@ describe('AuthService', () => {
 
       expect(rejection).toBeInstanceOf(HttpException);
       const httpError = rejection as HttpException;
+
       expect(httpError.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
       expect(httpError.getResponse()).toEqual({
         message: 'Invalid or expired email-change token',
@@ -3596,6 +3672,7 @@ describe('AuthService', () => {
         pendingEmailToken: 'hashed-token',
         pendingEmailExpiresAt: new Date(Date.now() - 1000)
       };
+
       mockManager.findOne.mockResolvedValue(pendingUser);
 
       await expect(service.confirmEmailChange('raw-token')).rejects.toThrow(
@@ -3617,6 +3694,7 @@ describe('AuthService', () => {
         pendingEmailToken: 'hashed-token',
         pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
       };
+
       mockManager.findOne.mockResolvedValue(pendingUser);
       // Conflicting other user under the same address
       userQb.getOne.mockResolvedValue({ id: 'other-user' });
@@ -3628,6 +3706,7 @@ describe('AuthService', () => {
         expect(err).toBeInstanceOf(HttpException);
         expect((err as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
       }
+
       // The pending fields must be cleared so the user can re-initiate cleanly,
       // and outside the transaction so the throw cannot roll the clear back.
       expect(mockManager.update).not.toHaveBeenCalled();
@@ -3644,6 +3723,7 @@ describe('AuthService', () => {
         pendingEmailToken: 'hashed-token',
         pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
       };
+
       mockManager.findOne.mockResolvedValue(pendingUser);
       // Nobody held the address at check time; the index rejects the write.
       mockManager.update.mockRejectedValue({ code: '23505' });
@@ -3660,6 +3740,7 @@ describe('AuthService', () => {
           })
         );
       }
+
       expect(mockUsersService.clearPendingEmailChange).toHaveBeenCalledWith(
         'user-1',
         hashToken('raw-token')
@@ -3673,6 +3754,7 @@ describe('AuthService', () => {
         pendingEmailToken: 'hashed-token',
         pendingEmailExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
       };
+
       mockManager.findOne.mockResolvedValue(pendingUser);
       mockManager.update.mockRejectedValue(new Error('connection lost'));
 

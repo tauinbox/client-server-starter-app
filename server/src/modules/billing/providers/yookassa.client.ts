@@ -17,8 +17,10 @@ export function createYooKassaClient(
 ): YooCheckout | null {
   const shopId = config.get<string>('YOOKASSA_SHOP_ID');
   const secretKey = config.get<string>('YOOKASSA_SECRET_KEY');
+
   if (!shopId || !secretKey) {
     return null;
   }
+
   return new YooCheckout({ shopId, secretKey });
 }

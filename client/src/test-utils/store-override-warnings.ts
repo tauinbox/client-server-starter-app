@@ -5,8 +5,10 @@
  */
 export function storeOverrideWarnings(create: () => unknown): string[] {
   const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined);
+
   try {
     create();
+
     return warn.mock.calls
       .map((call) => call.join(' '))
       .filter((line) => line.includes('cannot be overridden'));

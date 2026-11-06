@@ -54,6 +54,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -76,11 +77,14 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const updateUser = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'update' && p.resource.subject === 'User'
     );
+
     if (!updateUser) throw new Error('Permission update:User missing');
+
     const support = await roleService.create(
       { name: supportRoleName },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       support.id,
       [{ permissionId: updateUser.id, conditions: null }],
@@ -93,6 +97,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await roleService.assignRoleToUser(await userId(superEmail), superRole.id, {
       ability: SYSTEM_ABILITY
     });
@@ -120,6 +125,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return found.id;
   }
 
@@ -136,6 +142,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
       userAgent: 'session-revoke-e2e',
       ipAddress: null
     });
+
     return { access: tokens.access_token, refresh: tokens.refresh_token };
   }
 
@@ -161,12 +168,15 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
   async function refreshErrorKey(raw: string): Promise<string> {
     try {
       await authService.refreshTokens(raw, null);
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return body.errorKey ?? `STATUS_${error.getStatus()}`;
       }
+
       throw error;
     }
   }
@@ -175,11 +185,13 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const id = await userId(ownerEmail);
     const first = await sessionFor(ownerEmail);
     const second = await sessionFor(ownerEmail);
+
     expect((await profile(first.access)).status).toBe(200);
     expect(await refreshRows(id)).toBeGreaterThanOrEqual(2);
 
     const support = await sessionFor(supportEmail);
     const res = await revoke(support.access, id);
+
     expect(res.status).toBe(200);
 
     expect(await refreshRows(id)).toBe(0);
@@ -199,6 +211,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
         where: { action: AuditAction.SESSION_REVOKE, targetId: id }
       })
     );
+
     expect(audit?.actorEmail).toBe(supportEmail);
     expect(audit?.details).toEqual({ scope: 'all', source: 'admin' });
   }, 30000);
@@ -207,6 +220,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const support = await sessionFor(supportEmail);
 
     const refused = await revoke(support.access, await userId(supportEmail));
+
     expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.USERS.SESSION_REVOKE_SELF
@@ -221,6 +235,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
       (await sessionFor(supportEmail)).access,
       await userId(superEmail)
     );
+
     expect(refused.status).toBe(403);
     expect((await profile(target.access)).status).toBe(200);
   }, 30000);
@@ -230,6 +245,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const owner = await sessionFor(ownerEmail);
 
     const refused = await revoke(owner.access, await userId(supportEmail));
+
     expect(refused.status).toBe(403);
     expect((await profile(support.access)).status).toBe(200);
   }, 30000);
@@ -238,6 +254,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     const support = await sessionFor(supportEmail);
 
     const res = await revoke(support.access, randomUUID());
+
     expect(res.status).toBe(404);
   }, 30000);
 });

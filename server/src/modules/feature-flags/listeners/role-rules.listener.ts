@@ -24,6 +24,7 @@ export class RoleRulesListener {
       event.oldName,
       event.newName
     );
+
     this.#announceAfter(event.committed, keys);
   }
 
@@ -34,6 +35,7 @@ export class RoleRulesListener {
       event.name,
       null
     );
+
     this.#announceAfter(event.committed, keys);
   }
 
@@ -41,6 +43,7 @@ export class RoleRulesListener {
   // again, so the flags are announced only after it.
   #announceAfter(committed: Promise<void>, changedKeys: string[]): void {
     if (changedKeys.length === 0) return;
+
     void committed.then(() => {
       this.eventEmitter.emit(
         FeatureFlagChangedEvent.name,

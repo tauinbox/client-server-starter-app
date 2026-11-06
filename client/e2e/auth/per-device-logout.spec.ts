@@ -18,10 +18,12 @@ test.describe('Per-device logout', () => {
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
+
     await routeApiToMockServer(otherPage, _mockServer.url);
     await loginViaUi(otherPage, _mockServer.url, { roles: ['admin'] });
 
     const bothSignedIn = await _mockServer.getState();
+
     expect(bothSignedIn.refreshTokens).toBe(2);
 
     await page.getByRole('button', { name: /John Doe/i }).click();
@@ -29,6 +31,7 @@ test.describe('Per-device logout', () => {
     await expect(page).toHaveURL(/\/login\b/);
 
     const afterLogout = await _mockServer.getState();
+
     expect(afterLogout.refreshTokens).toBe(1);
 
     // The other device keeps its access token and its refresh cookie. A

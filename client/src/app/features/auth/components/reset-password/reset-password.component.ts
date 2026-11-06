@@ -100,12 +100,14 @@ export class ResetPasswordComponent implements OnInit {
     validate(path.confirmPassword, ({ value, valueOf }) => {
       const confirm = value();
       const password = valueOf(path.password);
+
       if (confirm && confirm !== password) {
         return {
           kind: 'passwordMismatch',
           message: 'forms.errors.passwordMismatch'
         };
       }
+
       return null;
     });
   });

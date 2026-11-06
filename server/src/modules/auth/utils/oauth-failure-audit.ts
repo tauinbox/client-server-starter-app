@@ -102,8 +102,10 @@ export class OAuthFailureAudit {
       reauth,
       TOKEN_PURPOSE.OAUTH_REAUTH
     );
+
     if (reauthAccount) {
       this.stepUpFailure(failure, reauthAccount);
+
       return;
     }
 
@@ -111,8 +113,10 @@ export class OAuthFailureAudit {
       link,
       TOKEN_PURPOSE.OAUTH_LINK
     );
+
     if (linkAccount) {
       this.linkFailure(failure, linkAccount);
+
       return;
     }
 
@@ -131,6 +135,7 @@ function actorFields(account: OAuthIntentAccount | undefined) {
   if (!account) {
     return {};
   }
+
   return {
     actorId: account.sub,
     actorEmail: account.email,

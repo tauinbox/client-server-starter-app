@@ -17,9 +17,11 @@ import type { AppAbility } from '../../auth/casl/app-ability';
 
 const fullAbility = (() => {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
   for (const action of ['create', 'read', 'update', 'delete']) {
     can(action, 'FeatureFlag');
   }
+
   return build();
 })();
 
@@ -99,6 +101,7 @@ describe('FeatureFlagsAdminController', () => {
 
   it('findOne passes the ability and the actor and sends the ETag', async () => {
     const res = response();
+
     await expect(
       controller.findOne('flag-1', req, fullAbility, res)
     ).resolves.toBe(sampleFlag);
@@ -112,6 +115,7 @@ describe('FeatureFlagsAdminController', () => {
 
   it('create passes the ability and the audit actor, emits a change event and sends the ETag', async () => {
     const res = response();
+
     await controller.create({ key: 'new-dashboard' }, req, fullAbility, res);
     expect(flagService.create).toHaveBeenCalledWith(
       { key: 'new-dashboard' },
@@ -159,6 +163,7 @@ describe('FeatureFlagsAdminController', () => {
 
   it('update passes the parsed condition, ability and audit actor, and sends the new ETag', async () => {
     const res = response();
+
     await controller.update(
       'flag-1',
       { enabled: true },

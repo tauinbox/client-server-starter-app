@@ -11,6 +11,7 @@ export function readAnonId(req: Request): string | null {
   const value = (req.cookies as Record<string, unknown> | undefined)?.[
     ANON_ID_COOKIE
   ];
+
   return typeof value === 'string' && ANON_ID_PATTERN.test(value)
     ? value
     : null;
@@ -20,6 +21,7 @@ export function writeAnonId(res: Response, value: string): void {
   // An unset ENVIRONMENT is local here: a Secure cookie would be dropped on
   // http://localhost and bucketing would restart on every request.
   const secure = requiresSecureCookies(process.env['ENVIRONMENT'] ?? 'local');
+
   res.cookie(ANON_ID_COOKIE, value, {
     httpOnly: true,
     sameSite: 'lax',

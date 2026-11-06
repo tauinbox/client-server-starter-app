@@ -30,8 +30,11 @@ type OpenSession =
 function findSession(sessionRef: string): OpenSession | undefined {
   const state = getState();
   const purchase = state.billingPurchaseSessions.get(sessionRef);
+
   if (purchase) return { kind: 'purchase', session: purchase };
+
   const checkout = state.billingCheckoutSessions.get(sessionRef);
+
   return checkout ? { kind: 'checkout', session: checkout } : undefined;
 }
 
@@ -53,19 +56,25 @@ function formatAmount(amountMinor: number, currency: string): string {
 
 function describe(open: OpenSession): { title: string; amount: string } {
   const state = getState();
+
   if (open.kind === 'purchase') {
     const { session } = open;
+
     return {
       title: state.billingProducts.get(session.productId)?.name ?? 'Purchase',
       amount: formatAmount(session.amountMinor, session.currency)
     };
   }
+
   const { session } = open;
+
   if (session.kind === 'method') {
     return { title: 'Update the payment method', amount: '' };
   }
+
   const plan = state.plans.values().find((p) => p.key === session.planKey);
   const price = plan?.prices[session.provider];
+
   return {
     title: `Plan: ${plan?.name ?? session.planKey}`,
     amount: price ? formatAmount(price.amountMinor ?? 0, price.currency) : ''
@@ -120,12 +129,16 @@ const router = Router();
 
 router.get('/:sessionRef', (req, res) => {
   const open = findSession(req.params.sessionRef);
+
   if (!open) {
     sessionNotFound(res);
+
     return;
   }
+
   const { title, amount } = describe(open);
   const ref = encodeURIComponent(open.session.sessionRef);
+
   sendPage(
     res,
     `<p>Provider: ${escapeHtml(open.session.provider)}</p>
@@ -142,30 +155,43 @@ ${amount ? `<p class="amount">${escapeHtml(amount)}</p>` : ''}
 // then returns the buyer to the client.
 router.post('/:sessionRef/pay', (req, res) => {
   const open = findSession(req.params.sessionRef);
+
   if (!open) {
     sessionNotFound(res);
+
     return;
   }
+
   const state = getState();
+
   if (open.kind === 'purchase') {
     settlePurchase(open.session);
     sendReturn(res, SUCCESS_URL);
+
     return;
   }
+
   const { session } = open;
+
   state.billingCheckoutSessions.delete(session.sessionRef);
+
   if (session.kind === 'method') {
     // The mock swaps the method when the update starts.
     sendReturn(res, SETTINGS_URL);
+
     return;
   }
+
   const userId = state.billingCustomers.get(session.customerId)?.userId;
   const user = userId ? state.users.get(userId) : undefined;
   const plan = state.plans.values().find((p) => p.key === session.planKey);
+
   if (!user || !plan) {
     sessionNotFound(res);
+
     return;
   }
+
   if (session.provider === 'yookassa') {
     settleSelfManagedCheckout(user, plan, {
       customerId: session.customerId,
@@ -177,6 +203,7 @@ router.post('/:sessionRef/pay', (req, res) => {
       provider: session.provider
     });
   }
+
   sendReturn(res, SUCCESS_URL);
 });
 

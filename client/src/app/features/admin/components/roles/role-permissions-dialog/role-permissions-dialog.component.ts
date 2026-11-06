@@ -136,6 +136,7 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   readonly checkedPermissions = computed(() => {
     const selected = this.selectedIds();
+
     return this.permissionGroups()
       .flatMap((g) => g.permissions)
       .filter((p) => selected.has(p.id));
@@ -146,14 +147,18 @@ export class RolePermissionsDialogComponent implements OnInit {
     const conditions = this.conditionsMap();
 
     if (current.size !== this.#originalIds.size) return true;
+
     for (const id of current) {
       if (!this.#originalIds.has(id)) return true;
     }
+
     for (const id of current) {
       const orig = JSON.stringify(this.#originalConditions.get(id) ?? null);
       const curr = JSON.stringify(conditions.get(id) ?? null);
+
       if (orig !== curr) return true;
     }
+
     return false;
   });
 
@@ -203,25 +208,31 @@ export class RolePermissionsDialogComponent implements OnInit {
     const n = group.permissions.filter((p) =>
       this.selectedIds().has(p.id)
     ).length;
+
     return n > 0 && n < group.permissions.length;
   }
 
   togglePermission(permissionId: string): void {
     if (this.role.isSystem) return;
+
     const next = new Set(this.selectedIds());
+
     if (next.has(permissionId)) {
       next.delete(permissionId);
       this.#collapseAndClear(permissionId);
     } else {
       next.add(permissionId);
     }
+
     this.selectedIds.set(next);
   }
 
   toggleGroup(group: PermissionGroup): void {
     if (this.role.isSystem) return;
+
     const next = new Set(this.selectedIds());
     const allChecked = this.isGroupAllChecked(group);
+
     for (const p of group.permissions) {
       if (allChecked) {
         next.delete(p.id);
@@ -230,6 +241,7 @@ export class RolePermissionsDialogComponent implements OnInit {
         next.add(p.id);
       }
     }
+
     this.selectedIds.set(next);
   }
 
@@ -258,12 +270,19 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   activeConditionTypes(permissionId: string): string[] {
     const c = this.conditionsMap().get(permissionId);
+
     if (!c) return [];
+
     const types: string[] = [];
+
     if (c.ownership) types.push('ownership');
+
     if (c.fieldMatch) types.push('fieldMatch');
+
     if (c.userAttr) types.push('userAttr');
+
     if (c.custom) types.push('custom');
+
     return types;
   }
 
@@ -286,10 +305,13 @@ export class RolePermissionsDialogComponent implements OnInit {
   /** Drops every restriction branch and keeps the effect. */
   clearRestrictions(permissionId: string): void {
     if (this.role.isSystem || this.isReadonly()) return;
+
     const map = new Map(this.conditionsMap());
     const effect = map.get(permissionId)?.effect;
+
     map.set(permissionId, effect === 'deny' ? { effect } : null);
     this.conditionsMap.set(map);
+
     for (const type of Object.keys(CONDITION_TYPE_LABEL_KEYS)) {
       this.#clearJsonError(permissionId, type);
     }
@@ -303,8 +325,10 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   setEffect(permissionId: string, effect: PermissionEffect): void {
     if (this.role.isSystem || this.isReadonly()) return;
+
     const map = new Map(this.conditionsMap());
     const current = map.get(permissionId) ?? {};
+
     if (effect === 'deny') {
       map.set(permissionId, { ...current, effect: 'deny' });
     } else {
@@ -312,19 +336,23 @@ export class RolePermissionsDialogComponent implements OnInit {
       // is left, collapse to null so the dirty check treats a pure-allow
       // permission as unconditional.
       const next: PermissionCondition = { ...current };
+
       delete next.effect;
       map.set(permissionId, Object.keys(next).length > 0 ? next : null);
     }
+
     this.conditionsMap.set(map);
   }
 
   toggleExpand(permissionId: string): void {
     const next = new Set(this.expandedIds());
+
     if (next.has(permissionId)) {
       next.delete(permissionId);
     } else {
       next.add(permissionId);
     }
+
     this.expandedIds.set(next);
   }
 
@@ -353,7 +381,9 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   setOwnershipField(permissionId: string, event: Event): void {
     const { value } = event.target as HTMLInputElement;
+
     this.#patchCondition(permissionId, { ownership: { userField: value } });
+
     if (findOwnershipShapeError({ userField: value })) {
       this.#setJsonError(
         permissionId,
@@ -438,6 +468,7 @@ export class RolePermissionsDialogComponent implements OnInit {
     if (!text.trim()) {
       this.#removeConditionKey(permissionId, 'custom');
       this.#clearJsonError(permissionId, 'custom');
+
       return;
     }
 
@@ -497,10 +528,12 @@ export class RolePermissionsDialogComponent implements OnInit {
     // Populate JSON text buffers from loaded conditions
     const fmTexts = new Map<string, string>();
     const uaTexts = new Map<string, string>();
+
     for (const [id, cond] of condMap) {
       if (cond?.fieldMatch) {
         fmTexts.set(id, JSON.stringify(cond.fieldMatch, null, 2));
       }
+
       if (cond?.userAttr) {
         uaTexts.set(id, JSON.stringify(cond.userAttr, null, 2));
       }
@@ -516,10 +549,12 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   #collapseAndClear(permissionId: string): void {
     const expanded = new Set(this.expandedIds());
+
     expanded.delete(permissionId);
     this.expandedIds.set(expanded);
 
     const map = new Map(this.conditionsMap());
+
     map.delete(permissionId);
     this.conditionsMap.set(map);
 
@@ -527,9 +562,11 @@ export class RolePermissionsDialogComponent implements OnInit {
     this.#deleteEditorText(permissionId, 'userAttr');
 
     const errors = new Map(this.jsonErrors());
+
     for (const key of [...errors.keys()]) {
       if (key.startsWith(`${permissionId}:`)) errors.delete(key);
     }
+
     this.jsonErrors.set(errors);
   }
 
@@ -553,6 +590,7 @@ export class RolePermissionsDialogComponent implements OnInit {
   ): void {
     const textsSignal = this.#editorTexts(editor);
     const texts = new Map(textsSignal());
+
     texts.set(permissionId, text);
     textsSignal.set(texts);
   }
@@ -560,6 +598,7 @@ export class RolePermissionsDialogComponent implements OnInit {
   #deleteEditorText(permissionId: string, editor: JsonObjectEditor): void {
     const textsSignal = this.#editorTexts(editor);
     const texts = new Map(textsSignal());
+
     texts.delete(permissionId);
     textsSignal.set(texts);
   }
@@ -602,11 +641,13 @@ export class RolePermissionsDialogComponent implements OnInit {
     event: Event
   ): void {
     const text = (event.target as HTMLTextAreaElement).value;
+
     this.#setEditorText(permissionId, editor, text);
 
     if (!text.trim()) {
       this.#removeConditionKey(permissionId, editor);
       this.#clearJsonError(permissionId, editor);
+
       return;
     }
 
@@ -616,6 +657,7 @@ export class RolePermissionsDialogComponent implements OnInit {
         editor === 'fieldMatch'
           ? findFieldMatchShapeError(parsed)
           : findUserAttrShapeError(parsed);
+
       if (shapeError) {
         this.#setJsonError(
           permissionId,
@@ -626,8 +668,10 @@ export class RolePermissionsDialogComponent implements OnInit {
               : 'admin.rolePermissions.invalidUserAttrShape'
           )
         );
+
         return;
       }
+
       this.#patchCondition(permissionId, this.#editorPatch(editor, parsed));
       this.#clearJsonError(permissionId, editor);
     } catch {
@@ -647,6 +691,7 @@ export class RolePermissionsDialogComponent implements OnInit {
   ): void {
     const map = new Map(this.conditionsMap());
     const current = map.get(permissionId) ?? {};
+
     map.set(permissionId, { ...current, ...patch });
     this.conditionsMap.set(map);
   }
@@ -657,8 +702,11 @@ export class RolePermissionsDialogComponent implements OnInit {
   ): void {
     const map = new Map(this.conditionsMap());
     const current = map.get(permissionId);
+
     if (!current) return;
+
     const next = { ...current };
+
     delete next[key];
     map.set(permissionId, Object.keys(next).length > 0 ? next : null);
     this.conditionsMap.set(map);
@@ -666,25 +714,31 @@ export class RolePermissionsDialogComponent implements OnInit {
 
   #setJsonError(permissionId: string, type: string, message: string): void {
     const errors = new Map(this.jsonErrors());
+
     errors.set(`${permissionId}:${type}`, message);
     this.jsonErrors.set(errors);
   }
 
   #clearJsonError(permissionId: string, type: string): void {
     const errors = new Map(this.jsonErrors());
+
     errors.delete(`${permissionId}:${type}`);
     this.jsonErrors.set(errors);
   }
 
   #groupByResource(permissions: PermissionResponse[]): PermissionGroup[] {
     const map = new Map<string, PermissionResponse[]>();
+
     for (const p of permissions) {
       if (!grantableActionNames(p.resource).includes(p.action.name)) continue;
 
       const resourceName = p.resource.displayName || p.resource.name;
+
       if (!map.has(resourceName)) map.set(resourceName, []);
+
       map.get(resourceName)!.push(p);
     }
+
     return Array.from(map.entries()).map(([resource, perms]) => ({
       resource,
       permissions: perms

@@ -214,10 +214,13 @@ export class DeadlineBoundProvider implements PaymentProvider {
 
   private async bound<T>(method: string, call: () => Promise<T>): Promise<T> {
     let timer: NodeJS.Timeout | undefined;
+
     try {
       const calls: Promise<T>[] = [call()];
+
       if (this.timeoutMs !== null) {
         const { timeoutMs } = this;
+
         calls.push(
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(
@@ -230,9 +233,11 @@ export class DeadlineBoundProvider implements PaymentProvider {
           })
         );
       }
+
       return await Promise.race(calls);
     } catch (error) {
       if (error instanceof HttpException) throw error;
+
       throw new ProviderError(this.inner.id, method, error);
     } finally {
       clearTimeout(timer);
@@ -252,5 +257,6 @@ export function withProviderDeadline(
 ): PaymentProvider {
   const deadline =
     Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null;
+
   return new DeadlineBoundProvider(provider, deadline);
 }

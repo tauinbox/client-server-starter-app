@@ -15,8 +15,11 @@ beforeEach(() => {
 
 function editorUser(): MockUser {
   const user = findUserByEmail('user@example.com');
+
   if (!user) throw new Error('seed user missing');
+
   user.roles = ['editor'];
+
   return user;
 }
 
@@ -31,6 +34,7 @@ function grantToEditor(permissionId: string, deny = false): void {
 
 function addReservedAction(): string {
   const state = getState();
+
   state.actions.set('act-manage', {
     id: 'act-manage',
     name: 'manage',
@@ -43,11 +47,13 @@ function addReservedAction(): string {
     description: null,
     createdAt: NOW
   });
+
   return 'perm-users-manage';
 }
 
 function addReservedSubjectResource(): string {
   const state = getState();
+
   state.resources.set('res-wildcard', {
     id: 'res-wildcard',
     name: 'wildcard',
@@ -64,7 +70,9 @@ function addReservedSubjectResource(): string {
     createdAt: NOW
   });
   const readAction = state.actions.values().find((a) => a.name === 'read');
+
   if (!readAction) throw new Error('seed action read missing');
+
   state.permissions.set('perm-wildcard-read', {
     id: 'perm-wildcard-read',
     resourceId: 'res-wildcard',
@@ -72,6 +80,7 @@ function addReservedSubjectResource(): string {
     description: null,
     createdAt: NOW
   });
+
   return 'perm-wildcard-read';
 }
 
@@ -110,6 +119,7 @@ describe('reserved CASL keyword parity with server', () => {
         (p) =>
           p.resourceId === mockId('res-users') && p.actionId === readAction?.id
       );
+
     if (!usersRead) throw new Error('seed permission users/read missing');
 
     grantToEditor(addReservedAction());

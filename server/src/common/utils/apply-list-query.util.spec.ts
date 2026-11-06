@@ -45,6 +45,7 @@ function render(qb: SelectQueryBuilder<ObjectLiteral>): {
   params: Record<string, unknown>;
 } {
   const where = qb.getQuery().split(' WHERE ')[1] ?? '';
+
   return { where, params: qb.getParameters() };
 }
 
@@ -63,6 +64,7 @@ describe('applyListQuery', () => {
     applyListQuery(qb, { spec: SPEC, columns: COLUMNS }, { q: 'abc' });
 
     const { where, params } = render(qb);
+
     expect(where).toBe(
       'item.tenant = :tenant AND (item.name ILIKE :listSearch OR item.description ILIKE :listSearch)'
     );
@@ -79,6 +81,7 @@ describe('applyListQuery', () => {
     );
 
     const { params } = render(qb);
+
     expect(params['listSearch']).toBe('%50\\%\\_a\\\\b%');
     expect(params['listFilter_email']).toBe('%\\%%');
   });
@@ -98,6 +101,7 @@ describe('applyListQuery', () => {
     );
 
     const { where, params } = render(qb);
+
     expect(where).toBe(
       'item.tenant = :tenant AND item.active = :listFilter_active AND item.email ILIKE :listFilter_email AND item.id IN (:...listFilter_ids)'
     );
@@ -114,6 +118,7 @@ describe('applyListQuery', () => {
     applyListQuery(qb, { spec: SPEC, columns: COLUMNS }, { region: 'eu' });
 
     const { where, params } = render(qb);
+
     expect(where).toBe(
       'item.tenant = :tenant AND (cardinality(item.regions) = 0 OR :listFilter_region = ANY(item.regions))'
     );

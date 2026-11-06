@@ -25,6 +25,7 @@ function createJwt(payload: Record<string, unknown>): string {
       .replaceAll('+', '-')
       .replaceAll('/', '_')
       .replace(/=+$/, '');
+
   return `${encode(header)}.${encode(payload)}.fake-signature`;
 }
 
@@ -130,6 +131,7 @@ describe('AuthStore', () => {
 
     it('should report isAccessTokenExpired false for valid in-memory token', () => {
       const store = createStore(null);
+
       store.saveAuthResponse(createMockAuthResponse());
 
       expect(store.isAccessTokenExpired()).toBe(false);
@@ -137,6 +139,7 @@ describe('AuthStore', () => {
 
     it('should report isAccessTokenExpired true for expired in-memory token', () => {
       const store = createStore(null);
+
       store.saveAuthResponse(createMockAuthResponse({ expiredToken: true }));
 
       expect(store.isAccessTokenExpired()).toBe(true);
@@ -145,6 +148,7 @@ describe('AuthStore', () => {
     it('should report isAccessTokenExpired true for a token with no exp claim (fail closed)', () => {
       const store = createStore(null);
       const response = createMockAuthResponse();
+
       response.tokens.access_token = createJwt({
         sub: '1',
         email: 'test@example.com'
@@ -156,6 +160,7 @@ describe('AuthStore', () => {
 
     it('should expose roles from user', () => {
       const store = createStore(null);
+
       store.saveAuthResponse(createMockAuthResponse());
 
       expect(store.roles()).toEqual([mockUserRole]);
@@ -190,10 +195,12 @@ describe('AuthStore', () => {
   describe('updateCurrentUser', () => {
     it('should update user in state and localStorage', () => {
       const store = createStore(null);
+
       store.saveAuthResponse(createMockAuthResponse());
       storageMock.setItem.mockClear();
 
       const updatedUser = { ...createMockUser(), name: 'Updated' };
+
       store.updateCurrentUser(updatedUser);
 
       expect(store.user()).toEqual(updatedUser);
@@ -207,6 +214,7 @@ describe('AuthStore', () => {
   describe('clearSession', () => {
     it('should clear localStorage user key and reset state', () => {
       const store = createStore(null);
+
       store.saveAuthResponse(createMockAuthResponse());
 
       store.clearSession();
@@ -233,6 +241,7 @@ describe('AuthStore', () => {
 
     it('should return false after clearSession', () => {
       const store = createStore(createMockUser());
+
       store.clearSession();
 
       expect(store.hasPersistedUser()).toBe(false);
@@ -242,9 +251,11 @@ describe('AuthStore', () => {
   describe('getTokenExpiryTime', () => {
     it('should return expiry time in milliseconds for in-memory token', () => {
       const store = createStore(null);
+
       store.saveAuthResponse(createMockAuthResponse());
 
       const expiryTime = store.getTokenExpiryTime();
+
       expect(expiryTime).toBeGreaterThan(Date.now());
     });
 
@@ -288,6 +299,7 @@ describe('AuthStore', () => {
 
     it('drops the requirement when the session ends', () => {
       const store = createStore(createMockUser());
+
       store.setMfaMandatory(true);
 
       store.clearSession();
@@ -369,6 +381,7 @@ describe('AuthStore', () => {
 
       it('denies a delegated actor update and delete on a super account', () => {
         const store = createStore(null);
+
         store.setRules(
           packedOf([
             { action: 'update', subject: 'User' },
@@ -397,6 +410,7 @@ describe('AuthStore', () => {
 
       it('leaves a super actor free to change a super account', () => {
         const store = createStore(null);
+
         store.setRules(packedOf([{ action: 'manage', subject: 'all' }]));
 
         expect(
@@ -455,6 +469,7 @@ describe('AuthStore', () => {
         { action: 'search', subject: 'User' }
       ]);
       const packed = packRules(ability.rules) as unknown[][];
+
       store.setRules(packed);
 
       store.clearSession();
@@ -468,6 +483,7 @@ describe('AuthStore', () => {
   describe('persisted user validation (real storage)', () => {
     function createStoreOverRealStorage() {
       TestBed.configureTestingModule({});
+
       return TestBed.inject(AuthStore);
     }
 
@@ -502,6 +518,7 @@ describe('AuthStore', () => {
 
     it('should restore a well-formed persisted user', () => {
       const savedUser = createMockUser();
+
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(savedUser));
 
       const store = createStoreOverRealStorage();

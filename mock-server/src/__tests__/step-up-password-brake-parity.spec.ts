@@ -15,6 +15,7 @@ const NEW_PASSWORD = 'Sunrise-Kettle-19';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -45,6 +46,7 @@ function request(
 async function accessToken(): Promise<string> {
   const res = await request('POST', '/auth/login', { body: CREDENTIALS });
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -58,6 +60,7 @@ function setup(token: string, currentPassword?: string): Promise<Response> {
 async function guessWrong(token: string, times: number): Promise<void> {
   for (let i = 0; i < times; i += 1) {
     const res = await setup(token, WRONG_PASSWORD);
+
     expect(res.status).toBe(403);
   }
 }
@@ -69,6 +72,7 @@ function failureRows(): MockAuditLog[] {
 describe('the step-up password carries a per-account brake', () => {
   it('bars the account on the attempt that spends the budget', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
 
     const res = await setup(token, WRONG_PASSWORD);
@@ -85,6 +89,7 @@ describe('the step-up password carries a per-account brake', () => {
 
   it('audits the attempt that bars the account', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
 
     await setup(token, WRONG_PASSWORD);
@@ -95,7 +100,9 @@ describe('the step-up password carries a per-account brake', () => {
 
   it('audits each attempt on a barred account', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+
     for (let i = 0; i < 3; i += 1) {
       expect((await setup(token, WRONG_PASSWORD)).status).toBe(423);
     }
@@ -105,6 +112,7 @@ describe('the step-up password carries a per-account brake', () => {
 
   it('refuses a correct password while the account is barred', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
     await setup(token, WRONG_PASSWORD);
 
@@ -115,6 +123,7 @@ describe('the step-up password carries a per-account brake', () => {
 
   it('spends one budget across the routes, not one budget per route', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
 
     // The route throttle is keyed by client address and by handler. This is
@@ -132,6 +141,7 @@ describe('the step-up password carries a per-account brake', () => {
 
   it('bars the password-set route on the same budget', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
 
     const res = await request('PATCH', '/auth/profile', {
@@ -150,6 +160,7 @@ describe('the step-up password carries a per-account brake', () => {
 
     for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
       const res = await setup(token);
+
       expect(res.status).toBe(403);
       expect(await res.json()).toMatchObject({
         errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
@@ -161,6 +172,7 @@ describe('the step-up password carries a per-account brake', () => {
 
   it('closes the window on a correct password', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
 
     expect((await setup(token, CREDENTIALS.password)).status).toBe(200);
@@ -171,6 +183,7 @@ describe('the step-up password carries a per-account brake', () => {
 
   it('leaves the sign-in open while the step-up is barred', async () => {
     const token = await accessToken();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
     await setup(token, WRONG_PASSWORD);
 

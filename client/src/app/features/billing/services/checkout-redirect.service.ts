@@ -9,11 +9,13 @@ import { NotifyService } from '@core/services/notify.service';
  */
 export function isSafeCheckoutUrl(url: string, baseOrigin: string): boolean {
   let parsed: URL;
+
   try {
     parsed = new URL(url, baseOrigin);
   } catch {
     return false;
   }
+
   return parsed.protocol === 'https:' || parsed.origin === baseOrigin;
 }
 
@@ -25,11 +27,15 @@ export class CheckoutRedirectService {
 
   redirect(url: string): void {
     const win = this.#window;
+
     if (!win) return;
+
     if (!isSafeCheckoutUrl(url, win.location.origin)) {
       this.#notify.error('billing.checkout.errorUnsafeRedirect');
+
       return;
     }
+
     win.location.href = url;
   }
 }

@@ -68,6 +68,7 @@ describe('RegionControlComponent', () => {
         '.region-control button[aria-checked="true"]'
       )
     );
+
     return checked.map((button) => button.textContent?.trim() ?? '');
   }
 
@@ -78,7 +79,9 @@ describe('RegionControlComponent', () => {
       )
     );
     const button = buttons.find((b) => b.textContent?.trim() === label);
+
     if (!button) throw new Error(`No region button "${label}"`);
+
     return button;
   }
 
@@ -132,6 +135,7 @@ describe('RegionControlComponent', () => {
         region: 'ru',
         effectiveProvider: 'yookassa'
       });
+
       return true;
     });
 

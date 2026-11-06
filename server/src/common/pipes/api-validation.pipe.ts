@@ -34,6 +34,7 @@ export class ApiValidationPipe extends ValidationPipe {
           cause: error
         });
       }
+
       throw error;
     }
   }

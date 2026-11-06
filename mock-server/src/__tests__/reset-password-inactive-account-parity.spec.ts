@@ -15,6 +15,7 @@ const oldPassword = 'Password1';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -37,10 +38,13 @@ function postJson(path: string, body: unknown): Promise<Response> {
 
 async function issueResetToken(): Promise<string> {
   const res = await postJson('forgot-password', { email });
+
   expect(res.status).toBe(200);
 
   const [token] = [...getState().passwordResetTokens.keys()];
+
   expect(token).toBeDefined();
+
   return token;
 }
 
@@ -53,12 +57,14 @@ const invalidTokenBody = {
 describe('reset-password against a deactivated account', () => {
   it('refuses the reset once the account is deactivated', async () => {
     const token = await issueResetToken();
+
     findUserByEmail(email)!.isActive = false;
 
     const res = await postJson('reset-password', {
       token,
       password: newPassword
     });
+
     expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(invalidTokenBody);
     expect(findUserByEmail(email)?.password).toBe(oldPassword);
@@ -66,6 +72,7 @@ describe('reset-password against a deactivated account', () => {
 
   it('answers the deactivated case exactly like an unknown token', async () => {
     const token = await issueResetToken();
+
     findUserByEmail(email)!.isActive = false;
 
     const deactivated = await postJson('reset-password', {
@@ -90,6 +97,7 @@ describe('reset-password against a deactivated account', () => {
       token,
       password: newPassword
     });
+
     expect(res.status).toBe(200);
     expect(findUserByEmail(email)?.password).toBe(newPassword);
   });

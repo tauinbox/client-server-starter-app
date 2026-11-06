@@ -40,13 +40,16 @@ export function trackAttemptAndSetHeader(
   const state = getState();
 
   const window = state.captchaAttempts.get(key) ?? { timestamps: [] };
+
   window.timestamps = window.timestamps.filter((t) => now - t < route.ttlMs);
   window.timestamps.push(now);
   state.captchaAttempts.set(key, window);
 
   const remaining = Math.max(0, route.limit - window.timestamps.length);
+
   res.setHeader('X-RateLimit-Limit', route.limit);
   res.setHeader('X-RateLimit-Remaining', remaining);
+
   return remaining;
 }
 
@@ -61,10 +64,13 @@ export function evaluateCaptcha(
   captchaToken: unknown
 ): { ok: true } | { ok: false; status: number; body: Record<string, unknown> } {
   const state = getState();
+
   if (!state.captchaConfig.enabled) return { ok: true };
+
   if (remaining > CAPTCHA_THRESHOLD) return { ok: true };
 
   const token = typeof captchaToken === 'string' ? captchaToken.trim() : '';
+
   if (!token) {
     return {
       ok: false,
@@ -75,5 +81,6 @@ export function evaluateCaptcha(
       }
     };
   }
+
   return { ok: true };
 }

@@ -42,6 +42,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.getByLabel('Email')).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -53,6 +54,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.getByLabel('Email')).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -64,6 +66,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.getByLabel('Email')).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -79,6 +82,7 @@ test.describe('Accessibility (axe-core)', () => {
     // loginViaUi already lands on /profile
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -92,13 +96,17 @@ test.describe('Accessibility (axe-core)', () => {
     await loginViaUi(page, _mockServer.url);
 
     const { promise: held, resolve: release } = Promise.withResolvers<void>();
+
     await page.route('**/api/v1/auth/sessions', async (route) => {
       if (route.request().method() !== 'GET') return route.fallback();
+
       await held;
+
       return route.fallback();
     });
     await page.reload();
     const spinner = page.locator('.sessions-loading mat-spinner');
+
     await expect(spinner).toBeVisible();
     // A raw key would also satisfy axe, so the text is asserted too.
     await expect(spinner).toHaveAttribute('aria-label', 'Loading...');
@@ -106,6 +114,7 @@ test.describe('Accessibility (axe-core)', () => {
     const { violations } = await buildAxeScanner(page)
       .include('.sessions-loading')
       .analyze();
+
     release();
 
     expect(seriousOrCritical(violations)).toEqual([]);
@@ -124,6 +133,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -138,6 +148,7 @@ test.describe('Accessibility (axe-core)', () => {
     ).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -150,6 +161,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -162,6 +174,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 
@@ -174,6 +187,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
     const { violations } = await buildAxeScanner(page).analyze();
+
     expect(seriousOrCritical(violations)).toEqual([]);
   });
 });

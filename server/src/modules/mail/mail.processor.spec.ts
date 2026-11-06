@@ -56,6 +56,7 @@ describe('MailProcessor', () => {
     };
     // @ts-expect-error minimal Job stub — process() only reads `data`
     const job: Job<MailJobData> = { data };
+
     await processor.process(job);
 
     expect(deliver).toHaveBeenCalledWith(data);
@@ -69,6 +70,7 @@ describe('MailProcessor', () => {
     const job: Job<MailJobData> = {
       data: { to: 'user@example.com', subject: 'Hi', html: '<p>x</p>' }
     };
+
     await expect(processor.process(job)).rejects.toThrow('smtp down');
   });
 
@@ -104,6 +106,7 @@ describe('MailProcessor', () => {
       attemptsMade: 3,
       data: { to: 'user@example.com', subject: 'Hi', html: '<p>x</p>' }
     };
+
     processor.onFailed(job, new Error('smtp down'));
 
     expect(recordMailJob).toHaveBeenCalledWith('failed');
@@ -121,6 +124,7 @@ describe('MailProcessor', () => {
       attemptsMade: 1,
       data: { to: 'alice.private@example.com', subject: 'Hi', html: '<p>x</p>' }
     };
+
     processor.onFailed(job, new Error('smtp down'));
 
     expect(loggerError).toHaveBeenCalledWith(

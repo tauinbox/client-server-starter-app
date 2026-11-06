@@ -35,9 +35,11 @@ import { CursorPaginatedResponseDto } from '../src/common/dtos/cursor-paginated-
 class TestPermissionsGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
+
     if (req.headers['x-test-role'] !== 'admin') {
       throw new ForbiddenException();
     }
+
     return true;
   }
 }
@@ -163,6 +165,7 @@ describe('Billing admin (e2e)', () => {
       .expect(200);
 
     const body = res.body as { data: Array<Record<string, unknown>> };
+
     expect(body.data).toHaveLength(1);
     expect(body.data[0]).not.toHaveProperty('providerSubscriptionId');
   });
@@ -181,6 +184,7 @@ describe('Billing admin (e2e)', () => {
       data: Array<{ providerInvoiceRef: string }>;
       meta: { nextCursor: string | null; hasMore: boolean; limit: number };
     };
+
     expect(body.data[0]).not.toHaveProperty('providerEventId');
     expect(body.data[0].providerInvoiceRef).toBe('pay_1');
     expect(body.meta).toEqual({

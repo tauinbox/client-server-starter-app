@@ -54,6 +54,7 @@ function storePendingReauth(pending: object): void {
 
 function readPendingReauth(): unknown {
   const raw = sessionStorage.getItem('pending_reauth');
+
   return raw === null ? null : JSON.parse(raw);
 }
 
@@ -176,6 +177,7 @@ describe('ProfileComponent', () => {
 
     it('offers no profile form and keeps the name and address in the header', () => {
       const root: HTMLElement = fixture.nativeElement;
+
       expect(root.querySelector('form')).toBeNull();
       expect(root.querySelector('button[type="submit"]')).toBeNull();
       expect(root.querySelector('.profile-name')?.textContent).toContain(
@@ -188,6 +190,7 @@ describe('ProfileComponent', () => {
 
     it('keeps the security cards', () => {
       const root: HTMLElement = fixture.nativeElement;
+
       expect(root.querySelector('nxs-two-factor')).not.toBeNull();
       expect(root.querySelector('nxs-active-sessions')).not.toBeNull();
       expect(root.querySelector('nxs-linked-providers')).not.toBeNull();
@@ -322,6 +325,7 @@ describe('ProfileComponent', () => {
         error: { errorKey: 'errors.users.notFound', message: 'Unauthorized' },
         status: 401
       });
+
       authServiceMock.getProfile.mockReturnValue(throwError(() => httpError));
 
       fixture.detectChanges();
@@ -335,6 +339,7 @@ describe('ProfileComponent', () => {
         error: null,
         status: 500
       });
+
       authServiceMock.getProfile.mockReturnValue(throwError(() => httpError));
 
       fixture.detectChanges();
@@ -372,6 +377,7 @@ describe('ProfileComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.profileForm.name().errors();
+
       expect(errors.map((e) => [e.kind, e.message])).toContainEqual([
         'required',
         'auth.profile.nameRequired'
@@ -389,6 +395,7 @@ describe('ProfileComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.profileForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
     });
 
@@ -409,6 +416,7 @@ describe('ProfileComponent', () => {
 
     it('rejects a password longer than the server ceiling', async () => {
       const tooLong = `Aa1${'x'.repeat(126)}`;
+
       component.profileModel.set({
         email: 'test@example.com',
         name: 'Test User',
@@ -420,6 +428,7 @@ describe('ProfileComponent', () => {
       await fixture.whenStable();
 
       const errors = component.profileForm.password().errors();
+
       expect(errors.some((e) => e.kind === 'maxLength')).toBe(true);
       expect(errors.find((e) => e.kind === 'maxLength')?.message).toBe(
         'auth.profile.passwordMaxLength'
@@ -450,6 +459,7 @@ describe('ProfileComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.profileForm.confirmPassword().errors();
+
       expect(errors.some((e) => e.kind === 'passwordMismatch')).toBe(true);
     });
 
@@ -477,6 +487,7 @@ describe('ProfileComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.profileForm.currentPassword().errors();
+
       expect(errors.some((e) => e.kind === 'currentPasswordRequired')).toBe(
         true
       );
@@ -494,6 +505,7 @@ describe('ProfileComponent', () => {
       });
       await fixture.whenStable();
       const errors = component.profileForm.currentPassword().errors();
+
       expect(errors.some((e) => e.kind === 'currentPasswordRequired')).toBe(
         false
       );
@@ -545,6 +557,7 @@ describe('ProfileComponent', () => {
       component.onSubmit();
 
       const stored = sessionStorage.getItem('pending_reauth');
+
       expect(stored).not.toBeNull();
       expect(stored).not.toContain('Sunrise-Kettle-19');
     });
@@ -987,6 +1000,7 @@ describe('ProfileComponent', () => {
 
     it('should submit without password when password is empty', async () => {
       const updatedUser = { ...mockUser, name: 'Updated' };
+
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
@@ -1007,6 +1021,7 @@ describe('ProfileComponent', () => {
 
     it('should include password and currentPassword when password is provided', async () => {
       const updatedUser = { ...mockUser, name: 'Updated' };
+
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
@@ -1029,6 +1044,7 @@ describe('ProfileComponent', () => {
 
     it('should show snackbar and update user on success', async () => {
       const updatedUser = { ...mockUser, name: 'Updated' };
+
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
@@ -1051,6 +1067,7 @@ describe('ProfileComponent', () => {
 
     it('clears the password fields after a save without a password', async () => {
       const updatedUser = { ...mockUser, name: 'Updated' };
+
       authServiceMock.updateProfile.mockReturnValue(of(updatedUser));
 
       component.profileModel.set({
@@ -1125,6 +1142,7 @@ describe('ProfileComponent', () => {
         error: { message: 'Update failed' },
         status: 400
       });
+
       authServiceMock.updateProfile.mockReturnValue(
         throwError(() => httpError)
       );
@@ -1151,6 +1169,7 @@ describe('ProfileComponent', () => {
         error: null,
         status: 500
       });
+
       authServiceMock.updateProfile.mockReturnValue(
         throwError(() => httpError)
       );
@@ -1192,6 +1211,7 @@ describe('ProfileComponent', () => {
       await fixture.whenStable();
 
       const host = fixture.nativeElement.querySelector('nxs-linked-providers');
+
       expect(host.querySelector('mat-card')).toBeNull();
       expect(getComputedStyle(host).display).toBe('contents');
     });
@@ -1273,6 +1293,7 @@ describe('ProfileComponent', () => {
 
       it('enables the card again when the round trip cannot start', async () => {
         const httpError = new HttpErrorResponse({ status: 500 });
+
         authServiceMock.initOAuthReauth.mockReturnValue(
           throwError(() => httpError)
         );
@@ -1432,6 +1453,7 @@ describe('ProfileComponent', () => {
 
         // The reload answers later, so the spinner replaces the card first.
         const reload = new Subject<UserResponse>();
+
         authServiceMock.getProfile.mockReturnValue(reload);
         component['onTwoFactorChanged']();
         fixture.detectChanges();
@@ -1484,6 +1506,7 @@ describe('ProfileComponent', () => {
       const input = fixture.nativeElement.querySelector(
         selector
       ) as HTMLInputElement;
+
       input.value = value;
       input.dispatchEvent(new Event('input'));
       await fixture.whenStable();
@@ -1494,6 +1517,7 @@ describe('ProfileComponent', () => {
       const navigate = vi
         .spyOn(TestBed.inject(Router), 'navigate')
         .mockResolvedValue(true);
+
       component.profileModel.set({
         email: 'new@example.com',
         name: 'Test User',

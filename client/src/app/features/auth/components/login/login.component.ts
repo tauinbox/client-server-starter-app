@@ -114,6 +114,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   // block is hidden when none resolve true.
   protected readonly visibleOAuthProviders = computed(() => {
     const flags = this.#flagsStore.flags();
+
     return OAUTH_PROVIDER_FLAGS.filter((p) => flags[p.flagKey] === true).map(
       (p) => ({
         id: p.provider,
@@ -146,6 +147,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   protected readonly passwordChanged = signal<PasswordChangedValue | null>(
     null
   );
+
   protected readonly passwordChangedValues = PASSWORD_CHANGED;
 
   // Idle-timeout banner: the client ended the session after no input.
@@ -172,6 +174,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     void this.#flagsStore.load();
 
     const oauthError = this.#route.snapshot.queryParams['oauth_error'];
+
     if (oauthError) {
       const fullKey =
         OAUTH_ERROR_KEYS[oauthError] ?? 'auth.login.errorAuthFailed';
@@ -180,6 +183,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       // translation file (which the *transloco directive only does at
       // render time — after ngOnInit), then emits the translated string.
       const scopedKey = fullKey.replace(/^auth\./, '');
+
       this.#translocoService
         .selectTranslate(scopedKey, undefined, 'auth')
         .pipe(take(1), takeUntilDestroyed(this.#destroyRef))
@@ -187,12 +191,14 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
 
     const { registered } = this.#route.snapshot.queryParams;
+
     if (registered === 'pending-verification') {
       this.pendingVerification.set(true);
     }
 
     const passwordChanged =
       this.#route.snapshot.queryParams[PASSWORD_CHANGED_PARAM];
+
     if (passwordChanged === PASSWORD_CHANGED.Done) {
       this.passwordChanged.set(PASSWORD_CHANGED.Done);
     } else if (passwordChanged === PASSWORD_CHANGED.EmailPending) {
@@ -215,6 +221,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (!isOAuthProvider(provider)) return;
 
     this.#oauthIntent.start(this.#returnUrl());
+
     if (this.#window) {
       this.#window.location.href = this.oauthUrls[provider];
     }
@@ -238,10 +245,13 @@ export class LoginComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (response) => {
           this.loading.set(false);
+
           if ('mfaRequired' in response) {
             this.mfaChallenge.set(response);
+
             return;
           }
+
           void this.#router.navigateByUrl(this.#returnUrl());
         },
         error: (err: HttpErrorResponse) => {
@@ -270,6 +280,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   protected onResendCaptchaToken(token: string | null): void {
     this.resendCaptchaToken.set(token);
+
     if (token) {
       this.resendError.set(null);
     }
@@ -277,13 +288,16 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   protected canResend(): boolean {
     if (this.resendingVerification()) return false;
+
     if (this.resendCaptchaRequired() && !this.resendCaptchaToken())
       return false;
+
     return true;
   }
 
   resendVerification(): void {
     const { email } = this.loginModel();
+
     if (!email || !this.canResend()) return;
 
     this.resendingVerification.set(true);
@@ -307,6 +321,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   // it and asks the widget for a fresh one.
   #handleResendError(err: HttpErrorResponse): void {
     const errorKey = err.error?.errorKey as string | undefined;
+
     if (
       errorKey === ErrorKeys.AUTH.CAPTCHA_REQUIRED ||
       errorKey === ErrorKeys.AUTH.CAPTCHA_INVALID
@@ -314,6 +329,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.resendCaptchaRequired.set(true);
       this.resendCaptchaToken.set(null);
       this.resendError.set(parseHttpErrorMessage(err, this.#translocoService));
+
       return;
     }
 
@@ -325,6 +341,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   /** Attacker-supplied `?returnUrl=` is only followed when same-origin. */
   #returnUrl(): string {
     const returnUrl = this.#route.snapshot.queryParams['returnUrl'] as unknown;
+
     return safeReturnUrl(returnUrl, this.#window?.location.origin) ?? '/';
   }
 
@@ -338,6 +355,7 @@ export class LoginComponent implements OnInit, OnDestroy {
           ? (err.error as Partial<LockoutErrorData>)
           : null;
       const retryAfter = data?.retryAfter;
+
       if (
         typeof retryAfter === 'number' &&
         Number.isFinite(retryAfter) &&
@@ -345,9 +363,11 @@ export class LoginComponent implements OnInit, OnDestroy {
       ) {
         this.#startLockoutCountdown(retryAfter);
       }
+
       this.error.set(
         this.#resolveErrorMessage(err, 'errors.auth.accountLocked')
       );
+
       return;
     }
 
@@ -359,6 +379,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.error.set(
         this.#resolveErrorMessage(err, 'errors.auth.emailNotVerified')
       );
+
       return;
     }
 
@@ -377,6 +398,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     this.#lockoutTimer = setInterval(() => {
       const remaining = this.lockoutSeconds() - 1;
+
       if (remaining <= 0) {
         this.#clearLockoutTimer();
         this.lockoutSeconds.set(0);

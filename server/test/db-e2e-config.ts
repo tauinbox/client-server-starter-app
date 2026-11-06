@@ -41,6 +41,7 @@ export function resolveE2eEnv(
 
   for (const key of E2E_ENV_KEYS) {
     const value = key in env ? env[key] : fromFile[key];
+
     if (value !== undefined) {
       resolved[key] = value;
     }
@@ -77,6 +78,7 @@ export async function assertDatabaseReachable(
     await dataSource.initialize();
   } catch (error) {
     const reason = describeConnectionError(error);
+
     throw new Error(
       `Cannot reach the e2e Postgres (${host}:${port}/${database}): ${reason}. The e2e run needs a database - start it (server/docker-compose.yml), run "npm run build && npm run migrations:run", then try again.`,
       { cause: error }
@@ -97,6 +99,7 @@ function describeConnectionError(error: unknown): string {
         inner instanceof Error ? inner.message : String(inner)
       )
       .filter(Boolean);
+
     if (causes.length > 0) {
       return [...new Set(causes)].join('; ');
     }

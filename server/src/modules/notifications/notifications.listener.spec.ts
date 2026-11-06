@@ -15,7 +15,9 @@ import type { AppAbility } from '../auth/casl/app-ability';
 
 function abilityOf(define: (can: AbilityBuilder<AppAbility>['can']) => void) {
   const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
   define(builder.can);
+
   return builder.build();
 }
 
@@ -107,6 +109,7 @@ describe('NotificationsListener', () => {
       unknown,
       (ability: AppAbility) => boolean
     ][];
+
     expect(
       allows(abilityOf((can) => can('search', 'User', { isActive: true })))
     ).toBe(true);
@@ -207,6 +210,7 @@ describe('NotificationsListener', () => {
         unknown,
         (ability: AppAbility) => boolean
       ][];
+
       expect(allows(abilityOf((can) => can('search', 'User')))).toBe(true);
       expect(allows(abilityOf((can) => can('read', 'Role')))).toBe(false);
     }

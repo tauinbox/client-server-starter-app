@@ -25,6 +25,7 @@ test.describe('Profile page', () => {
     const roleChip = page
       .locator('.profile-badges mat-chip')
       .filter({ hasText: 'user' });
+
     await expect(roleChip).toBeVisible();
     await expect(roleChip.locator('mat-icon')).toHaveText('person');
     await expect(page.getByText('Active', { exact: true })).toBeVisible();
@@ -40,6 +41,7 @@ test.describe('Profile page', () => {
     const roleChip = page
       .locator('.profile-badges mat-chip')
       .filter({ hasText: 'admin' });
+
     await expect(roleChip).toBeVisible();
     await expect(roleChip.locator('mat-icon')).toHaveText(
       'admin_panel_settings'
@@ -70,6 +72,7 @@ test.describe('Profile page', () => {
           })
         });
       }
+
       return route.fallback();
     });
 
@@ -263,6 +266,7 @@ test.describe('Profile page', () => {
           })
         });
       }
+
       return route.fallback();
     });
 

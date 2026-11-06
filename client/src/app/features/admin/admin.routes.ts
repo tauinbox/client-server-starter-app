@@ -33,14 +33,18 @@ export const adminRoutes: Routes = [
         pathMatch: 'full',
         redirectTo: () => {
           const authStore = inject(AuthStore);
+
           if (authStore.hasPermissions({ action: 'search', subject: 'User' }))
             return 'users';
+
           if (authStore.hasPermissions({ action: 'read', subject: 'Role' }))
             return 'roles';
+
           if (
             authStore.hasPermissions({ action: 'read', subject: 'Permission' })
           )
             return 'resources';
+
           return 'feature-flags';
         }
       },

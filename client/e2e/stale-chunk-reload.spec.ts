@@ -44,12 +44,15 @@ test.describe('a page loaded before a deploy', () => {
     // no chunk on the server.
     let deployed = true;
     const missing: string[] = [];
+
     await page.route(/\/chunk-[^/]+\.js$/, async (route) => {
       if (deployed) {
         missing.push(route.request().url());
         await route.fulfill({ status: 404, body: 'Not Found' });
+
         return;
       }
+
       await route.fallback();
     });
     page.on('request', (request) => {

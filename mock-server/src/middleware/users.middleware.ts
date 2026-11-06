@@ -66,11 +66,15 @@ import { sendError } from '../helpers/error-envelope.helpers';
 function listUsers(req: Request, res: Response): void {
   const query = req.query as Record<string, unknown>;
   const queryErrors = listQueryErrors(query, USER_LIST_QUERY);
+
   if (queryErrors.length > 0) {
     sendValidationError(res, 'query', queryErrors);
+
     return;
   }
+
   if (rejectInvalidCursor(res, query)) return;
+
   const { role, includeDeleted } = parseListQuery(query, USER_LIST_QUERY);
   const users = Array.from(getState().users.values()).filter(
     (u) => (includeDeleted || !u.deletedAt) && (!role || u.roles.includes(role))
@@ -83,6 +87,7 @@ function listUsers(req: Request, res: Response): void {
     USER_LIST_QUERY,
     query
   );
+
   res.json({ data: page.data.map(toAdminUserResponse), meta: page.meta });
 }
 
@@ -101,14 +106,17 @@ const UPDATE_USER_FIELDS = [
 // POST /api/v1/users
 router.post('/', permissionGuard('create', 'User'), (req, res) => {
   const validated = validateCreateUserDto(req.body);
+
   if (!validated.ok) {
     res.status(validated.status).json(validated.body);
+
     return;
   }
 
   // The password is left out of the subject on purpose: no authorization
   // condition can legitimately be written over it.
   const { password: _password, ...subjectFields } = validated.fields;
+
   if (
     !assertInstancePermission(req, res, {
       action: 'create',
@@ -120,8 +128,10 @@ router.post('/', permissionGuard('create', 'User'), (req, res) => {
   }
 
   const conflict = findCreateUserConflict(validated.fields);
+
   if (conflict) {
     res.status(conflict.status).json(conflict.body);
+
     return;
   }
 
@@ -130,6 +140,7 @@ router.post('/', permissionGuard('create', 'User'), (req, res) => {
   getState().users.set(user.id, user);
 
   const actor = (req as AuthenticatedRequest).user;
+
   logAudit('USER_CREATE', {
     actorId: actor.id,
     actorEmail: actor.email,
@@ -156,8 +167,10 @@ router.get(
   (req, res) => {
     const id = req.params['id'] as string;
     const user = findUserById(id);
+
     if (!user) {
       sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+
       return;
     }
 
@@ -184,8 +197,10 @@ router.get(
   (req, res) => {
     const id = req.params['id'] as string;
     const user = findUserById(id);
+
     if (!user) {
       sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+
       return;
     }
 
@@ -202,6 +217,7 @@ router.get(
     const adminResponse = toAdminUserResponse(user);
     const permissions = getResolvedPermissionsForUser(user);
     const rules = getPackedRulesForUser(user);
+
     res.json({
       roles: adminResponse.roles,
       permissions,
@@ -257,12 +273,15 @@ router.patch(
         ErrorKeys.USERS.MODERATION_SELF,
         'You cannot deactivate or unlock your own account. Ask another administrator.'
       );
+
       return;
     }
 
     const user = findUserById(id);
+
     if (!user) {
       sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+
       return;
     }
 
@@ -278,6 +297,7 @@ router.patch(
         ErrorKeys.USERS.CREDENTIAL_SELF,
         'Change your own email and password on your profile page'
       );
+
       return;
     }
 
@@ -305,8 +325,10 @@ router.patch(
         operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
         acceptsReauthProof: false
       });
+
       if (refusal) {
         sendWithRetryAfter(res, refusal);
+
         return;
       }
     }
@@ -321,8 +343,10 @@ router.patch(
             email: email ?? user.email,
             name: typeof name === 'string' ? name : user.name
           });
+
     if (passwordRefusal) {
       sendError(res, passwordRefusal.errorKey, passwordRefusal.message);
+
       return;
     }
 
@@ -332,15 +356,18 @@ router.patch(
       locale,
       isActive
     });
+
     if (
       unlockAccount &&
       (user.failedLoginAttempts !== 0 || user.lockedUntil !== null)
     ) {
       changed.push('unlockAccount');
     }
+
     const previous = { ...user };
 
     let previousEmail: string | undefined;
+
     if (email !== undefined) {
       const existing = findUserByEmail(email);
       const pendingConflict = getState()
@@ -348,14 +375,17 @@ router.patch(
         .find(
           (u) => !u.deletedAt && u.pendingEmail === email && u.id !== user.id
         );
+
       if ((existing && existing.id !== user.id) || pendingConflict) {
         sendError(
           res,
           ErrorKeys.USERS.EMAIL_EXISTS,
           'User with this email already exists'
         );
+
         return;
       }
+
       if (email !== user.email) {
         previousEmail = user.email;
         user.isEmailVerified = false;
@@ -366,16 +396,21 @@ router.patch(
         // not keep authenticating with the tokens issued before the move.
         revokeUserSessions(user.id);
       }
+
       user.email = email;
     }
+
     if (typeof name === 'string') user.name = name;
+
     if (locale !== undefined) user.locale = locale as string;
+
     if (password !== undefined) {
       user.password = password;
       // Invalidate target user's sessions so attacker cannot keep access after admin password reset
       revokeUserSessions(user.id);
       clearMailedProofs(user);
     }
+
     if (isActive !== undefined) {
       // Keyed on the submitted value and not on a transition, because the
       // server writes both effects whenever the request carries `false`.
@@ -385,15 +420,19 @@ router.patch(
         // revives on reactivation, the same reason the soft delete clears them.
         clearMailedProofs(user);
       }
+
       user.isActive = isActive;
     }
+
     if (unlockAccount) {
       user.failedLoginAttempts = 0;
       user.lockedUntil = null;
     }
+
     user.updatedAt = new Date().toISOString();
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('USER_UPDATE', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -455,8 +494,10 @@ router.delete(
   (req, res) => {
     const id = req.params['id'] as string;
     const targetUser = findUserById(id);
+
     if (!targetUser) {
       sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+
       return;
     }
 
@@ -481,6 +522,7 @@ router.delete(
     cancelSubscriptionsForDeletedUser(id);
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('USER_DELETE', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -503,8 +545,10 @@ router.post(
   (req, res) => {
     const id = req.params['id'] as string;
     const targetUser = findUserByIdWithDeleted(id);
+
     if (!targetUser) {
       sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+
       return;
     }
 
@@ -521,6 +565,7 @@ router.post(
         ErrorKeys.USERS.NOT_DELETED,
         `User with ID ${id} is not deleted, so there is nothing to restore`
       );
+
       return;
     }
 
@@ -530,6 +575,7 @@ router.post(
     targetUser.updatedAt = new Date().toISOString();
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('USER_RESTORE', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -556,18 +602,22 @@ router.post(
     const { currentPassword, code } = req.body;
 
     const actor = (req as AuthenticatedRequest).user;
+
     if (id === actor.id) {
       sendError(
         res,
         ErrorKeys.USERS.MFA_RESET_SELF,
         'Turn off your own two-factor authentication from your profile'
       );
+
       return;
     }
 
     const user = findUserById(id);
+
     if (!user) {
       sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+
       return;
     }
 
@@ -581,6 +631,7 @@ router.post(
         ErrorKeys.AUTH.MFA_NOT_ENABLED,
         'Two-factor authentication is not enabled'
       );
+
       return;
     }
 
@@ -590,8 +641,10 @@ router.post(
       operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
       acceptsReauthProof: false
     });
+
     if (refusal) {
       sendWithRetryAfter(res, refusal);
+
       return;
     }
 
@@ -626,18 +679,22 @@ router.post(
   (req, res) => {
     const id = req.params['id'] as string;
     const actor = (req as AuthenticatedRequest).user;
+
     if (id === actor.id) {
       sendError(
         res,
         ErrorKeys.USERS.SESSION_REVOKE_SELF,
         'End your own sessions from your profile'
       );
+
       return;
     }
 
     const user = findUserById(id);
+
     if (!user) {
       sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+
       return;
     }
 

@@ -57,5 +57,6 @@ export async function verifyPassword(
     legacy ? password : prehashPassword(password),
     hash
   );
+
   return { valid, upgrade: valid && legacy };
 }

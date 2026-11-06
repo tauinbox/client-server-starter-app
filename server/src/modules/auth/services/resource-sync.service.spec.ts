@@ -13,6 +13,7 @@ import { RESOURCE_METADATA_KEY } from '../decorators/register-resource.decorator
 function makeController(ctrlName: string) {
   class Ctrl {}
   Object.defineProperty(Ctrl, 'name', { value: ctrlName, configurable: true });
+
   return { metatype: Ctrl };
 }
 
@@ -177,6 +178,7 @@ describe('ResourceSyncService', () => {
 
     it('should skip controllers without @RegisterResource decorator (non-Health/Auth/OAuth)', async () => {
       const ctrl = makeController('UsersController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(undefined);
 
@@ -189,6 +191,7 @@ describe('ResourceSyncService', () => {
       const healthCtrl = makeController('HealthController');
       const authCtrl = makeController('AuthController');
       const oauthCtrl = makeController('OAuthController');
+
       discoveryServiceMock.getControllers.mockReturnValue([
         healthCtrl,
         authCtrl,
@@ -204,6 +207,7 @@ describe('ResourceSyncService', () => {
 
     it('should log debug for undecorated non-system controllers', async () => {
       const ctrl = makeController('ReportController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(undefined);
       const debugSpy = jest.spyOn(Logger.prototype, 'debug');
@@ -221,9 +225,11 @@ describe('ResourceSyncService', () => {
   describe('syncResources — upsert and permission creation', () => {
     it('should upsert resource with isSystem:true and its declared actions', async () => {
       const ctrl = makeController('RbacController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockImplementation((key: string) => {
         if (key === RESOURCE_METADATA_KEY) return usersMeta;
+
         return undefined;
       });
 
@@ -242,6 +248,7 @@ describe('ResourceSyncService', () => {
 
     it('creates permissions only for the declared actions', async () => {
       const ctrl = makeController('RbacController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
       resourceServiceMock.upsertResource.mockResolvedValue({ id: 'res-1' });
@@ -265,6 +272,7 @@ describe('ResourceSyncService', () => {
 
     it('should not create permission if it already exists', async () => {
       const ctrl = makeController('RbacController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue({ ...usersMeta, actions: ['read'] });
       resourceServiceMock.upsertResource.mockResolvedValue({ id: 'res-1' });
@@ -282,6 +290,7 @@ describe('ResourceSyncService', () => {
 
     it('creates a row for each declared action that has none', async () => {
       const ctrl = makeController('RbacController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
       actionRepoMock.find.mockResolvedValue([{ id: 'act-read', name: 'read' }]);
@@ -293,6 +302,7 @@ describe('ResourceSyncService', () => {
 
     it('never creates a reserved CASL action', async () => {
       const ctrl = makeController('RbacController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue({
         ...usersMeta,
@@ -314,6 +324,7 @@ describe('ResourceSyncService', () => {
     it('syncs the first of two resources with one name and logs an error for the second', async () => {
       const ctrl1 = makeController('ControllerA');
       const ctrl2 = makeController('ControllerB');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl1, ctrl2]);
       reflectorMock.get.mockImplementation(
         (_key: string, target: { name: string }) =>
@@ -342,11 +353,14 @@ describe('ResourceSyncService', () => {
     it('should process multiple distinct resources', async () => {
       const ctrl1 = makeController('UsersController');
       const ctrl2 = makeController('RolesController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl1, ctrl2]);
       reflectorMock.get.mockImplementation(
         (_key: string, target: { name: string }) => {
           if (target.name === 'UsersController') return usersMeta;
+
           if (target.name === 'RolesController') return rolesMeta;
+
           return undefined;
         }
       );
@@ -368,6 +382,7 @@ describe('ResourceSyncService', () => {
   describe('syncResources — subject casing', () => {
     it('should warn when subject does not start with uppercase', async () => {
       const ctrl = makeController('PostsController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue({
         name: 'posts',
@@ -388,6 +403,7 @@ describe('ResourceSyncService', () => {
 
     it('should not warn when subject is already PascalCase', async () => {
       const ctrl = makeController('UsersController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
       const warnSpy = jest.spyOn(Logger.prototype, 'warn');
@@ -404,6 +420,7 @@ describe('ResourceSyncService', () => {
     it('should mark resource as orphaned and warn when not registered', async () => {
       discoveryServiceMock.getControllers.mockReturnValue([]);
       const legacy = { id: 'old-res', name: 'legacy', isOrphaned: false };
+
       resourceRepoMock.find.mockResolvedValue([legacy]);
       const warnSpy = jest.spyOn(Logger.prototype, 'warn');
 
@@ -434,6 +451,7 @@ describe('ResourceSyncService', () => {
 
     it('should not warn for resources that are registered', async () => {
       const ctrl = makeController('UsersController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
       resourceRepoMock.find.mockResolvedValue([
@@ -472,6 +490,7 @@ describe('ResourceSyncService', () => {
   describe('syncResources — resource registry', () => {
     it('should register discovered resource names in the registry', async () => {
       const ctrl = makeController('UsersController');
+
       discoveryServiceMock.getControllers.mockReturnValue([ctrl]);
       reflectorMock.get.mockReturnValue(usersMeta);
 

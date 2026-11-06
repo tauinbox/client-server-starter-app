@@ -36,30 +36,36 @@ describe('FeatureEnabledPipe', () => {
   it('returns true when the flag is on', async () => {
     flagsSignal.set({ 'beta-export': true });
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const span = (fixture.nativeElement as HTMLElement).querySelector(
       '[data-testid="badge"]'
     );
+
     expect(span?.classList.contains('beta')).toBe(true);
   });
 
   it('returns false when the flag is off', async () => {
     flagsSignal.set({ 'beta-export': false });
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const span = (fixture.nativeElement as HTMLElement).querySelector(
       '[data-testid="badge"]'
     );
+
     expect(span?.classList.contains('beta')).toBe(false);
   });
 
   it('re-evaluates when the underlying store signal updates', async () => {
     flagsSignal.set({ 'beta-export': false });
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const span = (fixture.nativeElement as HTMLElement).querySelector(
       '[data-testid="badge"]'
     );
+
     expect(span?.classList.contains('beta')).toBe(false);
 
     flagsSignal.set({ 'beta-export': true });

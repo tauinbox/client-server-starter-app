@@ -35,24 +35,30 @@ export function cursorParams({
   sortOrder
 }: CursorPageRequest): HttpParams {
   let params = new HttpParams();
+
   if (cursor) {
     params = params.set('cursor', cursor);
   }
+
   if (limit !== undefined) {
     params = params.set('limit', limit.toString());
   }
+
   if (sortBy !== undefined && sortBy !== DEFAULT_SORT_BY) {
     params = params.set('sortBy', sortBy);
   }
+
   if (sortOrder !== undefined && sortOrder !== DEFAULT_SORT_ORDER) {
     params = params.set('sortOrder', sortOrder);
   }
+
   return params;
 }
 
 /** A filter value that narrows a list: an empty string or array does not. */
 export function isActiveFilterValue(value: unknown): boolean {
   if (value === undefined || value === null || value === '') return false;
+
   return !Array.isArray(value) || value.length > 0;
 }
 
@@ -66,12 +72,15 @@ export function listQueryParams(
   query: Readonly<Record<string, unknown>>
 ): HttpParams {
   let next = params;
+
   for (const [name, value] of Object.entries(query)) {
     if (!isActiveFilterValue(value)) continue;
+
     next = next.set(
       name,
       Array.isArray(value) ? value.join(',') : String(value)
     );
   }
+
   return next;
 }

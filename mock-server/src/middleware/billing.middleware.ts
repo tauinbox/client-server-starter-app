@@ -101,13 +101,16 @@ function rejectInvalid(
   location: ValidationLocation = 'body'
 ): boolean {
   if (errors.length === 0) return false;
+
   sendValidationError(res, location, errors);
+
   return true;
 }
 
 /** Checkout and plan change share a single-`planKey` DTO with the same bounds. */
 function planKeyBodyErrors(body: unknown): string[] {
   const fields = body as Record<string, unknown> | undefined;
+
   return [
     ...unknownPropertyErrors(body, ['planKey']),
     ...trimmedStringErrors('planKey', fields?.['planKey'], { min: 1, max: 100 })
@@ -117,6 +120,7 @@ function planKeyBodyErrors(body: unknown): string[] {
 /** Both cancel routes take the same optional `mode` DTO. */
 function cancelBodyErrors(body: unknown): string[] {
   const fields = body as Record<string, unknown> | undefined;
+
   return [
     ...unknownPropertyErrors(body, CANCEL_KEYS),
     ...oneOfErrors('mode', fields?.['mode'], {
@@ -139,12 +143,16 @@ function handleWebhook(
   return (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
       refuseWebhook(res, 'Missing webhook body');
+
       return;
     }
+
     if (!isConfirmable(req)) {
       refuseWebhook(res, 'Webhook verification failed');
+
       return;
     }
+
     res.status(200).json({ received: true });
   };
 }
@@ -163,6 +171,7 @@ router.post(
       event?: unknown;
       object?: { id?: unknown };
     };
+
     return (
       (body.event === 'payment.succeeded' ||
         body.event === 'payment.canceled') &&
@@ -181,9 +190,11 @@ const billingRouter = Router();
 // ---------------------------------------------------------------------------
 billingRouter.get('/plans', (_req: Request, res: Response) => {
   const plans: PlanResponse[] = [];
+
   for (const plan of getState().plans.values()) {
     if (plan.active) plans.push(toPlanResponse(plan));
   }
+
   plans.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   res.json(plans);
 });
@@ -210,6 +221,7 @@ function isProviderAvailable(
   const flagKey = BILLING_PROVIDER_FLAGS.find(
     (p) => p.provider === provider
   )?.enabledFlagKey;
+
   return flagKey !== undefined && isFlagEnabledForUser(user, flagKey);
 }
 
@@ -221,11 +233,13 @@ function rejectUnavailableProvider(
   user: MockUser
 ): boolean {
   if (isProviderAvailable(provider, user)) return false;
+
   sendError(
     res,
     ErrorKeys.BILLING.PROVIDER_UNAVAILABLE,
     `Billing provider "${provider}" is not available`
   );
+
   return true;
 }
 
@@ -239,11 +253,13 @@ function rejectMissingPaddlePrice(
   if (provider !== 'paddle' || plan.prices.paddle?.providerPriceId) {
     return false;
   }
+
   sendError(
     res,
     ErrorKeys.BILLING.PLAN_NOT_CONFIGURED,
     `Plan "${plan.key}" has no Paddle price configured`
   );
+
   return true;
 }
 
@@ -272,6 +288,7 @@ function findCustomer(userId: string): MockCustomer | undefined {
   for (const customer of getState().billingCustomers.values()) {
     if (customer.userId === userId) return customer;
   }
+
   return undefined;
 }
 
@@ -282,6 +299,7 @@ function findPlanByKey(key: string): MockPlan | undefined {
   for (const plan of getState().plans.values()) {
     if (plan.key === key) return plan;
   }
+
   return undefined;
 }
 
@@ -328,6 +346,7 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
         (!grant.expiresAt || Date.parse(grant.expiresAt) > now)
     )
     .map((grant) => grant.entitlement);
+
   if (granted.length === 0) return base;
 
   return {
@@ -356,9 +375,12 @@ export function resolveEntitlementLimit(
  */
 export function cancelSubscriptionsForDeletedUser(userId: string): void {
   const customer = findCustomer(userId);
+
   if (!customer) return;
+
   for (const sub of getState().billingSubscriptions.values()) {
     if (sub.customerId !== customer.id || sub.status === 'canceled') continue;
+
     sub.status = 'canceled';
     sub.cancelAtPeriodEnd = false;
     sub.updatedAt = new Date().toISOString();
@@ -367,7 +389,9 @@ export function cancelSubscriptionsForDeletedUser(userId: string): void {
 
 function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
   const existing = findCustomer(userId);
+
   if (existing) return existing;
+
   const { country, currency } = geoFromLocale(locale);
   const now = new Date().toISOString();
   const customer: MockCustomer = {
@@ -382,7 +406,9 @@ function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
     createdAt: now,
     updatedAt: now
   };
+
   getState().billingCustomers.set(customer.id, customer);
+
   return customer;
 }
 
@@ -401,6 +427,7 @@ function findCurrentSubscription(
         OPEN_SUBSCRIPTION_STATUSES.includes(s.status)
     )
     .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
+
   return subs[0];
 }
 
@@ -409,6 +436,7 @@ billingRouter.get('/subscription', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
   const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+
   res.json(sub ? toSubscriptionResponse(sub) : null);
 });
 
@@ -416,7 +444,9 @@ billingRouter.get('/subscription', authGuard, (req: Request, res: Response) => {
 billingRouter.get('/invoices', authGuard, (req: Request, res: Response) => {
   const query = req.query as Record<string, unknown>;
   const errors = listQueryErrors(query, INVOICE_LIST_QUERY);
+
   if (rejectInvalid(res, errors, 'query')) return;
+
   if (rejectInvalidCursor(res, query)) return;
 
   const { user } = req as AuthenticatedRequest;
@@ -427,6 +457,7 @@ billingRouter.get('/invoices', authGuard, (req: Request, res: Response) => {
       )
     : [];
   const page = listPage(invoices, INVOICE_LIST_QUERY, query);
+
   res.json({ data: page.data.map(toInvoiceResponse), meta: page.meta });
 });
 
@@ -440,6 +471,7 @@ billingRouter.get(
     const method = customer?.defaultPaymentMethodId
       ? getState().billingPaymentMethods.get(customer.defaultPaymentMethodId)
       : undefined;
+
     res.json(method ? toPaymentMethodResponse(method) : null);
   }
 );
@@ -452,14 +484,19 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
   const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+
   if (!sub || sub.billingMode !== 'usage') {
     res.json(null);
+
     return;
   }
+
   const plan = findPlanByKey(sub.planKey);
   const price = plan?.prices[sub.provider];
+
   if (!plan || !price) {
     res.json(null);
+
     return;
   }
 
@@ -482,6 +519,7 @@ billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
     amountMinor: rated.amountMinor,
     currency: price.currency
   };
+
   res.json(summary);
 });
 
@@ -498,14 +536,17 @@ billingRouter.post(
     const { user } = req as AuthenticatedRequest;
     const customer = findCustomer(user.id);
     const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+
     if (!customer || !sub) {
       sendError(
         res,
         ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
         'No active subscription to update the payment method for'
       );
+
       return;
     }
+
     // The server re-binds in the currency of the price of the current plan.
     if (!findPlanByKey(sub.planKey)?.prices[sub.provider]) {
       sendError(
@@ -513,17 +554,20 @@ billingRouter.post(
         ErrorKeys.BILLING.CURRENT_PLAN_MISSING,
         'The current plan is missing from the catalog'
       );
+
       return;
     }
 
     const state = getState();
     const nowIso = new Date().toISOString();
+
     for (const method of state.billingPaymentMethods.values()) {
       if (method.customerId === customer.id && method.isDefault) {
         method.isDefault = false;
         method.updatedAt = nowIso;
       }
     }
+
     const replacement: MockPaymentMethod = {
       id: randomUUID(),
       customerId: customer.id,
@@ -535,6 +579,7 @@ billingRouter.post(
       createdAt: nowIso,
       updatedAt: nowIso
     };
+
     state.billingPaymentMethods.set(replacement.id, replacement);
     customer.defaultPaymentMethodId = replacement.id;
     customer.updatedAt = nowIso;
@@ -542,6 +587,7 @@ billingRouter.post(
     sub.updatedAt = nowIso;
 
     const sessionRef = randomUUID();
+
     state.billingCheckoutSessions.set(sessionRef, {
       sessionRef,
       customerId: customer.id,
@@ -572,6 +618,7 @@ billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
     .filter((product) => product.active && product.prices[provider])
     .toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map(toProductResponse);
+
   res.json(products);
 });
 
@@ -579,6 +626,7 @@ billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
 // entitlement guard stays the enforcement point.
 billingRouter.get('/entitlements', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
+
   res.json(resolveEntitlements(user.id));
 });
 
@@ -590,6 +638,7 @@ billingRouter.get('/credits', authGuard, (req: Request, res: Response) => {
   const balance = customer
     ? getState().billingCreditBalances.get(customer.id)
     : undefined;
+
   res.json(balance ? toCreditBalanceResponse(balance) : null);
 });
 
@@ -601,6 +650,7 @@ billingRouter.get('/credits', authGuard, (req: Request, res: Response) => {
 billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const body = req.body as Record<string, unknown> | undefined;
+
   if (
     rejectInvalid(res, [
       ...unknownPropertyErrors(body, [
@@ -624,31 +674,38 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   ) {
     return;
   }
+
   const productKey = (body?.['productKey'] as string).trim();
   const requestedMinor = body?.['amountMinor'] as number | undefined;
 
   const product = getState()
     .billingProducts.values()
     .find((p) => p.key === productKey);
+
   if (!product || !product.active) {
     sendError(
       res,
       ErrorKeys.BILLING.PRODUCT_NOT_FOUND,
       `Product "${productKey}" was not found`
     );
+
     return;
   }
 
   const customer = getOrCreateCustomer(user.id, user.locale);
   const provider = effectiveProvider(customer);
+
   if (rejectUnavailableProvider(res, provider, user)) return;
+
   const price = product.prices[provider];
+
   if (!price) {
     sendError(
       res,
       ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER,
       `Product "${product.key}" is not available for your billing provider.`
     );
+
     return;
   }
 
@@ -656,6 +713,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   // charge the catalog price (client amount ignored); custom requires a
   // client amount inside the configured bounds.
   let amountMinor: number;
+
   if (product.type !== 'custom') {
     if (!price.amountMinor || price.amountMinor <= 0) {
       sendError(
@@ -663,11 +721,14 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
         ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
         `Product "${product.key}" has no price configured`
       );
+
       return;
     }
+
     amountMinor = price.amountMinor;
   } else {
     const { minAmountMinor, maxAmountMinor } = price;
+
     // `== null`, not falsy: a configured lower bound of 0 (any amount the
     // request already has to be >= 1 for) is legitimate, not "unconfigured".
     if (minAmountMinor == null || maxAmountMinor == null) {
@@ -676,26 +737,33 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
         ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
         `Product "${product.key}" has no amount bounds configured`
       );
+
       return;
     }
+
     if (requestedMinor === undefined) {
       sendError(
         res,
         ErrorKeys.BILLING.AMOUNT_REQUIRED,
         'amountMinor is required for a custom-amount product'
       );
+
       return;
     }
+
     if (requestedMinor < minAmountMinor || requestedMinor > maxAmountMinor) {
       sendError(
         res,
         ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE,
         `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`
       );
+
       return;
     }
+
     amountMinor = requestedMinor;
   }
+
   // The Paddle webhook grants the product it finds by the paid catalog price
   // id, so a fixed-price Paddle purchase needs one.
   if (
@@ -708,10 +776,12 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
       ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED,
       `Product "${product.key}" has no Paddle price configured`
     );
+
     return;
   }
 
   const sessionRef = randomUUID();
+
   getState().billingPurchaseSessions.set(sessionRef, {
     sessionRef,
     customerId: customer.id,
@@ -731,18 +801,22 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
 // POST /billing/checkout — start a hosted checkout for a plan.
 billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
+
   if (rejectInvalid(res, planKeyBodyErrors(req.body))) return;
+
   const planKey = (
     (req.body as Record<string, unknown>)['planKey'] as string
   ).trim();
 
   const plan = findPlanByKey(planKey);
+
   if (!plan?.active) {
     sendError(
       res,
       ErrorKeys.BILLING.PLAN_NOT_FOUND,
       `Plan "${planKey}" was not found`
     );
+
     return;
   }
 
@@ -755,16 +829,19 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
         s.customerId === customer.id &&
         ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     );
+
   if (hasActive) {
     sendError(
       res,
       ErrorKeys.BILLING.ALREADY_SUBSCRIBED,
       'You already have an active subscription. Cancel it before subscribing to another plan.'
     );
+
     return;
   }
 
   const provider = effectiveProvider(customer);
+
   if (rejectUnavailableProvider(res, provider, user)) return;
 
   // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
@@ -796,6 +873,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
       providerSubscriptionId: null,
       updatedAt: now.toISOString()
     };
+
     if (pending) {
       Object.assign(pending, fields);
     } else {
@@ -805,6 +883,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
         ...fields,
         createdAt: now.toISOString()
       };
+
       getState().billingSubscriptions.set(sub.id, sub);
     }
   } else if (pending) {
@@ -812,9 +891,11 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     pending.status = 'canceled';
     pending.updatedAt = new Date().toISOString();
   }
+
   if (rejectMissingPaddlePrice(res, provider, plan)) return;
 
   const sessionRef = randomUUID();
+
   getState().billingCheckoutSessions.set(sessionRef, {
     sessionRef,
     customerId: customer.id,
@@ -848,37 +929,46 @@ interface ChangeGuardResult {
 /** Shared guards of change/preview; replies with the error and returns null. */
 function guardChange(req: Request, res: Response): ChangeGuardResult | null {
   const { user } = req as AuthenticatedRequest;
+
   if (rejectInvalid(res, planKeyBodyErrors(req.body))) return null;
+
   const planKey = (
     (req.body as Record<string, unknown>)['planKey'] as string
   ).trim();
 
   const customer = findCustomer(user.id);
   const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+
   if (!customer || !sub) {
     sendError(
       res,
       ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
       'No active subscription to change'
     );
+
     return null;
   }
+
   if (!CHANGEABLE_SUBSCRIPTION_STATUSES.includes(sub.status)) {
     sendError(
       res,
       ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE,
       'The subscription must be active to change plans. Settle any outstanding payment first.'
     );
+
     return null;
   }
+
   if (sub.cancelAtPeriodEnd) {
     sendError(
       res,
       ErrorKeys.BILLING.CANCELLATION_SCHEDULED,
       'A cancellation is scheduled for this subscription; it can no longer change plans.'
     );
+
     return null;
   }
+
   if (
     sub.lifecycleOwner === 'self' &&
     new Date(renewalAnchor(sub)).getTime() <= Date.now()
@@ -888,44 +978,54 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
       ErrorKeys.BILLING.RENEWAL_IN_PROGRESS,
       'The billing period has ended and its renewal is in progress. Try again shortly.'
     );
+
     return null;
   }
 
   const toPlan = findPlanByKey(planKey);
+
   if (!toPlan?.active) {
     sendError(
       res,
       ErrorKeys.BILLING.PLAN_NOT_FOUND,
       `Plan "${planKey}" was not found`
     );
+
     return null;
   }
+
   if (toPlan.key === sub.planKey) {
     sendError(
       res,
       ErrorKeys.BILLING.SAME_PLAN,
       'You are already on this plan.'
     );
+
     return null;
   }
+
   if (!toPlan.prices[sub.provider]) {
     sendError(
       res,
       ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER,
       `Plan "${toPlan.key}" is not available for your billing provider.`
     );
+
     return null;
   }
 
   const fromPlan = findPlanByKey(sub.planKey);
+
   if (!fromPlan) {
     sendError(
       res,
       ErrorKeys.BILLING.CURRENT_PLAN_MISSING,
       'The current plan is missing from the catalog'
     );
+
     return null;
   }
+
   if (rejectMissingPaddlePrice(res, sub.provider, toPlan)) return null;
 
   return { customer, sub, fromPlan, toPlan };
@@ -952,6 +1052,7 @@ function prorationRefund(
   const refundMinor = source
     ? Math.min(quotedMinor, source.amountMinor - (source.refundedMinor ?? 0))
     : 0;
+
   return { source, refundMinor };
 }
 
@@ -961,7 +1062,9 @@ billingRouter.post(
   authGuard,
   (req: Request, res: Response) => {
     const ctx = guardChange(req, res);
+
     if (!ctx) return;
+
     const { customer, sub, fromPlan, toPlan } = ctx;
     const now = new Date();
     const nowIso = now.toISOString();
@@ -1011,6 +1114,7 @@ billingRouter.post(
           createdAt: nowIso,
           updatedAt: nowIso
         };
+
         state.billingInvoices.set(charge.id, charge);
       }
 
@@ -1034,10 +1138,12 @@ billingRouter.post(
           createdAt: nowIso,
           updatedAt: nowIso
         };
+
         state.billingInvoices.set(refund.id, refund);
         // Record the partial refund on the source so an admin refund of the same
         // invoice can't give the money back twice.
         source.refundedMinor = (source.refundedMinor ?? 0) + refundMinor;
+
         if (source.refundedMinor >= source.amountMinor) {
           source.status = 'refunded';
           source.updatedAt = nowIso;
@@ -1047,7 +1153,9 @@ billingRouter.post(
 
     sub.planKey = toPlan.key;
     sub.billingMode = toPlan.billingMode;
+
     if (modeChanges) sub.meteredFrom = nowIso;
+
     sub.updatedAt = nowIso;
     notifyEntitlementsChanged(customer.id);
     res.json(toSubscriptionResponse(sub));
@@ -1060,7 +1168,9 @@ billingRouter.post(
   authGuard,
   (req: Request, res: Response) => {
     const ctx = guardChange(req, res);
+
     if (!ctx) return;
+
     const { sub, fromPlan, toPlan } = ctx;
     const delegated = managesLifecycle(sub.provider);
     const quote = prorationAmounts({
@@ -1090,6 +1200,7 @@ billingRouter.post(
       chargeMinor: delegated ? null : chargeMinor,
       dueNowMinor: chargeMinor - refundMinor
     };
+
     res.json(preview);
   }
 );
@@ -1105,19 +1216,23 @@ function cancelRefusal(
       errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED
     };
   }
+
   if (mode === 'immediate') return null;
+
   if (sub.status === 'incomplete') {
     return {
       message: 'This subscription has no paid period to end.',
       errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
     };
   }
+
   if (sub.cancelAtPeriodEnd) {
     return {
       message: 'A cancellation is already scheduled for the end of the period.',
       errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
     };
   }
+
   return null;
 }
 
@@ -1131,8 +1246,10 @@ function cancelOpenSubscription(
   mode: CancelMode
 ): boolean {
   const refusal = cancelRefusal(sub, mode);
+
   if (refusal) {
     sendError(res, refusal.errorKey, refusal.message);
+
     return false;
   }
 
@@ -1141,15 +1258,19 @@ function cancelOpenSubscription(
     // provider-managed row is billed by its cancel webhook instead, and a
     // period-end cancel by the renewal scan at the boundary.
     if (sub.lifecycleOwner === 'self') billClosingUsagePeriod(sub);
+
     sub.status = 'canceled';
     sub.cancelAtPeriodEnd = false;
   } else {
     sub.cancelAtPeriodEnd = true;
   }
+
   sub.updatedAt = new Date().toISOString();
+
   // Only an immediate cancel revokes access now; a period-end cancel leaves
   // entitlements untouched until the boundary, so it pushes nothing.
   if (mode === 'immediate') notifyEntitlementsChanged(sub.customerId);
+
   return true;
 }
 
@@ -1159,21 +1280,26 @@ billingRouter.post(
   authGuard,
   (req: Request, res: Response) => {
     const { user } = req as AuthenticatedRequest;
+
     if (rejectInvalid(res, cancelBodyErrors(req.body))) return;
+
     const mode = req.body?.mode ?? 'period_end';
 
     const customer = findCustomer(user.id);
     const sub = customer ? findCurrentSubscription(customer.id) : undefined;
+
     if (!sub) {
       sendError(
         res,
         ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
         'No active subscription to cancel'
       );
+
       return;
     }
 
     if (!cancelOpenSubscription(res, sub, mode)) return;
+
     res.json(toSubscriptionResponse(sub));
   }
 );
@@ -1182,11 +1308,15 @@ billingRouter.post(
 billingRouter.get('/region', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
+
   if (customer) {
     res.json(regionView(user, customer));
+
     return;
   }
+
   const { country } = geoFromLocale(user.locale);
+
   res.json(regionView(user, { providerOverride: null, country }));
 });
 
@@ -1194,6 +1324,7 @@ billingRouter.get('/region', authGuard, (req: Request, res: Response) => {
 billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const region = (req.body as Record<string, unknown> | undefined)?.['region'];
+
   if (
     rejectInvalid(res, [
       ...unknownPropertyErrors(req.body, ['region']),
@@ -1213,10 +1344,12 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
       ErrorKeys.BILLING.REGION_UNAVAILABLE,
       'Payments are not available in this billing region.'
     );
+
     return;
   }
 
   const open = findCurrentSubscription(customer.id);
+
   if (open && open.provider !== newEffective) {
     if (open.status !== 'incomplete' || open.lifecycleOwner !== 'self') {
       sendError(
@@ -1224,8 +1357,10 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
         ErrorKeys.BILLING.REGION_CHANGE_BLOCKED,
         'Cancel the current subscription before changing your billing region.'
       );
+
       return;
     }
+
     // Release the unpaid self-managed checkout, as checkout does.
     open.status = 'canceled';
     open.updatedAt = new Date().toISOString();
@@ -1242,14 +1377,17 @@ billingRouter.get(
   authGuard,
   (req: Request, res: Response) => {
     const { user } = req as AuthenticatedRequest;
+
     if (!resolveEntitlements(user.id).capabilities.includes('reports')) {
       sendError(
         res,
         ErrorKeys.BILLING.ENTITLEMENT_REQUIRED,
         'This action requires the "reports" entitlement'
       );
+
       return;
     }
+
     res.json({ available: true });
   }
 );
@@ -1280,6 +1418,7 @@ function auditAdminAction(
   }
 ): void {
   const { user } = req as AuthenticatedRequest;
+
   logAudit(action, {
     actorId: user?.id ?? null,
     actorEmail: user?.email ?? null,
@@ -1296,7 +1435,9 @@ billingAdminRouter.get(
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, SUBSCRIPTION_LIST_QUERY);
+
     if (rejectInvalid(res, errors, 'query')) return;
+
     if (rejectInvalidCursor(res, query)) return;
 
     const page = listPage(
@@ -1304,6 +1445,7 @@ billingAdminRouter.get(
       SUBSCRIPTION_LIST_QUERY,
       query
     );
+
     res.json({
       data: page.data.map(toSubscriptionResponse),
       meta: page.meta
@@ -1317,7 +1459,9 @@ billingAdminRouter.get(
   (req: Request, res: Response) => {
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, INVOICE_LIST_QUERY);
+
     if (rejectInvalid(res, errors, 'query')) return;
+
     if (rejectInvalidCursor(res, query)) return;
 
     const page = listPage(
@@ -1325,6 +1469,7 @@ billingAdminRouter.get(
       INVOICE_LIST_QUERY,
       query
     );
+
     res.json({ data: page.data.map(toInvoiceResponse), meta: page.meta });
   }
 );
@@ -1335,20 +1480,25 @@ billingAdminRouter.post(
   requireUuid('id'),
   (req: Request, res: Response) => {
     if (rejectInvalid(res, cancelBodyErrors(req.body))) return;
+
     const mode = req.body?.mode ?? 'period_end';
 
     const sub = getState().billingSubscriptions.get(
       (req.params['id'] as string) ?? ''
     );
+
     if (!sub) {
       sendError(
         res,
         ErrorKeys.BILLING.SUBSCRIPTION_NOT_FOUND,
         'Subscription not found'
       );
+
       return;
     }
+
     if (!cancelOpenSubscription(res, sub, mode)) return;
+
     auditAdminAction(req, {
       action: 'BILLING_SUBSCRIPTION_CANCEL',
       targetType: 'Subscription',
@@ -1366,23 +1516,29 @@ billingAdminRouter.post(
 // keep the invoice `paid`, so grants and credits survive them by construction.
 function revokeOneTimeEffects(invoice: MockInvoice): void {
   if (invoice.kind !== 'one_time') return;
+
   const state = getState();
   const nowIso = new Date().toISOString();
 
   let revoked = false;
+
   for (const grant of state.billingCustomerGrants.values()) {
     if (grant.sourceInvoiceId === invoice.id && !grant.revokedAt) {
       grant.revokedAt = nowIso;
       revoked = true;
     }
   }
+
   if (revoked) notifyEntitlementsChanged(invoice.customerId);
 
   const product = invoice.productId
     ? state.billingProducts.get(invoice.productId)
     : undefined;
+
   if (product?.type !== 'credits' || !product.grant?.credits) return;
+
   const balance = state.billingCreditBalances.get(invoice.customerId);
+
   if (balance) {
     balance.balanceUnits -= product.grant.credits;
     balance.updatedAt = nowIso;
@@ -1403,6 +1559,7 @@ billingAdminRouter.post(
     const amountMinor = (req.body as Record<string, unknown> | undefined)?.[
       'amountMinor'
     ] as number | undefined;
+
     // The DTO's @IsInt()/@Min(1) run in the global pipe, before the handler, so
     // a supplied 0 or a fractional amount fails the DTO whether or not the
     // invoice exists and never reaches the remaining-total check.
@@ -1421,37 +1578,46 @@ billingAdminRouter.post(
     const invoice = getState().billingInvoices.get(
       (req.params['id'] as string) ?? ''
     );
+
     if (!invoice) {
       sendError(res, ErrorKeys.BILLING.INVOICE_NOT_FOUND, 'Invoice not found');
+
       return;
     }
+
     if (invoice.status !== 'paid') {
       sendError(
         res,
         ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE,
         'Only paid invoices can be refunded'
       );
+
       return;
     }
 
     const alreadyRefunded = invoice.refundedMinor ?? 0;
     const remaining = invoice.amountMinor - alreadyRefunded;
     const refundAmount = amountMinor ?? remaining;
+
     if (refundAmount <= 0 || refundAmount > remaining) {
       sendError(
         res,
         ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE,
         'Refund amount must be between 1 and the remaining refundable total'
       );
+
       return;
     }
 
     const cumulativeRefunded = alreadyRefunded + refundAmount;
+
     invoice.refundedMinor = cumulativeRefunded;
+
     if (cumulativeRefunded >= invoice.amountMinor) {
       invoice.status = 'refunded';
       revokeOneTimeEffects(invoice);
     }
+
     invoice.updatedAt = new Date().toISOString();
     auditAdminAction(req, {
       action: 'BILLING_INVOICE_REFUND',
@@ -1475,22 +1641,27 @@ billingAdminRouter.post(
     const event = getState().billingWebhookEvents.get(
       (req.params['id'] as string) ?? ''
     );
+
     if (!event) {
       sendError(
         res,
         ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND,
         'Webhook event not found'
       );
+
       return;
     }
+
     if (event.status !== 'dead_letter') {
       sendError(
         res,
         ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE,
         'Only dead-lettered webhook events can be replayed'
       );
+
       return;
     }
+
     event.status = 'received';
     event.attempts = 0;
     event.lastError = null;
@@ -1560,6 +1731,7 @@ billingAdminRouter.post(
         (r) =>
           r.customerId === customerId && r.idempotencyKey === idempotencyKey
       );
+
     if (existing) {
       // The server audits by response, so an idempotent replay is recorded too,
       // pointing at the original record's id.
@@ -1574,6 +1746,7 @@ billingAdminRouter.post(
         }
       });
       res.status(201).json(toUsageResponse(existing));
+
       return;
     }
 
@@ -1581,12 +1754,14 @@ billingAdminRouter.post(
     // new usage may accrue until the debt is topped up. Replays above still
     // succeed — the record predates the block, exactly like the server.
     const creditBalance = state.billingCreditBalances.get(customerId);
+
     if (creditBalance && creditBalance.balanceUnits < 0) {
       sendError(
         res,
         ErrorKeys.BILLING.CREDITS_BLOCKED,
         'Credit balance is negative. Top up credits before recording more usage.'
       );
+
       return;
     }
 
@@ -1599,12 +1774,14 @@ billingAdminRouter.post(
           ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
       )
       .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
+
     if (!subscription) {
       sendError(
         res,
         ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION,
         'No active subscription for customer to record usage against'
       );
+
       return;
     }
 
@@ -1617,6 +1794,7 @@ billingAdminRouter.post(
         ErrorKeys.BILLING.METER_NOT_DECLARED,
         `Meter "${meterKey}" is not declared by any plan`
       );
+
       return;
     }
 
@@ -1629,20 +1807,24 @@ billingAdminRouter.post(
         ? new Date(occurredAtRaw).toISOString()
         : now;
     const occurredAtMs = new Date(occurredAt).getTime();
+
     if (occurredAtMs < new Date(usageIngestStart(subscription)).getTime()) {
       sendError(
         res,
         ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW,
         'occurredAt is before the open metered window'
       );
+
       return;
     }
+
     if (occurredAtMs > nowMs + USAGE_FUTURE_TOLERANCE_MS) {
       sendError(
         res,
         ErrorKeys.BILLING.USAGE_IN_FUTURE,
         'occurredAt is in the future'
       );
+
       return;
     }
 
@@ -1656,6 +1838,7 @@ billingAdminRouter.post(
       idempotencyKey,
       recordedAt: now
     };
+
     state.billingUsageRecords.set(record.id, record);
     auditAdminAction(req, {
       action: 'BILLING_USAGE_RECORD',

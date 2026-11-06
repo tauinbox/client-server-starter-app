@@ -33,18 +33,24 @@ export function featureFlagRuleError(
   knownCustomKeys: ReadonlySet<string> | null = null
 ): string | null {
   if (payload.type !== 'attribute') return null;
+
   if (!FEATURE_FLAG_ATTRIBUTE_FIELD_OPS[payload.field].includes(payload.op)) {
     return 'admin.featureFlagRule.errorOpUnsupported';
   }
+
   if (payload.field === 'custom') {
     const customKey = payload.customKey ?? '';
+
     if (customKey.trim() === '') {
       return 'admin.featureFlagRule.errorCustomKeyRequired';
     }
+
     if (knownCustomKeys !== null && !knownCustomKeys.has(customKey)) {
       return 'admin.featureFlagRule.errorCustomKeyUnknown';
     }
   }
+
   if (attributeValueError(payload.op, payload.value) === null) return null;
+
   return VALUE_ERROR_KEYS[payload.op];
 }

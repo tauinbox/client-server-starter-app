@@ -29,11 +29,13 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
   const statusOf = async (run: Promise<unknown>): Promise<number> => {
     try {
       await run;
+
       return HttpStatus.OK;
     } catch (error) {
       if (error instanceof HttpException) {
         return error.getStatus();
       }
+
       throw error;
     }
   };
@@ -45,9 +47,11 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     overrides: Partial<User> = {}
   ): Promise<User> => {
     const email = `reset-verifies-${label}-${Date.now()}@example.com`;
+
     emails.push(email);
 
     const repository = dataSource.getRepository(User);
+
     return repository.save(
       repository.create({
         email,
@@ -63,11 +67,13 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     user: Pick<User, 'id' | 'email'>
   ): Promise<string> => {
     const rawToken = crypto.randomBytes(32).toString('hex');
+
     await usersService.setPasswordResetToken(user.id, {
       email: user.email,
       hashedToken: hashToken(rawToken),
       expiresAt: new Date(Date.now() + 30 * 60 * 1000)
     });
+
     return rawToken;
   };
 
@@ -90,6 +96,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((e) => ({ email: e })));
     }
+
     await app?.close();
   });
 
@@ -102,11 +109,13 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     const afterReset = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(afterReset.isEmailVerified).toBe(true);
 
     const audit = dataSource.getRepository(AuditLog);
     const where = { action: AuditAction.EMAIL_VERIFIED, targetId: user.id };
     const row = await eventually(() => audit.findOne({ where }));
+
     expect(row?.details).toEqual({ source: 'reset' });
     expect(await audit.count({ where })).toBe(1);
 
@@ -130,6 +139,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     const afterReset = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(afterReset.email).toBe(user.email);
     expect(afterReset.isEmailVerified).toBe(true);
     expect(afterReset.pendingEmail).toBeNull();

@@ -50,9 +50,11 @@ describe('ApiError', () => {
     const keys = Object.values(ErrorKeys).flatMap((group) =>
       Object.values(group)
     );
+
     for (const key of keys) {
       expect(ERROR_STATUS[key]).toEqual(expect.any(Number));
     }
+
     expect(Object.keys(ERROR_STATUS)).toHaveLength(keys.length);
   });
 
@@ -61,6 +63,7 @@ describe('ApiError', () => {
     const partial: Record<ErrorKey, ErrorStatus> = {
       [ErrorKeys.AUTH.INVALID_CREDENTIALS]: 401
     };
+
     expect(partial).toBeDefined();
   });
 });

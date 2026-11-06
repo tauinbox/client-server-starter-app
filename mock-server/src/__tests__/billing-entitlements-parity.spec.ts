@@ -15,6 +15,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -33,8 +34,10 @@ async function login(email = 'user@example.com'): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -46,7 +49,9 @@ function getEntitlements(token: string): Promise<Response> {
 
 async function readEntitlements(token: string): Promise<EntitlementsResponse> {
   const res = await getEntitlements(token);
+
   expect(res.status).toBe(200);
+
   return (await res.json()) as EntitlementsResponse;
 }
 
@@ -66,7 +71,9 @@ function currentUserId(): string {
   const user = getState()
     .users.values()
     .find((u) => u.email === 'user@example.com');
+
   expect(user).toBeDefined();
+
   return user!.id;
 }
 
@@ -74,18 +81,22 @@ function customerIdOf(userId: string): string {
   const customer = getState()
     .billingCustomers.values()
     .find((c) => c.userId === userId);
+
   expect(customer).toBeDefined();
+
   return customer!.id;
 }
 
 describe('GET /billing/entitlements', () => {
   it('requires auth', async () => {
     const res = await fetch(`${baseUrl}/api/v1/billing/entitlements`);
+
     expect(res.status).toBe(401);
   });
 
   it('falls back to the Free tier for a user with no billing customer', async () => {
     const token = await login();
+
     await expect(readEntitlements(token)).resolves.toEqual({
       planKey: 'free',
       capabilities: [],
@@ -95,6 +106,7 @@ describe('GET /billing/entitlements', () => {
 
   it('returns the plan capabilities and limits for an active subscription', async () => {
     const token = await login();
+
     expect((await activateSubscription(currentUserId(), 'pro')).status).toBe(
       200
     );
@@ -108,11 +120,13 @@ describe('GET /billing/entitlements', () => {
 
   it('keeps full entitlements through the past_due grace window', async () => {
     const token = await login();
+
     expect(
       (await activateSubscription(currentUserId(), 'pro', 'past_due')).status
     ).toBe(200);
 
     const resolved = await readEntitlements(token);
+
     expect(resolved.planKey).toBe('pro');
     expect(resolved.capabilities).toContain('reports');
   });
@@ -120,6 +134,7 @@ describe('GET /billing/entitlements', () => {
   it('drops to Free once the subscription is canceled', async () => {
     const token = await login();
     const userId = currentUserId();
+
     expect((await activateSubscription(userId, 'pro')).status).toBe(200);
 
     for (const sub of getState().billingSubscriptions.values()) {
@@ -136,11 +151,14 @@ describe('GET /billing/entitlements', () => {
   it('unions an active one-time grant on top of the Free tier', async () => {
     const token = await login();
     const userId = currentUserId();
+
     expect((await activateSubscription(userId, 'pro')).status).toBe(200);
     const customerId = customerIdOf(userId);
+
     for (const sub of getState().billingSubscriptions.values()) {
       sub.status = 'canceled';
     }
+
     getState().billingCustomerGrants.set('grant-1', {
       id: 'grant-1',
       customerId,
@@ -152,6 +170,7 @@ describe('GET /billing/entitlements', () => {
     });
 
     const resolved = await readEntitlements(token);
+
     expect(resolved.planKey).toBe('free');
     expect(resolved.capabilities).toEqual(['reports']);
   });
@@ -159,6 +178,7 @@ describe('GET /billing/entitlements', () => {
   it('deduplicates a grant the plan already carries', async () => {
     const token = await login();
     const userId = currentUserId();
+
     expect((await activateSubscription(userId, 'pro')).status).toBe(200);
     getState().billingCustomerGrants.set('grant-2', {
       id: 'grant-2',
@@ -171,6 +191,7 @@ describe('GET /billing/entitlements', () => {
     });
 
     const resolved = await readEntitlements(token);
+
     expect(resolved.capabilities).toEqual([
       'reports',
       'api-access',
@@ -181,11 +202,14 @@ describe('GET /billing/entitlements', () => {
   it('ignores expired and revoked grants', async () => {
     const token = await login();
     const userId = currentUserId();
+
     expect((await activateSubscription(userId, 'pro')).status).toBe(200);
     const customerId = customerIdOf(userId);
+
     for (const sub of getState().billingSubscriptions.values()) {
       sub.status = 'canceled';
     }
+
     getState().billingCustomerGrants.set('grant-expired', {
       id: 'grant-expired',
       customerId,
@@ -215,6 +239,7 @@ describe('GET /billing/entitlements', () => {
   it('is scoped to the caller - another user sees their own resolution', async () => {
     const userToken = await login();
     const adminToken = await login('admin@example.com');
+
     expect((await activateSubscription(currentUserId(), 'pro')).status).toBe(
       200
     );
@@ -233,9 +258,11 @@ describe('GET /billing/entitlements', () => {
 describe('the concurrent-session allowance is plan-driven', () => {
   function tokensHeldBy(userId: string): number {
     let held = 0;
+
     for (const uid of getState().refreshTokens.values()) {
       if (uid === userId) held++;
     }
+
     return held;
   }
 
@@ -280,6 +307,7 @@ describe('GET /billing/premium-content shares the resolver', () => {
 
   it('403s on Free and 200s once the plan reports the capability', async () => {
     const token = await login();
+
     expect((await getPremium(token)).status).toBe(403);
 
     expect((await activateSubscription(currentUserId(), 'pro')).status).toBe(
@@ -291,11 +319,14 @@ describe('GET /billing/premium-content shares the resolver', () => {
   it('agrees with the entitlements read after a one-time grant', async () => {
     const token = await login();
     const userId = currentUserId();
+
     expect((await activateSubscription(userId, 'pro')).status).toBe(200);
     const customerId = customerIdOf(userId);
+
     for (const sub of getState().billingSubscriptions.values()) {
       sub.status = 'canceled';
     }
+
     getState().billingCustomerGrants.set('grant-3', {
       id: 'grant-3',
       customerId,
@@ -307,6 +338,7 @@ describe('GET /billing/premium-content shares the resolver', () => {
     });
 
     const resolved = await readEntitlements(token);
+
     expect(resolved.capabilities).toContain('reports');
     expect((await getPremium(token)).status).toBe(200);
   });

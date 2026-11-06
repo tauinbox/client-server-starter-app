@@ -78,7 +78,9 @@ function translateField(
 ): Fragment {
   if (isAcceptableScalar(value)) {
     const p = nextParam(ctx);
+
     ctx.params[p] = value;
+
     return `${column} = :${p}`;
   }
 
@@ -87,19 +89,23 @@ function translateField(
   }
 
   const ops = Object.entries(value);
+
   if (ops.length === 0) {
     return { skip: true, reason: `empty operator object` };
   }
 
   const fragments: string[] = [];
+
   for (const [op, opVal] of ops) {
     if (op in COMPARISON_OPERATORS) {
       if (!isAcceptableScalar(opVal)) {
         return { skip: true, reason: `${op} value must be a scalar` };
       }
+
       const sqlOp =
         COMPARISON_OPERATORS[op as keyof typeof COMPARISON_OPERATORS];
       const p = nextParam(ctx);
+
       ctx.params[p] = opVal;
       fragments.push(`${column} ${sqlOp} :${p}`);
       continue;
@@ -109,14 +115,18 @@ function translateField(
       if (!Array.isArray(opVal)) {
         return { skip: true, reason: `${op} value must be an array` };
       }
+
       if (opVal.length === 0) {
         return { skip: true, reason: `${op} array is empty` };
       }
+
       if (!opVal.every(isAcceptableScalar)) {
         return { skip: true, reason: `${op} array element must be a scalar` };
       }
+
       const sqlOp = LIST_OPERATORS[op as keyof typeof LIST_OPERATORS];
       const p = nextParam(ctx);
+
       ctx.params[p] = opVal;
       fragments.push(`${column} ${sqlOp} (:...${p})`);
       continue;
@@ -137,30 +147,40 @@ function translateLogical(
     if (!isPlainObject(value)) {
       return { skip: true, reason: '$not value must be an object' };
     }
+
     const sub = translate(value, ctx);
+
     if (isSkip(sub)) return sub;
+
     return `NOT (${sub})`;
   }
 
   if (!Array.isArray(value)) {
     return { skip: true, reason: `${op} value must be an array` };
   }
+
   if (value.length === 0) {
     return { skip: true, reason: `${op} array is empty` };
   }
 
   const subs: string[] = [];
+
   for (const child of value) {
     if (!isPlainObject(child)) {
       return { skip: true, reason: `${op} array element must be an object` };
     }
+
     const sub = translate(child, ctx);
+
     if (isSkip(sub)) return sub;
+
     subs.push(sub);
   }
 
   if (op === '$and') return `(${subs.join(' AND ')})`;
+
   if (op === '$or') return `(${subs.join(' OR ')})`;
+
   return `NOT (${subs.join(' OR ')})`;
 }
 
@@ -173,7 +193,9 @@ function translate(
   for (const [key, value] of Object.entries(node)) {
     if (LOGICAL_OPERATORS.has(key)) {
       const sub = translateLogical(key, value, ctx);
+
       if (isSkip(sub)) return sub;
+
       fragments.push(sub);
       continue;
     }
@@ -183,12 +205,15 @@ function translate(
     }
 
     const column = ctx.columnFor(key);
+
     if (!column) {
       return { skip: true, reason: `unknown field "${key}"` };
     }
 
     const sub = translateField(column, value, ctx);
+
     if (isSkip(sub)) return sub;
+
     fragments.push(sub);
   }
 
@@ -250,6 +275,7 @@ export function translateRuleSet<R extends { conditions?: unknown }>(
       params: ruleParams,
       columnFor
     });
+
     if (isSkip(result)) {
       // Roll back partially-consumed param indices so surviving rules keep
       // contiguous numbering (purely cosmetic — SQL is correct either way).
@@ -257,6 +283,7 @@ export function translateRuleSet<R extends { conditions?: unknown }>(
       skipped.push({ reason: result.reason, conditions: rule.conditions });
       continue;
     }
+
     Object.assign(params, ruleParams);
     fragments.push(result);
     translated.push(rule);

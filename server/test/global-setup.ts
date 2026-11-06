@@ -24,17 +24,20 @@ export default async function globalSetup(): Promise<void> {
   }
 
   const baseUrl = readRedisUrl();
+
   if (!baseUrl) {
     return;
   }
 
   const isolatedUrl = withRedisDatabase(baseUrl, readE2eRedisDb());
+
   process.env['REDIS_URL'] = isolatedUrl;
 
   try {
     await flushRedisDatabase(isolatedUrl);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+
     throw new Error(
       `Cannot isolate the e2e Redis database (${isolatedUrl}): ${reason}. Start Redis (server/docker-compose.yml) or run with REDIS_URL= to use the in-memory throttler.`,
       { cause: error }

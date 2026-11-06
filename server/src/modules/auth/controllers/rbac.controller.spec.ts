@@ -39,6 +39,7 @@ describe('RbacController', () => {
     update: jest.Mock;
     restore: jest.Mock;
   };
+
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
@@ -84,14 +85,17 @@ describe('RbacController', () => {
       )!.value as object;
 
       const checks = Reflect.getMetadata(PERMISSIONS_KEY, handler) as unknown;
+
       expect(checks).toEqual([['read', 'Permission']]);
 
       const guards = Reflect.getMetadata(GUARDS_METADATA, handler) as unknown[];
+
       expect(guards).toContain(PermissionsGuard);
     });
 
     it('should return all resources from resourceService', () => {
       const resources = [{ id: 'r1', name: 'users' }];
+
       resourceServiceMock.findAll.mockReturnValue(resources);
 
       const result = controller.findAllResources();
@@ -109,6 +113,7 @@ describe('RbacController', () => {
     it('passes the dto, the ability and the actor to the update and returns its result', async () => {
       const dto = { displayName: 'Users' };
       const updated = { id: 'res-1', displayName: 'Users' };
+
       resourceServiceMock.update.mockResolvedValue(updated);
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -146,6 +151,7 @@ describe('RbacController', () => {
           }) => unknown;
         }
       ];
+
       expect(row({ displayName: 'Old', description: 'old' })).toMatchObject({
         action: AuditAction.RESOURCE_UPDATE,
         actorId: 'user-42',

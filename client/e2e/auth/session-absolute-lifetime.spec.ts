@@ -10,9 +10,11 @@ test.describe('Absolute session lifetime', () => {
     page
   }) => {
     const userId = '100';
+
     await loginViaUi(page, _mockServer.url, { id: userId, roles: ['admin'] });
 
     const refreshStatuses: number[] = [];
+
     page.on('response', (resp) => {
       if (resp.url().includes('/api/v1/auth/refresh-token')) {
         refreshStatuses.push(resp.status());
@@ -35,6 +37,7 @@ test.describe('Absolute session lifetime', () => {
     // Nothing of the session is left behind, so no reuse detection fires on a
     // later attempt with the same cookie.
     const state = await _mockServer.getState();
+
     expect(state.refreshTokens).toBe(0);
     expect(state.revokedRefreshTokens).toBe(0);
     expect(state.sessionStarts).toBe(0);

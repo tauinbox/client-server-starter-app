@@ -58,6 +58,7 @@ export function createDiskStorageOptions(options: {
         callback: (error: Error | null, filename: string) => void
       ) {
         const sanitized = file.originalname.replaceAll(/[^a-zA-Z0-9._-]/g, '_');
+
         callback(
           null,
           `${Date.now()}-${Math.round(Math.random() * 1e9)}-${sanitized}`
@@ -77,8 +78,10 @@ export function createDiskStorageOptions(options: {
           false
         );
       }
+
       const ext = file.originalname.split('.').pop()?.toLowerCase() ?? '';
       const expectedMimeTypes = UPLOAD_ALLOWED_MIME_TYPES[ext];
+
       if (!expectedMimeTypes || !expectedMimeTypes.includes(file.mimetype)) {
         return callback(
           // eslint-disable-next-line no-restricted-syntax -- no route uses this upload config, so no user reaches this text
@@ -86,6 +89,7 @@ export function createDiskStorageOptions(options: {
           false
         );
       }
+
       callback(null, true);
     }
   };

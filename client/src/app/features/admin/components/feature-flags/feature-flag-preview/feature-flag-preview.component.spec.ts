@@ -50,8 +50,10 @@ describe('FeatureFlagPreviewComponent', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(FeatureFlagPreviewComponent);
+
     fixture.componentRef.setInput('flagId', flagId);
     fixture.detectChanges();
+
     return fixture;
   };
 
@@ -61,16 +63,19 @@ describe('FeatureFlagPreviewComponent', () => {
       { value: 'admin', label: 'admin', sub: 'System admins' },
       { value: 'beta', label: 'beta' }
     ];
+
     fixture.componentRef.setInput('roleOptions', roles);
     fixture.detectChanges();
     const pickers = fixture.debugElement
       .queryAll(By.directive(NxsChipsAutocompleteComponent))
       .map((el) => el.componentInstance as NxsChipsAutocompleteComponent);
+
     expect(pickers.some((p) => p.options() === roles)).toBe(true);
   });
 
   it('builds a structured context from form fields and calls preview()', async () => {
     const fixture = await setup('flag-42');
+
     previewSpy.mockReturnValue(
       of({
         result: true,
@@ -79,6 +84,7 @@ describe('FeatureFlagPreviewComponent', () => {
       } satisfies FeatureFlagPreviewResult)
     );
     const cmp = fixture.componentInstance;
+
     cmp['selectedUser'].set([
       {
         value: '123e4567-e89b-12d3-a456-426614174000',
@@ -105,6 +111,7 @@ describe('FeatureFlagPreviewComponent', () => {
     const fixture = await setup();
     const select = fixture.debugElement.query(By.directive(MatSelect))
       .componentInstance as MatSelect;
+
     select.open();
     fixture.detectChanges();
     await fixture.whenStable();
@@ -116,6 +123,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('sends the chosen environment and omits the server default', async () => {
     const fixture = await setup();
+
     previewSpy.mockReturnValue(
       of({
         result: true,
@@ -124,6 +132,7 @@ describe('FeatureFlagPreviewComponent', () => {
       } satisfies FeatureFlagPreviewResult)
     );
     const cmp = fixture.componentInstance;
+
     cmp['env'].set('staging');
     cmp.run();
     cmp['env'].set('');
@@ -136,6 +145,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('sends the unsaved draft alongside the context', async () => {
     const fixture = await setup('flag-42');
+
     previewSpy.mockReturnValue(
       of({
         result: true,
@@ -153,9 +163,11 @@ describe('FeatureFlagPreviewComponent', () => {
       enabled: true,
       environments: ['staging']
     };
+
     fixture.componentRef.setInput('draft', draft);
     fixture.detectChanges();
     const cmp = fixture.componentInstance;
+
     cmp['selectedRoles'].set([{ value: 'gamma', label: 'gamma' }]);
     cmp.run();
     expect(previewSpy).toHaveBeenCalledWith('flag-42', {
@@ -166,6 +178,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('sends the draft in raw-JSON mode too', async () => {
     const fixture = await setup('flag-42');
+
     previewSpy.mockReturnValue(
       of({
         result: false,
@@ -176,6 +189,7 @@ describe('FeatureFlagPreviewComponent', () => {
     fixture.componentRef.setInput('draft', { rules: [], enabled: false });
     fixture.detectChanges();
     const cmp = fixture.componentInstance;
+
     cmp.toggleRawJson(true);
     cmp['rawJson'].set('{"roles":["beta"]}');
     cmp.run();
@@ -188,6 +202,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('debounces user search and queries UserService.searchCursor with q', async () => {
     vi.useFakeTimers();
+
     try {
       const fixture = await setup();
       const cmp = fixture.componentInstance;
@@ -211,6 +226,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('searches again after a refused user search', async () => {
     vi.useFakeTimers();
+
     try {
       const fixture = await setup();
       const cmp = fixture.componentInstance;
@@ -228,6 +244,7 @@ describe('FeatureFlagPreviewComponent', () => {
         updatedAt: '',
         deletedAt: null
       };
+
       searchUsersSpy
         .mockReturnValueOnce(
           throwError(() => new HttpErrorResponse({ status: 429 }))
@@ -249,6 +266,7 @@ describe('FeatureFlagPreviewComponent', () => {
   it('caps user selection to at most one chip (newest wins)', async () => {
     const fixture = await setup();
     const cmp = fixture.componentInstance;
+
     cmp.onUserChipsChange([
       { value: 'u-1', label: 'Alice' },
       { value: 'u-2', label: 'Bob' }
@@ -261,6 +279,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('omits empty fields from the structured context', async () => {
     const fixture = await setup();
+
     previewSpy.mockReturnValue(
       of({
         result: true,
@@ -274,6 +293,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('parses attributes JSON when provided', async () => {
     const fixture = await setup();
+
     previewSpy.mockReturnValue(
       of({
         result: false,
@@ -292,6 +312,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('flags invalid attributes JSON instead of submitting', async () => {
     const fixture = await setup();
+
     fixture.componentInstance['attributesJson'].set('not-json');
     fixture.componentInstance.run();
     expect(previewSpy).not.toHaveBeenCalled();
@@ -300,6 +321,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('uses raw-JSON payload when the toggle is on', async () => {
     const fixture = await setup();
+
     previewSpy.mockReturnValue(
       of({
         result: true,
@@ -320,6 +342,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('shows an error toast when the preview HTTP call fails', async () => {
     const fixture = await setup();
+
     previewSpy.mockReturnValue(throwError(() => new Error('boom')));
     fixture.componentInstance.run();
     expect(notifyError).toHaveBeenCalledWith(
@@ -335,6 +358,7 @@ describe('FeatureFlagPreviewComponent', () => {
       status: 400,
       error: { message: 'userId must be a UUID' }
     });
+
     previewSpy.mockReturnValue(throwError(() => rejection));
 
     fixture.componentInstance.run();
@@ -351,6 +375,7 @@ describe('FeatureFlagPreviewComponent', () => {
   it('maps each preview reason to a stable i18n key', async () => {
     const fixture = await setup();
     const cmp = fixture.componentInstance;
+
     type Reason = FeatureFlagPreviewResult['reason'];
     const cases: [Reason, string][] = [
       ['disabled', 'admin.featureFlagPreview.reason.disabled'],
@@ -363,6 +388,7 @@ describe('FeatureFlagPreviewComponent', () => {
       ],
       ['not-included', 'admin.featureFlagPreview.reason.notIncluded']
     ];
+
     for (const [reason, expected] of cases) {
       expect(cmp['reasonKey'](reason)).toBe(expected);
     }
@@ -370,6 +396,7 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('does not claim an exclusion when no include rule matched', async () => {
     const fixture = await setup();
+
     previewSpy.mockReturnValue(
       of({
         result: false,
@@ -382,6 +409,7 @@ describe('FeatureFlagPreviewComponent', () => {
     const panel = fixture.nativeElement.querySelector(
       '.preview-result'
     ) as HTMLElement;
+
     expect(panel.textContent).toContain('No rule included this context');
     expect(panel.textContent).not.toContain('Excluded by rule');
   });
@@ -392,6 +420,7 @@ describe('FeatureFlagPreviewComponent', () => {
       '.preview-actions button'
     ) as HTMLElement;
     const icon = button.querySelector('mat-icon') as HTMLElement;
+
     expect(icon.textContent?.trim()).toBe('play_arrow');
     // The icon must be a direct child of the button so Angular Material projects
     // it into the leading-icon slot. When it is nested inside .mdc-button__label
@@ -402,11 +431,13 @@ describe('FeatureFlagPreviewComponent', () => {
 
   it('shows the loading spinner inline in place of the icon while running', async () => {
     const fixture = await setup();
+
     fixture.componentInstance['loading'].set(true);
     fixture.detectChanges();
     const button = fixture.nativeElement.querySelector(
       '.preview-actions button'
     ) as HTMLElement;
+
     expect(button.querySelector('mat-spinner.run-indicator')).not.toBeNull();
     expect(button.querySelector('mat-icon')).toBeNull();
   });

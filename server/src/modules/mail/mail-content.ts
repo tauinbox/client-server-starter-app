@@ -102,7 +102,9 @@ const RU_RECOVERY =
  */
 function enStillLinked(providers: string[] = []): string[] {
   if (providers.length === 0) return [];
+
   const list = providers.map(providerLabel).join(', ');
+
   return [
     `These sign-in providers can still sign in to your account: ${list}. If you did not link one of them, remove it on your profile page.`
   ];
@@ -110,7 +112,9 @@ function enStillLinked(providers: string[] = []): string[] {
 
 function ruStillLinked(providers: string[] = []): string[] {
   if (providers.length === 0) return [];
+
   const list = providers.map(providerLabel).join(', ');
+
   return [
     `Для входа в аккаунт по-прежнему можно использовать: ${list}. Если вы не подключали какой-то из этих способов, отключите его на странице профиля.`
   ];

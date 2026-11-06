@@ -38,6 +38,7 @@ function createStore(): UserStore {
 
 function buildSeedUser(): User {
   const u = new User();
+
   u.id = 'user-1';
   u.email = 'before@example.com';
   u.name = 'Before User';
@@ -56,6 +57,7 @@ function buildSeedUser(): User {
   u.lockedUntil = null;
   u.tokenRevokedAt = null;
   u.roles = [];
+
   return u;
 }
 
@@ -67,12 +69,15 @@ type WhereClause = {
 
 function matchOne(row: User, where: WhereClause): boolean {
   if (where.id !== undefined && row.id !== where.id) return false;
+
   if (where.email !== undefined && row.email !== where.email) return false;
+
   if (
     where.pendingEmail !== undefined &&
     row.pendingEmail !== where.pendingEmail
   )
     return false;
+
   return true;
 }
 
@@ -81,11 +86,13 @@ function makeUserRepoMock(store: UserStore) {
     findOne: jest.fn(
       (opts: { where: WhereClause | WhereClause[] }): Promise<User | null> => {
         const clauses = Array.isArray(opts.where) ? opts.where : [opts.where];
+
         for (const row of store.rows.values()) {
           for (const where of clauses) {
             if (matchOne(row, where)) return Promise.resolve(row);
           }
         }
+
         return Promise.resolve(null);
       }
     )
@@ -99,7 +106,9 @@ function transactionOver(store: UserStore) {
   const manager = {
     update: (_target: unknown, where: { id: string }, set: Partial<User>) => {
       const row = store.rows.get(where.id);
+
       if (row) Object.assign(row, set);
+
       return Promise.resolve({ affected: row ? 1 : 0 });
     },
     exists: (_target: unknown, options: { where: { id: string } }) =>
@@ -109,9 +118,11 @@ function transactionOver(store: UserStore) {
       Promise.resolve(store.rows.get(options.where.id) ?? null),
     findOneOrFail: (_target: unknown, options: { where: { id: string } }) => {
       const row = store.rows.get(options.where.id);
+
       return row ? Promise.resolve(row) : Promise.reject(new Error('no row'));
     }
   };
+
   return {
     transaction: (run: (m: typeof manager) => Promise<unknown>) => run(manager)
   };
@@ -169,6 +180,7 @@ describe('UsersService.update — email change side effects', () => {
     expect(updated.isEmailVerified).toBe(false);
 
     const persisted = store.rows.get('user-1');
+
     expect(persisted?.isEmailVerified).toBe(false);
     expect(persisted?.emailVerificationToken).toEqual(expect.any(String));
     expect(persisted?.emailVerificationToken?.length).toBeGreaterThan(0);
@@ -199,6 +211,7 @@ describe('UsersService.update — email change side effects', () => {
 
   it('clears self-service pending email fields when admin sets a new email', async () => {
     const u = store.rows.get('user-1')!;
+
     u.pendingEmail = 'self-service@example.com';
     u.pendingEmailToken = 'hashed-self-service-token';
     u.pendingEmailExpiresAt = new Date(Date.now() + 3600_000);
@@ -210,6 +223,7 @@ describe('UsersService.update — email change side effects', () => {
     );
 
     const persisted = store.rows.get('user-1');
+
     expect(persisted?.pendingEmail).toBeNull();
     expect(persisted?.pendingEmailToken).toBeNull();
     expect(persisted?.pendingEmailExpiresAt).toBeNull();
@@ -217,12 +231,14 @@ describe('UsersService.update — email change side effects', () => {
 
   it('rejects when another user holds the address as a pending email change', async () => {
     const dupe = buildSeedUser();
+
     dupe.id = 'user-3';
     dupe.email = 'other@example.com';
     dupe.pendingEmail = 'reserved@example.com';
     store.rows.set('user-3', dupe);
 
     let caught: unknown;
+
     try {
       await usersService.update(
         'user-1',
@@ -232,17 +248,20 @@ describe('UsersService.update — email change side effects', () => {
     } catch (err) {
       caught = err;
     }
+
     expect(caught).toBeInstanceOf(HttpException);
     expect((caught as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
   });
 
   it('throws 409 with EMAIL_EXISTS errorKey on duplicate (no MailService side effect)', async () => {
     const dupe = buildSeedUser();
+
     dupe.id = 'user-2';
     dupe.email = 'taken@example.com';
     store.rows.set('user-2', dupe);
 
     let caught: unknown;
+
     try {
       await usersService.update(
         'user-1',
@@ -317,7 +336,9 @@ describe('Admin email change - session revocation through the real event bus', (
     };
     userUpdate = jest.fn((id: string, patch: Partial<User>) => {
       const row = store.rows.get(id);
+
       if (row) Object.assign(row, patch);
+
       return Promise.resolve({});
     });
     const userRepo = makeUserRepoMock(store);

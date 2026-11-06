@@ -19,12 +19,15 @@ export class PermissionConditionShapeConstraint implements ValidatorConstraintIn
     if (value === undefined || value === null) {
       return true;
     }
+
     const finder = args.constraints[0] as ShapeFinder;
+
     return finder(value) === null;
   }
 
   defaultMessage(args: ValidationArguments): string {
     const finder = args.constraints[0] as ShapeFinder;
+
     return finder(args.value) ?? 'invalid condition shape';
   }
 }

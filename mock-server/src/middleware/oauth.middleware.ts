@@ -32,6 +32,7 @@ const router = Router();
 router.get('/accounts', authGuard, (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const accounts = getState().oauthAccounts.get(user.id) || [];
+
   res.json(
     accounts.map((a) => ({
       provider: a.provider,
@@ -52,12 +53,14 @@ router.delete(
   (req, res) => {
     const { user } = req as AuthenticatedRequest;
     const provider = req.params['provider'] as string;
+
     if (!OAUTH_PROVIDERS.includes(provider)) {
       sendError(
         res,
         ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER,
         `Invalid OAuth provider: ${provider}`
       );
+
       return;
     }
 
@@ -71,8 +74,10 @@ router.delete(
       code,
       operation: STEP_UP_OPERATION.OAUTH_UNLINK
     });
+
     if (stepUp) {
       sendWithRetryAfter(res, stepUp);
+
       return;
     }
 
@@ -85,6 +90,7 @@ router.delete(
         ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED,
         `No linked ${provider} account found`
       );
+
       return;
     }
 
@@ -96,6 +102,7 @@ router.delete(
         ErrorKeys.AUTH.UNLINK_LAST_PROVIDER,
         'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.'
       );
+
       return;
     }
 
@@ -154,11 +161,13 @@ router.post('/exchange', (req, res) => {
 
   if (!cookie) {
     sendError(res, ErrorKeys.AUTH.MISSING_OAUTH_DATA, 'Missing OAuth data');
+
     return;
   }
 
   const state = getState();
   const pending = state.oauthDataTokens.get(cookie);
+
   // One-shot, like the cookie the real server clears on exchange.
   state.oauthDataTokens.delete(cookie);
   const user = pending ? findUserById(pending.userId) : undefined;
@@ -176,6 +185,7 @@ router.post('/exchange', (req, res) => {
       ErrorKeys.AUTH.INVALID_OAUTH_DATA,
       'Invalid or expired OAuth data'
     );
+
     return;
   }
 
@@ -186,6 +196,7 @@ router.post('/exchange', (req, res) => {
   // right to present a code. POST /auth/mfa/verify finishes the sign-in.
   if ('challenge' in pending) {
     res.json(pending.challenge);
+
     return;
   }
 
@@ -210,8 +221,10 @@ router.post('/link-init', authGuard, requireStepUpBody(), (req, res) => {
     code,
     operation: STEP_UP_OPERATION.OAUTH_LINK
   });
+
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
+
     return;
   }
 
@@ -232,8 +245,10 @@ router.post('/reauth-init', authGuard, (req, res) => {
     ...unknownPropertyErrors(req.body, ['operation']),
     ...oneOfErrors('operation', operation, { values: STEP_UP_OPERATIONS })
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 

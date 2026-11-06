@@ -23,6 +23,7 @@ function loadManifestRoutes(): Route[] {
       const { routes } = JSON.parse(
         fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
       ) as { routes: Route[] };
+
       return routes;
     });
 }
@@ -32,6 +33,7 @@ let baseUrl: string;
 
 beforeAll(async () => {
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -44,6 +46,7 @@ test.each<Route>(loadManifestRoutes())(
   '$method $path → $expectedStatus',
   async ({ method, path, expectedStatus }) => {
     const response = await fetch(`${baseUrl}${path}`, { method });
+
     expect(response.status).toBe(expectedStatus);
   }
 );

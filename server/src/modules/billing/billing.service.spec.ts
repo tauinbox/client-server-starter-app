@@ -59,11 +59,13 @@ describe('BillingService.resolveProvider', () => {
 
   it('routes a Russian customer to YooKassa', async () => {
     const provider = await service.resolveProvider(args({ country: 'RU' }));
+
     expect(provider.id).toBe('yookassa');
   });
 
   it('routes a rest-of-world customer to Paddle', async () => {
     const provider = await service.resolveProvider(args({ country: 'US' }));
+
     expect(provider.id).toBe('paddle');
   });
 
@@ -71,6 +73,7 @@ describe('BillingService.resolveProvider', () => {
     const provider = await service.resolveProvider(
       args({ country: 'US', providerOverride: 'yookassa' })
     );
+
     expect(provider.id).toBe('yookassa');
   });
 
@@ -103,6 +106,7 @@ describe('BillingService.resolveProvider', () => {
         { provide: BillingConfigService, useValue: billingConfig }
       ]
     }).compile();
+
     await expectApiRejection(
       module.get(BillingService).resolveProvider(args({ country: 'US' })),
       ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR
@@ -132,6 +136,7 @@ describe('BillingService.isProviderAvailable', () => {
         { provide: BillingConfigService, useValue: billingConfig }
       ]
     }).compile();
+
     return module.get(BillingService);
   };
 
@@ -144,6 +149,7 @@ describe('BillingService.isProviderAvailable', () => {
 
   it('is true for an enabled, configured and registered provider', async () => {
     const service = await build();
+
     await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
       true
     );
@@ -156,6 +162,7 @@ describe('BillingService.isProviderAvailable', () => {
   it('is false when the kill-switch flag evaluates to false', async () => {
     featureFlags.isEnabledForUserId.mockResolvedValue(false);
     const service = await build();
+
     await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
       false
     );
@@ -166,6 +173,7 @@ describe('BillingService.isProviderAvailable', () => {
       (id: string) => id !== 'paddle'
     );
     const service = await build();
+
     await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
       false
     );
@@ -176,6 +184,7 @@ describe('BillingService.isProviderAvailable', () => {
 
   it('is false when the provider is not registered', async () => {
     const service = await build([yookassa]);
+
     await expect(service.isProviderAvailable('paddle', USER_ID)).resolves.toBe(
       false
     );
@@ -195,11 +204,13 @@ describe('BillingService.getProviderById', () => {
         { provide: BillingConfigService, useValue: { isConfigured: jest.fn() } }
       ]
     }).compile();
+
     return module.get(BillingService);
   };
 
   it('returns the registered provider without an availability check', async () => {
     const service = await build();
+
     expect(service.getProviderById('yookassa')).toBe(yookassa);
   });
 

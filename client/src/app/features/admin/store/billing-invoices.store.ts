@@ -23,6 +23,7 @@ export const BillingInvoicesStore = signalStore(
     fallbackKey: 'admin.billing.errorLoadFailed',
     fetcher: () => {
       const billing = inject(BillingAdminService);
+
       return (request) => billing.listInvoices(request);
     }
   }),
@@ -36,18 +37,22 @@ export const BillingInvoicesStore = signalStore(
     return {
       async refundInvoice(id: string, amountMinor?: number): Promise<boolean> {
         patchState(store, { working: true });
+
         try {
           const updated = await firstValueFrom(
             billing.refundInvoice(id, amountMinor)
           );
+
           patchState(store, updateEntity({ id, changes: updated }));
           notify.success('admin.billing.successRefunded');
+
           return true;
         } catch (error) {
           notify.error(
             error as HttpErrorResponse,
             'admin.billing.errorRefundFailed'
           );
+
           return false;
         } finally {
           patchState(store, { working: false });

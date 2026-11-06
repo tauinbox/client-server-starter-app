@@ -7,6 +7,7 @@ import { flushRedisDatabase, readRedisUrl } from './redis-e2e-isolation';
  */
 export default async function globalTeardown(): Promise<void> {
   const isolatedUrl = readRedisUrl();
+
   if (!isolatedUrl) {
     return;
   }
@@ -15,6 +16,7 @@ export default async function globalTeardown(): Promise<void> {
     await flushRedisDatabase(isolatedUrl);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+
     console.warn(`Could not flush the e2e Redis database: ${reason}`);
   }
 }

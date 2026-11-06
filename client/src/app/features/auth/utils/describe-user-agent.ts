@@ -36,6 +36,7 @@ function firstMatch(value: string, table: [RegExp, string][]): string | null {
  */
 export function describeUserAgent(userAgent: string | null): DeviceDescription {
   if (!userAgent) return { browser: null, os: null };
+
   return {
     browser: firstMatch(userAgent, BROWSERS),
     os: firstMatch(userAgent, SYSTEMS)

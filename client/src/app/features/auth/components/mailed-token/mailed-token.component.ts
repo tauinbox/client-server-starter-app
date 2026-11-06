@@ -82,6 +82,7 @@ export class MailedTokenComponent implements OnInit {
     if (!token) {
       this.loading.set(false);
       this.error.set(this.#transloco.translate(prefix + 'errorNoToken'));
+
       return;
     }
 

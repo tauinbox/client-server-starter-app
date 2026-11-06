@@ -58,6 +58,7 @@ test.describe('OAuth — unlink last provider safety', () => {
       userId,
       STEP_UP_OPERATION.OAUTH_UNLINK
     );
+
     await page.context().addCookies([
       {
         name: 'reauth_proof',

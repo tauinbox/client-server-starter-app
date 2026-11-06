@@ -98,10 +98,12 @@ export class FeatureFlagResolverService {
           if (err instanceof HttpException && err.getStatus() === 404) {
             return null;
           }
+
           throw err;
         }),
       this.permissionService.getRoleNamesForUser(userId)
     ]);
+
     return {
       userId,
       email: user?.email ?? null,
@@ -120,14 +122,17 @@ export class FeatureFlagResolverService {
     req: Request
   ): Promise<RolloutEvaluation> {
     const flags = await this.loadAllFlags();
+
     if (!signedInEvaluationNeedsAnonId(flags, this.env())) {
       return {
         result: await this.evaluateForUser(user, req),
         issuedAnonId: null
       };
     }
+
     const issuedAnonId = anonId === null ? randomUUID() : null;
     const ctx = this.buildContext(user, anonId ?? issuedAnonId, req);
+
     return {
       result: this.evaluate(flags, ctx, /* publicOnly */ false),
       issuedAnonId
@@ -144,6 +149,7 @@ export class FeatureFlagResolverService {
   ): Promise<EvaluatedFeatureFlagsResponse> {
     const flags = await this.loadAllFlags();
     const ctx = this.buildContext(user, null, req);
+
     return this.evaluate(flags, ctx, /* publicOnly */ false);
   }
 
@@ -162,6 +168,7 @@ export class FeatureFlagResolverService {
         ? randomUUID()
         : null;
     const ctx = this.buildContext(null, anonId ?? issuedAnonId, req);
+
     return {
       result: this.evaluate(flags, ctx, /* publicOnly */ true),
       issuedAnonId
@@ -174,8 +181,11 @@ export class FeatureFlagResolverService {
     key: string
   ): Promise<boolean> {
     const flag = (await this.loadAllFlags()).find((f) => f.key === key);
+
     if (!flag) return false;
+
     const ctx = this.buildContext(user, null, req);
+
     return this.evaluateOne(flag, ctx);
   }
 
@@ -185,6 +195,7 @@ export class FeatureFlagResolverService {
    */
   async isEnabledForUserId(userId: string, key: string): Promise<boolean> {
     const user = await this.buildResolverUser(userId);
+
     return this.isEnabledForUser(user, null, key);
   }
 
@@ -196,10 +207,12 @@ export class FeatureFlagResolverService {
     const version = await this.#version.read();
     const cacheKey = `${ALL_FLAGS_KEY}:v${version}`;
     const cached = await this.cacheManager.get<CachedFlag[]>(cacheKey);
+
     this.metrics.recordCacheAccess(
       'feature_flags_all',
       cached ? 'hit' : 'miss'
     );
+
     if (cached) return cached;
 
     // Single-flight: the flag-change broadcast triggers a synchronized refetch
@@ -210,27 +223,35 @@ export class FeatureFlagResolverService {
       const load = this.#loadAllFlagsFromDb(cacheKey).finally(() => {
         if (this.#loadAllInFlight?.load === load) this.#loadAllInFlight = null;
       });
+
       this.#loadAllInFlight = { version, load };
     }
+
     return this.#loadAllInFlight.load;
   }
 
   async #loadAllFlagsFromDb(cacheKey: string): Promise<CachedFlag[]> {
     const flags = await this.flagRepo.find({ order: { key: 'ASC' } });
+
     if (flags.length === 0) {
       await this.cacheManager.set(cacheKey, [], ALL_FLAGS_TTL_MS);
+
       return [];
     }
+
     const rules = await this.ruleRepo.find({
       where: { flagId: In(flags.map((f) => f.id)) },
       order: { createdAt: 'ASC', id: 'ASC' }
     });
     const rulesByFlag = new Map<string, typeof rules>();
+
     for (const r of rules) {
       const arr = rulesByFlag.get(r.flagId) ?? [];
+
       arr.push(r);
       rulesByFlag.set(r.flagId, arr);
     }
+
     const projected: CachedFlag[] = flags.map((f) => ({
       key: f.key,
       enabled: f.enabled,
@@ -241,7 +262,9 @@ export class FeatureFlagResolverService {
         payload: r.payload
       }))
     }));
+
     await this.cacheManager.set(cacheKey, projected, ALL_FLAGS_TTL_MS);
+
     return projected;
   }
 
@@ -261,6 +284,7 @@ export class FeatureFlagResolverService {
         : null,
       req
     );
+
     return {
       userId: user?.userId ?? null,
       anonId,
@@ -280,15 +304,20 @@ export class FeatureFlagResolverService {
     publicOnly: boolean
   ): EvaluatedFeatureFlagsResponse {
     const result: Record<string, boolean> = {};
+
     for (const flag of flags) {
       if (publicOnly && !flag.public) continue;
+
       const value = this.evaluateOne(flag, ctx);
+
       // Authenticated callers receive all flags, but a disabled non-public flag
       // would leak an internal/unfinished feature key. Omit it: the client's
       // isEnabled() treats an absent key as false, so this is transparent.
       if (!publicOnly && !value && !flag.public) continue;
+
       result[flag.key] = value;
     }
+
     return {
       flags: result,
       evaluatedAt: new Date().toISOString()
@@ -308,6 +337,7 @@ export class FeatureFlagResolverService {
       effect: r.effect,
       payload: r.payload
     }));
+
     return evaluateFeatureFlag(evalFlag, evalRules, ctx);
   }
 }

@@ -16,6 +16,7 @@ const PASSWORD = 'Password1';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -49,6 +50,7 @@ async function accessToken(userId: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId })
   });
+
   expect(dataRes.status).toBe(200);
   const { token } = (await dataRes.json()) as { token: string };
 
@@ -56,10 +58,12 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
+
   expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as {
     tokens: { access_token: string };
   };
+
   return body.tokens.access_token;
 }
 
@@ -69,8 +73,10 @@ async function issueProof(userId: string, operation: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId, operation })
   });
+
   expect(res.status).toBe(200);
   const { token } = (await res.json()) as { token: string };
+
   return token;
 }
 
@@ -116,6 +122,7 @@ describe('POST /api/v1/auth/oauth/link-init demands a step-up', () => {
     const audit = getState().auditLogs.filter(
       (row) => row.action === 'STEP_UP_FAILURE'
     );
+
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({
       actorId: user.id,

@@ -9,6 +9,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -27,11 +28,13 @@ async function login(email: string): Promise<{ token: string; id: string }> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     tokens: { access_token: string };
     user: { id: string };
   };
+
   return { token: body.tokens.access_token, id: body.user.id };
 }
 
@@ -48,7 +51,9 @@ async function activate(
   planKey: string
 ): Promise<{ id: string; customerId: string }> {
   const res = await control('activate-subscription', { userId, planKey });
+
   expect(res.status).toBe(200);
+
   return (await res.json()) as { id: string; customerId: string };
 }
 
@@ -58,10 +63,12 @@ async function listInvoices(
   const res = await fetch(`${baseUrl}/api/v1/billing/invoices`, {
     headers: { authorization: `Bearer ${token}` }
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     data: Array<Record<string, unknown>>;
   };
+
   return body.data;
 }
 
@@ -69,6 +76,7 @@ describe('POST /__control/billing/advance-renewal', () => {
   it('closes a usage period postpaid: invoice covers the closed period at overage pricing', async () => {
     const { token, id } = await login('user@example.com');
     const { customerId } = await activate(id, 'usage');
+
     await control('seed-usage', { customerId, quantity: 30 });
     await control('seed-usage', { customerId, quantity: 12 });
     // Outside the current period — must not be billed.
@@ -80,14 +88,18 @@ describe('POST /__control/billing/advance-renewal', () => {
 
     const before = await listInvoices(token);
     const res = await control('advance-renewal', { userId: id });
+
     expect(res.status).toBe(200);
     const sub = (await res.json()) as Record<string, unknown>;
+
     expect(sub['status']).toBe('active');
 
     const invoices = await listInvoices(token);
+
     expect(invoices).toHaveLength(before.length + 1);
     // user@example.com is non-RU → paddle price: $0.02/unit, 0 included.
     const usageInvoice = invoices.find((i) => i['amountMinor'] === 84);
+
     expect(usageInvoice).toMatchObject({
       billingMode: 'usage',
       status: 'paid',
@@ -100,6 +112,7 @@ describe('POST /__control/billing/advance-renewal', () => {
   it('rates the closing period on the plan meter only, ignoring a foreign meter', async () => {
     const { token, id } = await login('user@example.com');
     const { customerId } = await activate(id, 'usage');
+
     await control('seed-usage', { customerId, quantity: 30 });
     // A meter the plan does not name belongs to another product and is priced
     // at that product's rate, never at this plan's.
@@ -111,12 +124,14 @@ describe('POST /__control/billing/advance-renewal', () => {
 
     const before = await listInvoices(token);
     const res = await control('advance-renewal', { userId: id });
+
     expect(res.status).toBe(200);
 
     const invoices = await listInvoices(token);
     const added = invoices.filter(
       (i) => !before.some((b) => b['id'] === i['id'])
     );
+
     expect(added).toHaveLength(1);
     // 30 api_calls × $0.02. The 500 storage units add nothing.
     expect(added[0]).toMatchObject({ amountMinor: 60, billingMode: 'usage' });
@@ -128,29 +143,35 @@ describe('POST /__control/billing/advance-renewal', () => {
     const plan = getState()
       .plans.values()
       .find((p) => p.key === 'usage')!;
+
     plan.meterKey = null;
     await control('seed-usage', { customerId, quantity: 30 });
 
     const before = await listInvoices(token);
+
     await control('advance-renewal', { userId: id });
 
     const invoices = await listInvoices(token);
     const added = invoices.filter(
       (i) => !before.some((b) => b['id'] === i['id'])
     );
+
     expect(added).toHaveLength(1);
     expect(added[0]).toMatchObject({ amountMinor: 0, billingMode: 'usage' });
   });
 
   it('closes a zero-usage period with a zero invoice and still advances', async () => {
     const { token, id } = await login('user@example.com');
+
     await activate(id, 'usage');
 
     const before = await listInvoices(token);
     const res = await control('advance-renewal', { userId: id });
+
     expect(res.status).toBe(200);
 
     const invoices = await listInvoices(token);
+
     expect(invoices).toHaveLength(before.length + 1);
     expect(
       invoices.some(
@@ -164,12 +185,15 @@ describe('POST /__control/billing/advance-renewal', () => {
 
   it('renews a fixed subscription at the plan price', async () => {
     const { token, id } = await login('user@example.com');
+
     await activate(id, 'pro');
 
     const before = await listInvoices(token);
+
     await control('advance-renewal', { userId: id });
 
     const invoices = await listInvoices(token);
+
     expect(invoices).toHaveLength(before.length + 1);
     // pro paddle price: $12.00.
     expect(
@@ -183,9 +207,11 @@ describe('POST /__control/billing/advance-renewal', () => {
     const { id } = await login('user@example.com');
     const { id: subscriptionId } = await activate(id, 'pro');
     const row = getState().billingSubscriptions.get(subscriptionId)!;
+
     row.billingAnchorAt = '2025-12-31T10:00:00.000Z';
 
     const res = await control('advance-renewal', { userId: id });
+
     expect(res.status).toBe(200);
     const advanced = (await res.json()) as Record<string, string>;
 
@@ -195,6 +221,7 @@ describe('POST /__control/billing/advance-renewal', () => {
     const daysInTargetMonth = new Date(
       Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 2, 0)
     ).getUTCDate();
+
     expect(new Date(advanced['currentPeriodEnd']!).getUTCDate()).toBe(
       Math.min(31, daysInTargetMonth)
     );
@@ -203,6 +230,7 @@ describe('POST /__control/billing/advance-renewal', () => {
 
   it('walks the dunning ladder on failures: past_due, then canceled after 3', async () => {
     const { id } = await login('user@example.com');
+
     await activate(id, 'usage');
 
     for (const expected of ['past_due', 'past_due', 'canceled']) {
@@ -210,8 +238,10 @@ describe('POST /__control/billing/advance-renewal', () => {
         userId: id,
         outcome: 'failure'
       });
+
       expect(res.status).toBe(200);
       const sub = (await res.json()) as Record<string, unknown>;
+
       expect(sub['status']).toBe(expected);
     }
   });
@@ -219,6 +249,7 @@ describe('POST /__control/billing/advance-renewal', () => {
   it('returns 404 when there is no subscription to advance', async () => {
     const { id } = await login('user@example.com');
     const res = await control('advance-renewal', { userId: id });
+
     expect(res.status).toBe(404);
   });
 
@@ -227,6 +258,7 @@ describe('POST /__control/billing/advance-renewal', () => {
     const { id: subscriptionId } = await activate(id, 'pro');
 
     const res = await control('advance-renewal', { subscriptionId });
+
     expect(res.status).toBe(200);
     expect(((await res.json()) as Record<string, unknown>)['status']).toBe(
       'active'
@@ -241,11 +273,13 @@ describe('POST /__control/billing/advance-renewal', () => {
     for (let i = 0; i < 3; i++) {
       await control('advance-renewal', { subscriptionId, outcome: 'failure' });
     }
+
     expect(getState().billingSubscriptions.get(subscriptionId)?.status).toBe(
       'canceled'
     );
 
     const res = await control('advance-renewal', { subscriptionId });
+
     expect(res.status).toBe(404);
   });
 
@@ -263,6 +297,7 @@ describe('POST /__control/billing/advance-renewal', () => {
       body: JSON.stringify({ productKey: 'credits-500' })
     });
     const session = (await purchase.json()) as { sessionRef: string };
+
     await control('complete-purchase', { sessionRef: session.sessionRef });
 
     async function balanceUnits(): Promise<number> {
@@ -270,15 +305,18 @@ describe('POST /__control/billing/advance-renewal', () => {
         headers: { authorization: `Bearer ${token}` }
       });
       const body = (await res.json()) as { balanceUnits: number } | null;
+
       return body?.balanceUnits ?? 0;
     }
 
     // Pass 1 — 30 billable units, 500 credits: fully covered, zero invoice.
     await control('seed-usage', { customerId, quantity: 30 });
     let res = await control('advance-renewal', { userId: id });
+
     expect(res.status).toBe(200);
     expect(await balanceUnits()).toBe(470);
     let invoices = await listInvoices(token);
+
     expect(
       invoices.some(
         (i) => i['billingMode'] === 'usage' && i['amountMinor'] === 0

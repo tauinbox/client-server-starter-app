@@ -34,8 +34,10 @@ export function featureFlagGuard(
       () => {
         const evaluate = (): GuardResult => {
           if (flagsStore.isEnabled(key)()) return true;
+
           return router.parseUrl(redirectTo);
         };
+
         // Flags are loaded fire-and-forget at login/bootstrap; without
         // awaiting, a fast first navigation evaluates an empty flag dict
         // and bounces an enabled route to /forbidden. load() joins the

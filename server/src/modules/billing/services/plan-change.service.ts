@@ -138,12 +138,15 @@ export class PlanChangeService {
 
     if (provider.managesLifecycle) {
       const { providerSubscriptionId } = subscription;
+
       if (!providerSubscriptionId) {
         throw subscriptionNotLinked();
       }
+
       // Serialize against a concurrent change on the same row before delegating.
       return this.whileClaimed(subscription, async () => {
         await provider.changePlan(providerSubscriptionId, customer, toPlan);
+
         return this.applyPlanChange(ctx, now);
       });
     }
@@ -182,6 +185,7 @@ export class PlanChangeService {
     const seq = subscription.planChangeSeq;
     const chargeKey = changeChargeKey(subscription.id, seq, toPlan.key);
     const refundKey = changeRefundKey(subscription.id, seq);
+
     await this.assertNoUnfinishedSwitch(subscription, seq, chargeKey);
 
     // External legs run outside the DB transaction - a provider HTTP call must
@@ -190,6 +194,7 @@ export class PlanChangeService {
     let chargeInvoiceId: string | null = null;
     let chargeRef: string | null = null;
     let chargeCaptured = true;
+
     if (quote && quote.chargeMinor > 0) {
       const planted = await this.plantChangeCharge({
         subscription,
@@ -198,12 +203,15 @@ export class PlanChangeService {
         currency: quote.currency,
         billingMode: toPlan.billingMode
       });
+
       chargeInvoiceId = planted.id;
+
       if (planted.paidRef !== null) {
         // A retry after the webhook settled the charge of the earlier attempt.
         chargeRef = planted.paidRef;
       } else {
         let charge: ChargeResult;
+
         try {
           charge = await provider.chargeOffSession(customer, {
             amountMinor: quote.chargeMinor,
@@ -215,6 +223,7 @@ export class PlanChangeService {
           await this.failPlantedCharge(chargeKey, error);
           throw error;
         }
+
         chargeRef = charge.providerInvoiceRef;
         // Uncaptured (payment-after-receipt) stays pending for the webhook.
         chargeCaptured = charge.status === 'captured';
@@ -246,6 +255,7 @@ export class PlanChangeService {
         : null;
 
     let refundIssued = false;
+
     if (refund) {
       try {
         await provider.refund(
@@ -279,12 +289,14 @@ export class PlanChangeService {
           chargeRef && chargeCaptured
             ? await this.settleChangeCharge(manager, chargeKey, chargeRef)
             : false;
+
         if (refundIssued && refund) {
           await manager.update(
             Invoice,
             { providerEventId: refundKey, status: 'pending' },
             { status: 'refunded', paidAt: new Date() }
           );
+
           // Gated on this leg's own cumulative, as the admin refund is, so a
           // concurrent leg still in flight cannot flip it for money that may
           // never move. A subscription invoice has no grant or credit to revoke.
@@ -296,10 +308,12 @@ export class PlanChangeService {
             );
           }
         }
+
         const saved = await this.commitPlanChange(manager, subscription, {
           toPlan,
           now
         });
+
         return { saved, chargeSettled };
       }
     );
@@ -315,6 +329,7 @@ export class PlanChangeService {
         )
       );
     }
+
     // The webhook runs the same guarded flip, so gating on the win is what
     // keeps exactly one side announcing the payment.
     if (chargeInvoiceId && chargeSettled) {
@@ -323,12 +338,14 @@ export class PlanChangeService {
         new InvoicePaidEvent(customer.userId, chargeInvoiceId)
       );
     }
+
     if (!saved) {
       throw new ApiError(
         ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT,
         'This subscription changed while the payment was in flight; the plan was not switched. Any amount charged is on your invoices.'
       );
     }
+
     return saved;
   }
 
@@ -353,8 +370,11 @@ export class PlanChangeService {
         status: In(['pending', 'paid'])
       }
     });
+
     if (!unfinished?.providerEventId) return;
+
     const planKey = unfinished.providerEventId.slice(prefix.length);
+
     throw new ApiError(
       ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED,
       `A switch to plan "${planKey}" was charged but did not finish. Switch to that plan again to finish it.`
@@ -370,6 +390,7 @@ export class PlanChangeService {
     change: () => Promise<T>
   ): Promise<T> {
     const lease = await this.claimChange(subscription);
+
     try {
       return await change();
     } finally {
@@ -414,16 +435,20 @@ export class PlanChangeService {
         ...(modeChanges ? { meteredFrom: now } : {})
       }
     );
+
     if (applied.affected !== 1) return null;
 
     subscription.planKey = toPlan.key;
     subscription.billingMode = toPlan.billingMode;
+
     if (modeChanges) {
       subscription.meteredFrom = now;
     }
+
     const fresh = await manager.findOne(Subscription, {
       where: { id: subscription.id }
     });
+
     return fresh ?? subscription;
   }
 
@@ -437,6 +462,7 @@ export class PlanChangeService {
    */
   private async claimChange(subscription: Subscription): Promise<Date> {
     const claimedAt = new Date();
+
     // The entry guard ran before the catalog reads. A renewal scan that started
     // since then is charging this period, and the lease cannot stop it.
     this.assertBeforeRenewal(subscription, claimedAt);
@@ -453,13 +479,16 @@ export class PlanChangeService {
       },
       { version: subscription.version + 1, planChangeStartedAt: claimedAt }
     );
+
     if (result.affected !== 1) {
       throw new ApiError(
         ErrorKeys.BILLING.SUBSCRIPTION_BUSY,
         'This subscription is already being updated. Please retry.'
       );
     }
+
     subscription.version += 1;
+
     return claimedAt;
   }
 
@@ -515,10 +544,12 @@ export class PlanChangeService {
       if (!subscription.providerSubscriptionId) {
         throw subscriptionNotLinked();
       }
+
       const preview = await provider.previewChangePlan(
         subscription.providerSubscriptionId,
         toPlan
       );
+
       return {
         ...base,
         currency: preview.currency,
@@ -540,6 +571,7 @@ export class PlanChangeService {
 
     const seq = subscription.planChangeSeq;
     const chargeKey = changeChargeKey(subscription.id, seq, toPlan.key);
+
     await this.assertNoUnfinishedSwitch(subscription, seq, chargeKey);
     const quote = this.proration.quote({
       fromPlan,
@@ -564,6 +596,7 @@ export class PlanChangeService {
             excludeInvoiceId: charge?.id ?? null
           })
         : 0;
+
     return {
       ...base,
       currency: quote.currency,
@@ -581,12 +614,17 @@ export class PlanChangeService {
     const leg = await this.invoices.findOne({
       where: { providerEventId: refundKey }
     });
+
     if (leg && leg.status !== 'pending') return 0;
+
     const source = await this.invoices.findOne(
       this.refundLegSource(subscription, leg, excludeInvoiceId)
     );
+
     if (!source) return 0;
+
     if (leg) return leg.amountMinor.toNumber();
+
     return Math.min(refundMinor, remainingRefundable(source).toNumber());
   }
 
@@ -639,31 +677,38 @@ export class PlanChangeService {
       userId,
       'No active subscription to change'
     );
+
     if (!CHANGEABLE_SUBSCRIPTION_STATUSES.includes(subscription.status)) {
       throw new ApiError(
         ErrorKeys.BILLING.SUBSCRIPTION_NOT_CHANGEABLE,
         'The subscription must be active to change plans. Settle any outstanding payment first.'
       );
     }
+
     if (subscription.cancelAtPeriodEnd) {
       throw new ApiError(
         ErrorKeys.BILLING.CANCELLATION_SCHEDULED,
         'A cancellation is scheduled for this subscription; it can no longer change plans.'
       );
     }
+
     this.assertBeforeRenewal(subscription, new Date());
 
     const toPlan = await this.plans.findOne({ where: { key: planKey } });
+
     if (!toPlan || !toPlan.active) {
       throw planNotFound(planKey);
     }
+
     if (toPlan.key === subscription.planKey) {
       throw new ApiError(
         ErrorKeys.BILLING.SAME_PLAN,
         'You are already on this plan.'
       );
     }
+
     const toPrice = toPlan.prices[subscription.provider];
+
     if (!toPrice) {
       throw new ApiError(
         ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER,
@@ -674,6 +719,7 @@ export class PlanChangeService {
     const fromPlan = await this.plans.findOne({
       where: { key: subscription.planKey }
     });
+
     if (!fromPlan) {
       throw currentPlanMissing();
     }
@@ -714,13 +760,16 @@ export class PlanChangeService {
       const leg = await manager.findOne(Invoice, {
         where: { providerEventId: refundKey }
       });
+
       if (leg && leg.status !== 'pending') return null;
 
       const source = await lockInvoice(
         manager,
         this.refundLegSource(subscription, leg, excludeInvoiceId)
       );
+
       if (!source) return null;
+
       if (leg) {
         return {
           source,
@@ -737,6 +786,7 @@ export class PlanChangeService {
         Money.fromMinor(refundMinor)
       );
       const minor = reserved.toNumber();
+
       if (minor <= 0) return null;
 
       await this.insertChangeInvoice(manager, {
@@ -747,6 +797,7 @@ export class PlanChangeService {
         currency: source.currency,
         billingMode: 'fixed'
       });
+
       return { source, minor, cumulative };
     });
   }
@@ -797,16 +848,19 @@ export class PlanChangeService {
       subscription,
       { toPlan, now }
     );
+
     if (!saved) {
       throw new ApiError(
         ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT,
         'This subscription changed while the plan change was in flight. Please retry.'
       );
     }
+
     this.events.emit(
       PlanChangedEvent.name,
       new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
     );
+
     if (closesWindow) {
       this.events.emit(
         UsagePeriodClosedEvent.name,
@@ -819,6 +873,7 @@ export class PlanChangeService {
         )
       );
     }
+
     return saved;
   }
 
@@ -849,12 +904,15 @@ export class PlanChangeService {
       ...args,
       providerInvoiceRef: ''
     });
+
     if (planted) {
       return { id: planted, paidRef: null };
     }
+
     const existing = await this.invoices.findOne({
       where: { providerEventId: args.providerEventId }
     });
+
     return {
       id: existing?.id ?? null,
       paidRef: existing?.status === 'paid' ? existing.providerInvoiceRef : null
@@ -893,6 +951,7 @@ export class PlanChangeService {
     if (!(error instanceof ChargeDeclinedError)) {
       return;
     }
+
     try {
       await this.invoices.update(
         { providerEventId: chargeKey, status: 'pending' },
@@ -923,6 +982,7 @@ export class PlanChangeService {
       { providerEventId: chargeKey, status: In([...UNPAID_INVOICE_STATUSES]) },
       { status: 'paid', providerInvoiceRef, paidAt: new Date() }
     );
+
     return flip.affected === 1;
   }
 
@@ -946,6 +1006,7 @@ export class PlanChangeService {
   ): Promise<string | null> {
     const { subscription } = args;
     const now = new Date();
+
     return insertInvoiceOnce(manager, {
       customerId: subscription.customerId,
       subscriptionId: subscription.id,

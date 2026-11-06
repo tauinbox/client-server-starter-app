@@ -12,10 +12,12 @@ function chain(
 ): string[] {
   const ends: string[] = [];
   let cursor = anchor;
+
   for (let i = 0; i < periods; i++) {
     cursor = nextPeriodEnd(anchor, cursor, interval);
     ends.push(cursor.toISOString().slice(0, 10));
   }
+
   return ends;
 }
 
@@ -50,6 +52,7 @@ describe('nextPeriodEnd', () => {
 
   it('preserves the time-of-day component', () => {
     const anchor = new Date('2026-01-31T13:45:30Z');
+
     expect(nextPeriodEnd(anchor, anchor, 'month').toISOString()).toBe(
       '2026-02-28T13:45:30.000Z'
     );
@@ -57,7 +60,9 @@ describe('nextPeriodEnd', () => {
 
   it('diverges from chaining addInterval, which never recovers the day', () => {
     let chained = new Date('2025-12-31T10:00:00Z');
+
     for (let i = 0; i < 3; i++) chained = addInterval(chained, 'month');
+
     expect(chained.toISOString().slice(0, 10)).toBe('2026-03-28');
   });
 });

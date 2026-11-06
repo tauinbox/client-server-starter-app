@@ -112,6 +112,7 @@ describe('IsSafeMongoQueryConstraint', () => {
 
   it('should reject $where deeply nested', () => {
     const deep = '{"$or":[{"$and":[{"field":{"$where":"hack"}}]}]}';
+
     expect(validator.validate(deep)).toBe(false);
     expect(validator.defaultMessage()).toContain('$where');
   });

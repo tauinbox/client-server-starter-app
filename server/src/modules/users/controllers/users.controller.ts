@@ -124,10 +124,12 @@ export class UsersController {
         }
       ]
     });
+
     this.eventEmitter.emit(
       UserCreatedEvent.name,
       new UserCreatedEvent(createdUser.id)
     );
+
     return createdUser;
   }
 
@@ -211,6 +213,7 @@ export class UsersController {
     );
     const { ability, permissions } =
       await this.caslAbilityFactory.resolveForUser(id);
+
     return {
       roles: user.roles,
       permissions,
@@ -263,10 +266,12 @@ export class UsersController {
     // and revoking on a resubmit would log the target out for nothing.
     const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
     let previousEmail: string | undefined;
+
     if (changes.email !== undefined || changes.password !== undefined) {
       if (changes.email !== undefined) {
         previousEmail = target.email;
       }
+
       // The profile flows own these for the caller: the address change waits
       // for a link from the new mailbox and alerts the old one, and neither
       // happens here. Compared with the stored address because the editor
@@ -280,6 +285,7 @@ export class UsersController {
           'Change your own email and password on your profile page'
         );
       }
+
       if (changes.password !== undefined || changes.email !== target.email) {
         await this.assertCredentialStepUp(req, ability, {
           target,
@@ -291,6 +297,7 @@ export class UsersController {
 
     const { password, unlockAccount, ...fields } = changes;
     const changed = changedFields(target, fields);
+
     if (
       unlockAccount &&
       (target.failedLoginAttempts !== 0 || target.lockedUntil !== null)
@@ -383,6 +390,7 @@ export class UsersController {
         new UserSessionRevocationRequiredEvent(id)
       );
     }
+
     // After the revocation: a link callback that starts later is refused by
     // the new revocation time, and one already running holds the user row,
     // so its row is committed before this delete runs.
@@ -398,6 +406,7 @@ export class UsersController {
       UserUpdatedEvent.name,
       new UserUpdatedEvent(id, target)
     );
+
     return updatedUser;
   }
 
@@ -435,6 +444,7 @@ export class UsersController {
     }
 
     const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
+
     // Before the step-up, so a request refused anyway spends no code; the
     // instance check leads so an outsider cannot probe for the factor.
     this.usersService.assertCanWrite(ability, {
@@ -442,12 +452,14 @@ export class UsersController {
       target,
       actorId: req.user.userId
     });
+
     if (!target.mfaEnabled) {
       throw new ApiError(
         ErrorKeys.AUTH.MFA_NOT_ENABLED,
         'Two-factor authentication is not enabled'
       );
     }
+
     await this.assertCredentialStepUp(req, ability, {
       target,
       currentPassword: dto.currentPassword,
@@ -472,6 +484,7 @@ export class UsersController {
       new UserSessionRevocationRequiredEvent(id)
     );
     this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(id));
+
     return this.usersService.findOne(id, SYSTEM_ABILITY);
   }
 
@@ -503,6 +516,7 @@ export class UsersController {
     }
 
     const target = await this.usersService.findOne(id, SYSTEM_ABILITY);
+
     this.usersService.assertCanWrite(ability, {
       action: 'update',
       target,
@@ -525,6 +539,7 @@ export class UsersController {
       UserSessionRevocationRequiredEvent.name,
       new UserSessionRevocationRequiredEvent(id)
     );
+
     return { message: 'Every session of the user has ended' };
   }
 
@@ -597,6 +612,7 @@ export class UsersController {
       UserSessionRevocationRequiredEvent.name,
       new UserSessionRevocationRequiredEvent(id)
     );
+
     return {};
   }
 
@@ -633,7 +649,9 @@ export class UsersController {
         }
       ]
     });
+
     this.eventEmitter.emit(UserRestoredEvent.name, new UserRestoredEvent(id));
+
     return restoredUser;
   }
 }

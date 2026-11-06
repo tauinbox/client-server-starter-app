@@ -81,9 +81,11 @@ export class NxsFormFieldComponent {
    */
   readonly activeError = computed(() => {
     const state = this.field()();
+
     if (!state.touched() || !state.invalid()) return null;
 
     const errs = state.errors();
+
     if (errs.length === 0) return null;
 
     const [err] = errs;
@@ -101,6 +103,7 @@ export class NxsFormFieldComponent {
       message: _m,
       ...params
     } = err;
+
     return { key, params };
   });
 }

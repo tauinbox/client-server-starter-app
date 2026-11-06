@@ -80,6 +80,7 @@ describe('SessionsController', () => {
     it('maps the live rows and marks the session of the caller', async () => {
       const startedAt = new Date('2026-09-01T10:00:00.000Z');
       const createdAt = new Date('2026-09-20T08:30:00.000Z');
+
       refreshTokenService.findLiveSessions.mockResolvedValue([
         {
           sessionId: 'current-session',

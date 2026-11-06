@@ -71,6 +71,7 @@ async function setRules(
   { rules, actor }: { rules: FeatureFlagRuleDto[]; actor: FlagAuditActor }
 ): Promise<FeatureFlag> {
   const current = await service.findOne(id, SYSTEM_ABILITY);
+
   return service.update(
     id,
     { rules },
@@ -103,7 +104,9 @@ function makeFlagRepoMock(stores: Stores) {
             ? Array.from(stores.rules.values()).filter((r) => r.flagId === f.id)
             : []
       }));
+
       list.sort((a, b) => a.key.localeCompare(b.key));
+
       return Promise.resolve(list);
     }),
     findOne: jest.fn((opts: { where: { id?: string; key?: string } }) => {
@@ -116,28 +119,37 @@ function makeFlagRepoMock(stores: Stores) {
             )
           });
         }
+
         if (opts.where.key !== undefined && f.key === opts.where.key) {
           return Promise.resolve({ ...f, rules: [] });
         }
       }
+
       return Promise.resolve(null);
     }),
     create: (data: Partial<FeatureFlag>): FeatureFlag => {
       const f = new FeatureFlag();
+
       Object.assign(f, data);
+
       return f;
     },
     save: jest.fn((entity: FeatureFlag) => {
       if (!entity.id) entity.id = `flag-${stores.flags.size + 1}`;
+
       if (!entity.createdAt) entity.createdAt = nowDate();
+
       entity.updatedAt = nowDate();
       stores.flags.set(entity.id, entity);
+
       return Promise.resolve(entity);
     }),
     update: jest.fn(
       (id: string, patch: Partial<FeatureFlag> & { version?: unknown }) => {
         const existing = stores.flags.get(id);
+
         if (!existing) return Promise.resolve({ affected: 0 });
+
         const versionExpr = patch.version;
         const versionValue =
           typeof versionExpr === 'function'
@@ -145,42 +157,51 @@ function makeFlagRepoMock(stores: Stores) {
             : typeof versionExpr === 'number'
               ? versionExpr
               : existing.version;
+
         Object.assign(existing, patch, {
           version: versionValue,
           updatedAt: nowDate()
         });
+
         return Promise.resolve({ affected: 1 });
       }
     ),
     remove: jest.fn((entity: FeatureFlag) => {
       stores.flags.delete(entity.id);
+
       for (const r of Array.from(stores.rules.values())) {
         if (r.flagId === entity.id) stores.rules.delete(r.id);
       }
+
       return Promise.resolve(entity);
     }),
     createQueryBuilder: () => {
       let pendingPatch: Partial<FeatureFlag> & { version?: unknown } = {};
       let whereId = '';
       let whereExpectedVersion = 0;
+
       return {
         update() {
           return this;
         },
         set(patch: Partial<FeatureFlag> & { version?: unknown }) {
           pendingPatch = patch;
+
           return this;
         },
         where(_clause: string, params: { id: string; expected: number }) {
           whereId = params.id;
           whereExpectedVersion = params.expected;
+
           return this;
         },
         execute(): Promise<{ affected: number }> {
           const existing = stores.flags.get(whereId);
+
           if (!existing || existing.version !== whereExpectedVersion) {
             return Promise.resolve({ affected: 0 });
           }
+
           const versionExpr = pendingPatch.version;
           const versionValue =
             typeof versionExpr === 'function'
@@ -189,8 +210,10 @@ function makeFlagRepoMock(stores: Stores) {
                 ? versionExpr
                 : existing.version;
           const next = { ...existing, ...pendingPatch, version: versionValue };
+
           next.updatedAt = nowDate();
           stores.flags.set(whereId, next);
+
           return Promise.resolve({ affected: 1 });
         }
       };
@@ -207,12 +230,17 @@ function makeRuleRepoMock(stores: Stores) {
         const flagId = opts?.where?.flagId;
         const list = Array.from(stores.rules.values()).filter((r) => {
           if (flagId === undefined) return true;
+
           if (typeof flagId === 'string') return r.flagId === flagId;
+
           // typeorm In() shape: object with internal markers; for tests treat as union
           const v = flagId as { _value?: unknown };
+
           if (Array.isArray(v._value)) return v._value.includes(r.flagId);
+
           return true;
         });
+
         return Promise.resolve(list);
       }
     )
@@ -231,12 +259,14 @@ function makeDataSourceMock(
       where: { flagId: string }
     ): Promise<{ affected: number }> {
       let affected = 0;
+
       for (const r of Array.from(stores.rules.values())) {
         if (r.flagId === where.flagId) {
           stores.rules.delete(r.id);
           affected++;
         }
       }
+
       return Promise.resolve({ affected });
     },
     create(
@@ -244,8 +274,11 @@ function makeDataSourceMock(
       data: Partial<FeatureFlag> & Partial<FeatureFlagRule>
     ): FeatureFlag | FeatureFlagRule {
       if (entity === FeatureFlag) return flagRepo.create(data);
+
       const r = new FeatureFlagRule();
+
       Object.assign(r, data);
+
       return r;
     },
     save(
@@ -253,10 +286,14 @@ function makeDataSourceMock(
       record: FeatureFlag | FeatureFlagRule
     ): Promise<FeatureFlag | FeatureFlagRule> {
       if (record instanceof FeatureFlag) return flagRepo.save(record);
+
       if (!record.id) record.id = `rule-${stores.rules.size + 1}`;
+
       if (!record.createdAt) record.createdAt = nowDate();
+
       record.updatedAt = nowDate();
       stores.rules.set(record.id, record);
+
       return Promise.resolve(record);
     },
     createQueryBuilder: () => flagRepo.createQueryBuilder()
@@ -266,6 +303,7 @@ function makeDataSourceMock(
       cb(em)
     )
   };
+
   // @ts-expect-error - partial DataSource fake: only transaction is used
   return dataSource;
 }
@@ -275,16 +313,19 @@ function makeCacheMock(): {
   manager: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
 } {
   const store = new Map<string, unknown>();
+
   return {
     store,
     manager: {
       get: jest.fn((k: string) => Promise.resolve(store.get(k))),
       set: jest.fn((k: string, v: unknown) => {
         store.set(k, v);
+
         return Promise.resolve();
       }),
       del: jest.fn((k: string) => {
         store.delete(k);
+
         return Promise.resolve();
       })
     }
@@ -365,6 +406,7 @@ describe('Feature flags end-to-end', () => {
 
     // No rules → enabled flag returns true for any user.
     const evaluated = await resolver.evaluateForUser(user, fakeReq);
+
     expect(evaluated.flags['beta-export']).toBe(true);
 
     // Add 10% include rule. Pick a userId that lands ABOVE the 10 bucket.
@@ -372,12 +414,14 @@ describe('Feature flags end-to-end', () => {
       for (let i = 0; i < 200; i++) {
         if (percentageBucket(`u-${i}`, 'beta-export') >= 10) return `u-${i}`;
       }
+
       throw new Error('expected at least one id above bucket 10');
     })();
     const belowBucketId = (() => {
       for (let i = 0; i < 200; i++) {
         if (percentageBucket(`u-${i}`, 'beta-export') < 10) return `u-${i}`;
       }
+
       throw new Error('expected at least one id below bucket 10');
     })();
 
@@ -396,12 +440,14 @@ describe('Feature flags end-to-end', () => {
       { ...user, userId: belowBucketId },
       fakeReq
     );
+
     expect(insider.flags['beta-export']).toBe(true);
 
     const outsider = await resolver.evaluateForUser(
       { ...user, userId: aboveBucketId },
       fakeReq
     );
+
     // Non-public flag that resolves false for this user is omitted (absent ⇒ off).
     expect('beta-export' in outsider.flags).toBe(false);
 
@@ -421,6 +467,7 @@ describe('Feature flags end-to-end', () => {
       { ...user, userId: aboveBucketId },
       fakeReq
     );
+
     expect(all.flags['beta-export']).toBe(true);
   });
 
@@ -430,6 +477,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await setRules(flagService, flag.id, {
       rules: [
         {
@@ -449,6 +497,7 @@ describe('Feature flags end-to-end', () => {
       { userId: 'u-1', email: null, createdAt: null, roles: ['beta'] },
       {} as Parameters<typeof resolver.evaluateForUser>[1]
     );
+
     expect(beta.flags['risky-feature']).toBe(true);
 
     const banned = await resolver.evaluateForUser(
@@ -460,6 +509,7 @@ describe('Feature flags end-to-end', () => {
       },
       {} as Parameters<typeof resolver.evaluateForUser>[1]
     );
+
     // Excluded user resolves false on a non-public flag → key omitted (absent ⇒ off).
     expect('risky-feature' in banned.flags).toBe(false);
   });
@@ -470,6 +520,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     expect(flag.version).toBe(1);
 
     // Concurrent edit from another caller — bumps version to 2.
@@ -482,6 +533,7 @@ describe('Feature flags end-to-end', () => {
         actor: flagAuditActor('actor-2')
       }
     );
+
     expect(next.version).toBe(2);
 
     // A stale PATCH at v1 answers 412 (RFC 9110 13.1.1).
@@ -506,6 +558,7 @@ describe('Feature flags end-to-end', () => {
     );
     const flagsKey = (): string =>
       `featureflags:all:v${String(cache.store.get('featureflags:version'))}`;
+
     expect(cache.store.has(flagsKey())).toBe(true);
 
     await listener.handleFeatureFlagChanged();
@@ -528,6 +581,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await setRules(flagService, flag.id, {
       rules: [
         {
@@ -548,6 +602,7 @@ describe('Feature flags end-to-end', () => {
         roles: ['beta-tester']
       }
     );
+
     expect(result).toEqual({
       result: true,
       reason: 'included-by-rule',
@@ -561,6 +616,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await setRules(flagService, flag.id, {
       rules: [
         {
@@ -581,6 +637,7 @@ describe('Feature flags end-to-end', () => {
         roles: ['beta', 'banned']
       }
     );
+
     expect(result.result).toBe(false);
     expect(result.reason).toBe('excluded');
     expect(result.matchedRule).toEqual({
@@ -596,6 +653,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await setRules(flagService, flag.id, {
       rules: [
         {
@@ -612,6 +670,7 @@ describe('Feature flags end-to-end', () => {
         roles: ['plain']
       }
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'not-included',
@@ -625,6 +684,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await expect(
       setRules(flagService, flag.id, {
         rules: [
@@ -668,6 +728,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await expect(
       setRules(flagService, flag.id, {
         rules: [{ effect: 'include', payload }],
@@ -689,6 +750,7 @@ describe('Feature flags end-to-end', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await setRules(flagService, flag.id, {
       rules: [
         {
@@ -711,12 +773,14 @@ describe('Feature flags end-to-end', () => {
         attributes: { createdAt: createdAt.toISOString() }
       }
     );
+
     expect(preview.result).toBe(true);
 
     const evaluated = await resolver.evaluateForUser(
       { userId: 'u-new', email: null, createdAt, roles: [] },
       {} as Parameters<typeof resolver.evaluateForUser>[1]
     );
+
     expect(evaluated.flags['new-accounts']).toBe(true);
   });
 
@@ -732,6 +796,7 @@ describe('Feature flags end-to-end', () => {
         roles: ['anyone']
       }
     );
+
     expect(result).toEqual({
       result: false,
       reason: 'disabled',
@@ -755,6 +820,7 @@ describe('Feature flags end-to-end', () => {
       { userId: 'user-1', email: 'u1@example.com', createdAt: null, roles: [] },
       {} as Parameters<typeof resolver.evaluateForUser>[1]
     );
+
     // A disabled non-public flag must not leak its key to a non-admin caller.
     expect('unreleased-internal' in evaluated.flags).toBe(false);
     expect(evaluated.flags['shipped-internal']).toBe(true);
@@ -776,6 +842,7 @@ describe('Feature flags end-to-end', () => {
       'anon-cookie-1',
       {} as Parameters<typeof resolver.evaluateAnonymous>[1]
     );
+
     expect(anon.flags['public-banner']).toBe(true);
     expect('private-tool' in anon.flags).toBe(false);
   });
@@ -796,11 +863,13 @@ class TestFeatureController {
 class PassThroughJwtGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
+
     req.user = {
       userId: 'caller-1',
       email: 'caller@example.com',
       sessionId: 'session-1'
     };
+
     return true;
   }
 }
@@ -926,6 +995,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
     // Stands in for the JWT guard: a request that names a user is signed in.
     app.use((req: JwtAuthRequest, _res: unknown, next: () => void) => {
       const userId = req.headers[SIGNED_IN_HEADER];
+
       if (typeof userId === 'string') {
         req.user = {
           userId,
@@ -933,6 +1003,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
           sessionId: 's'
         };
       }
+
       next();
     });
     await app.init();
@@ -968,6 +1039,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await setRules(flagService, flag.id, {
       rules: [{ effect: 'include', payload }],
       actor: flagAuditActor('actor-1')
@@ -983,6 +1055,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
   function anonIdWhere(flagKey: string, inside: boolean): string {
     for (let i = 0; ; i++) {
       const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+
       if (percentageBucket(id, flagKey) < 50 === inside) return id;
     }
   }
@@ -998,6 +1071,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
       SYSTEM_ABILITY,
       flagAuditActor('actor-1')
     );
+
     await setRules(flagService, hidden.id, {
       rules: [
         {
@@ -1022,6 +1096,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
     const res = await request(server).get('/feature-flags').expect(200);
 
     const cookie = anonIdCookieOf(res);
+
     expect(cookie).toMatch(
       new RegExp(
         `^${HOST_ANON_ID_COOKIE}=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12};`
@@ -1057,6 +1132,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
       .expect(200);
 
     const cookie = anonIdCookieOf(res);
+
     expect(cookie).toBeDefined();
     expect(cookie).not.toContain('xxx');
   });

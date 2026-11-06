@@ -50,7 +50,9 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
 
   const superAbility = (): AppAbility => {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     can('manage', 'all');
+
     return build();
   };
 
@@ -64,6 +66,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
 
   const seedSession = async (): Promise<string> => {
     const raw = `raw-${randomUUID()}`;
+
     await refreshTokenService.createRefreshToken(userId, {
       token: raw,
       sessionId: randomUUID(),
@@ -72,18 +75,22 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
         ipAddress: null
       }
     });
+
     return raw;
   };
 
   const errorKeyOf = async (run: Promise<unknown>): Promise<string> => {
     try {
       await run;
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return body.errorKey ?? `STATUS_${error.getStatus()}`;
       }
+
       throw error;
     }
   };
@@ -115,6 +122,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
         password: null
       })
     );
+
     userId = user.id;
   }, 60000);
 
@@ -149,6 +157,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
   it('ends the session at the deactivated refusal, so a replay is not read as reuse', async () => {
     const raw = await seedSession();
     const other = await seedSession();
+
     await dataSource.getRepository(User).update(userId, { isActive: false });
 
     expect(await errorKeyOf(authService.refreshTokens(raw, null))).toBe(
@@ -162,6 +171,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
       ([entry]: [{ action: AuditAction }]) =>
         entry.action === AuditAction.TOKEN_REUSE_DETECTED
     );
+
     expect(reuseRows).toHaveLength(0);
 
     await dataSource.getRepository(User).update(userId, { isActive: true });
@@ -173,6 +183,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
   // A failed revocation listener leaves the rows of a deleted account.
   it('ends the session at the not-found refusal, so a replay is not read as reuse', async () => {
     const raw = await seedSession();
+
     await dataSource.getRepository(User).softDelete(userId);
 
     try {
@@ -192,6 +203,7 @@ runWithInfra('A deactivation ends the sessions (e2e)', () => {
         ([entry]: [{ action: AuditAction }]) =>
           entry.action === AuditAction.TOKEN_REUSE_DETECTED
       );
+
       expect(reuseRows).toHaveLength(0);
     } finally {
       await dataSource.getRepository(User).restore(userId);

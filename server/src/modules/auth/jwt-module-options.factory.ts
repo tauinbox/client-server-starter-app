@@ -21,6 +21,7 @@ export function buildJwtVerification(
   configService: ConfigService
 ): JwtVerification {
   const issuerAudience = { issuer: JWT_ISSUER, audience: JWT_AUDIENCE };
+
   if (configService.get<string>('JWT_ALGORITHM') === 'RS256') {
     return {
       algorithm: 'RS256',
@@ -28,6 +29,7 @@ export function buildJwtVerification(
       ...issuerAudience
     };
   }
+
   return {
     algorithm: 'HS256',
     key: configService.getOrThrow<string>('JWT_SECRET'),
@@ -76,6 +78,7 @@ export function readJwtMinIat(
   configService: ConfigService
 ): number | undefined {
   const raw = configService.get<number>('JWT_MIN_IAT');
+
   return raw !== undefined ? Number(raw) : undefined;
 }
 

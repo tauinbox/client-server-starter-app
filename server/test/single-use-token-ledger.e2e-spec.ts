@@ -65,6 +65,7 @@ runWithRedis('single-use token ledger (real Redis)', () => {
     expect(await ledger.claim(CLAIM_ID, 60_000)).toBe(false);
 
     const ttl = await redis.pTTL(`${KEY_PREFIX}${CLAIM_ID}`);
+
     expect(ttl).toBeGreaterThan(0);
     expect(ttl).toBeLessThanOrEqual(60_000);
   });

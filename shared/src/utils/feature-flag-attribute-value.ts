@@ -8,10 +8,13 @@ type AttributeScalar = string | number | boolean | null;
 
 function isScalar(value: unknown): value is AttributeScalar {
   if (value === null) return true;
+
   if (typeof value === 'string') {
     return value.length <= ATTRIBUTE_VALUE_MAX_LENGTH;
   }
+
   if (typeof value === 'number') return Number.isFinite(value);
+
   return typeof value === 'boolean';
 }
 

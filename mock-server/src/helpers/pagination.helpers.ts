@@ -18,10 +18,15 @@ const CURSOR_KEYS = ['cursor', 'limit', 'sortBy', 'sortOrder'];
 
 function integerErrors(name: string, raw: unknown, max: number): string[] {
   if (raw === undefined) return [];
+
   const value = Number(raw);
+
   if (!Number.isInteger(value)) return [`${name} must be an integer number`];
+
   if (value < 1) return [`${name} must not be less than 1`];
+
   if (value > max) return [`${name} must not be greater than ${max}`];
+
   return [];
 }
 
@@ -37,12 +42,15 @@ function unknownKeyErrors(
 
 function sortOrderErrors(raw: unknown): string[] {
   if (raw === undefined || raw === 'asc' || raw === 'desc') return [];
+
   return ['sortOrder must be one of the following values: asc, desc'];
 }
 
 function sortByErrors(raw: unknown, allowed: readonly string[]): string[] {
   if (raw === undefined || allowed.length === 0) return [];
+
   if (allowed.includes(String(raw))) return [];
+
   return [`sortBy must be one of the following values: ${allowed.join(', ')}`];
 }
 
@@ -63,6 +71,7 @@ export function cursorQueryErrors(
   } = {}
 ): string[] {
   const { extraAllowed = [], sortColumns = [] } = options;
+
   return [
     ...unknownKeyErrors(query, CURSOR_KEYS, extraAllowed),
     ...integerErrors('limit', query['limit'], MAX_PAGE_SIZE),
@@ -93,6 +102,7 @@ export interface CursorPaginatedBody<T> {
 /** The cursor payload only carries primitives; a Date is sent as its ISO text. */
 function toCursorValue(value: unknown): string | number | boolean | null {
   if (value === null || value === undefined) return null;
+
   if (
     typeof value === 'string' ||
     typeof value === 'number' ||
@@ -100,6 +110,7 @@ function toCursorValue(value: unknown): string | number | boolean | null {
   ) {
     return value;
   }
+
   return String(value);
 }
 
@@ -107,12 +118,15 @@ export function compareValues(a: unknown, b: unknown): number {
   if (typeof a === 'boolean' && typeof b === 'boolean') {
     return Number(a) - Number(b);
   }
+
   if (typeof a === 'number' && typeof b === 'number') {
     return a - b;
   }
+
   if (typeof a === 'string' && typeof b === 'string') {
     return a.localeCompare(b);
   }
+
   return String(a).localeCompare(String(b));
 }
 
@@ -135,20 +149,27 @@ export function cursorPaginate<T extends { id: string }>(
   const sorted = items.toSorted((a, b) => {
     const cmp =
       compareValues(readField(a, sortBy), readField(b, sortBy)) * direction;
+
     if (cmp !== 0) return cmp;
+
     return a.id.localeCompare(b.id) * direction;
   });
 
   let startIndex = 0;
+
   if (cursor) {
     const decoded = parseCursor(cursor);
+
     if (decoded) {
       startIndex = sorted.findIndex((item) => {
         const cmp =
           compareValues(readField(item, sortBy), decoded.sortValue) * direction;
+
         if (cmp > 0) return true;
+
         return cmp === 0 && item.id.localeCompare(decoded.id) * direction > 0;
       });
+
       if (startIndex === -1) startIndex = sorted.length;
     }
   }

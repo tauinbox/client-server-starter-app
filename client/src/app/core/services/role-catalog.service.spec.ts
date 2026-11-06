@@ -30,6 +30,7 @@ describe('RoleCatalogService', () => {
     service.getAll().subscribe();
 
     const req = httpMock.expectOne(ROLES_API_V1);
+
     expect(req.request.method).toBe('GET');
     expect(req.request.params.keys()).toEqual([]);
     req.flush([]);
@@ -38,6 +39,7 @@ describe('RoleCatalogService', () => {
   it('emits the roles the server returned', () => {
     const roles = [{ id: 'role-1', name: 'user' }];
     let received: unknown;
+
     service.getAll().subscribe((value) => (received = value));
 
     httpMock.expectOne(ROLES_API_V1).flush(roles);

@@ -59,12 +59,14 @@ async function build() {
         into: () => builder,
         values: (v: Record<string, unknown>) => {
           insertedInvoices.push(v);
+
           return builder;
         },
         orIgnore: () => builder,
         returning: () => builder,
         execute: () => Promise.resolve({ raw: [{ id: 'inv-1' }] })
       };
+
       return builder;
     }
   };
@@ -133,6 +135,7 @@ async function build() {
       }
     ]
   }).compile();
+
   await moduleRef.init();
 
   return {

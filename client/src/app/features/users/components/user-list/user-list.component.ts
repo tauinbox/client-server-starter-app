@@ -91,6 +91,7 @@ export class UserListComponent implements OnInit {
   /** The table marks a sort only when it is not the default one. */
   readonly sortView = computed(() => {
     const { active, direction } = this.#list.sortView();
+
     return { active: SORT_TO_COLUMN_MAP[active] ?? '', direction };
   });
 

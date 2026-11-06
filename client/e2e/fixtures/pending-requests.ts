@@ -36,6 +36,7 @@ export function trackRoutedRequest(
   url: string
 ): void {
   const { pathname, search } = new URL(url);
+
   routed.set(request, {
     page,
     method: request.method(),
@@ -60,6 +61,7 @@ export function recordMockServerArrival(path: string): void {
  */
 export async function pendingRequestReport(): Promise<PendingRequestReport[]> {
   const now = Date.now();
+
   return Promise.all(
     [...routed.values()].map(async (entry) => {
       const documentStart = entry.page.isClosed()
@@ -67,6 +69,7 @@ export async function pendingRequestReport(): Promise<PendingRequestReport[]> {
         : await entry.page
             .evaluate(() => performance.timeOrigin)
             .catch(() => null);
+
       return {
         method: entry.method,
         path: entry.path,

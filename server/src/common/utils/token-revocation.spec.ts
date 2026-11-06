@@ -20,6 +20,7 @@ describe('issuedBeforeRevocation', () => {
 
   it('reads the ISO string the mock stores like a Date', () => {
     const revokedAt = new Date(iat * 1000 + 700).toISOString();
+
     expect(issuedBeforeRevocation(iat, revokedAt)).toBe(false);
     expect(issuedBeforeRevocation(iat - 1, revokedAt)).toBe(true);
   });

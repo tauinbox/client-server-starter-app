@@ -33,6 +33,7 @@ class HostComponent {
     effect: 'include',
     payload: { type: 'percentage', percent: 25 }
   });
+
   readonly error = signal<string | null>(null);
   readonly customKeyOptions = signal<readonly string[]>([]);
   readonly roleOptions = signal<ChipOption[]>([]);
@@ -68,33 +69,40 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('renders the percentage payload editor by default', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const sliderInput = (fixture.nativeElement as HTMLElement).querySelector(
       'input[matSliderThumb]'
     );
+
     expect(sliderInput).not.toBeNull();
   });
 
   it('shows a static percent label that mirrors the slider value', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const label = (fixture.nativeElement as HTMLElement).querySelector(
       '.rule-percent-value'
     );
+
     expect(label?.textContent?.trim()).toBe('25%');
   });
 
   it('drops the redundant number-input form-field from the percentage editor', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const numberInput = (fixture.nativeElement as HTMLElement).querySelector(
       '.rule-percent-input'
     );
+
     expect(numberInput).toBeNull();
   });
 
   it('snaps percent change to the nearest multiple of 5', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
@@ -126,6 +134,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('writes the chosen bucketBy into the payload', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
@@ -141,6 +150,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('keeps bucketBy when the percent changes', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'percentage', percent: 25, bucketBy: 'device' }
@@ -160,19 +170,23 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('selects user for a stored rule without bucketBy', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const select = fixture.debugElement.query(
       By.css('.rule-bucket-by mat-select')
     ).componentInstance as MatSelect;
+
     expect(select.value).toBe('user');
   });
 
   it('reflects rule effect on the root .rule-row via data-effect', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const row = (fixture.nativeElement as HTMLElement).querySelector(
       '.rule-row'
     );
+
     expect(row?.getAttribute('data-effect')).toBe('include');
 
     fixture.componentInstance.rule.set({
@@ -185,6 +199,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('every <mat-form-field> in the row uses subscriptSizing="dynamic"', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -199,11 +214,14 @@ describe('FeatureFlagRuleRowComponent', () => {
     const fields = (fixture.nativeElement as HTMLElement).querySelectorAll(
       'mat-form-field'
     );
+
     expect(fields.length).toBeGreaterThan(0);
+
     for (const field of Array.from(fields)) {
       const subscript = field.querySelector(
         '.mat-mdc-form-field-subscript-wrapper'
       );
+
       expect(subscript).not.toBeNull();
       expect(
         subscript!.classList.contains(
@@ -215,10 +233,12 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('emits remove when the trash button is clicked', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const removeBtn = (
       fixture.nativeElement as HTMLElement
     ).querySelector<HTMLButtonElement>('button.rule-remove');
+
     expect(removeBtn).not.toBeNull();
     removeBtn?.click();
     expect(fixture.componentInstance.removed).toBe(1);
@@ -226,6 +246,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('switching type rebuilds the payload with a default for the new type', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.detectChanges();
     const [rowDebug] = fixture.debugElement.children;
     const rowInstance =
@@ -270,6 +291,7 @@ describe('FeatureFlagRuleRowComponent', () => {
         )
     );
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'user', userIds: ['uuid-1', 'uuid-2'] }
@@ -285,12 +307,14 @@ describe('FeatureFlagRuleRowComponent', () => {
     const chipLabels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
     ).map((el) => el.textContent?.trim());
+
     // Each chip should now display the user's name, not the raw UUID.
     expect(chipLabels.some((t) => t?.includes('Alice Adams'))).toBe(true);
   });
 
   it('does not fetch user details for non-user rule types', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'role', roleNames: ['admin'] }
@@ -301,6 +325,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('skips the id search when payload.userIds is empty', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'user', userIds: [] }
@@ -320,6 +345,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       ])
     );
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'user', userIds: ['uuid-known', 'uuid-missing'] }
@@ -328,6 +354,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     const chipLabels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
     ).map((el) => el.textContent?.trim());
+
     expect(chipLabels.some((t) => t?.includes('Carol Clark'))).toBe(true);
     expect(chipLabels.some((t) => t?.includes('uuid-missing'))).toBe(true);
   });
@@ -337,6 +364,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       throwError(() => new Error('rate limited'))
     );
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'user', userIds: ['uuid-1'] }
@@ -345,11 +373,13 @@ describe('FeatureFlagRuleRowComponent', () => {
     const chipLabels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('mat-chip-row')
     ).map((el) => el.textContent?.trim());
+
     expect(chipLabels.some((t) => t?.includes('uuid-1'))).toBe(true);
   });
 
   it('user chip change writes UUIDs (not labels) into payload.userIds', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'user', userIds: [] }
@@ -357,6 +387,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onUserChipsChange([
       { value: 'uuid-1', label: 'Alice — alice@example.com' },
       { value: 'uuid-2', label: 'Bob — bob@example.com' }
@@ -369,6 +400,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('role chip change writes role names into payload.roleNames', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'role', roleNames: [] }
@@ -376,6 +408,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onRoleChipsChange([
       { value: 'beta-tester', label: 'beta-tester' },
       { value: 'admin', label: 'admin' }
@@ -388,6 +421,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('renders a datepicker for attribute op=before', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -401,15 +435,18 @@ describe('FeatureFlagRuleRowComponent', () => {
     const toggle = (fixture.nativeElement as HTMLElement).querySelector(
       'mat-datepicker-toggle'
     );
+
     expect(toggle).not.toBeNull();
     const dateInput = (
       fixture.nativeElement as HTMLElement
     ).querySelector<HTMLInputElement>('input[matInput]');
+
     expect(dateInput).not.toBeNull();
   });
 
   it('renders a datepicker for attribute op=after', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -423,11 +460,13 @@ describe('FeatureFlagRuleRowComponent', () => {
     const toggle = (fixture.nativeElement as HTMLElement).querySelector(
       'mat-datepicker-toggle'
     );
+
     expect(toggle).not.toBeNull();
   });
 
   it('onAttributeDateChange writes ISO string to payload.value', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -442,6 +481,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       .componentInstance as FeatureFlagRuleRowComponent;
 
     const d = new Date(Date.UTC(2026, 0, 15, 0, 0, 0));
+
     cmp.onAttributeDateChange(d);
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -453,6 +493,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('onAttributeDateChange with null blanks payload.value', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -465,6 +506,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeDateChange(null);
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -476,6 +518,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('keeps a plain text input for attribute op=eq', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -489,11 +532,13 @@ describe('FeatureFlagRuleRowComponent', () => {
     const toggle = (fixture.nativeElement as HTMLElement).querySelector(
       'mat-datepicker-toggle'
     );
+
     expect(toggle).toBeNull();
   });
 
   it('attribute op=in stores chip array as payload.value', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'attribute', field: 'email', op: 'in', value: [] }
@@ -501,6 +546,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeChipsChange([
       { value: 'a@x.com', label: 'a@x.com' },
       { value: 'b@x.com', label: 'b@x.com' }
@@ -515,6 +561,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('switching attribute op from in to eq collapses chip array to a scalar', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -527,6 +574,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeOpChange('eq');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -538,6 +586,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('switching attribute op from eq to in preserves the scalar as the first chip', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'attribute', field: 'email', op: 'eq', value: 'a@x.com' }
@@ -545,6 +594,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeOpChange('in');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -556,6 +606,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('preserves customKey when the attribute value changes', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -569,6 +620,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeValueChange('pro');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -581,6 +633,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('preserves customKey when the attribute op changes', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -594,6 +647,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeOpChange('endsWith');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -609,6 +663,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     options: readonly string[]
   ): ComponentFixture<HostComponent> => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.customKeyOptions.set(options);
     fixture.componentInstance.rule.set({
       effect: 'include',
@@ -621,6 +676,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       }
     });
     fixture.detectChanges();
+
     return fixture;
   };
 
@@ -630,9 +686,11 @@ describe('FeatureFlagRuleRowComponent', () => {
     const input = (
       fixture.nativeElement as HTMLElement
     ).querySelector<HTMLInputElement>('input[aria-autocomplete="list"]');
+
     expect(input).not.toBeNull();
     input?.dispatchEvent(new Event('focusin'));
     fixture.detectChanges();
+
     return Array.from(document.querySelectorAll('mat-option')).map((option) =>
       (option.textContent ?? '').trim()
     );
@@ -643,6 +701,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       'billingConfigured',
       'oauthGoogleConfigured'
     ]);
+
     expect(openCustomKeyPanel(fixture)).toEqual([
       'billingConfigured',
       'oauthGoogleConfigured'
@@ -654,11 +713,13 @@ describe('FeatureFlagRuleRowComponent', () => {
       'billingConfigured',
       'oauthGoogleConfigured'
     ]);
+
     expect(openCustomKeyPanel(fixture)).toEqual(['oauthGoogleConfigured']);
   });
 
   it('writes the picked key into the payload', () => {
     const fixture = customRuleFixture('', ['billingConfigured']);
+
     openCustomKeyPanel(fixture);
     document.querySelector<HTMLElement>('mat-option')?.click();
     fixture.detectChanges();
@@ -674,6 +735,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('onAttributeCustomKeyChange updates only customKey', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -687,6 +749,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeCustomKeyChange('tier');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -699,6 +762,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('onAttributeFieldChange to custom initializes an empty customKey', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'attribute', field: 'email', op: 'eq', value: 'x' }
@@ -706,6 +770,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeFieldChange('custom');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -718,6 +783,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('onAttributeFieldChange away from custom drops customKey', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -731,6 +797,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeFieldChange('email');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -742,6 +809,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('lists only the date operators for createdAt', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'attribute', field: 'createdAt', op: 'after', value: '' }
@@ -750,6 +818,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     const [, opSelect] = (
       fixture.nativeElement as HTMLElement
     ).querySelectorAll('.rule-attribute mat-select');
+
     opSelect?.querySelector<HTMLElement>('.mat-mdc-select-trigger')?.click();
     fixture.detectChanges();
     expect(document.querySelectorAll('mat-option')).toHaveLength(2);
@@ -757,6 +826,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('onAttributeFieldChange to createdAt replaces an operator it cannot match', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'attribute', field: 'email', op: 'in', value: ['a'] }
@@ -764,6 +834,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeFieldChange('createdAt');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -775,6 +846,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('onAttributeFieldChange from createdAt to email starts a fresh eq value', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: {
@@ -787,6 +859,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     cmp.onAttributeFieldChange('email');
     expect(fixture.componentInstance.rule().payload).toEqual({
       type: 'attribute',
@@ -798,6 +871,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('labels role chips from the roleOptions input, and keeps unknown names', () => {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'role', roleNames: ['beta-tester', 'gone'] }
@@ -805,6 +879,7 @@ describe('FeatureFlagRuleRowComponent', () => {
     fixture.detectChanges();
     const cmp = fixture.debugElement.children[0]
       .componentInstance as FeatureFlagRuleRowComponent;
+
     expect(cmp['roleChips']()).toEqual([
       { value: 'beta-tester', label: 'beta-tester' },
       { value: 'gone', label: 'gone' }
@@ -831,6 +906,7 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('searches again after a refused user search', async () => {
     vi.useFakeTimers();
+
     try {
       const bob: User = {
         id: '22222222-2222-2222-2222-222222222222',
@@ -846,11 +922,13 @@ describe('FeatureFlagRuleRowComponent', () => {
         updatedAt: '',
         deletedAt: null
       };
+
       userServiceStub.searchCursor
         .mockReturnValueOnce(throwError(() => new Error('429')))
         .mockReturnValueOnce(of({ data: [bob], meta: { nextCursor: null } }));
 
       const fixture = TestBed.createComponent(HostComponent);
+
       fixture.componentInstance.rule.set({
         effect: 'include',
         payload: { type: 'user', userIds: [] }
@@ -873,8 +951,10 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('user search debounces and issues a single request with unified q', async () => {
     vi.useFakeTimers();
+
     try {
       const fixture = TestBed.createComponent(HostComponent);
+
       fixture.componentInstance.rule.set({
         effect: 'include',
         payload: { type: 'user', userIds: [] }
@@ -904,8 +984,10 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('skips user search when term is shorter than the min-chars threshold', async () => {
     vi.useFakeTimers();
+
     try {
       const fixture = TestBed.createComponent(HostComponent);
+
       fixture.componentInstance.rule.set({
         effect: 'include',
         payload: { type: 'user', userIds: [] }
@@ -925,8 +1007,10 @@ describe('FeatureFlagRuleRowComponent', () => {
 
   it('asks the server again when the admin narrows the term', async () => {
     vi.useFakeTimers();
+
     try {
       const fixture = TestBed.createComponent(HostComponent);
+
       fixture.componentInstance.rule.set({
         effect: 'include',
         payload: { type: 'user', userIds: [] }
@@ -953,6 +1037,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       payload: FeatureFlagRuleDraft['payload']
     ): [ComponentFixture<HostComponent>, FeatureFlagRuleRowComponent] {
       const fixture = TestBed.createComponent(HostComponent);
+
       fixture.componentInstance.rule.set({
         effect: 'include',
         payload
@@ -960,6 +1045,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       fixture.detectChanges();
       const cmp = fixture.debugElement.children[0]
         .componentInstance as FeatureFlagRuleRowComponent;
+
       return [fixture, cmp];
     }
 
@@ -1022,6 +1108,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       const chips = (fixture.nativeElement as HTMLElement).querySelectorAll(
         'mat-chip-row'
       );
+
       expect(chips.length).toBe(3);
     });
 
@@ -1061,6 +1148,7 @@ describe('FeatureFlagRuleRowComponent', () => {
   describe('rule error', () => {
     it('renders the translated error text when one is supplied', () => {
       const fixture = TestBed.createComponent(HostComponent);
+
       fixture.detectChanges();
 
       expect(
@@ -1075,6 +1163,7 @@ describe('FeatureFlagRuleRowComponent', () => {
       const el = (fixture.nativeElement as HTMLElement).querySelector(
         '.rule-error'
       );
+
       expect(el).not.toBeNull();
       expect(el!.textContent?.trim()).toBe('Pick a date.');
     });
@@ -1098,6 +1187,7 @@ describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
       (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`
     );
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.rule.set({
       effect: 'include',
       payload: { type: 'user', userIds }
@@ -1108,6 +1198,7 @@ describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
     const searches = http.match((req) =>
       req.url.endsWith('/users/search/cursor')
     );
+
     expect(searches.map((req) => req.request.params.get('limit'))).toEqual([
       '100',
       '30'
@@ -1123,9 +1214,11 @@ describe('FeatureFlagRuleRowComponent user label preload over HTTP', () => {
     expect(http.match((req) => /\/users\/[^/]+$/.test(req.url))).toHaveLength(
       0
     );
+
     for (const req of searches) {
       req.flush({ data: [], meta: { nextCursor: null, hasMore: false } });
     }
+
     http.verify();
   });
 });

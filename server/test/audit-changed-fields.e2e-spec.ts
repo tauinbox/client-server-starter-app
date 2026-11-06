@@ -48,6 +48,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -63,11 +64,13 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
         .send({ email, password, name: 'Audit Fields' })
         .expect(201);
     }
+
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const usersService = app.get(UsersService);
     const adminId = await userId(adminEmail);
+
     await app
       .get(RoleService)
       .assignRoleToUser(adminId, superRole.id, { ability: SYSTEM_ABILITY });
@@ -77,6 +80,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
         userAgent: 'audit-fields-e2e',
         ipAddress: null
       });
+
     token = tokens.access_token;
   }, 60000);
 
@@ -86,6 +90,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
         description: resourceRestore.description
       });
     }
+
     await dataSource?.getRepository(FeatureFlag).delete({ key: flagKey });
     await dataSource?.getRepository(Role).delete({ name: roleName });
     await dataSource
@@ -102,6 +107,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return found.id;
   }
 
@@ -113,6 +119,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
       where: { action, targetId },
       order: { createdAt: 'DESC' }
     });
+
     return row.details?.['changedFields'];
   }
 
@@ -120,7 +127,9 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     const req = request(http())
       .patch(`/api/v1/${path}`)
       .auth(token, { type: 'bearer' });
+
     if (ifMatch !== undefined) req.set('If-Match', versionEtag(ifMatch));
+
     return req.send(body).expect(200);
   }
 
@@ -181,6 +190,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     const resource = await dataSource
       .getRepository(Resource)
       .findOneByOrFail({ name: 'users' });
+
     resourceRestore = { id: resource.id, description: resource.description };
     const form = {
       displayName: resource.displayName,

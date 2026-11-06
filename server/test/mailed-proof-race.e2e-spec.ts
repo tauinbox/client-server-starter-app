@@ -46,6 +46,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -84,6 +85,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
         .where('email LIKE :prefix', { prefix: `${prefix}%` })
         .execute();
     }
+
     await app?.close();
   });
 
@@ -101,6 +103,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
       .post('/api/v1/auth/register')
       .send({ email: address(label), password, name: 'Mailed Proof' })
       .expect(201);
+
     return dataSource
       .getRepository(User)
       .findOneByOrFail({ email: address(label) });
@@ -116,6 +119,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
       release = resolve;
       setTimeout(resolve, 10000).unref();
     });
+
     return { wait, release };
   }
 
@@ -133,17 +137,20 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     const { promise: arrived, resolve: markArrived } =
       Promise.withResolvers<void>();
     const original = UsersService.prototype[method];
+
     jest.spyOn(usersService, method).mockImplementation(async function (
       this: UsersService,
       ...args: unknown[]
     ) {
       markArrived();
       await wait;
+
       return (original as (...a: unknown[]) => Promise<never>).apply(
         usersService,
         args
       );
     });
+
     return { arrived, release };
   }
 
@@ -157,6 +164,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     const { promise: arrived, resolve: markArrived } =
       Promise.withResolvers<void>();
     const original = EntityManager.prototype.transaction;
+
     jest
       .spyOn(EntityManager.prototype, 'transaction')
       .mockImplementation(async function (
@@ -168,13 +176,16 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
           markArrived();
           await wait;
         }
+
         return original.apply(this, args);
       });
+
     return { arrived, release };
   }
 
   async function resetThePassword(user: User): Promise<void> {
     const rawToken = `${prefix}-${user.id}-reset`;
+
     await dataSource.getRepository(User).update(user.id, {
       passwordResetToken: hashToken(rawToken),
       passwordResetExpiresAt: new Date(Date.now() + hourMs)
@@ -195,12 +206,14 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
         () => 'ok',
         (err: { response?: { errorKey?: string } }) => err.response?.errorKey
       );
+
     await barrier.arrived;
     await resetThePassword(user);
     barrier.release();
 
     expect(await initiate).toBe(ErrorKeys.AUTH.TOKEN_REVOKED);
     const after = await row(user.id);
+
     expect(after.pendingEmail).toBeNull();
     expect(after.pendingEmailToken).toBeNull();
     expect(mail.sendEmailChangeConfirmation).not.toHaveBeenCalled();
@@ -211,6 +224,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     const barrier = holdUsersServiceCall('setPasswordResetToken');
 
     const forgot = authService.forgotPassword(user.email);
+
     await barrier.arrived;
     await usersService.update(
       user.id,
@@ -226,10 +240,12 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
 
   it('mails no verification token to an address that an administrator moved away', async () => {
     const user = await register('resend');
+
     jest.mocked(mail.sendEmailVerification).mockClear();
     const barrier = holdUsersServiceCall('setEmailVerificationToken');
 
     const resend = authService.resendVerificationEmail(user.email);
+
     await barrier.arrived;
     await usersService.update(
       user.id,
@@ -248,6 +264,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
   it('keeps a newer email change when an expired confirmation cleans up', async () => {
     const user = await register('expired');
     const rawToken = `${prefix}-expired-token`;
+
     await dataSource.getRepository(User).update(user.id, {
       pendingEmail: address('expired-old'),
       pendingEmailToken: hashToken(rawToken),
@@ -259,6 +276,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
       () => 'ok',
       (err: { response?: { errorKey?: string } }) => err.response?.errorKey
     );
+
     await barrier.arrived;
     await authService.initiateEmailChange(user.id, {
       newEmail: address('expired-fresh'),
@@ -268,6 +286,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
 
     expect(await confirm).toBe(ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED);
     const after = await row(user.id);
+
     expect(after.pendingEmail).toBe(address('expired-fresh'));
     expect(after.pendingEmailToken).not.toBeNull();
   }, 30000);
@@ -285,6 +304,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
       .auth(tokens.access_token, { type: 'bearer' })
       .send({ password: heldPassword, currentPassword: password })
       .then((r) => r);
+
     await barrier.arrived;
     await resetThePassword(user);
     barrier.release();
@@ -297,6 +317,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     const after = await row(user.id);
     const check = (candidate: string) =>
       verifyPassword(candidate, after.password!, after.passwordHashVersion);
+
     expect((await check(resetPassword)).valid).toBe(true);
     expect((await check(heldPassword)).valid).toBe(false);
   }, 30000);

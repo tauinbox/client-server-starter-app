@@ -47,6 +47,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
     canActivate: (context: ExecutionContext): boolean => {
       context.switchToHttp().getRequest<{ user: OAuthUserProfile }>().user =
         currentProfile;
+
       return true;
     }
   };
@@ -81,6 +82,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
         .send({ email, password, name: 'Relogin Owner' })
         .expect(201);
     }
+
     await dataSource
       .getRepository(User)
       .update(
@@ -94,11 +96,13 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
       ?.getRepository(User)
       .find({ where: { email: In([ownerEmail, otherEmail, oauthEmail]) } });
     const ids = users?.map((u) => u.id) ?? [];
+
     if (ids.length) {
       await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
       // refresh_tokens.user_id and oauth_accounts.user_id cascade on delete.
       await dataSource.getRepository(User).delete({ id: In(ids) });
     }
+
     await app?.close();
   });
 
@@ -111,7 +115,9 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
     const header = res.headers['set-cookie'] as string[] | string | undefined;
     const lines = Array.isArray(header) ? header : [header ?? ''];
     const line = lines.find((l) => l.startsWith(`${name}=`));
+
     if (!line) throw new Error(`the response set no ${name} cookie`);
+
     return line.split(';')[0];
   }
 
@@ -130,13 +136,17 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
         ipAddress: null
       }
     );
+
     return `${refreshCookieName}=${tokens.refresh_token}`;
   }
 
   async function signIn(email: string, presented?: string): Promise<string> {
     const req = request(http()).post('/api/v1/auth/login');
+
     if (presented) void req.set('Cookie', presented);
+
     const res = await req.send({ email, password }).expect(200);
+
     return cookieOf(res, refreshCookieName);
   }
 
@@ -144,6 +154,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
     const res = await request(http())
       .post('/api/v1/auth/refresh-token')
       .set('Cookie', cookie);
+
     return res.status;
   }
 
@@ -154,6 +165,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
        WHERE u.email = $1 AND rt.revoked = false`,
       [email]
     );
+
     return count;
   }
 
@@ -178,6 +190,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
 
   it('the provider exchange ends the session the browser replaces', async () => {
     const presented = await sessionCookieOf(ownerEmail);
+
     currentProfile = {
       provider: 'google',
       providerId: `google-${stamp}`,
@@ -193,6 +206,7 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
         isEmailVerified: true
       })
     );
+
     await dataSource.getRepository(OAuthAccount).save({
       userId: user.id,
       provider: 'google',

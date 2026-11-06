@@ -63,6 +63,7 @@ describe('permissionGuard', () => {
   it('should redirect to forbidden when user lacks the required permission', () => {
     authStoreMock.hasPermissions.mockReturnValue(false);
     const router = TestBed.inject(Router);
+
     vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
@@ -95,6 +96,7 @@ describe('permissionGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<GuardResult>);
+
     expect(String(value)).toBe('/login?returnUrl=%2Fusers');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
   });
@@ -112,6 +114,7 @@ describe('permissionGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);
+
     expect(value).toBe(true);
   });
 
@@ -128,6 +131,7 @@ describe('permissionGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<GuardResult>);
+
     expect(String(value)).toBe('/forbidden');
   });
 });

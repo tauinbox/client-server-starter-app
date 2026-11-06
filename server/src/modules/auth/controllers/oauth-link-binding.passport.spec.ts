@@ -50,8 +50,10 @@ function startProviderStub(): Promise<{ server: Server; url: string }> {
         res.end(JSON.stringify({ access_token: 'at', token_type: 'Bearer' }));
       });
     });
+
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as AddressInfo;
+
       resolve({ server, url: `http://127.0.0.1:${port}` });
     });
   });
@@ -84,9 +86,11 @@ class CookieJar {
    */
   absorb(setCookie: string | string[]): void {
     const raws = Array.isArray(setCookie) ? setCookie : [setCookie];
+
     for (const raw of raws) {
       const [name, ...rest] = raw.split(';')[0].split('=');
       const value = rest.join('=');
+
       if (value === '') {
         this.entries.delete(name);
       } else {
@@ -112,6 +116,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
     const stub = await startProviderStub();
+
     providerStub = stub.server;
 
     passport.use(
@@ -195,6 +200,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
               if (token !== LINK_TOKEN) {
                 throw new Error('invalid token');
               }
+
               return {
                 sub: OWNER_ID,
                 purpose: TOKEN_PURPOSE.OAUTH_LINK,
@@ -253,6 +259,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
 
   it('reaches the link branch on a real round trip of the owning flow', async () => {
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_link', LINK_TOKEN);
 
     const state = await authorize(jar);
@@ -272,6 +279,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
 
   it('links nothing when a second flow presents its own state', async () => {
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_link', LINK_TOKEN);
 
     // The owner starts a link and walks away without a sign-out.

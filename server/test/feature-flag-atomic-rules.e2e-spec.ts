@@ -62,6 +62,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
   afterAll(async () => {
     jest.restoreAllMocks();
+
     if (dataSource) {
       await dataSource
         .getRepository(FeatureFlag)
@@ -70,6 +71,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
         .where('key LIKE :prefix', { prefix: `${tag}%` })
         .execute();
     }
+
     await app?.close();
   });
 
@@ -97,6 +99,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     const rules = await dataSource
       .getRepository(FeatureFlagRule)
       .find({ where: { flagId }, order: { createdAt: 'ASC' } });
+
     return rules.map((r) =>
       r.payload.type === 'percentage' ? r.payload.percent : -1
     );
@@ -167,6 +170,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
   it('writes no rule on a stale version', async () => {
     const flag = await seed('stale');
+
     await flagService.update(
       flag.id,
       { enabled: true },
@@ -194,6 +198,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
   it('refuses an If-Match version that a concurrent write reached after the read', async () => {
     const flag = await seed('raced');
+
     await flagService.update(
       flag.id,
       { enabled: true },
@@ -229,6 +234,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
   it('rolls the flag write back when a rule insert fails', async () => {
     const flag = await seed('rollback');
+
     await failRuleInserts();
 
     await expect(
@@ -255,6 +261,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
   it('creates no flag when a rule insert fails', async () => {
     const key = `${tag}-create-rollback`;
+
     await failRuleInserts();
 
     await expect(

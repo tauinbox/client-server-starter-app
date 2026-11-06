@@ -54,6 +54,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
   const abilityOf = async (userId: string): Promise<AppAbility> => {
     await permissionService.invalidateUserCache(userId);
+
     return abilityFactory.createForUser(
       userId,
       await permissionService.getRolesForUser(userId),
@@ -67,12 +68,15 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
   const outcome = async (run: Promise<unknown>): Promise<string> => {
     try {
       await run;
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return `${error.getStatus()} ${body.errorKey ?? ''}`.trim();
       }
+
       throw error;
     }
   };
@@ -114,9 +118,12 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       const found = permissions.find(
         (p) => p.action.name === action && p.resource.subject === resource
       );
+
       if (!found) throw new Error(`Permission ${action}:${resource} missing`);
+
       return found;
     };
+
     updateUser = find('update', 'User');
     deleteUser = find('delete', 'User');
     const updateRole = find('update', 'Role');
@@ -124,6 +131,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
     const deleteRole = find('delete', 'Role');
 
     const userRepository = dataSource.getRepository(User);
+
     for (const key of Object.keys(emails) as (keyof typeof emails)[]) {
       users[key] = await userRepository.save(
         userRepository.create({
@@ -173,6 +181,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });
     }
+
     await app?.close();
   });
 
@@ -278,6 +287,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
   it('lets the actor add and assign a deny on a pair it does not hold', async () => {
     const actorAbility = await abilityOf(users.actor.id);
+
     expect(actorAbility.can('delete', 'User')).toBe(false);
     const denyDelete = { permissionId: deleteUser.id, conditions: denyCeo() };
 

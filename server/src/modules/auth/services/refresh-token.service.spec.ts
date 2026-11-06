@@ -117,6 +117,7 @@ describe('RefreshTokenService', () => {
         expiresAt: expect.any(Date)
       });
       const expiresAt = (row.expiresAt as Date).getTime();
+
       expect(expiresAt).toBeGreaterThanOrEqual(before + 7200 * 1000);
       expect(expiresAt).toBeLessThanOrEqual(after + 7200 * 1000);
     });
@@ -173,6 +174,7 @@ describe('RefreshTokenService', () => {
         expiresAt: expect.any(Date),
         revoked: false
       };
+
       mockRepository.create.mockReturnValue(mockToken);
       mockRepository.save.mockResolvedValue(mockToken);
 
@@ -235,6 +237,7 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
+
       await service.createRefreshToken('user-1', {
         token: 'token',
         sessionId: 'session-1',
@@ -263,6 +266,7 @@ describe('RefreshTokenService', () => {
       );
 
       const before = Date.now();
+
       await service.createRefreshToken('user-1', {
         token: 'token',
         sessionId: 'session-1',
@@ -337,6 +341,7 @@ describe('RefreshTokenService', () => {
         token: hashToken('raw-token'),
         userId: 'user-1'
       };
+
       mockRepository.findOne.mockResolvedValue(mockToken);
 
       const result = await service.findByToken('raw-token');
@@ -497,6 +502,7 @@ describe('RefreshTokenService', () => {
     it('keeps the named session and counts the live sessions in the deleted rows', async () => {
       const future = new Date(Date.now() + 60_000);
       const past = new Date(Date.now() - 60_000);
+
       mockQueryBuilder.execute.mockResolvedValue({
         affected: 5,
         raw: [

@@ -15,6 +15,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -36,8 +37,10 @@ async function loginAsAdmin(): Promise<string> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -58,6 +61,7 @@ describe('condition shape parity with server', () => {
       permissionId = mockId('perm-1')
     ): Promise<Response> {
       const token = await loginAsAdmin();
+
       return fetch(
         `${baseUrl}/api/v1/roles/${mockId('role-editor')}/permissions`,
         {
@@ -83,8 +87,10 @@ describe('condition shape parity with server', () => {
             p.resourceId === mockId('res-users') &&
             p.actionId === mockId('act-update')
         );
+
       if (!permission)
         throw new Error('Seed permission users/update is missing');
+
       return permission.id;
     }
 
@@ -129,6 +135,7 @@ describe('condition shape parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors.join(' ')).toContain(part);
       expect(editorRolePermissions()).toEqual([]);
     });
@@ -171,6 +178,7 @@ describe('condition shape parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors.join(' ')).toContain('fieldMatch.name');
       expect(editorRolePermissions()).toEqual([]);
     });
@@ -188,14 +196,19 @@ describe('condition shape parity with server', () => {
 
     function editorUserRules(): { granted: boolean } {
       const user = findUserByEmail('user@example.com');
+
       if (!user) throw new Error('seed user missing');
+
       user.roles = ['editor'];
 
       const state = getState();
       const perm = state.permissions.get(mockId('perm-1'));
+
       if (!perm) throw new Error('seed permission missing');
+
       const resource = state.resources.get(perm.resourceId);
       const action = state.actions.get(perm.actionId);
+
       if (!resource || !action) throw new Error('seed rbac data missing');
 
       const rules = getPackedRulesForUser(user);
@@ -204,6 +217,7 @@ describe('condition shape parity with server', () => {
           String(rule[0]).includes(action.name) &&
           String(rule[1]).includes(resource.subject)
       );
+
       return { granted };
     }
 

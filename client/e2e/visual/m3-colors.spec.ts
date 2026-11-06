@@ -34,10 +34,13 @@ const resolveTokenColor = async (
 ): Promise<string> =>
   page.evaluate((name) => {
     const probe = document.createElement('div');
+
     probe.style.color = `var(${name})`;
     document.body.appendChild(probe);
     const resolved = getComputedStyle(probe).color;
+
     document.body.removeChild(probe);
+
     return resolved;
   }, tokenName);
 
@@ -49,7 +52,9 @@ const computedProp = async (
   page.evaluate(
     ({ s, p }) => {
       const el = document.querySelector(s) as HTMLElement | null;
+
       if (!el) throw new Error(`Selector not found: ${s}`);
+
       return getComputedStyle(el).getPropertyValue(p).trim();
     },
     { s: selector, p: prop }
@@ -74,6 +79,7 @@ for (const theme of ['light', 'dark'] as const) {
       ).toBeVisible();
 
       const errorToken = await resolveTokenColor(page, '--mat-sys-error');
+
       expect(errorToken).toMatch(/^rgba?\(/);
 
       // The delete button is a `matButton="text"` — the destructive tone is
@@ -84,6 +90,7 @@ for (const theme of ['light', 'dark'] as const) {
         'button.app-btn-danger',
         'color'
       );
+
       expect(normalise(buttonColor)).toBe(normalise(errorToken));
     });
 
@@ -105,6 +112,7 @@ for (const theme of ['light', 'dark'] as const) {
             '[color="primary"], [color="accent"], [color="warn"]'
           ).length
       );
+
       expect(legacyAttrs).toBe(0);
     });
   });

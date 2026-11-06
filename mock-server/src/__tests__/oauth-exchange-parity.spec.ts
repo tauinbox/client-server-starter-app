@@ -15,6 +15,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -33,13 +34,16 @@ async function issueOAuthData(userId: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { token: string };
+
   return body.token;
 }
 
 function exchange(cookie?: string, presented?: string): Promise<Response> {
   const cookies = [cookie && `oauth_data=${cookie}`, presented].filter(Boolean);
+
   return fetch(`${baseUrl}/api/v1/auth/oauth/exchange`, {
     method: 'POST',
     headers: cookies.length ? { cookie: cookies.join('; ') } : {}
@@ -50,7 +54,9 @@ function refreshCookieOf(res: Response): string {
   const match = /refresh_token=([^;]+)/.exec(
     res.headers.get('set-cookie') ?? ''
   );
+
   expect(match).not.toBeNull();
+
   return `refresh_token=${match?.[1] ?? ''}`;
 }
 
@@ -71,6 +77,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
       tokens: Record<string, unknown>;
       user: { id: string; email: string };
     };
+
     expect(body.user).toMatchObject({
       id: admin!.id,
       email: 'admin@example.com'
@@ -87,6 +94,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
   // in by the round trip: it gets the same challenge the password path gives.
   it('answers with a challenge and no session for an enrolled account', async () => {
     const admin = findUserByEmail('admin@example.com');
+
     admin!.totpEnabledAt = new Date().toISOString();
     const refreshTokensBefore = getState().refreshTokens.size;
 
@@ -105,6 +113,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
 
   it('mints a pending token the two-factor route accepts', async () => {
     const admin = findUserByEmail('admin@example.com');
+
     admin!.totpEnabledAt = new Date().toISOString();
 
     const token = await issueOAuthData(admin!.id);
@@ -149,6 +158,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);
     const pending = getState().oauthDataTokens.get(token)!;
+
     pending.expiresAt = Date.now() - 1;
 
     const res = await exchange(token);
@@ -181,11 +191,13 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
   it('keeps every other device when the quota is full and the browser signs in again', async () => {
     const admin = findUserByEmail('admin@example.com');
     const devices: string[] = [];
+
     for (let i = 0; i < MAX_CONCURRENT_SESSIONS; i++) {
       devices.push(
         refreshCookieOf(await exchange(await issueOAuthData(admin!.id)))
       );
     }
+
     expect(liveTokensOf(admin!.id)).toBe(MAX_CONCURRENT_SESSIONS);
     const newest = devices.at(-1)!;
 
@@ -198,6 +210,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
         method: 'POST',
         headers: { cookie }
       }).then((r) => r.status);
+
     expect(await refresh(newest)).toBe(401);
     expect(await refresh(devices[0])).toBe(200);
   });
@@ -205,6 +218,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
   it('refuses an account deactivated after the callback like a bad cookie', async () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);
+
     admin!.isActive = false;
 
     const res = await exchange(token);
@@ -221,6 +235,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
   it('refuses a cookie issued before a session revocation like a bad cookie', async () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);
+
     // The revocation is floored to its second, so the cookie must be older.
     getState().oauthDataTokens.get(token)!.issuedAt -= 1;
     const revoke = await fetch(
@@ -231,6 +246,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
         body: JSON.stringify({ userId: admin!.id })
       }
     );
+
     expect(revoke.status).toBe(200);
 
     const res = await exchange(token);
@@ -245,6 +261,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
   it('records the sign-in with its method and provider at the exchange', async () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);
+
     expect(
       getState().auditLogs.filter((l) => l.action === 'USER_LOGIN_SUCCESS')
     ).toHaveLength(0);
@@ -254,6 +271,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     const rows = getState().auditLogs.filter(
       (l) => l.action === 'USER_LOGIN_SUCCESS'
     );
+
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       actorId: admin!.id,

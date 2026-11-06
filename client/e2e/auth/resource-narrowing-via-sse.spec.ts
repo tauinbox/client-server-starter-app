@@ -28,6 +28,7 @@ test.describe('Live RBAC update via SSE - resource narrowing', () => {
     await page.goto('/profile');
 
     const adminLink = page.getByRole('link', { name: 'Admin panel' });
+
     await expect(adminLink).toBeVisible();
 
     const login = await fetch(`${_mockServer.url}/api/v1/auth/login`, {
@@ -52,6 +53,7 @@ test.describe('Live RBAC update via SSE - resource narrowing', () => {
         body: JSON.stringify({ allowedActionNames: ['create', 'update'] })
       }
     );
+
     expect(narrowing.status).toBe(200);
 
     await expect(adminLink).toBeHidden({ timeout: 15_000 });

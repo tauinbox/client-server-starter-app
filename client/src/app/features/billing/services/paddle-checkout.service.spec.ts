@@ -30,6 +30,7 @@ function paddleStub() {
       close: vi.fn(() => callback({ name: 'checkout.closed' }))
     }
   } satisfies PaddleStub;
+
   return { stub, emit: (name: string) => callback({ name }) };
 }
 
@@ -60,9 +61,11 @@ describe('PaddleCheckoutService', () => {
   /** Opens a checkout and waits until the overlay is open. */
   async function opened(): Promise<{ result: Promise<PaddleCheckoutResult> }> {
     const result = service.open(TXN);
+
     await vi.waitFor(() =>
       expect(paddle.stub.Checkout.open).toHaveBeenCalled()
     );
+
     return { result };
   }
 
@@ -98,6 +101,7 @@ describe('PaddleCheckoutService', () => {
 
   it('initializes Paddle.js once for several checkouts', async () => {
     const first = await opened();
+
     paddle.emit('checkout.closed');
     await first.result;
     paddle.stub.Checkout.open.mockClear();
@@ -130,10 +134,12 @@ describe('PaddleCheckoutService', () => {
     delete window.Paddle;
 
     const result = service.open(TXN);
+
     await vi.waitFor(() =>
       expect(document.getElementById(SCRIPT_ID)).not.toBeNull()
     );
     const tag = document.getElementById(SCRIPT_ID) as HTMLScriptElement;
+
     expect(tag.src).toBe('https://cdn.paddle.com/paddle/v2/paddle.js');
     tag.dispatchEvent(new Event('error'));
 

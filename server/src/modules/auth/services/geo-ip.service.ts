@@ -43,6 +43,7 @@ export class GeoIpService {
 
     const reader = await this.acquire(this.dbPath);
     const record = reader?.get(ip);
+
     return {
       countryCode: record?.country?.iso_code ?? null,
       city: record?.city?.names?.en ?? null
@@ -55,6 +56,7 @@ export class GeoIpService {
     this.releaseTimer = setTimeout(() => {
       this.reader = null;
     }, GEOIP_IDLE_RELEASE_MS).unref();
+
     return this.reader;
   }
 
@@ -68,6 +70,7 @@ export class GeoIpService {
         { err },
         'GeoIP database cannot be read; the session location stays empty'
       );
+
       return null;
     }
   }

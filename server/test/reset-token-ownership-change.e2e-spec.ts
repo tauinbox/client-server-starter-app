@@ -30,19 +30,24 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
   const errorKeyOf = async (run: Promise<unknown>): Promise<string> => {
     try {
       await run;
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return body.errorKey ?? `STATUS_${error.getStatus()}`;
       }
+
       throw error;
     }
   };
 
   const newEmail = (label: string): string => {
     const email = `reset-owner-${label}-${Date.now()}@example.com`;
+
     emails.push(email);
+
     return email;
   };
 
@@ -62,6 +67,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
         ...overrides
       })
     );
+
     return { user, rawToken };
   };
 
@@ -95,6 +101,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((e) => ({ email: e })));
     }
+
     await app?.close();
   });
 
@@ -110,6 +117,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
     await authService.confirmEmailChange(rawPendingToken);
 
     const moved = await reload(user.id);
+
     expect(moved.email).toBe(pendingEmail);
     expect(moved.passwordResetToken).toBeNull();
     expect(moved.passwordResetExpiresAt).toBeNull();
@@ -135,6 +143,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
 
     // Pre-fix the old-address link also verified the new address.
     const after = await reload(user.id);
+
     expect(after.email).toBe(recoveredEmail);
     expect(after.isEmailVerified).toBe(false);
   }, 60000);
@@ -177,6 +186,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
     const original = breachedPasswordService.assertNotBreached.bind(
       breachedPasswordService
     );
+
     jest
       .spyOn(breachedPasswordService, 'assertNotBreached')
       .mockImplementationOnce(async (password, context) => {
@@ -198,6 +208,7 @@ runWithInfra('A reset link dies with an ownership change (e2e)', () => {
       .addSelect('u.password')
       .where('u.id = :id', { id: user.id })
       .getOneOrFail();
+
     expect(
       (
         await verifyPassword(

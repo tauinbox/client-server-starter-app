@@ -38,6 +38,7 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
         password: null
       })
     );
+
     userId = user.id;
   }, 60000);
 
@@ -54,6 +55,7 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
       maxAttempts,
       lockDurationMs
     );
+
     expect(first).toEqual({ failedLoginAttempts: 1, lockedUntil: null });
 
     const second = await usersService.incrementFailedAttemptsAndLockIfNeeded(
@@ -61,6 +63,7 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
       maxAttempts,
       lockDurationMs
     );
+
     expect(second).toEqual({ failedLoginAttempts: 2, lockedUntil: null });
 
     const third = await usersService.incrementFailedAttemptsAndLockIfNeeded(
@@ -68,10 +71,12 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
       maxAttempts,
       lockDurationMs
     );
+
     expect(third.failedLoginAttempts).toBe(3);
     expect(third.lockedUntil).toBeInstanceOf(Date);
 
     const lockedUntil = third.lockedUntil as Date;
+
     expect(lockedUntil.getTime()).toBeGreaterThan(
       before + lockDurationMs - 60000
     );
@@ -82,6 +87,7 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
     const persisted = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: userId });
+
     expect(persisted.failedLoginAttempts).toBe(3);
     expect(persisted.lockedUntil).toBeInstanceOf(Date);
   }, 30000);
@@ -109,6 +115,7 @@ runWithInfra('Login lockout UPDATE (e2e)', () => {
     const persisted = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: userId });
+
     expect(persisted.failedLoginAttempts).toBe(0);
     expect(persisted.lockedUntil).toBeNull();
   }, 30000);

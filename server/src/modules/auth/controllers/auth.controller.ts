@@ -150,6 +150,7 @@ export class AuthController {
       const { mfaToken, expiresIn } = this.mfaService.issuePendingToken(
         req.user
       );
+
       return { mfaRequired: true, mfaToken, expiresIn };
     }
 
@@ -171,6 +172,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response
   ) {
     const cookieToken = this.cookies.readRefresh(req);
+
     if (!cookieToken) {
       throw new ApiError(
         ErrorKeys.AUTH.REFRESH_TOKEN_REQUIRED,
@@ -183,7 +185,9 @@ export class AuthController {
       normalizeIpAddress(req.ip)
     );
     const { refresh_token, ...publicTokens } = result.tokens;
+
     this.cookies.setRefresh(res, refresh_token);
+
     return { tokens: publicTokens, user: result.user };
   }
 
@@ -205,6 +209,7 @@ export class AuthController {
       req.user.userId,
       cookieToken
     );
+
     this.cookies.clearRefresh(res);
     this.cookies.clearIntents(res);
     this.setClearSiteData(res);
@@ -216,6 +221,7 @@ export class AuthController {
       context: extractAuditContext(req)
     });
     this.metricsService.recordAuthEvent('logout');
+
     return { message: 'Successfully logged out' };
   }
 
@@ -257,6 +263,7 @@ export class AuthController {
     const reauthProof = this.cookies.readReauthProof(req);
 
     let verified: User | undefined;
+
     if (updateProfileDto.password) {
       // A first password binds a credential that outlives the session, so it
       // needs the same fresh proof of identity an email change needs.
@@ -292,6 +299,7 @@ export class AuthController {
         expected: verified && { password: verified.password }
       }
     );
+
     if (previous && previous.name !== updatedUser.name) {
       this.eventEmitter.emit(
         UserUpdatedEvent.name,
@@ -304,6 +312,7 @@ export class AuthController {
       this.cookies.clearRefresh(res);
       this.cookies.clearIntents(res);
       const actor = { actorId: req.user.userId, actorEmail: req.user.email };
+
       this.auditService.logFireAndForget({
         action: AuditAction.PASSWORD_CHANGE,
         ...actor,
@@ -323,12 +332,14 @@ export class AuthController {
           auditContext: extractAuditContext(req)
         });
       }
+
       // Only the notice reads this, and the notice is best effort: a failed
       // read must not turn a completed change into an error.
       const stillLinked = await this.authService
         .linkedProviders(req.user.userId)
         .catch((err) => {
           this.logger.error('Failed to read the linked providers', err);
+
           return [];
         });
 
@@ -410,6 +421,7 @@ export class AuthController {
       this.mfaPolicy.appliesTo(req.user.userId)
     ]);
     const roleNames = roles.map((r) => r.name);
+
     return {
       roles: roleNames,
       rules: packRules(ability.rules),

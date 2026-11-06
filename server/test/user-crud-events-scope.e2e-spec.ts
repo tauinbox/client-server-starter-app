@@ -81,11 +81,14 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     // answer and not a slow delivery.
     const notifications = app.get(NotificationsService);
     const pushToAuthorized = notifications.pushToAuthorized.bind(notifications);
+
     jest
       .spyOn(notifications, 'pushToAuthorized')
       .mockImplementation((event, allows, grant) => {
         const push = pushToAuthorized(event, allows, grant);
+
         pushes.push(push);
+
         return push;
       });
 
@@ -93,9 +96,11 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       where: { action: { name: 'search' }, resource: { subject: 'User' } },
       relations: { action: true, resource: true }
     });
+
     if (!searchUser) throw new Error('Permission search:User missing');
 
     const repository = dataSource.getRepository(User);
+
     for (const key of Object.keys(emails) as (keyof typeof emails)[]) {
       users[key] = await repository.save(
         repository.create({
@@ -116,12 +121,14 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
         { name: `${tag}-${suffix}` },
         { ability: SYSTEM_ABILITY }
       );
+
       await roleService.setPermissionsForRole(role.id, items, {
         ability: SYSTEM_ABILITY
       });
       await roleService.assignRoleToUser(holder.id, role.id, {
         ability: SYSTEM_ABILITY
       });
+
       return role;
     };
 
@@ -140,6 +147,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       [{ permissionId: searchUser.id }],
       users.wide
     );
+
     await grantRole(
       'active',
       [
@@ -159,6 +167,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await roleService.assignRoleToUser(users.superUser.id, superRole.id, {
       ability: SYSTEM_ABILITY
     });
@@ -171,6 +180,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
 
   afterAll(async () => {
     for (const req of requests) req.destroy();
+
     if (dataSource) {
       await dataSource.getRepository(Role).delete({
         name: In([
@@ -184,6 +194,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });
     }
+
     await app?.close();
   });
 
@@ -192,6 +203,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       await usersService.findOne(user.id, SYSTEM_ABILITY),
       { userAgent: 'crud-events-e2e', ipAddress: '203.0.113.10' }
     );
+
     return new Promise((resolve, reject) => {
       const req = get(
         {
@@ -202,9 +214,12 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
         (res: IncomingMessage) => {
           if (res.statusCode !== 200) {
             reject(new Error(`stream status ${res.statusCode}`));
+
             return;
           }
+
           let body = '';
+
           res.setEncoding('utf8');
           res.on('data', (chunk: string) => {
             body += chunk;
@@ -222,6 +237,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
           );
         }
       );
+
       req.on('error', () => undefined);
       requests.push(req);
     });
@@ -229,7 +245,9 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
 
   const superAbility = (): AppAbility => {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     can('manage', 'all');
+
     return build();
   };
 
@@ -244,6 +262,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       ip: '127.0.0.1',
       headers: {}
     };
+
     // @ts-expect-error partial request: the handlers read only these fields
     return req;
   };
@@ -299,9 +318,11 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       action: 'updated',
       userId: own
     };
+
     for (const action of ['updated', 'deleted', 'restored'] as const) {
       await frame(wide, { type: 'user_crud_events', action, userId: other });
     }
+
     await frame(wide, ownUpdate);
     await frame(scoped, ownUpdate);
     expect(scoped()).toEqual([ownUpdate]);
@@ -331,6 +352,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       action: 'updated',
       userId: other
     };
+
     await frame(activeOnly, left);
     expect(activeOnly()).toEqual([left]);
   }, 30000);
@@ -368,9 +390,11 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       action: 'updated',
       userId: users.scoped.id
     };
+
     await frame(wide, update);
     expect(plain()).toEqual([]);
     const resolved = resolve.mock.calls.map(([userId]) => userId);
+
     expect(resolved).toContain(users.wide.id);
     expect(resolved).not.toContain(users.other.id);
     resolve.mockRestore();

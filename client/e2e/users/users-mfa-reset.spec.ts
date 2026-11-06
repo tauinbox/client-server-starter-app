@@ -40,10 +40,12 @@ test.describe('Two-factor reset by an administrator', () => {
     await page.getByRole('button', { name: 'Reset two-factor' }).click();
 
     const dialog = page.getByRole('dialog');
+
     await expect(
       dialog.getByText('Reset two-factor authentication')
     ).toBeVisible();
     const confirm = dialog.getByRole('button', { name: 'Reset', exact: true });
+
     await expect(confirm).toBeDisabled();
 
     await dialog.getByLabel('Your current password').fill(PASSWORD);
@@ -76,6 +78,7 @@ test.describe('Two-factor reset by an administrator', () => {
 
     await page.getByRole('button', { name: 'Reset two-factor' }).click();
     const dialog = page.getByRole('dialog');
+
     await dialog.getByLabel('Your current password').fill('Wrong-Password-00');
     await dialog.getByRole('button', { name: 'Reset', exact: true }).click();
 

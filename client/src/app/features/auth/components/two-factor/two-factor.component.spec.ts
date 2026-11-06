@@ -97,6 +97,7 @@ describe('TwoFactorComponent', () => {
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent as string;
+
     expect(text).toContain('Set a password for this account');
   });
 
@@ -106,6 +107,7 @@ describe('TwoFactorComponent', () => {
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent as string;
+
     expect(text).not.toContain('Set a password for this account');
     expect(text).toContain('Google');
   });
@@ -116,6 +118,7 @@ describe('TwoFactorComponent', () => {
     fixture.detectChanges();
 
     const asked = vi.fn();
+
     component.reauthRequested.subscribe(asked);
 
     component.startEnrolment();
@@ -137,6 +140,7 @@ describe('TwoFactorComponent', () => {
     expect(authServiceMock.startMfaSetup).toHaveBeenCalledWith();
     const img: HTMLImageElement | null =
       fixture.nativeElement.querySelector('.two-factor-qr');
+
     expect(img?.src).toContain('data:image/png;base64,AAAA');
   });
 
@@ -189,6 +193,7 @@ describe('TwoFactorComponent', () => {
     expect(authServiceMock.startMfaSetup).toHaveBeenCalledWith('Password1');
     const img: HTMLImageElement | null =
       fixture.nativeElement.querySelector('.two-factor-qr');
+
     expect(img?.src).toContain('data:image/png;base64,AAAA');
     expect(fixture.nativeElement.textContent).toContain('JBSWY3DPEHPK3PXP');
   });
@@ -268,6 +273,7 @@ describe('TwoFactorComponent', () => {
       currentPassword: 'Password1'
     });
     const text = fixture.nativeElement.textContent as string;
+
     expect(text).toContain('KKKKKKKK-KKKKKKKK');
     expect(text).toContain('replace the earlier set');
   });

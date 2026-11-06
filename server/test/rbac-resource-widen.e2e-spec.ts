@@ -48,6 +48,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
   const abilityOf = async (userId: string): Promise<AppAbility> => {
     await permissionService.invalidateUserCache(userId);
+
     return abilityFactory.createForUser(
       userId,
       await permissionService.getRolesForUser(userId),
@@ -67,12 +68,15 @@ runWithInfra('Offering a resource action again (e2e)', () => {
   const outcome = async (run: Promise<unknown>): Promise<string> => {
     try {
       await run;
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return `${error.getStatus()} ${body.errorKey ?? ''}`.trim();
       }
+
       throw error;
     }
   };
@@ -106,11 +110,14 @@ runWithInfra('Offering a resource action again (e2e)', () => {
       .findBy({ name: In(['read', 'delete']) });
     const action = (name: string): Action => {
       const found = actions.find((a) => a.name === name);
+
       if (!found) throw new Error(`Action ${name} missing`);
+
       return found;
     };
 
     const resourceRepository = dataSource.getRepository(Resource);
+
     resource = await resourceRepository.save(
       resourceRepository.create({
         name: tag,
@@ -133,9 +140,11 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     const updatePermission = (await permissionRepository.find()).find(
       (p) => p.action.name === 'update' && p.resource.subject === 'Permission'
     );
+
     if (!updatePermission) throw new Error('update:Permission missing');
 
     const userRepository = dataSource.getRepository(User);
+
     actor = await userRepository.save(
       userRepository.create({
         email: actorEmail,
@@ -151,6 +160,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
       { name: `${tag}-admin` },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: updatePermission.id }, { permissionId: deleteProbe.id }],
@@ -170,6 +180,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     if (dataSource) {
       await dataSource.getRepository(Role).delete({ name: `${tag}-admin` });
       await dataSource.getRepository(User).delete({ email: actorEmail });
+
       if (resource) {
         await dataSource
           .getRepository(Permission)
@@ -177,6 +188,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
         await dataSource.getRepository(Resource).delete({ id: resource.id });
       }
     }
+
     await app?.close();
   });
 
@@ -199,6 +211,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
         )
       ).toBe(widenRefused);
     }
+
     expect(await offered()).toEqual(['read']);
     expect(await actorCanDelete()).toBe(false);
   });
@@ -255,6 +268,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     const restored = await resourceService.restore(resource.id, {
       ability: superAbility
     });
+
     expect(restored.isOrphaned).toBe(false);
   });
 
@@ -293,6 +307,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
     it('is refused after a stale read, as the loser of two concurrent restores is', async () => {
       const users = await usersResource();
+
       expect(users.isOrphaned).toBe(false);
       jest
         .spyOn(

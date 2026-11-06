@@ -26,6 +26,7 @@ describe('corsOptions', () => {
       process.env['CORS_ORIGINS'] = '*';
       process.env['ENVIRONMENT'] = 'local';
       const result = corsOptions() as Record<string, unknown>;
+
       expect(result['origin']).toBe('*');
       expect(result['credentials']).toBe(false);
     });
@@ -36,6 +37,7 @@ describe('corsOptions', () => {
       process.env['CORS_ORIGINS'] =
         'https://app.example.com,https://admin.example.com';
       const result = corsOptions() as Record<string, unknown>;
+
       expect(result['origin']).toEqual([
         'https://app.example.com',
         'https://admin.example.com'
@@ -48,6 +50,7 @@ describe('corsOptions', () => {
     it('returns localhost origins with credentials: true', () => {
       process.env['ENVIRONMENT'] = 'local';
       const result = corsOptions() as Record<string, unknown>;
+
       expect(result['origin']).toEqual([
         'http://localhost:4200',
         'http://localhost:3000'
@@ -59,6 +62,7 @@ describe('corsOptions', () => {
   describe('no env vars set', () => {
     it('returns origin: false', () => {
       const result = corsOptions() as Record<string, unknown>;
+
       expect(result['origin']).toBe(false);
     });
   });

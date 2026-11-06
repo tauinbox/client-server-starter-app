@@ -100,6 +100,7 @@ export class RegisterComponent {
 
   protected onCaptchaToken(token: string | null): void {
     this.captchaToken.set(token);
+
     if (token) {
       this.error.set(null);
     }
@@ -107,7 +108,9 @@ export class RegisterComponent {
 
   protected canSubmit(): boolean {
     if (this.registerForm().invalid() || this.loading()) return false;
+
     if (this.captchaRequired() && !this.captchaToken()) return false;
+
     return true;
   }
 
@@ -130,6 +133,7 @@ export class RegisterComponent {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           const errorKey = err.error?.errorKey as string | undefined;
+
           if (
             errorKey === ErrorKeys.AUTH.CAPTCHA_REQUIRED ||
             errorKey === ErrorKeys.AUTH.CAPTCHA_INVALID
@@ -137,8 +141,10 @@ export class RegisterComponent {
             this.captchaRequired.set(true);
             this.captchaToken.set(null);
             this.error.set(parseHttpErrorMessage(err, this.#translocoService));
+
             return;
           }
+
           if (err.status === 409) {
             this.error.set(
               this.#translocoService.translate('auth.register.errorEmailExists')

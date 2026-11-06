@@ -20,8 +20,10 @@ export async function readErrorBody(
       `timestamp is ${String(timestamp)}`,
     path !== url.pathname + url.search && `path is ${String(path)}`
   ].filter(Boolean);
+
   if (problems.length > 0) {
     throw new Error(`Bad error envelope: ${problems.join(', ')}`);
   }
+
   return rest;
 }

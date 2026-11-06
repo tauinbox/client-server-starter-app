@@ -18,12 +18,15 @@ export type LocalPasswordRefusal = 'common' | 'context';
  */
 function wordsOf(value: string | null | undefined): string[] {
   if (!value) return [];
+
   const lower = value.toLowerCase();
+
   return [lower, ...lower.split(/[^\p{L}\p{N}]+/u)];
 }
 
 function contextWords(context: PasswordContext): string[] {
   const localPart = context.email?.split('@')[0];
+
   return [
     ...PASSWORD_PRODUCT_WORDS,
     ...wordsOf(localPart),
@@ -44,10 +47,13 @@ export function localPasswordRefusal(
   context: PasswordContext
 ): LocalPasswordRefusal | null {
   const lower = password.toLowerCase();
+
   if (COMMON_PASSWORDS.has(lower)) return 'common';
+
   if (contextWords(context).some((word) => lower.includes(word))) {
     return 'context';
   }
+
   return null;
 }
 

@@ -34,6 +34,7 @@ runWithRedis('failed attempt counter (real Redis)', () => {
     }).compile();
 
     const cache = moduleRef.get<Cache>(CACHE_MANAGER);
+
     await cache.get('e2e-counter:warmup');
     counter = new FailedAttemptCounter(cache, KEY_PREFIX, new Logger('test'));
   });

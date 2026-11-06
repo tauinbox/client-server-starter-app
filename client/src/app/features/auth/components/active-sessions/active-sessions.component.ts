@@ -127,6 +127,7 @@ export class ActiveSessionsComponent {
 
   protected readonly factor = computed<StepUpFactor>(() => {
     const factor = this.#stepUpFactor();
+
     return factor === 'none' ? 'provider' : factor;
   });
 
@@ -139,6 +140,7 @@ export class ActiveSessionsComponent {
     passwordRequired: 'auth.sessions.passwordRequired',
     codeRequired: 'auth.sessions.codeRequired'
   });
+
   readonly passwordModel = this.#stepUp.passwordModel;
   readonly passwordForm = this.#stepUp.passwordForm;
   readonly codeModel = this.#stepUp.codeModel;
@@ -156,7 +158,9 @@ export class ActiveSessionsComponent {
 
     effect(() => {
       const target = this.resumeRevoke();
+
       if (!target || this.#resumed) return;
+
       this.#resumed = true;
       this.#revoke(target, {});
     });
@@ -185,6 +189,7 @@ export class ActiveSessionsComponent {
 
     if (this.factor() === 'provider') {
       this.reauthRequested.emit(target);
+
       return;
     }
 
@@ -198,6 +203,7 @@ export class ActiveSessionsComponent {
 
   confirm(): void {
     const target = this.pending();
+
     if (!target || this.stepUpBlocked()) return;
 
     this.#revoke(target, this.#stepUp.request());
@@ -224,6 +230,7 @@ export class ActiveSessionsComponent {
       error: (err: HttpErrorResponse) => {
         this.busy.set(false);
         this.#notify.error(err, 'auth.sessions.errorEndFailed');
+
         // A 404 means the session ended on its own in the meantime.
         if (err.status === 404) this.load();
       }

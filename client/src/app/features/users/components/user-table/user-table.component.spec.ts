@@ -108,6 +108,7 @@ describe('UserTableComponent', () => {
   describe('trackById', () => {
     it('should return user id', () => {
       const result = component.trackById(0, mockUser);
+
       expect(result).toBe('test-user-id');
     });
 
@@ -156,6 +157,7 @@ describe('UserTableComponent', () => {
       ).map((header) => header.classList.value);
 
       expect(sortable).toHaveLength(Object.keys(COLUMN_TO_SORT_MAP).length);
+
       for (const column of Object.keys(COLUMN_TO_SORT_MAP)) {
         expect(
           sortable.some((classes) => classes.includes(`mat-column-${column}`))
@@ -219,6 +221,7 @@ describe('UserTableComponent', () => {
       const chip = fixture.nativeElement.querySelector(
         'td mat-chip.app-chip-danger'
       );
+
       expect(chip.textContent.trim()).toBe('Deleted');
     });
 
@@ -252,6 +255,7 @@ describe('UserTableComponent', () => {
       fixture.detectChanges();
 
       const emitted: User[] = [];
+
       component.restoreUser.subscribe((user) => emitted.push(user));
       findRestoreButton(fixture.nativeElement)?.click();
 
@@ -282,6 +286,7 @@ describe('UserTableComponent', () => {
         ...mockUser,
         roles: [mockUserRole, editorRole, mockAdminRole]
       };
+
       expect(component.sortedRoles(multi).map((r) => r.name)).toEqual([
         SYSTEM_ROLES.ADMIN,
         SYSTEM_ROLES.USER,
@@ -297,10 +302,12 @@ describe('UserTableComponent', () => {
         id: 'admin-user',
         roles: [mockAdminRole]
       };
+
       componentRef.setInput('users', [adminUser]);
       fixture.detectChanges();
 
       const chip = fixture.nativeElement.querySelector('.role-chips mat-chip');
+
       expect(chip.querySelector('mat-icon')?.textContent?.trim()).toBe(
         'admin_panel_settings'
       );
@@ -313,6 +320,7 @@ describe('UserTableComponent', () => {
       fixture.detectChanges();
 
       const chip = fixture.nativeElement.querySelector('.role-chips mat-chip');
+
       expect(chip.querySelector('mat-icon')?.textContent?.trim()).toBe(
         'person'
       );
@@ -326,23 +334,27 @@ describe('UserTableComponent', () => {
         id: 'multi',
         roles: [mockUserRole, mockAdminRole]
       };
+
       componentRef.setInput('users', [multi]);
       fixture.detectChanges();
 
       const chips = fixture.nativeElement.querySelectorAll(
         '.role-chips mat-chip'
       );
+
       expect(chips.length).toBe(2);
       expect(chips[0].textContent).toContain(SYSTEM_ROLES.ADMIN);
 
       const overflow = fixture.nativeElement.querySelector(
         '.role-overflow-chip'
       );
+
       expect(overflow.textContent.trim()).toBe('+1');
     });
 
     it('renders no chips when the user has no roles', () => {
       const noRoles: User = { ...mockUser, id: 'no-roles', roles: [] };
+
       componentRef.setInput('users', [noRoles]);
       fixture.detectChanges();
 

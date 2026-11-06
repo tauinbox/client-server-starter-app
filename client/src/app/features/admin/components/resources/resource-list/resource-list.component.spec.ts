@@ -37,6 +37,7 @@ const mockResource: ResourceResponse = {
 describe('ResourceListComponent', () => {
   let component: ResourceListComponent;
   let fixture: ComponentFixture<ResourceListComponent>;
+
   function createResourcesStoreMock() {
     return {
       ...listUrlStoreMock(RESOURCE_LIST_QUERY, 'resources'),
@@ -106,6 +107,7 @@ describe('ResourceListComponent', () => {
     fixture.detectChanges();
 
     const skeleton = fixture.nativeElement.querySelector('nxs-list-skeleton');
+
     expect(skeleton).toBeTruthy();
   });
 
@@ -125,6 +127,7 @@ describe('ResourceListComponent', () => {
     fixture.detectChanges();
 
     const tables = fixture.nativeElement.querySelectorAll('table[mat-table]');
+
     expect(tables.length).toBe(1);
   });
 
@@ -133,6 +136,7 @@ describe('ResourceListComponent', () => {
     fixture.detectChanges();
 
     const skeleton = fixture.nativeElement.querySelector('nxs-list-skeleton');
+
     expect(skeleton).toBeNull();
   });
 
@@ -145,6 +149,7 @@ describe('ResourceListComponent', () => {
       const editBtns = fixture.nativeElement.querySelectorAll(
         'button[aria-label^="Edit resource"]'
       );
+
       expect(editBtns.length).toBe(0);
     });
 
@@ -156,6 +161,7 @@ describe('ResourceListComponent', () => {
       const editBtns = fixture.nativeElement.querySelectorAll(
         'button[aria-label^="Edit resource"]'
       );
+
       expect(editBtns.length).toBeGreaterThan(0);
     });
 
@@ -167,6 +173,7 @@ describe('ResourceListComponent', () => {
         subject: 'Role',
         displayName: 'Roles'
       };
+
       resourcesStoreMock.resources = signal([mockResource, otherResource]);
       authStoreMock.hasPermissions.mockImplementation(
         (check: { instance?: ResourceResponse }) =>
@@ -180,6 +187,7 @@ describe('ResourceListComponent', () => {
           'button[aria-label^="Edit resource"]'
         )
       ).map((button) => button.getAttribute('aria-label'));
+
       expect(labels).toEqual(['Edit resource Users']);
     });
   });

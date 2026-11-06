@@ -28,10 +28,12 @@ export const guestGuard: CanActivateFn = () => {
       }
 
       authService.clearSession();
+
       return true;
     }),
     catchError(() => {
       authService.clearSession();
+
       return of(true);
     })
   );

@@ -135,6 +135,7 @@ describe('UserDetailComponent', () => {
       const roleChip = chips.find(
         (c) => c.querySelector('mat-icon')?.textContent?.trim() === 'person'
       );
+
       expect(roleChip).toBeTruthy();
       expect(roleChip?.textContent).toContain('user');
     });
@@ -204,6 +205,7 @@ describe('UserDetailComponent', () => {
         const back = Array.from(
           errorCard()?.querySelectorAll<HTMLButtonElement>('button') ?? []
         ).find((b) => b.textContent?.trim() === 'Back');
+
         expect(back !== undefined).toBe(canSearch);
       }
     );
@@ -215,6 +217,7 @@ describe('UserDetailComponent', () => {
       const buttons = Array.from(
         root.querySelectorAll<HTMLButtonElement>('.actions-container button')
       );
+
       return (
         buttons.find(
           (b) => b.querySelector('mat-icon')?.textContent?.trim() === 'edit'
@@ -228,6 +231,7 @@ describe('UserDetailComponent', () => {
       fixture.detectChanges();
 
       const button = editButton(fixture);
+
       expect(button).toBeTruthy();
       expect(button?.disabled).toBe(false);
     });
@@ -238,6 +242,7 @@ describe('UserDetailComponent', () => {
       fixture.detectChanges();
 
       const button = editButton(fixture);
+
       expect(button).toBeTruthy();
       expect(button?.disabled).toBe(true);
     });

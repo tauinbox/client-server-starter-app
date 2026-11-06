@@ -43,9 +43,12 @@ export function sendError(
 export const errorEnvelope: RequestHandler = (req, res, next) => {
   if (req.originalUrl.startsWith('/__control')) {
     next();
+
     return;
   }
+
   const json = res.json.bind(res);
+
   res.json = ((body?: unknown) => {
     if (
       res.statusCode < 400 ||
@@ -55,10 +58,13 @@ export const errorEnvelope: RequestHandler = (req, res, next) => {
     ) {
       return json(body);
     }
+
     const source = body as Record<string, unknown>;
+
     if (isErrorKey(source['errorKey'])) {
       res.status(ERROR_STATUS[source['errorKey']]);
     }
+
     if (res.statusCode === 401) {
       res.setHeader(
         'WWW-Authenticate',
@@ -67,6 +73,7 @@ export const errorEnvelope: RequestHandler = (req, res, next) => {
           : 'Bearer'
       );
     }
+
     const envelope: Record<string, unknown> = {
       statusCode: res.statusCode,
       message: source['message'],
@@ -74,9 +81,11 @@ export const errorEnvelope: RequestHandler = (req, res, next) => {
       timestamp: new Date().toISOString(),
       path: req.originalUrl
     };
+
     for (const field of FORWARDED_FIELDS) {
       if (source[field] !== undefined) envelope[field] = source[field];
     }
+
     return json(envelope);
   }) as Response['json'];
   next();
@@ -98,13 +107,16 @@ export const unhandledError: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof SyntaxError || err instanceof URIError) {
     // eslint-disable-next-line no-restricted-syntax -- Nest sends this 400 with no key
     res.status(400).json({ message: err.message });
+
     return;
   }
+
   const { status, expose, message } = (err ?? {}) as {
     status?: unknown;
     expose?: unknown;
     message?: unknown;
   };
+
   if (
     expose === true &&
     typeof status === 'number' &&
@@ -112,8 +124,10 @@ export const unhandledError: ErrorRequestHandler = (err, _req, res, _next) => {
     status < 500
   ) {
     res.status(status).json({ message });
+
     return;
   }
+
   sendError(
     res,
     ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,

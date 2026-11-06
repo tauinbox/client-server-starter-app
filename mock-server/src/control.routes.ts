@@ -123,12 +123,15 @@ router.get('/state', (_req, res) => {
 // POST /__control/users — add or override users
 router.post('/users', (req, res) => {
   const users: MockUser[] = req.body;
+
   if (!Array.isArray(users)) {
     res.status(400).json({ message: 'Body must be an array of users' });
+
     return;
   }
 
   const state = getState();
+
   for (const user of users) {
     // A test seeds the fields it cares about. Anything it leaves out has to
     // land as the null the rest of the mock reads, not as undefined.
@@ -147,6 +150,7 @@ router.post('/users', (req, res) => {
 // GET /__control/tokens — get all verification and reset tokens (for E2E)
 router.get('/tokens', (_req, res) => {
   const state = getState();
+
   res.json({
     emailVerificationTokens: mapTokensToUserIds(state.emailVerificationTokens),
     passwordResetTokens: mapTokensToUserIds(state.passwordResetTokens),
@@ -162,6 +166,7 @@ router.post('/expire-token', (req, res) => {
 
   if (!token) {
     res.status(400).json({ message: 'Body must have token' });
+
     return;
   }
 
@@ -172,6 +177,7 @@ router.post('/expire-token', (req, res) => {
 
   if (!issued) {
     res.status(404).json({ message: `Unknown token ${token}` });
+
     return;
   }
 
@@ -188,6 +194,7 @@ router.post('/oauth-accounts', (req, res) => {
     res
       .status(400)
       .json({ message: 'Body must have userId and accounts array' });
+
     return;
   }
 
@@ -195,8 +202,10 @@ router.post('/oauth-accounts', (req, res) => {
     addOAuthAccounts(userId, accounts);
   } catch (error) {
     res.status(400).json({ message: (error as Error).message });
+
     return;
   }
+
   res.json({
     message: `Added ${accounts.length} OAuth account(s) for user ${userId}`
   });
@@ -211,6 +220,7 @@ router.post('/oauth-data', (req, res) => {
 
   if (!user) {
     res.status(400).json({ message: 'Body must have a known userId' });
+
     return;
   }
 
@@ -236,6 +246,7 @@ router.post('/oauth-data', (req, res) => {
       expiresAt
     });
     res.json({ token });
+
     return;
   }
 
@@ -261,15 +272,18 @@ router.post('/reauth-proof', (req, res) => {
 
   if (!user) {
     res.status(400).json({ message: 'Body must have a known userId' });
+
     return;
   }
 
   if (!isStepUpOperation(operation)) {
     res.status(400).json({ message: 'Body must have a known operation' });
+
     return;
   }
 
   const token = randomUUID();
+
   getState().reauthProofs.set(token, {
     userId: user.id,
     issuedAt: Math.floor(Date.now() / 1000),
@@ -286,15 +300,18 @@ router.post('/reauth-proof', (req, res) => {
 // the server to refuse.
 router.post('/breached-passwords', (req, res) => {
   const passwords: unknown = req.body;
+
   if (
     !Array.isArray(passwords) ||
     passwords.some((value) => typeof value !== 'string')
   ) {
     res.status(400).json({ message: 'Body must be an array of strings' });
+
     return;
   }
 
   const state = getState();
+
   for (const password of passwords as string[]) {
     state.breachedPasswords.add(password);
   }
@@ -305,12 +322,15 @@ router.post('/breached-passwords', (req, res) => {
 // POST /__control/roles — add or override roles
 router.post('/roles', (req, res) => {
   const roles: MockRole[] = req.body;
+
   if (!Array.isArray(roles)) {
     res.status(400).json({ message: 'Body must be an array of roles' });
+
     return;
   }
 
   const state = getState();
+
   for (const role of roles) {
     state.roles.set(role.id, role);
   }
@@ -321,12 +341,15 @@ router.post('/roles', (req, res) => {
 // POST /__control/permissions — add or override permissions
 router.post('/permissions', (req, res) => {
   const permissions: MockPermission[] = req.body;
+
   if (!Array.isArray(permissions)) {
     res.status(400).json({ message: 'Body must be an array of permissions' });
+
     return;
   }
 
   const state = getState();
+
   for (const permission of permissions) {
     state.permissions.set(permission.id, permission);
   }
@@ -337,14 +360,17 @@ router.post('/permissions', (req, res) => {
 // POST /__control/role-permissions — replace all role-permission assignments
 router.post('/role-permissions', (req, res) => {
   const rolePermissions: MockRolePermission[] = req.body;
+
   if (!Array.isArray(rolePermissions)) {
     res
       .status(400)
       .json({ message: 'Body must be an array of role-permissions' });
+
     return;
   }
 
   const state = getState();
+
   state.rolePermissions = rolePermissions;
 
   res.json({ message: `Set ${rolePermissions.length} role-permission(s)` });
@@ -356,16 +382,22 @@ router.post('/role-permissions', (req, res) => {
 // LEFT INTACT so the client's Unauthorized interceptor can refresh-and-retry.
 router.post('/invalidate-access-tokens', (req, res) => {
   const { userId } = req.body as { userId?: string };
+
   if (!userId) {
     res.status(400).json({ message: 'userId is required' });
+
     return;
   }
+
   const state = getState();
   const user = state.users.get(userId);
+
   if (!user) {
     res.status(404).json({ message: 'user not found' });
+
     return;
   }
+
   user.tokenRevokedAt = new Date().toISOString();
   rekeyUserSessions(userId);
   res.json({ message: `tokens invalidated for user ${userId}` });
@@ -377,26 +409,33 @@ router.post('/invalidate-access-tokens', (req, res) => {
 // mailed token.
 router.post('/age-session', (req, res) => {
   const { userId, ageMs } = req.body as { userId?: string; ageMs?: number };
+
   if (!userId) {
     res.status(400).json({ message: 'userId is required' });
+
     return;
   }
 
   const state = getState();
+
   if (!state.users.has(userId)) {
     res.status(404).json({ message: 'user not found' });
+
     return;
   }
 
   const offset = ageMs ?? DEFAULT_SESSION_ABSOLUTE_MAX_MS;
   let aged = 0;
+
   for (const [token, tokenUserId] of state.refreshTokens.entries()) {
     if (tokenUserId !== userId) continue;
 
     const sessionId = state.refreshSessions.get(token);
+
     if (sessionId === undefined) continue;
 
     const startedAt = state.sessionStarts.get(sessionId);
+
     if (startedAt === undefined) continue;
 
     state.sessionStarts.set(sessionId, startedAt - offset);
@@ -412,15 +451,21 @@ router.post('/age-session', (req, res) => {
 // Clearing the floor is that wait, without a 30-second sleep in the run.
 router.post('/totp-ledger', (req, res) => {
   const { userId } = req.body as { userId?: string };
+
   if (!userId) {
     res.status(400).json({ message: 'userId is required' });
+
     return;
   }
+
   const user = getState().users.get(userId);
+
   if (!user) {
     res.status(404).json({ message: 'user not found' });
+
     return;
   }
+
   user.totpLastUsedStep = null;
   res.json({ message: `totp ledger cleared for user ${userId}` });
 });
@@ -432,16 +477,22 @@ router.post('/change-user-roles', (req, res) => {
     userId?: string;
     newRoles?: string[];
   };
+
   if (!userId || !Array.isArray(newRoles)) {
     res.status(400).json({ message: 'userId and newRoles[] required' });
+
     return;
   }
+
   const state = getState();
   const user = state.users.get(userId);
+
   if (!user) {
     res.status(404).json({ message: 'user not found' });
+
     return;
   }
+
   user.roles = newRoles;
   pushToUser(userId, { type: 'permissions_updated' });
   res.json({ message: `roles updated for user ${userId}` });
@@ -457,16 +508,22 @@ router.post('/change-role-permissions', (req, res) => {
     roleName?: string;
     permissionIds?: string[];
   };
+
   if (!roleName || !Array.isArray(permissionIds)) {
     res.status(400).json({ message: 'roleName and permissionIds[] required' });
+
     return;
   }
+
   const state = getState();
   const role = state.roles.values().find((r) => r.name === roleName);
+
   if (!role) {
     res.status(404).json({ message: 'role not found' });
+
     return;
   }
+
   state.rolePermissions = [
     ...state.rolePermissions.filter((rp) => rp.roleId !== role.id),
     ...permissionIds.map((permissionId) => ({
@@ -489,11 +546,15 @@ router.post('/captcha', (req, res) => {
     enabled?: boolean;
     siteKey?: string | null;
   };
+
   if (typeof enabled !== 'boolean') {
     res.status(400).json({ message: 'enabled (boolean) is required' });
+
     return;
   }
+
   const state = getState();
+
   state.captchaConfig = {
     enabled,
     // Default to the Turnstile public test sitekey that always passes.
@@ -508,13 +569,17 @@ router.post('/captcha', (req, res) => {
 // any non-empty token works; null disables the Paddle checkout again.
 router.post('/billing/paddle-config', (req, res) => {
   const { clientToken } = req.body as { clientToken?: string | null };
+
   if (clientToken !== null && typeof clientToken !== 'string') {
     res
       .status(400)
       .json({ message: 'clientToken (string | null) is required' });
+
     return;
   }
+
   const state = getState();
+
   state.paddleClientConfig = {
     ...state.paddleClientConfig,
     clientToken: clientToken || null
@@ -532,15 +597,19 @@ router.post('/billing/provider-enabled', (req, res) => {
   const flagKey = BILLING_PROVIDER_FLAGS.find(
     (p) => p.provider === provider
   )?.enabledFlagKey;
+
   if (!flagKey || typeof enabled !== 'boolean') {
     res.status(400).json({
       message: 'provider (paddle | yookassa) and enabled (boolean) are required'
     });
+
     return;
   }
+
   for (const flag of getState().featureFlags.values()) {
     if (flag.key === flagKey) flag.enabled = enabled;
   }
+
   res.json({ message: `${flagKey} ${enabled ? 'enabled' : 'disabled'}` });
 });
 
@@ -557,21 +626,27 @@ router.post('/billing/activate-subscription', (req, res) => {
     planKey?: string;
     status?: MockSubscription['status'];
   };
+
   if (!userId) {
     res.status(400).json({ message: 'userId is required' });
+
     return;
   }
 
   const state = getState();
   const user = state.users.get(userId);
+
   if (!user) {
     res.status(404).json({ message: 'user not found' });
+
     return;
   }
 
   const plan = state.plans.values().find((p) => p.key === planKey);
+
   if (!plan) {
     res.status(404).json({ message: `plan "${planKey}" not found` });
+
     return;
   }
 
@@ -599,8 +674,10 @@ router.post('/billing/seed-usage', (req, res) => {
     subscriptionId?: string;
     idempotencyKey?: string;
   };
+
   if (!customerId) {
     res.status(400).json({ message: 'customerId is required' });
+
     return;
   }
 
@@ -609,8 +686,10 @@ router.post('/billing/seed-usage', (req, res) => {
     subscriptionId ??
     state.billingSubscriptions.values().find((s) => s.customerId === customerId)
       ?.id;
+
   if (!subId) {
     res.status(404).json({ message: 'no subscription for customer' });
+
     return;
   }
 
@@ -630,6 +709,7 @@ router.post('/billing/seed-usage', (req, res) => {
     idempotencyKey: idempotencyKey ?? `seed-${randomUUID()}`,
     recordedAt: now
   };
+
   state.billingUsageRecords.set(record.id, record);
   res.json(toUsageResponse(record));
 });
@@ -642,8 +722,10 @@ router.post('/billing/complete-purchase', (req, res) => {
     userId?: string;
     sessionRef?: string;
   };
+
   if (!userId && !sessionRef) {
     res.status(400).json({ message: 'userId or sessionRef is required' });
+
     return;
   }
 
@@ -651,18 +733,22 @@ router.post('/billing/complete-purchase', (req, res) => {
   let session = sessionRef
     ? state.billingPurchaseSessions.get(sessionRef)
     : undefined;
+
   if (!session && userId) {
     const customer = state.billingCustomers
       .values()
       .find((c) => c.userId === userId);
+
     session = customer
       ? [...state.billingPurchaseSessions.values()]
           .filter((s) => s.customerId === customer.id)
           .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
       : undefined;
   }
+
   if (!session) {
     res.status(404).json({ message: 'pending purchase session not found' });
+
     return;
   }
 
@@ -691,8 +777,10 @@ router.post('/billing/advance-renewal', (req, res) => {
     subscriptionId?: string;
     outcome?: 'success' | 'failure';
   };
+
   if (outcome !== 'success' && outcome !== 'failure') {
     res.status(400).json({ message: 'outcome must be success or failure' });
+
     return;
   }
 
@@ -706,10 +794,12 @@ router.post('/billing/advance-renewal', (req, res) => {
     byId && ENTITLED_SUBSCRIPTION_STATUSES.includes(byId.status)
       ? byId
       : undefined;
+
   if (!subscription && userId) {
     const customer = state.billingCustomers
       .values()
       .find((c) => c.userId === userId);
+
     subscription = customer
       ? [...state.billingSubscriptions.values()]
           .filter(
@@ -720,8 +810,10 @@ router.post('/billing/advance-renewal', (req, res) => {
           .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
       : undefined;
   }
+
   if (!subscription) {
     res.status(404).json({ message: 'subscription not found' });
+
     return;
   }
 
@@ -734,23 +826,30 @@ router.post('/billing/advance-renewal', (req, res) => {
     if (subscription.billingMode === 'usage') {
       subscription.usageSealedUntil = nowIso;
     }
+
     const attempts = (subscription.dunningAttempts ?? 0) + 1;
+
     subscription.dunningAttempts = attempts;
     subscription.status =
       attempts >= DUNNING_MAX_ATTEMPTS ? 'canceled' : 'past_due';
+
     if (subscription.status === 'canceled') {
       subscription.cancelAtPeriodEnd = false;
     }
+
     subscription.updatedAt = nowIso;
     notifyEntitlementsChanged(subscription.customerId);
     res.json(toSubscriptionResponse(subscription));
+
     return;
   }
 
   const plan = state.plans.values().find((p) => p.key === subscription.planKey);
   const price = plan?.prices[subscription.provider];
+
   if (!plan || !price) {
     res.status(404).json({ message: 'plan or price not found' });
+
     return;
   }
 
@@ -763,6 +862,7 @@ router.post('/billing/advance-renewal', (req, res) => {
     subscription.updatedAt = nowIso;
     notifyEntitlementsChanged(subscription.customerId);
     res.json(toSubscriptionResponse(subscription));
+
     return;
   }
 
@@ -783,6 +883,7 @@ router.post('/billing/advance-renewal', (req, res) => {
   let { amountMinor } = price;
   let periodStart = nowIso;
   let periodEnd = newEnd.toISOString();
+
   if (subscription.billingMode === 'usage') {
     const totalUnits = sumPlanMeterUnits(plan, subscription.id, {
       startIso: closedStart,
@@ -796,10 +897,12 @@ router.post('/billing/advance-renewal', (req, res) => {
       price,
       availableCreditUnits: balance?.balanceUnits ?? 0
     });
+
     if (balance && rated.creditUnitsApplied > 0) {
       balance.balanceUnits -= rated.creditUnitsApplied;
       balance.updatedAt = nowIso;
     }
+
     amountMinor = rated.amountMinor;
     periodStart = closedStart;
     periodEnd = nowIso;
@@ -824,6 +927,7 @@ router.post('/billing/advance-renewal', (req, res) => {
     createdAt: nowIso,
     updatedAt: nowIso
   };
+
   state.billingInvoices.set(invoice.id, invoice);
 
   subscription.status = 'active';

@@ -19,12 +19,14 @@ function fireKey(
     bubbles: true,
     cancelable: true
   });
+
   if (target) {
     Object.defineProperty(event, 'target', { value: target, enumerable: true });
     (target as EventTarget).dispatchEvent(event);
   } else {
     doc.dispatchEvent(event);
   }
+
   return event;
 }
 
@@ -43,6 +45,7 @@ describe('KeyboardShortcutsService', () => {
       { key: 'ctrl+s', label: 'Save', group: 'Forms' },
       vi.fn()
     );
+
     expect(service.shortcuts()).toHaveLength(1);
     expect(service.shortcuts()[0]).toEqual({
       key: 'ctrl+s',
@@ -57,6 +60,7 @@ describe('KeyboardShortcutsService', () => {
       { key: 'ctrl+s', label: 'Save', group: 'Forms' },
       vi.fn()
     );
+
     cleanup();
     expect(service.shortcuts()).toHaveLength(0);
   });
@@ -92,6 +96,7 @@ describe('KeyboardShortcutsService', () => {
       { key: 'ctrl+s', label: 'Save', group: 'Forms' },
       handler2
     );
+
     cleanup2();
 
     fireKey(doc, { key: 's', ctrlKey: true });
@@ -122,6 +127,7 @@ describe('KeyboardShortcutsService', () => {
     );
 
     const input = doc.createElement('input');
+
     doc.body.appendChild(input);
     fireKey(doc, { key: 's', ctrlKey: true }, input);
     doc.body.removeChild(input);
@@ -138,6 +144,7 @@ describe('KeyboardShortcutsService', () => {
     );
 
     const input = doc.createElement('input');
+
     doc.body.appendChild(input);
     fireKey(doc, { key: '?', shiftKey: true }, input);
     doc.body.removeChild(input);
@@ -154,6 +161,7 @@ describe('KeyboardShortcutsService', () => {
     );
 
     const textarea = doc.createElement('textarea');
+
     doc.body.appendChild(textarea);
     fireKey(doc, { key: '?', shiftKey: true }, textarea);
     doc.body.removeChild(textarea);
@@ -219,6 +227,7 @@ describe('KeyboardShortcutsService', () => {
     );
 
     const shortcuts = service.shortcuts();
+
     expect(shortcuts).toHaveLength(1);
     expect(shortcuts[0].label).toBe('Save 2');
     cleanup1();

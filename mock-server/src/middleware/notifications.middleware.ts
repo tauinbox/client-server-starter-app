@@ -28,9 +28,11 @@ const router = Router();
 router.get('/stream', authGuard, (req, res) => {
   const { user, sessionId } = req as AuthenticatedRequest;
   const userId = user.id;
+
   if (countSseConnections(userId) >= MAX_SSE_STREAMS_PER_USER) {
     // eslint-disable-next-line no-restricted-syntax -- the server sends this 429 with no key
     res.status(429).json({ message: 'Too many open notification streams' });
+
     return;
   }
 
@@ -42,6 +44,7 @@ router.get('/stream', authGuard, (req, res) => {
   res.write(HEARTBEAT_FRAME);
 
   const connectionId = randomUUID();
+
   registerSseConnection(userId, connectionId, res);
 
   // The stream is authenticated only when it opens, so the keep-alive also
@@ -52,9 +55,12 @@ router.get('/stream', authGuard, (req, res) => {
       clearInterval(keepalive);
       removeSseConnection(userId, connectionId);
       const event: NotificationEvent = { type: 'session_invalidated' };
+
       res.end(`data: ${JSON.stringify(event)}\n\n`);
+
       return;
     }
+
     try {
       res.write(HEARTBEAT_FRAME);
     } catch {

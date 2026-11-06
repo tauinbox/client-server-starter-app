@@ -58,6 +58,7 @@ export class AccessRefusalService {
       details: refusal.details,
       context: refusal.context
     });
+
     for (const { action, subject } of refusal.denied) {
       this.metricsService.recordPermissionDenied(
         refusal.level,
@@ -65,6 +66,7 @@ export class AccessRefusalService {
         subject
       );
     }
+
     throw exception;
   }
 
@@ -74,6 +76,7 @@ export class AccessRefusalService {
    */
   assertCan(ability: AppAbility, check: InstanceCheck): void {
     const { action, subject } = check;
+
     if (ability.can(action, subject)) {
       return;
     }
@@ -117,13 +120,16 @@ export class AccessRefusalService {
    */
   assertNotSuperTarget(ability: AppAbility, check: SuperTargetCheck): void {
     const { action, target, actorId } = check;
+
     if (ability.can('manage', 'all')) {
       return;
     }
+
     // Fail closed: a target loaded without its roles would pass as ordinary.
     if (!target.roles) {
       throw new Error('assertNotSuperTarget needs the roles of the target');
     }
+
     if (!target.roles.some((r) => r.isSuper)) {
       return;
     }

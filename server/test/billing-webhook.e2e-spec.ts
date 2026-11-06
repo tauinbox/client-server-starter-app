@@ -79,6 +79,7 @@ interface Stores {
 function matchesWhere<T extends object>(row: T, where: Partial<T>): boolean {
   return Object.entries(where).every(([key, value]) => {
     const actual = row[key as keyof T];
+
     return value instanceof FindOperator
       ? (value.value as unknown[]).includes(actual)
       : actual === value;
@@ -91,20 +92,27 @@ function findWhere<T extends object>(rows: T[], where: Partial<T>): T | null {
 
 function makeManager(stores: Stores) {
   let seq = 0;
+
   return {
     findOne: (entity: unknown, opts: { where: Record<string, unknown> }) => {
       if (entity === Subscription)
         return Promise.resolve(findWhere(stores.subscriptions, opts.where));
+
       if (entity === Plan)
         return Promise.resolve(findWhere(stores.plans, opts.where));
+
       if (entity === Customer)
         return Promise.resolve(findWhere(stores.customers, opts.where));
+
       if (entity === Invoice)
         return Promise.resolve(findWhere(stores.invoices, opts.where));
+
       if (entity === Product)
         return Promise.resolve(findWhere(stores.products, opts.where));
+
       if (entity === CreditBalance)
         return Promise.resolve(findWhere(stores.creditBalances, opts.where));
+
       return Promise.resolve(null);
     },
     find: (entity: unknown) =>
@@ -126,9 +134,13 @@ function makeManager(stores: Stores) {
           : entity === Subscription
             ? stores.subscriptions
             : null;
+
       if (!rows) return Promise.resolve({ affected: 0 });
+
       const matches = rows.filter((row) => matchesWhere(row, where));
+
       for (const row of matches) Object.assign(row, set);
+
       return Promise.resolve({ affected: matches.length });
     },
     create: (entity: { prototype: object }, data: object) =>
@@ -146,6 +158,7 @@ function makeManager(stores: Stores) {
           stores.subscriptions.push(entity as Subscription);
         }
       }
+
       return Promise.resolve(entity);
     },
     // Stands in for CreditService's balance upsert (the only raw SQL in the
@@ -155,6 +168,7 @@ function makeManager(stores: Stores) {
       const balance = stores.creditBalances.find(
         (b) => b.customerId === customerId
       );
+
       if (balance) {
         balance.balanceUnits = balance.balanceUnits.add(Money.fromMinor(delta));
       } else {
@@ -164,6 +178,7 @@ function makeManager(stores: Stores) {
           updatedAt: new Date()
         });
       }
+
       return Promise.resolve(undefined);
     },
     createQueryBuilder: (entity?: unknown) => {
@@ -182,14 +197,17 @@ function makeManager(stores: Stores) {
           andWhere: () => sum,
           getRawOne: () => Promise.resolve({ held: String(held) })
         };
+
         return sum;
       }
+
       const captured: { values?: Record<string, unknown> } = {};
       const builder = {
         insert: () => builder,
         into: () => builder,
         values: (v: Record<string, unknown>) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -199,14 +217,19 @@ function makeManager(stores: Stores) {
           const dup = stores.invoices.some(
             (i) => i.providerEventId === v['providerEventId']
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `inv-${++seq}`;
           // @ts-expect-error - partial Invoice fake assembled from insert().values()
           const invoice: Invoice = { id, ...v };
+
           stores.invoices.push(invoice);
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     }
   };
@@ -217,6 +240,7 @@ function makeManager(stores: Stores) {
 // status-aware dedup (skip only when `processed`) can be exercised end to end.
 function makeWebhookEventRepo(stores: Stores) {
   let seq = 0;
+
   return {
     createQueryBuilder: () => {
       const captured: {
@@ -236,6 +260,7 @@ function makeWebhookEventRepo(stores: Stores) {
           payload: NormalizedEvent;
         }) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -247,8 +272,11 @@ function makeWebhookEventRepo(stores: Stores) {
               e.provider === v.provider &&
               e.providerEventId === v.providerEventId
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `wh-${++seq}`;
+
           stores.webhookEvents.push({
             id,
             provider: v.provider,
@@ -256,16 +284,20 @@ function makeWebhookEventRepo(stores: Stores) {
             status: v.status,
             payload: v.payload
           });
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     },
     findOne: (opts: { where: Record<string, unknown> }) =>
       Promise.resolve(findWhere(stores.webhookEvents, opts.where)),
     update: (where: { id: string }, set: Record<string, unknown>) => {
       const matches = stores.webhookEvents.filter((e) => e.id === where.id);
+
       for (const row of matches) Object.assign(row, set);
+
       return Promise.resolve({ affected: matches.length });
     }
   };
@@ -292,6 +324,7 @@ function makeStubProvider(): PaymentProvider {
       const parsed = JSON.parse(rawBody.toString('utf8')) as {
         event: WebhookVerificationResult;
       };
+
       return Promise.resolve(parsed.event);
     }
   };
@@ -447,10 +480,12 @@ describe('Billing Paddle webhook (e2e)', () => {
             get: (key: string) => Promise.resolve(cacheStore.get(key)),
             set: (key: string, value: unknown) => {
               cacheStore.set(key, value);
+
               return Promise.resolve();
             },
             del: (key: string) => {
               cacheStore.delete(key);
+
               return Promise.resolve();
             }
           }
@@ -461,6 +496,7 @@ describe('Billing Paddle webhook (e2e)', () => {
         { provide: BILLING_PROVIDERS, useValue: [makeStubProvider()] }
       ]
     }).compile();
+
     entitlements = moduleRef.get(EntitlementService);
     reducer = moduleRef.get(BillingEventReducer);
 
@@ -663,12 +699,14 @@ describe('Billing Paddle webhook (e2e)', () => {
 
   it('resolves the granted entitlement as active for the buyer (capability union)', async () => {
     const before = await entitlements.capabilitiesFor('user-1');
+
     expect(before.capabilities).not.toContain('reports');
     await entitlements.invalidateUser('user-1');
 
     await postWebhook(oneTimePaid('evt_ot_1', skuPaid));
 
     const after = await entitlements.capabilitiesFor('user-1');
+
     expect(after.capabilities).toContain('reports');
   });
 
@@ -676,6 +714,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     const before = await request(server)
       .get('/api/v1/billing/entitlements')
       .expect(200);
+
     expect(
       (before.body as { capabilities: string[] }).capabilities
     ).not.toContain('reports');
@@ -687,6 +726,7 @@ describe('Billing Paddle webhook (e2e)', () => {
     const after = await request(server)
       .get('/api/v1/billing/entitlements')
       .expect(200);
+
     expect((after.body as { capabilities: string[] }).capabilities).toContain(
       'reports'
     );
@@ -784,6 +824,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
 
   function invoicesRepo() {
     let seq = 100;
+
     return {
       createQueryBuilder: () => {
         const captured: { values?: Record<string, unknown> } = {};
@@ -792,6 +833,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
           into: () => builder,
           values: (v: Record<string, unknown>) => {
             captured.values = v;
+
             return builder;
           },
           orIgnore: () => builder,
@@ -801,14 +843,19 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
             const dup = stores.invoices.some(
               (i) => i.providerEventId === v['providerEventId']
             );
+
             if (dup) return Promise.resolve({ raw: [] });
+
             const id = `inv-${++seq}`;
             // @ts-expect-error - partial Invoice fake assembled from insert().values()
             const invoice: Invoice = { id, ...v };
+
             stores.invoices.push(invoice);
+
             return Promise.resolve({ raw: [{ id }] });
           }
         };
+
         return builder;
       }
     };
@@ -903,6 +950,7 @@ describe('Billing Paddle usage invoicing (e2e)', () => {
                 andWhere: () => qb,
                 getRawOne: () => Promise.resolve({ total: '142' })
               };
+
               return qb;
             }
           }

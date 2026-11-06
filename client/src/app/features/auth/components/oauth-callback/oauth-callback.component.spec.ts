@@ -137,6 +137,7 @@ describe('OAuthCallbackComponent', () => {
 
   it('should not navigate until the exchange has started the session', async () => {
     const exchange$ = new Subject<AuthResponse>();
+
     authServiceMock.exchangeOAuthData.mockReturnValue(exchange$);
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
@@ -173,6 +174,7 @@ describe('OAuthCallbackComponent', () => {
       const input: HTMLInputElement = fixture.nativeElement.querySelector(
         'input[autocomplete="one-time-code"]'
       );
+
       input.value = value;
       input.dispatchEvent(new Event('input'));
       await fixture.whenStable();
@@ -180,6 +182,7 @@ describe('OAuthCallbackComponent', () => {
 
       const challengeForm: HTMLFormElement =
         fixture.nativeElement.querySelector('nxs-mfa-challenge form');
+
       challengeForm.dispatchEvent(new Event('submit'));
       await fixture.whenStable();
       fixture.detectChanges();
@@ -217,6 +220,7 @@ describe('OAuthCallbackComponent', () => {
       const buttons: HTMLButtonElement[] = Array.from(
         fixture.nativeElement.querySelectorAll('.mfa-links button')
       );
+
       buttons.at(-1)!.click();
       await fixture.whenStable();
 
@@ -311,6 +315,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
         .replaceAll('+', '-')
         .replaceAll('/', '_')
         .replace(/=+$/, '');
+
     return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.sig`;
   }
 
@@ -411,9 +416,11 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
 
   async function runCallback() {
     const fixture = TestBed.createComponent(OAuthCallbackComponent);
+
     fixture.detectChanges();
     httpMock.expectOne(AuthApiEnum.OAuthExchange).flush(liveAuthResponse);
     await settle(fixture);
+
     return fixture;
   }
 
@@ -424,6 +431,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
     await settle(fixture);
 
     const authStore = TestBed.inject(AuthStore);
+
     expect(authStore.hasPermissions({ action: 'read', subject: 'User' })).toBe(
       true
     );
@@ -434,6 +442,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
         { url: '/admin/users' } as RouterStateSnapshot
       )
     );
+
     expect(guardResult).toBe(true);
   });
 
@@ -452,6 +461,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
     const fixture = await runCallback();
 
     const permissionsRequest = httpMock.expectOne(AuthApiEnum.Permissions);
+
     expect(router.navigateByUrl).not.toHaveBeenCalled();
 
     permissionsRequest.flush({ rules: packedRules });
@@ -465,6 +475,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
   it('saves nothing and redirects to login on an incomplete response', async () => {
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const fixture = TestBed.createComponent(OAuthCallbackComponent);
+
     fixture.detectChanges();
     httpMock.expectOne(AuthApiEnum.OAuthExchange).flush({
       ...liveAuthResponse,
@@ -483,6 +494,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
 
   it('saves no session when the account answers with a challenge', async () => {
     const fixture = TestBed.createComponent(OAuthCallbackComponent);
+
     fixture.detectChanges();
     httpMock.expectOne(AuthApiEnum.OAuthExchange).flush({
       mfaRequired: true,

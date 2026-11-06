@@ -11,13 +11,17 @@ describe('ListEmptyComponent', () => {
 
   async function render(filtered?: boolean): Promise<HTMLElement> {
     const fixture = TestBed.createComponent(ListEmptyComponent);
+
     fixture.componentRef.setInput('icon', 'shield');
     fixture.componentRef.setInput('message', 'No roles yet.');
+
     if (filtered !== undefined) {
       fixture.componentRef.setInput('filtered', filtered);
     }
+
     fixture.detectChanges();
     await fixture.whenStable();
+
     return fixture.nativeElement as HTMLElement;
   }
 
@@ -25,6 +29,7 @@ describe('ListEmptyComponent', () => {
     const host = await render();
 
     const icon = host.querySelector('mat-icon');
+
     expect(icon?.textContent?.trim()).toBe('shield');
     expect(icon?.getAttribute('aria-hidden')).toBe('true');
     expect(host.querySelector('.empty-message')?.textContent?.trim()).toBe(

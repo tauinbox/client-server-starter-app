@@ -35,6 +35,7 @@ describe('GoogleStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.emailVerified).toBe(true);
     expect(profile.provider).toBe(OAuthProvider.GOOGLE);
     expect(profile.email).toBe('a@example.com');
@@ -53,6 +54,7 @@ describe('GoogleStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.emailVerified).toBe(false);
   });
 
@@ -69,6 +71,7 @@ describe('GoogleStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.emailVerified).toBe(false);
   });
 
@@ -87,6 +90,7 @@ describe('GoogleStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.email).toBe('john@gmail.com');
   });
 
@@ -99,6 +103,7 @@ describe('GoogleStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.emailVerified).toBe(false);
     expect(profile.email).toBe('');
   });
@@ -116,6 +121,7 @@ describe('GoogleStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.name).toBe('María José García');
   });
 
@@ -128,6 +134,7 @@ describe('GoogleStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.name).toBe('Madonna');
   });
 });

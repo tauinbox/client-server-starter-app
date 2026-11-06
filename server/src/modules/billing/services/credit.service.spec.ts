@@ -54,6 +54,7 @@ describe('CreditService', () => {
         andWhere: jest.fn(() => qb),
         getRawOne: jest.fn().mockResolvedValue({ held })
       };
+
       return {
         findOne: jest.fn().mockResolvedValue(balance),
         createQueryBuilder: jest.fn(() => qb),
@@ -129,14 +130,17 @@ describe('CreditService', () => {
       const { service: negative } = await build({
         balanceUnits: Money.fromMinor(-1)
       });
+
       await expect(negative.isBlocked('cust-1')).resolves.toBe(true);
 
       const { service: zero } = await build({
         balanceUnits: Money.fromMinor(0)
       });
+
       await expect(zero.isBlocked('cust-1')).resolves.toBe(false);
 
       const { service: missing } = await build(null);
+
       await expect(missing.isBlocked('cust-1')).resolves.toBe(false);
     });
   });

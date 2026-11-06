@@ -37,13 +37,17 @@ async function sessions(token: string): Promise<ActiveSessionResponse[]> {
   const res = await fetch(`${baseUrl}/api/v1/auth/sessions`, {
     headers: { authorization: `Bearer ${token}` }
   });
+
   expect(res.status).toBe(200);
+
   return (await res.json()) as ActiveSessionResponse[];
 }
 
 async function withSessionId(token: string): Promise<Device> {
   const current = (await sessions(token)).find((s) => s.current);
+
   expect(current).toBeDefined();
+
   return { token, sessionId: current?.id ?? '' };
 }
 
@@ -53,8 +57,10 @@ async function signIn(email: string, userAgent: string): Promise<Device> {
     headers: { 'content-type': 'application/json', 'user-agent': userAgent },
     body: JSON.stringify({ email, password: PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return withSessionId(body.tokens.access_token);
 }
 
@@ -70,8 +76,10 @@ async function providerSignIn(userId: string): Promise<Device> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
+
   expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as { tokens: { access_token: string } };
+
   return withSessionId(body.tokens.access_token);
 }
 
@@ -81,6 +89,7 @@ function revoke(
   { body, proof }: { body?: unknown; proof?: string } = {}
 ): Promise<Response> {
   const path = target === null ? '' : `/${target}`;
+
   return fetch(`${baseUrl}/api/v1/auth/sessions${path}`, {
     method: 'DELETE',
     headers: {
@@ -110,6 +119,7 @@ describe('GET /api/v1/auth/sessions', () => {
     const list = await sessions(a.token);
 
     const mine = list.find((s) => s.id === a.sessionId);
+
     expect(mine).toMatchObject({
       current: true,
       userAgent: 'Device-A',
@@ -142,6 +152,7 @@ describe('GET /api/v1/auth/sessions', () => {
     };
 
     const list = await sessions(body.tokens.access_token);
+
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ current: true, userAgent: 'Phone' });
   });
@@ -183,11 +194,13 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
 
     for (const id of [randomUUID(), foreign.sessionId]) {
       const res = await revoke(a, id, { body: { currentPassword: PASSWORD } });
+
       expect(res.status).toBe(404);
       expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
         ErrorKeys.AUTH.SESSION_NOT_FOUND
       );
     }
+
     await expect(profileStatus(foreign)).resolves.toBe(200);
   });
 
@@ -220,6 +233,7 @@ describe('DELETE /api/v1/auth/sessions/:sessionId', () => {
 
   it('accepts the provider proof of an account with no password, once', async () => {
     const template = findUserByEmail(EMAIL) as MockUser;
+
     getState().users.set(OAUTH_ONLY_ID, {
       ...template,
       id: OAUTH_ONLY_ID,
@@ -261,6 +275,7 @@ describe('DELETE /api/v1/auth/sessions', () => {
     const refused = await revoke(a, null, {
       body: { currentPassword: 'Wrong-00' }
     });
+
     expect(refused.status).toBe(403);
     await expect(profileStatus(c)).resolves.toBe(200);
 

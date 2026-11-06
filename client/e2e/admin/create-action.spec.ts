@@ -34,11 +34,13 @@ test.describe('the create action of a list page', () => {
 
       const header = page.locator('mat-card-header');
       const button = header.getByRole('button', { name: label, exact: true });
+
       await expect(button).toBeVisible();
       await expect(page.locator('.create-fab')).toHaveCount(0);
 
       await button.click();
       const dialog = await openedDialog(page);
+
       await expect(
         dialog.getByRole('heading', { name: dialogTitle })
       ).toBeVisible();
@@ -47,6 +49,7 @@ test.describe('the create action of a list page', () => {
 
       for (const colorScheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme });
+
         for (const width of [375, 768, 1366]) {
           await page.setViewportSize({ width, height: 900 });
           const overflow = await page.evaluate(
@@ -54,6 +57,7 @@ test.describe('the create action of a list page', () => {
               document.documentElement.scrollWidth -
               document.documentElement.clientWidth
           );
+
           expect(
             overflow,
             `horizontal overflow at ${width}px in ${colorScheme}`
@@ -63,6 +67,7 @@ test.describe('the create action of a list page', () => {
 
       await page.setViewportSize({ width: 375, height: 800 });
       const fab = page.locator('.create-fab');
+
       await expect(fab).toBeVisible();
       await expect(fab).toHaveAccessibleName(label);
       await expect(
@@ -72,13 +77,17 @@ test.describe('the create action of a list page', () => {
       const cardContent = page.locator('mat-card-content').first();
       const contentBottom = await cardContent.evaluate((el) => {
         let scroller = el.parentElement;
+
         while (scroller && scroller.scrollHeight <= scroller.clientHeight) {
           scroller = scroller.parentElement;
         }
+
         scroller?.scrollTo(0, scroller.scrollHeight);
+
         return el.getBoundingClientRect().bottom;
       });
       const fabTop = (await fab.boundingBox())!.y;
+
       expect(contentBottom).toBeLessThanOrEqual(fabTop);
 
       await fab.click();

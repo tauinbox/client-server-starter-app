@@ -162,8 +162,10 @@ function generateUsers(): MockUser[] {
   ];
 
   const generated: MockUser[] = [];
+
   for (let i = 0; i < 65; i++) {
     const combo = i % 20 === 0 ? ['admin'] : roleCombos[i % roleCombos.length];
+
     generated.push(
       createMockUser({
         id: mockId(`user-${i + 6}`),
@@ -191,6 +193,7 @@ function generateOAuthAccounts(): Map<string, OAuthAccount[]> {
   // Add OAuth accounts for ~10 random generated users
   for (let i = 0; i < 10; i++) {
     const userId = mockId(`user-${faker.number.int({ min: 6, max: 70 })}`);
+
     if (!accounts.has(userId)) {
       accounts.set(userId, [createOAuthAccount()]);
     }
@@ -201,6 +204,7 @@ function generateOAuthAccounts(): Map<string, OAuthAccount[]> {
 
 function generateResources(): MockResource[] {
   const now = '2025-01-01T00:00:00.000Z';
+
   return [
     {
       id: mockId('res-users'),
@@ -299,6 +303,7 @@ function generateResources(): MockResource[] {
 // creates one row per declared action name.
 function generateActions(): MockAction[] {
   const now = '2025-01-01T00:00:00.000Z';
+
   return [
     'create',
     'read',
@@ -385,6 +390,7 @@ function generatePermissions(
   for (const resource of resources) {
     for (const action of actions) {
       if (!resource.actionNames.includes(action.name)) continue;
+
       perms.push({
         id: mockId(`perm-${id++}`),
         resourceId: resource.id,
@@ -472,6 +478,7 @@ export const seedRolePermissions: MockRolePermission[] =
 
 function generateFeatureFlags(): MockFeatureFlag[] {
   const now = '2025-01-01T00:00:00.000Z';
+
   return [
     {
       id: mockId('flag-new-dashboard'),
@@ -548,6 +555,7 @@ function generateFeatureFlags(): MockFeatureFlag[] {
 
 function generateFeatureFlagRules(): MockFeatureFlagRule[] {
   const now = '2025-01-01T00:00:00.000Z';
+
   return [
     {
       id: mockId('rule-beta-export-percent'),
@@ -622,6 +630,7 @@ function generatePlans(): MockPlan[] {
     createdAt: now,
     updatedAt: now
   };
+
   return [
     {
       ...base,
@@ -728,6 +737,7 @@ export const seedPlans: MockPlan[] = generatePlans();
 // without one POST /billing/purchase answers `PRODUCT_NOT_CONFIGURED`.
 function generateProducts(): MockProduct[] {
   const now = '2025-01-01T00:00:00.000Z';
+
   return [
     {
       id: 'prod-report-pack',

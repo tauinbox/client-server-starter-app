@@ -37,6 +37,7 @@ class ProbeController {
     if (fail) {
       throw new UnauthorizedException();
     }
+
     return { ok: true };
   }
 
@@ -57,9 +58,11 @@ class ProbeController {
     if (body.password) {
       throw new UnauthorizedException();
     }
+
     if (body.name === 'bad') {
       throw new BadRequestException();
     }
+
     return { ok: true };
   }
 }
@@ -86,14 +89,17 @@ describe('LoginThrottlerGuard', () => {
     const res = await request(app.getHttpServer() as Server).get(
       fail ? '/probe/login?fail=1' : '/probe/login'
     );
+
     return res.status;
   };
 
   const repeat = async (times: number, fail: boolean): Promise<number[]> => {
     const statuses: number[] = [];
+
     for (let i = 0; i < times; i++) {
       statuses.push(await login(fail));
     }
+
     return statuses;
   };
 
@@ -113,11 +119,13 @@ describe('LoginThrottlerGuard', () => {
     const res = await request(app.getHttpServer() as Server)
       .post('/probe/profile')
       .send(body);
+
     return res.status;
   };
 
   it('never spends the failure budget on a refused request that carries no secret', async () => {
     const statuses: number[] = [];
+
     for (let i = 0; i < MAX_FAILED_ATTEMPTS + 2; i++) {
       statuses.push(await profile({ name: 'bad' }));
     }
@@ -127,6 +135,7 @@ describe('LoginThrottlerGuard', () => {
 
   it('counts the refused requests that do carry a secret', async () => {
     const statuses: number[] = [];
+
     for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
       statuses.push(await profile({ password: 'WrongPass1' }));
     }
@@ -140,6 +149,7 @@ describe('LoginThrottlerGuard', () => {
     }
 
     const statuses: number[] = [];
+
     for (let i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
       statuses.push(await profile({ password: 'WrongPass1' }));
     }

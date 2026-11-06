@@ -16,6 +16,7 @@ type Session = { accessToken: string; refreshCookie: string };
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -34,12 +35,15 @@ async function signIn(email: string): Promise<Session> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const match = /refresh_token=([^;]+)/.exec(
     res.headers.get('set-cookie') ?? ''
   );
+
   expect(match).not.toBeNull();
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return {
     accessToken: body.tokens.access_token,
     refreshCookie: `refresh_token=${match?.[1] ?? ''}`
@@ -59,6 +63,7 @@ async function patchUser(
     },
     body: JSON.stringify(body)
   });
+
   expect(res.status).toBe(200);
 }
 
@@ -79,6 +84,7 @@ describe('a deactivation ends the sessions', () => {
 
     // Pre-fix the kept token minted a new access token here.
     const res = await refresh(user);
+
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN

@@ -25,6 +25,7 @@ describe('CreateFeatureFlagDto environments', () => {
       metatype === CreateFeatureFlagDto
         ? { key: 'new-dashboard', environments }
         : { environments };
+
     return (await pipe.transform(body, {
       type: 'body',
       metatype
@@ -36,10 +37,12 @@ describe('CreateFeatureFlagDto environments', () => {
       () => null,
       (e: unknown) => e
     );
+
     expect(error).toBeInstanceOf(BadRequestException);
     const response = (error as BadRequestException).getResponse() as {
       message: string[];
     };
+
     return response.message.join(' ');
   }
 
@@ -50,11 +53,13 @@ describe('CreateFeatureFlagDto environments', () => {
       'production',
       'staging'
     ]);
+
     expect(dto.environments).toEqual(['production', 'staging']);
   });
 
   it('accepts every deployable environment name', async () => {
     const dto = await validate([...APP_ENVIRONMENTS]);
+
     expect(dto.environments).toEqual([...APP_ENVIRONMENTS]);
   });
 
@@ -69,12 +74,14 @@ describe('CreateFeatureFlagDto environments', () => {
 
   it('applies the same rules on update', async () => {
     const dto = await validate([' Local '], UpdateFeatureFlagDto);
+
     expect(dto.environments).toEqual(['local']);
 
     const error = await validate(['qa'], UpdateFeatureFlagDto).then(
       () => null,
       (e: unknown) => e
     );
+
     expect(error).toBeInstanceOf(BadRequestException);
   });
 
@@ -83,6 +90,7 @@ describe('CreateFeatureFlagDto environments', () => {
       { key: 'new-dashboard' },
       { type: 'body', metatype: CreateFeatureFlagDto }
     )) as CreateFeatureFlagDto;
+
     expect(dto.environments).toBeUndefined();
   });
 });
@@ -159,6 +167,7 @@ describe('UpdateFeatureFlagDto key', () => {
         () => null,
         (e: unknown) => e
       );
+
     expect(error).toBeInstanceOf(BadRequestException);
     expect(
       ((error as BadRequestException).getResponse() as { message: string[] })
@@ -171,6 +180,7 @@ describe('UpdateFeatureFlagDto key', () => {
       { enabled: true },
       { type: 'body', metatype: UpdateFeatureFlagDto }
     )) as UpdateFeatureFlagDto;
+
     expect(dto.enabled).toBe(true);
   });
 });

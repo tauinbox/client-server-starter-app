@@ -15,9 +15,11 @@ export const routes: Routes = [
     // with full permissions instead of baking /profile into the query string.
     redirectTo: () => {
       const authStore = inject(AuthStore);
+
       if (!authStore.isAuthenticated()) {
         return `/${AppRouteSegmentEnum.Login}`;
       }
+
       return inject(SidenavStateService).defaultRoute();
     },
     pathMatch: 'full'

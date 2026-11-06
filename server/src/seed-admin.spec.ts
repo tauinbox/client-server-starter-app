@@ -5,6 +5,7 @@ import { User } from './modules/users/entities/user.entity';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual<typeof import('typeorm')>('typeorm');
+
   return { ...actual, DataSource: jest.fn() };
 });
 jest.mock('./postgres.config', () => ({ postgresConfig: () => ({}) }));

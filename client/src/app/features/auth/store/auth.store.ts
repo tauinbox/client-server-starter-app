@@ -43,6 +43,7 @@ export const AuthStore = signalStore(
   { providedIn: 'root' },
   withState<AuthState>(() => {
     const storage = inject(LocalStorageService);
+
     return {
       accessToken: null,
       user: storage.getItem(AUTH_USER_KEY, isPersistedUser) ?? null,
@@ -71,15 +72,18 @@ export const AuthStore = signalStore(
 
     function isAccessTokenExpired(): boolean {
       const expiryTime = getTokenExpiryTime();
+
       return expiryTime === null || expiryTime < Date.now();
     }
 
     function getTokenExpiryTime(): number | null {
       const token = getAccessToken();
+
       if (!token) return null;
 
       try {
         const decoded = jwtDecode<CustomJwtPayload>(token);
+
         return decoded.exp ? decoded.exp * 1000 : null;
       } catch {
         return null;
@@ -117,15 +121,18 @@ export const AuthStore = signalStore(
       if (!Array.isArray(rules) || !rules.every(Array.isArray)) {
         return;
       }
+
       // Safe cast: validation above guarantees rules is unknown[][]
       // which matches PackRule<RawRuleOf<AppAbility>>[] structure
       const unpacked = unpackRules(rules as PackRule<RawRuleOf<AppAbility>>[]);
       const ability = createMongoAbility<AppAbility>(unpacked);
+
       // The server refuses a non-super actor every write on an account that
       // holds a super role (assertNotSuperTarget), whatever the grants say.
       if (!ability.can('manage', 'all')) {
         ability.update([...unpacked, SUPER_TARGET_DENY]);
       }
+
       patchState(store, { ability });
     }
 
@@ -143,11 +150,14 @@ export const AuthStore = signalStore(
       // by callers reacting to it, and deny an empty list instead of the
       // fail-open `[].every() === true`.
       const ability = store.ability();
+
       if (!ability || checks.length === 0) return false;
+
       return checks.every(({ action, subject: subjectName, instance }) => {
         if (instance !== undefined) {
           return ability.can(action, subject(subjectName, instance));
         }
+
         return ability.can(action, subjectName);
       });
     }

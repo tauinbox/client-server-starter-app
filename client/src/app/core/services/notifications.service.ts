@@ -98,6 +98,7 @@ export class NotificationsService {
 
           const progressEvent = event as HttpDownloadProgressEvent;
           const text = progressEvent.partialText ?? '';
+
           pendingFrame += text.slice(lastLength);
           lastLength = text.length;
 
@@ -105,9 +106,11 @@ export class NotificationsService {
           // frames terminated by \n\n and keep the incomplete tail buffered
           // until the next chunk completes it
           const boundary = pendingFrame.lastIndexOf('\n\n');
+
           if (boundary === -1) return;
 
           const completeFrames = pendingFrame.slice(0, boundary);
+
           pendingFrame = pendingFrame.slice(boundary + 2);
 
           this.#parseAndEmit(completeFrames);
@@ -121,9 +124,11 @@ export class NotificationsService {
 
   #onStreamLive(): void {
     this.#reconnectAttempt = 0;
+
     if (this.#wasLive) {
       this.#reconnected$.next();
     }
+
     this.#wasLive = true;
   }
 
@@ -145,6 +150,7 @@ export class NotificationsService {
         MAX_RECONNECT_DELAY_MS
       ) *
       (0.5 + Math.random() / 2);
+
     this.#reconnectAttempt++;
     this.#reconnectTimer = setTimeout(() => {
       this.#reconnectTimer = null;
@@ -161,6 +167,7 @@ export class NotificationsService {
     this.#recycleTimer = setTimeout(
       () => {
         this.#recycleTimer = null;
+
         if (!this.#subscription || !this.#authStore.isAuthenticated()) return;
 
         this.#subscription.unsubscribe();
@@ -200,15 +207,21 @@ export class NotificationsService {
 
   #parseAndEmit(chunk: string): void {
     const blocks = chunk.split('\n\n');
+
     for (const block of blocks) {
       const dataLine = block
         .split('\n')
         .find((line) => line.startsWith('data:'));
+
       if (!dataLine) continue;
+
       const json = dataLine.slice('data:'.length).trim();
+
       if (!json) continue;
+
       try {
         const event = JSON.parse(json) as NotificationEvent;
+
         this.#events$.next(event);
       } catch {
         // malformed SSE frame - skip

@@ -47,9 +47,11 @@ describe('CatalogTextPipe', () => {
     settle: () => Promise<void>;
   } {
     const fixture = TestBed.createComponent(HostComponent);
+
     fixture.componentInstance.item.set(item);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
+
     return {
       name: () => el.querySelector('.name')?.textContent ?? '',
       description: () => el.querySelector('.description')?.textContent ?? '',
@@ -66,12 +68,14 @@ describe('CatalogTextPipe', () => {
       name: 'Pro (db)',
       description: 'db text'
     });
+
     expect(view.name()).toBe('Pro');
     expect(view.description()).toBe('For growing teams');
   });
 
   it('follows the active language', async () => {
     const view = render({ key: 'pro', name: 'Pro', description: 'db text' });
+
     transloco.setActiveLang('ru');
     await view.settle();
     expect(view.name()).toBe('Про');
@@ -84,12 +88,14 @@ describe('CatalogTextPipe', () => {
       name: 'Team',
       description: null
     });
+
     expect(view.name()).toBe('Team');
     expect(view.description()).toBe('');
   });
 
   it('renders nothing for a missing item', () => {
     const view = render(null);
+
     expect(view.name()).toBe('');
   });
 });

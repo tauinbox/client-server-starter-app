@@ -23,7 +23,9 @@ async function refreshCookieValue(context: BrowserContext): Promise<string> {
   const cookie = (await context.cookies()).find(
     (c) => c.name === 'refresh_token'
   );
+
   expect(cookie, 'refresh_token cookie should be set').toBeDefined();
+
   return cookie!.value;
 }
 
@@ -34,6 +36,7 @@ async function setRefreshCookie(
   const current = (await context.cookies()).find(
     (c) => c.name === 'refresh_token'
   );
+
   expect(current).toBeDefined();
   await context.clearCookies({ name: 'refresh_token' });
   await context.addCookies([{ ...current!, value }]);
@@ -53,6 +56,7 @@ test.describe('Refresh-token reuse detection', () => {
     expect(await refreshInPage(page)).toBe(200);
     expect(await refreshInPage(page)).toBe(200);
     const latest = await refreshCookieValue(context);
+
     expect(latest).not.toBe(original);
 
     await setRefreshCookie(context, original);
@@ -74,6 +78,7 @@ test.describe('Refresh-token reuse detection', () => {
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
+
     await routeApiToMockServer(otherPage, _mockServer.url);
     await loginViaUi(otherPage, _mockServer.url, { roles: ['user'] });
 
@@ -95,6 +100,7 @@ test.describe('Refresh-token reuse detection', () => {
             body: '{}'
           }
         );
+
         expect(rotated.status).toBe(200);
         await route.fulfill({
           status: rotated.status,

@@ -73,6 +73,7 @@ describe('MfaChallengeComponent', () => {
     const input: HTMLInputElement = fixture.nativeElement.querySelector(
       'input[autocomplete="one-time-code"]'
     );
+
     input.value = value;
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();
@@ -82,6 +83,7 @@ describe('MfaChallengeComponent', () => {
   async function submit(): Promise<void> {
     const challengeForm: HTMLFormElement =
       fixture.nativeElement.querySelector('form');
+
     challengeForm.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
     fixture.detectChanges();
@@ -91,6 +93,7 @@ describe('MfaChallengeComponent', () => {
     const buttons: HTMLButtonElement[] = Array.from(
       fixture.nativeElement.querySelectorAll('.mfa-links button')
     );
+
     buttons[index].click();
   }
 
@@ -102,6 +105,7 @@ describe('MfaChallengeComponent', () => {
 
   it('sends the code to the verify route and reports success', async () => {
     const verified = vi.fn();
+
     component.verified.subscribe(verified);
 
     await typeCode('123456');
@@ -148,11 +152,13 @@ describe('MfaChallengeComponent', () => {
     const input: HTMLInputElement = fixture.nativeElement.querySelector(
       'input[autocomplete="one-time-code"]'
     );
+
     expect(input.value).toBe('');
   });
 
   it('keeps the form up and shows the reason when only the code was wrong', async () => {
     const expired = vi.fn();
+
     component.expired.subscribe(expired);
     authServiceMock.verifyMfa.mockReturnValue(
       throwError(
@@ -181,6 +187,7 @@ describe('MfaChallengeComponent', () => {
 
   it('reports an expired challenge to the host rather than showing it', async () => {
     const expired = vi.fn();
+
     component.expired.subscribe(expired);
     authServiceMock.verifyMfa.mockReturnValue(
       throwError(
@@ -203,6 +210,7 @@ describe('MfaChallengeComponent', () => {
 
   it('reports a cancellation to the host', () => {
     const cancelled = vi.fn();
+
     component.cancelled.subscribe(cancelled);
 
     clickLink(1);

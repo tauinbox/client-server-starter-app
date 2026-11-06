@@ -14,6 +14,7 @@ describe('EntitlementGuard', () => {
 
   function contextFor(userId: string | undefined): ExecutionContext {
     const req = { user: userId ? { userId } : undefined } as JwtAuthRequest;
+
     return createMockExecutionContext({ request: req });
   }
 

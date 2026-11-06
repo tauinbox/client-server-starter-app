@@ -44,6 +44,7 @@ function makeWebhookEventRepo() {
   const rows: Array<{ id: string; provider: string; providerEventId: string }> =
     [];
   let seq = 0;
+
   return {
     createQueryBuilder: () => {
       const captured: {
@@ -53,6 +54,7 @@ function makeWebhookEventRepo() {
         insert: () => builder,
         values: (v: { provider: string; providerEventId: string }) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -64,12 +66,17 @@ function makeWebhookEventRepo() {
               e.provider === v.provider &&
               e.providerEventId === v.providerEventId
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `wh-${++seq}`;
+
           rows.push({ id, ...v });
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     },
     findOne: () => Promise.resolve(null),
@@ -89,6 +96,7 @@ async function makeApp(options: {
     const parsed = JSON.parse(rawBody.toString('utf8')) as {
       event: NormalizedEvent;
     };
+
     return Promise.resolve(parsed.event);
   });
   const provider = {
@@ -135,12 +143,16 @@ async function makeApp(options: {
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     rawBody: true
   });
+
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI });
+
   if (options.trustProxy !== undefined) {
     app.set('trust proxy', options.trustProxy);
   }
+
   await app.init();
+
   return { app, server: app.getHttpServer(), verifySpy };
 }
 
@@ -155,6 +167,7 @@ describe('Billing webhook source-IP allowlist (e2e)', () => {
   it('rejects a non-allowlisted IP with 403 before provider verification runs', async () => {
     let verifySpy: jest.Mock;
     let server: Server;
+
     ({ app, server, verifySpy } = await makeApp({
       allowlist: '203.0.113.0/24'
     }));
@@ -171,6 +184,7 @@ describe('Billing webhook source-IP allowlist (e2e)', () => {
   it('ignores a spoofed X-Forwarded-For when the peer is not a trusted proxy', async () => {
     let verifySpy: jest.Mock;
     let server: Server;
+
     ({ app, server, verifySpy } = await makeApp({
       allowlist: '203.0.113.0/24'
     }));
@@ -187,6 +201,7 @@ describe('Billing webhook source-IP allowlist (e2e)', () => {
 
   it('accepts an allowlisted client IP forwarded by a trusted proxy', async () => {
     let server: Server;
+
     ({ app, server } = await makeApp({
       allowlist: '203.0.113.0/24',
       trustProxy: 'loopback'
@@ -203,6 +218,7 @@ describe('Billing webhook source-IP allowlist (e2e)', () => {
 
   it('accepts a directly connected allowlisted IP', async () => {
     let server: Server;
+
     ({ app, server } = await makeApp({ allowlist: '127.0.0.1,::1' }));
 
     await request(server)
@@ -215,6 +231,7 @@ describe('Billing webhook source-IP allowlist (e2e)', () => {
 
   it('leaves the receivers open when the allowlist is empty (local dev, e2e)', async () => {
     let server: Server;
+
     ({ app, server } = await makeApp({ allowlist: '' }));
 
     await request(server)

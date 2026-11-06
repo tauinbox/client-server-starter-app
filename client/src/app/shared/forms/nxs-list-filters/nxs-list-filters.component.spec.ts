@@ -114,6 +114,7 @@ describe('NxsListFiltersComponent', () => {
         fixture.detectChanges();
         vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS / 2);
       }
+
       vi.advanceTimersByTime(LIST_SEARCH_DEBOUNCE_MS);
 
       expect(host.changes).toEqual([{ q: 'beta' }]);

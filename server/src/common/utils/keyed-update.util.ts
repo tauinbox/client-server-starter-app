@@ -24,9 +24,12 @@ export async function keyedUpdate<T extends ObjectLiteral>(
   const set = Object.fromEntries(
     Object.entries(changes).filter(([, value]) => value !== undefined)
   ) as QueryDeepPartialEntity<T>;
+
   if (Object.keys(set).length === 0) {
     return manager.exists(target, { where });
   }
+
   const { affected } = await manager.update(target, where, set);
+
   return affected !== 0;
 }

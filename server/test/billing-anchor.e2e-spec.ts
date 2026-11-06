@@ -39,13 +39,16 @@ runWithInfra('subscription billing anchor (e2e)', () => {
        VALUES ($1, 'yookassa', 'RU', 'RUB') RETURNING id`,
       [userId]
     )) as Array<{ id: string }>;
+
     return customerId;
   }
 
   it('round-trips billingAnchorAt through the entity mapping', async () => {
     const runner = ds.createQueryRunner();
+
     await runner.connect();
     await runner.startTransaction();
+
     try {
       const customerId = await seedCustomer(runner, Date.now());
       const anchor = new Date('2025-12-31T10:00:00.000Z');
@@ -76,17 +79,20 @@ runWithInfra('subscription billing anchor (e2e)', () => {
         { id: saved.id },
         { billingAnchorAt: anchor, currentPeriodEnd: moved }
       );
+
       expect(updated.affected).toBe(1);
 
       const [row] = (await runner.query(
         `SELECT billing_anchor_at FROM subscriptions WHERE id = $1`,
         [saved.id]
       )) as Array<{ billing_anchor_at: Date }>;
+
       expect(new Date(row.billing_anchor_at).toISOString()).toBe(
         anchor.toISOString()
       );
 
       const reread = await repo.findOne({ where: { id: saved.id } });
+
       expect(reread?.billingAnchorAt?.toISOString()).toBe(anchor.toISOString());
     } finally {
       await runner.rollbackTransaction();
@@ -96,8 +102,10 @@ runWithInfra('subscription billing anchor (e2e)', () => {
 
   it('leaves the anchor nullable for provider-managed rows', async () => {
     const runner = ds.createQueryRunner();
+
     await runner.connect();
     await runner.startTransaction();
+
     try {
       const customerId = await seedCustomer(runner, Date.now() + 1);
       const [{ id }] = (await runner.query(
@@ -112,6 +120,7 @@ runWithInfra('subscription billing anchor (e2e)', () => {
       const reread = await runner.manager
         .getRepository(Subscription)
         .findOne({ where: { id } });
+
       expect(reread?.billingAnchorAt).toBeNull();
     } finally {
       await runner.rollbackTransaction();

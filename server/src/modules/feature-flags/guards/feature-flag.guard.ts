@@ -21,10 +21,12 @@ export class FeatureFlagGuard implements CanActivate {
       FEATURE_FLAG_KEY,
       [context.getHandler(), context.getClass()]
     );
+
     if (!key) return true;
 
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
     const userId = req.user?.userId;
+
     if (!userId) {
       // eslint-disable-next-line no-restricted-syntax -- a hidden feature answers a bare 404, as a route that does not exist
       throw new NotFoundException();
@@ -32,10 +34,12 @@ export class FeatureFlagGuard implements CanActivate {
 
     const user = await this.resolver.buildResolverUser(userId);
     const enabled = await this.resolver.isEnabledForUser(user, req, key);
+
     if (!enabled) {
       // eslint-disable-next-line no-restricted-syntax -- a hidden feature answers a bare 404, as a route that does not exist
       throw new NotFoundException();
     }
+
     return true;
   }
 }

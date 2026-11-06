@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -31,11 +32,13 @@ async function loginAsAdmin(): Promise<{ token: string; userId: string }> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     tokens: { access_token: string };
     user: { id: string };
   };
+
   return { token: body.tokens.access_token, userId: body.user.id };
 }
 

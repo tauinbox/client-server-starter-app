@@ -27,7 +27,9 @@ export class TranslocoHttpLoader implements TranslocoLoader {
 
   #parseLang(lang: string): [string | null, string] {
     const idx = lang.indexOf('/');
+
     if (idx === -1) return [null, lang];
+
     return [lang.slice(0, idx), lang.slice(idx + 1)];
   }
 }

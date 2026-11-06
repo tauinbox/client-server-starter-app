@@ -60,6 +60,7 @@ test.describe('Account lockout', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('locked@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');

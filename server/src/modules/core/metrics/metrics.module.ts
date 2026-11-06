@@ -114,9 +114,11 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       provide: getToken('mail_queue_jobs'),
       useFactory: (ref: MailQueueRef): Gauge<string> => {
         const existing = register.getSingleMetric('mail_queue_jobs');
+
         if (existing) {
           return existing as Gauge<string>;
         }
+
         return new Gauge<string>({
           name: 'mail_queue_jobs',
           help: 'Number of mail-queue jobs by state',
@@ -124,9 +126,11 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
           async collect() {
             try {
               const counts = await ref.getJobCounts();
+
               if (!counts) {
                 return;
               }
+
               for (const [state, value] of Object.entries(counts)) {
                 this.set({ state }, value);
               }
@@ -145,9 +149,11 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
         // Re-use the existing metric if already registered (e.g. multiple module
         // initializations in the same process during E2E tests or hot-reload).
         const existing = register.getSingleMetric('sse_connections_active');
+
         if (existing) {
           return existing as Gauge<string>;
         }
+
         return new Gauge<string>({
           name: 'sse_connections_active',
           help: 'Number of currently active SSE connections',

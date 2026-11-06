@@ -1,6 +1,8 @@
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null) return false;
+
   const proto: unknown = Object.getPrototypeOf(value);
+
   return proto === Object.prototype || proto === null;
 }
 
@@ -27,12 +29,15 @@ export function deepEqual(a: unknown, b: unknown): boolean {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
       return false;
     }
+
     return a.every((item, index) => deepEqual(item, b[index]));
   }
 
   if (!isPlainRecord(a) || !isPlainRecord(b)) return false;
 
   const aKeys = definedKeys(a);
+
   if (aKeys.length !== definedKeys(b).length) return false;
+
   return aKeys.every((key) => deepEqual(a[key], b[key]));
 }

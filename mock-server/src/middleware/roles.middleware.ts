@@ -74,11 +74,15 @@ function normalizeRoleName(value: unknown): RoleName {
   if (typeof value !== 'string') {
     return { ok: false, error: 'name must be a string' };
   }
+
   const name = value.trim();
+
   if (name.length === 0) {
     return { ok: false, error: 'name should not be empty' };
   }
+
   const maxErr = validateMaxLength(name, ROLE_NAME_MAX_LENGTH, 'name');
+
   return maxErr ? { ok: false, error: maxErr } : { ok: true, name };
 }
 
@@ -101,14 +105,18 @@ function conditionBranchErrors(
   findShapeError: (value: unknown) => string | null
 ): string[] {
   if (value === undefined || value === null) return [];
+
   const shapeError = findShapeError(value);
+
   return [...(shapeError ? [shapeError] : []), ...objectErrors(field, value)];
 }
 
 // Mirrors `@IsOptional() @IsString() @IsSafeMongoQuery()`, reported bottom-up.
 function customConditionErrors(value: unknown): string[] {
   if (value === undefined || value === null) return [];
+
   const queryError = findCustomQueryError(value);
+
   return [
     ...(queryError ? [queryError] : []),
     ...(typeof value === 'string' ? [] : ['custom must be a string'])
@@ -119,6 +127,7 @@ function customConditionErrors(value: unknown): string[] {
 // server cannot pass the mock and turn an e2e run false-green.
 function conditionObjectErrors(path: string, value: object): string[] {
   const cond = value as Record<string, unknown>;
+
   return [
     ...unknownPropertyErrors(cond, CONDITION_KEYS),
     ...oneOfErrors('effect', cond['effect'], {
@@ -148,6 +157,7 @@ function conditionObjectErrors(path: string, value: object): string[] {
 // @Type(() => PermissionConditionDto)`.
 function conditionsErrors(parentPath: string, value: unknown): string[] {
   if (value === undefined || value === null) return [];
+
   return nestedErrors('conditions', value, {
     parentPath,
     own: objectErrors('conditions', value),
@@ -163,9 +173,11 @@ function isUniqueArray(
   identifier: (item: unknown) => unknown = (item) => item
 ): boolean {
   if (!Array.isArray(value) || value.length > MAX_PERMISSION_ITEMS) return true;
+
   const keys = value.map((item: unknown) =>
     item != null ? identifier(item) : item
   );
+
   return new Set(keys).size === keys.length;
 }
 
@@ -183,6 +195,7 @@ function permissionIdOf(item: unknown): unknown {
 function assignPermissionsErrors(body: Record<string, unknown>): string[] {
   const ids = body['permissionIds'];
   const isArray = Array.isArray(ids);
+
   return [
     ...unknownPropertyErrors(body, ASSIGN_PERMISSIONS_KEYS),
     ...((isArray ? ids : [ids]).some((id) => !isUuidV4(id))
@@ -207,6 +220,7 @@ function assignPermissionsErrors(body: Record<string, unknown>): string[] {
 // Mirrors PermissionItemDto.
 function permissionItemErrors(path: string, value: object): string[] {
   const item = value as Record<string, unknown>;
+
   return [
     ...[
       ...unknownPropertyErrors(item, PERMISSION_ITEM_KEYS),
@@ -236,6 +250,7 @@ function setPermissionsErrors(body: Record<string, unknown>): string[] {
       : []),
     ...(isArray ? [] : ['items must be an array'])
   ];
+
   return [
     ...unknownPropertyErrors(body, SET_PERMISSIONS_KEYS),
     ...nestedErrors('items', items, {
@@ -256,10 +271,14 @@ function findGrantError(
 ): { message: string; errorKey: ErrorKey } | null {
   const state = getState();
   const permission = state.permissions.get(permissionId);
+
   if (!permission) return null;
+
   const resource = state.resources.get(permission.resourceId);
   const action = state.actions.get(permission.actionId);
+
   if (!resource || !action) return null;
+
   const label = `${action.name}:${resource.subject}`;
 
   if (
@@ -271,31 +290,38 @@ function findGrantError(
       errorKey: ErrorKeys.ROLES.ACTION_NOT_GRANTABLE
     };
   }
+
   const supportError = findConditionSupportError(
     action.name,
     resource.conditionalActionNames,
     conditions
   );
+
   if (supportError) {
     return {
       message: `Cannot grant ${label} - ${supportError}`,
       errorKey: ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED
     };
   }
+
   const actionError = findConditionActionError(action.name, conditions);
+
   if (actionError) {
     return {
       message: `Cannot grant ${label} - ${actionError}`,
       errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE
     };
   }
+
   const fieldError = findConditionFieldError(resource.subject, conditions);
+
   if (fieldError) {
     return {
       message: `Cannot grant ${label} - ${fieldError}`,
       errorKey: ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN
     };
   }
+
   return null;
 }
 
@@ -326,6 +352,7 @@ function refuseSuperRole(
     targetType: 'Role',
     details: { deniedAction: action, subject: 'Role', superRole: true }
   });
+
   if (action === 'assign') {
     sendError(
       res,
@@ -357,11 +384,15 @@ export function notifyRoleHolders(roleName: string): void {
 router.get('/cursor', permissionGuard('read', 'Role'), (req, res) => {
   const query = req.query as Record<string, unknown>;
   const errors = listQueryErrors(query, ROLE_LIST_QUERY);
+
   if (errors.length > 0) {
     sendValidationError(res, 'query', errors);
+
     return;
   }
+
   if (rejectInvalidCursor(res, query)) return;
+
   res.json(
     listPage(Array.from(getState().roles.values()), ROLE_LIST_QUERY, query)
   );
@@ -379,8 +410,10 @@ router.get('/permissions', permissionGuard('read', 'Role'), (_req, res) => {
   const permissions = Array.from(state.permissions.values())
     .map((p) => toPermissionResponse(p))
     .filter((p): p is NonNullable<typeof p> => p !== null);
+
   permissions.sort((a, b) => {
     const cmp = a.resource.name.localeCompare(b.resource.name);
+
     return cmp !== 0 ? cmp : a.action.name.localeCompare(b.action.name);
   });
   res.json(permissions);
@@ -398,6 +431,7 @@ router.get(
 
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -415,9 +449,13 @@ router.get(
       .filter((rp) => rp.roleId === id)
       .map((rp) => {
         const permission = state.permissions.get(rp.permissionId);
+
         if (!permission) return null;
+
         const permResponse = toPermissionResponse(permission);
+
         if (!permResponse) return null;
+
         return {
           id: rp.id,
           roleId: rp.roleId,
@@ -443,6 +481,7 @@ router.get(
 
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -469,10 +508,13 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
     ...unknownPropertyErrors(req.body, ROLE_BODY_KEYS),
     ...(normalized.ok ? [] : [normalized.error])
   ];
+
   if (errors.length > 0 || !normalized.ok) {
     sendValidationError(res, 'body', errors);
+
     return;
   }
+
   const { name } = normalized;
 
   // CreateRoleDto carries `name` and `description`; the service raises every
@@ -488,6 +530,7 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
   }
 
   const state = getState();
+
   for (const existing of state.roles.values()) {
     if (existing.name === name) {
       sendError(
@@ -495,6 +538,7 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
         ErrorKeys.ROLES.NAME_EXISTS,
         'Role with this name already exists'
       );
+
       return;
     }
   }
@@ -513,6 +557,7 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
   state.roles.set(role.id, role);
 
   const actor = (req as AuthenticatedRequest).user;
+
   logAudit('ROLE_CREATE', {
     actorId: actor.id,
     actorEmail: actor.email,
@@ -544,8 +589,10 @@ router.patch(
       ...unknownPropertyErrors(req.body, ROLE_BODY_KEYS),
       ...(normalized && !normalized.ok ? [normalized.error] : [])
     ];
+
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
+
       return;
     }
 
@@ -553,6 +600,7 @@ router.patch(
 
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -582,6 +630,7 @@ router.patch(
         ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
         'Cannot modify system roles'
       );
+
       return;
     }
 
@@ -599,16 +648,21 @@ router.patch(
               ErrorKeys.ROLES.NAME_EXISTS,
               'Role with this name already exists'
             );
+
             return;
           }
         }
+
         // Users hold role names here, where the server joins by role id, so
         // the holders follow the rename to keep the role.
         const oldName = role.name;
+
         role.name = normalized.name;
+
         for (const user of state.users.values()) {
           user.roles = user.roles.map((r) => (r === oldName ? role.name : r));
         }
+
         notifyRoleHolders(role.name);
         rewriteRoleNameInRules(oldName, role.name);
         pushUserListStale();
@@ -622,6 +676,7 @@ router.patch(
     role.updatedAt = new Date().toISOString();
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('ROLE_UPDATE', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -647,6 +702,7 @@ router.delete(
 
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -668,6 +724,7 @@ router.delete(
         ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM,
         'Cannot delete system roles'
       );
+
       return;
     }
 
@@ -702,9 +759,11 @@ router.delete(
     for (const userId of holderIds) {
       pushToUser(userId, { type: 'permissions_updated' });
     }
+
     pushUserListStale();
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('ROLE_DELETE', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -731,10 +790,13 @@ router.put(
     // handler runs, so its shape checks precede the role lookup. Everything
     // that needs the role or the permission registry stays below `NOT_FOUND`.
     const errors = setPermissionsErrors(req.body);
+
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
+
       return;
     }
+
     const { items } = req.body as {
       items: { permissionId: string; conditions?: unknown }[];
     };
@@ -743,6 +805,7 @@ router.put(
 
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -760,13 +823,16 @@ router.put(
 
     if (role.isSystem && !isActorSuper(req)) {
       refuseSystemRole(req, res, role.id);
+
       return;
     }
 
     for (const item of items) {
       const error = findGrantError(item.permissionId, item.conditions);
+
       if (error) {
         sendError(res, error.errorKey, error.message);
+
         return;
       }
     }
@@ -776,12 +842,14 @@ router.put(
     const unknownItem = items.find(
       (item) => !state.permissions.has(item.permissionId)
     );
+
     if (unknownItem) {
       sendError(
         res,
         ErrorKeys.ROLES.UNKNOWN_PERMISSION,
         `Permission ${unknownItem.permissionId} not found`
       );
+
       return;
     }
 
@@ -789,6 +857,7 @@ router.put(
       permissionId: item.permissionId,
       conditions: (item.conditions as PermissionCondition | null) ?? null
     }));
+
     if (
       !assertGrantScope(req, res, {
         check: 'grant',
@@ -808,6 +877,7 @@ router.put(
             sameConditions(item.conditions, row.conditions)
         )
     );
+
     if (
       !assertGrantScope(req, res, {
         check: 'lift',
@@ -835,6 +905,7 @@ router.put(
     notifyRoleHolders(role.name);
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('PERMISSION_ASSIGN', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -861,16 +932,20 @@ router.post(
     // handler runs, so its shape checks precede the role lookup. Everything
     // that needs the role or the permission registry stays below `NOT_FOUND`.
     const errors = assignPermissionsErrors(req.body);
+
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
+
       return;
     }
+
     const { permissionIds, conditions } = req.body;
 
     const role = state.roles.get(id);
 
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -888,13 +963,16 @@ router.post(
 
     if (role.isSystem && !isActorSuper(req)) {
       refuseSystemRole(req, res, role.id);
+
       return;
     }
 
     for (const permissionId of permissionIds as string[]) {
       const error = findGrantError(permissionId, conditions);
+
       if (error) {
         sendError(res, error.errorKey, error.message);
+
         return;
       }
     }
@@ -905,12 +983,14 @@ router.post(
     const unknownId = (permissionIds as string[]).find(
       (permissionId) => !state.permissions.has(permissionId)
     );
+
     if (unknownId !== undefined) {
       sendError(
         res,
         ErrorKeys.ROLES.UNKNOWN_PERMISSION,
         `Permission ${unknownId} not found`
       );
+
       return;
     }
 
@@ -918,6 +998,7 @@ router.post(
       permissionId,
       conditions: (conditions as PermissionCondition | undefined) ?? null
     }));
+
     if (
       !assertGrantScope(req, res, {
         check: 'grant',
@@ -933,12 +1014,14 @@ router.post(
         (rp) => rp.roleId === id && rp.permissionId === permissionId
       )
     );
+
     if (duplicateId !== undefined) {
       sendError(
         res,
         ErrorKeys.DB.UNIQUE_VIOLATION,
         'A record with this value already exists'
       );
+
       return;
     }
 
@@ -954,6 +1037,7 @@ router.post(
     notifyRoleHolders(role.name);
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('PERMISSION_ASSIGN', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -980,6 +1064,7 @@ router.delete(
 
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -997,12 +1082,14 @@ router.delete(
 
     if (role.isSystem && !isActorSuper(req)) {
       refuseSystemRole(req, res, role.id);
+
       return;
     }
 
     const removedRows = denyRowsOf(id).filter(
       (row) => row.permissionId === permissionId
     );
+
     if (
       !assertGrantScope(req, res, {
         check: 'lift',
@@ -1023,6 +1110,7 @@ router.delete(
         ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED,
         'The role does not hold this permission'
       );
+
       return;
     }
 
@@ -1033,6 +1121,7 @@ router.delete(
     notifyRoleHolders(role.name);
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('PERMISSION_UNASSIGN', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -1057,19 +1146,23 @@ router.post(
 
     const state = getState();
     const user = findUserById(userId);
+
     if (!user) {
       sendError(
         res,
         ErrorKeys.USERS.NOT_FOUND,
         `User with ID ${userId} not found`
       );
+
       return;
     }
 
     // The role id comes from the body, as on the server.
     const role = state.roles.get(roleId);
+
     if (!role) {
       sendError(res, ErrorKeys.ROLES.UNKNOWN_ROLE, 'Role not found');
+
       return;
     }
 
@@ -1077,6 +1170,7 @@ router.post(
     // this route, a super caller included: no API path grants one.
     if (role.isSuper) {
       refuseSuperRole(req, res, { action: 'assign', roleId });
+
       return;
     }
 
@@ -1086,6 +1180,7 @@ router.post(
     if (!assertCanWriteUser(req, res, { action: 'update', target: user })) {
       return;
     }
+
     if (
       !assertInstancePermission(req, res, {
         action: 'assign',
@@ -1099,6 +1194,7 @@ router.post(
     // `RoleService.assignRoleToUser` checks the rows of the role before the
     // insert that raises the duplicate `UNIQUE_VIOLATION`.
     const roleRows = state.rolePermissions.filter((rp) => rp.roleId === roleId);
+
     if (
       !assertGrantScope(req, res, { check: 'grant', roleId, items: roleRows })
     ) {
@@ -1114,6 +1210,7 @@ router.post(
         ErrorKeys.DB.UNIQUE_VIOLATION,
         'A record with this value already exists'
       );
+
       return;
     }
 
@@ -1123,6 +1220,7 @@ router.post(
     revokeUserSessions(user.id);
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('ROLE_ASSIGN', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -1149,18 +1247,22 @@ router.delete(
 
     const state = getState();
     const user = findUserById(userId);
+
     if (!user) {
       sendError(
         res,
         ErrorKeys.USERS.NOT_FOUND,
         `User with ID ${userId} not found`
       );
+
       return;
     }
 
     const role = state.roles.get(roleId);
+
     if (!role) {
       sendError(res, ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
+
       return;
     }
 
@@ -1168,12 +1270,14 @@ router.delete(
     // this route, a super caller included: no API path removes one.
     if (role.isSuper) {
       refuseSuperRole(req, res, { action: 'unassign', roleId });
+
       return;
     }
 
     if (!assertCanWriteUser(req, res, { action: 'update', target: user })) {
       return;
     }
+
     if (
       !assertInstancePermission(req, res, {
         action: 'assign',
@@ -1200,6 +1304,7 @@ router.delete(
         ErrorKeys.ROLES.ROLE_NOT_ASSIGNED,
         'The user does not hold this role'
       );
+
       return;
     }
 
@@ -1209,6 +1314,7 @@ router.delete(
     revokeUserSessions(user.id);
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('ROLE_UNASSIGN', {
       actorId: actor.id,
       actorEmail: actor.email,

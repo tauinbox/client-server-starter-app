@@ -66,6 +66,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
     const roleService = app.get(RoleService);
 
     const userRepository = dataSource.getRepository(User);
+
     for (const key of Object.keys(emails) as (keyof typeof emails)[]) {
       const saved = await userRepository.save(
         userRepository.create({
@@ -75,6 +76,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
           password: null
         })
       );
+
       ids[key] = saved.id;
     }
 
@@ -83,9 +85,12 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       const found = permissions.find(
         (p) => p.action.name === action && p.resource.subject === resource
       );
+
       if (!found) throw new Error(`Permission ${action}:${resource} missing`);
+
       return found;
     };
+
     deleteUser = find('delete', 'User');
     const updateUser = find('update', 'User');
 
@@ -94,6 +99,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
         roleService.create({ name }, { ability: SYSTEM_ABILITY })
       )
     );
+
     emptyRole = empty;
     await roleService.setPermissionsForRole(
       delegate.id,
@@ -125,6 +131,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
     });
 
     const roleRepository = dataSource.getRepository(Role);
+
     superRole = await roleRepository.findOneByOrFail({ isSuper: true });
     systemRole = await roleRepository.findOneByOrFail({
       isSystem: true,
@@ -141,6 +148,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       userAgent: 'refusal-audit-e2e',
       ipAddress: null
     });
+
     token = tokens.access_token;
   }, 60000);
 
@@ -154,6 +162,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });
     }
+
     await app?.close();
   });
 
@@ -182,8 +191,11 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
         .getRepository(AuditLog)
         .findOne({ where: { action, actorId: ids.actor, requestId } })
     );
+
     if (!row) throw new Error(`No ${action} row for ${requestId}`);
+
     expect(row.ipAddress).toEqual(expect.any(String));
+
     return row;
   }
 
@@ -191,9 +203,11 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
     const res = await send('delete', `/users/${ids.plain}`, {
       requestId: `${tag}-guard`
     });
+
     expect(res.status).toBe(403);
 
     const row = await refusalRow(`${tag}-guard`);
+
     expect(row.details).toEqual({ required: ['delete:User'] });
   });
 
@@ -204,12 +218,14 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
         name: 'Changed'
       }
     });
+
     expect(res.status).toBe(403);
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS
     );
 
     const row = await refusalRow(`${tag}-instance`);
+
     expect(row.targetId).toBe(ids.victim);
     expect(row.details).toMatchObject({ instanceCheck: true });
   });
@@ -221,11 +237,13 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
         name: 'Changed'
       }
     });
+
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN
     );
 
     const row = await refusalRow(`${tag}-target`);
+
     expect(row.details).toMatchObject({ superTarget: true });
   });
 
@@ -234,11 +252,13 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       requestId: `${tag}-super-role`,
       body: { roleId: superRole.id }
     });
+
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN
     );
 
     const row = await refusalRow(`${tag}-super-role`);
+
     expect(row.targetId).toBe(superRole.id);
     expect(row.details).toMatchObject({ superRole: true });
   });
@@ -248,12 +268,14 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       requestId: `${tag}-system-role`,
       body: { items: [] }
     });
+
     expect(res.status).toBe(403);
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM
     );
 
     const row = await refusalRow(`${tag}-system-role`);
+
     expect(row.targetId).toBe(systemRole.id);
     expect(row.details).toMatchObject({ systemRole: true });
   });
@@ -263,6 +285,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       requestId: `${tag}-grant`,
       body: { items: [{ permissionId: deleteUser.id }] }
     });
+
     expect((res.body as { errorKey: string }).errorKey).toBe(
       ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION
     );
@@ -271,6 +294,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       `${tag}-grant`,
       AuditAction.PERMISSION_GRANT_DENIED
     );
+
     expect(row.targetId).toBe(emptyRole.id);
   });
 });

@@ -10,6 +10,7 @@ test.describe('Email verification', () => {
     // Register a new user
     await page.goto('/register');
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('verify-test@example.com');
     await page.getByLabel('Full name').fill('Verify Test');
     await page
@@ -24,6 +25,7 @@ test.describe('Email verification', () => {
     const tokens = await _mockServer.getTokens();
     const verificationTokens = tokens.emailVerificationTokens;
     const [token] = Object.keys(verificationTokens);
+
     expect(token).toBeTruthy();
 
     // Visit the verify-email page with the token
@@ -62,6 +64,7 @@ test.describe('Email verification', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('unverified@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
@@ -100,6 +103,7 @@ test.describe('Email verification', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('resend@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
@@ -134,6 +138,7 @@ test.describe('Email verification', () => {
   }) => {
     await page.goto('/register');
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('expired-verify@example.com');
     await page.getByLabel('Full name').fill('Expired Verify');
     await page
@@ -145,6 +150,7 @@ test.describe('Email verification', () => {
 
     const tokens = await _mockServer.getTokens();
     const [token] = Object.keys(tokens.emailVerificationTokens);
+
     expect(token).toBeTruthy();
 
     // The token lives 24 hours, so the test ages it instead of waiting.
@@ -192,6 +198,7 @@ test.describe('Email verification', () => {
     const tokenEntry = Object.entries(verificationTokens).find(
       ([, userId]) => userId === mockId('user-302')
     );
+
     expect(tokenEntry).toBeTruthy();
     const [token] = tokenEntry!;
 
@@ -207,6 +214,7 @@ test.describe('Email verification', () => {
     await expect(page).toHaveURL(/.*\/login$/);
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('verifythenlogin@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');

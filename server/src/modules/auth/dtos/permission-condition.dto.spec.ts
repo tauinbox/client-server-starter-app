@@ -37,6 +37,7 @@ describe('PermissionConditionDto shape validation', () => {
     const response = (error as BadRequestException).getResponse() as {
       message: string[];
     };
+
     expect(response.message.join(' ')).toContain(messagePart);
   }
 
@@ -174,6 +175,7 @@ describe('PermissionConditionDto shape validation', () => {
       const response = (error as BadRequestException).getResponse() as {
         message: string[];
       };
+
       expect(response.message.join(' ')).toContain('fieldMatch.status');
     });
 
@@ -202,7 +204,9 @@ describe('PermissionConditionDto shape validation', () => {
         () => null,
         (e: unknown) => e
       );
+
       expect(error).toBeInstanceOf(BadRequestException);
+
       return (
         (error as BadRequestException).getResponse() as { message: string[] }
       ).message;

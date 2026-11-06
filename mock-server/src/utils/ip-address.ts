@@ -6,5 +6,6 @@ import { isIP } from 'net';
  */
 export function normalizeIpAddress(ip: string | undefined): string | null {
   if (!ip || isIP(ip) === 0) return null;
+
   return ip.replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1');
 }

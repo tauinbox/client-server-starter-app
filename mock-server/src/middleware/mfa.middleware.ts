@@ -101,6 +101,7 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
   if (typeof mfaToken !== 'string') return null;
 
   const decoded = decodeToken(mfaToken);
+
   if (
     !decoded ||
     decoded.purpose !== TOKEN_PURPOSE.MFA_PENDING ||
@@ -113,6 +114,7 @@ function userFromPendingToken(mfaToken: unknown): MockUser | null {
   }
 
   const user = findUserById(decoded.sub);
+
   if (!user || !user.isActive || !user.totpEnabledAt) return null;
 
   // A sign-out everywhere since the password check must end this attempt too.
@@ -136,8 +138,10 @@ router.post('/setup', authGuard, (req, res) => {
     ...unknownPropertyErrors(req.body, ['currentPassword']),
     ...currentPasswordErrors(currentPassword)
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 
@@ -145,8 +149,10 @@ router.post('/setup', authGuard, (req, res) => {
     currentPassword,
     operation: STEP_UP_OPERATION.MFA_SETUP
   });
+
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
+
     return;
   }
 
@@ -156,6 +162,7 @@ router.post('/setup', authGuard, (req, res) => {
       ErrorKeys.AUTH.MFA_ALREADY_ENABLED,
       'Two-factor authentication is already enabled'
     );
+
     return;
   }
 
@@ -185,8 +192,10 @@ router.post('/enable', authGuard, (req, res) => {
     ...unknownPropertyErrors(req.body, ['code']),
     ...totpCodeErrors(code)
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 
@@ -196,6 +205,7 @@ router.post('/enable', authGuard, (req, res) => {
       ErrorKeys.AUTH.MFA_ALREADY_ENABLED,
       'Two-factor authentication is already enabled'
     );
+
     return;
   }
 
@@ -205,6 +215,7 @@ router.post('/enable', authGuard, (req, res) => {
       ErrorKeys.AUTH.MFA_SETUP_REQUIRED,
       'Start the two-factor setup before you confirm a code'
     );
+
     return;
   }
 
@@ -222,6 +233,7 @@ router.post('/enable', authGuard, (req, res) => {
       ErrorKeys.AUTH.MFA_ENROLMENT_INVALID_CODE,
       'Verification code is incorrect'
     );
+
     return;
   }
 
@@ -251,8 +263,10 @@ router.post('/disable', authGuard, requireStepUpBody(), (req, res) => {
     code,
     operation: STEP_UP_OPERATION.MFA_DISABLE
   });
+
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
+
     return;
   }
 
@@ -262,6 +276,7 @@ router.post('/disable', authGuard, requireStepUpBody(), (req, res) => {
       ErrorKeys.AUTH.MFA_NOT_ENABLED,
       'Two-factor authentication is not enabled'
     );
+
     return;
   }
 
@@ -295,8 +310,10 @@ router.post('/recovery-codes', authGuard, requireStepUpBody(), (req, res) => {
     code,
     operation: STEP_UP_OPERATION.MFA_RECOVERY_CODES
   });
+
   if (stepUp) {
     sendWithRetryAfter(res, stepUp);
+
     return;
   }
 
@@ -306,6 +323,7 @@ router.post('/recovery-codes', authGuard, requireStepUpBody(), (req, res) => {
       ErrorKeys.AUTH.MFA_NOT_ENABLED,
       'Two-factor authentication is not enabled'
     );
+
     return;
   }
 
@@ -335,14 +353,18 @@ router.post('/verify', (req, res) => {
     ...mfaTokenErrors(mfaToken),
     ...totpCodeErrors(code)
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 
   const user = userFromPendingToken(mfaToken);
+
   if (!user) {
     sendInvalidPendingToken(res);
+
     return;
   }
 
@@ -351,6 +373,7 @@ router.post('/verify', (req, res) => {
 
   if (barred || !consumeTotpCode(user, code)) {
     const { count, remainingMs } = recordChallengeFailure(user.id);
+
     logAudit('MFA_CHALLENGE_FAILURE', {
       actorId: user.id,
       actorEmail: user.email,
@@ -359,15 +382,19 @@ router.post('/verify', (req, res) => {
       details: { stage: 'challenge', attempt: count },
       ip: req.ip
     });
+
     if (count >= MAX_FAILED_ATTEMPTS) {
       sendWithRetryAfter(res, challengeLockedEnvelope(remainingMs));
+
       return;
     }
+
     sendError(
       res,
       ErrorKeys.AUTH.MFA_INVALID_CODE,
       'Verification code is incorrect'
     );
+
     return;
   }
 
@@ -388,14 +415,18 @@ router.post('/recovery', (req, res) => {
     ...mfaTokenErrors(mfaToken),
     ...matchesErrors('recoveryCode', recoveryCode, RECOVERY_CODE_PATTERN)
   ];
+
   if (bodyErrors.length > 0) {
     sendValidationError(res, 'body', bodyErrors);
+
     return;
   }
 
   const user = userFromPendingToken(mfaToken);
+
   if (!user) {
     sendInvalidPendingToken(res);
+
     return;
   }
 
@@ -418,6 +449,7 @@ router.post('/recovery', (req, res) => {
       ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE,
       'Recovery code is invalid or was already used'
     );
+
     return;
   }
 

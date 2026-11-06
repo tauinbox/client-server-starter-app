@@ -46,6 +46,7 @@ describe('BillingWebhookProcessor', () => {
       sweep: pruneLedger
     };
     const queue: Pick<Queue, 'upsertJobScheduler'> = { upsertJobScheduler };
+
     processor = new BillingWebhookProcessor(
       ingestion as WebhookIngestionService,
       reconciliation as WebhookReconciliationService,
@@ -60,6 +61,7 @@ describe('BillingWebhookProcessor', () => {
 
   it('reduces a normal reduce job', async () => {
     const data = { webhookEventId: 'wh-1' };
+
     await processor.process(makeJob(BILLING_WEBHOOK_REDUCE_JOB, data));
 
     expect(processEvent).toHaveBeenCalledWith(data);

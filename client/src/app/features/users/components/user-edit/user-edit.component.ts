@@ -159,6 +159,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   protected readonly formChanged = computed(() => {
     const current = this.userModel();
     const initial = this.#initialFormData();
+
     return (
       current.email !== initial.email ||
       current.name !== initial.name ||
@@ -169,6 +170,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
   /** The server demands a step-up exactly for these two changes. */
   protected readonly credentialChanged = computed(() => {
     const current = this.userModel();
+
     return (
       current.email !== this.#initialFormData().email ||
       current.password.trim() !== ''
@@ -188,6 +190,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
     passwordRequired: 'users.edit.currentPasswordRequired',
     codeRequired: 'users.edit.stepUpCodeRequired'
   });
+
   readonly stepUpPasswordModel = this.#stepUp.passwordModel;
   readonly stepUpPasswordForm = this.#stepUp.passwordForm;
   readonly stepUpCodeModel = this.#stepUp.codeModel;
@@ -196,7 +199,9 @@ export class UserEditComponent implements OnInit, OnDestroy {
   protected readonly rolesChanged = computed(() => {
     const initial = this.#initialRoleIds();
     const selected = this.selectedRoleIds();
+
     if (initial.length !== selected.length) return true;
+
     return selected.some((id) => !initial.includes(id));
   });
 
@@ -206,6 +211,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
   protected readonly canSubmit = computed(() => {
     const state = this.userForm();
+
     return (
       state.valid() &&
       !this.saving() &&
@@ -216,7 +222,9 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
   protected readonly canManageUser = computed(() => {
     const u = this.user();
+
     if (!u) return false;
+
     return this.#authStore.hasPermissions({
       action: 'update',
       subject: 'User',
@@ -258,7 +266,9 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
   protected readonly canDelete = computed(() => {
     const u = this.user();
+
     if (!u) return false;
+
     return (
       this.#authStore.hasPermissions({
         action: 'delete',
@@ -335,8 +345,10 @@ export class UserEditComponent implements OnInit, OnDestroy {
               AppRouteSegmentEnum.Users,
               user.id
             ]);
+
             return;
           }
+
           this.availableRoles.set(roles);
           this.user.set(user);
 
@@ -345,6 +357,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
             name: user.name,
             password: ''
           };
+
           this.userModel.set(formData);
           this.#initialFormData.set({ ...formData });
           this.isActive.set(user.isActive);
@@ -352,6 +365,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
           this.userForm().reset();
 
           const roleIds = user.roles.map((role) => role.id);
+
           this.#initialRoleIds.set(roleIds);
           this.selectedRoleIds.set([...roleIds]);
 
@@ -363,8 +377,10 @@ export class UserEditComponent implements OnInit, OnDestroy {
             void this.#router.navigate([`/${AppRouteSegmentEnum.Forbidden}`], {
               replaceUrl: true
             });
+
             return;
           }
+
           this.loading.set(false);
           this.loadFailed.set(err.status !== 404);
         }
@@ -384,6 +400,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
     if (!emailChanged || !u) {
       this.#performSave();
+
       return;
     }
 
@@ -422,6 +439,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
     if (this.formChanged() || this.isActiveChanged()) {
       const updateData = this.#prepareUpdateData();
+
       ops.push(
         this.#usersStore.updateUser(this.id(), updateData).pipe(
           tap((user) => {
@@ -440,6 +458,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
       for (const roleId of toAdd) {
         ops.push(this.#userRoleService.assignRole(this.id(), roleId));
       }
+
       for (const roleId of toRemove) {
         ops.push(this.#userRoleService.removeRole(this.id(), roleId));
       }
@@ -453,6 +472,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
           if (updatedUser) {
             this.user.set(updatedUser);
+
             if (this.#isSelf()) {
               this.#authStore.updateCurrentUser(updatedUser);
             }
@@ -524,6 +544,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
   confirmRevokeSessions(): void {
     const u = this.user();
+
     if (!u) return;
 
     this.#adaptiveDialog
@@ -568,9 +589,11 @@ export class UserEditComponent implements OnInit, OnDestroy {
 
   openMfaReset(): void {
     const u = this.user();
+
     if (!u) return;
 
     const data: MfaResetDialogData = { user: u, factor: this.stepUpFactor() };
+
     this.#dialog
       .open<MfaResetDialogComponent, MfaResetDialogData, User>(
         MfaResetDialogComponent,

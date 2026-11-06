@@ -78,6 +78,7 @@ export class ForgotPasswordComponent {
 
   protected onCaptchaToken(token: string | null): void {
     this.captchaToken.set(token);
+
     if (token) {
       this.error.set(null);
     }
@@ -85,7 +86,9 @@ export class ForgotPasswordComponent {
 
   protected canSubmit(): boolean {
     if (this.forgotPasswordForm().invalid() || this.loading()) return false;
+
     if (this.captchaRequired() && !this.captchaToken()) return false;
+
     return true;
   }
 
@@ -107,6 +110,7 @@ export class ForgotPasswordComponent {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           const errorKey = err.error?.errorKey as string | undefined;
+
           if (
             errorKey === ErrorKeys.AUTH.CAPTCHA_REQUIRED ||
             errorKey === ErrorKeys.AUTH.CAPTCHA_INVALID
@@ -114,8 +118,10 @@ export class ForgotPasswordComponent {
             this.captchaRequired.set(true);
             this.captchaToken.set(null);
             this.error.set(parseHttpErrorMessage(err, this.#translocoService));
+
             return;
           }
+
           this.error.set(
             parseHttpErrorMessage(
               err,

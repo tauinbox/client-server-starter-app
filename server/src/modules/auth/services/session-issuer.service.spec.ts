@@ -74,6 +74,7 @@ describe('SessionIssuerService', () => {
       }),
       pruneOldestTokens: jest.fn().mockImplementation(() => {
         pruneSawSettledCreate = createRefreshTokenSettled;
+
         return Promise.resolve();
       })
     };

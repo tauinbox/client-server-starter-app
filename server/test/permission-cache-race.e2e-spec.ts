@@ -46,10 +46,13 @@ function holdNextCall<T extends object>(
     .spyOn(target, method as never)
     .mockImplementationOnce((async (...args: unknown[]) => {
       const result = await original.apply(target, args);
+
       onReached();
       await gate;
+
       return result;
     }) as never);
+
   return { reached, release, restore: () => spy.mockRestore() };
 }
 
@@ -99,10 +102,13 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     const permission = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'delete' && p.resource.subject === 'Role'
     );
+
     if (!permission) throw new Error('Permission delete:Role missing');
+
     deleteRole = permission;
 
     const userRepository = dataSource.getRepository(User);
+
     holder = await userRepository.save(
       userRepository.create({
         email,
@@ -122,17 +128,21 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
   afterAll(async () => {
     jest.restoreAllMocks();
+
     if (dataSource) {
       if (roleIds.length > 0) {
         await dataSource.getRepository(Role).delete({ id: In(roleIds) });
       }
+
       if (resourceId) {
         await dataSource.getRepository(Resource).delete({ id: resourceId });
       }
+
       // The customer and its subscription go with the user (CASCADE).
       await dataSource.getRepository(User).delete({ email });
       await dataSource.getRepository(Plan).delete({ key: planKey });
     }
+
     await app?.close();
   });
 
@@ -141,6 +151,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
       { name: `${tag}-${roleIds.length}` },
       { ability: SYSTEM_ABILITY }
     );
+
     roleIds.push(role.id);
     await roleService.setPermissionsForRole(
       role.id,
@@ -150,15 +161,18 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     await roleService.assignRoleToUser(holder.id, role.id, {
       ability: SYSTEM_ABILITY
     });
+
     return role;
   }
 
   it('keeps a revoked permission out of the cache', async () => {
     const role = await grantDeleteRole();
     const users = app.get<Repository<User>>(getRepositoryToken(User));
+
     held = holdNextCall(users, 'findOne');
 
     const reader = permissionService.getPermissionsForUser(holder.id);
+
     await held.reached;
     await roleService.removePermissionFromRole(role.id, deleteRole.id, {
       ability: SYSTEM_ABILITY
@@ -169,6 +183,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     );
 
     const after = await permissionService.getPermissionsForUser(holder.id);
+
     expect(after.map((p) => p.permission)).not.toContain(
       `${deleteRole.resource.name}:delete`
     );
@@ -177,9 +192,11 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
   it('keeps a removed role out of the cache', async () => {
     const role = await grantDeleteRole();
     const users = app.get<Repository<User>>(getRepositoryToken(User));
+
     held = holdNextCall(users, 'findOne');
 
     const reader = permissionService.getRolesForUser(holder.id);
+
     await held.reached;
     await roleService.removeRoleFromUser(holder.id, role.id, {
       ability: SYSTEM_ABILITY
@@ -188,6 +205,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     expect((await reader).map((r) => r.name)).toContain(role.name);
 
     const after = await permissionService.getRolesForUser(holder.id);
+
     expect(after.map((r) => r.name)).not.toContain(role.name);
   });
 
@@ -195,6 +213,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     const actions = await dataSource
       .getRepository(Action)
       .findBy({ name: In(['read', 'delete']) });
+
     expect(actions).toHaveLength(2);
     const resourceRepository = dataSource.getRepository(Resource);
     const resource = await resourceRepository.save(
@@ -207,15 +226,18 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
         allowedActionNames: null
       })
     );
+
     resourceId = resource.id;
     await resourceService.invalidateSubjectMapCache();
 
     const resources = app.get<Repository<Resource>>(
       getRepositoryToken(Resource)
     );
+
     held = holdNextCall(resources, 'find');
 
     const reader = resourceService.getSubjectMaps();
+
     await held.reached;
     await resourceService.update(
       resource.id,
@@ -226,6 +248,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     expect((await reader).grantableActions[tag]).toEqual(['read', 'delete']);
 
     const after = await resourceService.getSubjectMaps();
+
     expect(after.grantableActions[tag]).toEqual(['read']);
   });
 
@@ -278,9 +301,11 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     const subscriptions = app.get<Repository<Subscription>>(
       getRepositoryToken(Subscription)
     );
+
     held = holdNextCall(subscriptions, 'findOne');
 
     const reader = entitlements.capabilitiesFor(holder.id);
+
     await held.reached;
     await subscriptionRepository.update(
       { id: subscription.id },
@@ -291,6 +316,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     expect((await reader).capabilities).toContain(capability);
 
     const after = await entitlements.capabilitiesFor(holder.id);
+
     expect(after.planKey).not.toBe(planKey);
     expect(after.capabilities).not.toContain(capability);
   });

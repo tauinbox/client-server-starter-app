@@ -30,6 +30,7 @@ async function adminToken(): Promise<string> {
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 

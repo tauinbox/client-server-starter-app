@@ -43,6 +43,7 @@ function buildQueryFailedError(): QueryFailedError {
     new Error('duplicate key value violates unique constraint'),
     { code: '23505', detail: `Key (email)=(${ADDRESS}) already exists.` }
   );
+
   return new QueryFailedError(
     'INSERT INTO "users" ("email", "password") VALUES ($1, $2)',
     [ADDRESS, 'hash-SECRET'],
@@ -64,6 +65,7 @@ function buildAxiosError(): AxiosError {
 
 function buildSmtpRejection(): Error {
   const reply = `550 5.1.1 <${ADDRESS}>: Recipient address rejected`;
+
   return Object.assign(
     new Error(`Can't send mail - all recipients were rejected: ${reply}`),
     {
@@ -89,6 +91,7 @@ describe('buildLoggerOptions', () => {
         })
       ]
     }).compile();
+
     moduleRef.useLogger(moduleRef.get(PinoNestLogger));
   });
 
@@ -136,6 +139,7 @@ describe('buildLoggerOptions', () => {
       new Logger('Probe').error('Operation failed', build());
 
       const written = JSON.stringify(lines[0]);
+
       expect(Object.keys(lines[0].err ?? {}).toSorted()).toEqual([
         'code',
         'message',
@@ -160,6 +164,7 @@ describe('buildLoggerOptions', () => {
 
   it('masks an address in a stack string passed by an exception handler', () => {
     const error = buildSmtpRejection();
+
     new Logger('Probe').error('Unhandled', error.stack);
 
     expect(lines[0].err?.['stack']).toContain(`<${MASKED}>`);
@@ -190,6 +195,7 @@ describe('buildLoggerOptions inside a request', () => {
     const lines: LogLine[] = [];
     const middleware = pinoHttp(productionOptions(), collect(lines));
     const req = new IncomingMessage(new Socket());
+
     req.method = 'GET';
     req.url = '/api/v1/auth/google/callback?code=OAUTHCODE&state=OAUTHSTATE';
     req.headers = {
@@ -203,6 +209,7 @@ describe('buildLoggerOptions inside a request', () => {
     req.log.warn('Callback failed');
 
     const written = JSON.stringify(lines[0]);
+
     for (const secret of [
       'ACCESS-SECRET',
       'REFRESH-SECRET',
@@ -211,6 +218,7 @@ describe('buildLoggerOptions inside a request', () => {
     ]) {
       expect(written).not.toContain(secret);
     }
+
     expect(Object.keys(lines[0].req ?? {}).toSorted()).toEqual([
       'headers',
       'id',

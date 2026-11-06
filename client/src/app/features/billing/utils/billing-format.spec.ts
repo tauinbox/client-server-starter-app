@@ -75,11 +75,13 @@ describe('billing-format', () => {
   describe('planPriceFor', () => {
     it('returns the price for the requested provider', () => {
       const plan = makePlan({ paddle: usd, yookassa: rub });
+
       expect(planPriceFor(plan, 'yookassa')?.currency).toBe('RUB');
     });
 
     it('falls back to any available price when the provider is missing', () => {
       const plan = makePlan({ paddle: usd });
+
       expect(planPriceFor(plan, 'yookassa')?.currency).toBe('USD');
     });
 
@@ -108,6 +110,7 @@ describe('billing-format', () => {
       const product = makeProduct({
         paddle: { currency: 'USD', minAmountMinor: 100, maxAmountMinor: 50000 }
       });
+
       expect(productPriceFor(product, 'paddle')?.minAmountMinor).toBe(100);
       expect(productPriceFor(product, 'yookassa')?.currency).toBe('USD');
       expect(productPriceFor(makeProduct({}), 'paddle')).toBeNull();

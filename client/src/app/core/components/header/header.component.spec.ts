@@ -51,6 +51,7 @@ describe('HeaderComponent', () => {
 
   it('should reformat the build date when the active language changes', () => {
     const inEnglish = component['appVersion']();
+
     language.set('ru');
     const inRussian = component['appVersion']();
 

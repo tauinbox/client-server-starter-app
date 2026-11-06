@@ -64,6 +64,7 @@ runWithInfra(
         moduleRef.createNestApplication<NestExpressApplication>(
           HTTP_BODY_APP_OPTIONS
         );
+
       applyBodyParsers(expressApp);
       app = expressApp;
       app.useGlobalPipes(new ApiValidationPipe());
@@ -81,6 +82,7 @@ runWithInfra(
         { email: adminEmail, password, ...names },
         { ability: SYSTEM_ABILITY }
       );
+
       targetId = (
         await usersService.create(
           { email: targetEmail, password, ...names },
@@ -91,6 +93,7 @@ runWithInfra(
       const superRole = await dataSource
         .getRepository(Role)
         .findOneByOrFail({ isSuper: true });
+
       await roleService.assignRoleToUser(admin.id, superRole.id, {
         ability: SYSTEM_ABILITY
       });
@@ -101,6 +104,7 @@ runWithInfra(
         permissions.find(
           (p) => p.resource.subject === subject && p.action.name === 'read'
         )!.id;
+
       firstPermissionId = readOf('Role');
       secondPermissionId = readOf('Permission');
 
@@ -159,6 +163,7 @@ runWithInfra(
         await dataSource.getRepository(Resource).delete({ name: resourceName });
         await app.get(ResourceService).invalidateSubjectMapCache();
       }
+
       await app?.close();
     });
 
@@ -168,6 +173,7 @@ runWithInfra(
 
     function api() {
       const agent = request(http());
+
       return {
         post: (url: string) =>
           agent.post(`/api/v1${url}`).auth(token, { type: 'bearer' }),
@@ -188,6 +194,7 @@ runWithInfra(
           ipAddress: null
         }
       );
+
       return tokens.access_token;
     }
 
@@ -199,6 +206,7 @@ runWithInfra(
       const rows = await dataSource
         .getRepository(RolePermission)
         .findBy({ roleId });
+
       return rows.map((row) => row.permissionId).toSorted();
     }
 
@@ -207,6 +215,7 @@ runWithInfra(
         'SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2',
         [userId, roleId]
       );
+
       return rows.length > 0;
     }
 
@@ -224,6 +233,7 @@ runWithInfra(
 
     it('create answers 500 and stores no role', async () => {
       const name = `${prefix}-created`;
+
       await api().post('/roles').send({ name }).expect(500);
 
       expect(await dataSource.getRepository(Role).countBy({ name })).toBe(0);
@@ -319,6 +329,7 @@ runWithInfra(
       const name = `${prefix}-working`;
       const created = await api().post('/roles').send({ name }).expect(201);
       const { id } = created.body as { id: string };
+
       await api()
         .patch(`/roles/${id}`)
         .send({ description: 'working' })

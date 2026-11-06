@@ -79,6 +79,7 @@ describe('HealthController', () => {
       const [[checks]] = healthServiceMock.check.mock.calls as [
         [(() => unknown)[]]
       ];
+
       expect(checks).toHaveLength(1);
     });
 
@@ -91,6 +92,7 @@ describe('HealthController', () => {
       const [[checks]] = healthServiceMock.check.mock.calls as [
         [(() => unknown)[]]
       ];
+
       expect(checks).toHaveLength(2);
     });
 
@@ -103,6 +105,7 @@ describe('HealthController', () => {
       const [[checks]] = healthServiceMock.check.mock.calls as [
         [(() => unknown)[]]
       ];
+
       expect(checks).toHaveLength(1);
     });
 
@@ -116,6 +119,7 @@ describe('HealthController', () => {
       const [[checks]] = healthServiceMock.check.mock.calls as [
         [(() => unknown)[]]
       ];
+
       expect(checks).toHaveLength(2);
     });
 
@@ -128,6 +132,7 @@ describe('HealthController', () => {
       const [[checks]] = healthServiceMock.check.mock.calls as [
         [(() => unknown)[]]
       ];
+
       expect(checks).toHaveLength(2);
     });
 
@@ -140,6 +145,7 @@ describe('HealthController', () => {
       const [[checks]] = healthServiceMock.check.mock.calls as [
         [(() => unknown)[]]
       ];
+
       expect(checks).toHaveLength(3);
     });
   });

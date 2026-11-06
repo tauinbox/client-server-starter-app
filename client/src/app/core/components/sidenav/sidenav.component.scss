@@ -56,7 +56,11 @@ $indicator-radius: func.rem(28); // full pill
 
   &:hover {
     color: var(--mat-sys-on-surface);
-    background-color: color-mix(in srgb, var(--mat-sys-on-surface) 8%, transparent);
+    background-color: color-mix(
+      in srgb,
+      var(--mat-sys-on-surface) 8%,
+      transparent
+    );
   }
 
   // M3 active indicator: filled secondary container with on-secondary-container text
@@ -102,7 +106,10 @@ $indicator-radius: func.rem(28); // full pill
   overflow: hidden; // for matRipple
   color: var(--mat-sidenav-container-text-color, var(--mat-sys-on-surface));
   cursor: pointer;
-  background-color: var(--mat-sidenav-container-background-color, var(--mat-sys-surface-container));
+  background-color: var(
+    --mat-sidenav-container-background-color,
+    var(--mat-sys-surface-container)
+  );
   border: func.rem(1) solid var(--mat-sys-outline-variant);
   border-radius: 50%;
   transition: left vars.$transition-medium ease;

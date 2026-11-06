@@ -85,6 +85,7 @@ export const configValidationSchema = Joi.object({
     )
     .default((parent: Record<string, unknown>) => {
       const refreshWindowMs = Number(parent['JWT_REFRESH_EXPIRATION']) * 1000;
+
       return Number.isFinite(refreshWindowMs)
         ? Math.max(DEFAULT_SESSION_ABSOLUTE_MAX_MS, refreshWindowMs)
         : DEFAULT_SESSION_ABSOLUTE_MAX_MS;

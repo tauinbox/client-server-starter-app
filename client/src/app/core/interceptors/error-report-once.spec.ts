@@ -83,6 +83,7 @@ describe('errorInterceptor with the real NotifyService', () => {
         notify.error(err as HttpErrorResponse, CALLER_KEY);
       }
     })();
+
     refuse();
     await call;
     await nextMacrotask();

@@ -40,6 +40,7 @@ describe('WebhookReconciliationService', () => {
     const ingestion: Pick<WebhookIngestionService, 'processEvent'> = {
       processEvent
     };
+
     service = new WebhookReconciliationService(
       repo as Repository<WebhookEvent>,
       ingestion as WebhookIngestionService
@@ -48,9 +49,11 @@ describe('WebhookReconciliationService', () => {
 
   it('queries only `received` rows older than the stuck threshold', async () => {
     let where: { status: string; receivedAt: FindOperator<Date> } | undefined;
+
     find.mockImplementation(
       (opts: { where: { status: string; receivedAt: FindOperator<Date> } }) => {
         where = opts.where;
+
         return Promise.resolve([]);
       }
     );
@@ -69,6 +72,7 @@ describe('WebhookReconciliationService', () => {
   it('replays each stuck row from its persisted event', async () => {
     const a = row({ id: 'wh-a', providerEventId: 'evt_a' });
     const b = row({ id: 'wh-b', providerEventId: 'evt_b' });
+
     find.mockResolvedValue([a, b]);
 
     await service.sweep();
@@ -121,14 +125,17 @@ describe('WebhookReconciliationService', () => {
   it('quarantines a delivery on its Nth failure and alerts exactly once', async () => {
     const warn = jest.spyOn(service['logger'], 'warn').mockImplementation();
     const error = jest.spyOn(service['logger'], 'error').mockImplementation();
+
     processEvent.mockRejectedValue(new Error('poison'));
 
     // A stateful row whose attempts persist across ticks; once it flips to
     // `dead_letter` the sweep query (status `received`) no longer returns it.
     const persisted = row({ attempts: 0 });
+
     update.mockImplementation(
       (_criteria: unknown, patch: Partial<WebhookEvent>) => {
         Object.assign(persisted, patch);
+
         return Promise.resolve({ affected: 1 });
       }
     );
@@ -151,6 +158,7 @@ describe('WebhookReconciliationService', () => {
     const quarantineWarns = warn.mock.calls.filter((c) =>
       String(c[0]).includes('dead_letter')
     );
+
     expect(quarantineWarns).toHaveLength(1);
     expect(error).toHaveBeenCalledTimes(WEBHOOK_MAX_REPLAY_ATTEMPTS - 1);
   });

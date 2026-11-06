@@ -14,9 +14,11 @@ function runFileFilter(
     error: null,
     accepted: false
   };
+
   filter({} as Request, file as Express.Multer.File, (error, accepted) => {
     result = { error, accepted: Boolean(accepted) };
   });
+
   return result;
 }
 
@@ -30,6 +32,7 @@ describe('createDiskStorageOptions fileFilter', () => {
       originalname: 'photo.jpg',
       mimetype: 'image/jpeg'
     });
+
     expect(error).toBeNull();
     expect(accepted).toBe(true);
   });
@@ -39,6 +42,7 @@ describe('createDiskStorageOptions fileFilter', () => {
       originalname: 'evil.exe',
       mimetype: 'application/octet-stream'
     });
+
     expect(error).toBeInstanceOf(BadRequestException);
     expect(accepted).toBe(false);
   });
@@ -49,6 +53,7 @@ describe('createDiskStorageOptions fileFilter', () => {
       originalname: 'evil.jpg',
       mimetype: 'application/x-msdownload'
     });
+
     expect(error).toBeInstanceOf(BadRequestException);
     expect((error as BadRequestException).message).toContain('MIME');
     expect(accepted).toBe(false);

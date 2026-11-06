@@ -20,6 +20,7 @@ export function versionEtag(version: number): string {
 function skip(pattern: RegExp, text: string, index: number): number {
   pattern.lastIndex = index;
   pattern.exec(text);
+
   return pattern.lastIndex;
 }
 
@@ -31,27 +32,37 @@ export function parseIfMatch(
   header: string | undefined
 ): IfMatchCondition | 'missing' | 'invalid' {
   if (header === undefined || header.trim() === '') return 'missing';
+
   if (header.trim() === '*') return { any: true };
 
   const versions: number[] = [];
   let tags = 0;
   let index = skip(SEPARATORS, header, 0);
+
   while (index < header.length) {
     ENTITY_TAG.lastIndex = index;
     const tag = ENTITY_TAG.exec(header);
+
     if (!tag) return 'invalid';
+
     tags += 1;
     const [, weak, opaque] = tag;
+
     if (!weak && VERSION_PATTERN.test(opaque)) {
       const version = Number(opaque);
+
       if (version <= MAX_VERSION) versions.push(version);
     }
 
     index = skip(OWS, header, ENTITY_TAG.lastIndex);
+
     if (index < header.length && header[index] !== ',') return 'invalid';
+
     index = skip(SEPARATORS, header, index);
   }
+
   if (tags === 0) return 'invalid';
+
   return { any: false, versions };
 }
 

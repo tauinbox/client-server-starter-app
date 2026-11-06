@@ -46,6 +46,7 @@ runWithInfra('Common password check without the range lookup (e2e)', () => {
     } else {
       process.env['PWNED_PASSWORDS_RANGE_URL'] = previousRangeUrl;
     }
+
     await dataSource
       ?.getRepository(User)
       .delete({ email: In([commonEmail, cleanEmail]) });

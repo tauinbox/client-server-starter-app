@@ -27,6 +27,7 @@ describe('UserService', () => {
     service.update('user-1', { name: 'Ann' }).subscribe();
 
     const req = httpMock.expectOne(`${USERS_API_V1}/user-1`);
+
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ name: 'Ann' });
     expect(
@@ -41,6 +42,7 @@ describe('UserService', () => {
     service.getById('user-1').subscribe();
 
     const req = httpMock.expectOne(`${USERS_API_V1}/user-1`);
+
     expect(
       req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
     ).toBe(true);
@@ -51,6 +53,7 @@ describe('UserService', () => {
     service.getPermissions('user-1').subscribe();
 
     const req = httpMock.expectOne(`${USERS_API_V1}/user-1/permissions`);
+
     expect(
       req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
     ).toBe(true);
@@ -61,6 +64,7 @@ describe('UserService', () => {
     service.getListRow('user-1').subscribe();
 
     const req = httpMock.expectOne(`${USERS_API_V1}/user-1`);
+
     expect(req.request.method).toBe('GET');
     expect(
       req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)

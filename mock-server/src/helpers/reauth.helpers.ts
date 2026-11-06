@@ -38,7 +38,9 @@ export function readFailures(
 ): { count: number; remainingMs: number } {
   const open = windows.get(userId);
   const now = Date.now();
+
   if (!open || open.expiresAt <= now) return { count: 0, remainingMs: 0 };
+
   return { count: open.count, remainingMs: open.expiresAt - now };
 }
 
@@ -54,8 +56,10 @@ export function recordFailure(
     open && open.expiresAt > now
       ? open
       : { count: 0, expiresAt: now + LOCKOUT_DURATION_MS };
+
   entry.count += 1;
   windows.set(userId, entry);
+
   return { count: entry.count, remainingMs: entry.expiresAt - now };
 }
 
@@ -77,6 +81,7 @@ export function sendWithRetryAfter(
   if (body.retryAfter !== undefined) {
     res.setHeader('Retry-After', String(Math.max(0, body.retryAfter)));
   }
+
   res.status(ERROR_STATUS[body.errorKey]).json(body);
 }
 
@@ -101,6 +106,7 @@ export function isValidReauthProof(
   }
 
   const record = getState().reauthProofs.get(proof);
+
   if (!record || record.userId !== user.id || record.expiresAt < Date.now()) {
     return false;
   }
@@ -114,6 +120,7 @@ export function isValidReauthProof(
   }
 
   getState().reauthProofs.delete(proof);
+
   return true;
 }
 
@@ -192,6 +199,7 @@ export function stepUpFactorsBodyErrors(
   fieldErrors: readonly string[] = []
 ): string[] {
   const { currentPassword, code } = (body ?? {}) as Record<string, unknown>;
+
   return [
     ...unknownPropertyErrors(body, [...fields, 'currentPassword', 'code']),
     ...fieldErrors,
@@ -215,11 +223,13 @@ export function consumeTotpCode(user: MockUser, code: unknown): boolean {
   }
 
   const step = Math.floor(Date.now() / 1000 / TOTP_PERIOD_SECONDS);
+
   if (user.totpLastUsedStep !== null && step <= user.totpLastUsedStep) {
     return false;
   }
 
   user.totpLastUsedStep = step;
+
   return true;
 }
 
@@ -257,6 +267,7 @@ function stepUpCodeError(
 
   if (barred || !consumeTotpCode(user, code)) {
     const { count, remainingMs } = recordFailure(windows, user.id);
+
     logAudit('MFA_CHALLENGE_FAILURE', {
       actorId: user.id,
       actorEmail: user.email,
@@ -265,18 +276,22 @@ function stepUpCodeError(
       details: { stage: 'step_up', attempt: count },
       ip: req.ip
     });
+
     if (count >= MAX_FAILED_ATTEMPTS) {
       logStepUpFailure(req, user, {
         operation,
         factor: 'code',
         codeOffered: true
       });
+
       return stepUpLockedEnvelope(remainingMs);
     }
+
     return 'refused';
   }
 
   clearFailures(windows, user.id);
+
   return null;
 }
 
@@ -370,9 +385,11 @@ export function stepUpError(
         : code,
     operation
   });
+
   if (codeVerdict !== undefined && codeVerdict !== 'refused') {
     return codeVerdict;
   }
+
   const codeRefused = codeVerdict === 'refused';
 
   if (user.password === null) {
@@ -381,6 +398,7 @@ export function stepUpError(
           REAUTH_PROOF_COOKIE
         ]
       : undefined;
+
     if (isValidReauthProof(proof, user, operation)) {
       return null;
     }
@@ -391,13 +409,16 @@ export function stepUpError(
         factor: 'code',
         codeOffered: true
       });
+
       return invalidStepUpCodeEnvelope();
     }
+
     logStepUpFailure(req, user, {
       operation,
       factor: 'reauth_proof',
       codeOffered: code !== undefined
     });
+
     return {
       message: 'Confirm it is you with your sign-in provider, then try again',
       errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED
@@ -437,9 +458,12 @@ function stepUpPasswordError(
   if (!currentPassword) {
     if (codeRefused) {
       logStepUpFailure(req, user, { operation, factor: 'code', codeOffered });
+
       return invalidStepUpCodeEnvelope();
     }
+
     logStepUpFailure(req, user, { operation, factor: 'password', codeOffered });
+
     return invalidCurrentPasswordEnvelope();
   }
 
@@ -449,11 +473,14 @@ function stepUpPasswordError(
   // Plaintext comparison - mock only. Real server uses bcrypt.compare().
   if (!barred && user.password === currentPassword) {
     clearFailures(windows, user.id);
+
     return null;
   }
 
   const { count, remainingMs } = recordFailure(windows, user.id);
+
   logStepUpFailure(req, user, { operation, factor: 'password', codeOffered });
+
   return count >= MAX_FAILED_ATTEMPTS
     ? stepUpPasswordLockedEnvelope(remainingMs)
     : invalidCurrentPasswordEnvelope();

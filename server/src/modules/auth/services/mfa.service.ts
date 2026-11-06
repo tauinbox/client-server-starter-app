@@ -145,6 +145,7 @@ export class MfaService {
         totpLastUsedStep: null
       }
     );
+
     if (!affected) {
       throw this.alreadyEnabledException();
     }
@@ -195,11 +196,13 @@ export class MfaService {
             )
           }
         );
+
         if (!affected) {
           throw this.invalidEnrolmentCodeException();
         }
       }
     );
+
     if (!accepted) {
       this.recordChallengeFailure(user, 'enrolment', { context });
       throw this.invalidEnrolmentCodeException();
@@ -247,6 +250,7 @@ export class MfaService {
         )
       }
     );
+
     if (!affected) {
       throw this.notEnabledException();
     }
@@ -297,6 +301,7 @@ export class MfaService {
         totpLastUsedStep: null
       }
     );
+
     if (!affected) {
       throw this.notEnabledException();
     }
@@ -344,12 +349,14 @@ export class MfaService {
     // The row shares the transaction: a reset never commits without it.
     await withTransaction(this.dataSource, async (manager) => {
       const locked = await lockUserWithRoles(manager, { id: target.id });
+
       if (!locked) {
         throw new ApiError(
           ErrorKeys.USERS.NOT_FOUND,
           `User with ID ${target.id} not found`
         );
       }
+
       check(locked);
       const { affected } = await manager.update(
         User,
@@ -361,6 +368,7 @@ export class MfaService {
           totpLastUsedStep: null
         }
       );
+
       if (!affected) {
         throw this.notEnabledException();
       }
@@ -416,6 +424,7 @@ export class MfaService {
       user.id,
       LOCKOUT_DURATION_MS
     );
+
     if (count > MAX_FAILED_ATTEMPTS) {
       // The code is not checked, but the attempt is still a refused one.
       this.recordChallengeFailure(user, 'challenge', {
@@ -434,10 +443,12 @@ export class MfaService {
       if (count >= MAX_FAILED_ATTEMPTS) {
         throw this.challengeLockedException(remainingMs);
       }
+
       throw this.invalidCodeException();
     }
 
     await this.#challengeFailures.clear(user.id);
+
     return user;
   }
 
@@ -469,6 +480,7 @@ export class MfaService {
         if (left.length === stored.length) return null;
 
         await manager.update(User, user.id, { totpRecoveryCodes: left });
+
         return left;
       }
     );
@@ -520,10 +532,12 @@ export class MfaService {
       user.id,
       LOCKOUT_DURATION_MS
     );
+
     // A refusal is returned, not thrown, so the caller writes the step-up row
     // for an attempt on a barred account too.
     if (count > MAX_FAILED_ATTEMPTS) {
       this.recordChallengeFailure(user, 'step_up', { context, attempt: count });
+
       return { kind: 'refused', lockedMs: remainingMs };
     }
 
@@ -533,12 +547,14 @@ export class MfaService {
       if (count >= MAX_FAILED_ATTEMPTS) {
         return { kind: 'refused', lockedMs: remainingMs };
       }
+
       // The caller may still hold a password, so a wrong code is a refusal of
       // this factor rather than of the whole step-up.
       return { kind: 'refused' };
     }
 
     await this.#stepUpFailures.clear(user.id);
+
     return { kind: 'accepted' };
   }
 
@@ -622,12 +638,14 @@ export class MfaService {
       }
 
       let secret: string;
+
       try {
         secret = this.encryption.decrypt(locked.totpSecret);
       } catch (err) {
         // A secret that will not decrypt is a key problem, not a wrong code.
         // It must be loud in the log and must still refuse the sign-in.
         this.logger.error('Failed to decrypt a stored TOTP secret', err);
+
         return false;
       }
 
@@ -654,6 +672,7 @@ export class MfaService {
         totpLastUsedStep: result.timeStep
       });
       await onAccepted?.(manager, locked.totpSecret);
+
       return true;
     });
   }
@@ -666,9 +685,11 @@ export class MfaService {
         })
         .toUpperCase();
       const groups: string[] = [];
+
       for (let i = 0; i < encoded.length; i += RECOVERY_CODE_GROUP) {
         groups.push(encoded.slice(i, i + RECOVERY_CODE_GROUP));
       }
+
       return groups.join('-');
     });
   }

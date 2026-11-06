@@ -38,11 +38,13 @@ function createJwt(payload: Record<string, unknown>): string {
       .replaceAll('+', '-')
       .replaceAll('/', '_')
       .replace(/=+$/, '');
+
   return `${encode(header)}.${encode(payload)}.fake-signature`;
 }
 
 function createMockAuthResponse(): AuthResponse {
   const exp = Math.floor(Date.now() / 1000) + 3600;
+
   return {
     tokens: {
       access_token: createJwt({ sub: '1', email: 'test@example.com', exp }),
@@ -214,6 +216,7 @@ describe('AuthService', () => {
       );
 
       const req = httpMock.expectOne(AuthApiEnum.MfaVerify);
+
       expect(req.request.body).toEqual({
         mfaToken: 'pending-token',
         code: '123456'
@@ -232,6 +235,7 @@ describe('AuthService', () => {
       );
 
       const req = httpMock.expectOne(AuthApiEnum.MfaRecovery);
+
       expect(req.request.body).toEqual({
         mfaToken: 'pending-token',
         recoveryCode: 'AAAAAAAA-AAAAAAAA'
@@ -249,6 +253,7 @@ describe('AuthService', () => {
       const setupPromise = firstValueFrom(service.startMfaSetup('Password1'));
 
       const req = httpMock.expectOne(AuthApiEnum.MfaSetup);
+
       expect(req.request.body).toEqual({ currentPassword: 'Password1' });
       req.flush({ secret: 'S', otpauthUri: 'otpauth://', qrDataUrl: 'data:' });
 
@@ -263,6 +268,7 @@ describe('AuthService', () => {
       const enablePromise = firstValueFrom(service.enableMfa('123456'));
 
       const req = httpMock.expectOne(AuthApiEnum.MfaEnable);
+
       expect(req.request.body).toEqual({ code: '123456' });
       req.flush({ recoveryCodes: ['AAAAAAAA-AAAAAAAA'] });
 
@@ -277,6 +283,7 @@ describe('AuthService', () => {
       );
 
       const req = httpMock.expectOne(AuthApiEnum.MfaDisable);
+
       expect(req.request.body).toEqual({ currentPassword: 'Password1' });
       req.flush({ message: 'off' });
 
@@ -289,6 +296,7 @@ describe('AuthService', () => {
       );
 
       const req = httpMock.expectOne(AuthApiEnum.MfaRecoveryCodes);
+
       expect(req.request.body).toEqual({ code: '123456' });
       req.flush({ recoveryCodes: ['KKKKKKKK-KKKKKKKK'] });
 
@@ -306,6 +314,7 @@ describe('AuthService', () => {
       const loginPromise = firstValueFrom(service.login(credentials));
 
       const req = httpMock.expectOne(AuthApiEnum.Login);
+
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual(credentials);
       req.flush(mockAuth);
@@ -371,12 +380,14 @@ describe('AuthService', () => {
       const registerPromise = firstValueFrom(service.register(registerData));
 
       const req = httpMock.expectOne(AuthApiEnum.Register);
+
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual(registerData);
       expect(req.request.body.captchaToken).toBeUndefined();
       req.flush(mockUser);
 
       const result = await registerPromise;
+
       expect(result).toEqual(mockUser);
     });
 
@@ -393,6 +404,7 @@ describe('AuthService', () => {
       );
 
       const req = httpMock.expectOne(AuthApiEnum.Register);
+
       expect(req.request.body).toEqual({
         ...registerData,
         captchaToken: 'turnstile-xyz'
@@ -407,6 +419,7 @@ describe('AuthService', () => {
     it('POSTs without captchaToken when null', async () => {
       const promise = firstValueFrom(service.forgotPassword('a@b.com'));
       const req = httpMock.expectOne(AuthApiEnum.ForgotPassword);
+
       expect(req.request.body).toEqual({ email: 'a@b.com' });
       req.flush({ message: 'OK' });
       await promise;
@@ -417,6 +430,7 @@ describe('AuthService', () => {
         service.forgotPassword('a@b.com', 'tok-1')
       );
       const req = httpMock.expectOne(AuthApiEnum.ForgotPassword);
+
       expect(req.request.body).toEqual({
         email: 'a@b.com',
         captchaToken: 'tok-1'
@@ -432,6 +446,7 @@ describe('AuthService', () => {
         service.resendVerificationEmail('a@b.com')
       );
       const req = httpMock.expectOne(AuthApiEnum.ResendVerification);
+
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({ email: 'a@b.com' });
       req.flush({ message: 'OK' });
@@ -443,6 +458,7 @@ describe('AuthService', () => {
         service.resendVerificationEmail('a@b.com', 'tok-1')
       );
       const req = httpMock.expectOne(AuthApiEnum.ResendVerification);
+
       expect(req.request.body).toEqual({
         email: 'a@b.com',
         captchaToken: 'tok-1'
@@ -459,10 +475,12 @@ describe('AuthService', () => {
       const profilePromise = firstValueFrom(service.getProfile());
 
       const req = httpMock.expectOne(AuthApiEnum.Profile);
+
       expect(req.request.method).toBe('GET');
       req.flush(mockUser);
 
       const result = await profilePromise;
+
       expect(result).toEqual(mockUser);
       expect(authStoreMock.updateCurrentUser).toHaveBeenCalledWith(mockUser);
     });
@@ -471,6 +489,7 @@ describe('AuthService', () => {
   describe('refreshTokens', () => {
     it('should delegate to TokenService.refreshTokens', () => {
       const mockTokens = createMockAuthResponse().tokens;
+
       tokenServiceMock.refreshTokens.mockReturnValue(of(mockTokens));
 
       service.refreshTokens().subscribe((tokens) => {
@@ -488,6 +507,7 @@ describe('AuthService', () => {
       service.logout();
 
       const req = httpMock.expectOne(AuthApiEnum.Logout);
+
       expect(req.request.method).toBe('POST');
       req.flush({});
 
@@ -541,6 +561,7 @@ describe('AuthService', () => {
   describe('session_invalidated push', () => {
     it('signs out and keeps the current URL as the return URL', () => {
       const router = TestBed.inject(Router);
+
       router.navigated = true;
       vi.spyOn(router, 'url', 'get').mockReturnValue('/admin/users?q=x');
 
@@ -753,6 +774,7 @@ describe('AuthService', () => {
       );
 
       const req = httpMock.expectOne(`${AuthApiEnum.OAuthAccounts}/goo%2Fgle`);
+
       expect(req.request.method).toBe('DELETE');
       req.flush({ message: 'Unlinked' });
 
@@ -784,6 +806,7 @@ describe('AuthService', () => {
       call().subscribe({ error: () => undefined });
 
       const req = httpMock.expectOne(url);
+
       expect(
         req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
       ).toBe(true);
@@ -795,6 +818,7 @@ describe('AuthService', () => {
       service.exchangeOAuthData().subscribe({ error: () => undefined });
 
       const req = httpMock.expectOne(AuthApiEnum.OAuthExchange);
+
       expect(req.request.withCredentials).toBe(false);
       req.flush(null, { status: 400, statusText: 'Bad Request' });
     });
@@ -805,6 +829,7 @@ describe('AuthService', () => {
       service.getOAuthAccounts().subscribe({ error: () => undefined });
 
       const req = httpMock.expectOne(AuthApiEnum.OAuthAccounts);
+
       expect(
         req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
       ).toBe(false);

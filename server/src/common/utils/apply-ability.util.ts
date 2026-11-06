@@ -20,6 +20,7 @@ function columnResolver(
   alias: string
 ): ColumnResolver {
   const fields: readonly string[] = ABILITY_FILTER_FIELDS[subject];
+
   return (field) => (fields.includes(field) ? `${alias}.${field}` : undefined);
 }
 
@@ -76,17 +77,20 @@ export function applyAbilityToQuery<T extends ObjectLiteral>(
 
   if (allowRules.length === 0) {
     qb.andWhere('1 = 0');
+
     return qb;
   }
 
   const columnFor = columnResolver(subject, alias);
   const paramIdx = { value: 0 };
   const allow = translateRuleSet(allowRules, paramIdx, columnFor);
+
   logSkipped(allow);
   const deny =
     denyRules.length > 0
       ? translateRuleSet(denyRules, paramIdx, columnFor)
       : null;
+
   if (deny) logSkipped(deny);
 
   if (deny && (deny.kind === 'always' || deny.skipped.length > 0)) {
@@ -96,6 +100,7 @@ export function applyAbilityToQuery<T extends ObjectLiteral>(
         : 'Untranslatable deny rule cannot be enforced in SQL — restricting query to no rows'
     );
     qb.andWhere('1 = 0');
+
     return qb;
   }
 
@@ -107,13 +112,17 @@ export function applyAbilityToQuery<T extends ObjectLiteral>(
     new Brackets((bqb) => {
       if (allow.kind === 'never') {
         bqb.where('1 = 0');
+
         return;
       }
+
       if (allow.kind === 'conditional') {
         bqb.where(allow.sql, allow.params);
       }
+
       if (deny?.kind === 'conditional') {
         const negated = `NOT (${deny.sql})`;
+
         if (allow.kind === 'always') {
           bqb.where(negated, deny.params);
         } else {

@@ -28,17 +28,20 @@ runWithInfra('Lockout recovery (e2e)', () => {
   const statusOf = async (run: Promise<unknown>): Promise<number> => {
     try {
       await run;
+
       return HttpStatus.OK;
     } catch (error) {
       if (error instanceof HttpException) {
         return error.getStatus();
       }
+
       throw error;
     }
   };
 
   const createLockedUser = async (label: string): Promise<User> => {
     const email = `lockout-recovery-${label}-${Date.now()}@example.com`;
+
     emails.push(email);
 
     const repository = dataSource.getRepository(User);
@@ -56,6 +59,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     }
 
     const locked = await repository.findOneByOrFail({ id: user.id });
+
     expect(locked.failedLoginAttempts).toBe(MAX_FAILED_ATTEMPTS);
     expect(locked.lockedUntil).toBeInstanceOf(Date);
 
@@ -81,6 +85,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((e) => ({ email: e })));
     }
+
     await app?.close();
   });
 
@@ -88,6 +93,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     const user = await createLockedUser('reset');
 
     const rawToken = crypto.randomBytes(32).toString('hex');
+
     await usersService.setPasswordResetToken(user.id, {
       email: user.email,
       hashedToken: hashToken(rawToken),
@@ -99,6 +105,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     const afterReset = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(afterReset.failedLoginAttempts).toBe(0);
     expect(afterReset.lockedUntil).toBeNull();
 
@@ -111,6 +118,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     const user = await createLockedUser('expiry');
 
     const repository = dataSource.getRepository(User);
+
     await repository.update(user.id, {
       lockedUntil: new Date(Date.now() - 1000)
     });
@@ -121,6 +129,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     ).toBe(HttpStatus.UNAUTHORIZED);
 
     const afterExpiry = await repository.findOneByOrFail({ id: user.id });
+
     expect(afterExpiry.failedLoginAttempts).toBe(1);
     expect(afterExpiry.lockedUntil).toBeNull();
   }, 60000);
@@ -135,6 +144,7 @@ runWithInfra('Lockout recovery (e2e)', () => {
     const stillLocked = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(stillLocked.failedLoginAttempts).toBe(MAX_FAILED_ATTEMPTS);
     expect(stillLocked.lockedUntil).toBeInstanceOf(Date);
   }, 60000);

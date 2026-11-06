@@ -33,9 +33,11 @@ const CASL_RESERVED_ACTIONS = ['manage'];
 
 function decoratorName(d: ts.Decorator): string | undefined {
   const expr = d.expression;
+
   if (ts.isCallExpression(expr) && ts.isIdentifier(expr.expression)) {
     return expr.expression.text;
   }
+
   return ts.isIdentifier(expr) ? expr.text : undefined;
 }
 
@@ -51,13 +53,16 @@ function stringLiteral(node: ts.Expression): string | undefined {
 
 function parseRegisterResource(d: ts.Decorator): string | undefined {
   const args = decoratorArgs(d);
+
   if (!args?.length) return undefined;
 
   const [arg] = args;
+
   if (!ts.isObjectLiteralExpression(arg)) return undefined;
 
   for (const prop of arg.properties) {
     if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) continue;
+
     if (prop.name.text === 'subject') return stringLiteral(prop.initializer);
   }
 
@@ -69,15 +74,21 @@ function parseRegisterResource(d: ts.Decorator): string | undefined {
  */
 function parseAuthorizeActions(d: ts.Decorator): string[] {
   const args = decoratorArgs(d);
+
   if (!args?.length) return [];
 
   const actions: string[] = [];
+
   for (const arg of args) {
     if (!ts.isArrayLiteralExpression(arg)) continue;
+
     if (arg.elements.length < 2) continue;
+
     const action = stringLiteral(arg.elements[0]);
+
     if (action) actions.push(action);
   }
+
   return actions;
 }
 
@@ -85,6 +96,7 @@ function parseAuthorizeActions(d: ts.Decorator): string[] {
 
 function findControllers(dir: string): string[] {
   const results: string[] = [];
+
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (!EXCLUDE_DIRS.has(entry.name)) {
@@ -94,6 +106,7 @@ function findControllers(dir: string): string[] {
       results.push(path.join(dir, entry.name));
     }
   }
+
   return results;
 }
 
@@ -117,10 +130,12 @@ function extractFromFile(filePath: string): {
 
     // Class-level: @RegisterResource
     const classDecorators = ts.getDecorators(node);
+
     if (classDecorators) {
       for (const d of classDecorators) {
         if (decoratorName(d) === 'RegisterResource') {
           const subject = parseRegisterResource(d);
+
           if (subject) subjects.push(subject);
         }
       }
@@ -129,7 +144,9 @@ function extractFromFile(filePath: string): {
     // Method-level: @Authorize
     for (const member of node.members) {
       if (!ts.isMethodDeclaration(member)) continue;
+
       const methodDecorators = ts.getDecorators(member);
+
       if (!methodDecorators) continue;
 
       for (const d of methodDecorators) {
@@ -175,6 +192,7 @@ function main(): void {
 
   for (const file of controllerFiles) {
     const { subjects, actions } = extractFromFile(file);
+
     allSubjects.push(...subjects);
     allActions.push(...actions);
   }
@@ -187,6 +205,7 @@ function main(): void {
   const content = buildFileContent(allSubjects, allActions);
 
   const outDir = path.dirname(OUTPUT_FILE);
+
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }
@@ -195,6 +214,7 @@ function main(): void {
 
   const sortedSubjects = [...new Set(allSubjects)].toSorted();
   const sortedActions = [...new Set(allActions)].toSorted();
+
   console.log(
     `✓ generate:subjects: wrote ${sortedSubjects.length} subjects + ${sortedActions.length} actions to ${path.relative(process.cwd(), OUTPUT_FILE)}`
   );

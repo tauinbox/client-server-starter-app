@@ -59,6 +59,7 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
         password: null
       })
     );
+
     userId = user.id;
   }, 60000);
 
@@ -85,12 +86,14 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
       dataSource.createQueryRunner(),
       dataSource.createQueryRunner()
     ];
+
     await Promise.all(runners.map((r) => r.connect()));
     await Promise.all(runners.map((r) => r.release()));
   }
 
   async function seedSession(): Promise<string> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
     await refreshTokenService.createRefreshToken(userId, {
       token: raw,
       sessionId: randomUUID(),
@@ -99,11 +102,13 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
         ipAddress: null
       }
     });
+
     return raw;
   }
 
   it('gives one presented token exactly one live successor when rotated twice at once', async () => {
     const raw = await seedSession();
+
     await warmPool();
 
     const outcomes = await Promise.allSettled([
@@ -114,14 +119,17 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
     expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
 
     const rejected = outcomes.filter((o) => o.status === 'rejected');
+
     expect(rejected).toHaveLength(1);
     const reason = rejected[0].reason as HttpException;
+
     expect(reason.getStatus()).toBe(401);
     expect(reason.getResponse()).toMatchObject({
       errorKey: 'errors.auth.invalidRefreshToken'
     });
 
     const repository = dataSource.getRepository(RefreshToken);
+
     // Two rows total means the loser's INSERT rolled back with its throw.
     expect(await repository.count({ where: { userId, revoked: false } })).toBe(
       1
@@ -131,11 +139,13 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
     // Neither racer presented an already-revoked token, so the full reuse
     // detector must stay silent.
     const auditActions = auditSpy.mock.calls.map((call) => call[0].action);
+
     expect(auditActions).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
 
     const successes = metricsSpy.mock.calls.filter(
       (call) => call[0] === 'token_refresh_success'
     );
+
     expect(successes).toHaveLength(1);
   }, 30000);
 
@@ -143,9 +153,11 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
     const raw = await seedSession();
 
     const { tokens } = await authService.refreshTokens(raw, null);
+
     expect(tokens.refresh_token).toBeTruthy();
 
     const repository = dataSource.getRepository(RefreshToken);
+
     expect(await repository.count({ where: { userId, revoked: false } })).toBe(
       1
     );

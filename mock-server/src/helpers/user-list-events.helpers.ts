@@ -11,6 +11,7 @@ type UserCrudAction = 'created' | 'updated' | 'deleted' | 'restored';
 
 function abilityOfConnected(connectedUserId: string) {
   const viewer = findUserById(connectedUserId);
+
   return viewer === undefined ? undefined : buildAbilityForUser(viewer);
 }
 
@@ -22,13 +23,17 @@ export function pushUserCrudEvent(
   previous?: MockUser
 ): void {
   const user = findUserByIdWithDeleted(userId);
+
   if (!user) return;
+
   const records = [user, ...(previous ? [previous] : [])].map((row) =>
     caslSubject('User', row)
   );
+
   pushToUsersMatching(
     (connectedUserId) => {
       const ability = abilityOfConnected(connectedUserId);
+
       return records.some((record) => ability?.can('search', record) ?? false);
     },
     { type: 'user_crud_events', action, userId }

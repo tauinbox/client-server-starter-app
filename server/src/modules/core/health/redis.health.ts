@@ -30,11 +30,14 @@ export class RedisHealthIndicator implements OnModuleDestroy {
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key);
     const redisUrl = this.config.get<string>('REDIS_URL');
+
     if (!redisUrl) {
       // Unconfigured Redis in production is a silent degradation, not an
       // outage, so it stays out of readiness and is only visible on the gauge.
       const degraded = this.config.get('ENVIRONMENT') === 'production';
+
       this.dependencyHealth.statuses.set(key, !degraded);
+
       return degraded
         ? indicator.up({
             warning:
@@ -42,15 +45,18 @@ export class RedisHealthIndicator implements OnModuleDestroy {
           })
         : indicator.up();
     }
+
     try {
       await this.ping(redisUrl);
       this.dependencyHealth.statuses.set(key, true);
+
       return indicator.up();
     } catch {
       // Fails readiness (unlike SMTP's degrade-with-warning): throttler
       // storage, mail queue and cache invalidation all need Redis. Message
       // stays generic - /health/ready is public.
       this.dependencyHealth.statuses.set(key, false);
+
       return indicator.down('Redis ping failed');
     }
   }
@@ -64,6 +70,7 @@ export class RedisHealthIndicator implements OnModuleDestroy {
         PING_TIMEOUT_MS
       );
     });
+
     try {
       await Promise.race([this.client.ping(), timeout]);
     } finally {
@@ -77,8 +84,10 @@ export class RedisHealthIndicator implements OnModuleDestroy {
       connectTimeout: PING_TIMEOUT_MS,
       maxRetriesPerRequest: 1
     });
+
     // No 'error' listener would turn connection errors into uncaught exceptions
     client.on('error', () => undefined);
+
     return client;
   }
 }

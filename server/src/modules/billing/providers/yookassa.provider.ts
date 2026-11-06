@@ -99,6 +99,7 @@ function toMinor(value: string, currency: string): number {
 /** Whether a payment is a method-update re-bind (per its metadata marker). */
 function isMethodUpdate(metadata: unknown): boolean {
   const data = (metadata ?? {}) as Record<string, unknown>;
+
   return data['purpose'] === METHOD_UPDATE_PURPOSE;
 }
 
@@ -107,16 +108,20 @@ function oneTimeFromMetadata(
   metadata: unknown
 ): { productId: string | null } | null {
   const data = (metadata ?? {}) as Record<string, unknown>;
+
   if (data['purpose'] !== ONE_TIME_PURPOSE) {
     return null;
   }
+
   const { productId } = data;
+
   return { productId: typeof productId === 'string' ? productId : null };
 }
 
 function planKeyFrom(metadata: unknown): string | null {
   const data = (metadata ?? {}) as Record<string, unknown>;
   const { planKey } = data;
+
   return typeof planKey === 'string' ? planKey : null;
 }
 
@@ -127,10 +132,13 @@ function planKeyFrom(metadata: unknown): string | null {
  */
 function offSessionChargeKeyFrom(metadata: unknown): string | null {
   const data = (metadata ?? {}) as Record<string, unknown>;
+
   if (data['purpose'] !== OFF_SESSION_PURPOSE) {
     return null;
   }
+
   const key = data['chargeKey'];
+
   return typeof key === 'string' ? key : null;
 }
 
@@ -139,12 +147,14 @@ function confirmationSession(payment: {
   confirmation?: { confirmation_url?: string };
 }): CheckoutSession {
   const url = payment.confirmation?.confirmation_url;
+
   if (!url) {
     throw new ApiError(
       ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED,
       'YooKassa did not return a confirmation URL'
     );
   }
+
   return { url, sessionRef: payment.id };
 }
 
@@ -152,6 +162,7 @@ function confirmationSession(payment: {
 function refFromMetadata(metadata: unknown): NormalizedCustomerRef {
   const data = (metadata ?? {}) as Record<string, unknown>;
   const { customerId, userId } = data;
+
   return {
     customerId: typeof customerId === 'string' ? customerId : undefined,
     userId: typeof userId === 'string' ? userId : undefined
@@ -194,6 +205,7 @@ export class YooKassaProvider implements PaymentProvider {
     // The Joi schema already gates this at bootstrap; the guard here keeps a
     // NaN or out-of-range value out of receipts even if that gate changes.
     const vatCode = Number(config.get<string>('YOOKASSA_VAT_CODE') ?? '1');
+
     if (!Number.isInteger(vatCode) || vatCode < 1 || vatCode > 6) {
       throw new Error(
         `YOOKASSA_VAT_CODE must be an integer between 1 and 6, got "${String(
@@ -201,6 +213,7 @@ export class YooKassaProvider implements PaymentProvider {
         )}"`
       );
     }
+
     this.vatCode = vatCode;
   }
 
@@ -211,6 +224,7 @@ export class YooKassaProvider implements PaymentProvider {
         'YooKassa is not configured'
       );
     }
+
     return this.yoo;
   }
 
@@ -247,6 +261,7 @@ export class YooKassaProvider implements PaymentProvider {
   ): Promise<CheckoutSession> {
     const yoo = this.requireClient();
     const price = plan.prices.yookassa;
+
     if (!price) {
       throw new ApiError(
         ErrorKeys.BILLING.PLAN_NOT_CONFIGURED,
@@ -292,6 +307,7 @@ export class YooKassaProvider implements PaymentProvider {
     };
 
     const payment = await yoo.createPayment(payload, randomUUID());
+
     return confirmationSession(payment);
   }
 
@@ -330,6 +346,7 @@ export class YooKassaProvider implements PaymentProvider {
     };
 
     const payment = await yoo.createPayment(payload, randomUUID());
+
     return confirmationSession(payment);
   }
 
@@ -360,6 +377,7 @@ export class YooKassaProvider implements PaymentProvider {
     };
 
     const payment = await yoo.createPayment(payload, randomUUID());
+
     return confirmationSession(payment);
   }
 
@@ -402,6 +420,7 @@ export class YooKassaProvider implements PaymentProvider {
       );
       throw new ChargeDeclinedError();
     }
+
     return {
       providerInvoiceRef: payment.id,
       status: payment.status === 'succeeded' ? 'captured' : 'pending'
@@ -422,15 +441,18 @@ export class YooKassaProvider implements PaymentProvider {
   ): Promise<ChargeResult | null> {
     const yoo = this.requireClient();
     const payment = await yoo.getPayment(providerInvoiceRef);
+
     if (offSessionChargeKeyFrom(payment.metadata) !== chargeKey) {
       throw new ApiError(
         ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN,
         `YooKassa payment "${providerInvoiceRef}" does not carry charge key "${chargeKey}"`
       );
     }
+
     if (payment.status === 'canceled') {
       return null;
     }
+
     return {
       providerInvoiceRef: payment.id,
       status: payment.status === 'succeeded' ? 'captured' : 'pending'
@@ -459,6 +481,7 @@ export class YooKassaProvider implements PaymentProvider {
   ): Promise<ChargeResult | null> {
     const yoo = this.requireClient();
     let cursor: string | undefined;
+
     for (let page = 0; page < OFF_SESSION_SCAN_MAX_PAGES; page++) {
       const list = await yoo.getPaymentList({
         created_at: { value: createdAfter.toISOString(), mode: 'gte' },
@@ -470,17 +493,21 @@ export class YooKassaProvider implements PaymentProvider {
           offSessionChargeKeyFrom(payment.metadata) === chargeKey &&
           payment.status !== 'canceled'
       );
+
       if (match) {
         return {
           providerInvoiceRef: match.id,
           status: match.status === 'succeeded' ? 'captured' : 'pending'
         };
       }
+
       if (!list.next_cursor) {
         return null;
       }
+
       cursor = list.next_cursor;
     }
+
     throw new ApiError(
       ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN,
       `YooKassa payment scan for charge key "${chargeKey}" exceeded ${OFF_SESSION_SCAN_MAX_PAGES} pages without a definitive answer`
@@ -553,6 +580,7 @@ export class YooKassaProvider implements PaymentProvider {
   ): Promise<boolean> {
     const maxPages = 20;
     let cursor: string | undefined;
+
     for (let page = 0; page < maxPages; page++) {
       const list = await yoo.getRefundList({
         payment_id: paymentId,
@@ -564,14 +592,18 @@ export class YooKassaProvider implements PaymentProvider {
           refund.status !== 'canceled' &&
           (refund.description ?? '').includes(idempotencyKey)
       );
+
       if (match) {
         return true;
       }
+
       if (!list.next_cursor) {
         return false;
       }
+
       cursor = list.next_cursor;
     }
+
     throw new ApiError(
       ErrorKeys.BILLING.PROVIDER_STATE_UNCERTAIN,
       `YooKassa refund scan for payment "${paymentId}" exceeded ${maxPages} pages without a definitive answer`
@@ -586,6 +618,7 @@ export class YooKassaProvider implements PaymentProvider {
     }
 
     let notification: YooKassaNotification;
+
     try {
       notification = JSON.parse(
         rawBody.toString('utf8')
@@ -596,6 +629,7 @@ export class YooKassaProvider implements PaymentProvider {
 
     const { event } = notification;
     const objectId = notification.object?.id;
+
     if (!event || !objectId) {
       return null;
     }
@@ -609,12 +643,14 @@ export class YooKassaProvider implements PaymentProvider {
     }
 
     let payment;
+
     try {
       payment = await this.yoo.getPayment(objectId);
     } catch (error) {
       this.logger.warn(
         `YooKassa webhook re-fetch failed for ${objectId}: ${(error as Error).message}`
       );
+
       return null;
     }
 
@@ -634,6 +670,7 @@ export class YooKassaProvider implements PaymentProvider {
               last4: method.card?.last4 ?? '0000'
             }
           : null;
+
       // A method-update re-bind is not a payment: swap the default method,
       // never insert an invoice or touch the subscription status.
       if (isMethodUpdate(payment.metadata)) {
@@ -641,11 +678,14 @@ export class YooKassaProvider implements PaymentProvider {
           ref,
           savedPaymentMethod
         };
+
         return { ...base, type: 'payment_method.updated', payload };
       }
+
       // Surface the off-session charge key so the reducer reconciles onto the
       // invoice the core already recorded (see OFF_SESSION_PURPOSE).
       const offSessionChargeKey = offSessionChargeKeyFrom(payment.metadata);
+
       if (offSessionChargeKey) {
         const payload: NormalizedInvoicePayload = {
           ref,
@@ -659,8 +699,10 @@ export class YooKassaProvider implements PaymentProvider {
           savedPaymentMethod: null,
           offSessionChargeKey
         };
+
         return { ...base, type: 'invoice.paid', payload };
       }
+
       // A one-time purchase never saves a card or touches the subscription —
       // the marker routes the reducer to the one_time invoice + grant path.
       const oneTime = oneTimeFromMetadata(payment.metadata);
@@ -678,6 +720,7 @@ export class YooKassaProvider implements PaymentProvider {
           ? { kind: 'one_time', productId: oneTime.productId }
           : { planKey: planKeyFrom(payment.metadata) })
       };
+
       return { ...base, type: 'invoice.paid', payload };
     }
 
@@ -689,6 +732,7 @@ export class YooKassaProvider implements PaymentProvider {
       ) {
         return WEBHOOK_IGNORED;
       }
+
       // An off-session charge canceled at capture (accepted as `pending`, then
       // declined) must fail the pending invoice the core recorded. For a
       // synchronous decline (chargeOffSession threw, nothing recorded) the
@@ -698,6 +742,7 @@ export class YooKassaProvider implements PaymentProvider {
         providerSubscriptionId: null,
         offSessionChargeKey: offSessionChargeKeyFrom(payment.metadata)
       };
+
       return { ...base, type: 'payment.failed', payload };
     }
 
@@ -726,6 +771,7 @@ export class YooKassaProvider implements PaymentProvider {
       },
       vat_code: this.vatCode
     }));
+
     return {
       ...(email ? { customer: { email }, email } : {}),
       items
@@ -740,23 +786,27 @@ export class YooKassaProvider implements PaymentProvider {
    */
   private async resolveSavedMethodRef(customer: Customer): Promise<string> {
     const methodId = customer.defaultPaymentMethodId;
+
     if (!methodId) {
       throw new ApiError(
         ErrorKeys.BILLING.PAYMENT_METHOD_MISSING,
         `Customer "${customer.id}" has no saved YooKassa payment method`
       );
     }
+
     // Scoped to the owner (and this provider) so a mis-pointed default can never
     // charge another customer's card token - it fails loudly instead.
     const method = await this.paymentMethods.findOne({
       where: { id: methodId, customerId: customer.id, provider: this.id }
     });
+
     if (!method) {
       throw new ApiError(
         ErrorKeys.BILLING.PAYMENT_METHOD_MISSING,
         `Saved payment method "${methodId}" was not found`
       );
     }
+
     return method.providerMethodRef;
   }
 
@@ -765,6 +815,7 @@ export class YooKassaProvider implements PaymentProvider {
       where: { id: userId },
       select: { email: true }
     });
+
     return user?.email;
   }
 }

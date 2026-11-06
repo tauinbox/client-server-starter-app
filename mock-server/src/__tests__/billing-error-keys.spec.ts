@@ -12,6 +12,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -30,8 +31,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -45,10 +48,13 @@ async function activate(): Promise<MockSubscription> {
       body: JSON.stringify({ userId: mockId('user-2'), planKey: 'pro' })
     }
   );
+
   expect(res.status).toBe(200);
   const { id } = (await res.json()) as { id: string };
   const sub = getState().billingSubscriptions.get(id);
+
   if (!sub) throw new Error('subscription not seeded');
+
   return sub;
 }
 
@@ -56,7 +62,9 @@ function planByKey(key: string): MockPlan {
   const plan = getState()
     .plans.values()
     .find((p) => p.key === key);
+
   if (!plan) throw new Error(`plan ${key} not seeded`);
+
   return plan;
 }
 
@@ -64,7 +72,9 @@ function productByKey(key: string): MockProduct {
   const product = getState()
     .billingProducts.values()
     .find((p) => p.key === key);
+
   if (!product) throw new Error(`product ${key} not seeded`);
+
   return product;
 }
 
@@ -107,6 +117,7 @@ const REFUSALS: Refusal[] = [
     name: 'purchase of a product with no price for the provider',
     arrange: () => {
       delete productByKey('report-pack').prices.paddle;
+
       return Promise.resolve();
     },
     path: '/billing/purchase',
@@ -118,6 +129,7 @@ const REFUSALS: Refusal[] = [
     name: 'purchase of a product with no amount configured',
     arrange: () => {
       productByKey('report-pack').prices.paddle = { currency: 'USD' };
+
       return Promise.resolve();
     },
     path: '/billing/purchase',
@@ -182,6 +194,7 @@ const REFUSALS: Refusal[] = [
     name: 'self-managed plan change after the period end',
     arrange: async () => {
       const sub = await activate();
+
       sub.lifecycleOwner = 'self';
       sub.currentPeriodEnd = new Date(Date.now() - 1000).toISOString();
     },
@@ -237,7 +250,9 @@ const REFUSALS: Refusal[] = [
     name: 'admin cancel of a canceled subscription',
     arrange: async () => {
       const sub = await activate();
+
       sub.status = 'canceled';
+
       return `/admin/billing/subscriptions/${sub.id}/cancel`;
     },
     as: 'admin@example.com',

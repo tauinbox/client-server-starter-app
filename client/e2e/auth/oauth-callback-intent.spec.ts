@@ -23,9 +23,11 @@ async function holdOAuthData(
   const admin = (state.users as UserResponse[]).find(
     (u) => u.email === 'admin@example.com'
   );
+
   expect(admin).toBeDefined();
 
   const { token } = await mockServer.issueOAuthData(admin!.id);
+
   await context.addCookies([
     {
       name: 'oauth_data',
@@ -37,9 +39,11 @@ async function holdOAuthData(
 
 function countExchanges(page: Page): () => number {
   let count = 0;
+
   page.on('request', (req) => {
     if (req.url().includes('/api/v1/auth/oauth/exchange')) count++;
   });
+
   return () => count;
 }
 

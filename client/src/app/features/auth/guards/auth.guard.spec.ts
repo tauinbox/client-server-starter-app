@@ -60,6 +60,7 @@ describe('authGuard', () => {
   it('should redirect to login when not authenticated and refresh fails', async () => {
     authServiceMock.refreshTokens.mockReturnValue(of(null));
     const router = TestBed.inject(Router);
+
     vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
@@ -67,6 +68,7 @@ describe('authGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<GuardResult>);
+
     expect(String(value)).toBe('/login?returnUrl=%2Fprotected');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
@@ -93,6 +95,7 @@ describe('authGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);
+
     expect(value).toBe(true);
   });
 
@@ -108,6 +111,7 @@ describe('authGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);
+
     expect(value).toBe(true);
     expect(authServiceMock.refreshTokens).toHaveBeenCalled();
   });
@@ -122,6 +126,7 @@ describe('authGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<GuardResult>);
+
     expect(String(value)).toBe('/login?returnUrl=%2Fprotected');
     expect(authServiceMock.clearSession).toHaveBeenCalled();
   });

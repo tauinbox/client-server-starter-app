@@ -105,7 +105,9 @@ runWithInfra('billing write paths (e2e)', () => {
       await ds.getRepository(UsageRecord).delete({ customerId });
       await ds.getRepository(Invoice).delete({ customerId });
     }
+
     if (userId) await ds.getRepository(User).delete({ id: userId });
+
     await ds
       .getRepository(WebhookEvent)
       .delete({ providerEventId: 'wp-webhook-1' });
@@ -130,6 +132,7 @@ runWithInfra('billing write paths (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -143,6 +146,7 @@ runWithInfra('billing write paths (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     await ds.getRepository(Plan).save([
@@ -211,6 +215,7 @@ runWithInfra('billing write paths (e2e)', () => {
         isDefault: true
       })
     );
+
     await ds
       .getRepository(Customer)
       .update({ id: customer.id }, { defaultPaymentMethodId: method.id });
@@ -234,6 +239,7 @@ runWithInfra('billing write paths (e2e)', () => {
         nextRenewalAttemptAt: null
       })
     );
+
     subscriptionId = subscription.id;
   }
 
@@ -249,6 +255,7 @@ runWithInfra('billing write paths (e2e)', () => {
     idempotencyKey: string
   ): Promise<void> {
     const usage = await build(UsageService);
+
     await usage.record({
       customerId,
       meterKey: 'api_calls',
@@ -344,6 +351,7 @@ runWithInfra('billing write paths (e2e)', () => {
         ...extra
       ]
     }).compile();
+
     return module.get(type);
   }
 
@@ -386,6 +394,7 @@ runWithInfra('billing write paths (e2e)', () => {
         active: true
       })
     );
+
     return ds.getRepository(Product).findOneOrFail({ where: { key } });
   }
 
@@ -394,6 +403,7 @@ runWithInfra('billing write paths (e2e)', () => {
     productId: string
   ): Promise<void> {
     const reducer = await build(BillingEventReducer);
+
     await reducer.reduce({
       provider: 'yookassa',
       providerEventId: eventId,
@@ -424,6 +434,7 @@ runWithInfra('billing write paths (e2e)', () => {
     const rows = await ds
       .getRepository(UsageRecord)
       .find({ where: { customerId, meterKey: 'api_calls' } });
+
     return rows
       .filter(
         (r) =>
@@ -436,6 +447,7 @@ runWithInfra('billing write paths (e2e)', () => {
   describe('metering and credits', () => {
     it('records a usage event', async () => {
       const usage = await build(UsageService);
+
       await usage.record({
         customerId,
         meterKey: 'api_calls',
@@ -447,6 +459,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const rows = await ds
         .getRepository(UsageRecord)
         .find({ where: { customerId, idempotencyKey: 'wp-usage-1' } });
+
       expect(rows).toHaveLength(1);
       expect(rows[0].quantity.toNumber()).toBe(5);
     }, 30000);
@@ -466,6 +479,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const rows = await ds
         .getRepository(UsageRecord)
         .find({ where: { customerId, idempotencyKey: 'wp-usage-unknown' } });
+
       expect(rows).toHaveLength(0);
     }, 30000);
 
@@ -508,6 +522,7 @@ runWithInfra('billing write paths (e2e)', () => {
           { customerId, idempotencyKey: 'wp-usage-future' }
         ]
       });
+
       expect(rows).toHaveLength(0);
     }, 30000);
 
@@ -537,11 +552,13 @@ runWithInfra('billing write paths (e2e)', () => {
         occurredAt,
         idempotencyKey: 'wp-rate-foreign'
       });
+
       expect(own.pricedByCurrentPlan).toBe(true);
       expect(foreign.pricedByCurrentPlan).toBe(false);
       const stored = await ds
         .getRepository(UsageRecord)
         .find({ where: { customerId, meterKey: ALT_METER } });
+
       expect(stored).toHaveLength(1);
 
       const rating = await build(UsageRating);
@@ -624,11 +641,13 @@ runWithInfra('billing write paths (e2e)', () => {
       const row = await ds
         .getRepository(WebhookEvent)
         .findOne({ where: { providerEventId: 'wp-webhook-1' } });
+
       expect(row?.payload).toMatchObject({ type: 'invoice.paid' });
     }, 30000);
 
     it('inserts a subscription invoice, defaulting the columns it omits', async () => {
       const reducer = await build(BillingEventReducer);
+
       await reducer.reduce({
         provider: 'yookassa',
         providerEventId: 'wp-reduce-1',
@@ -649,6 +668,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const row = await ds
         .getRepository(Invoice)
         .findOne({ where: { providerEventId: 'wp-reduce-1' } });
+
       expect(row?.amountMinor.toNumber()).toBe(12345);
       // Neither is in the insert's value set — both come from the column default.
       expect(row?.refundedMinor.toNumber()).toBe(0);
@@ -668,10 +688,12 @@ runWithInfra('billing write paths (e2e)', () => {
       const invoice = await ds
         .getRepository(Invoice)
         .findOne({ where: { providerEventId: 'wp-sku-1' } });
+
       expect(invoice?.kind).toBe('one_time');
       const grants = await ds
         .getRepository(CustomerGrant)
         .find({ where: { customerId, entitlement: 'reports' } });
+
       expect(grants).toHaveLength(1);
       expect(grants[0].expiresAt).not.toBeNull();
     }, 30000);
@@ -734,6 +756,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const grants = await ds
         .getRepository(CustomerGrant)
         .find({ where: { customerId, sourceInvoiceId: target.id } });
+
       expect(grants).toHaveLength(1);
       expect(grants[0].revokedAt).not.toBeNull();
     }, 30000);
@@ -771,6 +794,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const rows = await ds
         .getRepository(Invoice)
         .find({ where: { subscriptionId, billingMode: 'usage' } });
+
       expect(rows).toHaveLength(1);
       expect(rows[0].refundedMinor.toNumber()).toBe(0);
     }, 30000);
@@ -784,11 +808,13 @@ runWithInfra('billing write paths (e2e)', () => {
       const sub = await ds
         .getRepository(Subscription)
         .findOneOrFail({ where: { id: subscriptionId } });
+
       expect(sub.currentPeriodEnd.getTime()).toBeGreaterThan(Date.now());
       expect(sub.status).toBe('active');
       const paid = await ds
         .getRepository(Invoice)
         .find({ where: { subscriptionId, status: 'paid' } });
+
       expect(paid.length).toBeGreaterThan(0);
     }, 60000);
 
@@ -804,6 +830,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const sub = await ds
         .getRepository(Subscription)
         .findOneOrFail({ where: { id: subscriptionId } });
+
       expect(sub.status).toBe('past_due');
       expect(sub.dunningAttempts).toBe(1);
       expect(sub.nextRenewalAttemptAt).not.toBeNull();
@@ -818,8 +845,10 @@ runWithInfra('billing write paths (e2e)', () => {
         Promise.withResolvers<void>();
       const { promise: gate, resolve: openGate } =
         Promise.withResolvers<void>();
+
       provider.chargeOffSession.mockImplementationOnce(() => {
         charging();
+
         return gate.then<never>(() =>
           Promise.reject(new Error('card declined'))
         );
@@ -829,6 +858,7 @@ runWithInfra('billing write paths (e2e)', () => {
 
       const now = new Date();
       const first = renewals.runDueRenewals(now);
+
       await charged;
       await renewals.runDueRenewals(now);
       openGate();
@@ -837,6 +867,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const sub = await ds
         .getRepository(Subscription)
         .findOneOrFail({ where: { id: subscriptionId } });
+
       expect(sub.status).toBe('past_due');
       expect(sub.dunningAttempts).toBe(1);
       expect(
@@ -857,6 +888,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const sub = await ds
         .getRepository(Subscription)
         .findOneOrFail({ where: { id: subscriptionId } });
+
       expect(sub.status).toBe('canceled');
       expect(sub.nextRenewalAttemptAt).toBeNull();
       expect(provider.chargeOffSession.mock.calls).toHaveLength(charges);
@@ -875,6 +907,7 @@ runWithInfra('billing write paths (e2e)', () => {
       // Seeded past the standing credit balance so the closing period leaves a
       // real charge rather than being fully absorbed.
       const credits = await creditUnits();
+
       await seedUnits(sub.currentPeriodStart, credits + 7, 'wp-close-boundary');
       const units = await ratableUnits(
         sub.currentPeriodStart,
@@ -888,6 +921,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const invoice = await ds.getRepository(Invoice).findOneOrFail({
         where: { providerEventId: renewalKey(sub) }
       });
+
       expect(invoice.amountMinor.toNumber()).toBe(
         (units - Math.max(0, credits)) * 200
       );
@@ -900,6 +934,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const after = await ds
         .getRepository(Subscription)
         .findOneOrFail({ where: { id: subscriptionId } });
+
       expect(after.status).toBe('canceled');
       // The period the invoice covers must stay put, not roll forward.
       expect(after.currentPeriodEnd.getTime()).toBe(
@@ -912,6 +947,7 @@ runWithInfra('billing write paths (e2e)', () => {
       const sub = await ds
         .getRepository(Subscription)
         .findOneOrFail({ where: { id: subscriptionId } });
+
       await seedUnits(sub.currentPeriodStart, 3, 'wp-close-immediate');
       const now = new Date();
       const units = await ratableUnits(sub.currentPeriodStart, now);
@@ -925,6 +961,7 @@ runWithInfra('billing write paths (e2e)', () => {
           providerEventId: `cancel:${subscriptionId}:${sub.currentPeriodStart.getTime()}`
         }
       });
+
       expect(invoice.status).toBe('paid');
       expect(invoice.amountMinor.toNumber()).toBe(
         Math.max(0, units - Math.max(0, credits)) * 200

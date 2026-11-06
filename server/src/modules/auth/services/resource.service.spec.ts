@@ -22,7 +22,9 @@ import { AccessRefusalService } from '../../audit/access-refusal.service';
 
 function abilityWith(define: (can: AbilityBuilder<AppAbility>['can']) => void) {
   const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
   define(builder.can);
+
   return builder.build();
 }
 
@@ -218,6 +220,7 @@ describe('ResourceService', () => {
     it('should return all resources ordered by name ASC', async () => {
       mockResourceRepo.find.mockResolvedValue([resource2, resource1]);
       const result = await service.findAll();
+
       expect(result).toHaveLength(2);
       expect(mockResourceRepo.find).toHaveBeenCalledWith({
         order: { name: 'ASC' }
@@ -312,6 +315,7 @@ describe('ResourceService', () => {
   describe('update', () => {
     it('should update an existing resource', async () => {
       const updatedResource = { ...resource1, displayName: 'Updated Users' };
+
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
 
       const result = await service.update(
@@ -490,6 +494,7 @@ describe('ResourceService', () => {
         [['read'], ['read', 'update']],
         [['read'], null]
       ];
+
       for (const [before, allowedActionNames] of writes) {
         mockResourceRepo.findOne.mockResolvedValue({
           ...resource1,
@@ -498,6 +503,7 @@ describe('ResourceService', () => {
         mockEventEmitter.emit.mockClear();
         mockResourceRepo.update.mockImplementationOnce(() => {
           expect(emitted()).toHaveLength(0);
+
           return Promise.resolve({ affected: 1 });
         });
 
@@ -517,6 +523,7 @@ describe('ResourceService', () => {
         { allowedActionNames: ['update', 'read'] },
         { allowedActionNames: null }
       ];
+
       for (const data of writes) {
         mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
         await service.update('res-1', data, { ability: superAbility });
@@ -628,6 +635,7 @@ describe('ResourceService', () => {
       const ability = abilityWith((can) => {
         can('update', 'Permission');
       });
+
       bindAuditContext(ability, { ip: '203.0.113.7', requestId: 'req-1' });
 
       await expect(
@@ -691,6 +699,7 @@ describe('ResourceService', () => {
         active: { users: 'User', articles: 'Article' },
         orphaned: {}
       };
+
       mockCacheManager.get.mockResolvedValue(cachedMaps);
 
       const result = await service.getSubjectMaps();
@@ -714,6 +723,7 @@ describe('ResourceService', () => {
         grantableActions: { users: ['read', 'update'], articles: ['read'] },
         conditionalActions: { users: ['update'], articles: [] }
       };
+
       expect(result).toEqual(expected);
       expect(mockResourceRepo.find).toHaveBeenCalled();
       expect(mockCacheManager.set).toHaveBeenCalledWith(
@@ -844,6 +854,7 @@ describe('ResourceService', () => {
     it('returns the row read again after the write', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
       const reread = { ...resource1, displayName: 'Edited by an admin' };
+
       mockResourceRepo.findOneByOrFail.mockResolvedValue(reread);
 
       const result = await service.upsertResource({

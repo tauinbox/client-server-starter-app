@@ -51,6 +51,7 @@ type UsersState = {
  */
 function userFetcher(): ListFetcher<User, typeof USER_LIST_QUERY> {
   const userService = inject(UserService);
+
   return (request: CursorPageRequest, filters: UserSearch) => {
     const params: UserCursorListParams = {
       cursor: request.cursor ?? undefined,
@@ -58,6 +59,7 @@ function userFetcher(): ListFetcher<User, typeof USER_LIST_QUERY> {
       sortBy: (request.sortBy as UserSortColumn) ?? 'createdAt',
       sortOrder: request.sortOrder ?? 'desc'
     };
+
     return Object.values(filters).some(isActiveFilterValue)
       ? userService.searchCursor(filters, params)
       : userService.getAllCursor(params);
@@ -90,19 +92,25 @@ export const UsersStore = signalStore(
     // only marks itself stale.
     function applyUserEvent({ action, userId }: UserCrudEvent) {
       const row = store.entityMap()[userId];
+
       if (action === 'created') {
         store.markStale();
+
         return EMPTY;
       }
+
       if (!row) return EMPTY;
+
       if (action === 'deleted') {
         if (!store.filters().includeDeleted) {
           patchState(store, removeEntity(userId));
         } else if (!row.deletedAt) {
           store.markStale();
         }
+
         return EMPTY;
       }
+
       return userService.getListRow(userId).pipe(
         tap((user) => {
           // A reload while the request ran may have dropped the row.
@@ -114,6 +122,7 @@ export const UsersStore = signalStore(
           } else {
             store.markStale();
           }
+
           return EMPTY;
         })
       );
@@ -173,8 +182,10 @@ export const UsersStore = signalStore(
                   changes: { deletedAt: new Date().toISOString() }
                 })
               );
+
               return;
             }
+
             patchState(store, removeEntity(id));
           })
         );

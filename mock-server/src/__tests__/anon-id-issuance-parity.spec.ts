@@ -38,6 +38,7 @@ function addPercentageFlag(
 ): void {
   const state = getState();
   const now = new Date().toISOString();
+
   state.featureFlags.set('flag-public-rollout', {
     id: 'flag-public-rollout',
     key: 'public-rollout',
@@ -75,19 +76,23 @@ async function loginAsUser(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'user@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
 describe('anonymous rollout id issuance', () => {
   it('sets no cookie on a route that is not /feature-flags', async () => {
     const res = await fetch(`${baseUrl}/api/health/live`);
+
     expect(res.headers.get('set-cookie')).toBeNull();
   });
 
   it('sets no cookie while no public flag has a percentage rule', async () => {
     const res = await getFlags();
+
     expect(res.status).toBe(200);
     expect(res.headers.get('set-cookie')).toBeNull();
   });
@@ -96,27 +101,32 @@ describe('anonymous rollout id issuance', () => {
     addPublicPercentageFlag();
     const res = await getFlags();
     const cookie = res.headers.get('set-cookie') ?? '';
+
     expect(cookie).toMatch(UUID_COOKIE);
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Lax');
     const body = (await res.json()) as { flags: Record<string, boolean> };
+
     expect(body.flags['public-rollout']).toBe(true);
   });
 
   it('keeps a valid cookie without re-issuing it', async () => {
     addPublicPercentageFlag();
     const res = await getFlags(`nxs_anon_id=${VALID_ANON_ID}`);
+
     expect(res.headers.get('set-cookie')).toBeNull();
   });
 
   it('replaces a cookie that is not a UUID when an id is needed', async () => {
     addPublicPercentageFlag();
     const res = await getFlags(`nxs_anon_id=${'x'.repeat(3000)}`);
+
     expect(res.headers.get('set-cookie') ?? '').toMatch(UUID_COOKIE);
   });
 
   it('ignores a cookie that is not a UUID when no id is needed', async () => {
     const res = await getFlags('nxs_anon_id=x');
+
     expect(res.headers.get('set-cookie')).toBeNull();
   });
 });
@@ -127,6 +137,7 @@ describe('signed-in rollout id issuance', () => {
   it('sets no cookie while no rule buckets by device', async () => {
     addPublicPercentageFlag();
     const res = await getFlags(undefined, await loginAsUser());
+
     expect(res.status).toBe(200);
     expect(res.headers.get('set-cookie')).toBeNull();
   });
@@ -137,8 +148,10 @@ describe('signed-in rollout id issuance', () => {
       { type: 'percentage', percent: 100, bucketBy: 'device' }
     );
     const res = await getFlags(undefined, await loginAsUser());
+
     expect(res.headers.get('set-cookie') ?? '').toMatch(UUID_COOKIE);
     const body = (await res.json()) as { flags: Record<string, boolean> };
+
     expect(body.flags['public-rollout']).toBe(true);
   });
 
@@ -150,10 +163,13 @@ describe('signed-in rollout id issuance', () => {
     // user-keyed bucket would give the opposite result.
     const userIsIn = percentageBucket(user?.id ?? '', 'public-rollout') < 50;
     let anonId = '';
+
     for (let i = 0; anonId === ''; i++) {
       const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+
       if (percentageBucket(id, 'public-rollout') < 50 !== userIsIn) anonId = id;
     }
+
     addPercentageFlag(
       { public: true },
       { type: 'percentage', percent: 50, bucketBy: 'device' }
@@ -169,6 +185,7 @@ describe('signed-in rollout id issuance', () => {
     const userBody = (await signedIn.json()) as {
       flags: Record<string, boolean>;
     };
+
     expect(guestBody.flags['public-rollout']).toBe(!userIsIn);
     expect(userBody.flags['public-rollout']).toBe(!userIsIn);
     expect(signedIn.headers.get('set-cookie')).toBeNull();

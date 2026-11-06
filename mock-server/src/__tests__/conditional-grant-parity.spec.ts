@@ -36,7 +36,9 @@ function permissionId(resource: string, action: string): string {
         p.resourceId === mockId(`res-${resource}`) &&
         p.actionId === mockId(`act-${action}`)
     );
+
   if (!permission) throw new Error(`Seed permission ${resource}/${action}`);
+
   return permission.id;
 }
 
@@ -45,6 +47,7 @@ type Grant = [string, string, PermissionCondition | null];
 function grant(grants: Grant[]): void {
   const state = getState();
   const now = '2025-01-01T00:00:00.000Z';
+
   for (const [id, name] of [
     [SCOPED_ROLE_ID, 'scoped'],
     [OTHER_ROLE_ID, 'other']
@@ -59,6 +62,7 @@ function grant(grants: Grant[]): void {
       updatedAt: now
     });
   }
+
   grants.forEach(([resource, action, conditions], i) => {
     state.rolePermissions.push({
       id: `rp-scoped-${i}`,
@@ -67,6 +71,7 @@ function grant(grants: Grant[]): void {
       conditions
     });
   });
+
   for (const user of state.users.values()) {
     if (user.email === CALLER_EMAIL) user.roles = ['user', 'scoped'];
   }
@@ -82,8 +87,10 @@ async function login(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: CALLER_EMAIL, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -105,12 +112,15 @@ async function call(
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const text = await res.text();
+
   return { status: res.status, json: text ? JSON.parse(text) : null };
 }
 
 async function userEmails(): Promise<string[]> {
   const res = await call('GET', '/users/cursor?limit=100');
+
   expect(res.status).toBe(200);
+
   return (res.json as { data: { email: string }[] }).data
     .map((u) => u.email)
     .toSorted();
@@ -118,7 +128,9 @@ async function userEmails(): Promise<string[]> {
 
 async function flagKeys(): Promise<string[]> {
   const res = await call('GET', '/admin/feature-flags/cursor?limit=100');
+
   expect(res.status).toBe(200);
+
   return (res.json as { data: { key: string }[] }).data
     .map((f) => f.key)
     .toSorted();
@@ -186,6 +198,7 @@ describe('conditional grants on FeatureFlag', () => {
       ['feature-flags', 'delete', onlyNewDashboard]
     ]);
     const outside = `/admin/feature-flags/${BETA_EXPORT_ID}`;
+
     expect((await call('GET', outside)).status).toBe(403);
     expect(
       (await call('POST', `${outside}/preview`, { body: {} })).status
@@ -202,6 +215,7 @@ describe('conditional grants on FeatureFlag', () => {
     expect(getState().featureFlags.get(BETA_EXPORT_ID)?.enabled).toBe(true);
 
     const inside = `/admin/feature-flags/${NEW_DASHBOARD_ID}`;
+
     expect((await call('GET', inside)).status).toBe(200);
   });
 
@@ -212,12 +226,14 @@ describe('conditional grants on FeatureFlag', () => {
         key: 'another-flag'
       }
     });
+
     expect(res.status).toBe(403);
   });
 
   it('refuses a write that moves the flag out of the condition', async () => {
     grant([['feature-flags', 'update', { fieldMatch: { enabled: [false] } }]]);
     const path = `/admin/feature-flags/${NEW_DASHBOARD_ID}`;
+
     expect(
       (
         await call('PATCH', path, {
@@ -258,6 +274,7 @@ describe('conditional update checks the record after the write', () => {
 
   it('refuses a user write that leaves the condition', async () => {
     const path = `/users/${johnId()}`;
+
     expect(
       (await call('PATCH', path, { body: { name: 'Moved' } })).status
     ).toBe(403);
@@ -269,6 +286,7 @@ describe('conditional update checks the record after the write', () => {
 
   it('refuses a role write that leaves the condition', async () => {
     const path = `/roles/${SCOPED_ROLE_ID}`;
+
     expect(
       (await call('PATCH', path, { body: { name: 'moved' } })).status
     ).toBe(403);
@@ -329,6 +347,7 @@ describe('conditional assign:Role', () => {
         roleId: SCOPED_ROLE_ID
       }
     });
+
     expect(res.status).toBe(201);
   });
 });

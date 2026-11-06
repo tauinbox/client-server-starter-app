@@ -25,14 +25,17 @@ export class BillingConfiguredAttributesRegistrar implements OnModuleInit {
 
   onModuleInit(): void {
     let anyConfigured = false;
+
     for (const { provider, configuredAttribute } of BILLING_PROVIDER_FLAGS) {
       const configured = this.billingConfig.isConfigured(provider);
+
       anyConfigured ||= configured;
       this.attributeRegistry.registerAttribute(
         configuredAttribute,
         () => configured
       );
     }
+
     this.attributeRegistry.registerAttribute(
       BILLING_CONFIGURED_ATTRIBUTE,
       () => anyConfigured

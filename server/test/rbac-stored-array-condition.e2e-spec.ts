@@ -30,6 +30,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
 
   const createUser = (name: string): Promise<User> => {
     const users = dataSource.getRepository(User);
+
     return users.save(
       users.create({
         email: `${tag}-${name}@example.com`,
@@ -45,6 +46,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
       { name: `${tag}-${user.name}-${Math.random()}` },
       { ability: SYSTEM_ABILITY }
     );
+
     await dataSource.getRepository(RolePermission).insert({
       roleId: role.id,
       permissionId: updateUser.id,
@@ -63,6 +65,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
       await permissionService.getRolesForUser(user.id),
       await permissionService.getPermissionsForUser(user.id)
     );
+
     return ability.can('update', subject('User', target));
   };
 
@@ -70,6 +73,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [CoreModule.forRoot()]
     }).compile();
+
     app = moduleRef.createNestApplication();
     await app.init();
 
@@ -86,7 +90,9 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
     const found = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'update' && p.resource.subject === 'User'
     );
+
     if (!found) throw new Error('Permission update:User missing');
+
     updateUser = found;
     target = await createUser('target');
   });
@@ -97,6 +103,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
 
   it('grants nothing for a restriction stored in an array', async () => {
     const actor = await createUser('narrow');
+
     await giveGrant(actor, [{ fieldMatch: { email: ['nobody@example.com'] } }]);
 
     expect(await canUpdateTarget(actor)).toBe(false);
@@ -104,6 +111,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
 
   it('denies everything for a deny stored in an array', async () => {
     const actor = await createUser('denied');
+
     await giveGrant(actor, null);
     expect(await canUpdateTarget(actor)).toBe(true);
 

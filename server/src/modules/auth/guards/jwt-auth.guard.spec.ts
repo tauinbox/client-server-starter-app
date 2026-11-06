@@ -6,6 +6,7 @@ import { IS_OPTIONAL_AUTH_KEY } from '../decorators/optional-auth.decorator';
 import { createMockExecutionContext } from '../../../common/testing/execution-context.mock';
 
 const handlerRef = () => 'handler-ref';
+
 class ClassRef {}
 
 describe('JwtAuthGuard', () => {
@@ -32,6 +33,7 @@ describe('JwtAuthGuard', () => {
     const proto = Object.getPrototypeOf(Object.getPrototypeOf(guard)) as {
       canActivate: () => boolean;
     };
+
     superCanActivate = jest.spyOn(proto, 'canActivate').mockReturnValue(true);
   });
 

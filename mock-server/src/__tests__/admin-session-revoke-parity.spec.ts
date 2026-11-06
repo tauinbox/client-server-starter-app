@@ -37,12 +37,15 @@ async function signIn(email: string): Promise<Session> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const match = /refresh_token=([^;]+)/.exec(
     res.headers.get('set-cookie') ?? ''
   );
+
   expect(match).not.toBeNull();
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return {
     accessToken: body.tokens.access_token,
     refreshCookie: `refresh_token=${match?.[1] ?? ''}`
@@ -91,6 +94,7 @@ describe('POST /api/v1/users/:id/sessions/revoke parity', () => {
     expect((await profile(first)).status).toBe(401);
     expect((await profile(second)).status).toBe(401);
     const refused = await refresh(first);
+
     expect(refused.status).toBe(401);
     expect(await errorKeyOf(refused)).toBe(
       ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
@@ -125,6 +129,7 @@ describe('POST /api/v1/users/:id/sessions/revoke parity', () => {
           p.resourceId === mockId('res-users') &&
           p.actionId === mockId('act-update')
       )!;
+
     state.rolePermissions = [
       ...state.rolePermissions.filter((rp) => rp.roleId !== EDITOR_ROLE_ID),
       {

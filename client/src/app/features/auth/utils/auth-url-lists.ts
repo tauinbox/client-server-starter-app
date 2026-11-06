@@ -28,5 +28,6 @@ export function matchesAnyPath(
   paths: readonly string[]
 ): boolean {
   const [urlPath] = request.url.split('?');
+
   return paths.some((path) => urlPath.endsWith(path));
 }

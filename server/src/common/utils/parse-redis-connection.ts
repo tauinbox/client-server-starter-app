@@ -9,6 +9,7 @@ export function parseRedisConnection(url: string): RedisOptions {
   const parsed = new URL(url);
   const database = parsed.pathname.replace(/^\/+/, '');
   const db = database === '' ? NaN : Number(database);
+
   return {
     host: parsed.hostname,
     port: parsed.port ? Number(parsed.port) : 6379,

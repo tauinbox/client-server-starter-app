@@ -24,12 +24,14 @@ test.describe('List state in the URL', () => {
     await expect(page.getByText('new-dashboard')).toBeVisible();
 
     const searched = listResponse(page, FLAGS_API, { q: 'dashboard' });
+
     await page.getByLabel('Search').fill('dashboard');
     await searched;
     const disabled = listResponse(page, FLAGS_API, {
       q: 'dashboard',
       enabled: 'false'
     });
+
     await chooseOption(page, 'Status', 'Disabled');
     await disabled;
     await expect(page).toHaveURL(
@@ -40,6 +42,7 @@ test.describe('List state in the URL', () => {
       q: 'dashboard',
       enabled: 'false'
     });
+
     await page.reload();
     await reloaded;
     await expect(page.getByLabel('Search')).toHaveValue('dashboard');
@@ -47,8 +50,10 @@ test.describe('List state in the URL', () => {
 
     // The search was typed without a history entry, the select made one.
     const back = listResponse(page, FLAGS_API, { q: 'dashboard' });
+
     await page.goBack();
     const response = await back;
+
     expect(new URL(response.url()).searchParams.has('enabled')).toBe(false);
     await expect(page).toHaveURL(/\?flags\.q=dashboard$/);
     await expect(page.getByLabel('Search')).toHaveValue('dashboard');
@@ -62,11 +67,13 @@ test.describe('List state in the URL', () => {
       sortBy: 'name',
       sortOrder: 'asc'
     });
+
     await page.goto(
       '/admin/roles?roles.isSystem=false&roles.sortBy=name&roles.sortOrder=asc' +
         '&roles.q=a&roles.q=b&roles.junk=1&roles.limit=500&returnUrl=%2Fx'
     );
     const response = await opened;
+
     expect(response.status()).toBe(200);
     expect(new URL(response.url()).searchParams.has('q')).toBe(false);
     // The page size is the client's own; the URL cannot set it.
@@ -96,6 +103,7 @@ test.describe('List state in the URL', () => {
       sortBy: 'name',
       sortOrder: 'asc'
     });
+
     await page.getByRole('columnheader', { name: 'Name' }).click();
     await sorted;
     await expect(page).toHaveURL(/\?roles\.sortBy=name&roles\.sortOrder=asc$/);
@@ -119,6 +127,7 @@ test.describe('List state in the URL', () => {
         new URL(r.url()).pathname.endsWith(FLAGS_API) &&
         !new URL(r.url()).searchParams.has('enabled')
     );
+
     await page.getByRole('tab', { name: 'Feature flags' }).click();
     await unfiltered;
     await expect(page).toHaveURL(/\/admin\/feature-flags$/);
@@ -135,6 +144,7 @@ test.describe('List state in the URL', () => {
     await page.getByLabel('Email').fill('testlogin@example.com');
     await page.getByLabel('Password', { exact: true }).fill('Password1');
     const searched = listResponse(page, FLAGS_API, { q: 'a&b #c' });
+
     await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
     await searched;
 

@@ -16,6 +16,7 @@ export function sumPlanMeterUnits(
   { startIso, endIso }: { startIso: string; endIso: string }
 ): number {
   if (!plan.meterKey) return 0;
+
   return [...getState().billingUsageRecords.values()]
     .filter(
       (r) =>
@@ -44,10 +45,12 @@ export function billClosingUsagePeriod(
   const state = getState();
   const plan = state.plans.values().find((p) => p.key === subscription.planKey);
   const price = plan?.prices[subscription.provider];
+
   if (!plan || !price) return null;
 
   const nowIso = now.toISOString();
   const closedStart = meteredWindowStart(subscription);
+
   if (now.getTime() <= new Date(closedStart).getTime()) return null;
 
   const totalUnits = sumPlanMeterUnits(plan, subscription.id, {
@@ -60,6 +63,7 @@ export function billClosingUsagePeriod(
     price,
     availableCreditUnits: balance?.balanceUnits ?? 0
   });
+
   if (balance && creditUnitsApplied > 0) {
     balance.balanceUnits -= creditUnitsApplied;
     balance.updatedAt = nowIso;
@@ -84,6 +88,8 @@ export function billClosingUsagePeriod(
     createdAt: nowIso,
     updatedAt: nowIso
   };
+
   state.billingInvoices.set(invoice.id, invoice);
+
   return invoice;
 }

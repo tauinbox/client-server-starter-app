@@ -50,6 +50,7 @@ export const jwtInterceptor: HttpInterceptorFn = (
       if (error.status === 401 && !skipsRefresh) {
         const handleError = () => {
           tokenService.forceLogout(currentReturnUrl(router, location));
+
           return throwError(() => error);
         };
 

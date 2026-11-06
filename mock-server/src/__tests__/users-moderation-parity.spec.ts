@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -31,8 +32,10 @@ async function loginAsAdmin(): Promise<string> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -59,6 +62,7 @@ describe('PATCH /api/v1/users/:id moderation-field parity with server', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { isActive: boolean };
+
     expect(body.isActive).toBe(false);
   });
 
@@ -82,6 +86,7 @@ describe('PATCH /api/v1/users/:id moderation-field parity with server', () => {
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
+
     expect(body.message).toBe(`${field} must be a boolean value`);
   });
 });

@@ -18,7 +18,9 @@ import { sendError } from './error-envelope.helpers';
 
 export function extractBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+
   return authHeader.slice(7);
 }
 
@@ -36,20 +38,24 @@ function refuse(errorKey: ErrorKey, message: string): AuthRefusal {
 /** Mirrors `JwtStrategy.validate`: the same checks in the same order. */
 export function authenticateRequest(req: Request): AuthResult | AuthRefusal {
   const token = extractBearerToken(req);
+
   if (!token) return KEYLESS_REFUSAL;
 
   const decoded = validateToken(token);
+
   if (!decoded) return KEYLESS_REFUSAL;
 
   if (decoded.purpose !== TOKEN_PURPOSE.ACCESS) {
     return refuse(ErrorKeys.AUTH.INVALID_TOKEN, 'Token is not an access token');
   }
+
   if (typeof decoded.sub !== 'string' || decoded.sub === '') {
     return refuse(
       ErrorKeys.AUTH.INVALID_TOKEN,
       'Token is missing a valid subject claim'
     );
   }
+
   if (typeof decoded.iat !== 'number' || !Number.isFinite(decoded.iat)) {
     return refuse(
       ErrorKeys.AUTH.INVALID_TOKEN,
@@ -58,6 +64,7 @@ export function authenticateRequest(req: Request): AuthResult | AuthRefusal {
   }
 
   const user = findUserById(decoded.sub);
+
   if (!user) return refuse(ErrorKeys.AUTH.USER_NOT_FOUND, 'User not found');
 
   if (issuedBeforeRevocation(decoded.iat, user.tokenRevokedAt)) {
@@ -70,6 +77,7 @@ export function authenticateRequest(req: Request): AuthResult | AuthRefusal {
       'Token is missing a valid session claim'
     );
   }
+
   if (!isSessionLive(decoded.sid)) {
     return refuse(ErrorKeys.AUTH.TOKEN_REVOKED, 'Session has ended');
   }
@@ -80,12 +88,15 @@ export function authenticateRequest(req: Request): AuthResult | AuthRefusal {
 /** For a route that serves an anonymous caller too: a refused token is anonymous. */
 export function optionalAuthentication(req: Request): AuthResult | null {
   const result = authenticateRequest(req);
+
   return 'refusal' in result ? null : result;
 }
 
 export function requireAuth(req: Request): AuthResult | GuardError {
   const result = authenticateRequest(req);
+
   if ('refusal' in result) return { error: 401, ...result.refusal };
+
   return result;
 }
 
@@ -121,8 +132,10 @@ export type GuardError = {
 function sendGuardError(res: Response, result: GuardError): void {
   if (result.errorKey) {
     sendError(res, result.errorKey, result.message);
+
     return;
   }
+
   // Passport sends this Unauthorized with no key.
   res.status(result.error).json({ message: result.message });
 }
@@ -145,6 +158,7 @@ export function requirePermission(
 ): (req: Request) => AuthResult | GuardError {
   return (req) => {
     const result = requireAuth(req);
+
     if ('error' in result) return result;
 
     // Mirrors MfaRequiredGuard, which travels with @Authorize on the server.
@@ -155,6 +169,7 @@ export function requirePermission(
           mfaEnrolmentRequired: true
         }
       });
+
       return {
         error: 403,
         message:
@@ -170,6 +185,7 @@ export function requirePermission(
       logRefusal(req, result.user.id, {
         details: { required: [`${action}:${subject}`] }
       });
+
       return {
         error: 403,
         message: 'Insufficient permissions',
@@ -184,10 +200,13 @@ export function requirePermission(
 /** Express middleware — requires authenticated user, attaches req.user */
 export function authGuard(req: Request, res: Response, next: NextFunction) {
   const result = requireAuth(req);
+
   if ('error' in result) {
     sendGuardError(res, result);
+
     return;
   }
+
   (req as AuthenticatedRequest).user = result.user;
   (req as AuthenticatedRequest).sessionId = result.sessionId;
   next();
@@ -200,12 +219,16 @@ export function permissionGuard(
   options: PermissionGuardOptions = {}
 ) {
   const check = requirePermission(action, subject, options);
+
   return (req: Request, res: Response, next: NextFunction) => {
     const result = check(req);
+
     if ('error' in result) {
       sendGuardError(res, result);
+
       return;
     }
+
     (req as AuthenticatedRequest).user = result.user;
     (req as AuthenticatedRequest).sessionId = result.sessionId;
     next();
@@ -239,9 +262,11 @@ export function assertInstancePermission(
   }
 ): boolean {
   const { user } = req as AuthenticatedRequest;
+
   if (buildAbilityForUser(user).can(action, caslSubject(subjectName, record))) {
     return true;
   }
+
   // Mirrors assertCan, which audits before it throws. It passes no actorEmail.
   // A create route submits a record with no id, which is why targetId reads
   // off the record itself.
@@ -259,12 +284,15 @@ export function assertInstancePermission(
     ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS,
     'Insufficient permissions'
   );
+
   return false;
 }
 
 export function isActorSuper(req: unknown): boolean {
   const actor = (req as AuthenticatedRequest).user;
+
   if (!actor) return false;
+
   return roleNamesAreSuper(actor.roles);
 }
 
@@ -294,9 +322,11 @@ export function assertCanWriteUser(
   ) {
     return false;
   }
+
   if (isActorSuper(req) || !roleNamesAreSuper(target.roles)) {
     return true;
   }
+
   logRefusal(req, (req as AuthenticatedRequest).user.id, {
     targetId: target.id,
     targetType: 'User',
@@ -312,6 +342,7 @@ export function assertCanWriteUser(
     ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN,
     'Only a super actor can modify a super account'
   );
+
   return false;
 }
 
@@ -325,11 +356,14 @@ export function pruneOldestUserTokens(
   maxSessions: number
 ): void {
   const userTokens: string[] = [];
+
   for (const [token, uid] of getState().refreshTokens.entries()) {
     if (uid === userId) userTokens.push(token);
   }
+
   if (userTokens.length > maxSessions) {
     const excess = userTokens.length - maxSessions;
+
     for (let i = 0; i < excess; i++) {
       endSessionOfToken(userTokens[i]);
     }
@@ -341,14 +375,17 @@ export function pruneOldestUserTokens(
 // write, so a link mailed before the change cannot take the account after it.
 export function clearMailedProofs(user: MockUser): void {
   const state = getState();
+
   for (const [token, issued] of state.passwordResetTokens.entries()) {
     if (issued.userId === user.id) {
       state.passwordResetTokens.delete(token);
     }
   }
+
   if (user.pendingEmailToken) {
     state.pendingEmailTokens.delete(user.pendingEmailToken);
   }
+
   user.pendingEmail = null;
   user.pendingEmailToken = null;
   user.pendingEmailExpiresAt = null;

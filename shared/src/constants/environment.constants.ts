@@ -23,13 +23,17 @@ export function normalizeEnvironmentList(
 ): unknown[] {
   const seen = new Set<unknown>();
   const normalized: unknown[] = [];
+
   for (const entry of values) {
     const value =
       typeof entry === 'string' ? entry.trim().toLowerCase() : entry;
+
     if (seen.has(value)) continue;
+
     seen.add(value);
     normalized.push(value);
   }
+
   return normalized;
 }
 

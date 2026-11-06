@@ -17,8 +17,10 @@ type PaddleProbe = Window & {
 // of Paddle.js and lets the test fire the checkout events of the overlay.
 async function stubPaddleJs(page: Page): Promise<{ requests: string[] }> {
   const requests: string[] = [];
+
   await page.route(PADDLE_SCRIPT_URL, (route) => {
     requests.push(route.request().url());
+
     return route.fulfill({
       status: 200,
       contentType: 'application/javascript',
@@ -39,6 +41,7 @@ async function stubPaddleJs(page: Page): Promise<{ requests: string[] }> {
       `
     });
   });
+
   return { requests };
 }
 
@@ -70,6 +73,7 @@ test.describe('Paddle checkout', () => {
     expect(
       await page.evaluate(() => {
         const probe = (window as PaddleProbe).paddleProbe;
+
         return { environment: probe?.environment, token: probe?.token };
       })
     ).toEqual({ environment: 'sandbox', token: 'test_e2e_token' });

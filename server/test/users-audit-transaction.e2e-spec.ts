@@ -55,6 +55,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -71,6 +72,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
       { email: adminEmail, password, ...names },
       { ability: SYSTEM_ABILITY }
     );
+
     targetId = (
       await usersService.create(
         { email: targetEmail, password, ...names },
@@ -88,6 +90,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await app
       .get(RoleService)
       .assignRoleToUser(admin.id, superRole.id, { ability: SYSTEM_ABILITY });
@@ -131,6 +134,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
         ipAddress: null
       }
     );
+
     return tokens.access_token;
   }
 
@@ -178,6 +182,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
     }).expect(500);
 
     const after = await stored(targetId);
+
     expect(after.password).toBe(before.password);
     expect(after.tokenRevokedAt).toBeNull();
     expect(await sessions(targetId)).toBeGreaterThan(0);
@@ -264,6 +269,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
         .getRepository(AuditLog)
         .findBy({ targetId, actorEmail: adminEmail })
     ).map((row) => row.action);
+
     expect(actions).toEqual(
       expect.arrayContaining([
         AuditAction.USER_UPDATE,
@@ -309,6 +315,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
 
     it('refuses a restore after a stale read, as the loser of two concurrent restores is', async () => {
       const live = await stored(targetId);
+
       jest
         .spyOn(app.get<Repository<User>>(getRepositoryToken(User)), 'findOne')
         .mockResolvedValueOnce({ ...live, deletedAt: new Date() } as User);

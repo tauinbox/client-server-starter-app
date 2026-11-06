@@ -54,6 +54,7 @@ describe('RequestIdMiddleware', () => {
     middleware.use(req, res as Response, next);
 
     const { requestId } = req as Request & { requestId: string };
+
     expect(requestId).toMatch(UUID_REGEX);
     expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', requestId);
   });
@@ -65,6 +66,7 @@ describe('RequestIdMiddleware', () => {
     middleware.use(req, res as Response, next);
 
     const { requestId } = req as Request & { requestId: string };
+
     expect(requestId).toMatch(UUID_REGEX);
     expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', requestId);
   });
@@ -76,6 +78,7 @@ describe('RequestIdMiddleware', () => {
     middleware.use(req, res as Response, next);
 
     const { requestId } = req as Request & { requestId: string };
+
     expect(requestId).toMatch(UUID_REGEX);
     expect(requestId).not.toBe('a'.repeat(65));
     expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', requestId);
@@ -99,6 +102,7 @@ describe('RequestIdMiddleware', () => {
     middleware.use(req, res as Response, next);
 
     const { requestId } = req as Request & { requestId: string };
+
     expect(requestId).toMatch(UUID_REGEX);
     expect(requestId).not.toContain('<');
   });
@@ -110,6 +114,7 @@ describe('RequestIdMiddleware', () => {
     middleware.use(req, res as Response, next);
 
     const { requestId } = req as Request & { requestId: string };
+
     expect(requestId).toMatch(UUID_REGEX);
     expect(requestId).not.toContain(' ');
   });
@@ -121,6 +126,7 @@ describe('RequestIdMiddleware', () => {
     middleware.use(req, res as Response, next);
 
     const { requestId } = req as Request & { requestId: string };
+
     expect(requestId).toMatch(UUID_REGEX);
   });
 
@@ -144,6 +150,7 @@ describe('RequestIdMiddleware', () => {
 
     const id1 = (req1 as Request & { requestId: string }).requestId;
     const id2 = (req2 as Request & { requestId: string }).requestId;
+
     expect(id1).not.toBe(id2);
   });
 });

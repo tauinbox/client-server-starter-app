@@ -124,6 +124,7 @@ describe('UsersStore', () => {
       store.deleteUser('user-1').subscribe();
 
       const [entity] = store.entities();
+
       expect(entity.id).toBe('user-1');
       expect(entity.deletedAt).not.toBeNull();
       expect(store.entities()).toHaveLength(1);
@@ -133,6 +134,7 @@ describe('UsersStore', () => {
   describe('restoreUser', () => {
     it('replaces the row with the restored user returned by the API', async () => {
       const deleted: User = { ...mockUser, deletedAt: '2024-02-01T00:00:00Z' };
+
       userServiceMock.getAllCursor.mockReturnValue(of(page([deleted])));
       store.load();
       await settled();
@@ -145,6 +147,7 @@ describe('UsersStore', () => {
 
     it('preserves the deactivated state the server returns', async () => {
       const deactivated: User = { ...mockUser, isActive: false };
+
       userServiceMock.restore.mockReturnValue(of(deactivated));
       store.load();
       await settled();
@@ -296,6 +299,7 @@ describe('UsersStore', () => {
     it('applies only the latest event of a user', () => {
       const first = new Subject<User>();
       const second = new Subject<User>();
+
       userServiceMock.getListRow
         .mockReturnValueOnce(first)
         .mockReturnValueOnce(second);
@@ -310,6 +314,7 @@ describe('UsersStore', () => {
 
     it('does not bring back a row that a reload dropped while the read ran', async () => {
       const read = new Subject<User>();
+
       userServiceMock.getListRow.mockReturnValue(read);
       userServiceMock.getAllCursor.mockReturnValueOnce(of(page([bob])));
 

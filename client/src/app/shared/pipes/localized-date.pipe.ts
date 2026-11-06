@@ -19,6 +19,7 @@ function formatterFor(
 ): Intl.DateTimeFormat {
   const key = `${lang}|${format}|${timeZone ?? ''}`;
   let formatter = formatters.get(key);
+
   if (!formatter) {
     formatter = new Intl.DateTimeFormat(lang, {
       ...FORMAT_OPTIONS[format],
@@ -26,6 +27,7 @@ function formatterFor(
     });
     formatters.set(key, formatter);
   }
+
   return formatter;
 }
 
@@ -49,6 +51,7 @@ export class LocalizedDatePipe implements PipeTransform {
     timeZone?: string
   ): string {
     if (value === null || value === undefined) return '';
+
     return formatterFor(this.#language(), format, timeZone).format(
       new Date(value)
     );

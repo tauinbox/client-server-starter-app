@@ -38,6 +38,7 @@ describe('Application bootstrap', () => {
     'should fully initialize including database connectivity',
     async () => {
       let app: INestApplication | undefined;
+
       try {
         const moduleFixture: TestingModule = await Test.createTestingModule({
           imports: [CoreModule.forRoot()]
@@ -60,6 +61,7 @@ describe('Application bootstrap', () => {
     async () => {
       const warnSpy = jest.spyOn(Logger.prototype, 'warn');
       let app: INestApplication | undefined;
+
       try {
         const moduleFixture: TestingModule = await Test.createTestingModule({
           imports: [CoreModule.forRoot()]
@@ -72,6 +74,7 @@ describe('Application bootstrap', () => {
         const legacyPathWarnings = warnSpy.mock.calls.filter(([message]) =>
           String(message).includes('Unsupported route path')
         );
+
         expect(legacyPathWarnings).toEqual([]);
       } finally {
         await app?.close();

@@ -70,6 +70,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
                   reauthProof,
                   operation
                 });
+
                 return refuse
                   ? Promise.reject(refuse)
                   : Promise.resolve(undefined);

@@ -205,9 +205,11 @@ describe('BillingSettingsComponent', () => {
     }).compileComponents();
 
     router = TestBed.inject(Router);
+
     if (transactionId) {
       await router.navigateByUrl(`/?_ptxn=${transactionId}`);
     }
+
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(BillingSettingsComponent);
     fixture.detectChanges();
@@ -217,6 +219,7 @@ describe('BillingSettingsComponent', () => {
     await setup(true);
     expect(storeMock.loadSettings).toHaveBeenCalled();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain('Pro');
     expect(text).toContain('$12.00');
   });
@@ -243,6 +246,7 @@ describe('BillingSettingsComponent', () => {
     expect(entitlementsMock.load).toHaveBeenCalled();
     expect(entitlementsMock.limit).toHaveBeenCalledWith('sessions');
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain('Devices at once: 10');
     expect(text).toContain('drops your oldest session');
   });
@@ -250,16 +254,20 @@ describe('BillingSettingsComponent', () => {
   it('falls back to the default allowance when the plan carries no sessions limit', async () => {
     await setup(false);
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain(`Devices at once: ${MAX_CONCURRENT_SESSIONS}`);
   });
 
   it('renders billing-boundary dates in UTC regardless of the browser timezone', async () => {
     const systemTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const systemOffset = new Date('2025-01-01T00:00:00Z').getTimezoneOffset();
+
     vi.stubEnv('TZ', 'America/Los_Angeles');
+
     try {
       await setup(true, { usage: usageSummary });
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
       // currentPeriodEnd, invoice periodEnd and the usage period end are all
       // 2026-07-01T00:00:00Z. West of UTC an un-zoned pipe renders the previous
       // day ("Jun 30") - the off-by-one the UTC arg prevents.
@@ -271,6 +279,7 @@ describe('BillingSettingsComponent', () => {
       vi.stubEnv('TZ', systemTimeZone);
       vi.unstubAllEnvs();
     }
+
     expect(new Date('2025-01-01T00:00:00Z').getTimezoneOffset()).toBe(
       systemOffset
     );
@@ -296,6 +305,7 @@ describe('BillingSettingsComponent', () => {
   it('renders the shared list empty state with no invoice', async () => {
     await setup(false);
     const empty = fixture.nativeElement.querySelector('nxs-list-empty');
+
     expect(empty?.textContent).toContain('No invoices yet.');
   });
 
@@ -390,6 +400,7 @@ describe('BillingSettingsComponent', () => {
     const card = fixture.nativeElement.querySelector(
       'nxs-credits-card'
     ) as HTMLElement;
+
     expect(card).not.toBeNull();
     expect(card.querySelector('.credits-units')?.textContent).toContain(
       '1,240'

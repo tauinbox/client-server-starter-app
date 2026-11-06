@@ -49,6 +49,7 @@ const captureFailure = (call: () => unknown) => {
   } catch (error) {
     return error as OAuthAuthenticationFailedException;
   }
+
   throw new Error('Expected an OAuthAuthenticationFailedException');
 };
 
@@ -98,6 +99,7 @@ describe.each([
     const callbackError = new UnauthorizedException(
       'Unable to verify authorization request state.'
     );
+
     mockBaseCanActivate.mockRejectedValue(callbackError);
     await expect(createGuard().canActivate(context)).rejects.toBe(
       callbackError
@@ -321,6 +323,7 @@ describe.each([
 
   it('rethrows a non-configuration error unchanged instead of masking it as 404', async () => {
     const exchangeError = new Error('Failed to obtain access token');
+
     mockBaseCanActivate.mockRejectedValue(exchangeError);
     await expect(createGuard().canActivate(context)).rejects.toBe(
       exchangeError
@@ -329,6 +332,7 @@ describe.each([
 
   it('rethrows a synchronously thrown error unchanged', async () => {
     const syncError = new Error('boom');
+
     mockBaseCanActivate.mockImplementation(() => {
       throw syncError;
     });

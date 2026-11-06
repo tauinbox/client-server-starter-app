@@ -7,6 +7,7 @@ import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 // (every 15s) would dominate the request log; keep them out of it.
 function isObservabilityPoll(originalUrl: string): boolean {
   const [path] = originalUrl.split('?');
+
   return path.startsWith('/api/health/') || path === '/metrics';
 }
 
@@ -17,6 +18,7 @@ export class RequestLoggingMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction): void {
     if (isObservabilityPoll(req.originalUrl)) {
       next();
+
       return;
     }
 
@@ -27,6 +29,7 @@ export class RequestLoggingMiddleware implements NestMiddleware {
       const { statusCode } = res;
 
       if (logLevel === 'error' && statusCode < 500) return;
+
       if (logLevel === 'warn' && statusCode < 400) return;
 
       const duration = Date.now() - start;

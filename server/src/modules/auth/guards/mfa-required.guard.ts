@@ -57,6 +57,7 @@ export class MfaRequiredGuard implements CanActivate {
           PERMISSIONS_KEY,
           targets
         ) ?? [];
+
       this.accessRefusals.refuse(
         {
           actorId: user.userId,

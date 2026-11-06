@@ -25,12 +25,14 @@ async function seedBreached(baseUrl: string, values: string[]): Promise<void> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(values)
   });
+
   expect(res.status).toBe(200);
 }
 
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -49,8 +51,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -77,6 +81,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
+
     expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
 
     const after = await fetch(`${baseUrl}/api/v1/users/${mockId('user-3')}`, {
@@ -87,6 +92,7 @@ describe('PATCH /api/v1/users/:id validates the whole body before mutating', () 
       email: string;
       isEmailVerified: boolean;
     };
+
     expect(user.name).toBe('John Smith');
     expect(user.email).toBe('john@example.com');
     expect(user.isEmailVerified).toBe(true);
@@ -110,6 +116,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
+
     expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
 
     const after = await fetch(`${baseUrl}/api/v1/auth/profile`, {
@@ -119,6 +126,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
       name: string;
       locale: string;
     };
+
     expect(profile.name).toBe('Regular User');
     expect(profile.locale).toBe('en');
   });
@@ -137,6 +145,7 @@ describe('PATCH /api/v1/auth/profile validates the whole body before mutating', 
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
+
     expect(body.message).toBe(PASSWORD_LENGTH_ERROR);
   });
 });
@@ -171,6 +180,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
       headers: authHeaders(token)
     });
     const user = (await after.json()) as { name: string };
+
     expect(user.name).toBe('John Smith');
   });
 
@@ -189,12 +199,14 @@ describe('the breach blocklist mirrors the server verdict', () => {
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errorKey: string };
+
     expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
 
     const after = await fetch(`${baseUrl}/api/v1/auth/profile`, {
       headers: authHeaders(token)
     });
     const profile = (await after.json()) as { name: string };
+
     expect(profile.name).toBe('Regular User');
   });
 
@@ -212,6 +224,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
 
     expect(res.status).toBe(403);
     const body = (await res.json()) as { errorKey: string };
+
     expect(body.errorKey).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
   });
 
@@ -228,6 +241,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errorKey: string };
+
     expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
   });
 
@@ -243,6 +257,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errorKey: string };
+
     expect(body.errorKey).toBe(ErrorKeys.AUTH.INVALID_RESET_TOKEN);
   });
 
@@ -258,6 +273,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
         password
       })
     });
+
     expect(accepted.status).toBe(201);
 
     await seedBreached(baseUrl, [password]);
@@ -274,6 +290,7 @@ describe('the breach blocklist mirrors the server verdict', () => {
 
     expect(refused.status).toBe(422);
     const body = (await refused.json()) as { errorKey: string };
+
     expect(body.errorKey).toBe(ErrorKeys.AUTH.PASSWORD_BREACHED);
   });
 
@@ -380,6 +397,7 @@ describe('body validation precedes the entity lookup', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(malformedMessage);
     }
   );
@@ -396,8 +414,10 @@ describe('body validation precedes the entity lookup', () => {
       });
 
       expect(res.status).toBe(404);
+
       if (notFoundKey) {
         const body = (await res.json()) as { errorKey: string };
+
         expect(body.errorKey).toBe(notFoundKey);
       }
     }
@@ -414,6 +434,7 @@ describe('body validation precedes the entity lookup', () => {
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toEqual(['property isSuper should not exist']);
   });
 
@@ -428,6 +449,7 @@ describe('body validation precedes the entity lookup', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { name: string };
+
     expect(body.name).toBe('Renamed');
   });
 });
@@ -443,6 +465,7 @@ describe('DELETE /api/v1/roles/:id/permissions/:permissionId', () => {
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as { errorKey: string };
+
     expect(body.errorKey).toBe(ErrorKeys.ROLES.NOT_FOUND);
   });
 
@@ -450,7 +473,9 @@ describe('DELETE /api/v1/roles/:id/permissions/:permissionId', () => {
     const token = await login('admin@example.com');
     // The seed grants the editor role nothing.
     const [permission] = getState().permissions.values();
+
     if (!permission) throw new Error('The seed holds no permission');
+
     getState().rolePermissions.push({
       id: mockId('rp-editor-held'),
       roleId: mockId('role-editor'),

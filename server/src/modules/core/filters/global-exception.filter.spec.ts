@@ -43,6 +43,7 @@ describe('GlobalExceptionFilter', () => {
 
     const mockRequest = {};
     const mockResponse = {};
+
     mockHost = {
       switchToHttp: () => ({
         // @ts-expect-error testing mock
@@ -74,6 +75,7 @@ describe('GlobalExceptionFilter', () => {
     filter.catch(new Error('test'), mockHost);
 
     const body = getResponseBody();
+
     expect(body).toHaveProperty('statusCode');
     expect(body).toHaveProperty('message');
     expect(body).toHaveProperty('error');
@@ -93,6 +95,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(404);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(404);
     expect(body.message).toBe('User not found');
     expect(body.error).toBe('Not Found');
@@ -103,6 +106,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(400);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(400);
     expect(body.message).toBe('Invalid input');
     expect(body.error).toBe('Bad Request');
@@ -113,6 +117,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(401);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(401);
     expect(body.message).toBe('Unauthorized');
     expect(body.error).toBe('Unauthorized');
@@ -123,6 +128,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(409);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(409);
     expect(body.message).toBe('Already exists');
     expect(body.error).toBe('Conflict');
@@ -133,6 +139,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(403);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(403);
     expect(body.message).toBe('Forbidden');
     expect(body.error).toBe('Forbidden');
@@ -142,6 +149,7 @@ describe('GlobalExceptionFilter', () => {
 
   it('should forward lockedUntil and retryAfter on a 423', () => {
     const lockedUntil = new Date(Date.now() + 600000).toISOString();
+
     filter.catch(
       new HttpException(
         {
@@ -157,6 +165,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(423);
     const body = getResponseBody();
+
     expect(body.error).toBe('Locked');
     expect(body.lockedUntil).toBe(lockedUntil);
     expect(body.retryAfter).toBe(600);
@@ -194,6 +203,7 @@ describe('GlobalExceptionFilter', () => {
     );
 
     const body = getResponseBody();
+
     expect(body.retryAfter).toBeUndefined();
     expect(body.lockedUntil).toBeUndefined();
     expect(mockHttpAdapter.setHeader).not.toHaveBeenCalled();
@@ -268,6 +278,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(400);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(400);
     expect(body.message).toBe(
       'email must be an email. name should not be empty'
@@ -288,6 +299,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(409);
     const body = getResponseBody();
+
     expect(body.message).toBe('A record with this value already exists');
     expect(body.error).toBe('Conflict');
   });
@@ -299,6 +311,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(409);
     const body = getResponseBody();
+
     expect(body.message).toBe('Cannot complete operation due to related data');
   });
 
@@ -309,6 +322,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(422);
     const body = getResponseBody();
+
     expect(body.message).toBe('A required field is missing');
   });
 
@@ -319,6 +333,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(400);
     const body = getResponseBody();
+
     expect(body.message).toBe('Invalid input format');
   });
 
@@ -329,6 +344,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(500);
     const body = getResponseBody();
+
     expect(body.message).toBe('Internal server error');
   });
 
@@ -341,6 +357,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(404);
     const body = getResponseBody();
+
     expect(body.message).toBe('The requested resource was not found');
     expect(body.error).toBe('Not Found');
   });
@@ -352,6 +369,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(500);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(500);
     expect(body.message).toBe('Internal server error');
     expect(body.message).not.toContain('database');
@@ -364,6 +382,7 @@ describe('GlobalExceptionFilter', () => {
       expose: true,
       type: 'entity.too.large'
     });
+
     filter.catch(tooLarge, mockHost);
 
     expect(getResponseStatus()).toBe(413);
@@ -397,6 +416,7 @@ describe('GlobalExceptionFilter', () => {
 
     expect(getResponseStatus()).toBe(500);
     const body = getResponseBody();
+
     expect(body.statusCode).toBe(500);
     expect(body.message).toBe('Internal server error');
   });
@@ -405,6 +425,7 @@ describe('GlobalExceptionFilter', () => {
 
   it('should log 5xx errors with logger.error', () => {
     const error = new Error('something broke');
+
     filter.catch(error, mockHost);
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
@@ -423,11 +444,13 @@ describe('GlobalExceptionFilter', () => {
 
   it('redacts the credential query values in the logged path only', () => {
     const url = '/api/v1/auth/google/callback?code=OAUTHCODE&state=OAUTHSTATE';
+
     mockHttpAdapter.getRequestUrl.mockReturnValue(url);
 
     filter.catch(new NotFoundException('Not found'), mockHost);
 
     const [logged] = loggerWarnSpy.mock.calls[0] as [string];
+
     expect(logged).toContain('code=REDACTED&state=REDACTED');
     expect(logged).not.toContain('OAUTHCODE');
     expect(logged).not.toContain('OAUTHSTATE');
@@ -441,6 +464,8 @@ describe('GlobalExceptionFilter', () => {
 
 function createQueryFailedError(pgCode: string): QueryFailedError {
   const driverError = new Error('query failed') as Error & { code: string };
+
   driverError.code = pgCode;
+
   return new QueryFailedError('SELECT 1', [], driverError);
 }

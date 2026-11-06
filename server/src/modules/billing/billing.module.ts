@@ -180,6 +180,7 @@ export class BillingModule {
               config.get<string>('BILLING_PROVIDER_TIMEOUT_MS') ??
                 DEFAULT_BILLING_PROVIDER_TIMEOUT_MS
             );
+
             return [paddle, yookassa].map((provider) =>
               withProviderDeadline(provider, timeoutMs)
             );

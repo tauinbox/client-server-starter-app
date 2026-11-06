@@ -15,6 +15,7 @@ describe('db-pool gauge', () => {
       const source = {
         driver: { master: { totalCount: 7, idleCount: 3, waitingCount: 2 } }
       };
+
       expect(readDbPoolCounts(source)).toEqual({
         total: 7,
         idle: 3,
@@ -31,6 +32,7 @@ describe('db-pool gauge', () => {
 
     it('returns null when the driver is not pg (no numeric counters)', () => {
       const source = { driver: { master: { query: jest.fn() } } };
+
       expect(readDbPoolCounts(source)).toBeNull();
     });
   });

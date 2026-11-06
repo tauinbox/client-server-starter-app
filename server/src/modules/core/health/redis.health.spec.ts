@@ -19,6 +19,7 @@ jest.mock('ioredis', () => ({
     constructor(...args: unknown[]) {
       redisCtorMock(...args);
     }
+
     ping = pingMock;
     disconnect = disconnectMock;
     on = onMock;
@@ -107,10 +108,12 @@ describe('RedisHealthIndicator', () => {
 
     it('reports down when PING hangs past the timeout', async () => {
       jest.useFakeTimers();
+
       try {
         pingMock.mockReturnValue(new Promise(() => undefined));
 
         const pending = indicator.isHealthy('redis');
+
         await jest.advanceTimersByTimeAsync(2000);
 
         await expect(pending).resolves.toEqual({

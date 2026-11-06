@@ -39,6 +39,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       const app = createApp();
       const server = await listenOnUnblockedPort(app);
       const port = portOf(server);
+
       console.log(`[Worker] Mock server started on port ${port}`);
       // Express rewrites `req.url` while it routes, so read it first.
       server.prependListener('request', (req) =>
@@ -68,10 +69,12 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       },
       async getState() {
         const res = await fetch(`${baseUrl}/__control/state`);
+
         return res.json();
       },
       async getTokens() {
         const res = await fetch(`${baseUrl}/__control/tokens`);
+
         return res.json();
       },
       async expireToken(token) {
@@ -94,6 +97,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, accounts })
         });
+
         if (!res.ok) {
           throw new Error(`seedOAuthAccounts failed: ${await res.text()}`);
         }
@@ -104,6 +108,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
+
         return res.json();
       },
       async issueReauthProof(userId, operation) {
@@ -112,6 +117,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, operation })
         });
+
         return res.json();
       },
       async seedBreachedPasswords(passwords) {
@@ -207,6 +213,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
             body: JSON.stringify(args)
           }
         );
+
         return res.json();
       },
       async seedBillingUsage(args) {
@@ -215,6 +222,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(args)
         });
+
         return res.json();
       },
       async advanceBillingRenewal(args) {
@@ -226,6 +234,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
             body: JSON.stringify(args)
           }
         );
+
         return res.json();
       }
     };

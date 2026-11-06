@@ -5,6 +5,7 @@ describe('mail-content', () => {
 
   it('returns English copy for the en locale', () => {
     const msg = mailMessages('en').verification(url);
+
     expect(msg.subject).toBe('Verify your email address');
     expect(msg.heading).toBe('Verify your email');
     expect(msg.button?.url).toBe(url);
@@ -13,6 +14,7 @@ describe('mail-content', () => {
 
   it('returns Russian copy for the ru locale', () => {
     const msg = mailMessages('ru').verification(url);
+
     expect(msg.subject).toBe('Подтвердите адрес электронной почты');
     expect(msg.button?.url).toBe(url);
     // Subject differs from the English variant
@@ -21,6 +23,7 @@ describe('mail-content', () => {
 
   it('embeds the masked address in the old-address alert without a button', () => {
     const msg = mailMessages('en').emailChangeNotifyOld('n***@example.com');
+
     expect(msg.button).toBeUndefined();
     expect(msg.paragraphs.join(' ')).toContain('n***@example.com');
   });
@@ -29,6 +32,7 @@ describe('mail-content', () => {
   // carries no action link of any kind.
   it('carries no action link in any credential-change notice', () => {
     const details = { when: '2026-09-01 12:34 UTC', ip: '198.51.100.7' };
+
     for (const locale of ['en', 'ru'] as const) {
       expect(
         mailMessages(locale).passwordChanged('self', details).button
@@ -47,6 +51,7 @@ describe('mail-content', () => {
 
     for (const locale of ['en', 'ru'] as const) {
       const msg = mailMessages(locale).mfaRecoveryCodesReplaced(details);
+
       expect(msg.button).toBeUndefined();
       expect(msg.paragraphs.length).toBeGreaterThan(0);
     }
@@ -64,11 +69,13 @@ describe('mail-content', () => {
 
     for (const locale of ['en', 'ru'] as const) {
       const msg = mailMessages(locale).mfaResetByAdmin(details);
+
       expect(msg.button).toBeUndefined();
       expect(msg.paragraphs.join(' ')).toContain('198.51.100.7');
     }
 
     const en = mailMessages('en').mfaResetByAdmin(details);
+
     expect(en.subject).toContain('administrator');
     expect(en.paragraphs[0]).toContain('session was signed out');
     expect(mailMessages('ru').mfaResetByAdmin(details).subject).not.toBe(
@@ -114,9 +121,11 @@ describe('mail-content', () => {
         'google',
         'vk'
       ]);
+
       expect(message.paragraphs).toHaveLength(without.paragraphs.length + 1);
       expect(message.paragraphs.join(' ')).toContain('Google, VK');
     }
+
     expect(
       mailMessages('en').passwordChanged('self', details, []).paragraphs
     ).toEqual(without.paragraphs);

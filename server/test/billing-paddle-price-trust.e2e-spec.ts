@@ -49,6 +49,7 @@ runWithInfra(
       ds = new DataSource({ ...postgresConfig(), logging: false });
       await ds.initialize();
       const plans = ds.getRepository(Plan);
+
       await plans.save(
         [PRO, BUSINESS].map((key) =>
           plans.create({
@@ -95,6 +96,7 @@ runWithInfra(
           })
         )
       );
+
       packSmallId = small.id;
       packLargeId = large.id;
 
@@ -118,6 +120,7 @@ runWithInfra(
           { provide: EventEmitter2, useValue: { emit: jest.fn() } }
         ]
       }).compile();
+
       provider = module.get(PaddleProvider);
       reducer = module.get(BillingEventReducer);
     }, 30000);
@@ -131,6 +134,7 @@ runWithInfra(
           password: 'hashed'
         })
       );
+
       userId = user.id;
       const customer = await ds.getRepository(Customer).save(
         ds.getRepository(Customer).create({
@@ -143,6 +147,7 @@ runWithInfra(
           defaultPaymentMethodId: null
         })
       );
+
       customerId = customer.id;
     });
 
@@ -151,6 +156,7 @@ runWithInfra(
       // customer, its balance and its subscription then cascade from the user.
       await ds.getRepository(CreditLedger).delete({ customerId });
       await ds.getRepository(Invoice).delete({ customerId });
+
       if (userId) {
         await ds.getRepository(User).delete({ id: userId });
         userId = undefined;
@@ -174,6 +180,7 @@ runWithInfra(
       const event = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
         'paddle-signature': 'sig'
       });
+
       await reducer.reduce(event as NormalizedEvent);
     }
 
@@ -195,6 +202,7 @@ runWithInfra(
       const stored = await ds
         .getRepository(Subscription)
         .findOneByOrFail({ providerSubscriptionId });
+
       expect(stored.planKey).toBe(PRO);
     });
 
@@ -220,10 +228,12 @@ runWithInfra(
       const balance = await ds
         .getRepository(CreditBalance)
         .findOneByOrFail({ customerId });
+
       expect(balance.balanceUnits.toNumber()).toBe(500);
       const invoice = await ds
         .getRepository(Invoice)
         .findOneByOrFail({ customerId });
+
       expect(invoice.productId).toBe(packSmallId);
     });
   }

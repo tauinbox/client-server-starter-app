@@ -35,12 +35,14 @@ test.describe('Feature flag preview — unsaved editor state', () => {
       .click();
 
     const dialog = await openedDialog(page);
+
     await dialog.getByRole('button', { name: 'Preview' }).click();
 
     const previewResult = dialog.locator('.preview-result');
     const runButton = dialog.getByRole('button', { name: 'Run preview' });
 
     const rolesInput = dialog.getByRole('combobox', { name: 'Roles' });
+
     await rolesInput.fill('user');
     await rolesInput.press('Enter');
     await expect(
@@ -55,12 +57,14 @@ test.describe('Feature flag preview — unsaved editor state', () => {
         r.request().method() === 'POST' &&
         r.status() === 200
     );
+
     await runButton.click();
     const savedBody = (await (
       await savedRun
     )
       .request()
       .postDataJSON()) as PreviewBody;
+
     expect(savedBody.rules).toHaveLength(1);
     expect(savedBody.rules?.[0].payload.type).toBe('percentage');
     await expect(previewResult).toContainText('Disabled');
@@ -69,9 +73,11 @@ test.describe('Feature flag preview — unsaved editor state', () => {
     // Swap the rule to a role rule that matches the synthetic context. Nothing
     // is saved — only the editor changes.
     const ruleRow = dialog.locator('nxs-feature-flag-rule-row').first();
+
     await ruleRow.getByRole('combobox', { name: 'Type' }).click();
     await page.getByRole('option', { name: 'Role', exact: true }).click();
     const ruleRoleInput = ruleRow.getByRole('combobox', { name: 'Role names' });
+
     await ruleRoleInput.click();
     await ruleRoleInput.fill('user');
     await page
@@ -87,12 +93,14 @@ test.describe('Feature flag preview — unsaved editor state', () => {
         r.request().method() === 'POST' &&
         r.status() === 200
     );
+
     await runButton.click();
     const draftBody = (await (
       await draftRun
     )
       .request()
       .postDataJSON()) as PreviewBody;
+
     expect(draftBody.rules).toHaveLength(1);
     expect(draftBody.rules?.[0].payload.type).toBe('role');
     await expect(previewResult).toContainText('Enabled');
@@ -106,12 +114,14 @@ test.describe('Feature flag preview — unsaved editor state', () => {
         r.request().method() === 'POST' &&
         r.status() === 200
     );
+
     await runButton.click();
     const disabledBody = (await (
       await disabledRun
     )
       .request()
       .postDataJSON()) as PreviewBody;
+
     expect(disabledBody.enabled).toBe(false);
     await expect(previewResult).toContainText('Flag is turned off');
 
@@ -125,6 +135,7 @@ test.describe('Feature flag preview — unsaved editor state', () => {
       .getByRole('button', { name: /Edit flag beta-export/ })
       .click();
     const reopened = await openedDialog(page);
+
     await expect(
       reopened
         .locator('nxs-feature-flag-rule-row')

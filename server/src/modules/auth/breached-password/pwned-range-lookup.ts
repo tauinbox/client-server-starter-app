@@ -27,10 +27,14 @@ export interface PwnedRangeOptions {
 function suffixIsListed(body: string, suffix: string): boolean {
   for (const line of body.split('\n')) {
     const separator = line.indexOf(':');
+
     if (separator === -1) continue;
+
     if (line.slice(0, separator).trim().toUpperCase() !== suffix) continue;
+
     return Number(line.slice(separator + 1).trim()) > 0;
   }
+
   return false;
 }
 
@@ -66,13 +70,16 @@ export async function lookupBreachedPassword(
 
     if (!response.ok) {
       options.onUnavailable?.(`HTTP ${response.status} ${response.statusText}`);
+
       return 'unavailable';
     }
 
     const body = await response.text();
+
     return suffixIsListed(body, suffix) ? 'breached' : 'clean';
   } catch (err) {
     options.onUnavailable?.('request failed', err);
+
     return 'unavailable';
   }
 }

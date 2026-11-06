@@ -20,6 +20,7 @@ const NEW_PASSWORD = 'Recovered-Kestrel-42';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -59,8 +60,10 @@ async function adminToken(): Promise<string> {
     email: ADMIN_EMAIL,
     password: SEED_PASSWORD
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -73,6 +76,7 @@ async function patchUser(body: Record<string, unknown>): Promise<void> {
     },
     body: JSON.stringify(body)
   });
+
   expect(res.status).toBe(200);
 }
 
@@ -91,6 +95,7 @@ describe('account recovery removes the linked providers', () => {
       token,
       password: NEW_PASSWORD
     });
+
     expect(res.status).toBe(200);
 
     expect(getState().oauthAccounts.get(userId) ?? []).toHaveLength(0);
@@ -130,7 +135,9 @@ describe('account recovery removes the linked providers', () => {
         email: USER_EMAIL,
         password: SEED_PASSWORD
       });
+
       expect(res.status).toBe(200);
+
       return ((await res.json()) as { tokens: { access_token: string } }).tokens
         .access_token;
     };
@@ -148,6 +155,7 @@ describe('account recovery removes the linked providers', () => {
       password: NEW_PASSWORD,
       currentPassword: SEED_PASSWORD
     });
+
     expect(kept.status).toBe(200);
     expect(getState().oauthAccounts.get(userId)).toHaveLength(1);
 
@@ -157,6 +165,7 @@ describe('account recovery removes the linked providers', () => {
       currentPassword: SEED_PASSWORD,
       removeLinkedProviders: true
     });
+
     expect(removed.status).toBe(200);
     expect(getState().oauthAccounts.get(userId) ?? []).toHaveLength(0);
     expect(unlinkRows()).toEqual([

@@ -25,6 +25,7 @@ function listDirs(dir: string): string[] {
     .readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => path.join(dir, e.name));
+
   return [dir, ...subdirs.flatMap(listDirs)];
 }
 
@@ -71,6 +72,7 @@ function checkTestHarnesses(): string[] {
       .readFileSync(file, 'utf-8')
       .split('createTestingModule(')
       .slice(1);
+
     modules.forEach((module, i) => {
       if (
         module.includes('CoreModule.forRoot') ||
@@ -78,14 +80,17 @@ function checkTestHarnesses(): string[] {
       ) {
         return;
       }
+
       const mounted = (module.match(/controllers:\s*\[([^\]]*)\]/)?.[1] ?? '')
         .split(',')
         .map((n) => n.trim())
         .filter((n) => production.has(n));
+
       if (mounted.length > 0 && !module.includes('RESPONSE_SERIALIZER')) {
         const rel = path
           .relative(path.dirname(TEST_DIR), file)
           .replaceAll('\\', '/');
+
         errors.push(
           `${rel}: test module ${i + 1} mounts ${mounted.join(', ')}; add RESPONSE_SERIALIZER to its providers`
         );
@@ -102,6 +107,7 @@ function main(): void {
 
   for (const dir of listDirs(SRC_DIR)) {
     const files = controllersIn(dir);
+
     count += files.length;
     const rel = path.relative(SRC_DIR, dir).replaceAll('\\', '/');
 

@@ -25,6 +25,7 @@ export class OAuthProviderFlagAttributesRegistrar implements OnModuleInit {
   onModuleInit(): void {
     for (const { envVar, attributeKey } of OAUTH_PROVIDER_FLAGS) {
       const configured = Boolean(this.configService.get(envVar));
+
       this.attributeRegistry.registerAttribute(attributeKey, () => configured);
     }
   }

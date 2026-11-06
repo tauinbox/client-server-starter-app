@@ -31,6 +31,7 @@ export function ensureAuthenticated(
   // every guarded navigation an anonymous visitor makes.
   if (!authStore.hasPersistedUser()) {
     authService.clearSession();
+
     return loginUrlTree(router, returnUrl);
   }
 
@@ -38,14 +39,17 @@ export function ensureAuthenticated(
     switchMap((tokens) => {
       if (tokens) {
         const result = onAuthenticated();
+
         return result instanceof Observable ? result : of(result);
       }
 
       authService.clearSession();
+
       return of(loginUrlTree(router, returnUrl));
     }),
     catchError(() => {
       authService.clearSession();
+
       return of(loginUrlTree(router, returnUrl));
     })
   );

@@ -76,6 +76,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     await page.goto('/profile');
 
     const card = page.locator('nxs-two-factor');
+
     await expect(card.getByRole('button', { name: 'Turn on' })).toBeVisible();
     // The instruction this account could never follow.
     await expect(
@@ -103,6 +104,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
         res.request().method() === 'POST',
       { timeout: 15_000 }
     );
+
     await page
       .locator('nxs-two-factor')
       .getByRole('button', { name: 'Turn on' })
@@ -111,6 +113,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     // A proof minted for another operation is refused by the setup route, so
     // the operation the trip declares is the whole point of this assertion.
     const response = await initiated;
+
     expect(response.request().postDataJSON()).toEqual({
       operation: STEP_UP_OPERATION.MFA_SETUP
     });
@@ -131,6 +134,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
       userId,
       STEP_UP_OPERATION.MFA_SETUP
     );
+
     await seedProof(page, token);
 
     // Seed before the document runs: the page reads and clears the key during
@@ -145,6 +149,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     // The reload that follows the enrolment builds a new card, which must not
     // read the resume signal again and ask for a second secret.
     const setupCalls: number[] = [];
+
     page.on('response', (res) => {
       if (
         res.url().includes('/auth/mfa/setup') &&
@@ -191,6 +196,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
       userId,
       STEP_UP_OPERATION.EMAIL_CHANGE
     );
+
     await seedProof(page, token);
     await page.addInitScript(() =>
       sessionStorage.setItem(
@@ -206,6 +212,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
         res.status() === 403,
       { timeout: 15_000 }
     );
+
     await page.goto('/profile?reauth=ok');
     await refused;
 
@@ -230,6 +237,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     await page.goto('/profile');
 
     const card = page.locator('nxs-two-factor');
+
     await expect(
       card.getByText('Two-factor authentication is on')
     ).toBeVisible();
@@ -241,6 +249,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
 
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
+
       for (const width of [375, 768, 1366]) {
         await page.setViewportSize({ width, height: 900 });
         const overflow = await page.evaluate(
@@ -248,12 +257,14 @@ test.describe('OAuth-only account turns two-factor on', () => {
             document.documentElement.scrollWidth -
             document.documentElement.clientWidth
         );
+
         expect(
           overflow,
           `horizontal overflow at ${width}px in ${colorScheme}`
         ).toBeLessThanOrEqual(0);
       }
     }
+
     await page.emulateMedia({ colorScheme: 'light' });
     await page.setViewportSize({ width: 1366, height: 900 });
 
@@ -285,6 +296,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     await page.goto('/profile');
 
     const card = page.locator('nxs-two-factor');
+
     await card.getByRole('button', { name: 'Turn off' }).click();
     await page.getByLabel('Authentication code').fill('000000');
     await card.getByRole('button', { name: 'Turn off' }).click();
@@ -294,6 +306,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     );
     const state = await _mockServer.getState();
     const user = (state.users as UserResponse[]).find((u) => u.id === userId);
+
     expect(user?.mfaEnabled).toBe(true);
   });
 
@@ -315,6 +328,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     });
 
     const roundTrips: string[] = [];
+
     page.on('request', (req) => {
       if (req.url().includes('/auth/oauth/reauth-init')) {
         roundTrips.push(req.url());
@@ -324,6 +338,7 @@ test.describe('OAuth-only account turns two-factor on', () => {
     await page.goto('/profile');
 
     const form = page.locator('form');
+
     await form.getByLabel('Email').fill('provider-mfa-new@example.com');
     await form.getByLabel('Email').blur();
 
@@ -337,10 +352,12 @@ test.describe('OAuth-only account turns two-factor on', () => {
         res.request().method() === 'POST',
       { timeout: 15_000 }
     );
+
     await form.getByRole('button', { name: 'Save', exact: true }).click();
     await page.getByRole('button', { name: 'Send link' }).click();
 
     const response = await initiated;
+
     expect(response.status()).toBe(200);
     expect(response.request().postDataJSON()).toEqual({
       newEmail: 'provider-mfa-new@example.com',

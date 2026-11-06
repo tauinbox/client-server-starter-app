@@ -103,11 +103,14 @@ function findCookie(res: request.Response, name: string): string | undefined {
  */
 function expectHostCookie(res: request.Response, name: string): string {
   const cookie = findCookie(res, `__Host-${name}`);
+
   expect(cookie).toBeDefined();
   const attributes = cookie!.split(/;\s*/).slice(1);
+
   expect(attributes).toContain('Path=/');
   expect(attributes).toContain('Secure');
   expect(attributes.some((a) => /^domain=/i.test(a))).toBe(false);
+
   return cookie!;
 }
 
@@ -131,6 +134,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
 
   beforeEach(async () => {
     const userEntity = createUserEntity();
+
     findByToken = jest.fn().mockResolvedValue({
       id: 'token-1',
       userId: 'user-1',
@@ -251,9 +255,11 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
             get: jest.fn((key: string) => configValues[key]),
             getOrThrow: jest.fn((key: string) => {
               const value = configValues[key];
+
               if (value === undefined) {
                 throw new Error(`unexpected config key ${key}`);
               }
+
               return value;
             })
           }
@@ -271,6 +277,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
           switchToHttp: () => { getRequest: () => { user: User } };
         }) => {
           context.switchToHttp().getRequest().user = userEntity;
+
           return true;
         }
       })
@@ -280,6 +287,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
           switchToHttp: () => { getRequest: () => { user: OAuthUserProfile } };
         }) => {
           context.switchToHttp().getRequest().user = oauthProfile;
+
           return true;
         }
       })
@@ -307,6 +315,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
           }
         });
       }
+
       next();
     });
     await app.init();
@@ -325,6 +334,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
       .expect(200);
 
     const cookie = expectHostCookie(res, 'refresh_token');
+
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Strict');
     expect(isClear(cookie)).toBe(false);
@@ -436,6 +446,7 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
       .set('x-test-user', '1')
       .send({ operation: STEP_UP_OPERATION.PASSWORD_SET })
       .expect(201);
+
     expectHostCookie(init, 'oauth_reauth');
 
     const intent = jwtService.sign({

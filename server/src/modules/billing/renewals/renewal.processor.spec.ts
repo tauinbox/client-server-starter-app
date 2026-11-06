@@ -20,6 +20,7 @@ describe('RenewalProcessor', () => {
       runDueRenewals
     };
     const queue: Pick<Queue, 'upsertJobScheduler'> = { upsertJobScheduler };
+
     processor = new RenewalProcessor(
       renewals as RenewalService,
       queue as Queue
@@ -49,6 +50,7 @@ describe('RenewalProcessor', () => {
 
   it('propagates a failed scan, so BullMQ marks the job failed', async () => {
     const failure = new Error('scan failed');
+
     runDueRenewals.mockRejectedValueOnce(failure);
 
     await expect(processor.process()).rejects.toBe(failure);

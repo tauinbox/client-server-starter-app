@@ -28,11 +28,13 @@ function readGlobalLimit(): number {
   const globalThrottler = buildThrottlerOptions(undefined).throttlers.find(
     (throttler) => throttler.name === undefined
   );
+
   if (typeof globalThrottler?.limit !== 'number') {
     throw new Error(
       'The unnamed global throttler must declare a numeric limit'
     );
   }
+
   return globalThrottler.limit;
 }
 
@@ -57,6 +59,7 @@ function makeStubProvider(): PaymentProvider {
       const parsed = JSON.parse(rawBody.toString('utf8')) as {
         event: NormalizedEvent | null;
       };
+
       return Promise.resolve(parsed.event);
     }
   };
@@ -70,6 +73,7 @@ function makeWebhookEventRepo() {
     status: string;
   }> = [];
   let seq = 0;
+
   return {
     createQueryBuilder: () => {
       const captured: {
@@ -83,6 +87,7 @@ function makeWebhookEventRepo() {
           status: string;
         }) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -94,17 +99,22 @@ function makeWebhookEventRepo() {
               e.provider === v.provider &&
               e.providerEventId === v.providerEventId
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `wh-${++seq}`;
+
           rows.push({
             id,
             provider: v.provider,
             providerEventId: v.providerEventId,
             status: v.status
           });
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     },
     findOne: (opts: { where: { provider: string; providerEventId: string } }) =>
@@ -117,7 +127,9 @@ function makeWebhookEventRepo() {
       ),
     update: (where: { id: string }, set: Record<string, unknown>) => {
       const matches = rows.filter((e) => e.id === where.id);
+
       for (const row of matches) Object.assign(row, set);
+
       return Promise.resolve({ affected: matches.length });
     }
   };

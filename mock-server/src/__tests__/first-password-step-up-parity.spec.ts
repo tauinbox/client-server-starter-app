@@ -15,6 +15,7 @@ const NEW_PASSWORD = 'Sunrise-Kettle-19';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -46,6 +47,7 @@ async function accessToken(userId: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId })
   });
+
   expect(dataRes.status).toBe(200);
   const { token } = (await dataRes.json()) as { token: string };
 
@@ -53,10 +55,12 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
+
   expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as {
     tokens: { access_token: string };
   };
+
   return body.tokens.access_token;
 }
 
@@ -69,10 +73,13 @@ async function issueProof(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId, operation })
   });
+
   if (res.status !== 200) {
     return null;
   }
+
   const { token } = (await res.json()) as { token: string };
+
   return token;
 }
 
@@ -166,6 +173,7 @@ describe('PATCH /api/v1/auth/profile demands a step-up for a first password', ()
     const proofClears = res.headers
       .getSetCookie()
       .filter((cookie) => cookie.startsWith('reauth_proof=;'));
+
     expect(proofClears).toHaveLength(1);
   });
 

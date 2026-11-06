@@ -342,7 +342,9 @@ export class RolesController {
         details: { roleId: dto.roleId }
       })
     });
+
     await this.emitUserRolesChanged(userId);
+
     return result;
   }
 
@@ -372,7 +374,9 @@ export class RolesController {
         details: { roleId }
       })
     });
+
     await this.emitUserRolesChanged(userId);
+
     return result;
   }
 }

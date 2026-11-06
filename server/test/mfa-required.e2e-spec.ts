@@ -41,11 +41,13 @@ const ENCRYPTION_KEY = Buffer.alloc(32, 3).toString('base64');
 class TestJwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
+
     req.user = {
       userId: 'admin-1',
       email: 'admin@example.com',
       sessionId: 'session-1'
     };
+
     return true;
   }
 }

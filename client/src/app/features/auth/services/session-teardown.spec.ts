@@ -136,10 +136,12 @@ describe('session teardown', () => {
     const entitlementsStore = TestBed.inject(EntitlementsStore);
 
     const flagsLoaded = featureFlagsStore.load();
+
     httpMock.expectOne(FEATURE_FLAGS_URL).flush({ flags: { beta: true } });
     await flagsLoaded;
 
     const entitlementsLoaded = entitlementsStore.load();
+
     httpMock.expectOne(ENTITLEMENTS_URL).flush(entitlements);
     await entitlementsLoaded;
 
@@ -192,6 +194,7 @@ describe('session teardown', () => {
     expect(featureFlagsStore.isEnabled('beta')()).toBe(false);
 
     const fixture = TestBed.createComponent(LoginComponent);
+
     fixture.detectChanges();
 
     httpMock
@@ -217,6 +220,7 @@ describe('session teardown', () => {
       () => true
     ) as Observable<GuardResult>;
     const settled = firstValueFrom(guarded);
+
     httpMock
       .expectOne(AuthApiEnum.RefreshToken)
       .flush(null, { status: 401, statusText: 'Unauthorized' });
@@ -246,6 +250,7 @@ describe('session teardown', () => {
       )
     ) as Observable<boolean>;
     const settled = firstValueFrom(guarded);
+
     httpMock
       .expectOne(AuthApiEnum.RefreshToken)
       .flush(null, { status: 401, statusText: 'Unauthorized' });
@@ -270,6 +275,7 @@ describe('session teardown', () => {
     it('logging out elsewhere tears this session down and lands it on /login', async () => {
       TestBed.inject(AuthService);
       const router = TestBed.inject(Router);
+
       router.navigated = true;
       const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
       const { featureFlagsStore, entitlementsStore } = await loadCaches();
@@ -297,6 +303,7 @@ describe('session teardown', () => {
       // A login writes the key rather than removing it. Tearing down here would
       // fight the session the other tab is establishing.
       const otherUser = { ...cachedUser, id: '2', email: 'other@example.com' };
+
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(otherUser));
       dispatchStorageEvent({
         key: AUTH_USER_KEY,

@@ -55,6 +55,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -78,11 +79,14 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const updateUser = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'update' && p.resource.subject === 'User'
     );
+
     if (!updateUser) throw new Error('Permission update:User missing');
+
     const selfEdit = await roleService.create(
       { name: selfEditRoleName },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       selfEdit.id,
       [
@@ -93,15 +97,18 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       ],
       { ability: SYSTEM_ABILITY }
     );
+
     for (const email of [ownerEmail, otherEmail]) {
       await roleService.assignRoleToUser(await userId(email), selfEdit.id, {
         ability: SYSTEM_ABILITY
       });
     }
+
     const adminEdit = await roleService.create(
       { name: adminEditRoleName },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       adminEdit.id,
       [{ permissionId: updateUser.id }],
@@ -135,6 +142,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return found.id;
   }
 
@@ -149,6 +157,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       userAgent: 'step-up-e2e',
       ipAddress: null
     });
+
     return tokens.access_token;
   }
 
@@ -156,6 +165,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const row = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id } });
+
     return (
       row.password !== null &&
       (await verifyPassword(value, row.password, row.passwordHashVersion)).valid
@@ -180,6 +190,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const token = await tokenFor(adminEmail);
 
     const refused = await patch(token, id, { password: newPassword });
+
     expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
@@ -192,6 +203,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
         order: { createdAt: 'DESC' }
       })
     );
+
     expect(audit?.details).toMatchObject({
       operation: STEP_UP_OPERATION.USER_CREDENTIAL_CHANGE,
       factor: 'password'
@@ -206,6 +218,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       password: newPassword,
       currentPassword: 'Wrong-Password-00'
     });
+
     expect(refused.status).toBe(403);
     expect((refused.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
@@ -221,11 +234,13 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       .findOneOrFail({ where: { id } });
 
     const refused = await patch(token, id, { email: movedEmail });
+
     expect(refused.status).toBe(403);
 
     const row = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id } });
+
     expect(row.email).toBe(otherEmail);
     expect(row.emailVerificationToken).toBe(before.emailVerificationToken);
   }, 30000);
@@ -243,6 +258,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       { email: movedEmail, name: 'Moved' }
     ]) {
       const refused = await patch(token, id, body);
+
       expect(refused.status).toBe(403);
       expect((refused.body as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.USERS.CREDENTIAL_SELF
@@ -252,6 +268,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     const row = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id } });
+
     expect(row.email).toBe(ownerEmail);
     expect(row.name).not.toBe('Moved');
     expect(await holdsPassword(id, password)).toBe(true);
@@ -279,6 +296,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       password: newPassword,
       currentPassword: 'Wrong-Password-00'
     });
+
     expect(res.status).toBe(403);
 
     expect(await stepUpFailures(ownerEmail)).toBe(before);
@@ -294,6 +312,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       email: movedEmail,
       currentPassword: password
     });
+
     expect(moved.status).toBe(200);
     expect((moved.body as { email: string }).email).toBe(movedEmail);
     // The factor never reaches the record or the audit row.
@@ -301,6 +320,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
       where: { action: AuditAction.USER_UPDATE, targetId: id },
       order: { createdAt: 'DESC' }
     });
+
     expect(update?.details).toEqual({ changedFields: ['email'] });
     // The old mailbox hears of the move, and not where the account went.
     expect(oldAddressMail).toHaveBeenCalledTimes(1);

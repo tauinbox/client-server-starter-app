@@ -20,6 +20,7 @@ const ID_B = '22222222-2222-4222-8222-222222222222';
 describe('list URL state', () => {
   it('gives every list its own key, with no dot in it', () => {
     expect(new Set(LIST_URL_KEYS).size).toBe(LIST_URL_KEYS.length);
+
     for (const key of LIST_URL_KEYS) {
       expect(key).toMatch(/^[a-z]+$/);
     }
@@ -148,9 +149,11 @@ describe('list URL state', () => {
           sortOrder: 'desc'
         })
       ).filter(([, value]) => value !== null);
+
       tree.queryParams = { ...Object.fromEntries(written), returnUrl: '/x' };
       const url = serializer.serialize(tree);
       const login = serializer.parse('/login');
+
       login.queryParams = { returnUrl: url };
       const back = serializer.parse(serializer.serialize(login)).queryParams[
         'returnUrl'
@@ -161,6 +164,7 @@ describe('list URL state', () => {
         'users',
         USER_LIST_QUERY
       );
+
       expect(state.filters).toEqual({ q });
       expect(serializer.parse(back).queryParams['returnUrl']).toBe('/x');
     });
@@ -170,6 +174,7 @@ describe('list URL state', () => {
     const canonicalOf = (params: Record<string, string | string[]>) => {
       const map = convertToParamMap(params);
       const state = readListUrl(map, 'roles', ROLE_LIST_QUERY);
+
       return isListUrlCanonical(
         map,
         'roles',

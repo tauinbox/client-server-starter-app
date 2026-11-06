@@ -49,6 +49,7 @@ describe('Money', () => {
     it('round-trips a very large value beyond Number range', () => {
       const major = '99999999999999999999.99';
       const money = Money.fromMajorString(major);
+
       expect(money.toMinorString()).toBe('9999999999999999999999');
       expect(money.toMajorString()).toBe(major);
     });
@@ -74,12 +75,14 @@ describe('Money', () => {
     it('adds and subtracts', () => {
       const a = Money.fromMinor(1000n);
       const b = Money.fromMinor(250n);
+
       expect(a.add(b).toMinorString()).toBe('1250');
       expect(a.sub(b).toMinorString()).toBe('750');
     });
 
     it('multiplies by an integer without overflow', () => {
       const unitPrice = Money.fromMinor(199n);
+
       expect(unitPrice.mulInt(10_000_000_000n).toMinorString()).toBe(
         '1990000000000'
       );
@@ -119,11 +122,13 @@ describe('Money', () => {
 
     it('throws above Number.MAX_SAFE_INTEGER', () => {
       const tooBig = Money.fromMinor(BigInt(Number.MAX_SAFE_INTEGER) + 1n);
+
       expect(() => tooBig.toNumber()).toThrow(RangeError);
     });
 
     it('throws below -Number.MAX_SAFE_INTEGER', () => {
       const tooSmall = Money.fromMinor(-BigInt(Number.MAX_SAFE_INTEGER) - 1n);
+
       expect(() => tooSmall.toNumber()).toThrow(RangeError);
     });
   });

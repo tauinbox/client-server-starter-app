@@ -169,9 +169,11 @@ describe('OAuthService', () => {
    */
   const loginExpectingUser = async (profile: OAuthUserProfile) => {
     const result = await service.loginWithOAuth(profile);
+
     if ('mfaRequired' in result) {
       throw new Error('Expected a user, received a two-factor challenge');
     }
+
     return result;
   };
 
@@ -204,6 +206,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       };
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         existingOAuth
       );
@@ -244,6 +247,7 @@ describe('OAuthService', () => {
       const entity = Object.assign(new User(), oauthUser, {
         emailVerificationToken: 'hashed-verification-token'
       });
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         id: '1',
         provider: 'google',
@@ -271,6 +275,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       };
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         existingOAuth
       );
@@ -339,6 +344,7 @@ describe('OAuthService', () => {
         ...oauthUser,
         isEmailVerified: false
       };
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         id: '1',
         provider: 'vkontakte',
@@ -363,6 +369,7 @@ describe('OAuthService', () => {
         ...oauthUser,
         isEmailVerified: false
       };
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         id: '1',
         provider: 'google',
@@ -385,6 +392,7 @@ describe('OAuthService', () => {
         ...oauthUser,
         isEmailVerified: false
       };
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         id: '1',
         provider: 'google',
@@ -411,6 +419,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       };
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         existingOAuth
       );
@@ -583,6 +592,7 @@ describe('OAuthService', () => {
         null
       );
       const failure = new Error('connection lost');
+
       mockManager.save.mockRejectedValueOnce(failure);
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toBe(failure);
@@ -735,6 +745,7 @@ describe('OAuthService', () => {
         ...oauthProfile,
         emailVerified: false
       };
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -767,6 +778,7 @@ describe('OAuthService', () => {
         string,
         string
       ];
+
       expect(callArgs[0]).toBe('oauth@example.com');
       // Token passed to mail is the RAW token, not the hashed one stored.
       expect(typeof callArgs[1]).toBe('string');
@@ -777,6 +789,7 @@ describe('OAuthService', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -874,6 +887,7 @@ describe('OAuthService', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       mockMailService.sendOAuthLinkedNotification.mockRejectedValueOnce(
         new Error('smtp down')
       );
@@ -891,6 +905,7 @@ describe('OAuthService', () => {
 
     it('should throw when user is deactivated', async () => {
       const inactiveUser = { ...mockUser, isActive: false };
+
       mockManager.findOne.mockResolvedValue(inactiveUser);
 
       await expect(
@@ -1039,6 +1054,7 @@ describe('OAuthService', () => {
 
     it('should rethrow non-unique-violation errors', async () => {
       const dbError = new Error('Connection lost');
+
       mockManager.insert.mockRejectedValue(dbError);
 
       await expect(

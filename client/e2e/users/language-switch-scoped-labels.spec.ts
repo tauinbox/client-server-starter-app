@@ -14,6 +14,7 @@ test.describe('First language switch on a list page', () => {
     page
   }) => {
     const rootLoaded = page.waitForResponse(/\/assets\/i18n\/ru\.json$/);
+
     await page.route(/\/features\/users\/i18n\/ru\.json$/, async (route) => {
       await rootLoaded;
       await route.continue();

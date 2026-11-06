@@ -61,7 +61,9 @@ export class InfiniteScrollDirective implements OnDestroy {
 
   #emitIfReady(): void {
     if (!this.hasMore() || this.busy()) return;
+
     const element = this.#host.nativeElement as HTMLElement;
+
     // getBoundingClientRect is the source of truth here: the observer callback
     // reports the state at its last sampling, which is stale right after rows
     // were appended.

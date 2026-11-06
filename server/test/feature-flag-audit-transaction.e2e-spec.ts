@@ -47,6 +47,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -68,6 +69,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
         .getRepository(User)
         .findOneOrFail({ where: { email: adminEmail } })
     ).id;
+
     await app
       .get(RoleService)
       .assignRoleToUser(adminId, superRole.id, { ability: SYSTEM_ABILITY });
@@ -77,6 +79,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
         userAgent: 'flag-audit-tx-e2e',
         ipAddress: null
       });
+
     token = tokens.access_token;
 
     const created = await request(http())
@@ -84,6 +87,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
       .auth(token, { type: 'bearer' })
       .send({ key: flagKey, description: 'before' })
       .expect(201);
+
     flag = created.body as FeatureFlag;
   }, 60000);
 
@@ -159,6 +163,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
       action: AuditAction.FEATURE_FLAG_DELETE,
       targetId: flag.id
     });
+
     expect(row.details).toEqual({ key: flagKey });
   });
 });

@@ -17,6 +17,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -35,8 +36,10 @@ async function login(email = 'user@example.com'): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -68,12 +71,14 @@ function completePurchase(body: unknown): Promise<Response> {
 describe('GET /billing/products', () => {
   it('requires auth', async () => {
     const res = await fetch(`${baseUrl}/api/v1/billing/products`);
+
     expect(res.status).toBe(401);
   });
 
   it('lists the seeded catalog priced for the effective provider, custom bounds included', async () => {
     const token = await login();
     const res = await getProducts(token);
+
     expect(res.status).toBe(200);
     const products = (await res.json()) as ProductResponse[];
 
@@ -103,14 +108,17 @@ describe('POST /billing/purchase', () => {
   it('rejects an unknown product with 422', async () => {
     const token = await login();
     const res = await postPurchase(token, { productKey: 'nope' });
+
     expect(res.status).toBe(422);
   });
 
   it('rejects a missing custom amount with 422', async () => {
     const token = await login();
     const res = await postPurchase(token, { productKey: 'donation' });
+
     expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
+
     expect(body.message).toBe(
       'amountMinor is required for a custom-amount product'
     );
@@ -124,8 +132,10 @@ describe('POST /billing/purchase', () => {
         productKey: 'donation',
         amountMinor
       });
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe('amountMinor must be between 100 and 50000');
     }
   );
@@ -136,6 +146,7 @@ describe('POST /billing/purchase', () => {
     const donation = getState()
       .billingProducts.values()
       .find((p) => p.key === 'donation')!;
+
     donation.prices.paddle = {
       currency: 'USD',
       minAmountMinor: 0,
@@ -157,8 +168,10 @@ describe('POST /billing/purchase', () => {
       productKey: 'report-pack',
       amountMinor: 1
     });
+
     expect(res.status).toBe(200);
     const session = (await res.json()) as PurchaseSessionResponse;
+
     expect(session.provider).toBe('paddle');
     expect(session.url).toContain(session.sessionRef);
   });
@@ -169,6 +182,7 @@ describe('POST /billing/purchase', () => {
       const product = getState()
         .billingProducts.values()
         .find((p) => p.key === productKey)!;
+
       product.prices.paddle = { currency: 'USD', amountMinor: 500 };
 
       const token = await login();
@@ -176,6 +190,7 @@ describe('POST /billing/purchase', () => {
 
       expect(res.status).toBe(500);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(
         `Product "${productKey}" has no Paddle price configured`
       );
@@ -194,13 +209,16 @@ describe('/__control/billing/complete-purchase', () => {
     const before = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
       headers: { authorization: `Bearer ${token}` }
     });
+
     expect(before.status).toBe(403);
 
     const complete = await completePurchase({
       sessionRef: session.sessionRef
     });
+
     expect(complete.status).toBe(200);
     const invoice = (await complete.json()) as InvoiceResponse;
+
     expect(invoice).toMatchObject({
       kind: 'one_time',
       status: 'paid',
@@ -214,6 +232,7 @@ describe('/__control/billing/complete-purchase', () => {
     const after = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
       headers: { authorization: `Bearer ${token}` }
     });
+
     expect(after.status).toBe(200);
 
     // The invoice is visible in the buyer's history.
@@ -221,10 +240,12 @@ describe('/__control/billing/complete-purchase', () => {
       headers: { authorization: `Bearer ${token}` }
     });
     const list = (await invoices.json()) as { data: InvoiceResponse[] };
+
     expect(list.data.map((i) => i.id)).toContain(invoice.id);
 
     // Settlement is once-per-session — a replay finds nothing pending.
     const replay = await completePurchase({ sessionRef: session.sessionRef });
+
     expect(replay.status).toBe(404);
   });
 
@@ -238,8 +259,10 @@ describe('/__control/billing/complete-purchase', () => {
 
     // Settle via the userId path (latest pending session for the buyer).
     const complete = await completePurchase({ userId: mockId('user-2') });
+
     expect(complete.status).toBe(200);
     const invoice = (await complete.json()) as InvoiceResponse;
+
     expect(invoice).toMatchObject({
       kind: 'one_time',
       status: 'paid',
@@ -251,6 +274,7 @@ describe('/__control/billing/complete-purchase', () => {
     const premium = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
       headers: { authorization: `Bearer ${token}` }
     });
+
     expect(premium.status).toBe(403);
   });
 
@@ -261,28 +285,33 @@ describe('/__control/billing/complete-purchase', () => {
     const before = await fetch(`${baseUrl}/api/v1/billing/credits`, {
       headers: { authorization: `Bearer ${token}` }
     });
+
     expect(before.status).toBe(200);
     expect(await before.json()).toBeNull();
 
     const purchase = await postPurchase(token, { productKey: 'credits-500' });
     const session = (await purchase.json()) as PurchaseSessionResponse;
     const complete = await completePurchase({ sessionRef: session.sessionRef });
+
     expect(complete.status).toBe(200);
 
     const after = await fetch(`${baseUrl}/api/v1/billing/credits`, {
       headers: { authorization: `Bearer ${token}` }
     });
     const balance = (await after.json()) as CreditBalanceResponse;
+
     expect(balance.balanceUnits).toBe(500);
 
     // A second pack accumulates on the same balance.
     const again = await postPurchase(token, { productKey: 'credits-1000' });
     const session2 = (await again.json()) as PurchaseSessionResponse;
+
     await completePurchase({ sessionRef: session2.sessionRef });
     const accumulated = await fetch(`${baseUrl}/api/v1/billing/credits`, {
       headers: { authorization: `Bearer ${token}` }
     });
     const total = (await accumulated.json()) as CreditBalanceResponse;
+
     expect(total.balanceUnits).toBe(1500);
   });
 });
@@ -290,6 +319,7 @@ describe('/__control/billing/complete-purchase', () => {
 describe('GET /billing/credits', () => {
   it('requires auth', async () => {
     const res = await fetch(`${baseUrl}/api/v1/billing/credits`);
+
     expect(res.status).toBe(401);
   });
 });
@@ -339,7 +369,9 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const complete = await completePurchase({
       sessionRef: session.sessionRef
     });
+
     expect(complete.status).toBe(200);
+
     return (await complete.json()) as InvoiceResponse;
   }
 
@@ -356,6 +388,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
         body: JSON.stringify({ userId: mockId('user-2'), planKey: 'usage' })
       }
     );
+
     expect(activate.status).toBe(200);
     const { customerId } = (await activate.json()) as { customerId: string };
 
@@ -368,6 +401,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
       quantity: 200,
       idempotencyKey: 'clawback-k1'
     });
+
     expect(first.status).toBe(201);
     const advance = await fetch(
       `${baseUrl}/__control/billing/advance-renewal`,
@@ -377,14 +411,17 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
         body: JSON.stringify({ userId: mockId('user-2') })
       }
     );
+
     expect(advance.status).toBe(200);
     const spent = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
+
     expect(spent.balanceUnits).toBe(300);
 
     // Full refund of the pack takes all 500 back: 300 - 500 = -200.
     const refunded = await refund(adminToken, invoice.id);
+
     expect(refunded.status).toBe(200);
     expect(((await refunded.json()) as InvoiceResponse).status).toBe(
       'refunded'
@@ -392,6 +429,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const negative = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
+
     expect(negative.balanceUnits).toBe(-200);
 
     // New usage is blocked while the balance is negative…
@@ -401,6 +439,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
       quantity: 1,
       idempotencyKey: 'clawback-k2'
     });
+
     expect(blocked.status).toBe(409);
     expect(((await blocked.json()) as { message: string }).message).toBe(
       'Credit balance is negative. Top up credits before recording more usage.'
@@ -413,6 +452,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
       quantity: 200,
       idempotencyKey: 'clawback-k1'
     });
+
     expect(replay.status).toBe(201);
   });
 
@@ -422,12 +462,14 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const invoice = await buyCredits(token, 'credits-500');
 
     const partial = await refund(adminToken, invoice.id, { amountMinor: 100 });
+
     expect(partial.status).toBe(200);
     expect(((await partial.json()) as InvoiceResponse).status).toBe('paid');
 
     const balance = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
+
     expect(balance.balanceUnits).toBe(500);
   });
 
@@ -439,21 +481,25 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const rest = invoice.amountMinor - half;
 
     const first = await refund(adminToken, invoice.id, { amountMinor: half });
+
     expect(first.status).toBe(200);
     expect(((await first.json()) as InvoiceResponse).status).toBe('paid');
     // The pack survives the first partial leg.
     const afterFirst = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
+
     expect(afterFirst.balanceUnits).toBe(500);
 
     const second = await refund(adminToken, invoice.id, { amountMinor: rest });
+
     expect(second.status).toBe(200);
     expect(((await second.json()) as InvoiceResponse).status).toBe('refunded');
     // Clawed back exactly once: 500 - 500 = 0.
     const afterSecond = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
+
     expect(afterSecond.balanceUnits).toBe(0);
   });
 
@@ -464,6 +510,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const half = Math.floor(invoice.amountMinor / 2);
 
     const first = await refund(adminToken, invoice.id, { amountMinor: half });
+
     expect(first.status).toBe(200);
     expect(((await first.json()) as InvoiceResponse).status).toBe('paid');
 
@@ -471,11 +518,13 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const over = await refund(adminToken, invoice.id, {
       amountMinor: invoice.amountMinor - half + 1
     });
+
     expect(over.status).toBe(422);
     // Credits stay intact — the rejected leg had no side effects.
     const balance = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
+
     expect(balance.balanceUnits).toBe(500);
   });
 
@@ -493,12 +542,15 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const before = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
       headers: { authorization: `Bearer ${token}` }
     });
+
     expect(before.status).toBe(200);
 
     const push = jest.spyOn(sseHub, 'pushToUser');
+
     try {
       await refund(adminToken, invoice.id);
       const userId = mockId('user-2');
+
       expect(push).toHaveBeenCalledWith(userId, {
         type: 'entitlements_updated'
       });
@@ -509,6 +561,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const after = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
       headers: { authorization: `Bearer ${token}` }
     });
+
     expect(after.status).toBe(403);
   });
 
@@ -521,6 +574,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     const invoice = (await complete.json()) as InvoiceResponse;
 
     const push = jest.spyOn(sseHub, 'pushToUser');
+
     try {
       await refund(adminToken, invoice.id, { amountMinor: 100 });
       expect(push).not.toHaveBeenCalled();
@@ -542,19 +596,23 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
 
     // First partial leg leaves the invoice paid and the grant intact.
     const first = await refund(adminToken, invoice.id, { amountMinor: half });
+
     expect(((await first.json()) as InvoiceResponse).status).toBe('paid');
     const stillGranted = await fetch(
       `${baseUrl}/api/v1/billing/premium-content`,
       { headers: { authorization: `Bearer ${token}` } }
     );
+
     expect(stillGranted.status).toBe(200);
 
     // Second leg reaches the total: invoice flips and the grant is revoked.
     const second = await refund(adminToken, invoice.id, { amountMinor: rest });
+
     expect(((await second.json()) as InvoiceResponse).status).toBe('refunded');
     const revoked = await fetch(`${baseUrl}/api/v1/billing/premium-content`, {
       headers: { authorization: `Bearer ${token}` }
     });
+
     expect(revoked.status).toBe(403);
   });
 });

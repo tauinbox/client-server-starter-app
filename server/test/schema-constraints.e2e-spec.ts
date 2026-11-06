@@ -21,6 +21,7 @@ runWithInfra('schema hardening constraints (e2e)', () => {
       `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = $1`,
       [table]
     );
+
     return rows.map((r) => r.indexname);
   }
 
@@ -53,8 +54,10 @@ runWithInfra('schema hardening constraints (e2e)', () => {
 
   it('accepts one usage idempotency key per customer but rejects its replay', async () => {
     const runner = ds.createQueryRunner();
+
     await runner.connect();
     await runner.startTransaction();
+
     try {
       const stamp = Date.now();
       const subscriptionIds: string[] = [];
@@ -106,8 +109,10 @@ runWithInfra('schema hardening constraints (e2e)', () => {
 
   it('rejects a second row with the same refresh-token hash', async () => {
     const runner = ds.createQueryRunner();
+
     await runner.connect();
     await runner.startTransaction();
+
     try {
       const [{ id: userId }] = (await runner.query(
         `INSERT INTO users (email, "name")
@@ -118,6 +123,7 @@ runWithInfra('schema hardening constraints (e2e)', () => {
       const token = `uq-token-${Date.now()}`;
       const expiresAt = new Date(Date.now() + 60_000);
       const insert = `INSERT INTO refresh_tokens (token, user_id, expires_at, session_id, session_started_at) VALUES ($1, $2, $3, gen_random_uuid(), now())`;
+
       await runner.query(insert, [token, userId, expiresAt]);
 
       await expect(
@@ -131,12 +137,15 @@ runWithInfra('schema hardening constraints (e2e)', () => {
 
   it('rejects a second account whose address differs only by case', async () => {
     const runner = ds.createQueryRunner();
+
     await runner.connect();
     await runner.startTransaction();
+
     try {
       const address = `uq-case-${Date.now()}@example.com`;
       const insert = `INSERT INTO users (email, "name")
          VALUES ($1, $2)`;
+
       await runner.query(insert, [address, 'Uq Case']);
 
       await expect(
@@ -150,8 +159,10 @@ runWithInfra('schema hardening constraints (e2e)', () => {
 
   it('allows many non-default payment methods but only one default per customer', async () => {
     const runner = ds.createQueryRunner();
+
     await runner.connect();
     await runner.startTransaction();
+
     try {
       const [{ id: userId }] = (await runner.query(
         `INSERT INTO users (email, "name")

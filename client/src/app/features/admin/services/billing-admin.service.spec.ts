@@ -29,6 +29,7 @@ describe('BillingAdminService', () => {
   it('GETs subscriptions without params when none are given', () => {
     service.listSubscriptions().subscribe();
     const req = httpMock.expectOne(`${ADMIN_BILLING_API_V1}/subscriptions`);
+
     expect(req.request.method).toBe('GET');
     expect(req.request.params.keys()).toEqual([]);
     req.flush({
@@ -42,6 +43,7 @@ describe('BillingAdminService', () => {
     const req = httpMock.expectOne(
       (r) => r.url === `${ADMIN_BILLING_API_V1}/invoices`
     );
+
     expect(req.request.method).toBe('GET');
     expect(req.request.params.get('cursor')).toBe('abc');
     expect(req.request.params.get('limit')).toBe('25');
@@ -56,6 +58,7 @@ describe('BillingAdminService', () => {
     const req = httpMock.expectOne(
       (r) => r.url === `${ADMIN_BILLING_API_V1}/invoices`
     );
+
     expect(req.request.params.has('cursor')).toBe(false);
     expect(req.request.params.get('limit')).toBe('10');
     req.flush({
@@ -69,6 +72,7 @@ describe('BillingAdminService', () => {
     const req = httpMock.expectOne(
       `${ADMIN_BILLING_API_V1}/subscriptions/sub-1/cancel`
     );
+
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ mode: 'period_end' });
     req.flush({});
@@ -79,6 +83,7 @@ describe('BillingAdminService', () => {
     const req = httpMock.expectOne(
       `${ADMIN_BILLING_API_V1}/subscriptions/sub-1/cancel`
     );
+
     expect(req.request.body).toEqual({ mode: 'immediate' });
     req.flush({});
   });
@@ -88,6 +93,7 @@ describe('BillingAdminService', () => {
     const req = httpMock.expectOne(
       `${ADMIN_BILLING_API_V1}/invoices/inv-1/refund`
     );
+
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({});
     req.flush({});
@@ -98,6 +104,7 @@ describe('BillingAdminService', () => {
     const req = httpMock.expectOne(
       `${ADMIN_BILLING_API_V1}/invoices/inv-1/refund`
     );
+
     expect(req.request.body).toEqual({ amountMinor: 500 });
     req.flush({});
   });

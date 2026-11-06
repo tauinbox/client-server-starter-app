@@ -45,5 +45,6 @@ export function writeStorageValue(
   value: unknown
 ): void {
   const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+
   storage?.setItem(key, serialized);
 }

@@ -51,5 +51,6 @@ function isJsonString(str: string) {
   } catch (_e) {
     return false;
   }
+
   return true;
 }

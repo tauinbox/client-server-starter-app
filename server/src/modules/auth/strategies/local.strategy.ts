@@ -28,6 +28,7 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
    */
   async validate(email: unknown, password: unknown): Promise<UserResponseDto> {
     const address = normalizeEmail(email) ?? '';
+
     return this.authService.validateUser(
       maxLength(address, MAX_EMAIL_LENGTH) ? address : '',
       typeof password === 'string' && maxLength(password, MAX_PASSWORD_LENGTH)

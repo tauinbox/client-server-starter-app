@@ -111,6 +111,7 @@ export class MfaChallengeComponent {
       this.expired.emit(
         this.#resolveErrorMessage(err, 'errors.auth.mfaInvalidPendingToken')
       );
+
       return;
     }
 

@@ -55,20 +55,28 @@ function buildManager(stubs: ManagerStubs) {
     .mockResolvedValue({ affected: stubs.updateAffected });
   const findOne = jest.fn((entity: unknown, _opts: unknown) => {
     if (entity === Subscription) return Promise.resolve(stubs.subscription);
+
     if (entity === Plan) return Promise.resolve(stubs.plan);
+
     if (entity === Customer) return Promise.resolve(stubs.customer);
+
     if (entity === Invoice) return Promise.resolve(stubs.invoice);
+
     if (entity === Product) return Promise.resolve(stubs.product);
+
     return Promise.resolve(null);
   });
   const find = jest.fn<Promise<unknown[]>, [unknown]>((entity) => {
     if (entity === Plan) return Promise.resolve(stubs.plan ? [stubs.plan] : []);
+
     if (entity === Product)
       return Promise.resolve(stubs.product ? [stubs.product] : []);
+
     return Promise.resolve([]);
   });
   const execute = jest.fn().mockResolvedValue({ raw: stubs.invoiceInsertRows });
   const insertValues = jest.fn();
+
   interface InsertBuilder {
     insert: () => InsertBuilder;
     into: () => InsertBuilder;
@@ -83,14 +91,17 @@ function buildManager(stubs: ManagerStubs) {
       into: () => builder,
       values: (v) => {
         insertValues(v);
+
         return builder;
       },
       orIgnore: () => builder,
       returning: () => builder,
       execute
     };
+
     return builder;
   });
+
   return {
     save,
     create,
@@ -235,15 +246,18 @@ describe('BillingEventReducer', () => {
       // First Subscription lookup (by providerSubscriptionId) misses, so the
       // create branch runs; the second (open-subscription guard) finds a conflict.
       let subLookups = 0;
+
       manager.findOne.mockImplementation((entity: unknown) => {
         if (entity === Subscription) {
           subLookups += 1;
+
           return Promise.resolve(
             subLookups === 1
               ? null
               : ({ id: 'sub-open', status: 'active' } as Subscription)
           );
         }
+
         return Promise.resolve(null);
       });
 
@@ -394,6 +408,7 @@ describe('BillingEventReducer', () => {
 
     it('creates the subscription on the plan whose price was charged', async () => {
       const { reducer, manager } = await build();
+
       manager.find.mockResolvedValue([planRow('business'), planRow('pro')]);
 
       await reducer.reduce(
@@ -679,9 +694,11 @@ describe('BillingEventReducer', () => {
         await reducer.reduce(inPeriod());
 
         const [[, where, fields]] = manager.update.mock.calls;
+
         expect(where).toEqual({ id: 'sub-1' });
         expect(fields).toMatchObject({ planKey: 'pro', billingMode: 'fixed' });
         const switchedAt = fields['meteredFrom'];
+
         expect(switchedAt).toBeInstanceOf(Date);
         expect(emit).toHaveBeenCalledWith(
           UsagePeriodClosedEvent.name,
@@ -708,6 +725,7 @@ describe('BillingEventReducer', () => {
         await reducer.reduce(inPeriod());
 
         const [[, where, fields]] = manager.update.mock.calls;
+
         expect(where).toEqual({ id: 'sub-1' });
         expect(fields).toMatchObject({ billingMode: 'usage' });
         expect(fields['meteredFrom']).toBeInstanceOf(Date);
@@ -726,6 +744,7 @@ describe('BillingEventReducer', () => {
         await reducer.reduce(inPeriod());
 
         const [[, , fields]] = manager.update.mock.calls;
+
         expect(fields).not.toHaveProperty('billingMode');
         expect(fields).not.toHaveProperty('meteredFrom');
         expect(emit).not.toHaveBeenCalledWith(
@@ -743,6 +762,7 @@ describe('BillingEventReducer', () => {
         await reducer.reduce(inPeriod());
 
         const [[, , fields]] = manager.update.mock.calls;
+
         expect(fields).not.toHaveProperty('planKey');
         expect(fields).not.toHaveProperty('billingMode');
       });
@@ -1547,6 +1567,7 @@ describe('BillingEventReducer', () => {
         const { reducer, manager, credits } = await build({
           invoiceInsertRows: [{ id: 'inv-cr' }]
         });
+
         manager.find.mockResolvedValue([
           pack('cr-5000', 5000),
           pack('cr-500', 500)
@@ -1570,6 +1591,7 @@ describe('BillingEventReducer', () => {
         const { reducer, manager, credits, emit } = await build({
           invoiceInsertRows: [{ id: 'inv-x' }]
         });
+
         manager.find.mockResolvedValue([pack('cr-500', 500)]);
 
         await reducer.reduce(

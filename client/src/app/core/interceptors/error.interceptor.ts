@@ -19,29 +19,40 @@ import { AuthApiEnum } from '@features/auth/constants/auth-api.const';
 
 function parseRetryAfterSeconds(value: string | null): number | null {
   if (!value) return null;
+
   const asInt = Number.parseInt(value, 10);
+
   if (Number.isFinite(asInt) && asInt > 0) return asInt;
+
   const asDate = Date.parse(value);
+
   if (Number.isFinite(asDate)) {
     const diff = Math.ceil((asDate - Date.now()) / 1000);
+
     return diff > 0 ? diff : null;
   }
+
   return null;
 }
 
 // A named throttler sends `Retry-After-<name>` instead of `Retry-After`.
 function retryAfterHeader(headers: HttpHeaders | undefined): string | null {
   if (!headers) return null;
+
   const plain = headers.get('Retry-After');
+
   if (plain !== null) return plain;
+
   const named = headers
     .keys()
     .find((key) => key.toLowerCase().startsWith('retry-after-'));
+
   return named ? headers.get(named) : null;
 }
 
 function isPermissionRefusal(error: HttpErrorResponse): boolean {
   const body: unknown = error.error;
+
   return (
     typeof body === 'object' &&
     body !== null &&
@@ -88,6 +99,7 @@ export const errorInterceptor: HttpInterceptorFn = (
               if (!silentMode) {
                 notify.reportLater(error, () => notify.error(error));
               }
+
               return throwError(() => error);
             }),
             switchMap((response) => {
@@ -96,6 +108,7 @@ export const errorInterceptor: HttpInterceptorFn = (
               const retried = request.clone({
                 context: request.context.set(RBAC_RETRY_CONTEXT, true)
               });
+
               return next(retried).pipe(
                 catchError((retryError: HttpErrorResponse) => {
                   // Retry failed — permission is genuinely revoked
@@ -104,6 +117,7 @@ export const errorInterceptor: HttpInterceptorFn = (
                       notify.error(retryError)
                     );
                   }
+
                   return throwError(() => retryError);
                 })
               );
@@ -120,6 +134,7 @@ export const errorInterceptor: HttpInterceptorFn = (
           const retryAfter = parseRetryAfterSeconds(
             retryAfterHeader(error.headers)
           );
+
           notify.reportLater(error, () => {
             if (retryAfter !== null) {
               notify.warn('errors.general.tooManyRequestsRetry', {

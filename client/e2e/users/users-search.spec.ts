@@ -13,6 +13,7 @@ const SEARCH_PATH = '/api/v1/users/search/cursor';
 /** Types a term and waits for the search that the pause in typing sends. */
 async function searchFor(page: Page, q: string): Promise<void> {
   const response = listResponse(page, SEARCH_PATH, { q });
+
   await page.getByLabel('Search').fill(q);
   await response;
 }
@@ -26,9 +27,11 @@ test.describe('Inline user search (User management page)', () => {
     await page.goto('/users');
 
     await expect(page.getByLabel('Search')).toBeVisible();
+
     for (const label of ['Role', 'Status', 'Email', 'Two-factor', 'Lock']) {
       await expect(page.getByLabel(label, { exact: true })).toBeVisible();
     }
+
     await expect(page.getByLabel('Sign-in')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Search' })).toHaveCount(0);
   });
@@ -53,14 +56,17 @@ test.describe('Inline user search (User management page)', () => {
     page
   }) => {
     const searches: string[] = [];
+
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.route(`**${SEARCH_PATH}*`, (route) => {
       searches.push(new URL(route.request().url()).searchParams.get('q') ?? '');
+
       return route.fallback();
     });
     await page.goto('/users');
 
     const response = listResponse(page, SEARCH_PATH, { q: 'admin@' });
+
     await page.getByLabel('Search').pressSequentially('admin@', { delay: 30 });
     await response;
 
@@ -94,6 +100,7 @@ test.describe('Inline user search (User management page)', () => {
     ).toBeVisible();
 
     const fullList = listResponse(page, '/api/v1/users/cursor', {});
+
     await page.getByLabel('Search').fill('');
     await fullList;
 
@@ -112,6 +119,7 @@ test.describe('Inline user search (User management page)', () => {
     await searchFor(page, 'admin@example.com');
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
+
     await row
       .locator('button', {
         has: page.locator('mat-icon', { hasText: 'visibility' })
@@ -131,6 +139,7 @@ test.describe('Inline user search (User management page)', () => {
     await searchFor(page, 'admin@example.com');
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
+
     await row
       .locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) })
       .click();
@@ -148,6 +157,7 @@ test.describe('Inline user search (User management page)', () => {
     await page.goto('/users');
 
     const response = listResponse(page, SEARCH_PATH, { isActive: 'true' });
+
     await chooseOption(page, 'Status', 'Active');
     await response;
 
@@ -170,6 +180,7 @@ test.describe('Inline user search (User management page)', () => {
       q: 'admin@example.com',
       mfaEnabled: 'false'
     });
+
     await chooseOption(page, 'Two-factor', 'Off');
     await twoFactor;
 
@@ -178,6 +189,7 @@ test.describe('Inline user search (User management page)', () => {
       mfaEnabled: 'false',
       hasPassword: 'true'
     });
+
     await chooseOption(page, 'Sign-in', 'Has a password');
     await both;
 
@@ -190,6 +202,7 @@ test.describe('Inline user search (User management page)', () => {
       q: 'admin@example.com',
       hasPassword: 'false'
     });
+
     await chooseOption(page, 'Sign-in', 'Provider only');
     await providerOnly;
     await expect(
@@ -205,6 +218,7 @@ test.describe('Inline user search (User management page)', () => {
     await page.goto('/users');
 
     const response = listResponse(page, SEARCH_PATH, { role: 'admin' });
+
     await chooseOption(page, 'Role', 'admin');
     await response;
 
@@ -227,6 +241,7 @@ test.describe('Inline user search (User management page)', () => {
     await searchFor(page, 'john@example.com');
 
     const row = page.getByRole('row', { name: /john@example\.com/ });
+
     await row
       .locator('button', {
         has: page.locator('mat-icon', { hasText: 'delete' })

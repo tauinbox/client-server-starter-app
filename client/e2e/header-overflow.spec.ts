@@ -14,13 +14,19 @@ async function assertHeaderFitsViewport(
 ): Promise<void> {
   const items = page.locator('mat-toolbar > *');
   const count = await items.count();
+
   for (let i = 0; i < count; i++) {
     const item = items.nth(i);
+
     if (!(await item.isVisible())) continue;
+
     const box = await item.boundingBox();
+
     if (!box) continue;
+
     const right = box.x + box.width;
     const tag = await item.evaluate((el) => el.tagName.toLowerCase());
+
     expect(
       right,
       `Header child #${i} (${tag}) right edge ${right}px must not exceed viewport ${viewportWidth}px`

@@ -83,6 +83,7 @@ export class UserService {
     params: UserCursorListParams
   ): Observable<CursorPaginatedResponse<User>> {
     const httpParams = this.#buildCursorPaginationParams(params);
+
     return this.#http.get<CursorPaginatedResponse<User>>(
       `${USERS_API_V1}/cursor`,
       { params: httpParams }

@@ -39,18 +39,22 @@ export class KeyboardShortcutsService {
   readonly shortcuts: Signal<ShortcutDef[]> = computed(() => {
     this.#revision();
     const result: ShortcutDef[] = [];
+
     for (const stack of this.#stacks.values()) {
       const top = stack.at(-1)?.def;
+
       // Entries with an empty label are blocking no-ops; exclude them from help.
       if (top?.label) {
         result.push(top);
       }
     }
+
     return result;
   });
 
   constructor() {
     const listener = (event: KeyboardEvent) => this.#onKeydown(event);
+
     this.#document.addEventListener('keydown', listener);
     this.#destroyRef.onDestroy(() =>
       this.#document.removeEventListener('keydown', listener)
@@ -67,19 +71,25 @@ export class KeyboardShortcutsService {
     if (!this.#stacks.has(key)) {
       this.#stacks.set(key, []);
     }
+
     this.#stacks.get(key)!.push(entry);
     this.#revision.update((v) => v + 1);
 
     return () => {
       const stack = this.#stacks.get(key);
+
       if (!stack) return;
+
       const idx = stack.lastIndexOf(entry);
+
       if (idx !== -1) {
         stack.splice(idx, 1);
       }
+
       if (stack.length === 0) {
         this.#stacks.delete(key);
       }
+
       this.#revision.update((v) => v + 1);
     };
   }
@@ -104,6 +114,7 @@ export class KeyboardShortcutsService {
     }
 
     const top = this.#stacks.get(key)?.at(-1);
+
     if (!top) return;
 
     event.preventDefault();
@@ -112,17 +123,25 @@ export class KeyboardShortcutsService {
 
   #normalise(event: KeyboardEvent): string {
     const parts: string[] = [];
+
     if (event.ctrlKey) parts.push('ctrl');
+
     if (event.metaKey) parts.push('cmd');
+
     if (event.shiftKey && event.key !== '?') parts.push('shift');
+
     if (event.altKey) parts.push('alt');
+
     parts.push(event.key.toLowerCase());
+
     return parts.join('+');
   }
 
   #isInputTarget(event: KeyboardEvent): boolean {
     const target = event.target as HTMLElement | null;
+
     if (!target) return false;
+
     return INPUT_LIKE_TAGS.has(target.tagName) || target.isContentEditable;
   }
 }

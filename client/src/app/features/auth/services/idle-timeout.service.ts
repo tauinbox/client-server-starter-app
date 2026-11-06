@@ -41,10 +41,12 @@ export class IdleTimeoutService {
   /** Starting counts as activity: a sign-in or a page load is user input. */
   start(): void {
     this.#recordActivity(true);
+
     if (this.#teardown) return;
 
     const doc = this.#document;
     const win = doc.defaultView;
+
     if (!win) return;
 
     const onActivity = () => this.#recordActivity(false);
@@ -61,6 +63,7 @@ export class IdleTimeoutService {
       for (const type of ACTIVITY_EVENTS) {
         doc.addEventListener(type, onActivity, listenerOptions);
       }
+
       doc.addEventListener('visibilitychange', onVisibilityChange);
       const intervalId = win.setInterval(
         () => this.#check(),
@@ -71,6 +74,7 @@ export class IdleTimeoutService {
         for (const type of ACTIVITY_EVENTS) {
           doc.removeEventListener(type, onActivity, listenerOptions);
         }
+
         doc.removeEventListener('visibilitychange', onVisibilityChange);
         win.clearInterval(intervalId);
       };
@@ -79,6 +83,7 @@ export class IdleTimeoutService {
 
   stop(): void {
     if (!this.#teardown) return;
+
     this.#teardown();
     this.#teardown = null;
     this.#lastWrite = 0;
@@ -87,7 +92,9 @@ export class IdleTimeoutService {
 
   #recordActivity(force: boolean): void {
     const now = Date.now();
+
     if (!force && now - this.#lastWrite < ACTIVITY_WRITE_INTERVAL_MS) return;
+
     this.#lastWrite = now;
     this.#writeStored(now);
   }
@@ -99,6 +106,7 @@ export class IdleTimeoutService {
   #check(): void {
     // This tab's own write covers storage that is blocked or was cleared.
     const lastActivity = Math.max(this.#readStored(), this.#lastWrite);
+
     if (Date.now() - lastActivity < SESSION_IDLE_TIMEOUT_MS) return;
 
     this.stop();
@@ -112,6 +120,7 @@ export class IdleTimeoutService {
       const value = Number(
         this.#document.defaultView?.localStorage.getItem(LAST_ACTIVITY_KEY)
       );
+
       return Number.isFinite(value) ? value : 0;
     } catch {
       return 0;
@@ -121,6 +130,7 @@ export class IdleTimeoutService {
   #writeStored(value: number | null): void {
     try {
       const storage = this.#document.defaultView?.localStorage;
+
       if (value === null) storage?.removeItem(LAST_ACTIVITY_KEY);
       else storage?.setItem(LAST_ACTIVITY_KEY, String(value));
     } catch {

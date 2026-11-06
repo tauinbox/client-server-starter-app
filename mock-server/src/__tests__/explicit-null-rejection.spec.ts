@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,8 +29,10 @@ async function loginAsAdmin(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -39,6 +42,7 @@ async function send(
   body: unknown
 ): Promise<Response> {
   const token = await loginAsAdmin();
+
   return fetch(`${baseUrl}/api/v1${path}`, {
     method,
     headers: {
@@ -55,8 +59,10 @@ async function expectValidation400(
   body: unknown
 ): Promise<void> {
   const res = await send(method, path, body);
+
   expect(res.status).toBe(422);
   const payload = (await res.json()) as { errors?: string[] };
+
   expect(payload.errors).toBeDefined();
 }
 
@@ -98,6 +104,7 @@ describe('explicit null parity with server DTOs', () => {
         name: string;
         description: string | null;
       };
+
       expect(role.name).toBe('content-editor');
       expect(role.description).toBeNull();
     });
@@ -174,6 +181,7 @@ describe('explicit null parity with server DTOs', () => {
       const admin = getState()
         .users.values()
         .find((u) => u.email === 'admin@example.com');
+
       expect(admin?.password).toBe('Password1');
     });
   });
@@ -191,6 +199,7 @@ describe('explicit null parity with server DTOs', () => {
 
       expect(res.status).toBe(422);
       const payload = (await res.json()) as { errors: string[] };
+
       expect(payload.errors).toEqual([
         'amountMinor must not be less than 1',
         'amountMinor must be an integer number'
@@ -215,6 +224,7 @@ describe('explicit null parity with server DTOs', () => {
 
       expect(res.status).toBe(422);
       const payload = (await res.json()) as { errors: string[] };
+
       expect(payload.errors).toEqual([
         'mode must be one of the following values: period_end, immediate'
       ]);

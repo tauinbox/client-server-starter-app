@@ -7,6 +7,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
     await expect(main.getByRole('button', { name: 'Login' })).toBeVisible();
@@ -19,6 +20,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await expect(main.getByRole('button', { name: 'Login' })).toBeDisabled();
   });
 
@@ -29,6 +31,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('user@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
@@ -48,6 +51,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('wrong@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('wrongpassword');
@@ -78,6 +82,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('user@example.com');
     await page.getByLabel('Email').blur();
     await page
@@ -106,8 +111,10 @@ test.describe('Login page', () => {
       })
     ]);
     const sessionCalls: string[] = [];
+
     page.on('request', (request) => {
       const { pathname } = new URL(request.url());
+
       if (
         pathname === '/api/v1/auth/permissions' ||
         pathname === '/api/v1/auth/refresh-token'
@@ -119,6 +126,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('unverified-login@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');

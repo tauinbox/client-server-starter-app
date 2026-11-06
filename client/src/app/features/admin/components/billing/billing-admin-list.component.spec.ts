@@ -114,6 +114,7 @@ describe('BillingAdminListComponent', () => {
         { provide: AuthStore, useValue: { hasPermissions } }
       ]
     }).compileComponents();
+
     return TestBed.createComponent(BillingAdminListComponent);
   }
 
@@ -135,20 +136,24 @@ describe('BillingAdminListComponent', () => {
 
   it('loads billing data on init', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     expect(subscriptionsMock.load).toHaveBeenCalled();
   });
 
   it('renders desktop tables with one row each', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     const tables = (fixture.nativeElement as HTMLElement).querySelectorAll(
       'table'
     );
+
     expect(tables.length).toBe(2);
     const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
       'table tbody tr'
     );
+
     expect(rows.length).toBe(2);
     expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain(
       'pro'
@@ -158,6 +163,7 @@ describe('BillingAdminListComponent', () => {
   it('switches to card lists on handset', async () => {
     layoutHandset.set(true);
     const fixture = await setup();
+
     fixture.detectChanges();
     expect(
       (fixture.nativeElement as HTMLElement).querySelectorAll('table').length
@@ -170,6 +176,7 @@ describe('BillingAdminListComponent', () => {
 
   it('confirmCancel cancels with the chosen mode when confirmed', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     fixture.componentInstance.confirmCancel(activeSub, 'immediate');
     expect(confirmSpy).toHaveBeenCalled();
@@ -182,6 +189,7 @@ describe('BillingAdminListComponent', () => {
   it('does not cancel when the dialog is dismissed', async () => {
     confirmSpy.mockReturnValue(of(false));
     const fixture = await setup();
+
     fixture.detectChanges();
     fixture.componentInstance.confirmCancel(activeSub, 'period_end');
     expect(subscriptionsMock.cancelSubscription).not.toHaveBeenCalled();
@@ -189,6 +197,7 @@ describe('BillingAdminListComponent', () => {
 
   it('confirmRefund refunds the invoice when confirmed', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     fixture.componentInstance.confirmRefund(paidInvoice);
     expect(invoicesMock.refundInvoice).toHaveBeenCalledWith('inv-1');
@@ -196,16 +205,19 @@ describe('BillingAdminListComponent', () => {
 
   it('confirmRefund promises the remaining amount, not the full total', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     fixture.componentInstance.confirmRefund(paidInvoice);
     // An invoice that a plan change refunded in part has less left than its total.
     const { message } = confirmSpy.mock.calls[0][0] as { message: string };
+
     expect(message).toContain('remaining unrefunded amount');
     expect(message).not.toContain('full amount');
   });
 
   it('ignores cancel and refund while a mutation is in flight', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     subscriptionsMock.working.set(true);
 
@@ -219,10 +231,12 @@ describe('BillingAdminListComponent', () => {
 
   it('does not dispatch when a mutation starts while the dialog is open', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     // The dialog resolves only after another action has flipped `working`.
     confirmSpy.mockImplementation(() => {
       subscriptionsMock.working.set(true);
+
       return of(true);
     });
 
@@ -234,11 +248,13 @@ describe('BillingAdminListComponent', () => {
 
   it('disables the action controls while a mutation is in flight', async () => {
     const fixture = await setup();
+
     fixture.detectChanges();
     subscriptionsMock.working.set(true);
     fixture.detectChanges();
 
     const actionButtons = rowActionButtons(fixture.nativeElement);
+
     expect(actionButtons.length).toBe(2);
     expect(actionButtons.every((button) => button.disabled)).toBe(true);
   });
@@ -246,6 +262,7 @@ describe('BillingAdminListComponent', () => {
   it('hides action buttons without the manage permission', async () => {
     hasPermissions.mockReturnValue(false);
     const fixture = await setup();
+
     fixture.detectChanges();
     expect(rowActionButtons(fixture.nativeElement).length).toBe(0);
   });
@@ -259,6 +276,7 @@ describe('BillingAdminListComponent', () => {
     async (_label, overrides, modes) => {
       subscriptionsMock.subscriptions.set([{ ...activeSub, ...overrides }]);
       const fixture = await setup();
+
       fixture.detectChanges();
 
       rowActionButtons(fixture.nativeElement)[0].click();
@@ -267,6 +285,7 @@ describe('BillingAdminListComponent', () => {
       const items = Array.from(
         document.querySelectorAll<HTMLButtonElement>('[mat-menu-item]')
       );
+
       expect(items.map((item) => item.textContent?.trim())).toEqual(
         modes.map((mode) =>
           mode === 'period_end' ? 'Cancel at period end' : 'Cancel immediately'
@@ -278,6 +297,7 @@ describe('BillingAdminListComponent', () => {
   it('exposes canCancel/canRefund guards matching server rules', async () => {
     const fixture = await setup();
     const cmp = fixture.componentInstance;
+
     expect(cmp.canCancel(activeSub)).toBe(true);
     expect(cmp.canCancel({ ...activeSub, status: 'canceled' })).toBe(false);
     expect(cmp.canRefund(paidInvoice)).toBe(true);

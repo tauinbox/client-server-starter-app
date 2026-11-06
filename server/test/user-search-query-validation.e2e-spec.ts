@@ -101,6 +101,7 @@ describe('User search query DTO validation (e2e)', () => {
         .expect(400);
 
       const body = res.body as { message: string[] };
+
       expect(body.message).toEqual(
         expect.arrayContaining([`${field} must be a string`])
       );
@@ -124,6 +125,7 @@ describe('User search query DTO validation (e2e)', () => {
         .expect(400);
 
       const body = res.body as { message: string[] };
+
       expect(body.message).toEqual(
         expect.arrayContaining([
           `${field} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`
@@ -141,6 +143,7 @@ describe('User search query DTO validation (e2e)', () => {
         .expect(400);
 
       const body = res.body as { message: string[] };
+
       expect(body.message).toEqual(
         expect.arrayContaining([`${field} must be a boolean value`])
       );

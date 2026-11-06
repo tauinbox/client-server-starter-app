@@ -19,5 +19,6 @@ export async function insertInvoiceOnce(
     .returning(['id'])
     .execute();
   const rows = insert.raw as Array<{ id: string }>;
+
   return rows[0]?.id ?? null;
 }

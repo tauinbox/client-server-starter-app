@@ -83,9 +83,11 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   protected readonly isCustomMode = signal(
     this.data.resource.allowedActionNames !== null
   );
+
   protected readonly selectedActionNames = signal<Set<string>>(
     new Set(this.data.resource.allowedActionNames ?? [])
   );
+
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
@@ -112,6 +114,7 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
   get isDirty(): boolean {
     const current = this.resourceModel();
     const { resource } = this.data;
+
     if (
       current.displayName !== resource.displayName ||
       current.description !== (resource.description ?? '')
@@ -123,15 +126,19 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
     const isCustom = this.isCustomMode();
 
     if (original === null) return isCustom;
+
     if (!isCustom) return true;
 
     const selected = this.selectedActionNames();
+
     if (original.length !== selected.size) return true;
+
     return original.some((name) => !selected.has(name));
   }
 
   toggleCustomMode(enabled: boolean): void {
     this.isCustomMode.set(enabled);
+
     if (enabled && this.data.resource.allowedActionNames === null) {
       this.selectedActionNames.set(new Set(this.actionNames));
     }
@@ -139,11 +146,13 @@ export class ResourceFormDialogComponent implements OnInit, OnDestroy {
 
   toggleAction(actionName: string): void {
     const next = new Set(this.selectedActionNames());
+
     if (next.has(actionName)) {
       next.delete(actionName);
     } else {
       next.add(actionName);
     }
+
     this.selectedActionNames.set(next);
   }
 

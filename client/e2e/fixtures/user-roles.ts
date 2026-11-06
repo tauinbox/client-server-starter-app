@@ -16,6 +16,7 @@ export async function seedUserRole(
 ): Promise<void> {
   const roleId = mockId(`role-${name}`);
   const resourceId = seedResources.find((r) => r.subject === 'User')!.id;
+
   await mockServer.seedRoles([
     {
       id: roleId,
@@ -34,6 +35,7 @@ export async function seedUserRole(
       const permission = seedPermissions.find(
         (p) => p.resourceId === resourceId && p.actionId === actionId
       )!;
+
       return {
         id: mockId(`rp-${name}-${action}`),
         roleId,

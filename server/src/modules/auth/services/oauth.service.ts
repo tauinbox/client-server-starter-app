@@ -91,12 +91,14 @@ export class OAuthService {
         existingOAuth.userId,
         SYSTEM_ABILITY
       );
+
       if (!user.isActive) {
         throw new ApiError(
           ErrorKeys.AUTH.USER_DEACTIVATED,
           'User account is deactivated'
         );
       }
+
       // Verifying unconditionally would void the mail sent at creation for
       // providers that assert nothing (VK), opening password login on an
       // unproven address.
@@ -109,6 +111,7 @@ export class OAuthService {
           user.id,
           { email: user.email }
         );
+
         if (user.isEmailVerified) {
           this.auditService.logFireAndForget({
             action: AuditAction.EMAIL_VERIFIED,
@@ -126,6 +129,7 @@ export class OAuthService {
       // the only writer of OAuth-created users, and a provider-cased address
       // would create a duplicate the conflict check below can never see.
       const email = normalizeEmail(profile.email);
+
       // Only creation needs an address; a linked account signs in without one.
       if (!email) {
         throw new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL);
@@ -152,6 +156,7 @@ export class OAuthService {
           const existing = await manager.findOne(User, {
             where: addressTakenWhere(email)
           });
+
           if (existing) {
             throw new OAuthAuthenticationFailedException(
               OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
@@ -159,6 +164,7 @@ export class OAuthService {
           }
 
           let newUser: User;
+
           try {
             newUser = await manager.save(User, {
               email,
@@ -174,8 +180,10 @@ export class OAuthService {
                 OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
               );
             }
+
             throw error;
           }
+
           await manager.save(OAuthAccount, {
             userId: newUser.id,
             provider: profile.provider,
@@ -186,6 +194,7 @@ export class OAuthService {
           const userRole = await this.roleService.findRoleByName(
             SYSTEM_ROLES.USER
           );
+
           await manager
             .createQueryBuilder()
             .relation(User, 'roles')
@@ -235,6 +244,7 @@ export class OAuthService {
   /** A provider vouching for a different mailbox says nothing about this one. */
   private assertsSameEmail(profile: OAuthUserProfile, user: User): boolean {
     const asserted = normalizeEmail(profile.email);
+
     return !!asserted && asserted === normalizeEmail(user.email);
   }
 
@@ -255,36 +265,43 @@ export class OAuthService {
           where: { id: userId },
           lock: { mode: 'pessimistic_read' }
         });
+
         if (!user) {
           throw new ApiError(
             ErrorKeys.USERS.NOT_FOUND,
             `User with ID ${userId} not found`
           );
         }
+
         this.assertIntentValid(user, linkTokenIssuedAt);
         await manager.insert(OAuthAccount, { userId, provider, providerId });
+
         return user;
       });
     } catch (error: unknown) {
       if (!isUniqueViolation(error)) {
         throw error;
       }
+
       // Read after the rollback: the failed insert aborted the transaction.
       const existing =
         await this.oauthAccountService.findByProviderAndProviderId(
           provider,
           providerId
         );
+
       if (existing && existing.userId !== userId) {
         throw new ApiError(
           ErrorKeys.AUTH.OAUTH_ALREADY_LINKED,
           'This OAuth account is already linked to another user'
         );
       }
+
       // Already linked to this user: safe to ignore
       if (existing) {
         return this.intentHolder(userId, linkTokenIssuedAt);
       }
+
       // The identity is free, so the user already holds another identity of
       // this provider: the API addresses a linked provider by name only.
       throw new ApiError(
@@ -312,6 +329,7 @@ export class OAuthService {
       provider,
       providerId
     );
+
     if (!account || account.userId !== userId) {
       throw new ApiError(
         ErrorKeys.AUTH.REAUTH_REQUIRED,
@@ -375,7 +393,9 @@ export class OAuthService {
     intentIssuedAt: number
   ): Promise<User> {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
+
     this.assertIntentValid(user, intentIssuedAt);
+
     return user;
   }
 
@@ -386,6 +406,7 @@ export class OAuthService {
         'User account not found or deactivated'
       );
     }
+
     if (issuedBeforeRevocation(intentIssuedAt, user.tokenRevokedAt)) {
       throw new ApiError(
         ErrorKeys.AUTH.TOKEN_REVOKED,

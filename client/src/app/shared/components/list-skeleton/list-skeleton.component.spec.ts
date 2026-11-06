@@ -20,6 +20,7 @@ describe('ListSkeletonComponent', () => {
     fixture.detectChanges();
 
     const rows = host.querySelectorAll('.skeleton-row');
+
     expect(rows).toHaveLength(5);
     expect(rows[0].querySelectorAll('.skeleton-cell')).toHaveLength(4);
   });
@@ -30,8 +31,10 @@ describe('ListSkeletonComponent', () => {
     fixture.detectChanges();
 
     const rows = host.querySelectorAll('.skeleton-row');
+
     expect(rows).toHaveLength(3);
     const cells = rows[0].querySelectorAll('.skeleton-cell');
+
     expect(cells[0].classList).toContain('sk-narrow');
     expect(cells[1].classList).toContain('sk-chip');
   });
@@ -39,6 +42,7 @@ describe('ListSkeletonComponent', () => {
   it('should draw the top border unless the host turns it off', () => {
     fixture.detectChanges();
     const table = (): Element | null => host.querySelector('.skeleton-table');
+
     expect(table()?.classList).toContain('top-border');
 
     fixture.componentRef.setInput('topBorder', false);
@@ -50,6 +54,7 @@ describe('ListSkeletonComponent', () => {
     fixture.detectChanges();
 
     const status = host.querySelector('[role="status"]');
+
     expect(status?.getAttribute('aria-busy')).toBe('true');
     expect(status?.textContent).toContain('Loading...');
     expect(

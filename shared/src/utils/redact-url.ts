@@ -18,10 +18,12 @@ const REDACTED = 'REDACTED';
  */
 export function redactSensitiveQuery(url: string): string {
   const queryStart = url.indexOf('?');
+
   if (queryStart === -1) return url;
 
   const params = new URLSearchParams(url.slice(queryStart + 1));
   let changed = false;
+
   for (const key of new Set(params.keys())) {
     if (SENSITIVE_QUERY_PARAMS.includes(key.toLowerCase())) {
       params.set(key, REDACTED);

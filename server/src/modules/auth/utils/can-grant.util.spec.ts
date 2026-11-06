@@ -28,6 +28,7 @@ function assertCanGrantPermissions(
   ctx: GrantCheckContext
 ): void {
   const refusal = grantRefusalOf(ability, items, ctx);
+
   if (refusal) throw grantDenied(refusal);
 }
 
@@ -36,6 +37,7 @@ function assertCanLiftDenies(
   items: GrantScopeItem[]
 ): void {
   const refusal = liftRefusalOf(ability, items);
+
   if (refusal) throw grantDenied(refusal);
 }
 
@@ -60,25 +62,32 @@ describe('grantRefusalOf', () => {
     }[]
   ): AppAbility {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     for (const g of grants) {
       const subject = g.subject as Extract<Subjects, string>;
+
       if (!g.conditions) {
         can(g.action, subject);
         continue;
       }
+
       const { query } = resolveConditions(g.conditions, {
         userId: CALLER_ID,
         permissionLabel: `${g.action}:${g.subject}`,
         logger
       });
+
       can(g.action, subject, query);
     }
+
     return build();
   }
 
   function superAbility(): AppAbility {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     can('manage', 'all');
+
     return build();
   }
 
@@ -105,7 +114,9 @@ describe('grantRefusalOf', () => {
 
   function abilityForOwnership(): AppAbility {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     can('update', 'User' as Extract<Subjects, string>, { id: CALLER_ID });
+
     return build();
   }
 
@@ -229,6 +240,7 @@ describe('grantRefusalOf', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(HttpException);
         const httpErr = err as HttpException;
+
         expect(httpErr.getStatus()).toBe(403);
         expect(httpErr.getResponse()).toMatchObject({
           errorKey: ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER,
@@ -278,6 +290,7 @@ describe('grantRefusalOf', () => {
         throw new Error('expected a 403');
       } catch (err) {
         const httpErr = err as HttpException;
+
         expect(httpErr.getStatus()).toBe(403);
         expect(httpErr.getResponse()).toMatchObject({
           errorKey: ErrorKeys.ROLES.CONDITION_UNRESOLVABLE,
@@ -386,8 +399,10 @@ function restrictedAbility(): AppAbility {
     createMongoAbility
   );
   const subject = 'User' as Extract<Subjects, string>;
+
   can('update', subject);
   cannot('update', subject, { email: { $in: ['ceo@example.com'] } });
+
   return build();
 }
 
@@ -410,13 +425,16 @@ describe('liftRefusalOf', () => {
     ) => void
   ): AppAbility {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     define(can, 'User');
+
     return build();
   }
 
   function liftError(ability: AppAbility): unknown {
     try {
       assertCanLiftDenies(ability, [denyItem()]);
+
       return null;
     } catch (err) {
       return err;

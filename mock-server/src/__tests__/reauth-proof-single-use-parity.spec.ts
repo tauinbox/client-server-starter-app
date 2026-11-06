@@ -23,6 +23,7 @@ function account(provider: string): OAuthAccount {
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -54,6 +55,7 @@ async function accessToken(userId: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId })
   });
+
   expect(dataRes.status).toBe(200);
   const { token } = (await dataRes.json()) as { token: string };
 
@@ -61,8 +63,10 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
+
   expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -72,8 +76,10 @@ async function issueProof(userId: string, operation: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId, operation })
   });
+
   expect(res.status).toBe(200);
   const { token } = (await res.json()) as { token: string };
+
   return token;
 }
 
@@ -126,6 +132,7 @@ describe('a reauth proof is spent on its first successful use', () => {
     );
 
     const first = await unlink(token, 'google', proof);
+
     expect(first.status).toBe(200);
 
     const second = await unlink(token, 'facebook', proof);
@@ -188,6 +195,7 @@ function iatOf(jwt: string): number {
   const payload = JSON.parse(
     Buffer.from(jwt.split('.')[1], 'base64url').toString()
   ) as { iat: number };
+
   return payload.iat;
 }
 
@@ -204,6 +212,7 @@ describe('a reauth proof is compared with the revocation at whole seconds', () =
       OAUTH_ONLY_ID,
       STEP_UP_OPERATION.OAUTH_UNLINK
     );
+
     getState().reauthProofs.get(proof)!.issuedAt = iat + proofOffset;
     getState().users.get(OAUTH_ONLY_ID)!.tokenRevokedAt = new Date(
       iat * 1000 + 700

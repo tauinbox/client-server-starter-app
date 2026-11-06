@@ -88,6 +88,7 @@ async function build(options: {
         into: () => builder,
         values: (v: Record<string, unknown>) => {
           capturedValues.value = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -95,6 +96,7 @@ async function build(options: {
         execute: () =>
           Promise.resolve({ raw: options.insertRows ?? [{ id: 'inv-1' }] })
       };
+
       return builder;
     }
   };
@@ -328,6 +330,7 @@ describe('UsageInvoicingService', () => {
 
   it('leaves the invoice pending and swallows a failed provider call', async () => {
     const { service, chargeUsage } = await build({});
+
     chargeUsage.mockRejectedValue(new Error('paddle down'));
 
     await expect(service.handlePeriodClosed(EVENT)).resolves.toBeUndefined();
@@ -374,6 +377,7 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
           : Promise.resolve(null),
       query: (_sql: string, params: [string, number]) => {
         state.balance += params[1];
+
         return Promise.resolve(undefined);
       },
       create: (entity: { prototype: object }, data: object) =>
@@ -381,6 +385,7 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
       save: (entity: { delta?: Money }) => {
         if (entity.delta instanceof Money)
           ledger.push({ delta: entity.delta.toNumber() });
+
         return Promise.resolve(entity);
       },
       createQueryBuilder: (entity?: unknown) => {
@@ -395,8 +400,10 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
             andWhere: () => sum,
             getRawOne: () => Promise.resolve({ held: String(held) })
           };
+
           return sum;
         }
+
         const captured: {
           values?: {
             providerEventId: string;
@@ -413,25 +420,31 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
             creditUnitsApplied: number;
           }) => {
             captured.values = v;
+
             return builder;
           },
           orIgnore: () => builder,
           returning: () => builder,
           execute: () => {
             const v = captured.values!;
+
             if (invoices.some((i) => i.providerEventId === v.providerEventId)) {
               return Promise.resolve({ raw: [] });
             }
+
             const id = `inv-${++seq}`;
+
             invoices.push({
               id,
               providerEventId: v.providerEventId,
               status: v.status,
               creditUnitsApplied: v.creditUnitsApplied
             });
+
             return Promise.resolve({ raw: [{ id }] });
           }
         };
+
         return builder;
       }
     };
@@ -442,10 +455,12 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
     const dataSource = {
       transaction: (cb: (m: typeof manager) => unknown) => {
         const run = lock.then(() => cb(manager));
+
         lock = run.then(
           () => undefined,
           () => undefined
         );
+
         return run;
       }
     };
@@ -509,6 +524,7 @@ describe('UsageInvoicingService - concurrent period closes (credit lock)', () =>
                 andWhere: () => qb,
                 getRawOne: () => Promise.resolve({ total: '60' })
               };
+
               return qb;
             }
           }

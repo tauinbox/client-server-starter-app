@@ -63,16 +63,19 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   afterEach(async () => {
     jest.restoreAllMocks();
+
     if (customerId) {
       // Invoices hold the customer under RESTRICT, so they go first; the
       // customer and its subscription then cascade from the user.
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
     }
+
     if (planKeys.length > 0) {
       await ds.getRepository(Plan).delete(planKeys.map((key) => ({ key })));
       planKeys = [];
@@ -91,12 +94,14 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
    */
   async function warmPool(): Promise<void> {
     const runners = [ds.createQueryRunner(), ds.createQueryRunner()];
+
     await Promise.all(runners.map((r) => r.connect()));
     await Promise.all(runners.map((r) => r.release()));
   }
 
   async function seedPlan(key: string, amountMinor: number): Promise<Plan> {
     planKeys.push(key);
+
     return ds.getRepository(Plan).save(
       ds.getRepository(Plan).create({
         key,
@@ -134,6 +139,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -147,6 +153,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     return ds.getRepository(Subscription).save(
@@ -182,11 +189,13 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const runConcurrentWrite = async (): Promise<void> => {
       if (duringCall) await duringCall(subscriptionId);
     };
+
     return {
       id,
       managesLifecycle: id === 'paddle',
       chargeOffSession: jest.fn(async () => {
         await runConcurrentWrite();
+
         return {
           providerInvoiceRef: `pay_${subscriptionId}`,
           status: 'captured'
@@ -260,6 +269,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();
+
     service = module.get(PlanChangeService);
     users = module.get(BillingUserService);
   }
@@ -280,8 +290,10 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     await seedPlan('race-business', 290000);
     const subscription = await seedSubscription(providerId, planKey, status);
     const provider = providerStub(providerId, subscription.id, duringCall);
+
     await buildServices(provider);
     await warmPool();
+
     return { subscription, user: userId as string, provider };
   }
 
@@ -291,6 +303,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     amountMinor: number
   ): Promise<Invoice> {
     const repo = ds.getRepository(Invoice);
+
     return repo.save(
       repo.create({
         customerId: subscription.customerId,
@@ -323,6 +336,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const { subscription, user } = await setup('yookassa', async (id) => {
       const repo = ds.getRepository(Subscription);
       const row = await repo.findOneOrFail({ where: { id } });
+
       row.cancelAtPeriodEnd = true;
       await repo.save(row);
     });
@@ -332,6 +346,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     ).rejects.toMatchObject({ status: 409 });
 
     const row = await reload(subscription.id);
+
     expect(row).toMatchObject({
       cancelAtPeriodEnd: true,
       status: 'active',
@@ -351,6 +366,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     ).rejects.toMatchObject({ status: 409 });
 
     const row = await reload(subscription.id);
+
     expect(row).toMatchObject({ status: 'canceled', planKey: 'race-pro' });
   }, 30000);
 
@@ -366,6 +382,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const invoices = await ds.getRepository(Invoice).find({
       where: { subscriptionId: subscription.id }
     });
+
     expect(invoices).toHaveLength(1);
     expect(invoices[0]).toMatchObject({
       status: 'paid',
@@ -400,6 +417,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const settled = await ds
       .getRepository(Invoice)
       .findOneOrFail({ where: { id: recordedDuringCall[0].id } });
+
     expect(settled).toMatchObject({
       status: 'paid',
       providerInvoiceRef: `pay_${subscription.id}`
@@ -409,6 +427,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   it('marks the planted charge failed when the provider declines the card', async () => {
     const { subscription, user, provider } = await setup('yookassa', null);
+
     provider.chargeOffSession.mockRejectedValue(new ChargeDeclinedError());
 
     await expect(
@@ -420,6 +439,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const invoices = await ds
       .getRepository(Invoice)
       .find({ where: { subscriptionId: subscription.id } });
+
     expect(invoices).toHaveLength(1);
     expect(invoices[0]).toMatchObject({
       status: 'failed',
@@ -442,6 +462,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
     expect(result.planKey).toBe('race-business');
     const row = await reload(subscription.id);
+
     expect(row).toMatchObject({
       planKey: 'race-business',
       dunningAttempts: 2,
@@ -489,6 +510,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const row = await ds
       .getRepository(Invoice)
       .findOneOrFail({ where: { id: source.id } });
+
     expect(row.refundedMinor.toNumber()).toBe(99000);
     expect(row.status).toBe('refunded');
   }, 30000);
@@ -505,6 +527,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const full = await ds
       .getRepository(Invoice)
       .findOneOrFail({ where: { id: source.id } });
+
     expect(full.status).toBe('refunded');
     expect(full.refundedMinor.toNumber()).toBe(99000);
   }, 30000);
@@ -518,6 +541,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const partial = await ds
       .getRepository(Invoice)
       .findOneOrFail({ where: { id: source.id } });
+
     expect(partial.status).toBe('paid');
     expect(partial.refundedMinor.toNumber()).toBeGreaterThan(0);
     expect(partial.refundedMinor.toNumber()).toBeLessThan(99000);
@@ -533,14 +557,17 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     // that reuses it - the only window checkout leaves open.
     const repo = ds.getRepository(Subscription);
     const read = repo.findOne.bind(repo);
+
     jest.spyOn(repo, 'findOne').mockImplementation(async (options) => {
       const row = await read(options);
+
       if (row?.status === 'incomplete') {
         await repo.update(
           { id: row.id },
           { status: 'active', currentPeriodStart: activatedAt }
         );
       }
+
       return row;
     });
 
@@ -572,13 +599,17 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   it('gives each switch of a period its own charge and refund keys', async () => {
     const { subscription, user, provider } = await setup('yookassa', null);
+
     await seedSourceInvoice(subscription, 99000);
     // The provider key store: a reused key returns the first payment.
     const payments = new Map<string, string>();
+
     provider.chargeOffSession.mockImplementation((...args: unknown[]) => {
       const key = (args[1] as OffSessionCharge).idempotencyKey ?? '';
       const ref = payments.get(key) ?? `pay_${payments.size + 1}`;
+
       payments.set(key, ref);
+
       return Promise.resolve({ providerInvoiceRef: ref, status: 'captured' });
     });
 
@@ -590,14 +621,17 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const refundKeys = provider.refund.mock.calls.map(
       (call: unknown[]) => call[2]
     );
+
     expect(new Set(refundKeys).size).toBe(3);
     const rows = await ds
       .getRepository(Invoice)
       .find({ where: { subscriptionId: subscription.id } });
+
     expect(rows).toHaveLength(7);
     const charges = rows.filter((row) =>
       row.providerEventId?.startsWith('change-charge:')
     );
+
     expect(charges.map((row) => row.providerInvoiceRef).toSorted()).toEqual([
       'pay_1',
       'pay_2',
@@ -620,16 +654,21 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   ): Promise<void> {
     let crashesLeft = 1;
     let crashNextTransaction = false;
+
     provider.refund.mockImplementation(() => {
       crashNextTransaction = crashesLeft-- > 0;
+
       return Promise.resolve(undefined);
     });
     const transaction = ds.transaction.bind(ds);
+
     jest.spyOn(ds, 'transaction').mockImplementation(((
       operation: (manager: EntityManager) => Promise<unknown>
     ) => {
       if (!crashNextTransaction) return transaction(operation);
+
       crashNextTransaction = false;
+
       return transaction(async (manager) => {
         await operation(manager);
         throw new Error('connection terminated');
@@ -650,6 +689,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   it('a retry after the closing transaction died neither charges nor reserves again', async () => {
     const { subscription, user, provider } = await setup('yookassa', null);
     const source = await seedSourceInvoice(subscription, 99000);
+
     await crashFirstSwitch(subscription, user, provider);
     await service.changePlan(user, 'race-business');
 
@@ -662,11 +702,13 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     const sourceAfter = await invoices.findOneOrFail({
       where: { id: source.id }
     });
+
     expect(sourceAfter.status).toBe('paid');
     expect(sourceAfter.refundedMinor.toNumber()).toBe(66000);
     const leg = await invoices.findOneOrFail({
       where: { providerEventId: `change-refund:${subscription.id}:0` }
     });
+
     expect(leg.status).toBe('refunded');
     expect(leg.amountMinor.toNumber()).toBe(66000);
     expect(await reload(subscription.id)).toMatchObject({
@@ -677,17 +719,21 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   it('refuses another target while a charged switch is unfinished, then finishes that switch', async () => {
     const { subscription, user, provider } = await setup('yookassa', null);
+
     await seedPlan('race-max', 500000);
     const source = await seedSourceInvoice(subscription, 99000);
+
     await crashFirstSwitch(subscription, user, provider);
 
     const unfinished = {
       response: { errorKey: ErrorKeys.BILLING.PLAN_CHANGE_UNFINISHED }
     };
+
     await expect(service.previewChange(user, 'race-max')).rejects.toMatchObject(
       unfinished
     );
     const refused = service.changePlan(user, 'race-max');
+
     await expect(refused).rejects.toMatchObject({ status: 409 });
     await expect(refused).rejects.toMatchObject(unfinished);
     expect(provider.chargeOffSession).toHaveBeenCalledTimes(1);
@@ -712,6 +758,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         providerEventId: Like('change-charge:%')
       }
     });
+
     expect(charges).toHaveLength(1);
     expect(await reload(subscription.id)).toMatchObject({
       planKey: 'race-business',
@@ -721,6 +768,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
   it('lets a declined switch be followed by a switch to another target', async () => {
     const { subscription, user, provider } = await setup('yookassa', null);
+
     await seedPlan('race-max', 500000);
     provider.chargeOffSession.mockRejectedValueOnce(new ChargeDeclinedError());
     await expect(

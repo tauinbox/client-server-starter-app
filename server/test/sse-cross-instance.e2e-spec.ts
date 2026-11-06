@@ -57,9 +57,11 @@ runWithRedis('server pushes across instances (e2e)', () => {
       })
       .compile();
     const app = moduleRef.createNestApplication();
+
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.listen(0);
+
     return app;
   };
 
@@ -79,6 +81,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
           password: null
         })
       );
+
     viewer = await saveUser(emails.viewer);
     plain = await saveUser(emails.plain);
     idle = await saveUser(emails.idle);
@@ -87,9 +90,12 @@ runWithRedis('server pushes across instances (e2e)', () => {
       where: { action: { name: 'search' }, resource: { subject: 'User' } },
       relations: { action: true, resource: true }
     });
+
     if (!permission) throw new Error('Permission search:User missing');
+
     searchUser = permission;
     const roleService = first.get(RoleService);
+
     role = await roleService.create(
       { name: roleName },
       { ability: SYSTEM_ABILITY }
@@ -108,24 +114,29 @@ runWithRedis('server pushes across instances (e2e)', () => {
 
     // Both instances listen before any push is raised.
     const channel = `${namespace}:push:${redis.options.db ?? 0}`;
+
     await eventually(async () => {
       const [, count] = (await redis.pubsub('NUMSUB', channel)) as [
         string,
         number
       ];
+
       return count === 2 ? true : null;
     });
   }, 60000);
 
   afterAll(async () => {
     for (const req of requests) req.destroy();
+
     if (first) {
       const dataSource = first.get(DataSource);
+
       await dataSource.getRepository(Role).delete({ name: roleName });
       await dataSource
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });
     }
+
     await first?.close();
     await second?.close();
     await redis?.del(`${namespace}:users`);
@@ -144,6 +155,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
         ipAddress: '203.0.113.12'
       });
     const { port } = (app.getHttpServer() as Server).address() as AddressInfo;
+
     return new Promise((resolve, reject) => {
       const req = get(
         {
@@ -154,9 +166,12 @@ runWithRedis('server pushes across instances (e2e)', () => {
         (res: IncomingMessage) => {
           if (res.statusCode !== 200) {
             reject(new Error(`stream status ${res.statusCode}`));
+
             return;
           }
+
           let body = '';
+
           res.setEncoding('utf8');
           res.on('data', (chunk: string) => {
             body += chunk;
@@ -170,6 +185,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
           );
         }
       );
+
       req.on('error', () => undefined);
       requests.push(req);
     });
@@ -190,6 +206,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
     // The first instance must see the users of the second in the registry.
     await eventually(async () => {
       const userIds = await first.get(NotificationsBus).connectedUserIds();
+
       return userIds?.includes(viewer.id) && userIds.includes(plain.id)
         ? true
         : null;
@@ -221,12 +238,15 @@ runWithRedis('server pushes across instances (e2e)', () => {
 
   it('sends a role permission change to the connected holders only, in one message', async () => {
     const viewerOnSecond = await openStream(second, viewer);
+
     await eventually(async () => {
       const userIds = await first.get(NotificationsBus).connectedUserIds();
+
       return userIds?.includes(viewer.id) ? true : null;
     });
     const listener = redis.duplicate();
     const messages: { userIds?: string[]; event: NotificationEvent }[] = [];
+
     listener.on('message', (_channel: string, raw: string) => {
       messages.push(
         JSON.parse(raw) as { userIds?: string[]; event: NotificationEvent }

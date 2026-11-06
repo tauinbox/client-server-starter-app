@@ -9,23 +9,28 @@ import { SidenavStateService } from '@core/services/sidenav-state.service';
 
 function getRootRedirect(): RedirectFunction {
   const [root] = routes;
+
   if (typeof root?.redirectTo !== 'function') {
     throw new Error(
       'Root route is expected to define redirectTo as a function'
     );
   }
+
   return root.redirectTo;
 }
 
 function runRedirect(): string {
   const fn = getRootRedirect();
+
   return TestBed.runInInjectionContext(() => {
     const result = fn({} as never);
+
     if (typeof result !== 'string') {
       throw new Error(
         'Test setup expects the root redirect to return a string'
       );
     }
+
     return result;
   });
 }

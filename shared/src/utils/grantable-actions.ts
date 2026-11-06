@@ -28,6 +28,7 @@ export function changesGrantableActions(
     actionNames: resource.actionNames,
     allowedActionNames
   });
+
   return (
     after.some((name) => !before.includes(name)) ||
     before.some((name) => !after.includes(name))
@@ -46,6 +47,7 @@ export function reofferedActionNames(
   allowedActionNames: readonly string[] | null
 ): string[] {
   const before = grantableActionNames(resource);
+
   return grantableActionNames({
     actionNames: resource.actionNames,
     allowedActionNames

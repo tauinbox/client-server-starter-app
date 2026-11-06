@@ -9,6 +9,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -27,11 +28,13 @@ async function login(email: string): Promise<{ token: string; id: string }> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     tokens: { access_token: string };
     user: { id: string };
   };
+
   return { token: body.tokens.access_token, id: body.user.id };
 }
 
@@ -52,6 +55,7 @@ describe('DELETE /api/v1/users/:id billing side effects', () => {
       userId: user.id,
       planKey: 'pro'
     });
+
     expect(activate.status).toBe(200);
     const { id: subscriptionId } = (await activate.json()) as { id: string };
 
@@ -59,9 +63,11 @@ describe('DELETE /api/v1/users/:id billing side effects', () => {
       method: 'DELETE',
       headers: { authorization: `Bearer ${admin.token}` }
     });
+
     expect(del.status).toBe(200);
 
     const sub = getState().billingSubscriptions.get(subscriptionId);
+
     expect(sub).toMatchObject({
       status: 'canceled',
       cancelAtPeriodEnd: false
@@ -69,6 +75,7 @@ describe('DELETE /api/v1/users/:id billing side effects', () => {
 
     // The renewal sweep no longer sees the subscription as due.
     const renewal = await control('advance-renewal', { userId: user.id });
+
     expect(renewal.status).toBe(404);
   });
 
@@ -80,6 +87,7 @@ describe('DELETE /api/v1/users/:id billing side effects', () => {
       userId: admin.id,
       planKey: 'pro'
     });
+
     expect(activate.status).toBe(200);
     const { id: subscriptionId } = (await activate.json()) as { id: string };
 
@@ -87,9 +95,11 @@ describe('DELETE /api/v1/users/:id billing side effects', () => {
       method: 'DELETE',
       headers: { authorization: `Bearer ${admin.token}` }
     });
+
     expect(del.status).toBe(200);
 
     const sub = getState().billingSubscriptions.get(subscriptionId);
+
     expect(sub?.status).toBe('active');
   });
 });

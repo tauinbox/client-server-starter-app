@@ -69,6 +69,7 @@ export class MetricsService {
     durationMs: number
   ): void {
     const labels = { method, route, status_code: String(statusCode) };
+
     this.httpRequestsCounter.inc(labels);
     this.httpDurationHistogram.observe(labels, durationMs / 1000);
   }

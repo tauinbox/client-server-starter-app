@@ -60,6 +60,7 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.use(cookieParser());
@@ -80,8 +81,10 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
         ?.getRepository(AuditLog)
         .delete(requestIds.map((requestId) => ({ requestId })));
     }
+
     await app?.close();
     passport.unuse('google');
+
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -98,25 +101,33 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
       purpose,
       operation: 'email_change'
     });
+
     return `${cookieName(base, secure)}=${bindIntent(token, STATE)}`;
   }
 
   async function callback(cookie?: string): Promise<AuditLog[]> {
     const requestId = `guard-audit-${randomBytes(8).toString('hex')}`;
+
     requestIds.push(requestId);
     const req = request(server)
       .get(`/api/v1/auth/oauth/google/callback?state=${STATE}&code=x`)
       .set('X-Request-Id', requestId);
+
     if (cookie) req.set('Cookie', cookie);
+
     const res = await req;
+
     expect(res.status).toBe(302);
 
     // The row is written fire-and-forget, after the redirect.
     const repository = dataSource.getRepository(AuditLog);
     const deadline = Date.now() + 5000;
+
     for (;;) {
       const rows = await repository.find({ where: { requestId } });
+
       if (rows.length > 0 || Date.now() > deadline) return rows;
+
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
   }

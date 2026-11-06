@@ -22,8 +22,11 @@ describe('permission DTOs refuse a repeated permission id', () => {
         () => null,
         (e: unknown) => e
       );
+
     if (error === null) return null;
+
     expect(error).toBeInstanceOf(UnprocessableEntityException);
+
     return (
       (error as UnprocessableEntityException).getResponse() as {
         message: unknown;

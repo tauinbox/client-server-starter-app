@@ -71,6 +71,7 @@ describe('CAPTCHA soft-trigger (e2e)', () => {
     const httpInstance = app.getHttpAdapter().getInstance() as {
       set: (key: string, value: unknown) => void;
     };
+
     httpInstance.set('trust proxy', true);
     await app.init();
   });
@@ -89,6 +90,7 @@ describe('CAPTCHA soft-trigger (e2e)', () => {
     // same throttler storage; tests use unique X-Forwarded-For IPs to avoid
     // counter contamination.
     const svc = app.get(CaptchaService);
+
     jest.spyOn(svc, 'verify').mockReset();
   });
 

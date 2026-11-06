@@ -15,9 +15,11 @@ function configOf(values: Record<string, unknown>): ConfigService {
     get: (key: string) => values[key],
     getOrThrow: (key: string) => {
       if (values[key] === undefined) throw new Error(`Missing: ${key}`);
+
       return values[key];
     }
   };
+
   // @ts-expect-error a two-method stand-in for the full ConfigService
   return config;
 }

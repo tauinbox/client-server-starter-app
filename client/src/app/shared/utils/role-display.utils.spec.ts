@@ -44,6 +44,7 @@ describe('role-display.utils', () => {
         role('2', 'editor'),
         role('3', SYSTEM_ROLES.ADMIN)
       ];
+
       expect(sortRolesForDisplay(roles).map((r) => r.name)).toEqual([
         SYSTEM_ROLES.ADMIN,
         SYSTEM_ROLES.USER,
@@ -54,6 +55,7 @@ describe('role-display.utils', () => {
     it('returns a new array and leaves the input untouched', () => {
       const roles = [role('1', SYSTEM_ROLES.USER)];
       const sorted = sortRolesForDisplay(roles);
+
       expect(sorted).not.toBe(roles);
       expect(roles.map((r) => r.name)).toEqual([SYSTEM_ROLES.USER]);
     });
@@ -70,6 +72,7 @@ describe('role-display.utils', () => {
         role('2', SYSTEM_ROLES.USER),
         role('3', 'editor')
       ];
+
       expect(overflowRoleNames(roles)).toBe(`${SYSTEM_ROLES.USER}, editor`);
     });
 

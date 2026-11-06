@@ -40,7 +40,9 @@ export class SmtpHealthIndicator {
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key);
     const ok = await this.verify();
+
     this.dependencyHealth.statuses.set(key, ok);
+
     return ok
       ? indicator.up()
       : indicator.up({ warning: 'SMTP verify failed' });
@@ -48,14 +50,17 @@ export class SmtpHealthIndicator {
 
   private verify(): Promise<boolean> {
     const { cached } = this;
+
     if (cached && Date.now() - cached.at < VERIFY_CACHE_TTL_MS) {
       return Promise.resolve(cached.ok);
     }
+
     // Without the in-flight guard concurrent probes each open their own login,
     // since the cache is only written once a verify completes.
     this.inFlight ??= this.runVerify().finally(() => {
       this.inFlight = undefined;
     });
+
     return this.inFlight;
   }
 
@@ -68,16 +73,20 @@ export class SmtpHealthIndicator {
         VERIFY_TIMEOUT_MS
       );
     });
+
     try {
       await Promise.race([this.mailService.verifySmtp(), timeout]);
       ok = true;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
+
       this.logger.warn(`SMTP verify failed: ${reason}`);
     } finally {
       clearTimeout(timer);
     }
+
     this.cached = { ok, at: Date.now() };
+
     return ok;
   }
 }

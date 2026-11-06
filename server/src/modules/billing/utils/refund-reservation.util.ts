@@ -58,11 +58,14 @@ export async function reserveRefund(
 ): Promise<RefundReservation> {
   const remaining = remainingRefundable(invoice);
   const reserved = requested.compare(remaining) > 0 ? remaining : requested;
+
   if (reserved.compare(ZERO) <= 0) {
     return { reserved: ZERO, cumulative: invoice.refundedMinor };
   }
+
   invoice.refundedMinor = invoice.refundedMinor.add(reserved);
   await manager.save(Invoice, invoice);
+
   return { reserved, cumulative: invoice.refundedMinor };
 }
 
@@ -80,8 +83,12 @@ export async function releaseRefund(
   minor: Money
 ): Promise<Invoice | null> {
   const invoice = await lockInvoice(manager, { where: { id: invoiceId } });
+
   if (!invoice) return null;
+
   const released = invoice.refundedMinor.sub(minor);
+
   invoice.refundedMinor = released.compare(ZERO) < 0 ? ZERO : released;
+
   return manager.save(Invoice, invoice);
 }

@@ -11,11 +11,13 @@ import type { RatedAmount } from './rating-strategy.interface';
 export class FixedRating {
   amountForPeriod(subscription: Subscription, plan: Plan): RatedAmount {
     const price = plan.prices[subscription.provider];
+
     if (!price) {
       throw new Error(
         `Plan "${plan.key}" has no price for provider "${subscription.provider}"`
       );
     }
+
     return {
       amountMinor: price.amountMinor,
       currency: price.currency,

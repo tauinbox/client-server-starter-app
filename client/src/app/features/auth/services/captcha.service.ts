@@ -55,7 +55,9 @@ export class CaptchaService {
    */
   loadConfig(): Promise<CaptchaConfigResponse> {
     const cached = this.#config();
+
     if (cached) return Promise.resolve(cached);
+
     if (this.#configRequest) return this.#configRequest;
 
     const ctx = new HttpContext().set(
@@ -69,6 +71,7 @@ export class CaptchaService {
     )
       .then((cfg) => {
         this.#config.set(cfg);
+
         return cfg;
       })
       .catch((err: unknown) => {
@@ -77,7 +80,9 @@ export class CaptchaService {
         // suppression is set on the request context above.
         throw err;
       });
+
     this.#configRequest = request;
+
     return request;
   }
 
@@ -93,7 +98,9 @@ export class CaptchaService {
       this.#scriptLoad = null;
       throw err;
     });
+
     this.#scriptLoad = load;
+
     return load;
   }
 

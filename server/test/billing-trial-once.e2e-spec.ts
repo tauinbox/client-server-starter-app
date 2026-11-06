@@ -121,6 +121,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();
+
     service = module.get(BillingUserService);
     reducer = module.get(BillingEventReducer);
 
@@ -132,6 +133,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
     const customer = await ds.getRepository(Customer).save(
       ds.getRepository(Customer).create({
@@ -144,6 +146,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
   });
 
@@ -154,6 +157,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -212,10 +216,12 @@ runWithInfra('One trial for each customer (e2e)', () => {
       await firstPayment(`pay_trial_${String(converted)}`, 0);
 
       const trialRow = await openRow();
+
       expect(trialRow.status).toBe('trialing');
       const customer = await ds
         .getRepository(Customer)
         .findOneByOrFail({ id: customerId });
+
       expect(customer.trialUsedAt).toBeInstanceOf(Date);
 
       if (converted) {
@@ -224,6 +230,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
           .getRepository(Subscription)
           .update({ id: trialRow.id }, { status: 'active', trialEnd: null });
       }
+
       await service.cancelSubscription(userId!, 'immediate');
 
       await service.checkout(userId!, PLAN);
@@ -233,6 +240,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
         { urls: expect.anything(), trial: false }
       );
       const second = await openRow();
+
       expect(second.status).toBe('incomplete');
       expect(second.trialEnd).toBeNull();
 

@@ -61,12 +61,14 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
         password: null
       })
     );
+
     userId = user.id;
   }, 60000);
 
   afterAll(async () => {
     await dataSource?.getRepository(User).delete({ email });
     await app?.close();
+
     if (previousMinIat === undefined) {
       delete process.env['JWT_MIN_IAT'];
     } else {
@@ -77,6 +79,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
   async function seedSession(): Promise<{ raw: string; sessionId: string }> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const sessionId = randomUUID();
+
     await refreshTokenService.createRefreshToken(userId, {
       token: raw,
       sessionId,
@@ -85,6 +88,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
         ipAddress: null
       }
     });
+
     return { raw, sessionId };
   }
 
@@ -94,6 +98,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     } catch (err) {
       return (err as HttpException).getResponse();
     }
+
     return 'RESOLVED';
   }
 
@@ -105,6 +110,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
 
   it('ends only the pre-rotation session and treats a second presentation as an unknown token', async () => {
     const preRotation = await seedSession();
+
     await dataSource.query(
       `UPDATE refresh_tokens SET created_at = to_timestamp($1) WHERE session_id = $2`,
       [minIat - 600, preRotation.sessionId]
@@ -128,12 +134,14 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     const user = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: userId });
+
     expect(user.tokenRevokedAt).toBeNull();
     expect(auditSpy.mock.calls.map((call) => call[0].action)).not.toContain(
       AuditAction.TOKEN_REUSE_DETECTED
     );
 
     const { tokens } = await authService.refreshTokens(postRotation.raw, null);
+
     expect(tokens.refresh_token).toBeTruthy();
   }, 30000);
 

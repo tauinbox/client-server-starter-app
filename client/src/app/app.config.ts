@@ -44,7 +44,9 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => {
       const iconRegistry = inject(MatIconRegistry);
       const sanitizer = inject(DomSanitizer);
+
       registerOAuthIcons(iconRegistry, sanitizer);
+
       for (const lang of ['en', 'ru']) {
         iconRegistry.addSvgIcon(
           `flag-${lang}`,

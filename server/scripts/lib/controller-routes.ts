@@ -10,6 +10,7 @@ import * as path from 'path';
 import * as ts from 'typescript';
 
 const GLOBAL_PREFIX = 'api';
+
 export const CONTROLLERS_ROOT = path.resolve(__dirname, '../../src/modules');
 
 /** Controller subdirectories to skip entirely. */
@@ -59,9 +60,11 @@ export interface ControllerRoute {
 
 export function decoratorName(d: ts.Decorator): string | undefined {
   const expr = d.expression;
+
   if (ts.isCallExpression(expr) && ts.isIdentifier(expr.expression)) {
     return expr.expression.text;
   }
+
   return ts.isIdentifier(expr) ? expr.text : undefined;
 }
 
@@ -80,6 +83,7 @@ function parseControllerArgs(d: ts.Decorator): {
   version: string | null;
 } {
   const args = decoratorArgs(d);
+
   if (!args?.length) return { controllerPath: '', version: null };
 
   const [arg] = args;
@@ -93,17 +97,21 @@ function parseControllerArgs(d: ts.Decorator): {
   if (ts.isObjectLiteralExpression(arg)) {
     let controllerPath = '';
     let version: string | null = null;
+
     for (const prop of arg.properties) {
       if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) {
         continue;
       }
+
       if (prop.name.text === 'path') {
         controllerPath = stringLiteral(prop.initializer) ?? '';
       }
+
       if (prop.name.text === 'version') {
         version = stringLiteral(prop.initializer) ?? null;
       }
     }
+
     return { controllerPath, version };
   }
 
@@ -112,7 +120,9 @@ function parseControllerArgs(d: ts.Decorator): {
 
 function parseMethodPath(d: ts.Decorator): string {
   const args = decoratorArgs(d);
+
   if (!args?.length) return '';
+
   return stringLiteral(args[0]) ?? '';
 }
 
@@ -130,6 +140,7 @@ function bodyTypeOf(member: ts.MethodDeclaration): string | undefined {
     const isBody = ts
       .getDecorators(param)
       ?.some((d) => decoratorName(d) === 'Body');
+
     if (
       isBody &&
       param.type &&
@@ -139,11 +150,13 @@ function bodyTypeOf(member: ts.MethodDeclaration): string | undefined {
       return param.type.typeName.text;
     }
   }
+
   return undefined;
 }
 
 export function findControllers(dir: string = CONTROLLERS_ROOT): string[] {
   const results: string[] = [];
+
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (!EXCLUDE_DIRS.has(entry.name)) {
@@ -156,6 +169,7 @@ export function findControllers(dir: string = CONTROLLERS_ROOT): string[] {
       results.push(path.join(dir, entry.name));
     }
   }
+
   return results;
 }
 
@@ -182,11 +196,13 @@ export function extractRoutes(
     if (!ts.isClassDeclaration(node)) return;
 
     const classDecorators = ts.getDecorators(node);
+
     if (!classDecorators) return;
 
     const controllerDec = classDecorators.find(
       (d) => decoratorName(d) === 'Controller'
     );
+
     if (!controllerDec) return;
 
     const { controllerPath, version } = parseControllerArgs(controllerDec);
@@ -199,12 +215,14 @@ export function extractRoutes(
       if (!ts.isMethodDeclaration(member)) continue;
 
       const methodDecorators = ts.getDecorators(member);
+
       if (!methodDecorators) continue;
 
       for (const httpMethod of HTTP_METHODS) {
         const httpDec = methodDecorators.find(
           (d) => decoratorName(d) === httpMethod
         );
+
         if (!httpDec) continue;
 
         // Strip leading slash so joining works correctly in all cases.

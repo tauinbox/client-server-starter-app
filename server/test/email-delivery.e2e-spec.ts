@@ -38,6 +38,7 @@ async function waitForEmailHtml(
   for (let attempt = 0; attempt < 40; attempt++) {
     try {
       const listRes = await fetch(`${MAILPIT_URL}/api/v1/messages`);
+
       if (listRes.ok) {
         const list = (await listRes.json()) as MailpitList;
         const hit = list.messages?.find(
@@ -45,18 +46,22 @@ async function waitForEmailHtml(
             m.To?.some((t) => t.Address === toAddress) &&
             (subject === undefined || m.Subject === subject)
         );
+
         if (hit) {
           const full = (await fetch(
             `${MAILPIT_URL}/api/v1/message/${hit.ID}`
           ).then((r) => r.json())) as { HTML: string };
+
           return full.HTML;
         }
       }
     } catch {
       // Mailpit may not accept connections on the first polls — retry.
     }
+
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+
   throw new Error(
     `No email${subject ? ` "${subject}"` : ''} delivered to ${toAddress} within the timeout`
   );
@@ -106,6 +111,7 @@ runWithInfra('Email delivery (e2e)', () => {
     // decode it on click); decode it before extracting the token.
     const decoded = html.replaceAll(/&#x3d;/gi, '=').replaceAll('&#61;', '=');
     const match = decoded.match(/verify-email\?token=([A-Fa-f0-9]+)/);
+
     if (!match) {
       throw new Error('Verification email did not contain a token link');
     }
@@ -123,6 +129,7 @@ runWithInfra('Email delivery (e2e)', () => {
     const loginBody = login.body as {
       tokens?: { access_token?: string };
     };
+
     expect(loginBody.tokens?.access_token).toBeTruthy();
   }, 60000);
 
@@ -143,6 +150,7 @@ runWithInfra('Email delivery (e2e)', () => {
       .replaceAll(/&#x3d;/gi, '=')
       .replaceAll('&#61;', '=');
     const match = decoded.match(/verify-email\?token=([A-Fa-f0-9]+)/);
+
     if (!match) {
       throw new Error('Verification email did not contain a token link');
     }
@@ -166,6 +174,7 @@ runWithInfra('Email delivery (e2e)', () => {
       .expect(200);
 
     const notice = await waitForEmailHtml(email, 'Your password was changed');
+
     expect(notice).toContain('profile page');
     expect(notice).toContain('UTC');
     // A notice must carry no action link at all.

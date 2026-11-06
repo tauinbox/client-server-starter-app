@@ -89,6 +89,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
         password: null
       })
     );
+
     userId = user.id;
   }, 60000);
 
@@ -117,6 +118,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
       ipAddress: '203.0.113.9'
     });
     const payload = decode(tokens.access_token) as { sid: string };
+
     return {
       token: tokens.access_token,
       refreshToken: tokens.refresh_token,
@@ -135,10 +137,13 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
         (res: IncomingMessage) => {
           if (res.statusCode !== 200) {
             reject(new Error(`stream status ${res.statusCode}`));
+
             return;
           }
+
           let body = '';
           let ended = false;
+
           res.setEncoding('utf8');
           res.on('data', (chunk: string) => {
             body += chunk;
@@ -152,17 +157,21 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
             ended: () => ended,
             close: () => req.destroy()
           };
+
           streams.push(stream);
           resolve(stream);
         }
       );
+
       req.on('error', () => undefined);
     });
   }
 
   const superAbility = (): AppAbility => {
     const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     can('manage', 'all');
+
     return build();
   };
 
@@ -177,6 +186,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
       ip: '127.0.0.1',
       headers: {}
     };
+
     // @ts-expect-error partial request: the update reads only these fields
     return req;
   };
@@ -251,6 +261,7 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
       .body()
       .split('\n')
       .filter((line) => line.startsWith('data: {'));
+
     expect(frames).toEqual([
       `data: ${JSON.stringify({ type: 'session_invalidated' })}`
     ]);

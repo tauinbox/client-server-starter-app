@@ -59,6 +59,7 @@ test.describe('OAuth-only account changes its email', () => {
     await page.goto('/profile');
 
     const emailField = page.getByLabel('Email', { exact: true });
+
     await expect(emailField).toHaveValue(email);
 
     await emailField.fill('new-address@example.com');
@@ -88,6 +89,7 @@ test.describe('OAuth-only account changes its email', () => {
       userId,
       STEP_UP_OPERATION.EMAIL_CHANGE
     );
+
     await page.context().addCookies([
       {
         name: 'reauth_proof',
@@ -120,6 +122,7 @@ test.describe('OAuth-only account changes its email', () => {
         res.status() === 200,
       { timeout: 15_000 }
     );
+
     await page.goto('/profile?reauth=ok');
     await initiated;
 
@@ -130,11 +133,13 @@ test.describe('OAuth-only account changes its email', () => {
     const state = (await _mockServer.getState()) as {
       users: { id: string; email: string }[];
     };
+
     // The address does not change until the link is confirmed.
     expect(state.users.find((u) => u.id === userId)?.email).toBe(email);
 
     const tokens = await _mockServer.getTokens();
     const [confirmToken] = Object.keys(tokens.pendingEmailTokens);
+
     expect(confirmToken).toBeTruthy();
 
     await page.goto(`/confirm-email-change?token=${confirmToken}`);
@@ -143,6 +148,7 @@ test.describe('OAuth-only account changes its email', () => {
     const confirmed = (await _mockServer.getState()) as {
       users: { id: string; email: string }[];
     };
+
     expect(confirmed.users.find((u) => u.id === userId)?.email).toBe(
       'new-address@example.com'
     );

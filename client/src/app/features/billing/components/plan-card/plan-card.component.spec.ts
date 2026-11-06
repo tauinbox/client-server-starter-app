@@ -39,6 +39,7 @@ describe('PlanCardComponent', () => {
   it('renders the plan name, price and entitlements', () => {
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain('Pro');
     expect(text).toContain('$12.00');
     expect(text).toContain('Reports');
@@ -49,6 +50,7 @@ describe('PlanCardComponent', () => {
     fixture.componentRef.setInput('featured', true);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
+
     expect(el.querySelector('.popular-chip')).not.toBeNull();
     expect(el.querySelector('button')).not.toBeNull();
   });
@@ -57,6 +59,7 @@ describe('PlanCardComponent', () => {
     fixture.componentRef.setInput('current', true);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
+
     expect(el.querySelector('.current-badge')).not.toBeNull();
     expect(el.querySelector('button')).toBeNull();
   });
@@ -67,11 +70,13 @@ describe('PlanCardComponent', () => {
     const button = (fixture.nativeElement as HTMLElement).querySelector(
       'button'
     );
+
     expect(button?.textContent?.trim()).toBe('Change plan');
   });
 
   it('emits choose with the plan key on click', () => {
     const choose = vi.fn();
+
     fixture.componentInstance.choose.subscribe(choose);
     fixture.detectChanges();
     fixture.nativeElement.querySelector('button').click();

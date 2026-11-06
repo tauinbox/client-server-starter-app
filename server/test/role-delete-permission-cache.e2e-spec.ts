@@ -45,6 +45,7 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
       .mockImplementation(() => undefined);
 
     const userRepository = dataSource.getRepository(User);
+
     holder = await userRepository.save(
       userRepository.create({
         email,
@@ -57,9 +58,11 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
 
   afterAll(async () => {
     jest.restoreAllMocks();
+
     if (dataSource) {
       await dataSource.getRepository(User).delete({ email });
     }
+
     await app?.close();
   });
 
@@ -68,12 +71,14 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
     const deleteRole = permissions.find(
       (p) => p.action.name === 'delete' && p.resource.subject === 'Role'
     );
+
     if (!deleteRole) throw new Error('Permission delete:Role missing');
 
     const role = await roleService.create(
       { name: `${tag}-role` },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       role.id,
       [{ permissionId: deleteRole.id }],
@@ -89,6 +94,7 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
     const eventEmitter = app.get(EventEmitter2);
     const emitAsync = eventEmitter.emitAsync.bind(eventEmitter);
     let readInside = false;
+
     jest
       .spyOn(eventEmitter, 'emitAsync')
       .mockImplementation(async (event, ...values: unknown[]) => {
@@ -97,6 +103,7 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
           await permissionService.getRolesForUser(holder.id);
           readInside = true;
         }
+
         return emitAsync(event, ...values);
       });
 
@@ -104,14 +111,17 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
 
     expect(readInside).toBe(true);
     const roleRepository = dataSource.getRepository(Role);
+
     expect(await roleRepository.findOne({ where: { id: role.id } })).toBeNull();
     const cachedPermissions = await permissionService.getPermissionsForUser(
       holder.id
     );
+
     expect(cachedPermissions.map((p) => p.permission)).not.toContain(
       `${deleteRole.resource.name}:${deleteRole.action.name}`
     );
     const cachedRoles = await permissionService.getRolesForUser(holder.id);
+
     expect(cachedRoles.map((r) => r.name)).not.toContain(`${tag}-role`);
   });
 });

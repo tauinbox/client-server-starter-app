@@ -18,9 +18,15 @@
   --mat-chip-with-icon-icon-color: var(--mat-sys-on-error-container);
   --mat-chip-with-icon-selected-icon-color: var(--mat-sys-on-error-container);
   --mat-chip-selected-trailing-icon-color: var(--mat-sys-on-error-container);
-  --mat-chip-trailing-action-state-layer-color: var(--mat-sys-on-error-container);
+  --mat-chip-trailing-action-state-layer-color: var(
+    --mat-sys-on-error-container
+  );
   --mat-chip-hover-state-layer-color: var(--mat-sys-on-error-container);
   --mat-chip-focus-state-layer-color: var(--mat-sys-on-error-container);
-  --mat-chip-selected-hover-state-layer-color: var(--mat-sys-on-error-container);
-  --mat-chip-selected-focus-state-layer-color: var(--mat-sys-on-error-container);
+  --mat-chip-selected-hover-state-layer-color: var(
+    --mat-sys-on-error-container
+  );
+  --mat-chip-selected-focus-state-layer-color: var(
+    --mat-sys-on-error-container
+  );
 }

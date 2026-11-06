@@ -17,5 +17,6 @@ export function oauthProfileName(profile: ProviderNameParts): string {
       .map((part) => part?.trim())
       .filter(Boolean)
       .join(' ');
+
   return name.slice(0, MAX_NAME_LENGTH);
 }

@@ -43,6 +43,7 @@ runWithInfra('The email change needs update:Profile (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -82,9 +83,11 @@ runWithInfra('The email change needs update:Profile (e2e)', () => {
     const user = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     await dataSource
       .getRepository(User)
       .update(user.id, { isEmailVerified: true });
+
     return user.id;
   }
 
@@ -94,6 +97,7 @@ runWithInfra('The email change needs update:Profile (e2e)', () => {
       userAgent: 'profile-grant-e2e',
       ipAddress: null
     });
+
     return tokens.access_token;
   }
 
@@ -117,6 +121,7 @@ runWithInfra('The email change needs update:Profile (e2e)', () => {
     const row = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id: noRoleId } });
+
     expect(row.pendingEmail).toBeNull();
   });
 
@@ -129,6 +134,7 @@ runWithInfra('The email change needs update:Profile (e2e)', () => {
     const row = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id: grantedId } });
+
     expect(row.pendingEmail).toBe(newEmail);
   });
 });

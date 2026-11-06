@@ -17,9 +17,12 @@ export function createRedisCacheStore(url: string): KeyvRedis<unknown> {
 
   const logger = new Logger('RedisCacheStore');
   let lastLoggedAt = 0;
+
   store.on('error', (error: unknown) => {
     const now = Date.now();
+
     if (now - lastLoggedAt < ERROR_LOG_THROTTLE_MS) return;
+
     lastLoggedAt = now;
     logger.warn(
       `Redis cache unreachable, serving uncached reads: ${
@@ -44,5 +47,6 @@ export function buildCacheOptions(
   if (!redisUrl) {
     return {};
   }
+
   return { stores: [createRedisCacheStore(redisUrl)] };
 }

@@ -16,6 +16,7 @@ const newEmail = 'moved@example.com';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -34,8 +35,10 @@ async function login(userEmail: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: userEmail, password })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -49,10 +52,13 @@ async function initiateEmailChange(): Promise<string> {
     },
     body: JSON.stringify({ newEmail, currentPassword: password })
   });
+
   expect(res.status).toBe(200);
 
   const token = findUserByEmail(email)?.pendingEmailToken;
+
   expect(token).toBeTruthy();
+
   return token as string;
 }
 
@@ -73,6 +79,7 @@ const invalidTokenBody = {
 describe('confirm-email-change against a deactivated account', () => {
   it('refuses the confirmation once the account is deactivated', async () => {
     const token = await initiateEmailChange();
+
     findUserByEmail(email)!.isActive = false;
 
     const res = await confirm(token);
@@ -85,6 +92,7 @@ describe('confirm-email-change against a deactivated account', () => {
 
   it('answers the deactivated case exactly like an unknown token', async () => {
     const token = await initiateEmailChange();
+
     findUserByEmail(email)!.isActive = false;
 
     const deactivated = await confirm(token);
@@ -109,15 +117,18 @@ describe('confirm-email-change against a deactivated account', () => {
       },
       body: JSON.stringify({ isActive: false })
     });
+
     expect(patched.status).toBe(200);
 
     const target = findUserByEmail(email)!;
+
     expect(target.pendingEmail).toBeNull();
     expect(target.pendingEmailToken).toBeNull();
     expect(target.pendingEmailExpiresAt).toBeNull();
     expect(getState().pendingEmailTokens.has(token)).toBe(false);
 
     const res = await confirm(token);
+
     expect(res.status).toBe(422);
     expect(await readErrorBody(res)).toEqual(invalidTokenBody);
   });

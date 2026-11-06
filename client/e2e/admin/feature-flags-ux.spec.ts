@@ -25,6 +25,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     await page.goto('/admin/feature-flags');
 
     const card = page.locator('.flag-card', { hasText: 'new-dashboard' });
+
     await expect(card).toBeVisible();
     await expect(card).toContainText('Environments');
     await expect(card.locator('.flag-card-fields dd').first()).toHaveText(
@@ -43,6 +44,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     });
 
     const writes: { method: string; url: string; body: unknown }[] = [];
+
     page.on('request', (req) => {
       if (
         req.url().includes('/api/v1/admin/feature-flags') &&
@@ -61,9 +63,11 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     const editButton = page
       .getByRole('row', { name: /beta-export/ })
       .getByRole('button', { name: /Edit flag beta-export/ });
+
     await editButton.click();
 
     let dialog = await openedDialog(page);
+
     // beta-export is seeded with one percentage rule.
     await dialog.getByRole('button', { name: 'Remove rule' }).click();
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -110,6 +114,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     // text, so a single keystroke used to store the string "true", which the
     // evaluator compares with === and never matches again.
     const valueInput = dialog.getByRole('textbox', { name: 'Value' });
+
     await expect(valueInput).toHaveValue('true');
     await valueInput.fill('true');
 
@@ -120,6 +125,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
 
     const res = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
     const body = (await res.json()) as { flags: Record<string, boolean> };
+
     expect(body.flags['oauth-google']).toBe(true);
   });
 
@@ -211,10 +217,12 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     const editButton = page
       .getByRole('row', { name: /beta-export/ })
       .getByRole('button', { name: /Edit flag beta-export/ });
+
     await editButton.click();
 
     let dialog = await openedDialog(page);
     const bucketBy = dialog.getByRole('combobox', { name: 'Bucket by' });
+
     // The seed rule has no bucketBy, which the server reads as user.
     await expect(bucketBy).toHaveText('User');
     await bucketBy.click();

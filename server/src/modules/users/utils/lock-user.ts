@@ -16,7 +16,9 @@ export async function lockUserWithRoles(
     withDeleted,
     lock: { mode: 'pessimistic_write' }
   });
+
   if (!locked) return null;
+
   return manager.findOne(User, {
     where: { id },
     relations: { roles: true },

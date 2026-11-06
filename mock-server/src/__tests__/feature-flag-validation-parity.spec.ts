@@ -11,6 +11,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -29,13 +30,16 @@ async function loginAsAdmin(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
 async function createFlag(body: unknown): Promise<Response> {
   const token = await loginAsAdmin();
+
   return fetch(`${baseUrl}/api/v1/admin/feature-flags`, {
     method: 'POST',
     headers: {
@@ -59,6 +63,7 @@ async function saveRules(flagId: string, rules: unknown): Promise<Response> {
   const version = current.ok
     ? ((await current.json()) as { version: number }).version
     : 1;
+
   return patchFlag(flagId, { rules }, versionEtag(version));
 }
 
@@ -68,6 +73,7 @@ async function patchFlag(
   ifMatch?: string
 ): Promise<Response> {
   const token = await loginAsAdmin();
+
   return fetch(`${baseUrl}/api/v1/admin/feature-flags/${flagId}`, {
     method: 'PATCH',
     headers: {
@@ -86,16 +92,20 @@ describe('feature-flag validation parity with server', () => {
   describe('key', () => {
     it('trims surrounding whitespace before validating', async () => {
       const res = await createFlag({ key: '  probe-trim  ' });
+
       expect(res.status).toBe(201);
       const flag = (await res.json()) as { key: string };
+
       expect(flag.key).toBe('probe-trim');
     });
 
     it('compares the trimmed key against the existing flags', async () => {
       const created = await createFlag({ key: 'dup-trim' });
+
       expect(created.status).toBe(201);
 
       const res = await createFlag({ key: ' dup-trim ' });
+
       expect(res.status).toBe(409);
     });
 
@@ -108,21 +118,26 @@ describe('feature-flag validation parity with server', () => {
         { key: 'patch-renamed-key', enabled: true },
         versionEtag(target.version)
       );
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors).toEqual(['property key should not exist']);
       const flag = getState().featureFlags.get(target.id);
+
       expect(flag?.key).toBe('patch-stable-key');
       expect(flag?.version).toBe(target.version);
     });
 
     it('rejects a key that is only whitespace', async () => {
       const res = await createFlag({ key: '   ' });
+
       expect(res.status).toBe(422);
     });
 
     it('rejects a whitespace-only key on PATCH', async () => {
       const created = await createFlag({ key: 'patch-blank' });
+
       expect(created.status).toBe(201);
       const flag = (await created.json()) as { id: string; version: number };
 
@@ -131,6 +146,7 @@ describe('feature-flag validation parity with server', () => {
         { key: '   ' },
         versionEtag(flag.version)
       );
+
       expect(res.status).toBe(422);
     });
   });
@@ -141,8 +157,10 @@ describe('feature-flag validation parity with server', () => {
         key: 'env-normalize',
         environments: [' Production ', 'STAGING', 'production']
       });
+
       expect(res.status).toBe(201);
       const flag = (await res.json()) as { environments: string[] };
+
       expect(flag.environments).toEqual(['production', 'staging']);
     });
 
@@ -151,18 +169,22 @@ describe('feature-flag validation parity with server', () => {
         key: 'env-all',
         environments: [...APP_ENVIRONMENTS]
       });
+
       expect(res.status).toBe(201);
     });
 
     it('rejects a name the server can never run as', async () => {
       const res = await createFlag({ key: 'env-bad', environments: ['qa'] });
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toContain('environment');
     });
 
     it('applies the same rules on PATCH', async () => {
       const created = await createFlag({ key: 'env-patch' });
+
       expect(created.status).toBe(201);
       const flag = (await created.json()) as { id: string; version: number };
       const token = await loginAsAdmin();
@@ -179,6 +201,7 @@ describe('feature-flag validation parity with server', () => {
           body: JSON.stringify({ environments: ['qa'] })
         }
       );
+
       expect(res.status).toBe(422);
     });
   });
@@ -192,8 +215,10 @@ describe('feature-flag validation parity with server', () => {
       rule: unknown
     ): Promise<{ res: Response; flagId: string }> {
       const created = await createFlag({ key });
+
       expect(created.status).toBe(201);
       const flag = (await created.json()) as { id: string };
+
       return { res: await saveRules(flag.id, [rule]), flagId: flag.id };
     }
 
@@ -208,8 +233,10 @@ describe('feature-flag validation parity with server', () => {
           value: true
         }
       });
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(
         'customKey "nope" is not registered in the attribute registry'
       );
@@ -223,8 +250,10 @@ describe('feature-flag validation parity with server', () => {
         effect: 'include',
         payload: { type: 'percentage', percent: 500 }
       });
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(
         'percentage rule requires percent: an integer in [0, 100]'
       );
@@ -251,8 +280,10 @@ describe('feature-flag validation parity with server', () => {
         `payload-${payload.type}-bad`,
         { effect: 'include', payload }
       );
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(message);
       expect(
         getState().featureFlagRules.filter((r) => r.flagId === flagId)
@@ -269,8 +300,10 @@ describe('feature-flag validation parity with server', () => {
           value: '2026-01-01T00:00:00.000Z'
         }
       });
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(
         'attribute rule with field=createdAt does not support op=eq'
       );
@@ -284,10 +317,12 @@ describe('feature-flag validation parity with server', () => {
         effect: 'include',
         payload: { type: 'percentage', percent: 10, bucketBy: 'device' }
       });
+
       expect(res.status).toBe(200);
       const flag = (await res.json()) as {
         rules: { payload: Record<string, unknown> }[];
       };
+
       expect(flag.rules[0]?.payload).toEqual({
         type: 'percentage',
         percent: 10,
@@ -308,6 +343,7 @@ describe('feature-flag validation parity with server', () => {
           password: 'Password1'
         })
       });
+
       expect(login.status).toBe(200);
       const { tokens } = (await login.json()) as {
         tokens: { access_token: string };
@@ -315,7 +351,9 @@ describe('feature-flag validation parity with server', () => {
       const res = await fetch(`${baseUrl}/api/v1/feature-flags`, {
         headers: { authorization: `Bearer ${tokens.access_token}` }
       });
+
       expect(res.status).toBe(200);
+
       return ((await res.json()) as { flags: Record<string, boolean> }).flags;
     }
 
@@ -323,7 +361,9 @@ describe('feature-flag validation parity with server', () => {
       const user = getState()
         .users.values()
         .find((u) => u.email === 'user@example.com');
+
       if (!user) throw new Error('seed user missing');
+
       return user.createdAt;
     }
 
@@ -344,6 +384,7 @@ describe('feature-flag validation parity with server', () => {
           }
         }
       ]);
+
       expect(res.status).toBe(200);
 
       await expect(flagsAsUser()).resolves.toMatchObject({
@@ -355,6 +396,7 @@ describe('feature-flag validation parity with server', () => {
       const created = await createFlag({ key: 'created-eq', enabled: true });
       const flag = (await created.json()) as { id: string };
       const now = new Date().toISOString();
+
       getState().featureFlagRules.push({
         id: 'legacy-created-eq',
         flagId: flag.id,
@@ -370,6 +412,7 @@ describe('feature-flag validation parity with server', () => {
       });
 
       const flags = await flagsAsUser();
+
       expect('created-eq' in flags).toBe(false);
     });
   });
@@ -382,6 +425,7 @@ describe('feature-flag validation parity with server', () => {
 
     async function preview(body: unknown): Promise<Response> {
       const token = await loginAsAdmin();
+
       return fetch(`${baseUrl}/api/v1/admin/feature-flags/${flagId}/preview`, {
         method: 'POST',
         headers: {
@@ -397,6 +441,7 @@ describe('feature-flag validation parity with server', () => {
         key: 'preview-draft',
         enabled: true
       });
+
       expect(created.status).toBe(201);
       flagId = ((await created.json()) as { id: string }).id;
       const stored = await saveRules(flagId, [
@@ -405,11 +450,13 @@ describe('feature-flag validation parity with server', () => {
           payload: { type: 'role', roleNames: ['beta'] }
         }
       ]);
+
       expect(stored.status).toBe(200);
     });
 
     it('evaluates the stored rules when no draft rules are sent', async () => {
       const res = await preview({ roles: ['beta'] });
+
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
         result: true,
@@ -427,6 +474,7 @@ describe('feature-flag validation parity with server', () => {
           }
         ]
       });
+
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
         result: false,
@@ -444,6 +492,7 @@ describe('feature-flag validation parity with server', () => {
           }
         ]
       });
+
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
         result: true,
@@ -461,10 +510,12 @@ describe('feature-flag validation parity with server', () => {
       ];
       const previewRes = await preview({ rules });
       const saveRes = await saveRules(flagId, rules);
+
       expect(previewRes.status).toBe(422);
       expect(saveRes.status).toBe(422);
       const previewBody = (await previewRes.json()) as { message: string };
       const saveBody = (await saveRes.json()) as { message: string };
+
       expect(previewBody.message).toBe(saveBody.message);
     });
 
@@ -481,13 +532,16 @@ describe('feature-flag validation parity with server', () => {
           body: JSON.stringify({ rules: 'nope' })
         }
       );
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors).toContain('rules must be an array');
     });
 
     it('evaluates a supplied enabled state instead of the stored one', async () => {
       const res = await preview({ roles: ['beta'], enabled: false });
+
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
         result: false,
@@ -497,11 +551,13 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a non-boolean enabled', async () => {
       const res = await preview({ enabled: 'yes' });
+
       expect(res.status).toBe(422);
     });
 
     it('evaluates a supplied environment list instead of the stored one', async () => {
       const res = await preview({ roles: ['beta'], environments: ['staging'] });
+
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
         result: false,
@@ -511,6 +567,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects an environment the server can never run as', async () => {
       const res = await preview({ environments: ['qa'] });
+
       expect(res.status).toBe(422);
     });
 
@@ -529,6 +586,7 @@ describe('feature-flag validation parity with server', () => {
       const stored = getState().featureFlagRules.filter(
         (r) => r.flagId === flagId
       );
+
       expect(stored).toHaveLength(1);
       expect(stored[0].payload).toEqual({ type: 'role', roleNames: ['beta'] });
       expect(getState().featureFlags.get(flagId)?.enabled).toBe(true);
@@ -544,6 +602,7 @@ describe('feature-flag validation parity with server', () => {
 
     async function preview(body: unknown): Promise<Response> {
       const token = await loginAsAdmin();
+
       return fetch(`${baseUrl}/api/v1/admin/feature-flags/${flagId}/preview`, {
         method: 'POST',
         headers: {
@@ -556,7 +615,9 @@ describe('feature-flag validation parity with server', () => {
 
     async function errorsOf(body: unknown): Promise<string[]> {
       const res = await preview(body);
+
       expect(res.status).toBe(422);
+
       return ((await res.json()) as { errors: string[] }).errors;
     }
 
@@ -565,6 +626,7 @@ describe('feature-flag validation parity with server', () => {
         key: 'preview-context',
         enabled: true
       });
+
       expect(created.status).toBe(201);
       flagId = ((await created.json()) as { id: string }).id;
     });
@@ -604,6 +666,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects more than 32 roles', async () => {
       const roles = Array.from({ length: 33 }, () => 'beta');
+
       await expect(errorsOf({ roles })).resolves.toEqual([
         'roles must contain no more than 32 elements'
       ]);
@@ -611,6 +674,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('accepts a role name of the role-name cap', async () => {
       const res = await preview({ roles: ['r'.repeat(100)] });
+
       expect(res.status).toBe(200);
     });
 
@@ -648,6 +712,7 @@ describe('feature-flag validation parity with server', () => {
       const res = await preview({
         anonId: '11111111-1111-1111-1111-111111111111'
       });
+
       expect(res.status).toBe(200);
     });
 
@@ -675,6 +740,7 @@ describe('feature-flag validation parity with server', () => {
         env: null,
         anonId: null
       });
+
       expect(res.status).toBe(200);
     });
 
@@ -686,12 +752,14 @@ describe('feature-flag validation parity with server', () => {
         env: 'staging',
         anonId: '0b6f2c1e-7d4a-4c1b-9e2f-3a5d8c7b6e10'
       });
+
       expect(res.status).toBe(200);
     });
 
     it('rejects an empty or over-long attribute key instead of dropping it', async () => {
       const message =
         'each key in attributes must be from 1 to 64 characters long';
+
       await expect(errorsOf({ attributes: { '': 1 } })).resolves.toEqual([
         message
       ]);
@@ -704,7 +772,9 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects 33 attribute keys instead of dropping the extra one', async () => {
       const attributes: Record<string, unknown> = {};
+
       for (let i = 0; i < 33; i++) attributes[`k${i}`] = i;
+
       await expect(errorsOf({ attributes })).resolves.toEqual([
         'attributes must contain no more than 32 keys'
       ]);
@@ -722,13 +792,17 @@ describe('feature-flag validation parity with server', () => {
           }
         }
       ]);
+
       expect(stored.status).toBe(200);
 
       const attributes: Record<string, unknown> = { ['k'.repeat(64)]: 1 };
+
       for (let i = 0; i < 30; i++) attributes[`k${i}`] = i;
+
       attributes['email'] = 'tester@example.com';
 
       const res = await preview({ attributes });
+
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
         result: true,
@@ -759,11 +833,13 @@ describe('feature-flag validation parity with server', () => {
 
     async function errorsOf(res: Response): Promise<string[]> {
       expect(res.status).toBe(422);
+
       return ((await res.json()) as { errors: string[] }).errors;
     }
 
     async function previewAbsent(body: unknown): Promise<Response> {
       const token = await loginAsAdmin();
+
       return fetch(
         `${baseUrl}/api/v1/admin/feature-flags/${ABSENT_ID}/preview`,
         {
@@ -957,6 +1033,7 @@ describe('feature-flag validation parity with server', () => {
 
     it('preview accepts a null rule set and reaches the lookup', async () => {
       const res = await previewAbsent({ rules: null });
+
       expect(res.status).toBe(404);
     });
   });
@@ -971,8 +1048,10 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a bad PATCH body on an absent flag with 422, not 404', async () => {
       const res = await patchFlag(ABSENT_ID, { enabled: 'yes' });
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors[0]).toContain('enabled');
     });
 
@@ -980,13 +1059,16 @@ describe('feature-flag validation parity with server', () => {
       const created = await createFlag({ key: 'order-patch-body' });
       const flag = (await created.json()) as { id: string };
       const res = await patchFlag(flag.id, { enabled: 'yes' });
+
       expect(res.status).toBe(422);
     });
 
     it('still answers 428 for a valid PATCH body with no If-Match on an absent flag', async () => {
       const res = await patchFlag(ABSENT_ID, { enabled: true });
+
       expect(res.status).toBe(428);
       const body = (await res.json()) as { errorKey: string };
+
       expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED);
     });
 
@@ -996,12 +1078,15 @@ describe('feature-flag validation parity with server', () => {
         const created = await createFlag({ key: 'order-if-match-junk' });
         const flag = (await created.json()) as { id: string; version: number };
         const res = await patchFlag(flag.id, { enabled: true }, ifMatch);
+
         expect(res.status).toBe(400);
         const body = (await res.json()) as { message: string };
+
         expect(body.message).toBe(
           'If-Match must be "*" or a list of entity tags'
         );
         const stored = getState().featureFlags.get(flag.id);
+
         expect(stored?.enabled).toBe(false);
         expect(stored?.version).toBe(flag.version);
       }
@@ -1009,8 +1094,10 @@ describe('feature-flag validation parity with server', () => {
 
     it('rejects a non-array rule set on an absent flag with 422, not 404', async () => {
       const res = await saveRules(ABSENT_ID, 'nope');
+
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors).toContain('rules must be an array');
     });
 
@@ -1018,6 +1105,7 @@ describe('feature-flag validation parity with server', () => {
       const res = await saveRules(ABSENT_ID, [
         { effect: 'include', payload: 'nope' }
       ]);
+
       expect(res.status).toBe(422);
     });
 
@@ -1025,8 +1113,10 @@ describe('feature-flag validation parity with server', () => {
       const res = await saveRules(ABSENT_ID, [
         { effect: 'include', payload: { type: 'user' } }
       ]);
+
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
+
       expect(body.errorKey).toBe(ErrorKeys.FEATURE_FLAGS.NOT_FOUND);
     });
 
@@ -1038,12 +1128,14 @@ describe('feature-flag validation parity with server', () => {
         { rules: [{ effect: 'include', payload: {} }] },
         '"7"'
       );
+
       expect(res.status).toBe(422);
     });
 
     it('rejects a non-array rule set on a taken key with 422, not 409', async () => {
       await createFlag({ key: 'order-taken-key' });
       const res = await createFlag({ key: 'order-taken-key', rules: 'nope' });
+
       expect(res.status).toBe(422);
     });
 
@@ -1053,6 +1145,7 @@ describe('feature-flag validation parity with server', () => {
         key: 'order-taken-payload',
         rules: [{ effect: 'include', payload: { type: 'user' } }]
       });
+
       expect(res.status).toBe(409);
     });
   });
@@ -1068,11 +1161,13 @@ describe('feature-flag validation parity with server', () => {
         key: 'atomic-create',
         rules: [roleRule('a'), roleRule('b')]
       });
+
       expect(res.status).toBe(201);
       const flag = (await res.json()) as {
         version: number;
         rules: { payload: { roleNames: string[] } }[];
       };
+
       expect(flag.version).toBe(1);
       expect(flag.rules.map((r) => r.payload.roleNames)).toEqual([
         ['a'],
@@ -1094,11 +1189,13 @@ describe('feature-flag validation parity with server', () => {
         key: 'rule-shape',
         rules: [roleRule('a')]
       });
+
       expect(res.status).toBe(201);
       const created = (await res.json()) as {
         id: string;
         rules: Record<string, unknown>[];
       };
+
       expect(Object.keys(created.rules[0]).toSorted()).toEqual(ruleKeys);
 
       const token = await loginAsAdmin();
@@ -1107,6 +1204,7 @@ describe('feature-flag validation parity with server', () => {
         { headers: { authorization: `Bearer ${token}` } }
       );
       const body = (await read.json()) as { rules: Record<string, unknown>[] };
+
       expect(Object.keys(body.rules[0]).toSorted()).toEqual(ruleKeys);
     });
 
@@ -1115,8 +1213,10 @@ describe('feature-flag validation parity with server', () => {
         key: 'atomic-create-rejected',
         rules: [roleRule('a'), { effect: 'include', payload: {} }]
       });
+
       expect(res.status).toBe(422);
       const keys = [...getState().featureFlags.values()].map((f) => f.key);
+
       expect(keys).not.toContain('atomic-create-rejected');
     });
 
@@ -1134,12 +1234,15 @@ describe('feature-flag validation parity with server', () => {
         },
         '"1"'
       );
+
       expect(res.status).toBe(422);
       const stored = getState().featureFlags.get(flag.id);
+
       expect(stored).toMatchObject({ enabled: false, version: 1 });
       const rules = getState().featureFlagRules.filter(
         (r) => r.flagId === flag.id
       );
+
       expect(rules.map((r) => r.payload)).toEqual([roleRule('a').payload]);
     });
 
@@ -1154,12 +1257,14 @@ describe('feature-flag validation parity with server', () => {
         { enabled: true, rules: [roleRule('b'), roleRule('c')] },
         '"1"'
       );
+
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
         enabled: boolean;
         version: number;
         rules: { payload: { roleNames: string[] } }[];
       };
+
       expect(body).toMatchObject({ enabled: true, version: 2 });
       expect(body.rules.map((r) => r.payload.roleNames)).toEqual([
         ['b'],
@@ -1175,6 +1280,7 @@ describe('feature-flag validation parity with server', () => {
       const flag = (await created.json()) as { id: string };
       const res = await patchFlag(flag.id, { enabled: true }, '"1"');
       const body = (await res.json()) as { rules: unknown[] };
+
       expect(body.rules).toHaveLength(1);
     });
   });

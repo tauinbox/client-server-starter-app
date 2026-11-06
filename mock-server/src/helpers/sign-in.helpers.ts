@@ -22,11 +22,13 @@ export function completeSignIn(
   details?: Record<string, unknown>
 ): void {
   const state = getState();
+
   // Before the new session exists, so the session limit prunes against a
   // count that no longer holds the session this browser is replacing.
   endPresentedSession(req);
   const sessionId = generateSessionId();
   const tokens = generateTokens(user, sessionId);
+
   state.refreshTokens.set(tokens.refresh_token, user.id);
   registerSession(tokens.refresh_token, sessionId, {
     userAgent: normalizeUserAgent(req.headers['user-agent']),
@@ -49,6 +51,7 @@ export function completeSignIn(
   });
 
   const { refresh_token, ...publicTokens } = tokens;
+
   setRefreshTokenCookie(res, refresh_token);
   res.json({ tokens: publicTokens, user: toUserResponse(user) });
 }

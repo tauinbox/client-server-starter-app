@@ -106,7 +106,9 @@ export class NxsListFiltersComponent<F extends { q?: string }> {
     // what the user is typing.
     effect(() => {
       const q = this.value().q ?? '';
+
       if (q === untracked(() => this.#searchTerm)) return;
+
       this.#searchTerm = q;
       this.searchModel.set({ q });
     });
@@ -132,6 +134,7 @@ export class NxsListFiltersComponent<F extends { q?: string }> {
     const index = control.options.findIndex(
       (option) => option.value === current
     );
+
     return index < 0 ? '' : String(index);
   }
 
@@ -152,7 +155,9 @@ export class NxsListFiltersComponent<F extends { q?: string }> {
 
   #emit(key: keyof F, next: unknown): void {
     const current = this.value();
+
     if (current[key] === next) return;
+
     this.valueChange.emit({ ...current, [key]: next });
   }
 }
