@@ -91,6 +91,8 @@ describe('OAuthAuthenticationExceptionFilter', () => {
   });
 
   it('sends a failed link flow back to the profile page and drops the link cookie', () => {
+    requestCookies['__Host-oauth_link'] = bindIntent('link-token', flowState);
+
     filter.catch(
       new OAuthAuthenticationFailedException(OAUTH_ERROR.CANCELLED, {
         redirectPath: '/profile'
@@ -101,6 +103,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
     expect(redirect).toHaveBeenCalledWith(
       `${clientUrl}/profile?oauth_error=oauth_cancelled`
     );
+    expect(clearCookie).toHaveBeenCalledTimes(1);
     expect(clearCookie).toHaveBeenCalledWith('__Host-oauth_link', {
       secure: true,
       path: '/'
@@ -108,6 +111,11 @@ describe('OAuthAuthenticationExceptionFilter', () => {
   });
 
   it('sends a failed step-up back to the profile page and drops the reauth cookie', () => {
+    requestCookies['__Host-oauth_reauth'] = bindIntent(
+      'reauth-token',
+      flowState
+    );
+
     filter.catch(
       new OAuthAuthenticationFailedException(OAUTH_ERROR.REAUTH_FAILED, {
         redirectPath: '/profile'
@@ -118,16 +126,28 @@ describe('OAuthAuthenticationExceptionFilter', () => {
     expect(redirect).toHaveBeenCalledWith(
       `${clientUrl}/profile?oauth_error=reauth_failed`
     );
+    expect(clearCookie).toHaveBeenCalledTimes(1);
     expect(clearCookie).toHaveBeenCalledWith('__Host-oauth_reauth', {
       secure: true,
       path: '/'
     });
   });
 
+  it('keeps an intent that another flow claimed', () => {
+    requestCookies['__Host-oauth_link'] = bindIntent('link-token', 'other');
+    requestCookies['__Host-oauth_reauth'] = bindIntent('reauth-token', 'other');
+
+    filter.catch(failure(OAUTH_ERROR.CANCELLED), host);
+
+    expect(clearCookie).not.toHaveBeenCalled();
+  });
+
   // The browser keeps a `__Host-` cookie whose expiring write lacks Secure,
   // and `local` runs on plain HTTP under the bare name.
   it('clears the bare names without Secure in local', () => {
     environment = 'local';
+    requestCookies['oauth_link'] = bindIntent('link-token', flowState);
+    requestCookies['oauth_reauth'] = bindIntent('reauth-token', flowState);
 
     filter.catch(
       new OAuthAuthenticationFailedException(OAUTH_ERROR.REAUTH_FAILED, {

@@ -7,11 +7,7 @@ import type { Request as ExpressRequest } from 'express';
 import type { OAuthFailureRedirect } from '../exceptions/oauth-authentication-failed.exception';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
-import {
-  OAUTH_LINK_COOKIE,
-  OAUTH_REAUTH_COOKIE
-} from '../constants/oauth.constants';
-import { AuthCookies } from '../utils/auth-cookies';
+import { AuthCookies, type ClaimedIntents } from '../utils/auth-cookies';
 import type { OAuthProvider } from '../enums/oauth-provider.enum';
 
 // Passport rejects with this message only when the provider's credentials
@@ -75,7 +71,7 @@ export function createOAuthProviderGuard(
     ): TUser {
       if (err || !user) {
         const request = context.switchToHttp().getRequest<ExpressRequest>();
-        const intents = intentCookies(request, this.cookies);
+        const intents = this.cookies.claimedIntents(request);
         throw new OAuthAuthenticationFailedException(
           resolveErrorKey(request, intents),
           {
@@ -91,29 +87,14 @@ export function createOAuthProviderGuard(
   return OAuthProviderGuard;
 }
 
-interface IntentCookies {
-  link: boolean;
-  reauth: boolean;
-}
-
-function intentCookies(
-  request: ExpressRequest,
-  cookies: AuthCookies
-): IntentCookies {
-  return {
-    link: cookies.read(request, OAUTH_LINK_COOKIE) !== undefined,
-    reauth: cookies.read(request, OAUTH_REAUTH_COOKIE) !== undefined
-  };
-}
-
 function resolveErrorKey(
   request: ExpressRequest,
-  intents: IntentCookies
+  intents: ClaimedIntents
 ): OAuthError {
   // A step-up that ends at the provider changed nothing, and the profile page
   // has a message written for exactly that. The callback reads the reauth
-  // intent first too, so a request holding both cookies is a step-up here.
-  if (intents.reauth) {
+  // intent first too, so a flow that claimed both is a step-up here.
+  if (intents.reauth !== null) {
     return OAUTH_ERROR.REAUTH_FAILED;
   }
   return request.query?.['error'] === PROVIDER_CANCELLED_ERROR
@@ -121,6 +102,8 @@ function resolveErrorKey(
     : OAUTH_ERROR.AUTH_FAILED;
 }
 
-function resolveRedirectPath(intents: IntentCookies): OAuthFailureRedirect {
-  return intents.link || intents.reauth ? '/profile' : '/login';
+function resolveRedirectPath(intents: ClaimedIntents): OAuthFailureRedirect {
+  return intents.link !== null || intents.reauth !== null
+    ? '/profile'
+    : '/login';
 }

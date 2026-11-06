@@ -30,16 +30,19 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
     this.logger.warn(`${exception.message}${reason}`);
 
     const http = host.switchToHttp();
+    const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
 
-    this.failureAudit.guardFailure(http.getRequest<Request>(), exception);
+    this.failureAudit.guardFailure(request, exception);
 
-    // The attempt is over, so neither intent cookie must survive to turn the
-    // user's next plain OAuth login into another link or step-up attempt. The
-    // success and in-handler failure paths clear them in OAuthController the
-    // same way. Only one of the two is normally present.
-    if (exception.redirectPath === '/profile') {
+    // The attempt of this flow is over, so its intent goes, as OAuthController
+    // clears it on the success and in-handler failure paths. An intent of
+    // another flow stays: that flow may still finish in another tab.
+    const claimed = this.cookies.claimedIntents(request);
+    if (claimed.link !== null) {
       this.cookies.clear(response, OAUTH_LINK_COOKIE);
+    }
+    if (claimed.reauth !== null) {
       this.cookies.clear(response, OAUTH_REAUTH_COOKIE);
     }
 

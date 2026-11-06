@@ -57,7 +57,6 @@ import {
   REAUTH_PROOF_COOKIE
 } from '../constants/oauth.constants';
 import { AuthCookies } from '../utils/auth-cookies';
-import { readIntentForFlow } from '../utils/oauth-flow-intent';
 import {
   OAuthFailureAudit,
   type OAuthIntentAccount
@@ -462,26 +461,14 @@ export class OAuthController {
     res: Response
   ): Promise<void> {
     try {
-      const flowState = req.query?.['state'];
-
-      // A cookie says which user this round trip is for; only the state says
-      // which flow may act on it, so an intent belonging to another flow leaves
-      // this callback a plain sign-in. Neither is cleared here: each stays
-      // consumable by its own flow, which may still finish. Re-authentication
-      // wins a tie because it links nothing.
-      const reauthIntent = this.cookies.read(req, OAUTH_REAUTH_COOKIE);
-      const reauthToken = reauthIntent
-        ? readIntentForFlow(reauthIntent, flowState)
-        : null;
+      // No intent is cleared here: an intent of another flow stays for that
+      // flow. Re-authentication wins a tie because it links nothing.
+      const { reauth: reauthToken, link: linkToken } =
+        this.cookies.claimedIntents(req);
 
       if (reauthToken) {
         return this.handleOAuthReauth({ reauthToken, profile }, req, res);
       }
-
-      const linkIntent = this.cookies.read(req, OAUTH_LINK_COOKIE);
-      const linkToken = linkIntent
-        ? readIntentForFlow(linkIntent, flowState)
-        : null;
 
       if (linkToken) {
         return this.handleOAuthLink({ linkToken, profile }, req, res);

@@ -12,8 +12,15 @@ import {
   readHostCookie,
   setHostCookie
 } from '../../../common/utils/host-cookie';
+import { readIntentForFlow } from './oauth-flow-intent';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
+
+/** The token of each intent cookie that the current flow claimed, else null. */
+export interface ClaimedIntents {
+  link: string | null;
+  reauth: string | null;
+}
 
 /**
  * The auth cookies, bound to the environment once. Every flag comes from
@@ -99,6 +106,23 @@ export class AuthCookies {
    */
   clearReauthProof(res: Response): void {
     this.clear(res, REAUTH_PROOF_COOKIE);
+  }
+
+  /**
+   * An intent belongs to the flow that claimed it: the `state` of the callback
+   * selects it. An intent of another flow, or one that no flow claimed, gives
+   * null, so this callback is a plain sign-in for it.
+   */
+  claimedIntents(req: Pick<Request, 'cookies' | 'query'>): ClaimedIntents {
+    const state: unknown = req.query?.['state'];
+    const claim = (base: string): string | null => {
+      const intent = this.read(req, base);
+      return intent ? readIntentForFlow(intent, state) : null;
+    };
+    return {
+      link: claim(OAUTH_LINK_COOKIE),
+      reauth: claim(OAUTH_REAUTH_COOKIE)
+    };
   }
 
   /**

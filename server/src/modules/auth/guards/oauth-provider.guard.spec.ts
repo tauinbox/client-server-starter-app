@@ -24,6 +24,11 @@ import { VkOAuthGuard } from './vk-oauth.guard';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { OAUTH_ERROR } from '@app/shared/constants';
 import { AuthCookies } from '../utils/auth-cookies';
+import { bindIntent } from '../utils/oauth-flow-intent';
+
+const FLOW_STATE = 'b'.repeat(32);
+const LINK = bindIntent('link-token', FLOW_STATE);
+const REAUTH = bindIntent('reauth-token', FLOW_STATE);
 
 const context = {} as ExecutionContext;
 
@@ -150,8 +155,8 @@ describe.each([
           false,
           undefined,
           contextWith({
-            query: { error: 'access_denied' },
-            cookies: { '__Host-oauth_link': 'link-token' }
+            query: { error: 'access_denied', state: FLOW_STATE },
+            cookies: { '__Host-oauth_link': LINK }
           })
         )
       );
@@ -167,8 +172,8 @@ describe.each([
           false,
           undefined,
           contextWith({
-            query: { error: 'access_denied' },
-            cookies: { '__Host-oauth_reauth': 'reauth-token' }
+            query: { error: 'access_denied', state: FLOW_STATE },
+            cookies: { '__Host-oauth_reauth': REAUTH }
           })
         )
       );
@@ -184,8 +189,8 @@ describe.each([
           undefined,
           undefined,
           contextWith({
-            query: {},
-            cookies: { '__Host-oauth_reauth': 'reauth-token' }
+            query: { state: FLOW_STATE },
+            cookies: { '__Host-oauth_reauth': REAUTH }
           })
         )
       );
@@ -201,10 +206,10 @@ describe.each([
           false,
           undefined,
           contextWith({
-            query: { error: 'access_denied' },
+            query: { error: 'access_denied', state: FLOW_STATE },
             cookies: {
-              '__Host-oauth_link': 'link-token',
-              '__Host-oauth_reauth': 'reauth-token'
+              '__Host-oauth_link': LINK,
+              '__Host-oauth_reauth': REAUTH
             }
           })
         )
@@ -212,6 +217,40 @@ describe.each([
 
       expect(failure.oauthError).toBe(OAUTH_ERROR.REAUTH_FAILED);
       expect(failure.redirectPath).toBe('/profile');
+    });
+
+    it('treats an intent that no flow claimed as a plain sign-in', () => {
+      const failure = captureFailure(() =>
+        createGuard().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'access_denied', state: FLOW_STATE },
+            cookies: { '__Host-oauth_reauth': 'reauth-token' }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR.CANCELLED);
+      expect(failure.redirectPath).toBe('/login');
+    });
+
+    it('treats an intent that another flow claimed as a plain sign-in', () => {
+      const failure = captureFailure(() =>
+        createGuard().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          contextWith({
+            query: { error: 'access_denied', state: 'a'.repeat(32) },
+            cookies: { '__Host-oauth_reauth': REAUTH }
+          })
+        )
+      );
+
+      expect(failure.oauthError).toBe(OAUTH_ERROR.CANCELLED);
+      expect(failure.redirectPath).toBe('/login');
     });
 
     // A sibling host can plant the bare names for the parent domain.
@@ -222,8 +261,8 @@ describe.each([
           false,
           undefined,
           contextWith({
-            query: { error: 'access_denied' },
-            cookies: { oauth_link: 'planted', oauth_reauth: 'planted' }
+            query: { error: 'access_denied', state: FLOW_STATE },
+            cookies: { oauth_link: LINK, oauth_reauth: REAUTH }
           })
         )
       );
@@ -240,8 +279,8 @@ describe.each([
           false,
           undefined,
           contextWith({
-            query: { error: 'access_denied' },
-            cookies: { oauth_reauth: 'reauth-token' }
+            query: { error: 'access_denied', state: FLOW_STATE },
+            cookies: { oauth_reauth: REAUTH }
           })
         )
       );

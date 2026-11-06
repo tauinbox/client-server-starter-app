@@ -1778,14 +1778,17 @@ that verifies, else `USER_LOGIN_FAILURE` with no actor.
 
 The guard selects the two halves of that redirect from a fixed set, and never from the request. The
 query `?error=access_denied`, which is how each provider reports a declined consent screen, becomes
-`oauth_error=oauth_cancelled`. The presence of the `oauth_link` cookie makes the target `/profile`
-instead of `/login`. Thus a link attempt that started on the profile page ends there. The filter also
-clears that cookie, because the attempt is over.
+`oauth_error=oauth_cancelled`. An `oauth_link` intent that this flow claimed makes the target
+`/profile` instead of `/login`. Thus a link attempt that started on the profile page ends there. The
+filter also clears that cookie, because the attempt is over. An intent that another flow claimed, or
+that no flow claimed, leaves the failure a plain sign-in, and the cookie stays for its own flow. The
+guard, the filter, the callback and the audit read the intents through one method,
+`AuthCookies.claimedIntents`.
 
-The `oauth_reauth` cookie of a step-up selects the same target, and the key `reauth_failed`, which is
-the message the profile page holds for a change that did not happen. The guard reads that cookie
-first, as the callback does, so a browser that holds both intents is a step-up. The filter clears
-both cookies on that branch. Without this the browser went to `/login`, where the client guest guard
+A claimed `oauth_reauth` intent of a step-up selects the same target, and the key `reauth_failed`,
+which is the message the profile page holds for a change that did not happen. The guard reads that
+intent first, as the callback does, so a flow that claimed both intents is a step-up. The filter
+clears only the claimed intents. Without this the browser went to `/login`, where the client guest guard
 sends an authenticated user to `/profile` and drops the query string, so the user saw no message.
 
 **The link intent belongs to one authorization flow.** `CookieStateStore.store` ties an unclaimed
