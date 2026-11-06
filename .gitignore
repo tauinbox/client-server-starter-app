@@ -11,3 +11,6 @@
 
 # IDE
 .idea/
+
+# Local Playwright report of client/
+.playwright-report/
