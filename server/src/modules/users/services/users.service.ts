@@ -24,6 +24,7 @@ import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util'
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { User } from '../entities/user.entity';
 import { addressTakenWhere, emailExistsConflict } from '../utils/email-taken';
+import { lockUserWithRoles } from '../utils/lock-user';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import type { CursorPaginatedResponseDto } from '../../../common/dtos';
@@ -113,6 +114,7 @@ export class UsersService {
     private breachedPasswordService: BreachedPasswordService
   ) {}
 
+  // race-checked: no stored row exists before the insert
   async create(
     createUserDto: CreateUserDto,
     { ability, actorId, audit }: UserWriteOptions
@@ -289,6 +291,28 @@ export class UsersService {
     this.accessRefusals.assertNotSuperTarget(ability, check);
   }
 
+  /**
+   * The record after the write is checked too: else a grant scoped by a
+   * writable field lets the caller move a user out of its own scope. The
+   * secrets of the body are not fields that a condition reads.
+   */
+  private assertCanUpdate(
+    ability: AbilityOrSystem,
+    user: User,
+    { changes, actorId }: { changes: Partial<UpdateUserDto>; actorId?: string }
+  ): void {
+    if (ability === SYSTEM_ABILITY) return;
+    const after = withChanges(user, {
+      ...changes,
+      password: undefined,
+      currentPassword: undefined,
+      code: undefined
+    });
+    for (const target of [user, after]) {
+      this.assertCanWrite(ability, { action: 'update', target, actorId });
+    }
+  }
+
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
@@ -297,22 +321,9 @@ export class UsersService {
     const user = await this.loadUser(id);
     const { unlockAccount, ...rest } = updateUserDto;
 
-    if (ability !== SYSTEM_ABILITY) {
-      this.assertCanWrite(ability, { action: 'update', target: user, actorId });
-      // The record after the write is checked too: else a grant scoped by a
-      // writable field lets the caller move a user out of its own scope. The
-      // secrets of the body are not fields that a condition reads.
-      this.assertCanWrite(ability, {
-        action: 'update',
-        target: withChanges(user, {
-          ...rest,
-          password: undefined,
-          currentPassword: undefined,
-          code: undefined
-        }),
-        actorId
-      });
-    }
+    // Checked here to answer before the breached-password lookup and the hash,
+    // and again on the locked row in the transaction of the write.
+    this.assertCanUpdate(ability, user, { changes: rest, actorId });
     // Only columns: the body also carries the step-up factors of the caller.
     const changes: QueryDeepPartialEntity<User> = {
       name: rest.name,
@@ -387,6 +398,11 @@ export class UsersService {
     let saved: User;
     try {
       saved = await withTransaction(this.dataSource, async (manager) => {
+        if (ability !== SYSTEM_ABILITY) {
+          const locked = await lockUserWithRoles(manager, { id });
+          if (!locked) throw userNotFound(id);
+          this.assertCanUpdate(ability, locked, { changes: rest, actorId });
+        }
         // Keyed on the live row: an edit that loses to a delete answers not
         // found, and a concurrent write to another column (a password reset)
         // is kept.
@@ -609,6 +625,15 @@ export class UsersService {
     // of two concurrent deletes one writes and audits and the other answers
     // not found.
     await withTransaction(this.dataSource, async (manager) => {
+      const locked = await lockUserWithRoles(manager, { id });
+      if (!locked) throw userNotFound(id);
+      if (ability !== SYSTEM_ABILITY) {
+        this.assertCanWrite(ability, {
+          action: 'delete',
+          target: locked,
+          actorId
+        });
+      }
       const live = { id, deletedAt: IsNull() };
       await manager.update(User, live, {
         pendingEmail: null,
@@ -619,7 +644,7 @@ export class UsersService {
       });
       const { affected } = await manager.softDelete(User, live);
       if (affected === 0) throw userNotFound(id);
-      await this.writeAudit(manager, audit, user);
+      await this.writeAudit(manager, audit, locked);
     });
   }
 
@@ -646,12 +671,24 @@ export class UsersService {
     // Keyed on the deleted state, so of two concurrent restores one writes
     // and audits and the other is refused.
     await withTransaction(this.dataSource, async (manager) => {
+      const locked = await lockUserWithRoles(manager, {
+        id,
+        withDeleted: true
+      });
+      if (!locked) throw userNotFound(id);
+      if (ability !== SYSTEM_ABILITY) {
+        this.assertCanWrite(ability, {
+          action: 'delete',
+          target: locked,
+          actorId
+        });
+      }
       const { affected } = await manager.restore(User, {
         id,
         deletedAt: Not(IsNull())
       });
       if (affected === 0) throw notDeleted(id);
-      await this.writeAudit(manager, audit, user);
+      await this.writeAudit(manager, audit, locked);
     });
     return this.loadUser(id);
   }

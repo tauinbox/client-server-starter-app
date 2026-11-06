@@ -1405,10 +1405,21 @@ describe('UsersController', () => {
           auditContext: expect.anything()
         }
       );
-      expect(mfaServiceMock.resetByAdmin).toHaveBeenCalledWith(
-        enrolled,
+      expect(mfaServiceMock.resetByAdmin).toHaveBeenCalledWith(enrolled, {
         actor,
-        expect.anything()
+        context: expect.anything(),
+        check: expect.any(Function)
+      });
+      // The check runs the instance check of the caller on the locked row.
+      const [[, { check }]] = mfaServiceMock.resetByAdmin.mock.calls as [
+        [unknown, { check: (locked: unknown) => void }]
+      ];
+      const locked = { ...enrolled, name: 'Locked' };
+      usersServiceMock.assertCanWrite.mockClear();
+      check(locked);
+      expect(usersServiceMock.assertCanWrite).toHaveBeenCalledWith(
+        mockAbility,
+        { action: 'update', target: locked, actorId: actor.id }
       );
       expect(eventEmitterMock.emitAsync).toHaveBeenCalledWith(
         UserSessionRevocationRequiredEvent.name,

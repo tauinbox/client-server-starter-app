@@ -102,7 +102,12 @@ function repositoryOf(rows: Rows, write: jest.Mock) {
             return Promise.resolve({ affected: rows.has(where.id) ? 1 : 0 });
           },
           findOneByOrFail: (_target: unknown, where: { id: string }) =>
-            Promise.resolve({ ...rows.get(where.id) })
+            Promise.resolve({ ...rows.get(where.id) }),
+          // The row lock of the instance check is not modelled.
+          findOne: (_target: unknown, { where }: { where: { id: string } }) => {
+            const row = rows.get(where.id);
+            return Promise.resolve(row ? { ...row } : null);
+          }
         })
       )
     }

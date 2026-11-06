@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ApiError } from '../../../common/errors/api-error';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { keyedUpdate } from '../../../common/utils/keyed-update.util';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -46,6 +46,12 @@ const SUBJECT_MAP_CACHE_KEY = 'rbac:subject_map:v3';
 const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
 const SUBJECT_MAP_VERSION_KEY = 'rbac:subject_map:version';
 const SUBJECT_MAP_VERSION_COUNTER_KEY = 'rbac:subject_map:version:counter';
+
+interface ResourceEdit {
+  displayName?: string;
+  description?: string | null;
+  allowedActionNames?: string[] | null;
+}
 
 export interface ResourceWriteOptions<A> {
   ability: AbilityOrSystem;
@@ -133,18 +139,36 @@ export class ResourceService {
   /** `audit` gets the resource as it is before the write. */
   async update(
     id: string,
-    data: {
-      displayName?: string;
-      description?: string | null;
-      allowedActionNames?: string[] | null;
-    },
+    data: ResourceEdit,
     {
       ability,
       actorId,
       audit
     }: ResourceWriteOptions<(before: Resource) => AuditLogParams>
   ): Promise<Resource> {
-    const resource = await this.loadResource(id);
+    const check = (record: Resource) =>
+      this.assertCanEdit(ability, record, { data, actorId });
+    // Checked here to answer early, and again on the locked row.
+    check(await this.loadResource(id));
+    const { before, saved } = await this.updateAudited(id, data, {
+      check,
+      audit
+    });
+    await this.invalidateSubjectMapCache();
+    if (
+      data.allowedActionNames !== undefined &&
+      changesGrantableActions(before, data.allowedActionNames)
+    ) {
+      this.#emitActionsChanged();
+    }
+    return saved;
+  }
+
+  private assertCanEdit(
+    ability: AbilityOrSystem,
+    resource: Resource,
+    { data, actorId }: { data: ResourceEdit; actorId?: string }
+  ): void {
     // The record after the write is checked too: else a grant scoped by a
     // writable field lets the caller move a resource out of its own scope.
     for (const record of [resource, withChanges(resource, data)]) {
@@ -165,14 +189,19 @@ export class ResourceService {
         actorId
       });
     }
-    const grantsChange =
-      data.allowedActionNames !== undefined &&
-      changesGrantableActions(resource, data.allowedActionNames);
-    const auditRow = audit?.({ ...resource });
-    const saved = await this.updateAudited(id, data, auditRow);
-    await this.invalidateSubjectMapCache();
-    if (grantsChange) this.#emitActionsChanged();
-    return saved;
+  }
+
+  /**
+   * The edit and the restore take this lock before their checks, so a check
+   * judges the row that the write changes.
+   */
+  private async lockResource(em: EntityManager, id: string): Promise<Resource> {
+    const locked = await em.findOne(Resource, {
+      where: { id },
+      lock: { mode: 'pessimistic_write' }
+    });
+    if (!locked) throw resourceNotFound();
+    return locked;
   }
 
   /**
@@ -216,21 +245,29 @@ export class ResourceService {
   }
 
   /**
-   * Writes the changed columns and the audit row of the change in one
-   * transaction. Keyed on the row, so an edit that loses to a delete answers
-   * not found.
+   * Locks the row, runs `check` on it, then writes the changed columns and the
+   * audit row of the change in one transaction. An edit that loses to a delete
+   * answers not found. `before` is the locked row as it was before the write.
    */
   private updateAudited(
     id: string,
     changes: QueryDeepPartialEntity<Resource>,
-    audit?: AuditLogParams
-  ): Promise<Resource> {
+    {
+      check,
+      audit
+    }: {
+      check: (locked: Resource) => void;
+      audit?: (before: Resource) => AuditLogParams;
+    }
+  ): Promise<{ before: Resource; saved: Resource }> {
     return this.resourceRepository.manager.transaction(async (em) => {
+      const before = await this.lockResource(em, id);
+      check(before);
       if (!(await keyedUpdate(em, Resource, { where: { id }, changes }))) {
         throw resourceNotFound();
       }
-      if (audit) await this.auditService.log(audit, em);
-      return em.findOneByOrFail(Resource, { id });
+      if (audit) await this.auditService.log(audit({ ...before }), em);
+      return { before, saved: await em.findOneByOrFail(Resource, { id }) };
     });
   }
 
@@ -268,7 +305,37 @@ export class ResourceService {
     id: string,
     { ability, actorId, audit }: ResourceWriteOptions<AuditLogParams>
   ): Promise<Resource> {
-    const resource = await this.loadResource(id);
+    // Checked here to answer early, and again on the locked row.
+    this.assertCanRestore(ability, await this.loadResource(id), actorId);
+    // Keyed on the orphaned state, so of two concurrent restores one writes
+    // and audits and the other is refused.
+    const resource = await this.resourceRepository.manager.transaction(
+      async (em) => {
+        const locked = await this.lockResource(em, id);
+        this.assertCanRestore(ability, locked, actorId);
+        const { affected } = await em.update(
+          Resource,
+          { id, isOrphaned: true },
+          { isOrphaned: false }
+        );
+        if (affected === 0) throw notOrphaned(locked);
+        if (audit) await this.auditService.log(audit, em);
+        return locked;
+      }
+    );
+    const woken = grantableActionNames(resource);
+    resource.isOrphaned = false;
+    await this.invalidateSubjectMapCache();
+    if (woken.length > 0) this.#emitActionsChanged();
+    resource.isRegistered = true;
+    return resource;
+  }
+
+  private assertCanRestore(
+    ability: AbilityOrSystem,
+    resource: Resource,
+    actorId?: string
+  ): void {
     this.assertCanUpdate(ability, resource, actorId);
     if (!this.registry.isRegistered(resource.name)) {
       throw new ApiError(
@@ -277,24 +344,10 @@ export class ResourceService {
       );
     }
     if (!resource.isOrphaned) throw notOrphaned(resource);
-    const woken = grantableActionNames(resource);
-    this.assertCanWiden(ability, resource, { reEnabled: woken, actorId });
-    // Keyed on the orphaned state, so of two concurrent restores one writes
-    // and audits and the other is refused.
-    await this.resourceRepository.manager.transaction(async (em) => {
-      const { affected } = await em.update(
-        Resource,
-        { id: resource.id, isOrphaned: true },
-        { isOrphaned: false }
-      );
-      if (affected === 0) throw notOrphaned(resource);
-      if (audit) await this.auditService.log(audit, em);
+    this.assertCanWiden(ability, resource, {
+      reEnabled: grantableActionNames(resource),
+      actorId
     });
-    resource.isOrphaned = false;
-    await this.invalidateSubjectMapCache();
-    if (woken.length > 0) this.#emitActionsChanged();
-    resource.isRegistered = true;
-    return resource;
   }
 
   #emitActionsChanged(): void {

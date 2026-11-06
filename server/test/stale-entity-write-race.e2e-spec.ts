@@ -1,4 +1,8 @@
-import { INestApplication, VersioningType } from '@nestjs/common';
+import {
+  HttpException,
+  INestApplication,
+  VersioningType
+} from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -17,7 +21,15 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
-import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
+import { ResourceService } from '../src/modules/auth/services/resource.service';
+import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
+import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
+import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
+import {
+  createMongoAbility,
+  SYSTEM_ABILITY,
+  type AppAbility
+} from '../src/modules/auth/casl/app-ability';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -84,6 +96,12 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
+      await dataSource
+        .createQueryBuilder()
+        .delete()
+        .from(FeatureFlag)
+        .where('key LIKE :prefix', { prefix: `${prefix}%` })
+        .execute();
       await dataSource
         .createQueryBuilder()
         .delete()
@@ -323,6 +341,207 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     expect(after.name).toBe('Target deleted');
     expect(await auditRows(AuditAction.USER_UPDATE, user.id)).toBe(0);
   }, 30000);
+
+  /** The status and key of a refused call, or `RESOLVED`. */
+  async function outcome(run: Promise<unknown>): Promise<string> {
+    try {
+      await run;
+      return 'RESOLVED';
+    } catch (error) {
+      if (error instanceof HttpException) {
+        const body = error.getResponse() as { errorKey?: string };
+        return `${error.getStatus()} ${body.errorKey ?? ''}`.trim();
+      }
+      throw error;
+    }
+  }
+
+  // Each case below holds a write of a delegated caller in front of its
+  // transaction, after its early check passed, while a concurrent change
+  // moves the record out of the rights of the caller.
+  describe('the instance check of a delegated caller', () => {
+    const scopedUserUpdate = { action: 'update', subject: 'User' } as const;
+    const activeOnly = { conditions: { isActive: true } };
+
+    it('refuses a non-super resource edit that read the row before a super narrowed it', async () => {
+      const resources = dataSource.getRepository(Resource);
+      const resource = await resources.save(
+        resources.create({
+          name: `${prefix}-widen`,
+          subject: `StaleWiden${stamp}`,
+          displayName: 'Stale widen',
+          description: null,
+          isSystem: false,
+          actionNames: ['read', 'delete'],
+          conditionalActionNames: [],
+          allowedActionNames: null
+        })
+      );
+      const delegate = createMongoAbility<AppAbility>([
+        { action: 'update', subject: 'Permission' }
+      ]);
+      const superAbility = createMongoAbility<AppAbility>([
+        { action: 'manage', subject: 'all' }
+      ]);
+      const resourceService = app.get(ResourceService);
+      const barrier = holdFirstTransaction();
+
+      const edit = outcome(
+        resourceService.update(
+          resource.id,
+          { allowedActionNames: ['read', 'delete'] },
+          { ability: delegate }
+        )
+      );
+      await barrier.arrived;
+      await resourceService.update(
+        resource.id,
+        { allowedActionNames: ['read'] },
+        { ability: superAbility }
+      );
+      barrier.release();
+
+      expect(await edit).toBe(`403 ${ErrorKeys.RESOURCES.CANNOT_WIDEN}`);
+      expect(
+        (await resources.findOneByOrFail({ id: resource.id }))
+          .allowedActionNames
+      ).toEqual(['read']);
+    }, 30000);
+
+    it('refuses a scoped user edit that read the row before a deactivation', async () => {
+      const user = await createUser('scoped-edit');
+      const delegate = createMongoAbility<AppAbility>([
+        { ...scopedUserUpdate, ...activeOnly }
+      ]);
+      const barrier = holdFirstTransaction();
+
+      const edit = outcome(
+        usersService.update(user.id, { name: 'After' }, { ability: delegate })
+      );
+      await barrier.arrived;
+      await usersService.update(
+        user.id,
+        { isActive: false },
+        { ability: SYSTEM_ABILITY }
+      );
+      barrier.release();
+
+      expect(await edit).toBe(
+        `403 ${ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS}`
+      );
+      const after = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ id: user.id });
+      expect(after.name).toBe('Target scoped-edit');
+      expect(after.isActive).toBe(false);
+    }, 30000);
+
+    it('refuses a role assignment whose target left the scope before the lock', async () => {
+      const user = await createUser('scoped-assign');
+      const role = await roleService.create(
+        { name: `${prefix}-assign` },
+        { ability: SYSTEM_ABILITY }
+      );
+      const delegate = createMongoAbility<AppAbility>([
+        { ...scopedUserUpdate, ...activeOnly },
+        { action: 'assign', subject: 'Role' }
+      ]);
+      const barrier = holdFirstTransaction();
+
+      const assign = outcome(
+        roleService.assignRoleToUser(user.id, role.id, { ability: delegate })
+      );
+      await barrier.arrived;
+      await usersService.update(
+        user.id,
+        { isActive: false },
+        { ability: SYSTEM_ABILITY }
+      );
+      barrier.release();
+
+      expect(await assign).toBe(
+        `403 ${ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS}`
+      );
+      const after = await dataSource.getRepository(User).findOneOrFail({
+        where: { id: user.id },
+        relations: { roles: true }
+      });
+      expect(after.roles.map((r) => r.id)).not.toContain(role.id);
+    }, 30000);
+  });
+
+  // The listeners of a role event rewrite the flag rules by the old name, so
+  // the event must carry the name of the row that the write changed.
+  describe('the role name of a role event', () => {
+    async function flagOnRole(label: string, roleName: string) {
+      return app.get(FeatureFlagService).create(
+        {
+          key: `${prefix}-${label}`,
+          rules: [
+            {
+              effect: 'include',
+              payload: { type: 'role', roleNames: [roleName] }
+            }
+          ]
+        },
+        SYSTEM_ABILITY,
+        { actorId: null, actorEmail: null, context: {} }
+      );
+    }
+
+    async function ruleRoleNames(flagId: string): Promise<string[]> {
+      const [rule] = await dataSource
+        .getRepository(FeatureFlagRule)
+        .findBy({ flagId });
+      return (rule.payload as { roleNames: string[] }).roleNames;
+    }
+
+    it('rewrites the rules by the name that a concurrent rename committed', async () => {
+      const role = await roleService.create(
+        { name: `${prefix}-rename-a` },
+        { ability: SYSTEM_ABILITY }
+      );
+      const flag = await flagOnRole('rename', role.name);
+      const barrier = holdFirstTransaction();
+
+      const last = roleService.update(
+        role.id,
+        { name: `${prefix}-rename-c` },
+        { ability: SYSTEM_ABILITY }
+      );
+      await barrier.arrived;
+      await roleService.update(
+        role.id,
+        { name: `${prefix}-rename-b` },
+        { ability: SYSTEM_ABILITY }
+      );
+      barrier.release();
+      await last;
+
+      expect(await ruleRoleNames(flag.id)).toEqual([`${prefix}-rename-c`]);
+    }, 30000);
+
+    it('drops the name that a concurrent rename committed from the rules on delete', async () => {
+      const role = await roleService.create(
+        { name: `${prefix}-delete-a` },
+        { ability: SYSTEM_ABILITY }
+      );
+      const flag = await flagOnRole('delete', role.name);
+      const barrier = holdFirstTransaction();
+
+      const removal = roleService.delete(role.id, { ability: SYSTEM_ABILITY });
+      await barrier.arrived;
+      await roleService.update(
+        role.id,
+        { name: `${prefix}-delete-b` },
+        { ability: SYSTEM_ABILITY }
+      );
+      barrier.release();
+      await removal;
+
+      expect(await ruleRoleNames(flag.id)).toEqual([]);
+    }, 30000);
+  });
 
   it('reports a user delete once and writes one audit row', async () => {
     const user = await createUser('twice');

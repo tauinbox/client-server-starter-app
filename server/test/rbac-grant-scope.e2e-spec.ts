@@ -143,7 +143,10 @@ describe('Grant scope over the HTTP path', () => {
         transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
           work({
             save: (_target: unknown, entity: unknown): unknown =>
-              rolePermissionRepo.save(entity) as unknown
+              rolePermissionRepo.save(entity) as unknown,
+            // The role row that the write locks; it holds no grant yet.
+            findOne: () => Promise.resolve(customRole),
+            find: () => Promise.resolve([])
           })
         )
       }

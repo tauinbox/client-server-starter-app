@@ -618,6 +618,11 @@ with no requesting principal gives the explicit `SYSTEM_ABILITY` sentinel. The s
 (`GET` and `PATCH /auth/profile`, the MFA and session routes) are such callers, because their
 target is the authenticated user.
 
+A write runs its instance check twice: before its transaction, to answer early, and again inside
+it on the row read `FOR UPDATE`. Thus a concurrent change that moves the record out of the rights
+of the caller cannot slip in between the check and the write. `npm run check:race` refuses a check
+that runs only before the transaction.
+
 **On the client** there are three mechanisms.
 
 1. The **`*appRequirePermissions` directive** works in a template. It evaluates for each row. It

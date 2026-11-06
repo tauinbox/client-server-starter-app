@@ -137,11 +137,13 @@ describe('MfaService', () => {
             transaction: (
               run: (manager: {
                 findOne: jest.Mock;
+                findOneOrFail: jest.Mock;
                 update: jest.Mock;
               }) => Promise<unknown>
             ) =>
               run({
                 findOne: repository.findOne,
+                findOneOrFail: repository.findOne,
                 update: jest.fn(
                   (_entity: unknown, id: string, changes: Partial<User>) =>
                     repository.update(id, changes)
@@ -420,6 +422,8 @@ describe('MfaService', () => {
 
   describe('resetByAdmin', () => {
     const actor = { id: 'admin-1', email: 'admin@example.com' };
+    let check: jest.Mock<void, [User]>;
+    let options: { actor: typeof actor; check: (locked: User) => void };
 
     function enrolled(): User {
       return buildUser({
@@ -429,10 +433,16 @@ describe('MfaService', () => {
       });
     }
 
+    beforeEach(() => {
+      check = jest.fn<void, [User]>();
+      options = { actor, check };
+      repository.findOne.mockResolvedValue(enrolled());
+    });
+
     it('clears the enrolment only while it is on, audits the administrator and warns the owner', async () => {
       repository.update.mockResolvedValueOnce({ affected: 1 });
 
-      await service.resetByAdmin(enrolled(), actor);
+      await service.resetByAdmin(enrolled(), options);
 
       const [[criteria, changes]] = repository.update.mock.calls;
       expect(criteria).toEqual({ id: 'user-1', totpEnabledAt: Not(IsNull()) });
@@ -459,7 +469,7 @@ describe('MfaService', () => {
       repository.update.mockResolvedValueOnce({ affected: 1 });
       auditService.log.mockRejectedValueOnce(new Error('audit down'));
 
-      await expect(service.resetByAdmin(enrolled(), actor)).rejects.toThrow(
+      await expect(service.resetByAdmin(enrolled(), options)).rejects.toThrow(
         'audit down'
       );
       expect(
@@ -467,9 +477,46 @@ describe('MfaService', () => {
       ).not.toHaveBeenCalled();
     });
 
+    it('runs the check of the caller on the row locked in the transaction', async () => {
+      const locked = enrolled();
+      repository.findOne.mockResolvedValue(locked);
+
+      await service.resetByAdmin(enrolled(), options);
+
+      expect(repository.findOne).toHaveBeenCalledWith(
+        User,
+        expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
+      );
+      expect(check).toHaveBeenCalledWith(locked);
+    });
+
+    it('writes nothing when the check of the caller refuses the locked row', async () => {
+      check.mockImplementation(() => {
+        throw new Error('refused');
+      });
+
+      await expect(service.resetByAdmin(enrolled(), options)).rejects.toThrow(
+        'refused'
+      );
+      expect(repository.update).not.toHaveBeenCalled();
+      expect(auditService.log).not.toHaveBeenCalled();
+    });
+
+    it('answers not found when the account is gone before the lock', async () => {
+      repository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.resetByAdmin(enrolled(), options)
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+      });
+      expect(check).not.toHaveBeenCalled();
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
     it('refuses when the factor is not on', async () => {
       await expect(
-        service.resetByAdmin(buildUser(), actor)
+        service.resetByAdmin(buildUser(), options)
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }
@@ -481,7 +528,7 @@ describe('MfaService', () => {
       repository.update.mockResolvedValueOnce({ affected: 0 });
 
       await expect(
-        service.resetByAdmin(enrolled(), actor)
+        service.resetByAdmin(enrolled(), options)
       ).rejects.toMatchObject({
         status: 409,
         response: { errorKey: ErrorKeys.AUTH.MFA_NOT_ENABLED }

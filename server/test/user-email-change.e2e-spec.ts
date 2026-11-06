@@ -104,6 +104,9 @@ function transactionOver(store: UserStore) {
     },
     exists: (_target: unknown, options: { where: { id: string } }) =>
       Promise.resolve(store.rows.has(options.where.id)),
+    // The row lock of the instance check is not modelled.
+    findOne: (_target: unknown, options: { where: { id: string } }) =>
+      Promise.resolve(store.rows.get(options.where.id) ?? null),
     findOneOrFail: (_target: unknown, options: { where: { id: string } }) => {
       const row = store.rows.get(options.where.id);
       return row ? Promise.resolve(row) : Promise.reject(new Error('no row'));
