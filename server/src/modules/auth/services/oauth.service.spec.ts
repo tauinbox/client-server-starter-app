@@ -968,6 +968,10 @@ describe('OAuthService', () => {
           { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).resolves.toBeUndefined();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendOAuthLinkedNotification
+      ).not.toHaveBeenCalled();
     });
 
     it('should refuse a second identity of a provider the user already linked', async () => {

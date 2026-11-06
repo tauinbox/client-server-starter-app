@@ -33,6 +33,8 @@ runWithInfra('One linked identity per provider (e2e)', () => {
 
   // Seconds, as a JWT `iat` is; the seeded user has no revocation.
   const LINK_TOKEN_IAT = Math.floor(Date.now() / 1000);
+  const logFireAndForget = jest.fn();
+  const sendOAuthLinkedNotification = jest.fn().mockResolvedValue(undefined);
 
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
@@ -56,11 +58,11 @@ runWithInfra('One linked identity per provider (e2e)', () => {
         },
         {
           provide: AuditService,
-          useValue: { logFireAndForget: () => undefined }
+          useValue: { logFireAndForget }
         },
         {
           provide: MailService,
-          useValue: { sendOAuthLinkedNotification: () => Promise.resolve() }
+          useValue: { sendOAuthLinkedNotification }
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: MfaService, useValue: {} },
@@ -75,6 +77,8 @@ runWithInfra('One linked identity per provider (e2e)', () => {
   }, 30000);
 
   beforeEach(async () => {
+    logFireAndForget.mockClear();
+    sendOAuthLinkedNotification.mockClear();
     stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const [{ id }] = await ds.query<Array<{ id: string }>>(
       `INSERT INTO users (email, "name", password)
@@ -127,6 +131,8 @@ runWithInfra('One linked identity per provider (e2e)', () => {
 
     await expect(link(id, `google-a-${stamp}`)).resolves.toBeUndefined();
     expect(await accounts.findByUserId(id)).toHaveLength(1);
+    expect(logFireAndForget).toHaveBeenCalledTimes(1);
+    expect(sendOAuthLinkedNotification).toHaveBeenCalledTimes(1);
   }, 30000);
 
   it('lets one of two concurrent links of different identities win', async () => {
