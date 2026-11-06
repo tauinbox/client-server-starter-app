@@ -1,3 +1,4 @@
+import { ErrorKeys } from '@app/shared/constants';
 import {
   expect,
   expectNoSnackbar,
@@ -176,7 +177,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
         body: JSON.stringify({
           statusCode: 404,
           message: 'Resource not found',
-          errorKey: 'errors.rbac.resourceNotFound'
+          errorKey: ErrorKeys.RESOURCES.NOT_FOUND
         })
       });
     });
