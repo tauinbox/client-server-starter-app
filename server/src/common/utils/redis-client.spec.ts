@@ -53,6 +53,63 @@ describe('redisClientOf', () => {
     expect(client.connect).not.toHaveBeenCalled();
   });
 
+  describe('after a failed connect', () => {
+    function unreachableStore() {
+      const client: { isOpen: boolean; connect: jest.Mock; on: jest.Mock } = {
+        isOpen: false,
+        connect: jest.fn().mockRejectedValue(new Error('ECONNREFUSED')),
+        on: jest.fn()
+      };
+      const store = new KeyvRedis<unknown>('redis://localhost:6379');
+
+      // @ts-expect-error stand-in for the node-redis client
+      store.client = client;
+      store.on('error', () => undefined);
+
+      return { client, cache: cacheWith(store) };
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers({ now: 1_000_000 });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    // Each connect to an unreachable Redis waits for the adapter timeout, so a
+    // retry on every command would add that wait to each request of an outage.
+    it('returns the closed client without a new connect for 5 seconds', async () => {
+      const { client, cache } = unreachableStore();
+
+      await expect(redisClientOf(cache)).resolves.toBe(client);
+      jest.advanceTimersByTime(4_999);
+      await expect(redisClientOf(cache)).resolves.toBe(client);
+
+      expect(client.connect).toHaveBeenCalledTimes(1);
+    });
+
+    it('connects again after the pause', async () => {
+      const { client, cache } = unreachableStore();
+
+      await redisClientOf(cache);
+      jest.advanceTimersByTime(5_000);
+      await redisClientOf(cache);
+
+      expect(client.connect).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns the client at once when the adapter connected it during the pause', async () => {
+      const { client, cache } = unreachableStore();
+
+      await redisClientOf(cache);
+      client.isOpen = true;
+
+      await expect(redisClientOf(cache)).resolves.toBe(client);
+      expect(client.connect).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('returns the closed client when the connect throws, so the command fails and the caller falls back', async () => {
     const store = Object.create(KeyvRedis.prototype) as KeyvRedis<unknown>;
     const client = { isOpen: false };

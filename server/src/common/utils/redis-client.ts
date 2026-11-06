@@ -4,6 +4,13 @@ import type { Cache } from 'cache-manager';
 
 const ERROR_LOG_THROTTLE_MS = 30_000;
 
+// A connect to an unreachable Redis takes the whole adapter timeout, about
+// 1 s, even when the port refuses at once. Without a pause each raw command
+// of an outage would pay it; with it the command fails at once and falls back.
+const CONNECT_RETRY_PAUSE_MS = 5_000;
+
+const failedConnects = new WeakMap<KeyvRedis<unknown>, number>();
+
 /**
  * The Redis client behind the cache, or null when the cache is the in-memory
  * fallback. Nest wraps the configured adapter in a Keyv, so the adapter sits
@@ -24,11 +31,28 @@ export async function redisClientOf(
 
   if (!(store instanceof KeyvRedis)) return null;
 
-  try {
-    return await store.getClient();
-  } catch {
-    return store.client;
+  const { client } = store;
+
+  if (client.isOpen) return client;
+
+  const failedAt = failedConnects.get(store);
+
+  if (
+    failedAt !== undefined &&
+    Date.now() - failedAt < CONNECT_RETRY_PAUSE_MS
+  ) {
+    return client;
   }
+
+  const connected = await store.getClient().catch(() => client);
+
+  if (connected.isOpen) {
+    failedConnects.delete(store);
+  } else {
+    failedConnects.set(store, Date.now());
+  }
+
+  return connected;
 }
 
 /**

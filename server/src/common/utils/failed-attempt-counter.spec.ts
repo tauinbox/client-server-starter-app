@@ -88,8 +88,8 @@ describe('FailedAttemptCounter', () => {
     function cacheWithRedis(client: Record<string, jest.Mock>): Cache {
       const store = Object.create(KeyvRedis.prototype) as KeyvRedis<unknown>;
 
-      Object.defineProperty(store, 'getClient', {
-        value: () => Promise.resolve(client)
+      Object.defineProperty(store, 'client', {
+        value: { ...client, isOpen: true }
       });
       const cache = createMockCache();
 

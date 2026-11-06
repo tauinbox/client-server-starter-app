@@ -16,8 +16,9 @@ import { redisClientOf, ThrottledFailureLog } from './redis-client';
  *
  * Without Redis (in-memory fallback, no `REDIS_URL`) a single process owns the
  * ledger. The read there still runs before the write, so the claims in flight
- * are reserved synchronously as well: Node runs each claim up to its first
- * await, which closes the window the two awaits would otherwise open. That
+ * are reserved synchronously as well: the check and the reservation have no
+ * await between them, which closes the window the two cache awaits would
+ * otherwise open. That
  * fallback is per instance: a deployment that runs several instances without
  * Redis records the claim on one of them only.
  *
