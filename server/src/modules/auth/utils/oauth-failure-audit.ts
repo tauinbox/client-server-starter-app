@@ -96,23 +96,23 @@ export class OAuthFailureAudit {
       context: extractAuditContext(req)
     };
 
-    const claimed = this.cookies.claimedIntents(req);
+    const { reauth, link } = this.cookies.claimedIntents(req);
 
-    const reauth = this.verifiedAccount<ReauthIntentAccount>(
-      claimed.reauth,
+    const reauthAccount = this.verifiedAccount<ReauthIntentAccount>(
+      reauth,
       TOKEN_PURPOSE.OAUTH_REAUTH
     );
-    if (reauth) {
-      this.stepUpFailure(failure, reauth);
+    if (reauthAccount) {
+      this.stepUpFailure(failure, reauthAccount);
       return;
     }
 
-    const link = this.verifiedAccount<OAuthIntentAccount>(
-      claimed.link,
+    const linkAccount = this.verifiedAccount<OAuthIntentAccount>(
+      link,
       TOKEN_PURPOSE.OAUTH_LINK
     );
-    if (link) {
-      this.linkFailure(failure, link);
+    if (linkAccount) {
+      this.linkFailure(failure, linkAccount);
       return;
     }
 

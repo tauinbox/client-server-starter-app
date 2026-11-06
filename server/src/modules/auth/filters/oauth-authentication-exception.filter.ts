@@ -38,11 +38,11 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
     // The attempt of this flow is over, so its intent goes, as OAuthController
     // clears it on the success and in-handler failure paths. An intent of
     // another flow stays: that flow may still finish in another tab.
-    const claimed = this.cookies.claimedIntents(request);
-    if (claimed.link !== null) {
+    const { link, reauth } = this.cookies.claimedIntents(request);
+    if (link !== null) {
       this.cookies.clear(response, OAUTH_LINK_COOKIE);
     }
-    if (claimed.reauth !== null) {
+    if (reauth !== null) {
       this.cookies.clear(response, OAUTH_REAUTH_COOKIE);
     }
 

@@ -102,8 +102,9 @@ function resolveErrorKey(
     : OAUTH_ERROR.AUTH_FAILED;
 }
 
-function resolveRedirectPath(intents: ClaimedIntents): OAuthFailureRedirect {
-  return intents.link !== null || intents.reauth !== null
-    ? '/profile'
-    : '/login';
+function resolveRedirectPath({
+  link,
+  reauth
+}: ClaimedIntents): OAuthFailureRedirect {
+  return link !== null || reauth !== null ? '/profile' : '/login';
 }
