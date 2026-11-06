@@ -258,14 +258,15 @@ export class OAuthService {
    * read `FOR SHARE`, and a password reset or an administrator recovery updates
    * that row: if the recovery comes first, this check sees its revocation time;
    * if this link comes first, the recovery waits and then deletes the new row.
+   * `created` is false when the identity was already linked to this user.
    */
   private async insertLink(
     userId: string,
     { provider, providerId }: ProviderIdentity,
     linkTokenIssuedAt: number
-  ): Promise<User> {
+  ): Promise<{ user: User; created: boolean }> {
     try {
-      return await withTransaction(this.dataSource, async (manager) => {
+      const user = await withTransaction(this.dataSource, async (manager) => {
         const user = await manager.findOne(User, {
           where: { id: userId },
           lock: { mode: 'pessimistic_read' }
@@ -283,6 +284,8 @@ export class OAuthService {
 
         return user;
       });
+
+      return { user, created: true };
     } catch (error: unknown) {
       if (!isUniqueViolation(error)) {
         throw error;
@@ -302,9 +305,10 @@ export class OAuthService {
         );
       }
 
-      // Already linked to this user: safe to ignore
       if (existing) {
-        return this.intentHolder(userId, linkTokenIssuedAt);
+        const user = await this.intentHolder(userId, linkTokenIssuedAt);
+
+        return { user, created: false };
       }
 
       // The identity is free, so the user already holds another identity of
@@ -360,11 +364,15 @@ export class OAuthService {
       auditContext
     }: { linkTokenIssuedAt: number; auditContext?: AuditContext }
   ): Promise<void> {
-    const user = await this.insertLink(
+    const { user, created } = await this.insertLink(
       userId,
       { provider, providerId },
       linkTokenIssuedAt
     );
+
+    if (!created) {
+      return;
+    }
 
     this.auditService.logFireAndForget({
       action: AuditAction.OAUTH_LINK,
