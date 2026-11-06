@@ -216,7 +216,9 @@ router.post('/oauth-data', (req, res) => {
 
   const state = getState();
   const token = randomUUID();
-  const expiresAt = Date.now() + OAUTH_DATA_MAX_AGE_MS;
+  const now = Date.now();
+  const expiresAt = now + OAUTH_DATA_MAX_AGE_MS;
+  const issuedAt = Math.floor(now / 1000);
 
   // The real server decides this in its provider callback, which is a Not
   // Implemented stub here. An account that carries a second factor is not
@@ -230,6 +232,7 @@ router.post('/oauth-data', (req, res) => {
         mfaToken: generateMfaPendingToken(user),
         expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
       },
+      issuedAt,
       expiresAt
     });
     res.json({ token });
@@ -240,6 +243,7 @@ router.post('/oauth-data', (req, res) => {
   state.oauthDataTokens.set(token, {
     userId: user.id,
     provider,
+    issuedAt,
     expiresAt
   });
 

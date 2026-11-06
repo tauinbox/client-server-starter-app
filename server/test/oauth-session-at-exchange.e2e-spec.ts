@@ -16,7 +16,7 @@ import cookieParser from 'cookie-parser';
 import * as crypto from 'crypto';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
-import { requiresSecureCookies } from '@app/shared/constants';
+import { ErrorKeys, requiresSecureCookies } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard';
 import { AuthService } from '../src/modules/auth/services/auth.service';
@@ -194,6 +194,26 @@ runWithInfra(
       await callback();
 
       expect(await liveRows()).toBe(before);
+    }, 30000);
+
+    // A password reset, an administrator recovery or a provider unlink ends
+    // every session. Before the fix a callback that the old holder finished
+    // just before it still turned into a fresh session.
+    it('refuses an oauth_data cookie issued before a session revocation', async () => {
+      const oauthData = await callback();
+      // iat has one-second resolution and the revocation is floored to it.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      await authService.revokeAllUserSessions(user.id);
+
+      const res = await request(http())
+        .post('/api/v1/auth/oauth/exchange')
+        .set('Cookie', oauthData)
+        .expect(401);
+
+      expect(res.body).toMatchObject({
+        errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+      });
+      expect(await liveRows()).toBe(0);
     }, 30000);
   }
 );

@@ -1238,12 +1238,19 @@ describe('OAuthController', () => {
       );
     });
 
-    // Deactivated or deleted between the callback and the exchange. The
-    // refusal is the one a bad cookie gets, so it tells nothing about the
+    // Deactivated, deleted or recovered between the callback and the exchange.
+    // The refusal is the one a bad cookie gets, so it tells nothing about the
     // account.
     it.each([
       ['deactivated', { ...OAUTH_USER, isActive: false }],
-      ['gone', null]
+      ['gone', null],
+      [
+        'recovered',
+        {
+          ...OAUTH_USER,
+          tokenRevokedAt: new Date((LINK_TOKEN_IAT + 1) * 1000)
+        }
+      ]
     ])(
       'issues no session when the account is %s by the exchange',
       async (_label, user) => {

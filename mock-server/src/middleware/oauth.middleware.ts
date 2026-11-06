@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { completeSignIn } from '../helpers/sign-in.helpers';
 import {
   ErrorKeys,
@@ -157,9 +158,14 @@ router.post('/exchange', (req, res) => {
   state.oauthDataTokens.delete(cookie);
   const user = pending ? findUserById(pending.userId) : undefined;
 
-  // A deactivated account gets the refusal a bad cookie gets, as on the
-  // server, so the exchange tells nothing about the account.
-  if (!pending || pending.expiresAt < Date.now() || !user?.isActive) {
+  // A deactivated or recovered account gets the refusal a bad cookie gets, as
+  // on the server, so the exchange tells nothing about the account.
+  if (
+    !pending ||
+    pending.expiresAt < Date.now() ||
+    !user?.isActive ||
+    issuedBeforeRevocation(pending.issuedAt, user.tokenRevokedAt)
+  ) {
     sendError(
       res,
       ErrorKeys.AUTH.INVALID_OAUTH_DATA,

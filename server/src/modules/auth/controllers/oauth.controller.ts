@@ -63,6 +63,7 @@ import {
   type OAuthIntentAccount
 } from '../utils/oauth-failure-audit';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
+import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
 import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { StepUpRoute } from '../decorators/step-up-route.decorator';
@@ -398,6 +399,7 @@ export class OAuthController {
     }
 
     let data: OAuthSignInData | MfaRequiredResponseDto;
+    let issuedAt: number;
     try {
       const payload = this.purposeTokens.verify<{
         jti?: string;
@@ -421,6 +423,7 @@ export class OAuthController {
         throw new Error('OAuth data already exchanged');
       }
       data = payload.data;
+      issuedAt = payload.iat;
     } catch {
       throw invalidOAuthData();
     }
@@ -433,11 +436,14 @@ export class OAuthController {
     // The session is issued here and not at the callback: only this request
     // carries the refresh cookie of the session it replaces, which must end
     // before the session limit counts the new one. The account can have been
-    // deactivated or deleted since the callback, and it gets the same refusal
-    // as a bad cookie so the exchange leaks no account state.
+    // deactivated, deleted or recovered since the callback, and it gets the
+    // same refusal as a bad cookie so the exchange leaks no account state.
     // eslint-disable-next-line no-restricted-syntax -- the id comes from the signed, single-use oauth_data cookie that the callback minted
     const user = await this.usersService.findById(data.userId);
-    if (!user?.isActive) {
+    if (
+      !user?.isActive ||
+      issuedBeforeRevocation(issuedAt, user.tokenRevokedAt)
+    ) {
       throw invalidOAuthData();
     }
     return await this.signIn.complete(
