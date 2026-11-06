@@ -1918,7 +1918,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3231 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3240 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 888 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 866 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1642 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 346 tests |

@@ -25,8 +25,11 @@ import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { PurposeTokenService } from '../services/purpose-token.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { bindIntent } from '../utils/oauth-flow-intent';
 
 const CLIENT = 'http://localhost:4200';
+const FLOW_STATE = 'b'.repeat(32);
+const OTHER_STATE = 'a'.repeat(32);
 
 /**
  * Drives the real Passport pipeline rather than a mocked AuthGuard: the defect
@@ -185,30 +188,72 @@ describe('createOAuthProviderGuard (real Passport pipeline)', () => {
 
   it('returns a cancelled link flow to the profile page and clears the link cookie', async () => {
     const response = await request(server)
-      .get('/oauth/fail/callback?error=access_denied')
-      .set('Cookie', '__Host-oauth_link=link-token');
+      .get(`/oauth/fail/callback?error=access_denied&state=${FLOW_STATE}`)
+      .set(
+        'Cookie',
+        `__Host-oauth_link=${bindIntent('link-token', FLOW_STATE)}`
+      );
 
     expect(response.status).toBe(302);
     expect(response.headers['location']).toBe(
       `${CLIENT}/profile?oauth_error=oauth_cancelled`
     );
     expect(response.headers['set-cookie']).toEqual([
-      expect.stringMatching(/^__Host-oauth_link=;.*Path=\/;.*Secure/),
-      expect.stringMatching(/^__Host-oauth_reauth=;.*Path=\/;.*Secure/)
+      expect.stringMatching(/^__Host-oauth_link=;.*Path=\/;.*Secure/)
     ]);
   });
 
   it('returns a cancelled step-up to the profile page and clears the reauth cookie', async () => {
     const response = await request(server)
-      .get('/oauth/fail/callback?error=access_denied')
-      .set('Cookie', '__Host-oauth_reauth=reauth-token');
+      .get(`/oauth/fail/callback?error=access_denied&state=${FLOW_STATE}`)
+      .set(
+        'Cookie',
+        `__Host-oauth_reauth=${bindIntent('reauth-token', FLOW_STATE)}`
+      );
 
     expect(response.status).toBe(302);
     expect(response.headers['location']).toBe(
       `${CLIENT}/profile?oauth_error=reauth_failed`
     );
     expect(response.headers['set-cookie']).toEqual([
-      expect.stringMatching(/^__Host-oauth_link=;.*Path=\/;.*Secure/),
+      expect.stringMatching(/^__Host-oauth_reauth=;.*Path=\/;.*Secure/)
+    ]);
+  });
+
+  it('sends a failed plain sign-in to the login page when the intent belongs to another flow and keeps that intent', async () => {
+    auditService.logFireAndForget.mockClear();
+
+    const response = await request(server)
+      .get(`/oauth/fail/callback?error=access_denied&state=${FLOW_STATE}`)
+      .set('Cookie', [
+        `__Host-oauth_reauth=${bindIntent('reauth-token', OTHER_STATE)}`,
+        `__Host-oauth_link=${bindIntent('link-token', OTHER_STATE)}`
+      ]);
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe(
+      `${CLIENT}/login?oauth_error=oauth_cancelled`
+    );
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(auditService.logFireAndForget).toHaveBeenCalledTimes(1);
+    expect(auditService.logFireAndForget).toHaveBeenCalledWith(
+      expect.objectContaining({ action: AuditAction.USER_LOGIN_FAILURE })
+    );
+  });
+
+  it('clears only the claimed reauth intent when the link intent belongs to another flow', async () => {
+    const response = await request(server)
+      .get(`/oauth/fail/callback?error=access_denied&state=${FLOW_STATE}`)
+      .set('Cookie', [
+        `__Host-oauth_reauth=${bindIntent('reauth-token', FLOW_STATE)}`,
+        `__Host-oauth_link=${bindIntent('link-token', OTHER_STATE)}`
+      ]);
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe(
+      `${CLIENT}/profile?oauth_error=reauth_failed`
+    );
+    expect(response.headers['set-cookie']).toEqual([
       expect.stringMatching(/^__Host-oauth_reauth=;.*Path=\/;.*Secure/)
     ]);
   });

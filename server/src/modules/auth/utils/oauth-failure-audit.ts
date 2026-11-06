@@ -6,13 +6,8 @@ import { AuditService, type AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { PurposeTokenService } from '../services/purpose-token.service';
-import {
-  OAUTH_LINK_COOKIE,
-  OAUTH_REAUTH_COOKIE
-} from '../constants/oauth.constants';
 import type { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { AuthCookies } from './auth-cookies';
-import { readIntentForFlow } from './oauth-flow-intent';
 
 /** The account that a verified intent cookie names. */
 export interface OAuthIntentAccount {
@@ -101,35 +96,33 @@ export class OAuthFailureAudit {
       context: extractAuditContext(req)
     };
 
-    const reauth = this.flowIntent<ReauthIntentAccount>(req, {
-      cookie: OAUTH_REAUTH_COOKIE,
-      purpose: TOKEN_PURPOSE.OAUTH_REAUTH
-    });
-    if (reauth) {
-      this.stepUpFailure(failure, reauth);
+    const { reauth, link } = this.cookies.claimedIntents(req);
+
+    const reauthAccount = this.verifiedAccount<ReauthIntentAccount>(
+      reauth,
+      TOKEN_PURPOSE.OAUTH_REAUTH
+    );
+    if (reauthAccount) {
+      this.stepUpFailure(failure, reauthAccount);
       return;
     }
 
-    const link = this.flowIntent<OAuthIntentAccount>(req, {
-      cookie: OAUTH_LINK_COOKIE,
-      purpose: TOKEN_PURPOSE.OAUTH_LINK
-    });
-    if (link) {
-      this.linkFailure(failure, link);
+    const linkAccount = this.verifiedAccount<OAuthIntentAccount>(
+      link,
+      TOKEN_PURPOSE.OAUTH_LINK
+    );
+    if (linkAccount) {
+      this.linkFailure(failure, linkAccount);
       return;
     }
 
     this.loginFailure(failure);
   }
 
-  private flowIntent<T extends OAuthIntentAccount>(
-    req: ExpressRequest,
-    { cookie, purpose }: { cookie: string; purpose: TokenPurpose }
+  private verifiedAccount<T extends OAuthIntentAccount>(
+    token: string | null,
+    purpose: TokenPurpose
   ): T | null {
-    const intent = this.cookies.read(req, cookie);
-    const token = intent
-      ? readIntentForFlow(intent, req.query?.['state'])
-      : null;
     return token ? this.purposeTokens.verify<T>(token, purpose) : null;
   }
 }
