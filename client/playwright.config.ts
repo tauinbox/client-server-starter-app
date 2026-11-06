@@ -12,7 +12,12 @@ export default defineConfig({
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
   workers: process.env['CI'] ? 4 : undefined,
-  reporter: process.env['CI'] ? [['dot'], ['html', { open: 'never' }]] : 'html',
+  // The report has inline scripts with global names such as `vi`. Inside
+  // `client/` the IDE resolves the Vitest globals to them, even when the folder
+  // is excluded, so a local report goes outside the workspace.
+  reporter: process.env['CI']
+    ? [['dot'], ['html', { open: 'never' }]]
+    : [['html', { outputFolder: '../.playwright-report' }]],
   // A full parallel run keeps the CPU near 100%, and a starved renderer can
   // paint the first view after a navigation more than 5 s late.
   expect: { timeout: 10_000 },
