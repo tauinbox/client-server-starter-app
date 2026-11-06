@@ -210,6 +210,7 @@ export class FeatureFlagService {
     };
   }
 
+  // race-checked: no stored row exists before the insert
   async create(
     dto: CreateFeatureFlagDto,
     ability: AbilityOrSystem,
@@ -258,6 +259,7 @@ export class FeatureFlagService {
     return this.#load(saved.id);
   }
 
+  // race-checked: the write is keyed on the version that the checks read
   async update(
     id: string,
     dto: UpdateFeatureFlagDto,
@@ -322,18 +324,25 @@ export class FeatureFlagService {
     ability: AbilityOrSystem,
     actor: FlagAuditActor
   ): Promise<void> {
-    const flag = await this.#load(id);
-    this.#assertCan(ability, {
-      action: 'delete',
-      record: flag,
-      actorId: actor.actorId
-    });
-    // The row is gone after the delete, so the key is recorded: a bare
-    // targetId resolves to nothing once the flag no longer exists.
-    const { key } = flag;
+    const check = (record: FeatureFlag) =>
+      this.#assertCan(ability, {
+        action: 'delete',
+        record,
+        actorId: actor.actorId
+      });
+    // Checked here to answer early, and again on the locked row.
+    check(await this.#load(id));
     await this.dataSource.transaction(async (em) => {
-      // The delete is the existence check: of two concurrent deletes, the
-      // loser writes no audit row. The rule rows go by ON DELETE CASCADE.
+      const locked = await em.findOne(FeatureFlag, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' }
+      });
+      if (!locked) throw flagNotFound();
+      check(locked);
+      // The row is gone after the delete, so the key is recorded: a bare
+      // targetId resolves to nothing once the flag no longer exists.
+      const { key } = locked;
+      // The rule rows go by ON DELETE CASCADE.
       const { affected } = await em.delete(FeatureFlag, { id });
       if (!affected) throw flagNotFound();
       await this.#audit(em, actor, {

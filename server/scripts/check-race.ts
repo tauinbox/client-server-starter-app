@@ -18,6 +18,12 @@
  *    `save`, in the method or through a parameter of a method of the same
  *    file. `save` writes every column of the loaded copy, so it undoes a
  *    concurrent write that landed after the read.
+ * 4. An instance check (`assertCan`, `assertCanWrite`, ...) that runs before
+ *    the transaction of the write and not again inside it. The check then
+ *    judges a row that a concurrent change can move out of the rights of the
+ *    caller before the write. Inside means in a callback of `transaction` or
+ *    `withTransaction`, or of a method of the same file that runs one, or in
+ *    a function that such a callback calls or receives.
  *
  * A method with `// race-checked: <reason>` on the line above it is skipped.
  *
@@ -44,6 +50,15 @@ const UNIQUE_HANDLING = new Set([
 ]);
 const LOCKS = new Set(['lock', 'setLock']);
 const DUPLICATE_KEY = /_EXISTS$|(^|_)ALREADY_/;
+const INSTANCE_CHECKS = new Set([
+  'assertCan',
+  'assertCanWrite',
+  'assertCanRole',
+  'assertCanUpdate',
+  'assertCanWiden',
+  'assertNotSuperTarget'
+]);
+const TRANSACTIONS = new Set(['transaction', 'withTransaction']);
 const MARKER = /\/\/\s*race-checked:\s*\S/;
 
 type Body = ts.FunctionLikeDeclaration;
@@ -175,7 +190,10 @@ class MethodScan {
   ) {}
 
   problems(): string[] {
-    const found = [this.staleSave()];
+    const found = [
+      this.staleSave(),
+      checkOutsideTransaction(this.method, this.local, this.label())
+    ];
     const read = this.firstRead();
     if (read !== undefined) {
       found.push(this.unguardedDelete(read), this.duplicateRead(read));
@@ -432,6 +450,136 @@ function reachesSave(
   });
 }
 
+type FunctionNode = ts.ArrowFunction | ts.FunctionExpression;
+
+/** The `const name = () => ...` functions declared in a method, by name. */
+function closuresOf(method: Body): Map<string, FunctionNode> {
+  const closures = new Map<string, FunctionNode>();
+  walk(method, (n) => {
+    if (
+      ts.isVariableDeclaration(n) &&
+      ts.isIdentifier(n.name) &&
+      n.initializer &&
+      (ts.isArrowFunction(n.initializer) ||
+        ts.isFunctionExpression(n.initializer))
+    ) {
+      closures.set(n.name.text, n.initializer);
+    }
+  });
+  return closures;
+}
+
+/** Whether the method or a method of the same file that it calls runs one. */
+function runsTransaction(body: Body, local: Map<string, Body>): boolean {
+  return reachable(body, local).some((b) =>
+    calls(b).some((c) => TRANSACTIONS.has(calleeName(c)))
+  );
+}
+
+/** A call whose function arguments run inside a transaction. */
+function isTransactionRunner(
+  call: ts.CallExpression,
+  local: Map<string, Body>
+): boolean {
+  if (TRANSACTIONS.has(calleeName(call))) return true;
+  const helper = localCallee(call, local);
+  return helper !== undefined && runsTransaction(helper, local);
+}
+
+/**
+ * The closure that a use of `id` names: a call, an argument or a shorthand
+ * property. Not the name of its own declaration, and not a member name.
+ */
+function closureRef(
+  id: ts.Identifier,
+  closures: Map<string, FunctionNode>
+): FunctionNode | undefined {
+  const { parent } = id;
+  if (
+    (ts.isVariableDeclaration(parent) && parent.name === id) ||
+    (ts.isPropertyAccessExpression(parent) && parent.name === id) ||
+    (ts.isPropertyAssignment(parent) && parent.name === id)
+  ) {
+    return undefined;
+  }
+  return closures.get(id.text);
+}
+
+/** Walks the node, but not into the subtrees that `skip` selects. */
+function walkUnless(
+  node: ts.Node,
+  skip: (n: ts.Node) => boolean,
+  visit: (n: ts.Node) => void
+): void {
+  if (skip(node)) return;
+  visit(node);
+  ts.forEachChild(node, (child) => walkUnless(child, skip, visit));
+}
+
+/**
+ * The instance checks that run from `nodes`: a direct call, a call of a
+ * method of the same file, and a closure of the method that is called or
+ * passed on.
+ */
+function checksFrom(
+  nodes: ts.Node[],
+  {
+    local,
+    closures,
+    skip = () => false
+  }: {
+    local: Map<string, Body>;
+    closures: Map<string, FunctionNode>;
+    skip?: (n: ts.Node) => boolean;
+  }
+): Set<string> {
+  const found = new Set<string>();
+  const seen = new Set<ts.Node>();
+  const queue: { node: ts.Node; skip: (n: ts.Node) => boolean }[] = nodes.map(
+    (node) => ({ node, skip })
+  );
+  while (queue.length > 0) {
+    const current = queue.pop()!;
+    walkUnless(current.node, current.skip, (n) => {
+      if (ts.isCallExpression(n)) {
+        if (INSTANCE_CHECKS.has(calleeName(n))) found.add(calleeName(n));
+        const helper = localCallee(n, local);
+        if (helper && !seen.has(helper)) {
+          seen.add(helper);
+          queue.push({ node: helper, skip: () => false });
+        }
+      }
+      const closure = ts.isIdentifier(n) && closureRef(n, closures);
+      if (closure && !seen.has(closure)) {
+        seen.add(closure);
+        queue.push({ node: closure, skip: () => false });
+      }
+    });
+  }
+  return found;
+}
+
+function checkOutsideTransaction(
+  method: Body,
+  local: Map<string, Body>,
+  label: string
+): string | undefined {
+  const runners = calls(method).filter((c) => isTransactionRunner(c, local));
+  if (runners.length === 0) return undefined;
+  const closures = closuresOf(method);
+  const runnerArgs = new Set<ts.Node>(runners.flatMap((r) => [...r.arguments]));
+  const closureBodies = new Set<ts.Node>(closures.values());
+  const outside = checksFrom([method], {
+    local,
+    closures,
+    skip: (n) => runnerArgs.has(n) || closureBodies.has(n)
+  });
+  const inside = checksFrom([...runnerArgs], { local, closures });
+  const missing = [...outside].filter((name) => !inside.has(name));
+  if (missing.length === 0) return undefined;
+  return `${label}: ${missing.join(', ')} runs before the transaction of the write and not inside it; run it again on the row locked in the transaction`;
+}
+
 function isMarked(method: Body, sf: ts.SourceFile): boolean {
   const ranges = ts.getLeadingCommentRanges(sf.text, method.getFullStart());
   return (ranges ?? []).some((r) => MARKER.test(sf.text.slice(r.pos, r.end)));
@@ -641,6 +789,69 @@ const SELF_TEST_CASES: { label: string; source: string; fails: boolean }[] = [
       async remove(id: string) {
         const user = await this.repository.findOne({ where: { id } });
         await this.manager.transaction((em) => em.softRemove(user));
+      }
+    }`,
+    fails: true
+  },
+  {
+    label: 'an instance check only before the transaction of the write',
+    source: `class S {
+      async update(id: string, ability: AppAbility) {
+        const user = await this.loadUser(id);
+        this.assertCanWrite(ability, { target: user });
+        await this.dataSource.transaction(async (em) => {
+          await em.update(User, { id }, { name: 'x' });
+        });
+      }
+    }`,
+    fails: true
+  },
+  {
+    label: 'an instance check repeated on the locked row in the transaction',
+    source: `class S {
+      async update(id: string, ability: AppAbility) {
+        const user = await this.loadUser(id);
+        this.assertCanWrite(ability, { target: user });
+        await withTransaction(this.dataSource, async (em) => {
+          const locked = await em.findOne(User, { where: { id }, lock: { mode: 'pessimistic_write' } });
+          this.assertCanWrite(ability, { target: locked });
+          await em.update(User, { id }, { name: 'x' });
+        });
+      }
+    }`,
+    fails: false
+  },
+  {
+    label:
+      'a check closure called early and passed to a method that runs the transaction',
+    source: `class S {
+      async update(id: string, ability: AppAbility) {
+        const check = (row: Role) => this.assertCanRole(ability, { record: row });
+        check(await this.loadRole(id));
+        await this.writeLocked(id, { check });
+      }
+      private writeLocked(id: string, { check }: { check: (row: Role) => void }) {
+        return this.manager.transaction(async (em) => {
+          check(await em.findOne(Role, { where: { id }, lock: { mode: 'pessimistic_write' } }));
+          await em.update(Role, { id }, { name: 'x' });
+        });
+      }
+    }`,
+    fails: false
+  },
+  {
+    label:
+      'a check in a helper before a method that runs the transaction without it',
+    source: `class S {
+      async update(id: string, ability: AppAbility) {
+        this.assertCanEdit(ability, await this.loadRole(id));
+        await this.writeLocked(id);
+      }
+      private assertCanEdit(ability: AppAbility, role: Role) {
+        this.accessRefusals.assertCan(ability, { subject: role });
+      }
+      private writeLocked(id: string) {
+        return this.manager.transaction((em) => em.update(Role, { id }, { name: 'x' }));
       }
     }`,
     fails: true

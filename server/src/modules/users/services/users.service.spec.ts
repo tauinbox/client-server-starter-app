@@ -103,6 +103,7 @@ describe('UsersService', () => {
         (
           run: (manager: {
             save: jest.Mock;
+            findOne: (entity: unknown, options: unknown) => unknown;
             restore: (entity: unknown, criteria: unknown) => Promise<unknown>;
             update: (
               entity: unknown,
@@ -114,6 +115,8 @@ describe('UsersService', () => {
         ) =>
           run({
             save: mockRepository.save,
+            findOne: (_entity, options) =>
+              mockRepository.findOne(options) as unknown,
             restore: (_entity, criteria) =>
               mockRepository.restore(criteria) as Promise<unknown>,
             update: (_entity, criteria, set) =>
@@ -600,6 +603,7 @@ describe('UsersService', () => {
     // writes, and `findOneOrFail` reads back the loaded row with them applied.
     let written: Partial<User>;
     let manager: {
+      findOne: jest.Mock;
       update: jest.Mock;
       exists: jest.Mock;
       findOneOrFail: jest.Mock;
@@ -608,6 +612,9 @@ describe('UsersService', () => {
     beforeEach(() => {
       written = {};
       manager = {
+        findOne: jest.fn((_entity, options): unknown =>
+          mockRepository.findOne(options)
+        ),
         update: jest.fn((_entity, _where, set: Partial<User>) => {
           Object.assign(written, set);
           return Promise.resolve({ affected: 1 });
@@ -622,6 +629,27 @@ describe('UsersService', () => {
       mockDataSource.transaction.mockImplementation(
         (run: (m: typeof manager) => Promise<unknown>) => run(manager)
       );
+    });
+
+    it('refuses the write when the locked row has left the scope of the grant', async () => {
+      mockRepository.findOne
+        .mockResolvedValueOnce({ ...mockUser, roles: [] })
+        .mockResolvedValue({ ...mockUser, roles: [], isActive: false });
+      const ability: AppAbility = {
+        // @ts-expect-error partial mock: `can` reads only the fields of a user
+        can: jest.fn((_action: string, record: Partial<User>) =>
+          Boolean(record.isActive)
+        )
+      };
+
+      await expect(
+        service.update('user-1', { name: 'After' }, { ability })
+      ).rejects.toThrow(ApiError);
+      expect(manager.findOne).toHaveBeenCalledWith(
+        User,
+        expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
+      );
+      expect(manager.update).not.toHaveBeenCalled();
     });
 
     it('should update user fields', async () => {
@@ -1142,6 +1170,7 @@ describe('UsersService', () => {
     const live = { id: 'user-1', deletedAt: IsNull() };
 
     interface RemoveManagerMock {
+      findOne: jest.Mock;
       update: jest.Mock;
       softDelete: jest.Mock;
     }
@@ -1150,6 +1179,9 @@ describe('UsersService', () => {
       overrides: Partial<RemoveManagerMock> = {}
     ): RemoveManagerMock {
       const manager: RemoveManagerMock = {
+        findOne: jest.fn((_entity, options): unknown =>
+          mockRepository.findOne(options)
+        ),
         update: jest.fn().mockResolvedValue({ affected: 1 }),
         softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
         ...overrides
@@ -1284,11 +1316,20 @@ describe('UsersService', () => {
       isActive: false
     };
 
+    /**
+     * The lookup and the two reads under the lock see `deleted`; the read
+     * after the restore sees `after`.
+     */
+    function mockRestoreReads(deleted: User, after?: User): void {
+      for (let read = 0; read < 3; read++) {
+        mockRepository.findOne.mockResolvedValueOnce(deleted);
+      }
+      if (after) mockRepository.findOne.mockResolvedValueOnce(after);
+    }
+
     it('should lift the soft-delete without reactivating a deactivated user', async () => {
       const restoredUser = { ...deletedUser, deletedAt: null } as User;
-      mockRepository.findOne
-        .mockResolvedValueOnce(deletedUser) // withDeleted lookup
-        .mockResolvedValueOnce(restoredUser); // final findOne after restore
+      mockRestoreReads(deletedUser, restoredUser);
 
       const result = await service.restore('user-1', {
         ability: SYSTEM_ABILITY
@@ -1314,9 +1355,7 @@ describe('UsersService', () => {
         ...mockUser,
         deletedAt: new Date('2025-06-01')
       } as User;
-      mockRepository.findOne
-        .mockResolvedValueOnce(deletedActiveUser)
-        .mockResolvedValueOnce(mockUser);
+      mockRestoreReads(deletedActiveUser, mockUser);
 
       const result = await service.restore('user-1', {
         ability: SYSTEM_ABILITY
@@ -1342,7 +1381,7 @@ describe('UsersService', () => {
     });
 
     it('refuses the loser of two concurrent restores and writes no audit row', async () => {
-      mockRepository.findOne.mockResolvedValueOnce(deletedUser);
+      mockRestoreReads(deletedUser);
       mockRepository.restore.mockResolvedValueOnce({ affected: 0 });
       const audit = jest.fn().mockReturnValue([]);
 
@@ -1395,9 +1434,7 @@ describe('UsersService', () => {
     });
 
     it('should proceed when ability allows restore', async () => {
-      mockRepository.findOne
-        .mockResolvedValueOnce(deletedUser)
-        .mockResolvedValueOnce(mockUser);
+      mockRestoreReads(deletedUser, mockUser);
       const canSpy = jest.fn().mockReturnValue(true);
       // @ts-expect-error partial mock — only `can` is needed for instance-level tests
       const ability: AppAbility = { can: canSpy };

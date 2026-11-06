@@ -42,6 +42,7 @@ describe('RoleService', () => {
       createQueryBuilder: jest.Mock;
       update: jest.Mock;
       findOne: jest.Mock;
+      find: jest.Mock;
       transaction: jest.Mock;
     };
     createQueryBuilder: jest.Mock;
@@ -159,6 +160,10 @@ describe('RoleService', () => {
         // Role membership writes now resolve the target user first, so the
         // default is an existing row; absence is opted into per test.
         findOne: jest.fn().mockResolvedValue({ id: 'user-1' }),
+        find: jest.fn(
+          (_target: unknown, options: unknown): unknown =>
+            mockRolePermissionRepo.find(options) as unknown
+        ),
         // The writes inside the transaction land on the repository mocks, so
         // a test asserts them in one place whether or not a transaction ran.
         transaction: jest.fn()
@@ -180,8 +185,11 @@ describe('RoleService', () => {
           ): unknown => roleRepo.update(criteria, set) as unknown,
           findOneByOrFail: (_target: unknown, where: unknown): unknown =>
             roleRepo.findOneByOrFail(where) as unknown,
-          findOne: (_target: unknown, options: unknown): unknown =>
-            mockRolePermissionRepo.lockRole(options) as unknown,
+          // The locked user is the one the test resolves for the target.
+          findOne: (target: unknown, options: unknown): unknown =>
+            target === User
+              ? (roleRepo.manager.findOne(target, options) as unknown)
+              : (mockRolePermissionRepo.lockRole(options) as unknown),
           find: (_target: unknown, options: unknown): unknown =>
             mockRolePermissionRepo.find(options) as unknown,
           createQueryBuilder: (...args: unknown[]): unknown =>
@@ -201,7 +209,12 @@ describe('RoleService', () => {
         .mockImplementation((data: Record<string, unknown>) => data),
       save: jest.fn(),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      lockRole: jest.fn().mockResolvedValue({ id: 'role-1' }),
+      // The locked row is the role that the first lookup of the test read.
+      lockRole: jest.fn(
+        async () =>
+          ((await mockRoleRepo.findOne.mock.results[0]?.value) as
+            Role | undefined) ?? { id: 'role-1' }
+      ),
       manager: { transaction: jest.fn() }
     };
     const rolePermissionRepo = mockRolePermissionRepo;
@@ -2337,6 +2350,42 @@ describe('RoleService', () => {
       );
     }
 
+    const write = { ability: scoped, actorId: 'actor-1' };
+    it.each<[string, (s: RoleService) => Promise<unknown>]>([
+      ['update', (s) => s.update('role-2', { description: 'x' }, write)],
+      ['delete', (s) => s.delete('role-2', write)],
+      [
+        'setPermissionsForRole',
+        (s) => s.setPermissionsForRole('role-2', [], write)
+      ],
+      [
+        'assignPermissionsToRole',
+        (s) => s.assignPermissionsToRole('role-2', { permissionIds: [] }, write)
+      ],
+      [
+        'removePermissionFromRole',
+        (s) => s.removePermissionFromRole('role-2', 'perm-1', write)
+      ]
+    ])(
+      '%s refuses a role that left the grant before the lock, and writes nothing',
+      async (_label, run) => {
+        mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
+        mockRolePermissionRepo.lockRole.mockResolvedValue({
+          ...otherRole,
+          id: 'role-2'
+        });
+
+        await expect(run(service)).rejects.toThrow(ApiError);
+        expect(mockRolePermissionRepo.lockRole).toHaveBeenCalledWith(
+          expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
+        );
+        expect(mockRoleRepo.update).not.toHaveBeenCalled();
+        expect(mockRoleRepo.delete).not.toHaveBeenCalled();
+        expect(mockRolePermissionRepo.delete).not.toHaveBeenCalled();
+        expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
+      }
+    );
+
     it('findOne refuses a role outside the grant and returns one inside it', async () => {
       mockRoleRepo.findOne.mockResolvedValue(otherRole);
       await expect(
@@ -2402,6 +2451,7 @@ describe('RoleService', () => {
       expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expectRefusal('delete', 'role-3');
 
+      mockRoleRepo.findOne.mockClear();
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
       await service.delete('role-2', { ability: scoped, actorId: 'actor-1' });
       expect(mockRoleRepo.delete).toHaveBeenCalled();

@@ -17,6 +17,7 @@ import { ROLE_LIST_COLUMNS } from '../utils/rbac-sort-columns.util';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
+import { lockUserWithRoles } from '../../users/utils/lock-user';
 import { PermissionService } from './permission.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import { PermissionCondition } from '@app/shared/types';
@@ -145,11 +146,23 @@ export class RoleService {
   }
 
   /**
-   * Locks the role row, then refuses the lift of the stored rows that `lifted`
-   * selects. A grant row goes in only under a key-share lock on its role, so
-   * the rows read here stay the same until the commit: a deny that another
-   * request adds cannot slip past the check. Throws `ROLES.NOT_FOUND` when the
-   * role is gone.
+   * Every change of a stored role, of its grants or of its holders takes this
+   * lock before its instance checks, so a check judges the row that the write
+   * changes.
+   */
+  private lockRole(em: EntityManager, id: string): Promise<Role | null> {
+    return em.findOne(Role, {
+      where: { id },
+      lock: { mode: 'pessimistic_write' }
+    });
+  }
+
+  /**
+   * Locks the role row, runs `check` on it, then refuses the lift of the
+   * stored rows that `lifted` selects. A grant row goes in only under a
+   * key-share lock on its role, so the rows read here stay the same until the
+   * commit: a deny that another request adds cannot slip past the check.
+   * Throws `ROLES.NOT_FOUND` when the role is gone. Returns the locked row.
    */
   private async lockRoleForLift(
     em: EntityManager,
@@ -157,24 +170,25 @@ export class RoleService {
     {
       roleId,
       actorId,
+      check,
       lifted = (rows) => rows
     }: {
       roleId: string;
       actorId?: string;
+      check: (locked: Role) => void;
       lifted?: (rows: RolePermission[]) => RolePermission[];
     }
-  ): Promise<void> {
-    const locked = await em.findOne(Role, {
-      where: { id: roleId },
-      lock: { mode: 'pessimistic_write' }
-    });
+  ): Promise<Role> {
+    const locked = await this.lockRole(em, roleId);
     if (!locked) throw this.roleNotFound();
-    if (!this.isScopeChecked(ability)) return;
+    check(locked);
+    if (!this.isScopeChecked(ability)) return locked;
     const rows = await em.find(RolePermission, { where: { roleId } });
     await this.assertDenyLiftAllowed(ability, lifted(rows), {
       actorId,
       roleId
     });
+    return locked;
   }
 
   private refuseGrant(
@@ -358,6 +372,91 @@ export class RoleService {
     );
   }
 
+  private assertCanEditRole(
+    ability: AbilityOrSystem,
+    role: Role,
+    {
+      data,
+      actorId
+    }: { data: { name?: string; description?: string }; actorId?: string }
+  ): void {
+    // The record after the write is checked too: else a grant scoped by a
+    // writable field lets the caller move a role out of its own scope.
+    for (const record of [role, withChanges(role, data)]) {
+      this.assertCanRole(ability, { action: 'update', record, actorId });
+    }
+    if (role.isSystem) {
+      throw new ApiError(
+        ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
+        'Cannot modify system roles'
+      );
+    }
+  }
+
+  private assertCanDeleteRole(
+    ability: AbilityOrSystem,
+    role: Role,
+    actorId?: string
+  ): void {
+    this.assertCanRole(ability, { action: 'delete', record: role, actorId });
+    if (role.isSystem) {
+      throw new ApiError(
+        ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM,
+        'Cannot delete system roles'
+      );
+    }
+  }
+
+  private assertCanChangeGrants(
+    ability: AbilityOrSystem,
+    role: Role,
+    actorId?: string
+  ): void {
+    this.assertCanRole(ability, { action: 'update', record: role, actorId });
+    this.assertNotSystem(role, ability, actorId);
+  }
+
+  private assertCanChangeHolder(
+    ability: AbilityOrSystem,
+    {
+      action,
+      user,
+      role,
+      actorId
+    }: {
+      action: 'assign' | 'unassign';
+      user: User;
+      role: Role;
+      actorId?: string;
+    }
+  ): void {
+    if (ability === SYSTEM_ABILITY) return;
+    if (role.isSuper) {
+      this.refuseSuperRole(ability, { action, roleId: role.id, actorId });
+    }
+    this.accessRefusals.assertCan(ability, {
+      action: 'update',
+      subject: subject('User', user),
+      actorId,
+      targetId: user.id,
+      targetType: 'User'
+    });
+    // Any role change ends every session of the target, so a delegated
+    // actor could keep a super account signed out with it.
+    this.accessRefusals.assertNotSuperTarget(ability, {
+      action: 'update',
+      target: user,
+      actorId
+    });
+    this.accessRefusals.assertCan(ability, {
+      action: 'assign',
+      subject: subject('Role', role),
+      actorId,
+      targetId: role.id,
+      targetType: 'Role'
+    });
+  }
+
   async findAll(): Promise<Role[]> {
     return this.roleRepository.find({
       order: { name: 'ASC' }
@@ -399,6 +498,7 @@ export class RoleService {
     return new ApiError(ErrorKeys.ROLES.NOT_FOUND, 'Role not found');
   }
 
+  // race-checked: no stored row exists before the insert
   async create(
     data: {
       name: string;
@@ -423,7 +523,7 @@ export class RoleService {
     });
   }
 
-  /** `audit` gets the role as it is before the write. */
+  /** `audit` gets the locked role as it is before the write. */
   async update(
     id: string,
     data: { name?: string; description?: string },
@@ -434,49 +534,38 @@ export class RoleService {
     }: RoleWriteOptions<(before: Role) => AuditLogParams>
   ): Promise<Role> {
     const role = await this.loadRole(id);
-    // The record after the write is checked too: else a grant scoped by a
-    // writable field lets the caller move a role out of its own scope.
-    for (const record of [role, withChanges(role, data)]) {
-      this.assertCanRole(ability, {
-        action: 'update',
-        record,
-        actorId
-      });
-    }
-    if (role.isSystem) {
-      throw new ApiError(
-        ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
-        'Cannot modify system roles'
-      );
-    }
+    const check = (record: Role) =>
+      this.assertCanEditRole(ability, record, { data, actorId });
+    // Checked here to answer early, and again on the locked row.
+    check(role);
     if (data.name) {
       const existing = await this.roleRepository.findOne({
         where: { name: data.name }
       });
       if (existing && existing.id !== id) throw this.nameExists();
     }
-    const oldName = role.name;
-    const newName = data.name ?? oldName;
-    const auditRow = audit?.({ ...role });
-    if (newName === oldName) {
-      return this.writeAudited(
-        this.roleRepository.manager,
-        (em) => this.updateRole(em, id, data),
-        auditRow
-      );
-    }
-
-    const saved = await this.writeWithRoleEvent(
-      (em) => this.updateRole(em, id, data),
-      {
-        name: RoleRenamedEvent.name,
-        create: (em, committed) =>
-          new RoleRenamedEvent(oldName, newName, em, committed)
-      },
-      auditRow
-    );
+    // The old name comes from the locked row: a rename that committed after
+    // the read above changed it, and the listeners rewrite by that name.
+    const { saved, renamed } = await this.writeWithRoleEvent(async (em) => {
+      const before = await this.lockRole(em, id);
+      if (!before) throw this.roleNotFound();
+      check(before);
+      const written = await this.updateRole(em, id, data);
+      const nameChanged = written.name !== before.name;
+      return {
+        result: { saved: written, renamed: nameChanged },
+        audit: audit?.({ ...before }),
+        event: nameChanged
+          ? {
+              name: RoleRenamedEvent.name,
+              create: (committed) =>
+                new RoleRenamedEvent(before.name, written.name, em, committed)
+            }
+          : undefined
+      };
+    });
     // Holders have the old name in the cached role names that flag rules use.
-    await this.invalidateUsersWithRole(id);
+    if (renamed) await this.invalidateUsersWithRole(id);
     return saved;
   }
 
@@ -489,30 +578,31 @@ export class RoleService {
     }: RoleWriteOptions<(role: Role) => AuditLogParams>
   ): Promise<void> {
     const role = await this.loadRole(id);
-    this.assertCanRole(ability, { action: 'delete', record: role, actorId });
-    if (role.isSystem) {
-      throw new ApiError(
-        ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM,
-        'Cannot delete system roles'
-      );
-    }
+    const check = (record: Role) =>
+      this.assertCanDeleteRole(ability, record, actorId);
+    // Checked here to answer early, and again on the locked row.
+    check(role);
     // Invalidate after the commit, or a holder read in between re-caches the
     // deleted grants for the TTL. Holders are read before the delete cascades.
     let holderIds: string[] = [];
-    const auditRow = audit?.(role);
-    await this.writeWithRoleEvent(
-      async (em) => {
-        await this.lockRoleForLift(em, ability, { roleId: id, actorId });
-        holderIds = await this.findHolderIds(em, id);
-        await em.delete(Role, { id });
-      },
-      {
-        name: RoleDeletedEvent.name,
-        create: (em, committed) =>
-          new RoleDeletedEvent(role.name, em, committed)
-      },
-      auditRow
-    );
+    await this.writeWithRoleEvent(async (em) => {
+      const locked = await this.lockRoleForLift(em, ability, {
+        roleId: id,
+        actorId,
+        check
+      });
+      holderIds = await this.findHolderIds(em, id);
+      await em.delete(Role, { id });
+      return {
+        result: undefined,
+        audit: audit?.(locked),
+        event: {
+          name: RoleDeletedEvent.name,
+          create: (committed) =>
+            new RoleDeletedEvent(locked.name, em, committed)
+        }
+      };
+    });
     await this.invalidateHolders(holderIds);
   }
 
@@ -566,32 +656,31 @@ export class RoleService {
   }
 
   /**
-   * Runs `write`, its audit row and the listeners of the event in one
-   * transaction, so a failed row or listener rolls the write back. The event
-   * gets a promise that resolves after the commit.
+   * Runs `write`, then the listeners of the event and the audit row that it
+   * returns, in one transaction, so a failed row or listener rolls the write
+   * back. `write` builds both from the rows it locked. The event gets a
+   * promise that resolves after the commit.
    */
   private async writeWithRoleEvent<T>(
-    write: (em: EntityManager) => Promise<T>,
-    event: {
-      name: string;
-      create: (em: EntityManager, committed: Promise<void>) => object;
-    },
-    audit?: AuditLogParams
+    write: (em: EntityManager) => Promise<{
+      result: T;
+      audit?: AuditLogParams;
+      event?: { name: string; create: (committed: Promise<void>) => object };
+    }>
   ): Promise<T> {
     const { promise: committed, resolve: markCommitted } =
       Promise.withResolvers<void>();
-    const result = await this.writeAudited(
-      this.roleRepository.manager,
-      async (em) => {
-        const written = await write(em);
+    const result = await this.roleRepository.manager.transaction(async (em) => {
+      const change = await write(em);
+      if (change.event) {
         await this.eventEmitter.emitAsync(
-          event.name,
-          event.create(em, committed)
+          change.event.name,
+          change.event.create(committed)
         );
-        return written;
-      },
-      audit
-    );
+      }
+      if (change.audit) await this.auditService.log(change.audit, em);
+      return change.result;
+    });
     markCommitted();
     return result;
   }
@@ -609,13 +698,60 @@ export class RoleService {
       where: { id: userId },
       relations: { roles: true }
     });
-    if (!targetUser) {
-      throw new ApiError(
-        ErrorKeys.USERS.NOT_FOUND,
-        `User with ID ${userId} not found`
-      );
-    }
+    if (!targetUser) throw this.userNotFound(userId);
     return targetUser;
+  }
+
+  /** The user is locked before the role, on every path that locks both. */
+  private async lockRoleAssignmentTarget(
+    em: EntityManager,
+    userId: string
+  ): Promise<User> {
+    const targetUser = await lockUserWithRoles(em, { id: userId });
+    if (!targetUser) throw this.userNotFound(userId);
+    return targetUser;
+  }
+
+  private userNotFound(userId: string): ApiError {
+    return new ApiError(
+      ErrorKeys.USERS.NOT_FOUND,
+      `User with ID ${userId} not found`
+    );
+  }
+
+  // The role id comes from the body, so a missing role is not a missing
+  // target resource.
+  private unknownRole(): ApiError {
+    return new ApiError(ErrorKeys.ROLES.UNKNOWN_ROLE, 'Role not found');
+  }
+
+  /**
+   * The checks of `assertCanChangeHolder`, then the rule against indirect
+   * escalation: the caller must hold every permission that the role carries.
+   */
+  private async assertCanAssignRole(
+    em: EntityManager,
+    ability: AbilityOrSystem,
+    { user, role, actorId }: { user: User; role: Role; actorId?: string }
+  ): Promise<void> {
+    if (ability === SYSTEM_ABILITY) return;
+    this.assertCanChangeHolder(ability, {
+      action: 'assign',
+      user,
+      role,
+      actorId
+    });
+    const rolePermissions = await em.find(RolePermission, {
+      where: { roleId: role.id }
+    });
+    const grantItems = rolePermissions.map((rp) => ({
+      permissionId: rp.permissionId,
+      conditions: rp.conditions ?? null
+    }));
+    await this.assertGrantAllowed(ability, grantItems, {
+      actorId,
+      roleId: role.id
+    });
   }
 
   /**
@@ -628,55 +764,32 @@ export class RoleService {
     { ability, actorId, audit }: RoleWriteOptions
   ): Promise<void> {
     const targetUser = await this.loadRoleAssignmentTarget(userId);
-    // The role id comes from the body, so a missing role is not a missing
-    // target resource.
     const role = await this.roleRepository.findOne({ where: { id: roleId } });
-    if (!role) {
-      throw new ApiError(ErrorKeys.ROLES.UNKNOWN_ROLE, 'Role not found');
-    }
-
-    if (ability !== SYSTEM_ABILITY) {
-      if (role.isSuper) {
-        this.refuseSuperRole(ability, { action: 'assign', roleId, actorId });
-      }
-      this.accessRefusals.assertCan(ability, {
-        action: 'update',
-        subject: subject('User', targetUser),
-        actorId,
-        targetId: userId,
-        targetType: 'User'
-      });
-      // Any role change ends every session of the target, so a delegated
-      // actor could keep a super account signed out with it.
-      this.accessRefusals.assertNotSuperTarget(ability, {
-        action: 'update',
-        target: targetUser,
-        actorId
-      });
-      this.accessRefusals.assertCan(ability, {
-        action: 'assign',
-        subject: subject('Role', role),
-        actorId,
-        targetId: roleId,
-        targetType: 'Role'
-      });
-
-      // Prevent indirect escalation: caller must hold every permission
-      // carried by the role they are assigning.
-      const rolePermissions = await this.rolePermissionRepository.find({
-        where: { roleId }
-      });
-      const grantItems = rolePermissions.map((rp) => ({
-        permissionId: rp.permissionId,
-        conditions: rp.conditions ?? null
-      }));
-      await this.assertGrantAllowed(ability, grantItems, { actorId, roleId });
-    }
+    if (!role) throw this.unknownRole();
+    // Checked here to answer early, and again on the locked rows.
+    await this.assertCanAssignRole(this.roleRepository.manager, ability, {
+      user: targetUser,
+      role,
+      actorId
+    });
 
     await this.writeAudited(
       this.roleRepository.manager,
-      (em) =>
-        em.createQueryBuilder().relation(User, 'roles').of(userId).add(roleId),
+      async (em) => {
+        const user = await this.lockRoleAssignmentTarget(em, userId);
+        const locked = await this.lockRole(em, roleId);
+        if (!locked) throw this.unknownRole();
+        await this.assertCanAssignRole(em, ability, {
+          user,
+          role: locked,
+          actorId
+        });
+        await em
+          .createQueryBuilder()
+          .relation(User, 'roles')
+          .of(userId)
+          .add(roleId);
+      },
       audit
     );
     await this.permissionService.invalidateUserCache(userId);
@@ -689,40 +802,27 @@ export class RoleService {
   ): Promise<void> {
     const targetUser = await this.loadRoleAssignmentTarget(userId);
     const role = await this.loadRole(roleId);
-
-    if (ability !== SYSTEM_ABILITY) {
-      if (role.isSuper) {
-        this.refuseSuperRole(ability, { action: 'unassign', roleId, actorId });
-      }
-      this.accessRefusals.assertCan(ability, {
-        action: 'update',
-        subject: subject('User', targetUser),
-        actorId,
-        targetId: userId,
-        targetType: 'User'
-      });
-      // Any role change ends every session of the target, so a delegated
-      // actor could keep a super account signed out with it.
-      this.accessRefusals.assertNotSuperTarget(ability, {
-        action: 'update',
-        target: targetUser,
+    const check = (user: User, record: Role) =>
+      this.assertCanChangeHolder(ability, {
+        action: 'unassign',
+        user,
+        role: record,
         actorId
       });
-      this.accessRefusals.assertCan(ability, {
-        action: 'assign',
-        subject: subject('Role', role),
-        actorId,
-        targetId: roleId,
-        targetType: 'Role'
-      });
-    }
+    // Checked here to answer early, and again on the locked rows.
+    check(targetUser, role);
 
     // The delete is the existence check, so a concurrent removal cannot
     // pass a separate read and still audit and end the sessions twice.
     await this.writeAudited(
       this.roleRepository.manager,
       async (em) => {
-        await this.lockRoleForLift(em, ability, { roleId, actorId });
+        const user = await this.lockRoleAssignmentTarget(em, userId);
+        await this.lockRoleForLift(em, ability, {
+          roleId,
+          actorId,
+          check: (locked) => check(user, locked)
+        });
         const { affected } = await em
           .createQueryBuilder()
           .delete()
@@ -758,9 +858,10 @@ export class RoleService {
     items: GrantItem[],
     { ability, actorId, audit }: RoleWriteOptions
   ): Promise<void> {
-    const role = await this.loadRole(roleId);
-    this.assertCanRole(ability, { action: 'update', record: role, actorId });
-    this.assertNotSystem(role, ability, actorId);
+    const check = (role: Role) =>
+      this.assertCanChangeGrants(ability, role, actorId);
+    // Checked here to answer early, and again on the locked row.
+    check(await this.loadRole(roleId));
     await this.assertGrantsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     await this.writeAudited(
@@ -773,6 +874,7 @@ export class RoleService {
         await this.lockRoleForLift(em, ability, {
           roleId,
           actorId,
+          check,
           lifted: (rows) =>
             rows.filter(
               (row) =>
@@ -808,9 +910,10 @@ export class RoleService {
     }: { permissionIds: string[]; conditions?: PermissionCondition },
     { ability, actorId, audit }: RoleWriteOptions
   ): Promise<void> {
-    const role = await this.loadRole(roleId);
-    this.assertCanRole(ability, { action: 'update', record: role, actorId });
-    this.assertNotSystem(role, ability, actorId);
+    const check = (role: Role) =>
+      this.assertCanChangeGrants(ability, role, actorId);
+    // Checked here to answer early, and again on the locked row.
+    check(await this.loadRole(roleId));
     const items = permissionIds.map((permissionId) => ({
       permissionId,
       conditions: conditions ?? null
@@ -826,7 +929,16 @@ export class RoleService {
     );
     await this.writeAudited(
       this.rolePermissionRepository.manager,
-      (em) => em.save(RolePermission, rolePermissions),
+      async (em) => {
+        // An add lifts no stored row.
+        await this.lockRoleForLift(em, ability, {
+          roleId,
+          actorId,
+          check,
+          lifted: () => []
+        });
+        await em.save(RolePermission, rolePermissions);
+      },
       audit
     );
     await this.invalidateUsersWithRole(roleId);
@@ -837,15 +949,17 @@ export class RoleService {
     permissionId: string,
     { ability, actorId, audit }: RoleWriteOptions
   ): Promise<void> {
-    const role = await this.loadRole(roleId);
-    this.assertCanRole(ability, { action: 'update', record: role, actorId });
-    this.assertNotSystem(role, ability, actorId);
+    const check = (role: Role) =>
+      this.assertCanChangeGrants(ability, role, actorId);
+    // Checked here to answer early, and again on the locked row.
+    check(await this.loadRole(roleId));
     await this.writeAudited(
       this.rolePermissionRepository.manager,
       async (em) => {
         await this.lockRoleForLift(em, ability, {
           roleId,
           actorId,
+          check,
           lifted: (rows) =>
             rows.filter((row) => row.permissionId === permissionId)
         });

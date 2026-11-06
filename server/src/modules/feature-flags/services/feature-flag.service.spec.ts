@@ -171,6 +171,7 @@ describe('FeatureFlagService', () => {
   });
 
   interface MockEm {
+    findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
@@ -179,6 +180,9 @@ describe('FeatureFlagService', () => {
 
   function mockTransaction(overrides: Partial<MockEm> = {}): MockEm {
     const em: MockEm = {
+      findOne: jest.fn((_e: unknown, options: unknown): unknown =>
+        flagRepo.findOne(options)
+      ),
       create: jest.fn((_e: unknown, v: unknown) => v),
       save: jest.fn((_e: unknown, v: unknown) => Promise.resolve(v)),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
@@ -528,6 +532,23 @@ describe('FeatureFlagService', () => {
       response: { errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS }
     };
     const inScope = { ...sampleFlag, environments: ['production'] };
+
+    it('refuses a delete of a flag that left the grant before the lock, and deletes nothing', async () => {
+      flagRepo.findOne
+        .mockResolvedValueOnce({ ...inScope })
+        .mockResolvedValue({ ...sampleFlag });
+      const em = mockTransaction();
+
+      await expect(
+        service.delete('flag-1', scoped, actor)
+      ).rejects.toMatchObject(refused);
+      expect(em.findOne).toHaveBeenCalledWith(
+        FeatureFlag,
+        expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
+      );
+      expect(em.delete).not.toHaveBeenCalled();
+      expect(auditService.log).not.toHaveBeenCalled();
+    });
 
     it('refuses a read of a flag outside the grant and audits the actor', async () => {
       flagRepo.findOne.mockResolvedValue({ ...sampleFlag });

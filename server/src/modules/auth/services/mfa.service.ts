@@ -33,6 +33,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { User } from '../../users/entities/user.entity';
+import { lockUserWithRoles } from '../../users/utils/lock-user';
 import { AuditContext, AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import {
@@ -321,12 +322,20 @@ export class MfaService {
    * too. The administrator has already proved itself through
    * AuthService.assertStepUp and has proved the owner's identity outside the
    * system. The owner is never the caller here: that path is `disable`, which
-   * demands the owner's own factor.
+   * demands the owner's own factor. `check` is the instance check of the
+   * caller; it runs on the row locked in the transaction of the reset.
    */
   async resetByAdmin(
     target: User,
-    actor: { id: string; email: string },
-    context?: AuditContext
+    {
+      actor,
+      context,
+      check
+    }: {
+      actor: { id: string; email: string };
+      context?: AuditContext;
+      check: (locked: User) => void;
+    }
   ): Promise<void> {
     this.assertEnabled(target);
 
@@ -334,6 +343,14 @@ export class MfaService {
     // only one audits and mails; the other is told there is nothing to reset.
     // The row shares the transaction: a reset never commits without it.
     await withTransaction(this.dataSource, async (manager) => {
+      const locked = await lockUserWithRoles(manager, { id: target.id });
+      if (!locked) {
+        throw new ApiError(
+          ErrorKeys.USERS.NOT_FOUND,
+          `User with ID ${target.id} not found`
+        );
+      }
+      check(locked);
       const { affected } = await manager.update(
         User,
         { id: target.id, totpEnabledAt: Not(IsNull()) },

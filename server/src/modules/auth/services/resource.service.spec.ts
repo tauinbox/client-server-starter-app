@@ -46,7 +46,11 @@ describe('ResourceService', () => {
     findOneByOrFail: jest.Mock;
     manager: { transaction: jest.Mock };
   };
-  let mockEm: { update: jest.Mock; findOneByOrFail: jest.Mock };
+  let mockEm: {
+    findOne: jest.Mock;
+    update: jest.Mock;
+    findOneByOrFail: jest.Mock;
+  };
   let mockAudit: { log: jest.Mock; logFireAndForget: jest.Mock };
   let mockCacheManager: {
     get: jest.Mock;
@@ -151,6 +155,9 @@ describe('ResourceService', () => {
     // The transactional writes go through the repository mock, so the
     // assertions on `update` below cover both paths.
     mockEm = {
+      findOne: jest.fn((_target: unknown, options: unknown): unknown =>
+        mockResourceRepo.findOne(options)
+      ),
       update: jest.fn(
         (_target: unknown, criteria: unknown, set: unknown): unknown =>
           mockResourceRepo.update(criteria, set)

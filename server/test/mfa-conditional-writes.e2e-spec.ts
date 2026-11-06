@@ -132,7 +132,10 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
 
   it('refuses a disable that an administrator reset overtook', async () => {
     const stale = await createAccount('disable-stale', true);
-    await mfaService.resetByAdmin(stale, { id: stale.id, email: stale.email });
+    await mfaService.resetByAdmin(stale, {
+      actor: { id: stale.id, email: stale.email },
+      check: () => undefined
+    });
 
     await expect(mfaService.disable(stale)).rejects.toMatchObject(notEnabled);
   }, 30000);

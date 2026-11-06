@@ -454,11 +454,16 @@ export class UsersController {
       code: dto.code
     });
 
-    await this.mfaService.resetByAdmin(
-      target,
-      { id: req.user.userId, email: req.user.email },
-      extractAuditContext(req)
-    );
+    await this.mfaService.resetByAdmin(target, {
+      actor: { id: req.user.userId, email: req.user.email },
+      context: extractAuditContext(req),
+      check: (locked) =>
+        this.usersService.assertCanWrite(ability, {
+          action: 'update',
+          target: locked,
+          actorId: req.user.userId
+        })
+    });
 
     // The sessions were opened with the factor the owner no longer holds, and
     // one of them may be the reason the owner asked for a reset.
