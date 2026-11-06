@@ -105,6 +105,21 @@
           "STEP_UP_FAILURE"
         ]
       }
+    },
+    {
+      "name": "an unknown provider with an unknown body field is a body fault",
+      "route": "DELETE /api/v1/auth/oauth/accounts/google",
+      "path": "/api/v1/auth/oauth/accounts/bogus",
+      "actor": "user",
+      "auth": "bearer",
+      "body": {
+        "junk": 1
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": null,
+        "audit": []
+      }
     }
   ]
 }

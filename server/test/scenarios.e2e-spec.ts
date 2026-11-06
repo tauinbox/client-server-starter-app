@@ -484,10 +484,9 @@ runWithInfra('Request scenarios (e2e)', () => {
         .get('/api/v1/auth/sessions')
         .auth(ctx.bearer!, { type: 'bearer' })
         .expect(200);
-      const other = (res.body as Array<{ id: string; current: boolean }>).find(
-        (s) => !s.current
-      );
-      ctx.values.$otherSessionId = other!.id;
+      const sessions = res.body as Array<{ id: string; current: boolean }>;
+      ctx.values.$otherSessionId = sessions.find((s) => !s.current)!.id;
+      ctx.values.$currentSessionId = sessions.find((s) => s.current)!.id;
     },
     'verification-token': async (ctx) => {
       ctx.values.$verificationToken = await mailedToken(

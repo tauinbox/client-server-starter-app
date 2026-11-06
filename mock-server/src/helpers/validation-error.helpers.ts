@@ -1,5 +1,6 @@
 import type { RequestHandler, Response } from 'express';
 import { isUuid } from '../utils/mock-id';
+import { stepUpFactorsBodyErrors } from './reauth.helpers';
 
 /** Where a refused value came from: the server pipe answers each differently. */
 export type ValidationLocation = 'body' | 'query';
@@ -26,6 +27,38 @@ export function requireUuid(...params: string[]): RequestHandler {
         });
         return;
       }
+    }
+    next();
+  };
+}
+
+export interface StepUpBodyOptions {
+  /** The fields of the DTO beside the two step-up factors. */
+  fields?: readonly string[];
+  /** The errors of those fields, in the order the DTO declares them. */
+  fieldErrors?: (body: Record<string, unknown>) => string[];
+}
+
+/**
+ * Mirrors the global ValidationPipe on a DTO that carries `StepUpFactorsDto`.
+ * The pipe runs before the handler, so a body fault comes before each check of
+ * the handler. Mount this after the guards and `requireUuid`, never call the
+ * validation from the handler.
+ */
+export function requireStepUpBody(
+  options: StepUpBodyOptions = {}
+): RequestHandler {
+  const { fields = [], fieldErrors } = options;
+  return (req, res, next) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const errors = stepUpFactorsBodyErrors(
+      req.body,
+      fields,
+      fieldErrors?.(body) ?? []
+    );
+    if (errors.length > 0) {
+      sendValidationError(res, 'body', errors);
+      return;
     }
     next();
   };

@@ -46,16 +46,13 @@ import {
   findCreateUserConflict,
   validateCreateUserDto
 } from '../helpers/user-create.helpers';
-import {
-  sendWithRetryAfter,
-  stepUpError,
-  stepUpFactorsBodyErrors
-} from '../helpers/reauth.helpers';
+import { sendWithRetryAfter, stepUpError } from '../helpers/reauth.helpers';
 import { cancelSubscriptionsForDeletedUser } from './billing.middleware';
 import { filterByAbility } from '../helpers/ability-filter.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { pushUserCrudEvent } from '../helpers/user-list-events.helpers';
 import {
+  requireStepUpBody,
   requireUuid,
   sendValidationError
 } from '../helpers/validation-error.helpers';
@@ -218,34 +215,29 @@ router.patch(
   '/:id',
   permissionGuard('update', 'User'),
   requireUuid('id'),
-  (req, res) => {
-    const id = req.params['id'] as string;
-
-    // The server's global ValidationPipe runs before the handler, so a body
-    // that fails UpdateUserDto is a validation error whether or not the
-    // addressed row exists. Only checks that need the looked-up row stay below
-    // `NOT_FOUND`.
-    const { password, isActive, unlockAccount, locale, currentPassword, code } =
-      req.body;
-    const name = trimName(req.body['name']);
-
-    // UpdateUserDto declares its own fields ahead of the inherited
-    // CreateUserDto fields, so the server reports them first.
-    const bodyErrors = stepUpFactorsBodyErrors(req.body, UPDATE_USER_FIELDS, [
-      ...booleanErrors('isActive', isActive, 'definedOnly'),
-      ...booleanErrors('unlockAccount', unlockAccount, 'definedOnly'),
-      ...emailErrors('email', req.body.email, 'definedOnly'),
-      ...nameErrors(name, 'definedOnly'),
-      ...newPasswordErrors(password, 'definedOnly'),
-      ...oneOfErrors('locale', locale, {
+  // UpdateUserDto declares its own fields ahead of the inherited CreateUserDto
+  // fields, so the server reports them first.
+  requireStepUpBody({
+    fields: UPDATE_USER_FIELDS,
+    fieldErrors: (body) => [
+      ...booleanErrors('isActive', body['isActive'], 'definedOnly'),
+      ...booleanErrors('unlockAccount', body['unlockAccount'], 'definedOnly'),
+      ...emailErrors('email', body['email'], 'definedOnly'),
+      ...nameErrors(trimName(body['name']), 'definedOnly'),
+      ...newPasswordErrors(body['password'], 'definedOnly'),
+      ...oneOfErrors('locale', body['locale'], {
         values: SUPPORTED_LOCALES,
         optional: 'definedOnly'
       })
-    ]);
-    if (bodyErrors.length > 0) {
-      sendValidationError(res, 'body', bodyErrors);
-      return;
-    }
+    ]
+  }),
+  (req, res) => {
+    const id = req.params['id'] as string;
+
+    // Only checks that need the looked-up row stay below `NOT_FOUND`.
+    const { password, isActive, unlockAccount, locale, currentPassword, code } =
+      req.body;
+    const name = trimName(req.body['name']);
 
     // An explicit null fails the DTO on the server, not an absent field:
     // UpdateUserDto uses PartialType(..., { skipNullProperties: false }).
@@ -558,14 +550,10 @@ router.post(
   '/:id/mfa/reset',
   permissionGuard('update', 'User'),
   requireUuid('id'),
+  requireStepUpBody(),
   (req, res) => {
     const id = req.params['id'] as string;
     const { currentPassword, code } = req.body;
-    const bodyErrors = stepUpFactorsBodyErrors(req.body);
-    if (bodyErrors.length > 0) {
-      sendValidationError(res, 'body', bodyErrors);
-      return;
-    }
 
     const actor = (req as AuthenticatedRequest).user;
     if (id === actor.id) {

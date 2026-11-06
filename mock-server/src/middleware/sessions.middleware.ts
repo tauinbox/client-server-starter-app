@@ -6,12 +6,11 @@ import { authGuard } from '../helpers/auth.helpers';
 import {
   clearReauthProofCookie,
   sendWithRetryAfter,
-  stepUpError,
-  stepUpFactorsBodyErrors
+  stepUpError
 } from '../helpers/reauth.helpers';
 import {
-  requireUuid,
-  sendValidationError
+  requireStepUpBody,
+  requireUuid
 } from '../helpers/validation-error.helpers';
 import { sendError } from '../helpers/error-envelope.helpers';
 import {
@@ -27,18 +26,12 @@ import type { AuthenticatedRequest } from '../types';
 const router = Router();
 
 /**
- * Mirrors the ValidationPipe on `StepUpFactorsDto`, then `assertStepUp`.
- * Answers and returns false when the caller did not prove itself.
+ * Mirrors `assertStepUp`. Answers and returns false when the caller did not
+ * prove itself.
  */
 function passesStepUp(req: Request, res: Response): boolean {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
-
-  const bodyErrors = stepUpFactorsBodyErrors(req.body);
-  if (bodyErrors.length > 0) {
-    sendValidationError(res, 'body', bodyErrors);
-    return false;
-  }
 
   const refusal = stepUpError(req, user, {
     currentPassword,
@@ -90,6 +83,7 @@ router.delete(
   '/:sessionId',
   authGuard,
   requireUuid('sessionId'),
+  requireStepUpBody(),
   (req, res) => {
     const { user, sessionId: current } = req as AuthenticatedRequest;
     const target = String(req.params['sessionId']);
@@ -117,7 +111,7 @@ router.delete(
 );
 
 // DELETE /api/v1/auth/sessions
-router.delete('/', authGuard, (req, res) => {
+router.delete('/', authGuard, requireStepUpBody(), (req, res) => {
   const { user, sessionId } = req as AuthenticatedRequest;
 
   if (!passesStepUp(req, res)) return;
