@@ -218,6 +218,30 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     expect(liveTokensOf(admin!.id)).toBe(0);
   });
 
+  it('refuses a cookie issued before a session revocation like a bad cookie', async () => {
+    const admin = findUserByEmail('admin@example.com');
+    const token = await issueOAuthData(admin!.id);
+    // The revocation is floored to its second, so the cookie must be older.
+    getState().oauthDataTokens.get(token)!.issuedAt -= 1;
+    const revoke = await fetch(
+      `${baseUrl}/__control/invalidate-access-tokens`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: admin!.id })
+      }
+    );
+    expect(revoke.status).toBe(200);
+
+    const res = await exchange(token);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+    });
+    expect(liveTokensOf(admin!.id)).toBe(0);
+  });
+
   it('records the sign-in with its method and provider at the exchange', async () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);

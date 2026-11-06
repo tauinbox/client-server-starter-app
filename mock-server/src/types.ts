@@ -360,6 +360,8 @@ export interface FailedAttemptWindow {
 
 interface MockOAuthDataBase {
   userId: string;
+  /** Seconds, like the `iat` of the real cookie. */
+  issuedAt: number;
   expiresAt: number;
 }
 
