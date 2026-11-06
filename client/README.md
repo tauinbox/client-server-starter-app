@@ -24,7 +24,7 @@ of `BACKEND_URL` is `http://localhost:3000`.
 | Lint (TS + SCSS + checks) | `npm run lint` (`ng lint` examines `src/` and `e2e/`) |
 | Lint fix (TS + SCSS) | `npm run lint:fix` |
 | Lint SCSS only | `npm run lint:styles` |
-| Format check | `npm run format:check` examines `src/`, `e2e/`, `scripts/` and the root-level configuration files |
+| Format check | `npm run format:check` examines `src/` (`.ts`, `.html` and `.scss`), `e2e/`, `scripts/` and the root-level configuration files. ESLint does not run Prettier: Prettier is a separate gate, as in the other workspaces |
 | Format | `npm run format` uses the same scope and writes the corrections |
 | Unit tests | `npm test` (Vitest) |
 | E2E tests | `npm run test:e2e` (builds, then Playwright against `dist/`) |
@@ -1346,10 +1346,10 @@ name that gets past the hook. It does this during the changelog generation, and 
 | RxJS | 7.8.2 |
 | Vitest | 5.0.3 |
 | Playwright | 1.63.0 |
-| ESLint | 10.12.0 |
-| Prettier | 3.9.9 |
+| ESLint | 10.14.0 |
+| Prettier | 3.9.10 |
 | Stylelint | 17.16.0 |
-| commitlint | 21.2.3 |
+| commitlint | 21.2.4 |
 | commit-and-tag-version | 13.2.1 |
 
 **Supported browsers** (`.browserslistrc`): Chrome and Edge 136, Firefox 134, Safari and iOS Safari

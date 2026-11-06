@@ -74,6 +74,11 @@ jobs:
       # detecting anything fails loudly instead of passing.
       - run: node ../scripts/check-imports.mjs --self-test
       - run: npm run check:imports
+      # Repo-wide too: a package that two workspaces declare has the same range
+      # and the same locked version. It reads only package files, so the server
+      # install is enough.
+      - run: node ../scripts/check-workspace-versions.mjs --self-test
+      - run: npm run check:versions
       # The deploy writes the production secrets with this script.
       - run: bash ../scripts/sync-prod-env.sh --self-test
 

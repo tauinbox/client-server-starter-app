@@ -5,6 +5,7 @@ import prettierConfig from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
+import stylistic from '@stylistic/eslint-plugin';
 import baseRules from '../eslint.base.config.mjs';
 
 // Flat config replaces rule options, so the base selectors are re-added.
@@ -32,7 +33,7 @@ export default defineConfig(
     rules: { 'import-x/no-cycle': 'error' }
   },
   {
-    plugins: { unicorn },
+    plugins: { unicorn, '@stylistic': stylistic },
     rules: baseRules
   },
   // `basePath` keeps `src/**` relative to this workspace. The pre-commit hook

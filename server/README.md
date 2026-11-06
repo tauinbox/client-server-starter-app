@@ -2953,5 +2953,5 @@ version in `server/package.json` automatically.
 | ioredis | 5.11.1 |
 | TypeScript | 6.0.3 |
 | Jest | 30.5.2 |
-| ESLint | 10.12.0 |
-| Prettier | 3.9.9 |
+| ESLint | 10.14.0 |
+| Prettier | 3.9.10 |

@@ -1820,16 +1820,18 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
 | Tool | Scope | Config |
 |------|-------|--------|
 | ESLint | Client (angular-eslint, unused-imports, import cycles) | `eslint.config.mjs` |
-| ESLint | Server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
-| ESLint | Mock server (@typescript-eslint + prettier, import cycles) | `eslint.config.ts` |
+| ESLint | Server (@typescript-eslint, import cycles) | `eslint.config.ts` |
+| ESLint | Mock server (@typescript-eslint, import cycles) | `eslint.config.ts` |
+| - | ESLint does not run Prettier in any workspace. Each configuration includes `eslint-config-prettier`, which turns off the rules that conflict with Prettier, and `format:check` runs Prettier as a separate gate | - |
 | - | The three configurations use ESLint 10 with `eslint-plugin-import-x`. They need `settings['import-x/parsers']` to map `.ts` to `@typescript-eslint/parser`, and `settings['import-x/resolver-next']` with the TypeScript and Node resolvers. Without the parser map, `import-x/no-cycle` passes on everything silently | - |
-| ESLint | Shared rules for the workspaces. They include a `no-restricted-syntax` ban on an `as unknown as T` double cast, `prefer-destructuring` for declarations and `object-shorthand`. The client configuration adds two selectors: one bans the `'admin'` role literal, and one bans the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
+| ESLint | Shared rules for the workspaces. They include a `no-restricted-syntax` ban on an `as unknown as T` double cast, `prefer-destructuring` for declarations and `object-shorthand`. They also include two `@stylistic` blank-line rules: a blank line before `return`, after a `const`/`let` group and around `if`, loop, `try` and `switch` blocks, and between multi-line class members. Prettier keeps blank lines but never adds one. The server turns the two rules off for `src/migrations/`, which Prettier also skips. The client configuration adds two selectors: one bans the `'admin'` role literal, and one bans the rendering of a server `errorKey` outside `parseHttpErrorMessage` | `eslint.base.config.mjs`, `client/eslint.config.mjs` |
 | Prettier | All workspaces (single quotes, no trailing commas) | `.prettierrc` |
 | Stylelint | Client SCSS (recess property order, no `px` unit outside a breakpoint, no `!important`, no `--mat-dialog-*` token outside `_dialogs.scss`) | `.stylelintrc.json` |
 | Husky + lint-staged | Pre-commit hook (auto-fix the staged files) | `.lintstagedrc.mjs` |
 | Commitlint | Conventional Commits enforcement | `client/commitlint.config.mjs` |
 | commit-and-tag-version | Automated versioning and CHANGELOG | `client/.versionrc.json` |
 | check-imports | Repo-wide cycles and barrel rules (all four source roots) | `scripts/check-imports.mjs` |
+| check-workspace-versions | `npm run check:versions` from any workspace. A package that two or more workspaces declare has the same range and the same locked version. A workspace that uses a package declares it, because the check does not see a transitive copy | `scripts/check-workspace-versions.mjs` |
 
 ### Import hygiene and barrels
 
@@ -1897,8 +1899,9 @@ commit. It applies auto-fix linting to the staged files only:
 
 | Glob | Linter |
 |------|--------|
-| `client/{src,e2e}/**/*.ts` | ESLint (angular-eslint + prettier) |
-| `client/src/**/*.scss` | Stylelint |
+| `client/{src,e2e}/**/*.ts` | Prettier + ESLint (angular-eslint) |
+| `client/src/**/*.html` | Prettier + ESLint (angular-eslint templates) |
+| `client/src/**/*.scss` | Prettier + Stylelint |
 | `server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 | `mock-server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 | `client/{*.{ts,mjs},scripts/*.mjs}` | Prettier |
@@ -1930,7 +1933,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server - Checks** | - | audit (high), lint, lint:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:imports | - |
+| **Server - Checks** | - | audit (high), lint, lint:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:imports, check:versions | - |
 | **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
